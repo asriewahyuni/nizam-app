@@ -1,26 +1,130 @@
 @import "tailwindcss";
 
+@theme {
+  --color-blue-50: #e6ebee;
+  --color-blue-100: #ccd6dd;
+  --color-blue-200: #99adc2;
+  --color-blue-300: #6685a6;
+  --color-blue-400: #335c8a;
+  --color-blue-500: #003366;
+  --color-blue-600: #003366;
+  --color-blue-700: #002d5a;
+  --color-blue-800: #00264d;
+  --color-blue-900: #001a33;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   NIZAM ERP — Global Design Tokens
+   ───────────────────────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Primary: Deep Tech Blue */
+  --color-primary-50:  #e6ebee;
+  --color-primary-100: #ccd6dd;
+  --color-primary-500: #003366; /* Deep Tech Blue */
+  --color-primary-600: #002d5a;
+  --color-primary-700: #00264d;
+  --color-primary-950: #001a33;
+
+  /* Neutrals: Precision Grey & Clean Slate */
+  --color-bg:               #f8f9fa; /* Clean Slate */
+  --color-surface:        #ffffff;
+  --color-surface-soft:   #f1f3f5;
+  --color-border:         #e9ecef;
+  --color-border-strong:  #dee2e6;
+  --color-grey-accent:    #4a4a4a; /* Precision Grey */
+
+  /* Typography */
+  --font-sans: 'Inter', 'Outfit', system-ui, sans-serif;
+
+  /* Radius: Modern & Soft */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 32px;
+
+  /* Shadows: Ultra-subtle depth */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.03), 0 4px 6px -4px rgba(0, 0, 0, 0.02);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.03), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ─────────────────────────────────────────────────────────────
+   Base resets
+   ───────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: #212529;
+  line-height: 1.6;
+  min-height: 100vh;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Scrollbar styling (subtle)
+   ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* ─────────────────────────────────────────────────────────────
+   Focus styles — accessible but not obtrusive
+   ───────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Smooth transitions for interactive elements
+   ───────────────────────────────────────────────────────────── */
+button, a, input, select, textarea {
+  transition: all 150ms ease;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Utility: visually-hidden (accessibility)
+   ───────────────────────────────────────────────────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Animation keyframes
+   ───────────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.animate-fade-in  { animation: fadeIn 200ms ease forwards; }
+.animate-slide-in { animation: slideIn 200ms ease forwards; }
+.animate-pulse-slow { animation: pulse-slow 2s ease-in-out infinite; }

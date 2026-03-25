@@ -30,12 +30,34 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — JANGAN pernah commit secrets!
 .env*
+!.env.local.example
 
 # vercel
 .vercel
 
-# typescript
+# typescript build artifacts
 *.tsbuildinfo
 next-env.d.ts
+
+# supabase temp
+/supabase/.temp/
+
+# one-off debug/audit scripts (jangan commit file ini)
+*.tmp.js
+*.tmp.ts
+tmp_*.js
+tmp_*.ts
+check_*.js
+check_*.ts
+get_*.js
+get_*.ts
+debug_*.js
+audit_*.js
+scan_*.js
+search_*.js
+trace_*.js
+find_*.js
+verify_*.ts
+fix_*.js

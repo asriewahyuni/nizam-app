@@ -1,0 +1,1139 @@
+'use client'
+
+import React, { useState } from 'react'
+import {
+  Plus,
+  Users,
+  ShieldCheck,
+  Banknote,
+  CalendarDays,
+  X,
+  Check,
+  Trash2,
+  Edit2,
+  Link as LinkIcon,
+  Eye,
+  Printer,
+  Briefcase,
+  Clock,
+  ChevronRight,
+  Search,
+  Filter,
+  ArrowUpRight,
+  TrendingUp,
+  CreditCard,
+  Wallet,
+  AlertTriangle,
+  ClipboardList,
+  CheckCircle,
+  AlertCircle
+} from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { createEmployee, updateEmployee } from '@/modules/hris/actions/employee.actions'
+import { createPayrollComponent, deletePayrollComponent, generatePayrollRun, payPayrollRun, fixEmptyPayrollJournals, getPayrollRunDetails, deletePayrollRun, voidPayrollRun } from '@/modules/hris/actions/payroll.actions'
+import { CurrencyInput } from '@/components/ui/CurrencyInput'
+import { formatRupiah, formatDate } from '@/lib/utils'
+import {
+  PageHeader,
+  StatCard,
+  SectionCard,
+  SectionHeader,
+  StatusBadge,
+  SafeButton,
+  ConfirmDialog,
+  EmptyState
+} from '@/components/ui/NizamUI'
+
+export default function HrisClient({
+  orgId,
+  initialEmployees,
+  initialPayrollComponents = [],
+  initialPayrollRuns = [],
+  accounts = [],
+  settings = {},
+  roles = []
+}: {
+  orgId: string,
+  initialEmployees: any[],
+  initialPayrollComponents?: any[],
+  initialPayrollRuns?: any[],
+  accounts?: any[],
+  settings?: any,
+  roles?: any[]
+}) {
+  const [employees, setEmployees] = useState(initialEmployees)
+  const [payrollComponents, setPayrollComponents] = useState(initialPayrollComponents)
+  const [payrollRuns, setPayrollRuns] = useState(initialPayrollRuns || [])
+  const [activeTab, setActiveTab] = useState<'EMPLOYEES' | 'PAYROLL' | 'ATTENDANCE' | 'RUNS'>('EMPLOYEES')
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [editingEmp, setEditingEmp] = useState<any>(null)
+  const [viewingRun, setViewingRun] = useState<any>(null)
+  const [viewingRunData, setViewingRunData] = useState<any[]>([])
+  const [isPayrollModalOpen, setIsPayrollModalOpen] = useState(false)
+  const [isRunModalOpen, setIsRunModalOpen] = useState(false)
+  const [isPayModalOpen, setIsPayModalOpen] = useState<any>(null) // selected run to pay
+  const [loading, setLoading] = useState(false)
+
+  // Basic Form State
+  const [basicSalary, setBasicSalary] = useState(0)
+  const [payrollAmount, setPayrollAmount] = useState(0)
+  const [isPercentage, setIsPercentage] = useState(false)
+  const [isTaxable, setIsTaxable] = useState(true)
+  const [componentType, setComponentType] = useState('EARNING')
+  const [componentNameOption, setComponentNameOption] = useState('Tunjangan Makan')
+  const [customComponentName, setCustomComponentName] = useState('')
+
+  const PREDEFINED_COMPONENTS: Record<string, any> = {
+    'Tunjangan Makan': { type: 'EARNING', is_taxable: true, is_percentage: false },
+    'Tunjangan Transport': { type: 'EARNING', is_taxable: true, is_percentage: false },
+    'BPJS Kesehatan (Karyawan)': { type: 'DEDUCTION', is_taxable: false, is_percentage: true, amount: 1 },
+    'BPJS Ketenagakerjaan JHT (Karyawan)': { type: 'DEDUCTION', is_taxable: false, is_percentage: true, amount: 2 },
+    'PPh 21': { type: 'TAX', is_taxable: false, is_percentage: false },
+    'Potongan Koperasi': { type: 'DEDUCTION', is_taxable: false, is_percentage: false },
+  }
+
+  const handleComponentSelect = (val: string) => {
+    setComponentNameOption(val)
+    const pref = PREDEFINED_COMPONENTS[val]
+    if (pref) {
+      setComponentType(pref.type)
+      setIsPercentage(pref.is_percentage)
+      setIsTaxable(pref.is_taxable)
+      if (pref.amount !== undefined) setPayrollAmount(pref.amount)
+      else setPayrollAmount(0)
+    }
+  }
+
+  const handleOpenEdit = (emp: any) => {
+    setEditingEmp(emp)
+    setBasicSalary(emp.basic_salary)
+    setIsAddModalOpen(true)
+  }
+
+  const handleOpenNew = () => {
+    setEditingEmp(null)
+    setBasicSalary(0)
+    setIsAddModalOpen(true)
+  }
+
+  const handleCreateEmp = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+    const formData = new FormData(e.currentTarget)
+    formData.append('basic_salary', basicSalary.toString())
+
+    const res = editingEmp
+      ? await updateEmployee(editingEmp.id, orgId, formData)
+      : await createEmployee(orgId, formData)
+
+    if (res.error) alert(res.error)
+    else {
+      setIsAddModalOpen(false)
+      window.location.reload()
+    }
+    setLoading(false)
+  }
+
+  const handleCreatePayrollComponent = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+    const formData = new FormData(e.currentTarget)
+    formData.append('amount', payrollAmount.toString())
+
+    const res = await createPayrollComponent(orgId, formData)
+    if (res.error) alert(res.error)
+    else window.location.reload()
+    setLoading(false)
+  }
+
+  const handleDeletePayrollComponent = async (id: string) => {
+    if (!confirm('Yakin ingin menghapus komponen ini? Semua keterkaitan karyawan dengan tunjangan/potongan ini bisa terpengaruh.')) return
+    setLoading(true)
+    const res = await deletePayrollComponent(id)
+    if (res.error) alert(res.error)
+    else setPayrollComponents(payrollComponents.filter((p: any) => p.id !== id))
+    setLoading(false)
+  }
+
+  const getNextNik = () => {
+    const rawFormat = settings?.emp_format || 'EMP{MM}{YY}{0000}'
+
+    // Resolve date variables
+    const now = new Date()
+    const MM = (now.getMonth() + 1).toString().padStart(2, '0')
+    const YY = now.getFullYear().toString().substring(2)
+    const YYYY = now.getFullYear().toString()
+    const DD = now.getDate().toString().padStart(2, '0')
+
+    let formatStr = rawFormat
+      .replace('{MM}', MM)
+      .replace('{YY}', YY)
+      .replace('{YYYY}', YYYY)
+      .replace('{DD}', DD)
+
+    // Find the {00..} part
+    const zeroMatch = formatStr.match(/\{0+\}/)
+    if (!zeroMatch) return formatStr // Fallback if no digits specified
+
+    const digitStr = zeroMatch[0] // e.g. "{0000}"
+    const digitsCount = digitStr.length - 2 // e.g. 4
+
+    // The prefix is everything before the zeros
+    const splitFormat = formatStr.split(digitStr)
+    const literalPrefix = splitFormat[0]
+
+    let maxNum = 0
+    employees.forEach((emp: any) => {
+      // Basic extraction matching the literalPrefix
+      if (emp.nik && emp.nik.startsWith(literalPrefix)) {
+        const potentialNum = emp.nik.substring(literalPrefix.length, literalPrefix.length + digitsCount)
+        const num = parseInt(potentialNum, 10)
+        if (!isNaN(num) && num > maxNum) maxNum = num
+      }
+    })
+
+    const nextNum = maxNum + 1
+    const nextNumStr = nextNum.toString().padStart(digitsCount, '0')
+
+    return formatStr.replace(digitStr, nextNumStr)
+  }
+
+  const handleDeleteRun = async (id: string, isPaid: boolean) => {
+    const msg = isPaid
+      ? 'Hapus & Batalkan (Void) Gaji? Tindakan ini akan menghapus slip gaji dan mematikan jurnal akuntansi terkait.'
+      : 'Yakin ingin menghapus draf penggajian ini?'
+
+    if (!confirm(msg)) return
+
+    setLoading(true)
+    const res = isPaid ? await voidPayrollRun(id) : await deletePayrollRun(id)
+    if (res.error) alert(res.error)
+    else {
+      setPayrollRuns(payrollRuns.filter((r: any) => r.id !== id))
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div className="space-y-10 pb-20">
+      <PageHeader
+        title="Human Resources"
+        subtitle="Manage employees, positions, and automated payroll systems."
+        icon={<Users />}
+        actions={
+          <div className="flex bg-slate-100 p-1.5 rounded-3xl border border-slate-200 shadow-inner overflow-x-auto scrollbar-hide max-w-[90vw] md:max-w-none">
+            <button
+              onClick={() => setActiveTab('EMPLOYEES')}
+              className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'EMPLOYEES' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Employees
+            </button>
+            <button
+              onClick={() => setActiveTab('ATTENDANCE')}
+              className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'ATTENDANCE' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Attendance
+            </button>
+            <button
+              onClick={() => setActiveTab('PAYROLL')}
+              className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'PAYROLL' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Payroll Components
+            </button>
+            <button
+              onClick={() => setActiveTab('RUNS')}
+              className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'RUNS' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Payroll Processing
+            </button>
+          </div>
+        }
+      />
+
+      {activeTab === 'EMPLOYEES' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard
+            label="Total Workforce"
+            value={employees.length.toString()}
+            sub="Active Employees"
+            icon={Users}
+            color="blue"
+          />
+          <StatCard
+            label="Open Roles"
+            value="3"
+            sub="Current Openings"
+            icon={Briefcase}
+            color="indigo"
+          />
+          <StatCard
+            label="This Month Payroll"
+            value={formatRupiah(employees.reduce((sum: number, e: any) => sum + e.basic_salary, 0))}
+            sub="Estimated Gross"
+            icon={Banknote}
+            color="emerald"
+          />
+          <StatCard
+            label="Attendance Rate"
+            value="98.2%"
+            sub="Past 30 Days"
+            icon={CheckCircle}
+            color="amber"
+          />
+        </div>
+      )}
+
+      <AnimatePresence mode="wait">
+        {activeTab === 'EMPLOYEES' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">
+            <SectionCard>
+              <SectionHeader
+                title="Active Personnel"
+                icon={Users}
+                actions={
+                  <SafeButton onClick={handleOpenNew} variant="primary" size="sm" icon={<Plus size={16} />}>
+                    ADD NEW EMPLOYEE
+                  </SafeButton>
+                }
+              />
+
+              <div className="p-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {employees.map((emp: any) => (
+                    <motion.div
+                      whileHover={{ y: -5 }}
+                      key={emp.id}
+                      className="bg-slate-50/50 p-8 rounded-[32px] border border-slate-100 hover:border-blue-200 hover:bg-white hover:shadow-2xl hover:shadow-blue-900/5 transition-all group flex flex-col gap-6"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-4">
+                          <div className="w-16 h-16 rounded-[24px] bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xl font-black text-white shadow-xl shadow-blue-100">
+                            {emp.first_name[0]}{emp.last_name?.[0]}
+                          </div>
+                          <div className="space-y-0.5">
+                            <h4 className="font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight">{emp.first_name} {emp.last_name}</h4>
+                            <div className="flex items-center gap-2">
+                              <StatusBadge label={emp.employment_status.replace('_', ' ')} variant={emp.employment_status === 'FULL_TIME' ? 'success' : 'warning'} />
+                              <span className="text-[10px] font-black font-mono text-slate-400 tracking-wider">#{emp.nik}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e: any) => { e.stopPropagation(); handleOpenEdit(emp); }}
+                          className="p-3 bg-white text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition shadow-sm border border-slate-100"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white p-4 rounded-2xl border border-slate-50 shadow-inner">
+                          <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest block mb-1">Position</span>
+                          <p className="text-xs font-bold text-slate-600 truncate">{emp.job_title}</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-2xl border border-slate-50 shadow-inner">
+                          <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest block mb-1">Department</span>
+                          <p className="text-xs font-bold text-slate-600 truncate">{emp.department || 'General'}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 bg-blue-600 rounded-2xl shadow-xl shadow-blue-100 text-white">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Base Salary</span>
+                        </div>
+                        <span className="text-sm font-black font-mono">{formatRupiah(emp.basic_salary)}</span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {employees.length === 0 && (
+                  <EmptyState
+                    title="No Employees Found"
+                    description="Populate your human resources database by adding your first active personnel."
+                    icon={Users}
+                    action={
+                      <SafeButton
+                        onClick={handleOpenNew}
+                        variant="primary"
+                        size="sm"
+                        icon={<Plus size={16} />}
+                      >
+                        Add First Employee
+                      </SafeButton>
+                    }
+                  />
+                )}
+              </div>
+            </SectionCard>
+          </motion.div>
+        )}
+
+        {activeTab === 'PAYROLL' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">
+            <SectionCard>
+              <SectionHeader
+                title="Payroll Engine Configuration"
+                subtitle="Define earnings, deductions, and tax rules with GL mapping."
+                icon={Banknote}
+                actions={
+                  <SafeButton onClick={() => setIsPayrollModalOpen(true)} variant="primary" size="sm" icon={<Plus size={16} />}>
+                    ADD COMPONENT
+                  </SafeButton>
+                }
+              />
+
+              <div className="p-2">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {(['EARNING', 'DEDUCTION', 'TAX', 'BENEFIT'] as const).map(type => {
+                    const mapped = payrollComponents.filter((p: any) => p.type === type)
+                    if (mapped.length === 0) return null
+
+                    const config = {
+                      EARNING: { title: 'Earnings & Allowances', variant: 'success', icon: TrendingUp },
+                      DEDUCTION: { title: 'Employee Deductions', variant: 'danger', icon: Wallet },
+                      TAX: { title: 'Taxation Rules (PPh 21)', variant: 'warning', icon: ShieldCheck },
+                      BENEFIT: { title: 'Company Benefits', variant: 'info', icon: Briefcase }
+                    } as const
+
+                    const { title, variant, icon: Icon } = config[type]
+
+                    return (
+                      <div key={type} className="bg-slate-50/50 rounded-[32px] border border-slate-100 overflow-hidden flex flex-col">
+                        <div className="px-8 py-5 flex items-center justify-between border-b border-white">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center 
+                                   ${variant === 'success' ? 'bg-emerald-100 text-emerald-600' :
+                                variant === 'danger' ? 'bg-rose-100 text-rose-600' :
+                                  variant === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                              <Icon size={16} />
+                            </div>
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{title}</h4>
+                          </div>
+                        </div>
+                        <div className="p-4 space-y-3">
+                          {mapped.map((comp: any) => (
+                            <div key={comp.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-50 flex items-center justify-between group hover:border-blue-200 transition-all">
+                              <div className="space-y-2">
+                                <h5 className="font-black text-slate-800 tracking-tight">{comp.name}</h5>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="px-3 py-1 bg-slate-50 text-slate-500 text-[10px] font-black font-mono rounded-lg border border-slate-100">
+                                    {comp.is_percentage ? `${comp.percentage_value}% of Base` : formatRupiah(comp.default_amount)}
+                                  </span>
+                                  <span className={`px-3 py-1 text-[10px] font-black uppercase rounded-lg border flex items-center gap-1.5
+                                         ${comp.account ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                                    <LinkIcon size={10} /> {comp.account ? `${comp.account.code}` : 'NO MAPPING'}
+                                  </span>
+                                  {comp.is_taxable && <StatusBadge label="TAXABLE" variant="warning" />}
+                                </div>
+                              </div>
+                              <button onClick={() => handleDeletePayrollComponent(comp.id)} className="p-3 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {payrollComponents.length === 0 && (
+                  <EmptyState
+                    title="No Components Defined"
+                    description="Set up your salary structure by adding allowances, deductions, and tax mapping."
+                    icon={Banknote}
+                    action={
+                      <SafeButton onClick={() => setIsPayrollModalOpen(true)} variant="primary" size="sm" icon={<Plus size={16} />}>
+                        Add First Component
+                      </SafeButton>
+                    }
+                  />
+                )}
+              </div>
+            </SectionCard>
+          </motion.div>
+        )}
+
+        {activeTab === 'RUNS' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">
+            <SectionCard>
+              <SectionHeader
+                title="Payroll Run History"
+                subtitle="Review, approve, and execute disbursements."
+                icon={CalendarDays}
+                actions={
+                  <div className="flex gap-3">
+                    <SafeButton
+                      onClick={async () => {
+                        setLoading(true)
+                        const res = await fixEmptyPayrollJournals(orgId)
+                        setLoading(false)
+                        if (res.success) alert(`Success: Fixed ${res.count} journals!`)
+                      }}
+                      variant="secondary"
+                      size="sm"
+                      icon={<Check size={16} />}
+                      isLoading={loading}
+                    >
+                      FIX JOURNALS
+                    </SafeButton>
+                    <SafeButton onClick={() => setIsRunModalOpen(true)} variant="primary" size="sm" icon={<Plus size={16} />}>
+                      GENERATE RUN
+                    </SafeButton>
+                  </div>
+                }
+              />
+
+              <div className="overflow-x-auto min-h-[400px]">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/50 border-b border-slate-100">
+                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Period</th>
+                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Gross Total</th>
+                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Deductions</th>
+                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right whitespace-nowrap">Net Payable</th>
+                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
+                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {payrollRuns.map((run: any) => (
+                      <tr key={run.id} className="group hover:bg-slate-50/50 transition-colors">
+                        <td className="px-8 py-6">
+                          <div className="font-black text-slate-900 tracking-tight uppercase">{new Date(run.period_start).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</div>
+                          <div className="text-[10px] text-slate-400 font-bold font-mono mt-1 tracking-wider italic flex items-center gap-2">
+                            <Clock size={10} /> {run.period_start} - {run.period_end}
+                          </div>
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                          <span className="text-xs font-bold text-slate-500 font-mono">{formatRupiah(run.total_gross)}</span>
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                          <span className="text-xs font-bold text-rose-400 font-mono">-{formatRupiah(run.total_deductions)}</span>
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                          <div className="bg-blue-50 px-4 py-2 rounded-xl inline-block border border-blue-100 shadow-inner">
+                            <span className="text-sm font-black text-blue-600 font-mono italic">{formatRupiah(run.total_net)}</span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6 text-center">
+                          <StatusBadge label={run.status} variant={run.status === 'PAID' ? 'success' : 'warning'} />
+                          {run.payment_date && <div className="text-[9px] text-slate-300 font-black mt-1 uppercase tracking-widest">{run.payment_date}</div>}
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={async () => {
+                                const res = await getPayrollRunDetails(run.id)
+                                setViewingRun(run)
+                                setViewingRunData(res)
+                              }}
+                              className="w-10 h-10 flex items-center justify-center bg-white text-slate-400 rounded-xl hover:text-blue-600 hover:shadow-lg transition-all border border-slate-100"
+                            >
+                              <Eye size={18} />
+                            </button>
+
+                            {run.status === 'DRAFT' ? (
+                              <>
+                                <SafeButton
+                                  onClick={() => setIsPayModalOpen(run)}
+                                  variant="emerald"
+                                  size="sm"
+                                >
+                                  DISBURSE
+                                </SafeButton>
+                                <button onClick={() => handleDeleteRun(run.id, false)} className="p-2 text-slate-200 hover:text-rose-500 transition-colors">
+                                  <Trash2 size={16} />
+                                </button>
+                              </>
+                            ) : (
+                              <button onClick={() => handleDeleteRun(run.id, true)} className="p-2 text-slate-200 hover:text-rose-500 transition-colors" title="Void Payroll">
+                                <AlertCircle size={16} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {payrollRuns.length === 0 && (
+                  <div className="py-20">
+                    <EmptyState
+                      title="No Payroll Records"
+                      description="Start your first payroll calculation for this organization."
+                      icon={CalendarDays}
+                      action={
+                        <SafeButton onClick={() => setIsRunModalOpen(true)} variant="primary" size="sm" icon={<Plus size={16} />}>
+                          Create First Run
+                        </SafeButton>
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            </SectionCard>
+          </motion.div>
+        )}
+
+        {/* Placeholder for other tabs */}
+        {activeTab === 'ATTENDANCE' && (
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="py-20 text-center">
+            <div className="w-32 h-32 bg-slate-50 text-slate-200 rounded-[48px] flex items-center justify-center mx-auto mb-10 shadow-inner border border-slate-100">
+              <ClipboardList size={64} strokeWidth={1} />
+            </div>
+            <h3 className="text-3xl font-black text-slate-900 tracking-tighter mb-4">Enterprise Attendance Engine</h3>
+            <p className="text-slate-400 max-w-md mx-auto font-medium text-sm leading-relaxed">
+              Automated biometric sync, leave management, and shift scheduling are currently in the final testing phase of Nizam ERP 2.1.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Payroll Component Modal */}
+      <AnimatePresence>
+        {isPayrollModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsPayrollModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-xl bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
+              <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center shadow-inner">
+                    <Banknote size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase italic">Payroll Component</h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Configuration & GL Mapping</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsPayrollModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-10">
+                <form id="payroll-form" onSubmit={handleCreatePayrollComponent} className="space-y-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Component Template</label>
+                    <select
+                      value={componentNameOption} onChange={(e: any) => handleComponentSelect(e.target.value)}
+                      className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black text-slate-700 outline-none focus:border-blue-400 focus:bg-white transition-all shadow-inner"
+                    >
+                      <option value="Tunjangan Makan">Tunjangan Makan (Pendapatan)</option>
+                      <option value="Tunjangan Transport">Tunjangan Transport (Pendapatan)</option>
+                      <option value="BPJS Kesehatan (Karyawan)">BPJS Kesehatan (Potongan Karyawan 1%)</option>
+                      <option value="BPJS Ketenagakerjaan JHT (Karyawan)">BPJS Ketenagakerjaan JHT (Potongan Karyawan 2%)</option>
+                      <option value="PPh 21">Tarif Pajak PPh 21 (Deduction)</option>
+                      <option value="Potongan Koperasi">Potongan Koperasi / Kasbon</option>
+                      <option value="CUSTOM">Lainnya (Tulis Kustom...)</option>
+                    </select>
+
+                    {componentNameOption === 'CUSTOM' && (
+                      <input
+                        name="name"
+                        value={customComponentName} onChange={(e: any) => setCustomComponentName(e.target.value)}
+                        required
+                        placeholder="Enter component name..."
+                        className="w-full mt-3 px-6 py-4 bg-white border-2 border-blue-50 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:border-blue-500 transition-all shadow-sm"
+                      />
+                    )}
+                    {componentNameOption !== 'CUSTOM' && (
+                      <input type="hidden" name="name" value={componentNameOption} />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Cash Flow Category</label>
+                    <select name="type" required value={componentType} onChange={(e: any) => setComponentType(e.target.value)} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black text-slate-700 outline-none focus:border-blue-400 focus:bg-white transition-all shadow-inner">
+                      <option value="EARNING">Earnings (Allowances / Bonuses)</option>
+                      <option value="DEDUCTION">Deductions (Employee Pays)</option>
+                      <option value="TAX">Tax Deduction (PPh 21 Specific)</option>
+                      <option value="BENEFIT">Company Benefits (Non-Slip)</option>
+                    </select>
+                  </div>
+
+                  <div className="p-6 rounded-[32px] border border-blue-100 bg-blue-50/30 space-y-6">
+                    <div className="flex items-center gap-4">
+                      <div className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="is_percentage" name="is_percentage" checked={isPercentage} onChange={(e: any) => setIsPercentage(e.target.checked)} className="sr-only peer" />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        <label htmlFor="is_percentage" className="ml-3 text-[11px] font-black text-slate-700 uppercase tracking-tight cursor-pointer">Calculate by Percentage (%)</label>
+                      </div>
+                    </div>
+                    {!isPercentage ? (
+                      <CurrencyInput
+                        label="Default Nominal (Rp)"
+                        value={payrollAmount}
+                        onChange={setPayrollAmount}
+                      />
+                    ) : (
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1 space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Percentage Rate (%)</label>
+                          <div className="relative">
+                            <input type="number" step="0.01" value={payrollAmount} onChange={(e: any) => setPayrollAmount(Number(e.target.value))} required placeholder="2.00" className="w-full px-6 py-4 bg-white border border-slate-100 rounded-2xl text-sm font-black text-slate-900 outline-none focus:border-blue-500 transition-all shadow-sm" />
+                            <span className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 font-black">%</span>
+                          </div>
+                        </div>
+                        <div className="pt-8 text-[10px] font-bold text-slate-400 italic">of Basic Salary</div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                      General Ledger Mapping
+                    </label>
+                    <select name="account_id" required className="w-full px-6 py-4 bg-white border-2 border-indigo-50 shadow-[0_10px_20px_-5px_rgba(99,102,241,0.1)] rounded-2xl text-sm font-black text-indigo-700 outline-none focus:border-indigo-500 transition-all">
+                      <option value="">-- UNMAPPED (REQUIRED) --</option>
+                      {accounts.map((acc: any) => (
+                        <option key={acc.account_id} value={acc.account_id}>{acc.code} - {acc.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-4 pt-4 bg-slate-50/50 p-6 rounded-[32px] border border-slate-100">
+                    <div className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" id="is_taxable" name="is_taxable" checked={isTaxable} onChange={(e: any) => setIsTaxable(e.target.checked)} className="sr-only peer" />
+                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                      <label htmlFor="is_taxable" className="ml-3 text-[11px] font-black text-slate-800 uppercase tracking-tight cursor-pointer">Taxable Component (PPh 21 Effect)</label>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              <div className="px-10 py-8 border-t border-slate-50 bg-slate-50/30 flex justify-end gap-4">
+                <button type="button" onClick={() => setIsPayrollModalOpen(false)} className="px-8 py-3 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-widest">CANCEL</button>
+                <SafeButton
+                  form="payroll-form"
+                  type="submit"
+                  variant="primary"
+                  size="lg"
+                  icon={<Check size={18} />}
+                  isLoading={loading}
+                >
+                  CREATE COMPONENT
+                </SafeButton>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isRunModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsRunModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
+              <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-blue-600 text-white">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
+                    <CalendarDays size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black tracking-tight uppercase italic">Generate Payroll</h3>
+                    <p className="text-[10px] font-black opacity-70 uppercase tracking-widest mt-0.5">Bulk salary calculation</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsRunModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-all">
+                  <X size={18} />
+                </button>
+              </div>
+              <form onSubmit={async (e: React.FormEvent<HTMLFormElement>) => {
+                e.preventDefault()
+                setLoading(true)
+                const res = await generatePayrollRun(orgId, new FormData(e.currentTarget))
+                if (res.error) alert(res.error)
+                else window.location.reload()
+              }} className="p-10 space-y-8">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Period Start</label>
+                    <input name="period_start" type="date" required className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 transition-all outline-none" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Period End</label>
+                    <input name="period_end" type="date" required className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 transition-all outline-none" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Disbursement Date</label>
+                  <input name="payment_date" type="date" required className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 transition-all outline-none" />
+                </div>
+                <div className="p-6 bg-blue-50/50 rounded-[32px] border border-blue-100/50">
+                  <p className="text-[11px] text-blue-600 font-bold leading-relaxed text-center italic">The engine will calculate basic salary and all active components for registered employees.</p>
+                </div>
+                <SafeButton
+                  type="submit"
+                  variant="primary"
+                  size="xl"
+                  isLoading={loading}
+                  icon={<CalendarDays size={20} />}
+                  className="w-full rounded-[24px]"
+                >
+                  GENERATE PAYROLL RUN
+                </SafeButton>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isPayModalOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsPayModalOpen(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
+              <div className="p-10 text-center space-y-8">
+                <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-[32px] flex items-center justify-center mx-auto shadow-inner">
+                  <Banknote size={48} />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Disburse Funds</h3>
+                  <p className="text-sm text-slate-500 font-medium">You are about to release <span className="text-emerald-600 font-black">{formatRupiah(isPayModalOpen.total_net)}</span> to employees.</p>
+                </div>
+
+                <div className="space-y-2 text-left bg-slate-50/50 p-8 rounded-[32px] border border-slate-100">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Funding Account (Bank/Cash)</label>
+                  <select id="pay-account" className="w-full px-6 py-4 rounded-2xl border border-slate-200 font-black text-slate-800 outline-none focus:border-emerald-500 transition-all bg-white shadow-sm appearance-none">
+                    <option value="">-- SELECT SOURCE ACCOUNT --</option>
+                    {accounts.filter((a: any) => a.code.startsWith('11')).map((acc: any) => (
+                      <option key={acc.account_id} value={acc.account_id}>{acc.code} - {acc.name} ({formatRupiah(acc.balance)})</option>
+                    ))}
+                  </select>
+                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 mt-4">
+                    <p className="text-[9px] text-amber-700 leading-relaxed font-black uppercase tracking-widest text-center">Auto-Journaling: This will create a Bank Credit & Salary Expense entry.</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-4">
+                  <SafeButton
+                    onClick={async () => {
+                      const accId = (document.getElementById('pay-account') as HTMLSelectElement).value
+                      if (!accId) return alert('Please select a source account.')
+                      setLoading(true)
+                      const res = await payPayrollRun(isPayModalOpen.id, orgId, accId)
+                      if (res.error) alert(res.error)
+                      else window.location.reload()
+                    }}
+                    isLoading={loading}
+                    variant="emerald"
+                    size="xl"
+                    icon={<ShieldCheck size={20} />}
+                    className="w-full rounded-[24px]"
+                  >
+                    CONFIRM & DISBURSE
+                  </SafeButton>
+                  <button onClick={() => setIsPayModalOpen(null)} className="text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-slate-500 transition-all">ABORT OPERATION</button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isAddModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAddModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-3xl bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white flex flex-col max-h-[90vh]"
+            >
+              <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-blue-100">
+                    <Users size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase italic">{editingEmp ? 'Profile Revision' : 'Employee Registration'}</h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{editingEmp ? 'Update personnel records' : 'Fill legal master data'}</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsAddModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-10 overflow-y-auto no-scrollbar flex-1">
+                <form id="emp-form" onSubmit={handleCreateEmp} className="space-y-12">
+
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-3">
+                      <div className="h-4 w-1 bg-blue-600 rounded-full" />
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Personal Identity</h4>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">NIK / ID</label>
+                        <input name="nik" placeholder="K-0001" required defaultValue={editingEmp?.nik || getNextNik()} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Join Date</label>
+                        <input name="join_date" type="date" required defaultValue={editingEmp?.join_date || new Date().toISOString().split('T')[0]} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <input name="first_name" placeholder="First Name *" required defaultValue={editingEmp?.first_name || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+                      <input name="last_name" placeholder="Last Name" defaultValue={editingEmp?.last_name || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <input name="email" type="email" placeholder="Email Address" defaultValue={editingEmp?.email || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+                      <select name="gender" defaultValue={editingEmp?.gender || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
+                        <option value="">GENDER</option>
+                        <option value="M">MALE</option>
+                        <option value="F">FEMALE</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-3">
+                      <div className="h-4 w-1 bg-indigo-600 rounded-full" />
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Occupation & Compensation</h4>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      {roles && roles.length > 0 ? (
+                        <select name="job_title" required defaultValue={editingEmp?.job_title || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
+                          <option value="">Pilih Jabatan (Role) *</option>
+                          {roles.map((r: any) => (
+                            <option key={r.id} value={r.name}>{r.name}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input name="job_title" placeholder="Job Title *" required defaultValue={editingEmp?.job_title || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+                      )}
+                      <input name="department" placeholder="Department" defaultValue={editingEmp?.department || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <select name="employment_status" defaultValue={editingEmp?.employment_status || 'FULL_TIME'} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
+                        <option value="FULL_TIME">FULL TIME</option>
+                        <option value="CONTRACT">CONTRACT (PKWT)</option>
+                        <option value="PROBATION">PROBATION</option>
+                        <option value="INTERN">INTERNSHIP</option>
+                      </select>
+                      <CurrencyInput
+                        label="Base Salary / Mo *"
+                        value={basicSalary}
+                        onChange={setBasicSalary}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-3">
+                      <div className="h-4 w-1 bg-amber-600 rounded-full" />
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Banking & Tax (PTKP)</h4>
+                    </div>
+                    <div className="grid grid-cols-3 gap-6">
+                      <input name="bank_name" placeholder="Bank Name" defaultValue={editingEmp?.bank_name || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+                      <input name="bank_account_number" placeholder="Account Number" defaultValue={editingEmp?.bank_account_number || ''} className="col-span-2 px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tax Status (PTKP PPh 21)</label>
+                      <select name="tax_status" required defaultValue={editingEmp?.tax_status || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
+                        <option value="">-- SELECT STATUS --</option>
+                        <option value="TK/0">TK/0 - Single, No Dependents</option>
+                        <option value="TK/1">TK/1 - Single, 1 Dependent</option>
+                        <option value="TK/2">TK/2 - Single, 2 Dependents</option>
+                        <option value="TK/3">TK/3 - Single, 3 Dependents</option>
+                        <option value="K/0">K/0 - Married, No Dependents</option>
+                        <option value="K/1">K/1 - Married, 1 Dependent</option>
+                        <option value="K/2">K/2 - Married, 2 Dependents</option>
+                        <option value="K/3">K/3 - Married, 3 Dependents</option>
+                      </select>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              <div className="p-10 border-t border-slate-50 bg-slate-50 flex justify-end gap-4">
+                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-8 py-3 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-widest">CANCEL</button>
+                <SafeButton
+                  form="emp-form"
+                  type="submit"
+                  variant="primary"
+                  size="lg"
+                  icon={<Check size={18} />}
+                  isLoading={loading}
+                >
+                  SAVE PROFILE
+                </SafeButton>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Run Detail Modal (NEW) */}
+      <AnimatePresence>
+        {viewingRun && (
+          <div className="fixed inset-0 z-50 flex items-center justify-end p-0 md:p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setViewingRun(null)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+            <motion.div
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              className="relative w-full max-w-2xl h-full md:h-auto md:max-h-[90vh] bg-white md:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+            >
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
+                    <CalendarDays size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800 tracking-tight">Detail Payroll: {new Date(viewingRun.period_start).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</h3>
+                    <p className="text-sm text-slate-500 font-medium">Periode {viewingRun.period_start} s/d {viewingRun.period_end}</p>
+                  </div>
+                </div>
+                <button onClick={() => setViewingRun(null)} className="p-2 bg-white text-slate-400 rounded-xl hover:text-slate-600 border border-slate-100 shadow-sm transition">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 p-8 space-y-8">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Gross</p>
+                    <p className="text-sm font-black text-slate-800">{formatRupiah(viewingRun.total_gross)}</p>
+                  </div>
+                  <div className="p-4 bg-red-50 rounded-2xl border border-red-100">
+                    <p className="text-[10px] font-bold text-red-300 uppercase tracking-widest mb-1">Total Potongan</p>
+                    <p className="text-sm font-black text-red-600">{formatRupiah(viewingRun.total_deductions)}</p>
+                  </div>
+                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 col-span-2 md:col-span-1">
+                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Total Netto Transfer</p>
+                    <p className="text-sm font-black text-emerald-600">{formatRupiah(viewingRun.total_net)}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                    <Users size={16} /> Rincian Gaji Karyawan ({viewingRunData.length})
+                  </h4>
+
+                  <div className="space-y-3 pb-20">
+                    {viewingRunData.map((slip: any) => (
+                      <div key={slip.id} className="p-5 border border-slate-100 rounded-2xl bg-white hover:border-blue-200 transition">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div>
+                            <div className="font-bold text-slate-900">{slip.employee?.first_name} {slip.employee?.last_name}</div>
+                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{slip.employee?.nik} • {slip.employee?.job_title}</div>
+                          </div>
+                          <div className="text-right flex flex-col items-end gap-2">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  const printWindow = window.open('', '_blank');
+                                  if (!printWindow) return;
+                                  printWindow.document.write(`
+                                           <html>
+                                             <head>
+                                               <title>Slip Gaji - ${slip.employee?.first_name}</title>
+                                               <style>
+                                                 body { font-family: sans-serif; padding: 40px; color: #333; }
+                                                 .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+                                                 .info { display: flex; justify-content: space-between; margin-bottom: 30px; }
+                                                 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+                                                 .section-title { font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px; text-transform: uppercase; font-size: 12px; }
+                                                 .row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; }
+                                                 .total { margin-top: 20px; padding-top: 10px; border-top: 2px solid #333; font-weight: bold; }
+                                                 .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #999; }
+                                               </style>
+                                             </head>
+                                             <body>
+                                               <div class="header">
+                                                 <h2 style="margin:0">SLIP GAJI KARYAWAN</h2>
+                                                 <p style="margin:5px 0">Periode: ${new Date(viewingRun.period_start).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p>
+                                               </div>
+                                               <div class="info">
+                                                 <div>
+                                                   <strong>${slip.employee?.first_name} ${slip.employee?.last_name}</strong><br/>
+                                                   NIK: ${slip.employee?.nik}<br/>
+                                                   Jabatan: ${slip.employee?.job_title}
+                                                 </div>
+                                                 <div style="text-align:right">
+                                                    Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}<br/>
+                                                    Status: ${viewingRun.status}
+                                                 </div>
+                                               </div>
+                                               <div class="grid">
+                                                 <div>
+                                                   <div class="section-title">Penerimaan (Earnings)</div>
+                                                   ${(slip.lines || []).filter((l: any) => l.type === 'EARNING' || l.type === 'BENEFIT').map((l: any) => `
+                                                     <div class="row"><span>${l.component_name}</span> <span>${formatRupiah(l.amount)}</span></div>
+                                                   `).join('')}
+                                                   ${(slip.lines || []).filter((l: any) => l.type === 'EARNING' || l.type === 'BENEFIT').length === 0 ? `
+                                                     <div class="row"><span>Gaji Pokok</span> <span>${formatRupiah(slip.basic_salary)}</span></div>
+                                                   ` : ''}
+                                                 </div>
+                                                 <div>
+                                                   <div class="section-title">Potongan (Deductions)</div>
+                                                   ${(slip.lines || []).filter((l: any) => l.type === 'DEDUCTION' || l.type === 'TAX').map((l: any) => `
+                                                     <div class="row"><span>${l.component_name}</span> <span>${formatRupiah(l.amount)}</span></div>
+                                                   `).join('')}
+                                                   ${(slip.lines || []).filter((l: any) => l.type === 'DEDUCTION' || l.type === 'TAX').length === 0 ? '<div class="row"><span>-</span> <span>0</span></div>' : ''}
+                                                 </div>
+                                               </div>
+
+                                               <div class="total">
+                                                  <div class="row" style="font-size:18px">
+                                                    <span>TOTAL GAJI NETTO</span>
+                                                    <span>${formatRupiah(slip.net_salary)}</span>
+                                                  </div>
+                                               </div>
+                                               <div class="footer">
+                                                  Dokumen ini dihasilkan secara otomatis oleh NIZAM Payroll System.<br/>
+                                                  Tanda tangan tidak diperlukan secara fisik.
+                                               </div>
+                                               <script>window.print();</script>
+                                             </body>
+                                           </html>
+                                         `);
+                                  printWindow.document.close();
+                                }}
+                                className="p-1 px-2 flex items-center gap-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-blue-50 hover:text-blue-600 border border-slate-100 transition"
+                                title="Cetak Slip Gaji"
+                              >
+                                <Printer size={12} /> <span className="text-[9px] font-bold uppercase tracking-tight">Cetak Slip</span>
+                              </button>
+                              <div className="text-sm font-black text-emerald-600">{formatRupiah(slip.net_salary)}</div>
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-medium">Net Income</div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-dashed border-slate-100 space-y-2">
+                          {/* Lines (Includes Gaji Pokok) */}
+                          {(slip.lines || []).length > 0 ? (
+                            (slip.lines || []).map((line: any) => (
+                              <div key={line.id} className="flex justify-between items-center text-xs">
+                                <span className="text-slate-500 font-medium">{line.component_name}</span>
+                                <span className={`font-bold ${line.type === 'EARNING' || line.type === 'BENEFIT' ? 'text-blue-600' : 'text-red-500'}`}>
+                                  {line.type === 'EARNING' || line.type === 'BENEFIT' ? '+' : '-'} {formatRupiah(line.amount)}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-slate-500 font-medium">Gaji Pokok (Header Only)</span>
+                              <span className="text-slate-700 font-bold">{formatRupiah(slip.basic_salary)}</span>
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 border-t border-slate-100 bg-slate-50 flex justify-end">
+                <button onClick={() => setViewingRun(null)} className="px-10 py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition shadow-sm">Tutup</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
