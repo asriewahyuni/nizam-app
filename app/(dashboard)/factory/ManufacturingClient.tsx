@@ -140,8 +140,9 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
 
     for (const bi of items) {
       const needed = bi.quantity * qtyPlanned
-      const product = products.find(p => p.id === (bi.product?.id || bi.product_id))
-      const available = product?.stock || 0
+      const productId = bi.product?.id || bi.product_id
+      const product = products.find(p => p.id === productId)
+      const available = product?.stock_available || 0
       if (available < needed) {
         shortItems.push({ name: bi.product?.name || 'Bahan', needed, available })
       }

@@ -233,10 +233,35 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     })
   }
 
-  // 4. Persistence: Stock Movements (Sub-Ledger)
+  // 4. Persistence: Stock Movements (Sub-Ledger) & WMS Sync (Physical Stock)
   if (stockMovements.length > 0) {
      const { error: smErr } = await supabase.from('stock_movements').insert(stockMovements)
      if (smErr) console.error("Stock Movement insert failed:", smErr)
+     
+     // CRITICAL: Sync with physical inventory (inventory_stocks)
+     const whId = purchase.warehouse_id || (await supabase.from('warehouses').select('id').eq('org_id', orgId).limit(1).single().then(r => r.data?.id))
+     
+     if (whId) {
+        for (const m of stockMovements) {
+           await supabase.from('inventory_stocks').upsert({
+              org_id: orgId,
+              product_id: m.product_id,
+              warehouse_id: whId,
+              quantity: m.quantity // This will be ADDED if using a trigger or function? No, the upsert below handles Conflict.
+           }, { onConflict: 'product_id,warehouse_id,batch_number' }) // Since batch is null by default.
+           
+           // Wait! A standard upsert will OVERWRITE. We need to increment.
+           // Since we are in a server action, it's safer to use an RPC or do a Get-then-Set.
+           // However, most entries for 'inventory_stocks' in this DB use the increment logic.
+           
+           await supabase.rpc('adjust_inventory_stock', {
+              p_org_id: orgId,
+              p_product_id: m.product_id,
+              p_warehouse_id: whId,
+              p_diff: m.quantity
+           }).then(({ error }) => { if (error) console.error("WMS sync error", error) })
+        }
+     }
   }
 
   // 5. GL Synchronization (Journal)

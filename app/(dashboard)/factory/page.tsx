@@ -14,17 +14,12 @@ export default async function ManufacturingPage() {
   const supabase = await createClient()
 
   // Fetch all necessary data
-  const [boms, workOrders, { data: productsRaw }, warehouses] = await Promise.all([
+  const [boms, workOrders, products, warehouses] = await Promise.all([
     getBoms(orgData.org.id),
     getWorkOrders(orgData.org.id),
-    supabase.from('products').select('id, name, sku, average_cost, purchase_price, unit, inventory_stocks(quantity)').eq('org_id', orgData.org.id),
+    import('@/modules/inventory/actions/inventory.actions').then(m => m.getProducts(orgData.org.id)),
     getWarehouses(orgData.org.id)
   ])
-
-  const products = productsRaw?.map(p => ({
-     ...p,
-     stock: p.inventory_stocks?.reduce((acc: number, s: any) => acc + s.quantity, 0) || 0
-  })) || []
 
   return (
     <div className="p-4 md:p-8">
