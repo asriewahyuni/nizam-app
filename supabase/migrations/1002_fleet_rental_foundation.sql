@@ -4,8 +4,15 @@
 -- This script adds Vehicle Management and Booking infrastructure.
 
 -- 1. FLEET ASSETS (The Units)
-CREATE TYPE fleet_type AS ENUM ('CAR', 'MOTORBIKE', 'BUS', 'TRUCK', 'OTHER');
-CREATE TYPE fleet_status AS ENUM ('AVAILABLE', 'RENTED', 'MAINTENANCE', 'OUT_OF_SERVICE');
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'fleet_type') THEN
+        CREATE TYPE fleet_type AS ENUM ('CAR', 'MOTORBIKE', 'BUS', 'TRUCK', 'OTHER');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'fleet_status') THEN
+        CREATE TYPE fleet_status AS ENUM ('AVAILABLE', 'RENTED', 'MAINTENANCE', 'OUT_OF_SERVICE');
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.fleet_assets (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -25,7 +32,12 @@ CREATE TABLE IF NOT EXISTS public.fleet_assets (
 );
 
 -- 2. FLEET BOOKINGS (The Rental Transactions)
-CREATE TYPE booking_status AS ENUM ('RESERVED', 'ACTIVE', 'COMPLETED', 'CANCELLED');
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'booking_status') THEN
+        CREATE TYPE booking_status AS ENUM ('RESERVED', 'ACTIVE', 'COMPLETED', 'CANCELLED');
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.fleet_bookings (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -61,15 +73,19 @@ ALTER TABLE public.fleet_assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fleet_bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fleet_maintenance_labs ENABLE ROW LEVEL SECURITY;
 
--- Policies
+-- Policies (Idempotent)
+DROP POLICY IF EXISTS "members_can_view_fleet" ON public.fleet_assets;
 CREATE POLICY "members_can_view_fleet" ON public.fleet_assets FOR SELECT 
 USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND is_active = TRUE));
 
+DROP POLICY IF EXISTS "members_can_view_bookings" ON public.fleet_bookings;
 CREATE POLICY "members_can_view_bookings" ON public.fleet_bookings FOR SELECT 
 USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND is_active = TRUE));
 
+DROP POLICY IF EXISTS "admins_can_manage_fleet" ON public.fleet_assets;
 CREATE POLICY "admins_can_manage_fleet" ON public.fleet_assets FOR ALL 
 USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND role IN ('owner', 'admin', 'manager') AND is_active = TRUE));
 
+DROP POLICY IF EXISTS "admins_can_manage_bookings" ON public.fleet_bookings;
 CREATE POLICY "admins_can_manage_bookings" ON public.fleet_bookings FOR ALL 
 USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND role IN ('owner', 'admin', 'manager') AND is_active = TRUE));

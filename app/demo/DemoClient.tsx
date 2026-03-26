@@ -2,18 +2,49 @@
 
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Play, Sparkles, Building2, ArrowRight, Zap, Shield, BarChart3, Package, Factory, Users } from 'lucide-react'
-import { startDemoSession } from '@/modules/demo/actions/demo.actions'
+import { Play, Sparkles, Building2, ArrowRight, Zap, Shield, BarChart3, Package, Factory, Users, Utensils, Store, Truck, Laptop } from 'lucide-react'
+import { startDemoSession, type DemoBusinessType } from '@/modules/demo/actions/demo.actions'
+
+const BUSINESS_TYPES: { id: DemoBusinessType; label: string; icon: any; description: string; color: string }[] = [
+  { 
+    id: 'CATERING', 
+    label: 'Katering', 
+    icon: Utensils, 
+    description: 'Manajemen bahan baku dapur, inventory box, dan layanan prasmanan.',
+    color: 'from-orange-500 to-red-600'
+  },
+  { 
+    id: 'RESTAURANT', 
+    label: 'Rumah Makan', 
+    icon: Store, 
+    description: 'Ideal untuk resto/warung dengan stok harian dan penjualan porsian.',
+    color: 'from-emerald-500 to-teal-600'
+  },
+  { 
+    id: 'SUPPLIER_MBG', 
+    label: 'Supplier MBG', 
+    icon: Truck, 
+    description: 'Khusus program Makan Bergizi Gratis: Logistik, Susu, dan Paket Sekolah.',
+    color: 'from-blue-500 to-indigo-600'
+  },
+  { 
+    id: 'COMPUTER', 
+    label: 'Umum / Manufaktur', 
+    icon: Laptop, 
+    description: 'Simulasi perakitan (PC Assembly) dan inventori barang elektronik.',
+    color: 'from-slate-600 to-slate-800'
+  },
+]
 
 export default function DemoClient() {
   const [businessName, setBusinessName] = useState('')
+  const [selectedType, setSelectedType] = useState<DemoBusinessType>('CATERING')
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<'welcome' | 'setup'>('welcome')
 
   const handleStart = async () => {
-    if (!businessName.trim()) return
     setLoading(true)
-    await startDemoSession(businessName.trim())
+    await startDemoSession(businessName.trim(), selectedType)
   }
 
   return (
@@ -35,7 +66,7 @@ export default function DemoClient() {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: 'easeOut' }}
-        className="relative z-10 w-full max-w-xl"
+        className="relative z-10 w-full max-w-2xl"
       >
         {step === 'welcome' ? (
           <div className="text-center space-y-8">
@@ -117,54 +148,88 @@ export default function DemoClient() {
             </motion.div>
           </div>
         ) : (
-          /* Step 2: Business Name Input */
+          /* Step 2: Selection & Business Name Input */
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white/5 backdrop-blur-xl rounded-[32px] border border-white/10 p-8 md:p-10 shadow-2xl space-y-6"
+            className="bg-white/5 backdrop-blur-xl rounded-[32px] border border-white/10 p-8 md:p-10 shadow-2xl space-y-8"
           >
             <div className="text-center space-y-2">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
-                <Building2 size={28} className="text-white" />
-              </div>
               <h3 className="text-2xl font-black text-white tracking-tight">
-                Beri Nama Bisnis Demo Anda
+                Pilih Tipe Bisnis Demo
               </h3>
               <p className="text-slate-400 text-sm">
-                Ini akan menjadi nama organisasi di dalam sistem ERP.
+                Data sampel akan disesuaikan dengan tipe bisnis yang Anda pilih.
               </p>
             </div>
 
+            {/* Business Type Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {BUSINESS_TYPES.map((type) => {
+                const Icon = type.icon
+                return (
+                  <button
+                    key={type.id}
+                    onClick={() => setSelectedType(type.id)}
+                    className={`relative p-4 rounded-2xl border transition-all duration-300 text-left group ${
+                      selectedType === type.id 
+                      ? 'bg-white/10 border-blue-500/50 ring-1 ring-blue-500/20' 
+                      : 'bg-white/5 border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="flex gap-4 items-start">
+                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${type.color} flex items-center justify-center shrink-0 shadow-lg`}>
+                        <Icon size={24} className="text-white" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="font-bold text-white group-hover:text-blue-400 transition-colors uppercase text-xs tracking-widest">{type.label}</h4>
+                        <p className="text-slate-400 text-[10px] leading-relaxed">
+                          {type.description}
+                        </p>
+                      </div>
+                    </div>
+                    {selectedType === type.id && (
+                      <div className="absolute top-2 right-2">
+                        <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                          <Sparkles size={10} className="text-white" />
+                        </div>
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
             <div className="space-y-2">
+              <label className="text-slate-500 text-[10px] font-bold uppercase tracking-wider px-2">
+                Nama Organisasi (Opsional)
+              </label>
               <input
                 type="text"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleStart()}
-                placeholder="cth: PT Maju Sejahtera"
+                placeholder="cth: Catering Berkah Jaya"
                 autoFocus
                 className="w-full px-6 py-4 bg-white/10 backdrop-blur-sm text-white placeholder:text-white/30 border border-white/10 rounded-2xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-lg font-bold transition-all"
               />
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider px-2">
-                💡 Ketik apapun — ini hanya untuk simulasi demo
-              </p>
             </div>
 
             <div className="space-y-3">
               <button
                 onClick={handleStart}
-                disabled={loading || !businessName.trim()}
+                disabled={loading}
                 className="w-full py-4 bg-gradient-to-r from-emerald-500 to-blue-600 text-white font-black text-base rounded-2xl shadow-2xl shadow-emerald-500/20 hover:shadow-emerald-500/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-3"
               >
                 {loading ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Menyiapkan demo Anda...
+                    Menyiapkan data {BUSINESS_TYPES.find(b => b.id === selectedType)?.label}...
                   </>
                 ) : (
                   <>
                     <Sparkles size={20} />
-                    Masuk ke Dashboard
+                    Mulai Demo Sekarang
                     <ArrowRight size={18} />
                   </>
                 )}
@@ -183,7 +248,7 @@ export default function DemoClient() {
                 <Shield size={16} className="shrink-0 text-emerald-500 mt-0.5" />
                 <p>
                   <span className="font-bold text-slate-400">Aman & Privat.</span> Semua data demo akan dihapus otomatis 
-                  saat Anda logout. Tidak ada data yang tersimpan permanen.
+                  saat Anda logout. Tidak ada data yang tersimpan permanen di cloud kami.
                 </p>
               </div>
             </div>
@@ -193,3 +258,4 @@ export default function DemoClient() {
     </div>
   )
 }
+

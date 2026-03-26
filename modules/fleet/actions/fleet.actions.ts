@@ -162,10 +162,12 @@ export async function getSchedules(orgId: string) {
     .from('fleet_schedules')
     .select(`
       *,
-      route:fleet_routes(id, name),
-      asset:fleet_assets(id, plate_number, model, capacity),
-      driver:contacts(id, name)
-    ` as any)
+      route:fleet_routes(*),
+      asset:fleet_assets(*),
+      driver:employees(first_name, last_name, phone),
+      helper:employees(first_name, last_name, phone),
+      tickets:fleet_tickets(count)
+    `)
     .eq('org_id', orgId)
     .order('departure_time', { ascending: true })
   
@@ -180,8 +182,9 @@ export async function createSchedule(orgId: string, formData: FormData) {
     route_id: formData.get('route_id') as string,
     asset_id: formData.get('asset_id') as string,
     driver_id: formData.get('driver_id') as string || null,
+    helper_id: formData.get('helper_id') as string || null,
     departure_time: new Date(formData.get('departure_time') as string).toISOString(),
-    status: 'SCHEDULED'
+    status: 'WAITING'
   }
   const { error } = await supabase.from('fleet_schedules').insert(payload)
   if (error) return { error: error.message }
@@ -203,6 +206,187 @@ export async function createTicket(orgId: string, payload: {
     status: 'PAID'
   })
   if (error) return { error: error.message }
+
+  revalidatePath('/fleet')
+  return { success: true }
+}
+
+/** 
+ * VEHICLE MEDICAL RECORD (MAINTENANCE) 
+ * "Rekam Medis Bus"
+ **/
+
+export async function getMedicalRecords(assetId: string) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('fleet_maintenance_labs')
+    .select('*')
+    .eq('asset_id', assetId)
+    .order('service_date', { ascending: false })
+
+  if (error) return []
+  return data
+}
+
+export async function getAllMedicalRecords(orgId: string) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('fleet_maintenance_labs')
+    .select(`
+      *,
+      asset:fleet_assets(id, plate_number, model)
+    `)
+    .eq('org_id', orgId)
+    .order('service_date', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching all medical records:', error)
+    return []
+  }
+  return data
+}
+
+export async function getFleetCrew(orgId: string) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('employees')
+    .select('*')
+    .eq('org_id', orgId)
+    .or('job_title.ilike.%sopir%,job_title.ilike.%driver%,job_title.ilike.%kernet%,job_title.ilike.%helper%')
+    .order('first_name', { ascending: true })
+
+  if (error) return []
+  return data
+}
+
+export async function createCrew(orgId: string, payload: any) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('employees')
+    .insert([{ ...payload, org_id: orgId }])
+    .select()
+    .single()
+
+  return { data, error: error?.message }
+}
+
+export async function createMedicalRecord(orgId: string, payload: {
+  asset_id: string,
+  service_date: string,
+  description: string,
+  maintenance_type: 'ROUTINE' | 'CORRECTIVE' | 'EMERGENCY',
+  cost: number,
+  odometer_at: number,
+  technician_name?: string,
+  vendor_name?: string,
+  parts_replaced?: any[],
+  next_service_km?: number,
+  next_service_date?: string,
+  attachment_url?: string
+}) {
+  const supabase = await createClient()
+
+  // 1. Mark asset as MAINTENANCE
+  await supabase.from('fleet_assets').update({ status: 'MAINTENANCE' }).eq('id', payload.asset_id)
+
+  // 2. Insert record
+  const { error } = await supabase
+    .from('fleet_maintenance_labs')
+    .insert({
+      org_id: orgId,
+      ...payload,
+      parts_replaced: JSON.stringify(payload.parts_replaced || [])
+    })
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/fleet')
+  return { success: true }
+}
+
+/** AVAILABILITY ENGINE **/
+
+export async function checkAssetAvailability(assetId: string, startDate: string, endDate: string) {
+  const supabase = await createClient()
+
+  // Find overlapping bookings
+  const { data, error } = await supabase
+    .from('fleet_bookings')
+    .select('id')
+    .eq('asset_id', assetId)
+    .not('status', 'eq', 'CANCELLED')
+    .filter('start_date', 'lt', endDate)
+    .filter('end_date', 'gt', startDate)
+
+  if (error) return { available: false, error: error.message }
+
+
+  return { available: data.length === 0 }
+}
+
+/** SMART ATTENDANCE (GPS + QR) **/
+
+export async function getTerminals(orgId: string) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('fleet_terminals')
+    .select('*')
+    .eq('org_id', orgId)
+    .order('name', { ascending: true })
+  
+  if (error) return []
+  return data
+}
+
+export async function recordCrewAttendance(orgId: string, payload: {
+  employee_id: string,
+  location_gps?: string,
+  qr_scanned_payload?: string,
+  type: 'IN' | 'OUT',
+  notes?: string
+}) {
+  const supabase = await createClient()
+  const date = new Date().toISOString().split('T')[0]
+  const now = new Date().toISOString()
+
+  // Find if already exists for today
+  const { data: existing } = await supabase
+    .from('attendance')
+    .select('*')
+    .eq('employee_id', payload.employee_id)
+    .eq('record_date', date)
+    .single()
+
+  if (payload.type === 'IN') {
+    if (existing) return { error: 'Anda sudah Clock-In hari ini.' }
+    
+    const { error } = await supabase.from('attendance').insert([{
+      org_id: orgId,
+      employee_id: payload.employee_id,
+      record_date: date,
+      check_in: now,
+      status: 'PRESENT',
+      location_gps: payload.location_gps,
+      qr_scanned_payload: payload.qr_scanned_payload,
+      notes: payload.notes
+    }])
+    if (error) return { error: error.message }
+  } else {
+    if (!existing) return { error: 'Belum ada data Clock-In hari ini.' }
+    if (existing.check_out) return { error: 'Anda sudah Clock-Out hari ini.' }
+
+    const { error } = await supabase
+      .from('attendance')
+      .update({
+        check_out: now,
+        notes: payload.notes ? (existing.notes ? existing.notes + ' | ' + payload.notes : payload.notes) : existing.notes
+      })
+      .eq('id', existing.id)
+    
+    if (error) return { error: error.message }
+  }
 
   revalidatePath('/fleet')
   return { success: true }

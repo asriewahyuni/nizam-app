@@ -26,7 +26,15 @@ CREATE TABLE IF NOT EXISTS public.fleet_routes (
 );
 
 -- 3. SCHEDULES (Keberangkatan)
-CREATE TYPE schedule_status AS ENUM ('SCHEDULED', 'DEPARTED', 'ARRIVED', 'CANCELLED');
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'schedule_status') THEN
+        CREATE TYPE schedule_status AS ENUM ('SCHEDULED', 'DEPARTED', 'ARRIVED', 'CANCELLED');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ticket_status') THEN
+        CREATE TYPE ticket_status AS ENUM ('BOOKED', 'PAID', 'USED', 'CANCELLED');
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.fleet_schedules (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -42,7 +50,6 @@ CREATE TABLE IF NOT EXISTS public.fleet_schedules (
 );
 
 -- 4. TICKETS
-CREATE TYPE ticket_status AS ENUM ('BOOKED', 'PAID', 'USED', 'CANCELLED');
 
 CREATE TABLE IF NOT EXISTS public.fleet_tickets (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -62,11 +69,21 @@ ALTER TABLE public.fleet_routes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fleet_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fleet_tickets ENABLE ROW LEVEL SECURITY;
 
--- Policies
+-- Policies (Idempotent)
+DROP POLICY IF EXISTS "members_view_routes" ON public.fleet_routes;
 CREATE POLICY "members_view_routes" ON public.fleet_routes FOR SELECT USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND is_active = TRUE));
+
+DROP POLICY IF EXISTS "members_view_schedules" ON public.fleet_schedules;
 CREATE POLICY "members_view_schedules" ON public.fleet_schedules FOR SELECT USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND is_active = TRUE));
+
+DROP POLICY IF EXISTS "members_view_tickets" ON public.fleet_tickets;
 CREATE POLICY "members_view_tickets" ON public.fleet_tickets FOR SELECT USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND is_active = TRUE));
 
+DROP POLICY IF EXISTS "admins_manage_routes" ON public.fleet_routes;
 CREATE POLICY "admins_manage_routes" ON public.fleet_routes FOR ALL USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND role IN ('owner', 'admin', 'manager') AND is_active = TRUE));
+
+DROP POLICY IF EXISTS "admins_manage_schedules" ON public.fleet_schedules;
 CREATE POLICY "admins_manage_schedules" ON public.fleet_schedules FOR ALL USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND role IN ('owner', 'admin', 'manager') AND is_active = TRUE));
+
+DROP POLICY IF EXISTS "admins_manage_tickets" ON public.fleet_tickets;
 CREATE POLICY "admins_manage_tickets" ON public.fleet_tickets FOR ALL USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND role IN ('owner', 'admin', 'manager') AND is_active = TRUE));

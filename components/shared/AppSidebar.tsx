@@ -71,6 +71,17 @@ const NAV_GROUPS: NavGroup[] = [
     ]
   },
   {
+    group: 'Operasional',
+    items: [
+      { label: 'Pembelian', href: '/purchasing', icon: ShoppingCart },
+      { label: 'Inventori', href: '/inventory', icon: Package },
+      { label: 'Gudang (WMS)', href: '/inventory/warehouses', icon: Warehouse },
+      { label: 'Manufaktur (BoM)', href: '/factory', icon: Factory },
+      { label: 'Fleet & Rental', href: '/fleet', icon: Truck },
+      { label: 'Job Order (Jasa)', href: '/services', icon: Briefcase },
+    ]
+  },
+  {
     group: 'Marketing & Sales',
     items: [
       { label: 'Pelanggan (CRM)', href: '/contacts', icon: Users },
@@ -83,17 +94,6 @@ const NAV_GROUPS: NavGroup[] = [
     ]
   },
   {
-    group: 'Operasional',
-    items: [
-      { label: 'Pembelian', href: '/purchasing', icon: ShoppingCart },
-      { label: 'Inventori', href: '/inventory', icon: Package },
-      { label: 'Gudang (WMS)', href: '/inventory/warehouses', icon: Warehouse },
-      { label: 'Manufaktur (BoM)', href: '/factory', icon: Factory },
-      { label: 'Fleet & Rental', href: '/fleet', icon: Truck },
-      { label: 'Job Order (Jasa)', href: '/services', icon: Briefcase },
-    ]
-  },
-  {
     group: 'HRIS',
     items: [
       { label: 'Karyawan (HRIS)', href: '/hris', icon: Users },
@@ -101,7 +101,7 @@ const NAV_GROUPS: NavGroup[] = [
     ]
   },
   {
-    group: 'Insight & Strategi',
+    group: 'Insight',
     items: [
       { label: 'Laporan', href: '/reports', icon: BarChart3 },
       { label: 'Strategi (BSC)', href: '/reports/bsc', icon: PieChart },

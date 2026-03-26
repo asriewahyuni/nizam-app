@@ -21,7 +21,9 @@ const DEMO_PASSWORD = 'demo-nizam-2026!'
  * 3. Create fresh org with seed data
  * 4. Redirect to dashboard
  */
-export async function startDemoSession(businessName?: string) {
+export type DemoBusinessType = 'COMPUTER' | 'CATERING' | 'RESTAURANT' | 'SUPPLIER_MBG'
+
+export async function startDemoSession(businessName?: string, demoType: DemoBusinessType = 'COMPUTER') {
   const supabase = await createClient()
 
   // 1. Sign up or sign in the demo user
@@ -85,19 +87,26 @@ export async function startDemoSession(businessName?: string) {
 
   // 3. Create fresh demo organization
   const orgId = crypto.randomUUID()
-  const orgName = businessName || 'Demo Bisnis NIZAM'
+  const defaultNames = {
+    'COMPUTER': 'NIZAM Computer Assembly',
+    'CATERING': 'NIZAM Catering Sehat',
+    'RESTAURANT': 'NIZAM Rumah Makan Mantap',
+    'SUPPLIER_MBG': 'NIZAM MBG Supplier Hub'
+  }
+  const orgName = businessName || defaultNames[demoType]
 
   const { error: orgErr } = await authedClient
     .from('organizations')
     .insert({
       id: orgId,
       name: orgName,
-      slug: 'demo-' + Date.now(),
+      slug: 'demo-' + demoType.toLowerCase() + '-' + Date.now(),
       settings: {
         currency: 'IDR',
         timezone: 'Asia/Jakarta',
         fiscal_year_start_month: 1,
         is_demo: true,
+        business_type: demoType
       },
     })
 
@@ -120,7 +129,7 @@ export async function startDemoSession(businessName?: string) {
   }
 
   // 5. Seed sample data for demo using authed client (so RLS doesn't block inserts)
-  await seedDemoData(authedClient, orgId)
+  await seedDemoData(authedClient, orgId, demoType)
 
   // 6. Set Demo Org ID in Cookie for session-specific tracking
   const cookieStore = await cookies()
@@ -192,59 +201,117 @@ export async function isDemoSession(): Promise<boolean> {
 // ═══════════════════════════════════════════════════════════
 // SEED DEMO DATA — Products, Warehouses, Contacts, etc.
 // ═══════════════════════════════════════════════════════════
-async function seedDemoData(supabase: any, orgId: string) {
-  // --- WAREHOUSES ---
-  const wh1Id = crypto.randomUUID()
-  const wh2Id = crypto.randomUUID()
+async function seedDemoData(supabase: any, orgId: string, demoType: DemoBusinessType) {
+  // --- WAREHOUSES & CONTACTS & PRODUCTS BY TYPE ---
+  let warehousesData: any[] = []
+  let contactsData: any[] = []
+  let productsData: any[] = []
 
-  await supabase.from('warehouses').insert([
-    { id: wh1Id, org_id: orgId, name: 'Gudang Utama', code: 'GU-01', address: 'Jl. Industri No.1' },
-    { id: wh2Id, org_id: orgId, name: 'Gudang Produksi', code: 'GP-01', address: 'Jl. Pabrik No.5' },
-  ])
+  if (demoType === 'COMPUTER') {
+    warehousesData = [
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Gudang Utama', code: 'GU-01', address: 'Jl. Industri No.1' },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Gudang Produksi', code: 'GP-01', address: 'Jl. Pabrik No.5' },
+    ]
+    contactsData = [
+      { org_id: orgId, name: 'PT Supplier Jaya', type: 'SUPPLIER', phone: '021-1234567', email: 'order@supplierjaya.com' },
+      { org_id: orgId, name: 'CV Bahan Berkah', type: 'SUPPLIER', phone: '021-7654321', email: 'sales@bahanberkah.id' },
+      { org_id: orgId, name: 'Toko Makmur', type: 'CUSTOMER', phone: '0812-9999-8888', email: 'makmur@email.com' },
+      { org_id: orgId, name: 'PT Retail Nusantara', type: 'CUSTOMER', phone: '021-5556677', email: 'procurement@retailnusantara.id' },
+    ]
+    productsData = [
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Motherboard ASUS B660', sku: 'RM-MB-001', type: 'INVENTORY', unit: 'Pcs', purchase_price: 1850000, selling_price: 2200000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'RAM DDR5 16GB', sku: 'RM-RAM-001', type: 'INVENTORY', unit: 'Pcs', purchase_price: 750000, selling_price: 950000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'SSD NVMe 512GB', sku: 'RM-SSD-001', type: 'INVENTORY', unit: 'Pcs', purchase_price: 680000, selling_price: 850000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Casing ATX Gaming', sku: 'RM-CSG-001', type: 'INVENTORY', unit: 'Pcs', purchase_price: 450000, selling_price: 600000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'PSU 650W 80+ Gold', sku: 'RM-PSU-001', type: 'INVENTORY', unit: 'Pcs', purchase_price: 920000, selling_price: 1200000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'PC Rakitan Custom Office', sku: 'FG-PC-001', type: 'INVENTORY', unit: 'Unit', purchase_price: 4650000, selling_price: 6500000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Jasa Rakit & Instalasi OS', sku: 'SVC-RAKIT-001', type: 'SERVICE', unit: 'Unit', purchase_price: 0, selling_price: 350000 },
+    ]
+  } else if (demoType === 'CATERING') {
+    warehousesData = [
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Dapur Utama', code: 'WH-K-01', address: 'Pusat Produksi' },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Gudang Bahan Baku', code: 'WH-K-02', address: 'Area Pendingin' },
+    ]
+    contactsData = [
+      { org_id: orgId, name: 'Supplier Beras Makmur', type: 'SUPPLIER', phone: '0811223344', email: 'v-beras@example.com' },
+      { org_id: orgId, name: 'CV Ayam Segar', type: 'SUPPLIER', phone: '0811223355', email: 'v-ayam@example.com' },
+      { org_id: orgId, name: 'Event Organizer Serasi', type: 'CUSTOMER', phone: '021-998877', email: 'c-eo@example.com' },
+    ]
+    productsData = [
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Beras Rojo Lele 5kg', sku: 'RM-K-01', type: 'INVENTORY', unit: 'Karung', purchase_price: 75000, selling_price: 85000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Ayam Potong (Ekor)', sku: 'RM-K-02', type: 'INVENTORY', unit: 'Ek', purchase_price: 35000, selling_price: 42000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Box Catering Eco', sku: 'RM-K-03', type: 'INVENTORY', unit: 'Pcs', purchase_price: 2500, selling_price: 3500 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Paket Nasi Box Ayam Bakar', sku: 'FG-K-01', type: 'INVENTORY', unit: 'Box', purchase_price: 22000, selling_price: 35000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Layanan Prasmanan VIP', sku: 'SVC-K-01', type: 'SERVICE', unit: 'Pax', purchase_price: 0, selling_price: 150000 },
+    ]
+  } else if (demoType === 'RESTAURANT') {
+    warehousesData = [
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Area Bar', code: 'WH-R-01', address: 'Front Counter' },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Kitchen Supply', code: 'WH-R-02', address: 'Back Area' },
+    ]
+    contactsData = [
+      { org_id: orgId, name: 'Pasar Induk Kramat Jati', type: 'SUPPLIER' },
+      { org_id: orgId, name: 'CV Minyak Berkah', type: 'SUPPLIER' },
+      { org_id: orgId, name: 'Pelanggan Walk-In', type: 'CUSTOMER' },
+    ]
+    productsData = [
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Daging Sapi (Kg)', sku: 'RM-R-01', type: 'INVENTORY', unit: 'Kg', purchase_price: 120000, selling_price: 140000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Minyak Goreng 2L', sku: 'RM-R-02', type: 'INVENTORY', unit: 'Botol', purchase_price: 28000, selling_price: 35000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Rempah Rendang Mix', sku: 'RM-R-03', type: 'INVENTORY', unit: 'Pack', purchase_price: 15000, selling_price: 20000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Nasi Rendang Padang', sku: 'FG-R-01', type: 'INVENTORY', unit: 'Porsi', purchase_price: 18000, selling_price: 28000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Es Teh Manis', sku: 'FG-R-02', type: 'INVENTORY', unit: 'Gelas', purchase_price: 1500, selling_price: 8000 },
+    ]
+  } else if (demoType === 'SUPPLIER_MBG') {
+    warehousesData = [
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Distribution Center 1', code: 'WH-M-01', address: 'Hub Utama MBG' },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Cold Storage A', code: 'WH-M-02', address: 'Area Susu & Buah' },
+    ]
+    contactsData = [
+      { org_id: orgId, name: 'Gabungan Kelompok Tani', type: 'SUPPLIER' },
+      { org_id: orgId, name: 'Peternakan Ayam Berkarya', type: 'SUPPLIER' },
+      { org_id: orgId, name: 'Dinas Pendidikan - Wil 1', type: 'CUSTOMER' },
+      { org_id: orgId, name: 'UPT Sekolah Dasar', type: 'CUSTOMER' },
+    ]
+    productsData = [
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Susu UHT 200ml', sku: 'RM-M-01', type: 'INVENTORY', unit: 'Box', purchase_price: 4000, selling_price: 5000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Apel Malang Merah', sku: 'RM-M-02', type: 'INVENTORY', unit: 'Kg', purchase_price: 25000, selling_price: 30000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Telur Ayam (Butir)', sku: 'RM-M-03', type: 'INVENTORY', unit: 'Butir', purchase_price: 1500, selling_price: 2000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Paket MBG SD - Menu A', sku: 'FG-M-01', type: 'INVENTORY', unit: 'Paket', purchase_price: 11000, selling_price: 15000 },
+      { id: crypto.randomUUID(), org_id: orgId, name: 'Biaya Logistik MBG', sku: 'SVC-M-01', type: 'SERVICE', unit: 'Trip', purchase_price: 0, selling_price: 250000 },
+    ]
+  }
 
-  // --- CONTACTS (Vendors & Customers) ---
-  await supabase.from('contacts').insert([
-    { org_id: orgId, name: 'PT Supplier Jaya', type: 'SUPPLIER', phone: '021-1234567', email: 'order@supplierjaya.com' },
-    { org_id: orgId, name: 'CV Bahan Berkah', type: 'SUPPLIER', phone: '021-7654321', email: 'sales@bahanberkah.id' },
-    { org_id: orgId, name: 'Toko Makmur', type: 'CUSTOMER', phone: '0812-9999-8888', email: 'makmur@email.com' },
-    { org_id: orgId, name: 'PT Retail Nusantara', type: 'CUSTOMER', phone: '021-5556677', email: 'procurement@retailnusantara.id' },
-  ])
+  // --- INSERT DATA ---
+  await supabase.from('warehouses').insert(warehousesData)
+  await supabase.from('contacts').insert(contactsData)
+  await supabase.from('products').insert(productsData)
 
-  // --- PRODUCTS (Raw Materials + Finished Goods) ---
-  const products = [
-    { id: crypto.randomUUID(), org_id: orgId, name: 'Motherboard ASUS B660', sku: 'RM-MB-001', type: 'INVENTORY', unit: 'Pcs', purchase_price: 1850000, selling_price: 2200000 },
-    { id: crypto.randomUUID(), org_id: orgId, name: 'RAM DDR5 16GB', sku: 'RM-RAM-001', type: 'INVENTORY', unit: 'Pcs', purchase_price: 750000, selling_price: 950000 },
-    { id: crypto.randomUUID(), org_id: orgId, name: 'SSD NVMe 512GB', sku: 'RM-SSD-001', type: 'INVENTORY', unit: 'Pcs', purchase_price: 680000, selling_price: 850000 },
-    { id: crypto.randomUUID(), org_id: orgId, name: 'Casing ATX Gaming', sku: 'RM-CSG-001', type: 'INVENTORY', unit: 'Pcs', purchase_price: 450000, selling_price: 600000 },
-    { id: crypto.randomUUID(), org_id: orgId, name: 'PSU 650W 80+ Gold', sku: 'RM-PSU-001', type: 'INVENTORY', unit: 'Pcs', purchase_price: 920000, selling_price: 1200000 },
-    { id: crypto.randomUUID(), org_id: orgId, name: 'PC Rakitan Custom Office', sku: 'FG-PC-001', type: 'INVENTORY', unit: 'Unit', purchase_price: 4650000, selling_price: 6500000 },
-    { id: crypto.randomUUID(), org_id: orgId, name: 'Jasa Rakit & Instalasi OS', sku: 'SVC-RAKIT-001', type: 'SERVICE', unit: 'Unit', purchase_price: 0, selling_price: 350000 },
-  ]
-
-  await supabase.from('products').insert(products)
-
+  const wh1Id = warehousesData[0].id
+  
   // --- INITIAL STOCK (give some items starting inventory) ---
-  const stockItems = [
-    { org_id: orgId, product_id: products[0].id, warehouse_id: wh1Id, quantity: 10 },
-    { org_id: orgId, product_id: products[1].id, warehouse_id: wh1Id, quantity: 20 },
-    { org_id: orgId, product_id: products[2].id, warehouse_id: wh1Id, quantity: 15 },
-    { org_id: orgId, product_id: products[3].id, warehouse_id: wh1Id, quantity: 8 },
-    { org_id: orgId, product_id: products[4].id, warehouse_id: wh1Id, quantity: 12 },
-  ]
-
-  await supabase.from('inventory_stocks').insert(stockItems).then(() => {})
-
-  // Seed stock_movements for accurate sub-ledger
-  const movements = stockItems.map(s => ({
+  const stockItems = productsData.filter(p => p.type === 'INVENTORY').slice(0, 5).map(p => ({
     org_id: orgId,
-    product_id: s.product_id,
-    movement_date: new Date().toISOString().split('T')[0],
-    quantity: s.quantity,
-    unit_price: products.find(p => p.id === s.product_id)?.purchase_price || 0,
-    reference_type: 'INITIAL',
-    reference_id: orgId,
-    notes: 'Saldo awal demo'
+    product_id: p.id,
+    warehouse_id: wh1Id,
+    quantity: 50 // Give decent starting stock for demo
   }))
 
-  await supabase.from('stock_movements').insert(movements).then(() => {})
+  if (stockItems.length > 0) {
+    await supabase.from('inventory_stocks').insert(stockItems)
+
+    // Seed stock_movements for accurate sub-ledger
+    const movements = stockItems.map(s => ({
+      org_id: orgId,
+      product_id: s.product_id,
+      movement_date: new Date().toISOString().split('T')[0],
+      quantity: s.quantity,
+      unit_price: productsData.find(p => p.id === s.product_id)?.purchase_price || 0,
+      reference_type: 'INITIAL',
+      reference_id: orgId,
+      notes: 'Saldo awal demo (' + demoType + ')'
+    }))
+
+    await supabase.from('stock_movements').insert(movements)
+  }
 }
+
