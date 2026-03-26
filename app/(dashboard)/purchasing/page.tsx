@@ -7,23 +7,19 @@ import { getProducts } from '@/modules/inventory/actions/inventory.actions'
 import { getAccountBalances } from '@/modules/accounting/actions/coa.actions'
 import PurchasingClient from './PurchasingClient'
 
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+
 export default async function PurchasingPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: member } = (await supabase
-    .from('org_members')
-    .select('org_id, organizations(name)')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()) as any
+  const orgData = await getActiveOrg()
+  if (!orgData) redirect('/onboarding')
 
-  if (!member) redirect('/onboarding')
-
-  const orgId = member.org_id
-  const orgName = member.organizations?.name || 'Nizam'
+  const orgId = orgData.org.id
+  const orgName = orgData.org.name || 'Nizam'
 
   const [purchases, vendors, products, coa] = await Promise.all([
     getPurchases(orgId),

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getContacts } from '@/modules/contacts/actions/contact.actions'
 import { getDashboardAnalytics } from '@/modules/accounting/actions/analytics.actions'
 import ContactClient from './ContactClient'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 export default async function ContactsPage() {
   const supabase = await createClient()
@@ -9,19 +10,19 @@ export default async function ContactsPage() {
 
   if (!user) return null
 
-  const { data: orgMember } = await supabase.from('org_members')
-    .select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  const orgData = await getActiveOrg()
+  if (!orgData) return null
 
-  if (!orgMember) return null
+  const orgId = orgData.org.id
 
   const [contacts, analytics] = await Promise.all([
-    getContacts(orgMember.org_id),
-    getDashboardAnalytics(orgMember.org_id)
+    getContacts(orgId),
+    getDashboardAnalytics(orgId)
   ])
   
   return (
     <ContactClient 
-      orgId={orgMember.org_id} 
+      orgId={orgId} 
       contacts={contacts} 
       customerPareto={analytics.customerPareto} 
     />

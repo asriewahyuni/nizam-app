@@ -38,24 +38,19 @@ export async function getBankAccountsWithBalance(orgId: string) {
   })
 }
 
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+
 export default async function CashPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Get current organization
-  const { data: member } = (await supabase
-    .from('org_members')
-    .select('org_id, role, organizations(name)')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()) as any
+  const orgData = await getActiveOrg()
+  if (!orgData) redirect('/onboarding')
 
-  if (!member) redirect('/onboarding')
-
-  const orgId = member.org_id
-  const orgName = member.organizations?.name || 'Nizam'
+  const orgId = orgData.org.id
+  const orgName = orgData.org.name || 'Nizam'
 
   const [bankAccounts, allAccounts, recentTransactions] = await Promise.all([
     getBankAccountsWithBalance(orgId),
@@ -83,7 +78,7 @@ export default async function CashPage() {
         categoryAccounts={categoryAccounts}
         bankGlAccounts={bankGlAccounts}
         recentTransactions={recentTransactions}
-        userRole={member.role}
+        userRole={orgData.role}
       />
     </div>
   )

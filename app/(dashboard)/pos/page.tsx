@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import POSClient from './POSClient'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 export default async function POSPage() {
   const supabase = await createClient()
@@ -7,12 +8,10 @@ export default async function POSPage() {
 
   if (!user) return null
 
-  const { data: orgMember } = await supabase.from('org_members')
-    .select('org_id').eq('user_id', user.id).eq('is_active', true).single()
+  const orgData = await getActiveOrg()
+  if (!orgData) return null
 
-  if (!orgMember) return null
-  
-  const orgId = orgMember.org_id
+  const orgId = orgData.org.id
 
   // Fetch active products with total stock
   const { data: products } = await supabase.from('products').select('*, inventory_stocks(quantity)')
