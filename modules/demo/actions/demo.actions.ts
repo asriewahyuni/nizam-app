@@ -281,37 +281,74 @@ async function seedDemoData(supabase: any, orgId: string, demoType: DemoBusiness
     ]
   }
 
-  // --- INSERT DATA ---
+  // --- FETCH ACCOUNTS CREATED BY TRIGGER ---
+  const { data: accounts } = await supabase.from('accounts').select('id, code').eq('org_id', orgId)
+  const invAccId = accounts?.find((a: any) => a.code === '1301')?.id
+  const incomeAccId = accounts?.find((a: any) => a.code === '4001')?.id
+  const expenseAccId = accounts?.find((a: any) => a.code === '5001')?.id
+  const capitalAccId = accounts?.find((a: any) => a.code === '3001')?.id
+
+  // --- MAP PRODUCTS WITH ACCOUNTS & INSERT ---
+  const finalProducts = productsData.map(p => ({
+    ...p,
+    asset_account_id: p.type === 'INVENTORY' ? invAccId : null,
+    income_account_id: incomeAccId,
+    expense_account_id: expenseAccId
+  }))
+
   await supabase.from('warehouses').insert(warehousesData)
   await supabase.from('contacts').insert(contactsData)
-  await supabase.from('products').insert(productsData)
+  await supabase.from('products').insert(finalProducts)
 
   const wh1Id = warehousesData[0].id
   
-  // --- INITIAL STOCK (give some items starting inventory) ---
-  const stockItems = productsData.filter(p => p.type === 'INVENTORY').slice(0, 5).map(p => ({
+  // --- INITIAL STOCK & JOURNAL ENTRY (Double Entry Accounting) ---
+  const stockItems = finalProducts.filter(p => p.type === 'INVENTORY').map(p => ({
     org_id: orgId,
     product_id: p.id,
     warehouse_id: wh1Id,
-    quantity: 50 // Give decent starting stock for demo
+    quantity: 50 
   }))
 
-  if (stockItems.length > 0) {
+  if (stockItems.length > 0 && invAccId && capitalAccId) {
+    // 1. Physical Stocks
     await supabase.from('inventory_stocks').insert(stockItems)
 
-    // Seed stock_movements for accurate sub-ledger
-    const movements = stockItems.map(s => ({
-      org_id: orgId,
-      product_id: s.product_id,
-      movement_date: new Date().toISOString().split('T')[0],
-      quantity: s.quantity,
-      unit_price: productsData.find(p => p.id === s.product_id)?.purchase_price || 0,
-      reference_type: 'INITIAL',
-      reference_id: orgId,
-      notes: 'Saldo awal demo (' + demoType + ')'
-    }))
+    // 2. Journal Entry (Ledger) for Financial Visibility
+    const totalValue = stockItems.reduce((sum, s) => {
+      const p = finalProducts.find(prod => prod.id === s.product_id)
+      return sum + (s.quantity * (p?.purchase_price || 0))
+    }, 0)
 
-    await supabase.from('stock_movements').insert(movements)
+    const { data: entry } = await supabase.from('journal_entries').insert({
+      org_id: orgId,
+      entry_date: new Date().toISOString().split('T')[0],
+      description: 'Saldo Awal Persediaan (Demo Seed)',
+      status: 'POSTED',
+      is_auto: true
+    }).select().single()
+
+    if (entry) {
+      // Create Journal Lines
+      await supabase.from('journal_lines').insert([
+        { entry_id: entry.id, account_id: invAccId, debit: totalValue, credit: 0, memo: 'Persediaan Awal' },
+        { entry_id: entry.id, account_id: capitalAccId, debit: 0, credit: totalValue, memo: 'Modal Awal (Inventory)' }
+      ])
+
+      // 3. Stock Movements (Sub-Ledger) - Link to Journal Entry
+      const movements = stockItems.map(s => ({
+        org_id: orgId,
+        product_id: s.product_id,
+        movement_date: new Date().toISOString().split('T')[0],
+        quantity: s.quantity,
+        unit_price: finalProducts.find(p => p.id === s.product_id)?.purchase_price || 0,
+        reference_type: 'INITIAL',
+        reference_id: entry.id,
+        notes: 'Saldo awal demo (' + demoType + ')'
+      }))
+
+      await supabase.from('stock_movements').insert(movements)
+    }
   }
 }
 

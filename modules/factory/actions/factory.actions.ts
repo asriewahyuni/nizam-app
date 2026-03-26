@@ -137,8 +137,9 @@ export async function getWorkOrders(orgId: string) {
         id, code,
         product:products(id, name, sku),
         items:production_bom_items(
+          product_id,
           quantity,
-          product:products(name, average_cost, purchase_price)
+          product:products(id, name, average_cost, purchase_price, sku)
         )
       )
     `)
