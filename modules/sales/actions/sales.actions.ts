@@ -7,7 +7,7 @@ export async function getSales(orgId: string) {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('sales' as any)
-    .select('*, contacts(name), sales_items(*, products(name, sku)), sales_returns(status, grand_total, return_number), sales_payments(amount, discount_amount)' as any)
+    .select('*, contacts(name), sales_items(*, products(name, sku, unit)), sales_returns(status, grand_total, return_number), sales_payments(amount, discount_amount)' as any)
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
 
@@ -213,7 +213,7 @@ export async function getQuotations(orgId: string) {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('sales' as any)
-    .select('*, contacts(name), sales_items(*, products(name, sku))' as any)
+    .select('*, contacts(name), sales_items(*, products(name, sku, unit))' as any)
     .eq('org_id', orgId)
     .eq('status', 'QUOTATION')
     .order('created_at', { ascending: false })

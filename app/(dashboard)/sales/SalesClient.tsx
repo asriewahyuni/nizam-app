@@ -100,7 +100,8 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
     unit_price: 0,
     discount_amount: 0,
     stock_available: 0,
-    type: 'INVENTORY'
+    type: 'INVENTORY' as 'INVENTORY' | 'NON_INVENTORY' | 'SERVICE',
+    unit: 'Pcs'
   }])
 
   // Filter COA for payment accounts (Kas/Bank) if Lunas
@@ -123,7 +124,8 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
       unit_price: 0,
       discount_amount: 0,
       stock_available: 0,
-      type: 'INVENTORY'
+      type: 'INVENTORY',
+      unit: 'Pcs'
     }])
   }
 
@@ -144,10 +146,12 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
           updatedLine.unit_price = foundProduct.selling_price || 0
           updatedLine.stock_available = foundProduct.stock_available || 0
           updatedLine.type = foundProduct.type
+          updatedLine.unit = foundProduct.unit || 'Pcs'
         } else {
           updatedLine.product_id = '' 
           updatedLine.stock_available = 0
           updatedLine.type = 'SERVICE' 
+          updatedLine.unit = 'Pasang' // Fallback for service? Or 'Unit'
         }
       }
       return updatedLine
@@ -215,7 +219,7 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
       setSuccess('Penjualan baru berhasil dicatat.')
       setShowModal(false)
       // Reset form
-      setLines([{ id: Date.now(), product_name: '', product_id: '', quantity: 1, unit_price: 0, discount_amount: 0, stock_available: 0, type: 'INVENTORY' }])
+      setLines([{ id: Date.now(), product_name: '', product_id: '', quantity: 1, unit_price: 0, discount_amount: 0, stock_available: 0, type: 'INVENTORY', unit: 'Pcs' }])
       setCustomerId('')
       setNotes('')
       setSaleDate(new Date().toISOString().split('T')[0])
@@ -700,8 +704,8 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
                     <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                        <div className="col-span-4">Barang / Jasa</div>
                        <div className="col-span-2">Qty Kuintitas</div>
-                       <div className="col-span-3">Harga Jual / Pcs</div>
-                       <div className="col-span-2">Diskon / Pcs (Rp)</div>
+                       <div className="col-span-3">Harga Jual / Satuan</div>
+                       <div className="col-span-2">Diskon / Satuan (Rp)</div>
                        <div className="col-span-1 text-center">Aksi</div>
                     </div>
 
@@ -722,7 +726,7 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg outline-none text-sm" 
                           />
                           {line.product_id ? (
-                            <span className="text-[9px] font-bold text-blue-600 block mt-1">✓ Master ({line.type}) | Sisa Stok: {line.stock_available}</span>
+                             <span className="text-[9px] font-bold text-blue-600 block mt-1">✓ Master ({line.type}) | Sisa Stok: {line.stock_available} {line.unit}</span>
                           ) : line.product_name ? (
                             <span className="text-[9px] font-bold text-purple-600 block mt-1">+ Jasa Kustom Non-Inventori</span>
                           ) : null}
@@ -756,7 +760,7 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
                         </div>
 
                         <div className="sm:col-span-2">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Potongan Harga / Pcs (Rp)</label>
+                           <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Potongan Harga / {line.unit} (Rp)</label>
                           <CurrencyInput
                             label=""
                             value={line.discount_amount}
@@ -871,7 +875,7 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
                            <div key={it.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                               <div>
                                 <div className="text-sm font-bold text-slate-900">{it.description}</div>
-                                <div className="text-[10px] text-slate-400 font-bold">Terjual: {it.quantity} Unit @ {formatCurrency(it.unit_price)}</div>
+                                 <div className="text-[10px] text-slate-400 font-bold">Terjual: {it.quantity} {it.products?.unit || 'Unit'} @ {formatCurrency(it.unit_price)}</div>
                               </div>
                               <div className="flex items-center gap-3">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase">Qty Retur:</label>
@@ -1020,7 +1024,7 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
                         {viewSale.sales_items?.map((item: any) => (
                           <tr key={item.id}>
                              <td className="py-3 px-2 font-medium text-slate-900 print:border print:border-slate-200">{item.description}</td>
-                             <td className="py-3 px-2 text-right text-slate-600 font-bold print:border print:border-slate-200">{item.quantity}</td>
+                              <td className="py-3 px-2 text-right text-slate-600 font-bold print:border print:border-slate-200">{item.quantity} {item.products?.unit || ''}</td>
                              <td className={`py-3 px-2 text-right text-slate-600 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>{formatCurrency(item.unit_price)}</td>
                              <td className={`py-3 px-2 text-right text-rose-500 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>{item.discount_amount > 0 ? formatCurrency(item.discount_amount) : '-'}</td>
                              <td className={`py-3 px-2 text-right font-bold text-slate-900 print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>{formatCurrency((item.quantity * item.unit_price) - item.discount_amount)}</td>

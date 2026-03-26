@@ -48,12 +48,14 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
   
   const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false)
   
+  const UNIT_OPTIONS = ['Pcs', 'Unit', 'Kg', 'Gram', 'Liter', 'Ml', 'Box', 'Pack', 'Roll', 'Lembar', 'Set', 'Lusin', 'Meter', 'Cm', 'Pasang', 'Rim', 'Karton', 'Botol', 'Galon', 'Lainnya']
   const [formData, setFormData] = useState({
     name: '',
     sku: '',
     barcode: '',
     type: 'INVENTORY' as 'INVENTORY' | 'NON_INVENTORY' | 'SERVICE',
     unit: 'Pcs',
+    custom_unit: '',
     purchase_price: '0',
     selling_price: '0'
   })
@@ -98,6 +100,7 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
       barcode: (product as any).barcode || '',
       type: product.type as any,
       unit: product.unit || 'Pcs',
+      custom_unit: UNIT_OPTIONS.includes(product.unit || 'Pcs') ? '' : (product.unit || ''),
       purchase_price: product.purchase_price?.toString() || '0',
       selling_price: product.selling_price?.toString() || '0'
     })
@@ -106,7 +109,7 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
 
   const handleOpenNew = () => {
     setEditId(null)
-    setFormData({ name: '', sku: '', barcode: '', type: 'INVENTORY', unit: 'Pcs', purchase_price: '0', selling_price: '0' })
+    setFormData({ name: '', sku: '', barcode: '', type: 'INVENTORY', unit: 'Pcs', custom_unit: '', purchase_price: '0', selling_price: '0' })
     setIsModalOpen(true)
   }
 
@@ -208,7 +211,7 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
           sku: formData.sku,
           barcode: formData.barcode,
           type: formData.type,
-          unit: formData.unit,
+          unit: formData.unit === 'Lainnya' ? formData.custom_unit : formData.unit,
           purchase_price: parseFloat(formData.purchase_price) || 0,
           selling_price: parseFloat(formData.selling_price) || 0,
         })
@@ -220,7 +223,7 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
           sku: formData.sku,
           barcode: formData.barcode,
           type: formData.type,
-          unit: formData.unit,
+          unit: formData.unit === 'Lainnya' ? formData.custom_unit : formData.unit,
           purchase_price: parseFloat(formData.purchase_price) || 0,
           selling_price: parseFloat(formData.selling_price) || 0,
         })
@@ -296,7 +299,7 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
           icon={AlertTriangle}
           color="rose"
           alert={stats.lowStock > 0}
-          sub="Barang dengan qty <= 5 pcs"
+          sub="Barang dengan stok mulai habis"
         />
         <StatCard 
           label="Lokasi Gudang" 
@@ -702,6 +705,26 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
                         <button type="button" onClick={() => setIsBarcodeScannerOpen(true)} className="absolute right-4 bottom-4 text-slate-400 hover:text-blue-600">
                           <Box size={16} />
                         </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-5">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Satuan Produk</label>
+                        <select required value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-bold text-slate-900 outline-none focus:border-blue-500 shadow-inner">
+                           {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                        {formData.unit === 'Lainnya' && (
+                          <input placeholder="Ketik satuan..." required value={formData.custom_unit} onChange={(e) => setFormData({...formData, custom_unit: e.target.value})} className="w-full mt-2 px-6 py-4 bg-amber-50 rounded-2xl border border-amber-200 font-bold text-amber-700 outline-none focus:border-amber-500 shadow-inner" />
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jenis Produk</label>
+                        <select value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value as any})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-bold text-slate-900 outline-none focus:border-blue-500 shadow-inner">
+                           <option value="INVENTORY">Inventory (Barang Fisik)</option>
+                           <option value="NON_INVENTORY">Non-Inventory (Bahan Habis Pakai)</option>
+                           <option value="SERVICE">Jasa/Servis</option>
+                        </select>
                       </div>
                     </div>
 

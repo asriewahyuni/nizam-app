@@ -19,7 +19,7 @@ export async function getPurchases(orgId: string) {
         quantity,
         unit_price,
         total_amount,
-        products (name, sku)
+        products (name, sku, unit)
       ),
       purchase_payments (amount, discount_amount),
       purchase_returns (total_amount)
@@ -42,7 +42,7 @@ export async function getPurchases(orgId: string) {
           quantity,
           unit_price,
           total_amount,
-          products (name, sku)
+          products (name, sku, unit)
         )
       ` as any)
       .eq('org_id', orgId)
@@ -127,7 +127,8 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
          .update({
             purchase_price: trueHpp,
             selling_price: line.selling_price || trueHpp * 1.25,
-            category: line.category
+            category: line.category,
+            unit: line.unit // Sync unit from PO to master product
          })
          .eq('id', finalProductId)
          .eq('org_id', orgId)

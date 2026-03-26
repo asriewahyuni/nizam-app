@@ -114,7 +114,7 @@ export default function POSClient({ orgId, products, customers, accounts, curren
                      setCart((prev: any[]) => {
                         const existing = prev.find((item: any) => item.id === product.id)
                         if (existing) return prev.map((item: any) => item.id === product.id ? { ...item, qty: item.qty + 1 } : item)
-                        return [...prev, { id: product.id, name: product.name, price: product.selling_price, qty: 1, sku: product.sku }]
+                        return [...prev, { id: product.id, name: product.name, price: product.selling_price, qty: 1, sku: product.sku, unit: product.unit || 'Pcs' }]
                      })
                   } else {
                      console.warn('Barcode Produk tidak dikenali:', scannedCode)
@@ -180,7 +180,7 @@ export default function POSClient({ orgId, products, customers, accounts, curren
             }
             return prev.map((item: any) => item.id === product.id ? { ...item, qty: item.qty + 1 } : item)
          }
-         return [...prev, { id: product.id, name: product.name, price: product.selling_price, qty: 1, sku: product.sku, stock: product.stock }]
+         return [...prev, { id: product.id, name: product.name, price: product.selling_price, qty: 1, sku: product.sku, stock: product.stock, unit: product.unit || 'Pcs' }]
       })
    }
 
@@ -346,7 +346,7 @@ export default function POSClient({ orgId, products, customers, accounts, curren
                               {formatRupiah(p.selling_price)}
                            </div>
                            <div className={`mt-2 text-[9px] font-bold px-2 py-0.5 rounded-md w-fit ${p.stock <= 5 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-400'}`}>
-                              Stok: {p.stock || 0}
+                              Stok: {p.stock || 0} {p.unit || 'Pcs'}
                            </div>
                         </button>
                      ))}
@@ -419,7 +419,7 @@ export default function POSClient({ orgId, products, customers, accounts, curren
                            >
                               <div className="flex-1 min-w-0">
                                  <div className="font-bold text-slate-800 text-xs truncate leading-tight">{item.name}</div>
-                                 <div className="text-[10px] font-black text-blue-600 mt-1">{formatRupiah(item.price)}</div>
+                                 <div className="text-[10px] font-black text-blue-600 mt-1">{formatRupiah(item.price)} / {item.unit}</div>
                               </div>
 
                               <div className="flex items-center gap-1.5 bg-slate-50 rounded-xl p-1 border border-slate-100">
@@ -750,7 +750,7 @@ export default function POSClient({ orgId, products, customers, accounts, curren
                            <tr key={idx} className="align-top">
                               <td className="w-full pb-1 pr-2">
                                  {item.name} <br/>
-                                 {item.qty} x {formatRupiah(item.price)}
+                                 {item.qty} {item.unit} x {formatRupiah(item.price)}
                               </td>
                               <td className="text-right pb-1">{formatRupiah(item.price * item.qty)}</td>
                            </tr>

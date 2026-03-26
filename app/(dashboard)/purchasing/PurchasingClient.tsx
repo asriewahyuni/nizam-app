@@ -727,7 +727,7 @@ export default function PurchasingClient({ orgId, orgName, purchases, vendors, p
 
                         <div className="col-span-2">
                           <CurrencyInput 
-                            label="HPP (Modal) / Pcs"
+                            label={`HPP (Modal) / ${line.unit}`}
                             value={line.unit_price}
                             onChange={(val) => handleLineChange(line.id, 'unit_price', val)}
                             placeholder="0"
@@ -1013,7 +1013,7 @@ export default function PurchasingClient({ orgId, orgName, purchases, vendors, p
                            <div key={it.id} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 transition-all hover:border-amber-200 group">
                               <div className="flex-1">
                                  <p className="text-xs font-black text-slate-900">{it.description}</p>
-                                 <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">Diterima: {it.quantity} Pcs • {formatCurrency(it.unit_price)}</p>
+                                 <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">Diterima: {it.quantity} {it.products?.unit || 'Pcs'} • {formatCurrency(it.unit_price)}</p>
                               </div>
                               <div className="flex items-center gap-3">
                                  <div className="text-right">
@@ -1167,7 +1167,7 @@ export default function PurchasingClient({ orgId, orgName, purchases, vendors, p
                              <tr key={item.id} className="hover:bg-slate-50/50">
                                <td className="py-3 px-4 text-slate-500 text-center">{i + 1}</td>
                                <td className="py-3 px-4 font-semibold text-slate-900">{item.description}</td>
-                               <td className="py-3 px-4 text-center text-slate-700">{item.quantity}</td>
+                               <td className="py-3 px-4 text-center text-slate-700">{item.quantity} {item.products?.unit || 'Pcs'}</td>
                                <td className="py-3 px-4 text-right text-slate-700">{formatRupiah(item.unit_price)}</td>
                                <td className="py-3 px-4 text-right font-semibold text-slate-900">{formatRupiah(item.total_amount)}</td>
                              </tr>
