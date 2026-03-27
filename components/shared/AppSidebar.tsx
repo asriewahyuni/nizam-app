@@ -148,9 +148,9 @@ export function AppSidebar({
 
   // Persist collapse state
   useEffect(() => {
-    setMounted(true)
     const saved = localStorage.getItem('nizam_sidebar_collapsed')
     if (saved === 'true') setIsCollapsed(true)
+    setMounted(true)
 
     // Listen for mobile toggle
     const handleMobileToggle = () => setIsCollapsed(prev => !prev)
