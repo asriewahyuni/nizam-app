@@ -153,3 +153,31 @@ export async function getAccountBalances(orgId: string): Promise<AccountBalance[
   if (error) return []
   return (data as AccountBalance[]) || []
 }
+// ─────────────────────────────────────────────────────────────
+// seedInitialCoA — Manual trigger to seed default PSAK CoA if empty
+// ─────────────────────────────────────────────────────────────
+export async function seedInitialCoA(orgId: string) {
+  const supabase = await createClient()
+
+  // First check if already has accounts to prevent double seeding
+  const { data: existing } = await supabase
+    .from('accounts')
+    .select('id')
+    .eq('org_id', orgId)
+    .limit(1)
+
+  if (existing && existing.length > 0) {
+    return { error: 'Sudah ada akun CoA untuk organisasi ini.' }
+  }
+
+  // Use RPC if available, or just call the seed function
+  const { error } = await supabase.rpc('seed_default_coa', { p_org_id: orgId })
+
+  if (error) {
+    console.error('Seed CoA Error:', error)
+    return { error: 'Gagal menyiapkan akun standar. Silakan hubungi dukungan.' }
+  }
+
+  revalidatePath('/settings/accounts')
+  return { success: true }
+}

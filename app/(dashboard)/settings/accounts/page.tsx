@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 
-import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
+import { getChartOfAccounts, seedInitialCoA } from '@/modules/accounting/actions/coa.actions'
 import AccountRowActions from './components/AccountRowActions'
 
 import { redirect } from 'next/navigation'
@@ -53,6 +53,33 @@ export default async function ChartOfAccountsPage() {
           + Tambah Akun
         </a>
       </div>
+
+      {/* Empty State */}
+      {accounts.length === 0 && (
+        <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">
+          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">Belum ada akun CoA</h3>
+          <p className="text-gray-500 max-w-sm mx-auto mb-8 text-sm">
+            Tabel Chart of Accounts (CoA) Anda masih kosong. Ini bisa terjadi jika terjadi kendala saat registrasi otomatis.
+          </p>
+          
+          <form action={async () => {
+            'use server'
+            await seedInitialCoA(orgData.org.id)
+          }}>
+            <button
+              type="submit"
+              className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+            >
+              Siapkan Akun Standar PSAK Sekarang
+            </button>
+          </form>
+        </div>
+      )}
 
       {typeOrder.map((type) => {
         const typeAccounts = grouped[type] || []
