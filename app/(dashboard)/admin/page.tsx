@@ -71,7 +71,9 @@ export default function SaaSAdminPage() {
       setLoadingPackages(true)
       const { data, error } = await db.from('saas_packages').select('*').order('price', { ascending: true })
       
-      if (error) return
+      if (error) throw error
+
+      console.log("RAW PACKAGES FROM DATABASE:", data) // 🕵️ LIHAT APAKAH ADA COLUMN duration_days?
 
       const formatted = (data || []).map((p: any) => ({
         ...p,
@@ -124,26 +126,27 @@ export default function SaaSAdminPage() {
       const payload = {
         name: fd.get('name') as string,
         price: Number(fd.get('price')),
-        duration_days: Number(fd.get('duration_days') || 30),
         billing: fd.get('billing') as string,
         is_active: true,
         modules: modules,
-        addons: addonsRaw ? addonsRaw.split(',').map(s => s.trim()).filter(Boolean) : []
+        addons: addonsRaw ? addonsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+        duration_days: Number(fd.get('duration_days') || 30)
       }
 
-      const { error } = pkgModal.editData?.id 
+      const { error } = pkgModal.editData?.id
         ? await db.from('saas_packages').update(payload).eq('id', pkgModal.editData.id)
-        : await db.from('saas_packages').insert([payload])
+        : await db.from('saas_packages').upsert([payload], { onConflict: 'name' })
 
       if (error) throw error
 
       setPkgModal({ open: false, editData: null })
-      fetchPackages()
+      await fetchPackages()
     } catch (err: any) {
-      console.error("SavePackage Failed:", err)
-      alert("Gagal menyimpan paket: " + (err.message || "Unknown error"))
+      console.error('SavePackage Failed:', err)
+      alert('❌ Gagal menyimpan paket: ' + (err.message || 'Unknown error'))
     }
   }
+
 
   // ==================== CRUD ORGANIZATIONS ====================
   const handleDeleteOrg = (id: string, name: string) => {
@@ -369,7 +372,7 @@ export default function SaaSAdminPage() {
                             {pkg.price > 0 && <span className="text-xs text-slate-400 font-bold">/{pkg.billing}</span>}
                           </div>
                           <p className={`text-[10px] font-black uppercase tracking-wider ${pkg.price === 0 ? 'text-orange-500' : 'text-emerald-600'}`}>
-                            Batas Waktu: {pkg.duration_days !== null && pkg.duration_days !== undefined ? pkg.duration_days : 30} Hari
+                            Batas: {pkg.duration_days ?? '?'} Hari
                           </p>
                         </div>
 
@@ -395,6 +398,11 @@ export default function SaaSAdminPage() {
                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${pkg.active ? 'translate-x-6' : 'translate-x-1'}`} />
                          </button>
                       </div>
+                      
+                      {/* 🛡️ RAW DATA (Hanya untuk kita pantau isi DB-nya) */}
+                      <pre className="mt-4 p-2 bg-slate-900 text-[8px] text-emerald-400 font-mono rounded-lg overflow-hidden opacity-30 group-hover:opacity-100 transition-opacity">
+                        {JSON.stringify({ dur: pkg.duration_days, name: pkg.name }, null, 2)}
+                      </pre>
                     </div>
                  ))}
               </div>
