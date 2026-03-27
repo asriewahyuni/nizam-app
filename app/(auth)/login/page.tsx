@@ -166,16 +166,6 @@ function LoginForm() {
             <form action={signInWithNik} className="space-y-5">
               <input type="hidden" name="redirectTo" value={searchParams.get('redirectTo') || ''} />
 
-              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-                <div className="flex items-center gap-2 text-emerald-700">
-                  <ShieldCheck size={16} />
-                  <span className="text-[10px] font-black uppercase tracking-wider">Login Karyawan — Gunakan NIK Anda</span>
-                </div>
-                <p className="text-[10px] text-emerald-600 mt-1 font-medium">
-                  Belum punya akun? Kunjungi <Link href="/register-employee" className="font-black underline">/register-employee</Link>
-                </p>
-              </div>
-
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nomor Induk Karyawan (NIK)</label>
                 <input

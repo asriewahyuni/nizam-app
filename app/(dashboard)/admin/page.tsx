@@ -22,12 +22,6 @@ import { Organization } from '@/types/database.types'
 
 const supabase = createClient()
 
-const MOCK_PACKAGES = [
-  { id: 'P-001', name: 'Basic', price: 150000, billing: 'Bulan', is_active: true, modules: ['Accounting', 'Cash'], addons: [] },
-  { id: 'P-002', name: 'Pro', price: 350000, billing: 'Bulan', is_active: true, modules: ['Accounting', 'Cash', 'POS', 'Inventory'], addons: ['CRM'] },
-  { id: 'P-003', name: 'Enterprise', price: 950000, billing: 'Bulan', is_active: true, modules: ['Accounting', 'Cash', 'POS', 'Inventory', 'HRIS', 'Factory'], addons: ['Full API', 'Priority Support'] }
-]
-
 const AVAILABLE_MODULES = [
   'Accounting', 'Finance', 'Inventory', 'Purchasing', 
   'Sales', 'POS', 'HRIS', 'Manufacturing', 
@@ -62,7 +56,7 @@ export default function SaaSAdminPage() {
   const fetchOrganizations = async () => {
     try {
       setLoading(true)
-      const { data, error } = await (supabase.from('organizations') as any).select('*').order('created_at', { ascending: false })
+      const { data, error } = await db.from('organizations').select('*').order('created_at', { ascending: false })
       if (error) throw error
       setOrgs(data || [])
     } catch (err: any) {
@@ -75,12 +69,9 @@ export default function SaaSAdminPage() {
   const fetchPackages = async () => {
     try {
       setLoadingPackages(true)
-      const { data, error } = await (supabase.from('saas_packages') as any).select('*').order('price', { ascending: true })
+      const { data, error } = await db.from('saas_packages').select('*').order('price', { ascending: true })
       
-      if (error) {
-         setPackages(MOCK_PACKAGES.map(p => ({ ...p, active: p.is_active })))
-         return
-      }
+      if (error) return
 
       const formatted = (data || []).map((p: any) => ({
         ...p,
@@ -88,9 +79,8 @@ export default function SaaSAdminPage() {
         modules: Array.isArray(p.modules) ? p.modules : JSON.parse(p.modules || '[]'),
         addons: Array.isArray(p.addons) ? p.addons : JSON.parse(p.addons || '[]')
       }))
-      setPackages(formatted.length > 0 ? formatted : MOCK_PACKAGES.map(p => ({ ...p, active: p.is_active })))
+      setPackages(formatted)
     } catch (err: any) {
-      setPackages(MOCK_PACKAGES.map(p => ({ ...p, active: p.is_active })))
     } finally {
       setLoadingPackages(false)
     }
@@ -105,7 +95,7 @@ export default function SaaSAdminPage() {
   const togglePackageStatus = async (pkgId: string, currentStatus: boolean) => {
     setPackages(packages.map(p => p.id === pkgId ? { ...p, active: !p.active } : p))
     try {
-       await (supabase.from('saas_packages') as any).update({ is_active: !currentStatus }).eq('id', pkgId)
+       await db.from('saas_packages').update({ is_active: !currentStatus }).eq('id', pkgId)
     } catch (err) {}
   }
 
@@ -115,7 +105,7 @@ export default function SaaSAdminPage() {
       title: "Hapus Paket?",
       message: "Tindakan ini tidak dapat dibatalkan. Konfirmasi penghapusan paket SaaS?",
       action: async () => {
-         const { error } = await (supabase.from('saas_packages') as any).delete().eq('id', id)
+         const { error } = await db.from('saas_packages').delete().eq('id', id)
         if (error) {
            alert("Gagal menghapus paket: " + error.message)
         }
@@ -132,9 +122,10 @@ export default function SaaSAdminPage() {
     const payload = {
       name: fd.get('name') as string,
       price: Number(fd.get('price')),
+      duration_days: Number(fd.get('duration_days') || 30),
       billing: fd.get('billing') as string,
       is_active: true,
-      modules: modules.length > 0 ? modules : (fd.get('modules_legacy') as string || '').split(',').map(s => s.trim()).filter(Boolean),
+      modules: modules,
       addons: (fd.get('addons') as string).split(',').map(s => s.trim()).filter(Boolean)
     }
 
@@ -154,9 +145,7 @@ export default function SaaSAdminPage() {
       title: "Hapus Organisasi?",
       message: `Tindakan ini akan menghapus permanen data "${name}" beserta seluruh isinya secara aman dan tuntas. Anda yakin?`,
       action: async () => {
-        // Use the new RPC function for robust cascading delete
-        const { error } = await (supabase as any).rpc('delete_org_cascade', { target_org_id: id })
-        
+        const { error } = await db.rpc('delete_org_cascade', { target_org_id: id })
         if (error) {
            alert("Gagal menghapus organisasi sakti:\n\n" + error.message)
         }
@@ -166,17 +155,15 @@ export default function SaaSAdminPage() {
     })
   }
 
-  const bulkDeleteDemos = async () => {
-    const demos = orgs.filter(o => (o as any).is_demo)
-    if (demos.length === 0) return alert("Tidak ada akun demo yang ditemukan.")
-
+  const bulkDeleteDemos = () => {
     setConfirmState({
       open: true,
-      title: `Hapus ${demos.length} Akun Demo?`,
-      message: `Tindakan ini akan menghapus SEMUA akun bertanda "DEMO" secara permanen dan tuntas.`,
+      title: "Hapus Semua Akun Demo?",
+      message: "Ini akan menghapus seluruh organisasi yang ditandai sebagai Akun Demo/Latihan secara aman.",
       action: async () => {
-        for (const demo of demos) {
-           await supabase.rpc('delete_org_cascade', { target_org_id: demo.id })
+        const demos = orgs.filter(o => (o as any).is_demo)
+        for(const d of demos) {
+          await db.rpc('delete_org_cascade', { target_org_id: d.id })
         }
         await fetchOrganizations()
         setConfirmState(prev => ({ ...prev, open: false }))
@@ -187,177 +174,163 @@ export default function SaaSAdminPage() {
   const saveOrgForm = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
-    const nameStr = fd.get('name') as string
-    
-    // Create random slug for simplicity if missing
-    const slug = nameStr.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random()*100)
-    const settings = { plan: fd.get('plan') as string }
+    const payload = {
+      name: fd.get('name') as string,
+      settings: { 
+        plan: fd.get('plan') as string,
+        subscription_start: new Date().toISOString()
+      },
+      is_active: fd.get('is_active') === 'on',
+      is_demo: fd.get('is_demo') === 'on'
+    }
 
     if (orgModal.editData?.id) {
-      await supabase.from('organizations').update({ 
-         name: nameStr,
-         settings,
-         is_active: fd.get('is_active') === 'on',
-         is_demo: fd.get('is_demo') === 'on'
-      }).eq('id', orgModal.editData.id)
+      await db.from('organizations').update(payload).eq('id', orgModal.editData.id)
     } else {
-      await supabase.from('organizations').insert([{ 
-         name: nameStr, 
-         slug, 
-         settings, 
-         is_active: fd.get('is_active') === 'on',
-         is_demo: fd.get('is_demo') === 'on'
-      }])
+      const slug = payload.name.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.random().toString(36).substring(7)
+      await db.from('organizations').insert([{ ...payload, slug }])
     }
     setOrgModal({ open: false, editData: null })
     fetchOrganizations()
   }
 
+  const filteredOrgs = orgs.filter(o => {
+    const matchesSearch = o.name.toLowerCase().includes(searchTxt.toLowerCase())
+    const matchesType = typeFilter === 'all' || 
+                       (typeFilter === 'demo' && (o as any).is_demo) || 
+                       (typeFilter === 'official' && !(o as any).is_demo)
+    const matchesPkg = packageFilter === 'all' || (o.settings as any)?.plan === packageFilter
+    return matchesSearch && matchesType && matchesPkg
+  })
+
   return (
-    <div className="max-w-[1400px] mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <PageHeader
-        title="SaaS Admin Portal"
-        subtitle="Manajemen Pengguna Terdaftar, Modul, dan Paket Harga (Live CRUD)."
-        icon={<ShieldCheck />}
-        iconColor="text-indigo-600"
-        tag="Super Admin"
-        actions={
-          <div className="flex gap-2 p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200/60 shadow-inner">
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'users' ? 'bg-white text-indigo-700 shadow-md border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <Users size={16} /> Data Pengguna
-            </button>
-            <button
-              onClick={() => setActiveTab('packages')}
-              className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'packages' ? 'bg-white text-indigo-700 shadow-md border border-slate-200/50' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <Package size={16} /> Manajemen Paket
-            </button>
-          </div>
-        }
+    <div className="p-8 max-w-[1400px] mx-auto space-y-8 min-h-screen bg-[#F8F9FA]/30 pb-32">
+      <PageHeader 
+        title="Admin Control Center" 
+        subtitle="SaaS Management & Tenant Registry"
+        icon={<ShieldCheck className="text-blue-600" size={32} />}
       />
 
-      <AnimatePresence mode="wait">
-        <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
-          {activeTab === 'users' ? (
-            <SectionCard>
-              <SectionHeader 
-                title="Daftar Organisasi (Penyewa SaaS)" 
-                subtitle="Data organisasi dari Supabase public.organizations."
-                icon={Users}
-                actions={
-                  <div className="flex flex-col md:flex-row items-center gap-4">
-                    <div className="flex gap-2">
-                       <select value={typeFilter} onChange={(e: any) => setTypeFilter(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black uppercase tracking-tight shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20">
-                          <option value="all">Semua Tipe</option>
-                          <option value="demo">Hanya Demo/Latihan</option>
-                          <option value="official">Hanya Resmi/Prod</option>
-                       </select>
-                       <select value={packageFilter} onChange={(e: any) => setPackageFilter(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black uppercase tracking-tight shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20">
-                          <option value="all">Semua Paket</option>
-                          {packages.map(p => <option key={p.id||p.name} value={p.name}>{p.name}</option>)}
-                       </select>
-                    </div>
+      <div className="flex gap-2 p-1.5 bg-slate-100/80 backdrop-blur-sm rounded-2xl w-fit border border-slate-200 shadow-sm">
+        <button 
+          onClick={() => setActiveTab('users')}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'users' ? 'bg-white text-blue-600 shadow-md scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          <Users size={18} /> Tenant Manager
+        </button>
+        <button 
+          onClick={() => setActiveTab('packages')}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'packages' ? 'bg-white text-blue-600 shadow-md scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          <Package size={18} /> SaaS Packages
+        </button>
+      </div>
 
-                    <div className="relative">
-                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input 
-                        type="text" placeholder="Cari..." value={searchTxt} onChange={(e) => setSearchTxt(e.target.value)}
-                        className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-44 shadow-sm"
-                      />
-                    </div>
-                    
-                    <div className="h-6 w-px bg-slate-200 hidden md:block" />
-                    
-                    <div className="flex gap-2">
-                      <SafeButton variant="ghost" size="sm" onClick={fetchOrganizations} icon={<RefreshCw size={12} className={loading ? "animate-spin" : ""} />}>Refresh</SafeButton>
-                      <SafeButton variant="primary" size="sm" onClick={() => setOrgModal({ open: true, editData: null })} icon={<Plus size={12} />}>Daftar Baru</SafeButton>
-                      <button 
-                        onClick={bulkDeleteDemos} 
-                        className="px-4 py-2 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all shadow-sm active:scale-95 flex items-center gap-2"
-                      >
-                         <Trash2 size={12} /> Hapus Semua Demo
-                      </button>
-                    </div>
-                  </div>
-                }
-              />
-              <div className="overflow-x-auto min-h-[300px]">
-                {loading ? (
-                  <div className="flex flex-col items-center justify-center p-20 text-slate-400 gap-4"><Loader2 size={32} className="animate-spin text-indigo-500" /></div>
-                ) : error ? (
-                   <div className="p-8 text-center text-rose-500 font-bold border-b border-rose-100 bg-rose-50/50">Gagal memuat data: {error}</div>
-                ) : (
-                  <table className="w-full text-left border-collapse">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.2 }}
+        >
+          {activeTab === 'users' ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
+                <div className="lg:col-span-2 relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    value={searchTxt}
+                    onChange={(e) => setSearchTxt(e.target.value)}
+                    placeholder="Cari tenant / organisasi..." 
+                    className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-slate-700"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-widest">Tipe Akun</label>
+                  <select 
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value as any)}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+                  >
+                    <option value="all">Semua Tipe</option>
+                    <option value="official">Resmi / Produksi</option>
+                    <option value="demo">Demo / Latihan</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-widest">Filter Paket</label>
+                  <select 
+                    value={packageFilter}
+                    onChange={(e) => setPackageFilter(e.target.value)}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+                  >
+                    <option value="all">Semua Paket</option>
+                    {packages.map(p => <option key={p.id||p.name} value={p.name}>{p.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                 <SafeButton variant="primary" onClick={() => setOrgModal({ open: true, editData: null })} icon={<Plus size={18} />}>Registrasi Tenant Baru</SafeButton>
+                 <SafeButton variant="danger-ghost" onClick={bulkDeleteDemos} icon={<Trash2 size={18} />}>Bersihkan Akun Demo</SafeButton>
+                 <button onClick={fetchOrganizations} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors shadow-sm"><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></button>
+              </div>
+
+              <SectionCard>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
                     <thead>
-                      <tr className="bg-slate-50/50 border-b border-slate-100">
-                          <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-400">ID / Perusahaan</th>
-                          <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Paket Layanan</th>
-                          <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Tgl Bergabung</th>
-                          <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Status</th>
-                          <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Aksi CRUD</th>
+                      <tr className="border-b border-slate-100">
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Organisasi</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Tipe</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Paket / Plan</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Status</th>
+                        <th className="text-right py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {orgs
-                        .filter(o => o.name.toLowerCase().includes(searchTxt.toLowerCase()))
-                        .filter(o => {
-                           if (typeFilter === 'all') return true
-                           if (typeFilter === 'demo') return (o as any).is_demo === true
-                           return (o as any).is_demo === false || (o as any).is_demo === null
-                        })
-                        .filter(o => {
-                           if (packageFilter === 'all') return true
-                           return ((o as any).settings?.plan || 'Basic') === packageFilter
-                        })
-                        .map((org) => {
-                        const planContext = (org.settings as any)?.plan || 'Basic'
-                        return (
-                        <tr key={org.id} className="hover:bg-slate-50/60 transition-colors group">
+                      {filteredOrgs.map((org) => (
+                        <tr key={org.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="py-4 px-6">
-                              <div className="flex items-center gap-2">
-                                <p className="font-bold text-slate-900 text-sm">{org.name}</p>
-                                {(org as any).is_demo ? (
-                                  <span className="px-1.5 py-0.5 rounded-md bg-orange-100 text-orange-700 text-[8px] font-black uppercase tracking-tighter border border-orange-200 shadow-sm leading-none">DEMO</span>
-                                ) : (
-                                  <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase tracking-tighter border border-emerald-200 shadow-sm leading-none">RESMI</span>
-                                )}
-                              </div>
-                              <p className="text-[10px] text-slate-400 font-mono mt-0.5 tracking-tight truncate max-w-[150px]">{org.id}</p>
+                            <div>
+                               <p className="font-bold text-slate-900">{org.name}</p>
+                               <p className="text-[10px] text-slate-400 font-mono">{org.id.slice(0,8)}...</p>
+                            </div>
                           </td>
                           <td className="py-4 px-6">
-                              <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-black tracking-tight border shadow-sm bg-indigo-50 text-indigo-700 border-indigo-100`}>
-                                {planContext}
-                              </span>
+                            {(org as any).is_demo ? 
+                              <span className="px-2.5 py-1 bg-orange-50 text-orange-600 text-[10px] font-black uppercase rounded-lg border border-orange-100 flex items-center gap-1 w-fit"><Settings2 size={10} /> Demo</span> : 
+                              <span className="px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-black uppercase rounded-lg border border-blue-100 flex items-center gap-1 w-fit"><CheckCircle2 size={10} /> Official</span>
+                            }
                           </td>
-                          <td className="py-4 px-6 text-sm text-slate-600 font-medium">
-                              {new Date(org.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          <td className="py-4 px-6">
+                            <span className="text-sm font-bold text-slate-700">{(org.settings as any)?.plan || 'Basic'}</span>
                           </td>
-                          <td className="py-4 px-6 text-center">
-                              <StatusBadge variant={org.is_active ? 'success' : 'neutral'} label={org.is_active ? 'Aktif' : 'Nonaktif'} />
+                          <td className="py-4 px-6">
+                            <StatusBadge status={org.is_active ? 'active' : 'inactive'} label={org.is_active ? 'Running' : 'Suspended'} />
                           </td>
-                          <td className="py-4 px-6 text-right space-x-2">
+                          <td className="py-4 px-6 text-right">
+                            <div className="flex justify-end gap-2">
                               <button onClick={() => setOrgModal({ open: true, editData: org })} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
-                                <Edit3 size={18} />
+                                 <Edit3 size={18} />
                               </button>
                               <button onClick={() => handleDeleteOrg(org.id, org.name)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
-                                <Trash2 size={18} />
+                                 <Trash2 size={18} />
                               </button>
+                            </div>
                           </td>
                         </tr>
-                      )})}
-                      {orgs.length === 0 && !loading && (<tr><td colSpan={5} className="py-8 text-center text-sm font-medium text-slate-500">Belum ada organisasi terdaftar</td></tr>)}
+                      ))}
                     </tbody>
                   </table>
-                )}
-              </div>
-            </SectionCard>
+                </div>
+              </SectionCard>
+            </div>
           ) : (
             <div className="space-y-6">
               <div className="flex justify-between items-center">
-                 <p className="text-sm font-bold text-slate-500 italic">Konfigurasi paket SaaS di Supabase</p>
+                 <p className="text-sm font-bold text-slate-500 italic">Daftar Paket SaaS Aktif</p>
                  <SafeButton variant="primary" onClick={() => setPkgModal({ open: true, editData: null })} icon={<Plus size={16} />}>Tambah Paket Baru</SafeButton>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -384,10 +357,13 @@ export default function SaaSAdminPage() {
                         <div className="mb-6 space-y-1">
                           <div className="flex items-baseline gap-1">
                             <span className="text-2xl font-black font-mono text-slate-900 tracking-tighter">
-                              {pkg.price === 0 ? 'Custom' : `Rp ${pkg.price.toLocaleString('id-ID')}`}
+                              {pkg.price === 0 ? 'Trial / Free' : `Rp ${pkg.price.toLocaleString('id-ID')}`}
                             </span>
                             {pkg.price > 0 && <span className="text-xs text-slate-400 font-bold">/{pkg.billing}</span>}
                           </div>
+                          <p className={`text-[10px] font-black uppercase tracking-wider ${pkg.price === 0 ? 'text-orange-500' : 'text-emerald-600'}`}>
+                            Batas Waktu: {pkg.duration_days || 30} Hari
+                          </p>
                         </div>
 
                         <div className="space-y-4 mb-8">
@@ -401,18 +377,6 @@ export default function SaaSAdminPage() {
                               )) : <span className="text-xs text-slate-400 italic">Standard</span>}
                             </div>
                           </div>
-                          {pkg.addons?.length > 0 && (
-                            <div>
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Add-ons</p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {pkg.addons.map((add: string) => (
-                                   <span key={add} className="flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded-lg">
-                                     <Plus size={10} className="text-indigo-500" /> {add}
-                                   </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </div>
                       </div>
                       <div className="pt-4 border-t border-slate-100 mt-auto flex items-center justify-between">
@@ -442,44 +406,35 @@ export default function SaaSAdminPage() {
                      <h3 className="text-xl font-black text-slate-900">{pkgModal.editData ? 'Edit Paket SaaS' : 'Tambah Paket Baru'}</h3>
                      <button onClick={() => setPkgModal({ open: false, editData: null })} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors"><X size={20} /></button>
                   </div>
-                  <form onSubmit={savePackageForm} className="p-8 space-y-6">
+                  <form onSubmit={savePackageForm} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
                      <div>
                        <label className="block text-xs font-black uppercase text-slate-500 mb-2">Nama Paket</label>
-                       <input name="name" required defaultValue={pkgModal.editData?.name} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Cth: Enterprise" />
+                       <input name="name" required defaultValue={pkgModal.editData?.name} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Cth: Trial / Pro" />
                      </div>
                      <div className="grid grid-cols-2 gap-4">
                        <div>
-                         <label className="block text-xs font-black uppercase text-slate-500 mb-2">Harga</label>
+                         <label className="block text-xs font-black uppercase text-slate-500 mb-2">Harga (0 untuk Trial)</label>
                          <input name="price" type="number" required defaultValue={pkgModal.editData?.price} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="0" />
                        </div>
                        <div>
-                         <label className="block text-xs font-black uppercase text-slate-500 mb-2">Siklus</label>
-                         <input name="billing" defaultValue={pkgModal.editData?.billing || 'Bulan'} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                         <label className="block text-xs font-black uppercase text-slate-500 mb-2">Batas Waktu (Hari)</label>
+                         <input name="duration_days" type="number" required defaultValue={pkgModal.editData?.duration_days || 30} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="14" />
                        </div>
                      </div>
                      <div>
-                        <label className="block text-xs font-black uppercase text-slate-500 mb-3 tracking-widest flex items-center justify-between">
-                           Pilih Modul Aktif
-                           <span className="text-[10px] font-medium normal-case text-slate-400">Pilih modul yang disertakan dalam paket ini</span>
-                        </label>
+                       <label className="block text-xs font-black uppercase text-slate-500 mb-2">Siklus Penagihan</label>
+                       <input name="billing" defaultValue={pkgModal.editData?.billing || 'Bulan'} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Cth: Sekali / Bulan" />
+                     </div>
+                     <div>
+                        <label className="block text-xs font-black uppercase text-slate-500 mb-3 tracking-widest flex items-center justify-between">Pilih Modul Aktif</label>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-200">
                            {AVAILABLE_MODULES.map(mod => (
-                              <label key={mod} className="flex items-center gap-2 p-2 hover:bg-white rounded-xl cursor-pointer transition-all border border-transparent hover:border-slate-200 group">
-                                 <input 
-                                    type="checkbox" 
-                                    name="modules" 
-                                    value={mod} 
-                                    defaultChecked={pkgModal.editData?.modules?.includes(mod)}
-                                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" 
-                                 />
+                              <label key={mod} className="flex items-center gap-2 p-2 hover:bg-white rounded-xl cursor-pointer border border-transparent hover:border-slate-200 group">
+                                 <input type="checkbox" name="modules" value={mod} defaultChecked={pkgModal.editData?.modules?.includes(mod)} className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
                                  <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900">{mod}</span>
                               </label>
                            ))}
                         </div>
-                     </div>
-                     <div>
-                       <label className="block text-xs font-black uppercase text-slate-500 mb-2">Addons Khusus (pisahkan dgn koma)</label>
-                       <input name="addons" defaultValue={pkgModal.editData?.addons?.join(', ')} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Full API, Priority Support" />
                      </div>
                      <div className="pt-2 flex justify-end">
                        <SafeButton type="submit" variant="primary" size="lg">Simpan Paket</SafeButton>
@@ -490,14 +445,13 @@ export default function SaaSAdminPage() {
         )}
       </AnimatePresence>
 
-      {/* ===================== ORGANIZATION MODAL ===================== */}
       <AnimatePresence>
         {orgModal.open && (
            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setOrgModal({ open: false, editData: null })} />
                <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100">
                   <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                     <h3 className="text-xl font-black text-slate-900">{orgModal.editData ? 'Edit Tenant / Org' : 'Registrasi Tenant Baru'}</h3>
+                     <h3 className="text-xl font-black text-slate-900">{orgModal.editData ? 'Edit Tenant' : 'Registrasi Tenant Baru'}</h3>
                      <button onClick={() => setOrgModal({ open: false, editData: null })} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors"><X size={20} /></button>
                   </div>
                   <form onSubmit={saveOrgForm} className="p-8 space-y-6">
@@ -506,34 +460,23 @@ export default function SaaSAdminPage() {
                        <input name="name" required defaultValue={orgModal.editData?.name} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Cth: PT Makmur Sentosa" />
                      </div>
                      <div>
-                       <label className="block text-xs font-black uppercase text-slate-500 mb-2">Terhubung ke Paket / Plan</label>
+                       <label className="block text-xs font-black uppercase text-slate-500 mb-2">Pilih Paket</label>
                        <select name="plan" defaultValue={orgModal.editData?.settings?.plan || 'Basic'} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                         {packages.map(p => <option key={p.id||p.name} value={p.name}>{p.name} — Rp {p.price}</option>)}
+                         {packages.map(p => <option key={p.id||p.name} value={p.name}>{p.name} — Rp {p.price.toLocaleString()}</option>)}
                        </select>
                      </div>
-                     <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                         <div>
-                            <p className="text-sm font-black text-slate-900">Akun Latihan / Demo</p>
-                            <p className="text-xs text-slate-500">Tandai jika ini adalah data dummy</p>
-                         </div>
-                         <label className="relative inline-flex items-center cursor-pointer">
-                           <input type="checkbox" name="is_demo" defaultChecked={(orgModal.editData as any)?.is_demo} className="sr-only peer" />
-                           <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                         </label>
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                        <div>
-                           <p className="text-sm font-black text-slate-900">Tenant Aktif</p>
-                           <p className="text-xs text-slate-500">Izinkan tenant login dan akses modul</p>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                           <span className="text-xs font-black uppercase text-slate-500">Demo</span>
+                           <input type="checkbox" name="is_demo" defaultChecked={(orgModal.editData as any)?.is_demo} className="w-5 h-5" />
                         </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" name="is_active" defaultChecked={orgModal.editData ? orgModal.editData.is_active : true} className="sr-only peer" />
-                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                        </label>
+                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                           <span className="text-xs font-black uppercase text-slate-500">Aktif</span>
+                           <input type="checkbox" name="is_active" defaultChecked={orgModal.editData ? orgModal.editData.is_active : true} className="w-5 h-5" />
+                        </div>
                      </div>
                      <div className="pt-2 flex justify-end">
-                       <SafeButton type="submit" variant="primary" size="lg">Simpan Organisasi</SafeButton>
+                       <SafeButton type="submit" variant="primary" size="lg">Simpan Perubahan</SafeButton>
                      </div>
                   </form>
                </motion.div>
@@ -548,7 +491,7 @@ export default function SaaSAdminPage() {
         title={confirmState.title}
         message={confirmState.message}
         variant="danger"
-        confirmLabel="Hapus Permanen"
+        confirmLabel="Ya, Hapus"
       />
     </div>
   )
