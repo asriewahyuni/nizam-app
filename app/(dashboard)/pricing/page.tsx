@@ -62,15 +62,18 @@ export default function PricingPage() {
 
   return (
     <div className="max-w-6xl mx-auto py-8 space-y-12">
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-4">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#003366]/10 text-[#003366] rounded-full text-xs font-black uppercase tracking-widest border border-[#003366]/20">
-          <Zap size={12} className="fill-amber-400 text-amber-400" />
-          Pilih Paket Terbaik untuk Bisnis Anda
+      {/* Header Ala Hormozi */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-6">
+        <div className="inline-flex items-center gap-2 px-6 py-2 bg-amber-500 text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-amber-500/20">
+          <Zap size={14} className="fill-white" />
+          The NIZAM Grand Slam Offer: Solusi Bisnis Tanpa Drama
         </div>
-        <h1 className="text-5xl font-black text-slate-900 tracking-tighter">Paket & Harga</h1>
-        <p className="text-slate-500 text-base max-w-lg mx-auto font-medium leading-relaxed">
-          Dari startup hingga enterprise — NIZAM ERP siap mendukung setiap tahap pertumbuhan bisnis Anda.
+        <h1 className="text-6xl md:text-7xl font-black text-slate-900 tracking-tighter leading-none">
+          Hentikan Kebocoran Kas, <br />
+          <span className="bg-gradient-to-r from-[#003366] to-blue-600 bg-clip-text text-transparent">Kuasai Operasional Anda.</span>
+        </h1>
+        <p className="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto font-bold leading-relaxed">
+          Jangan biarkan bisnis Anda berjalan di atas tebak-tebakan. Satu sistem, satu kebenaran — <span className="text-slate-900">pilih langkah kemenangan Anda hari ini.</span>
         </p>
       </motion.div>
 
@@ -147,15 +150,19 @@ export default function PricingPage() {
                 ) : (
                   <Link
                     href="/settings/business"
-                    className={`group flex items-center justify-center gap-2 w-full py-3 text-sm font-black rounded-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
+                    className={`group flex items-center justify-center gap-2 w-full py-4 text-sm font-black rounded-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
                       ${isEnterprise
-                        ? 'bg-gradient-to-r from-[#003366] to-indigo-700 text-white shadow-lg shadow-[#003366]/20 hover:shadow-[#003366]/40'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/20 hover:shadow-orange-500/40'
+                        : pkg.name === 'Trial' 
+                          ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                       }
                     `}
                   >
-                    Hubungi Tim Kami
-                    <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                    {pkg.name === 'Trial' ? 'Mulai Langkah Berkah Sekarang →' : 
+                     pkg.name === 'Basic' ? 'Dapatkan Akses Operasional →' :
+                     isEnterprise ? 'Dapatkan Full Power Expansion →' :
+                     'Hubungi Tim Kami →'}
                   </Link>
                 )}
               </div>
