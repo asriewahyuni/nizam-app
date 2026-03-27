@@ -1,13 +1,13 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { signIn, signInWithNik, requestPasswordReset } from '@/modules/auth/actions/auth.actions'
 import Link from 'next/link'
-import { Building2, IdCard, ArrowRight, Eye, EyeOff, ShieldCheck, Key } from 'lucide-react'
+import { Building2, IdCard, ArrowRight, Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 
-export default function LoginPage() {
+function LoginForm() {
   const searchParams = useSearchParams()
   const initialTab = searchParams.get('tab') === 'karyawan' ? 'karyawan' : 'bisnis'
   const error = searchParams.get('error')
@@ -74,6 +74,13 @@ export default function LoginPage() {
         </div>
       )}
 
+      {/* Reset Message */}
+      {resetMsg && (
+        <div className={`mb-5 px-4 py-3 rounded-xl text-xs font-bold ${resetMsg.type === 'success' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+          {resetMsg.text}
+        </div>
+      )}
+
       <AnimatePresence mode="wait">
         {tab === 'bisnis' ? (
           <motion.div
@@ -94,7 +101,7 @@ export default function LoginPage() {
                   type="email"
                   autoComplete="email"
                   required
-                  autoFocus
+                  autoFocus={tab === 'bisnis'}
                   placeholder="nama@perusahaan.com"
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-900 bg-slate-50 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                 />
@@ -175,7 +182,7 @@ export default function LoginPage() {
                   name="nik"
                   type="text"
                   required
-                  autoFocus
+                  autoFocus={tab === 'karyawan'}
                   placeholder="Cth: K-0001"
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm font-black text-gray-900 bg-slate-50 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all uppercase"
                 />
@@ -219,7 +226,7 @@ export default function LoginPage() {
 
             <p className="mt-6 text-center text-xs text-slate-400 font-medium">
               Anda pemilik bisnis?{' '}
-              <button onClick={() => setTab('bisnis')} className="text-blue-600 font-bold hover:text-blue-700">
+              <button type="button" onClick={() => setTab('bisnis')} className="text-blue-600 font-bold hover:text-blue-700">
                 Login di sini
               </button>
             </p>
@@ -227,5 +234,13 @@ export default function LoginPage() {
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center p-8 text-xs font-black uppercase text-slate-400 tracking-widest animate-pulse">Memuat Login...</div>}>
+      <LoginForm />
+    </Suspense>
   )
 }
