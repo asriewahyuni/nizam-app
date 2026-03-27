@@ -367,7 +367,7 @@ export default function SaaSAdminPage() {
                         <div className="mb-6 space-y-1">
                           <div className="flex items-baseline gap-1">
                             <span className="text-2xl font-black font-mono text-slate-900 tracking-tighter">
-                              {pkg.price === 0 ? 'Trial / Free' : `Rp ${pkg.price.toLocaleString('id-ID')}`}
+                              {pkg.price === 0 ? `${pkg.name} / Free` : `Rp ${pkg.price.toLocaleString('id-ID')}`}
                             </span>
                             {pkg.price > 0 && <span className="text-xs text-slate-400 font-bold">/{pkg.billing}</span>}
                           </div>
