@@ -207,7 +207,8 @@ export async function isDemoSession(): Promise<boolean> {
 // SEED DEMO DATA — Products, Warehouses, Contacts, etc.
 // ═══════════════════════════════════════════════════════════
 async function seedDemoData(supabase: any, orgId: string, demoType: DemoBusinessType) {
-  if (demoType === 'BLANK') return // Exit early for blank demo
+  // 🔴 AUTHENTIC BLANK DEMO: No products, no warehouses, no contacts.
+  if (demoType === 'BLANK') return 
 
   // --- WAREHOUSES & CONTACTS & PRODUCTS BY TYPE ---
   let warehousesData: any[] = []

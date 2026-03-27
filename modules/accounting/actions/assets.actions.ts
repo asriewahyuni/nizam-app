@@ -8,8 +8,7 @@ import { createJournalEntry } from './journal.actions'
 export async function getFixedAssets(orgId: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
-    .from('fixed_assets')
+  const { data, error } = await (supabase.from('fixed_assets') as any)
     .select('*')
     .eq('org_id', orgId)
     .order('purchase_date', { ascending: false })
@@ -40,8 +39,7 @@ export async function createFixedAsset(orgId: string, assetData: any) {
     ...finalAssetData 
   } = assetData
 
-  const { data: asset, error: assetError } = await supabase
-    .from('fixed_assets')
+  const { data: asset, error: assetError } = await (supabase.from('fixed_assets') as any)
     .insert({
        ...finalAssetData,
        org_id: orgId,
@@ -52,7 +50,7 @@ export async function createFixedAsset(orgId: string, assetData: any) {
        dep_expense_account_id: finalAssetData.dep_expense_account_id || null
     })
     .select()
-    .single() as any
+    .single()
 
   if (assetError) {
     console.error('Error creating fixed asset:', assetError)
@@ -133,11 +131,10 @@ export async function createFixedAsset(orgId: string, assetData: any) {
 // ─────────────────────────────────────────────────────────────
 export async function previewOrganizationDepreciation(orgId: string) {
   const supabase = await createClient()
-  const { data: assets, error: fetchError } = await supabase
-    .from('fixed_assets')
+  const { data: assets, error: fetchError } = await (supabase.from('fixed_assets') as any)
     .select('*')
     .eq('org_id', orgId)
-    .eq('status', 'ACTIVE') as any
+    .eq('status', 'ACTIVE')
 
   if (fetchError || !assets) return { error: 'Gagal mengambil data aset.' }
 
@@ -186,12 +183,11 @@ export async function runOrganizationDepreciation(orgId: string) {
   const supabase = await createClient()
 
   // 1. Ambil semua aset aktif yang bisa disusutkan
-  const { data: assets, error: assetError } = await supabase
-    .from('fixed_assets')
+  const { data: assets, error: assetError } = await (supabase.from('fixed_assets') as any)
     .select('*')
     .eq('org_id', orgId)
     .eq('status', 'ACTIVE')
-    .neq('depreciation_method', 'NON_DEPRECIABLE') as any
+    .neq('depreciation_method', 'NON_DEPRECIABLE')
 
   if (assetError) {
     console.error('Depreciation Error:', assetError)
@@ -266,25 +262,24 @@ export async function runOrganizationDepreciation(orgId: string) {
         const updatedAccum = Number(asset.accumulated_depreciation) + monthlyAmount
         const updatedBook = Number(asset.purchase_price) - updatedAccum
 
-        const { error: updateError } = await supabase
-          .from('fixed_assets')
+        const { error: updateError } = await (supabase.from('fixed_assets') as any)
           .update({
             accumulated_depreciation: updatedAccum,
             current_book_value: updatedBook,
             last_depreciation_date: nextRunDate.toISOString().split('T')[0]
-          } as any)
+          })
           .eq('id', asset.id)
 
         if (updateError) console.error('Error updating asset state:', updateError)
 
         // Catat Log Penyusutan
-        await supabase.from('asset_depreciation_logs').insert({
+        await (supabase.from('asset_depreciation_logs') as any).insert({
           asset_id: asset.id,
           org_id: orgId,
           period_date: nextRunDate.toISOString().split('T')[0],
           amount: monthlyAmount,
           journal_entry_id: journalRes.entryId
-        } as any)
+        })
 
         totalProcessed++
         
@@ -327,8 +322,7 @@ export async function updateFixedAsset(assetId: string, orgId: string, assetData
   } = assetData
 
   // GUARDRAIL: Jika sudah ada penyusutan, melarang edit data finansial
-  const { count: logCount } = await supabase
-    .from('asset_depreciation_logs')
+  const { count: logCount } = await (supabase.from('asset_depreciation_logs') as any)
     .select('*', { count: 'exact', head: true })
     .eq('asset_id', assetId)
 
@@ -352,8 +346,7 @@ export async function updateFixedAsset(assetId: string, orgId: string, assetData
     dep_expense_account_id: cleanData.dep_expense_account_id || undefined,
   }
 
-  const { data, error } = await supabase
-    .from('fixed_assets')
+  const { data, error } = await (supabase.from('fixed_assets') as any)
     .update(sanitizedData)
     .eq('id', assetId)
     .eq('org_id', orgId)
@@ -372,8 +365,7 @@ export async function updateFixedAsset(assetId: string, orgId: string, assetData
 export async function deleteFixedAsset(assetId: string, orgId: string) {
   const supabase = await createClient()
 
-  const { error } = await supabase
-    .from('fixed_assets')
+  const { error } = await (supabase.from('fixed_assets') as any)
     .delete()
     .eq('id', assetId)
     .eq('org_id', orgId)
