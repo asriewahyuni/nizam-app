@@ -33,6 +33,8 @@ type Tab = 'users' | 'packages'
 export default function SaaSAdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>('users')
   const [searchTxt, setSearchTxt] = useState('')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'demo' | 'official'>('all')
+  const [packageFilter, setPackageFilter] = useState<string>('all')
   
   const [packages, setPackages] = useState<any[]>([])
   const [loadingPackages, setLoadingPackages] = useState(true)
@@ -142,11 +144,31 @@ export default function SaaSAdminPage() {
     setConfirmState({
       open: true,
       title: "Hapus Organisasi?",
-      message: `Tindakan ini akan menghapus permanen data "${name}". Anda yakin? (Pastikan organisasi ini tidak memiliki transaksi aktif agar tidak terkendala Foreign Key database)`,
+      message: `Tindakan ini akan menghapus permanen data "${name}" beserta seluruh isinya secara aman dan tuntas. Anda yakin?`,
       action: async () => {
-        const { error } = await supabase.from('organizations').delete().eq('id', id)
+        // Use the new RPC function for robust cascading delete
+        const { error } = await supabase.rpc('delete_org_cascade', { target_org_id: id })
+        
         if (error) {
-           alert("Gagal menghapus organisasi:\n\n" + error.message + "\n\nSaran: Nonaktifkan (ubah status ke Nonaktif) organisasi ini sebagai gantinya jika sudah memiliki transaksi.")
+           alert("Gagal menghapus organisasi sakti:\n\n" + error.message)
+        }
+        await fetchOrganizations()
+        setConfirmState(prev => ({ ...prev, open: false }))
+      }
+    })
+  }
+
+  const bulkDeleteDemos = async () => {
+    const demos = orgs.filter(o => (o as any).is_demo)
+    if (demos.length === 0) return alert("Tidak ada akun demo yang ditemukan.")
+
+    setConfirmState({
+      open: true,
+      title: `Hapus ${demos.length} Akun Demo?`,
+      message: `Tindakan ini akan menghapus SEMUA akun bertanda "DEMO" secara permanen dan tuntas.`,
+      action: async () => {
+        for (const demo of demos) {
+           await supabase.rpc('delete_org_cascade', { target_org_id: demo.id })
         }
         await fetchOrganizations()
         setConfirmState(prev => ({ ...prev, open: false }))
@@ -167,11 +189,16 @@ export default function SaaSAdminPage() {
       await supabase.from('organizations').update({ 
          name: nameStr,
          settings,
-         is_active: fd.get('is_active') === 'on' 
+         is_active: fd.get('is_active') === 'on',
+         is_demo: fd.get('is_demo') === 'on'
       }).eq('id', orgModal.editData.id)
     } else {
       await supabase.from('organizations').insert([{ 
-         name: nameStr, slug, settings, is_active: fd.get('is_active') === 'on' 
+         name: nameStr, 
+         slug, 
+         settings, 
+         is_active: fd.get('is_active') === 'on',
+         is_demo: fd.get('is_demo') === 'on'
       }])
     }
     setOrgModal({ open: false, editData: null })
@@ -213,15 +240,38 @@ export default function SaaSAdminPage() {
                 subtitle="Data organisasi dari Supabase public.organizations."
                 icon={Users}
                 actions={
-                  <div className="flex items-center gap-3">
-                    <SafeButton variant="ghost" onClick={fetchOrganizations} icon={<RefreshCw size={14} className={loading ? "animate-spin" : ""} />}>Refresh</SafeButton>
-                    <SafeButton variant="primary" onClick={() => setOrgModal({ open: true, editData: null })} icon={<Plus size={14} />}>Registrasi Manual</SafeButton>
+                  <div className="flex flex-col md:flex-row items-center gap-4">
+                    <div className="flex gap-2">
+                       <select value={typeFilter} onChange={(e: any) => setTypeFilter(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black uppercase tracking-tight shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20">
+                          <option value="all">Semua Tipe</option>
+                          <option value="demo">Hanya Demo/Latihan</option>
+                          <option value="official">Hanya Resmi/Prod</option>
+                       </select>
+                       <select value={packageFilter} onChange={(e: any) => setPackageFilter(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black uppercase tracking-tight shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20">
+                          <option value="all">Semua Paket</option>
+                          {packages.map(p => <option key={p.id||p.name} value={p.name}>{p.name}</option>)}
+                       </select>
+                    </div>
+
                     <div className="relative">
-                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input 
-                        type="text" placeholder="Cari organisasi..." value={searchTxt} onChange={(e) => setSearchTxt(e.target.value)}
-                        className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-56 shadow-sm"
+                        type="text" placeholder="Cari..." value={searchTxt} onChange={(e) => setSearchTxt(e.target.value)}
+                        className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-44 shadow-sm"
                       />
+                    </div>
+                    
+                    <div className="h-6 w-px bg-slate-200 hidden md:block" />
+                    
+                    <div className="flex gap-2">
+                      <SafeButton variant="ghost" size="sm" onClick={fetchOrganizations} icon={<RefreshCw size={12} className={loading ? "animate-spin" : ""} />}>Refresh</SafeButton>
+                      <SafeButton variant="primary" size="sm" onClick={() => setOrgModal({ open: true, editData: null })} icon={<Plus size={12} />}>Daftar Baru</SafeButton>
+                      <button 
+                        onClick={bulkDeleteDemos} 
+                        className="px-4 py-2 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all shadow-sm active:scale-95 flex items-center gap-2"
+                      >
+                         <Trash2 size={12} /> Hapus Semua Demo
+                      </button>
                     </div>
                   </div>
                 }
@@ -243,12 +293,30 @@ export default function SaaSAdminPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {orgs.filter(o => o.name.toLowerCase().includes(searchTxt.toLowerCase())).map((org) => {
+                      {orgs
+                        .filter(o => o.name.toLowerCase().includes(searchTxt.toLowerCase()))
+                        .filter(o => {
+                           if (typeFilter === 'all') return true
+                           if (typeFilter === 'demo') return (o as any).is_demo === true
+                           return (o as any).is_demo === false || (o as any).is_demo === null
+                        })
+                        .filter(o => {
+                           if (packageFilter === 'all') return true
+                           return ((o as any).settings?.plan || 'Basic') === packageFilter
+                        })
+                        .map((org) => {
                         const planContext = (org.settings as any)?.plan || 'Basic'
                         return (
                         <tr key={org.id} className="hover:bg-slate-50/60 transition-colors group">
                           <td className="py-4 px-6">
-                              <p className="font-bold text-slate-900 text-sm">{org.name}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-bold text-slate-900 text-sm">{org.name}</p>
+                                {(org as any).is_demo ? (
+                                  <span className="px-1.5 py-0.5 rounded-md bg-orange-100 text-orange-700 text-[8px] font-black uppercase tracking-tighter border border-orange-200 shadow-sm leading-none">DEMO</span>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase tracking-tighter border border-emerald-200 shadow-sm leading-none">RESMI</span>
+                                )}
+                              </div>
                               <p className="text-[10px] text-slate-400 font-mono mt-0.5 tracking-tight truncate max-w-[150px]">{org.id}</p>
                           </td>
                           <td className="py-4 px-6">
@@ -420,6 +488,17 @@ export default function SaaSAdminPage() {
                        </select>
                      </div>
                      <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                         <div>
+                            <p className="text-sm font-black text-slate-900">Akun Latihan / Demo</p>
+                            <p className="text-xs text-slate-500">Tandai jika ini adalah data dummy</p>
+                         </div>
+                         <label className="relative inline-flex items-center cursor-pointer">
+                           <input type="checkbox" name="is_demo" defaultChecked={(orgModal.editData as any)?.is_demo} className="sr-only peer" />
+                           <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                         </label>
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
                         <div>
                            <p className="text-sm font-black text-slate-900">Tenant Aktif</p>
                            <p className="text-xs text-slate-500">Izinkan tenant login dan akses modul</p>
