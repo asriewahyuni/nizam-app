@@ -28,9 +28,16 @@ const MOCK_PACKAGES = [
   { id: 'P-003', name: 'Enterprise', price: 950000, billing: 'Bulan', is_active: true, modules: ['Accounting', 'Cash', 'POS', 'Inventory', 'HRIS', 'Factory'], addons: ['Full API', 'Priority Support'] }
 ]
 
+const AVAILABLE_MODULES = [
+  'Accounting', 'Finance', 'Inventory', 'Purchasing', 
+  'Sales', 'POS', 'HRIS', 'Manufacturing', 
+  'Fleet', 'CRM', 'Audit', 'Job Order'
+]
+
 type Tab = 'users' | 'packages'
 
 export default function SaaSAdminPage() {
+  const db = supabase as any
   const [activeTab, setActiveTab] = useState<Tab>('users')
   const [searchTxt, setSearchTxt] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'demo' | 'official'>('all')
@@ -55,7 +62,7 @@ export default function SaaSAdminPage() {
   const fetchOrganizations = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.from('organizations').select('*').order('created_at', { ascending: false })
+      const { data, error } = await (supabase.from('organizations') as any).select('*').order('created_at', { ascending: false })
       if (error) throw error
       setOrgs(data || [])
     } catch (err: any) {
@@ -68,14 +75,14 @@ export default function SaaSAdminPage() {
   const fetchPackages = async () => {
     try {
       setLoadingPackages(true)
-      const { data, error } = await supabase.from('saas_packages').select('*').order('price', { ascending: true })
+      const { data, error } = await (supabase.from('saas_packages') as any).select('*').order('price', { ascending: true })
       
       if (error) {
          setPackages(MOCK_PACKAGES.map(p => ({ ...p, active: p.is_active })))
          return
       }
 
-      const formatted = (data || []).map(p => ({
+      const formatted = (data || []).map((p: any) => ({
         ...p,
         active: p.is_active, 
         modules: Array.isArray(p.modules) ? p.modules : JSON.parse(p.modules || '[]'),
@@ -98,7 +105,7 @@ export default function SaaSAdminPage() {
   const togglePackageStatus = async (pkgId: string, currentStatus: boolean) => {
     setPackages(packages.map(p => p.id === pkgId ? { ...p, active: !p.active } : p))
     try {
-       await supabase.from('saas_packages').update({ is_active: !currentStatus }).eq('id', pkgId)
+       await (supabase.from('saas_packages') as any).update({ is_active: !currentStatus }).eq('id', pkgId)
     } catch (err) {}
   }
 
@@ -108,7 +115,7 @@ export default function SaaSAdminPage() {
       title: "Hapus Paket?",
       message: "Tindakan ini tidak dapat dibatalkan. Konfirmasi penghapusan paket SaaS?",
       action: async () => {
-        const { error } = await supabase.from('saas_packages').delete().eq('id', id)
+         const { error } = await (supabase.from('saas_packages') as any).delete().eq('id', id)
         if (error) {
            alert("Gagal menghapus paket: " + error.message)
         }
@@ -121,19 +128,20 @@ export default function SaaSAdminPage() {
   const savePackageForm = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
+    const modules = fd.getAll('modules') as string[]
     const payload = {
       name: fd.get('name') as string,
       price: Number(fd.get('price')),
       billing: fd.get('billing') as string,
       is_active: true,
-      modules: (fd.get('modules') as string).split(',').map(s => s.trim()).filter(Boolean),
+      modules: modules.length > 0 ? modules : (fd.get('modules_legacy') as string || '').split(',').map(s => s.trim()).filter(Boolean),
       addons: (fd.get('addons') as string).split(',').map(s => s.trim()).filter(Boolean)
     }
 
     if (pkgModal.editData?.id) {
-      await supabase.from('saas_packages').update(payload).eq('id', pkgModal.editData.id)
+      await db.from('saas_packages').update(payload).eq('id', pkgModal.editData.id)
     } else {
-      await supabase.from('saas_packages').insert([payload])
+      await db.from('saas_packages').insert([payload])
     }
     setPkgModal({ open: false, editData: null })
     fetchPackages()
@@ -147,7 +155,7 @@ export default function SaaSAdminPage() {
       message: `Tindakan ini akan menghapus permanen data "${name}" beserta seluruh isinya secara aman dan tuntas. Anda yakin?`,
       action: async () => {
         // Use the new RPC function for robust cascading delete
-        const { error } = await supabase.rpc('delete_org_cascade', { target_org_id: id })
+        const { error } = await (supabase as any).rpc('delete_org_cascade', { target_org_id: id })
         
         if (error) {
            alert("Gagal menghapus organisasi sakti:\n\n" + error.message)
@@ -450,8 +458,24 @@ export default function SaaSAdminPage() {
                        </div>
                      </div>
                      <div>
-                       <label className="block text-xs font-black uppercase text-slate-500 mb-2">Modul Termasuk (pisahkan dgn koma)</label>
-                       <input name="modules" defaultValue={pkgModal.editData?.modules?.join(', ')} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Accounting, POS, Inventory" />
+                        <label className="block text-xs font-black uppercase text-slate-500 mb-3 tracking-widest flex items-center justify-between">
+                           Pilih Modul Aktif
+                           <span className="text-[10px] font-medium normal-case text-slate-400">Pilih modul yang disertakan dalam paket ini</span>
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                           {AVAILABLE_MODULES.map(mod => (
+                              <label key={mod} className="flex items-center gap-2 p-2 hover:bg-white rounded-xl cursor-pointer transition-all border border-transparent hover:border-slate-200 group">
+                                 <input 
+                                    type="checkbox" 
+                                    name="modules" 
+                                    value={mod} 
+                                    defaultChecked={pkgModal.editData?.modules?.includes(mod)}
+                                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" 
+                                 />
+                                 <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900">{mod}</span>
+                              </label>
+                           ))}
+                        </div>
                      </div>
                      <div>
                        <label className="block text-xs font-black uppercase text-slate-500 mb-2">Addons Khusus (pisahkan dgn koma)</label>
