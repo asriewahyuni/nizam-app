@@ -117,25 +117,32 @@ export default function SaaSAdminPage() {
 
   const savePackageForm = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const fd = new FormData(e.currentTarget)
-    const modules = fd.getAll('modules') as string[]
-    const payload = {
-      name: fd.get('name') as string,
-      price: Number(fd.get('price')),
-      duration_days: Number(fd.get('duration_days') || 30),
-      billing: fd.get('billing') as string,
-      is_active: true,
-      modules: modules,
-      addons: (fd.get('addons') as string).split(',').map(s => s.trim()).filter(Boolean)
-    }
+    try {
+      const fd = new FormData(e.currentTarget)
+      const modules = fd.getAll('modules') as string[]
+      const addonsRaw = fd.get('addons') as string | null
+      const payload = {
+        name: fd.get('name') as string,
+        price: Number(fd.get('price')),
+        duration_days: Number(fd.get('duration_days') || 30),
+        billing: fd.get('billing') as string,
+        is_active: true,
+        modules: modules,
+        addons: addonsRaw ? addonsRaw.split(',').map(s => s.trim()).filter(Boolean) : []
+      }
 
-    if (pkgModal.editData?.id) {
-      await db.from('saas_packages').update(payload).eq('id', pkgModal.editData.id)
-    } else {
-      await db.from('saas_packages').insert([payload])
+      const { error } = pkgModal.editData?.id 
+        ? await db.from('saas_packages').update(payload).eq('id', pkgModal.editData.id)
+        : await db.from('saas_packages').insert([payload])
+
+      if (error) throw error
+
+      setPkgModal({ open: false, editData: null })
+      fetchPackages()
+    } catch (err: any) {
+      console.error("SavePackage Failed:", err)
+      alert("Gagal menyimpan paket: " + (err.message || "Unknown error"))
     }
-    setPkgModal({ open: false, editData: null })
-    fetchPackages()
   }
 
   // ==================== CRUD ORGANIZATIONS ====================
