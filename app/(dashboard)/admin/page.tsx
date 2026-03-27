@@ -130,7 +130,9 @@ export default function SaaSAdminPage() {
         is_active: true,
         modules: modules,
         addons: addonsRaw ? addonsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
-        duration_days: Number(fd.get('duration_days') || 30)
+        duration_days: Number(fd.get('duration_days') || 30),
+        max_orgs: Number(fd.get('max_orgs') || 1),
+        max_warehouses: Number(fd.get('max_warehouses') || 1)
       }
 
       const { error } = pkgModal.editData?.id
@@ -439,7 +441,17 @@ export default function SaaSAdminPage() {
                      <div>
                        <label className="block text-xs font-black uppercase text-slate-500 mb-2">Siklus Penagihan</label>
                        <input name="billing" defaultValue={pkgModal.editData?.billing || 'Bulan'} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Cth: Sekali / Bulan" />
-                     </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-black uppercase text-slate-500 mb-2 text-[#003366]">Maks Bisnis (Entitas)</label>
+                          <input name="max_orgs" type="number" defaultValue={pkgModal.editData?.max_orgs || 1} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#003366]/30 font-bold" placeholder="1" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-black uppercase text-slate-500 mb-2 text-[#003366]">Maks Lokasi (Gudang)</label>
+                          <input name="max_warehouses" type="number" defaultValue={pkgModal.editData?.max_warehouses || 1} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#003366]/30 font-bold" placeholder="1" />
+                        </div>
+                      </div>
                      <div>
                         <label className="block text-xs font-black uppercase text-slate-500 mb-3 tracking-widest flex items-center justify-between">Pilih Modul Aktif</label>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-200">
