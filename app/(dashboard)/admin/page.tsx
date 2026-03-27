@@ -25,7 +25,7 @@ const supabase = createClient()
 const AVAILABLE_MODULES = [
   'Accounting', 'Finance', 'Inventory', 'Purchasing', 
   'Sales', 'Marketing', 'POS', 'HRIS', 'Manufacturing', 
-  'Fleet', 'Audit', 'Job Order'
+  'Fleet', 'Audit', 'Job Order', 'CRM', 'Warehouse'
 ]
 
 type Tab = 'users' | 'packages'
