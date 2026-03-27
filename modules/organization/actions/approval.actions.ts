@@ -20,41 +20,49 @@ export async function getPendingApprovals(orgId: string) {
   
   return data
 }
+
+export async function getApprovalHistory(orgId: string) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('approval_requests')
+    .select('*')
+    .eq('org_id', orgId)
+    .neq('status', 'PENDING')
+    .order('decided_at', { ascending: false })
+    .limit(50)
+
+  if (error) {
+    console.error('Error fetching approval history:', error)
+    return []
+  }
+  
+  return data
+}
 export async function getApprovalDetail(orgId: string, sourceId: string, sourceType: string) {
   const supabase = await createClient()
 
+  let dataRes: any = { data: null, error: null }
+  
   if (sourceType === 'PURCHASE_ORDER') {
-    const { data, error } = await supabase
-      .from('purchases' as any)
-      .select('*, purchase_items(*, products(name))')
-      .eq('id', sourceId)
-      .eq('org_id', orgId)
-      .single()
-    return { data, error: error?.message }
+    dataRes = await supabase.from('purchases' as any).select('*, purchase_items(*, products(name, unit))').eq('id', sourceId).eq('org_id', orgId).single()
+  } else if (sourceType === 'SALES_ORDER') {
+    dataRes = await supabase.from('sales' as any).select('*, contacts(name, phone, email), sales_items(*, products(name, sku, unit))').eq('id', sourceId).eq('org_id', orgId).single()
+  } else if (sourceType === 'REIMBURSEMENT') {
+    dataRes = await supabase.from('reimbursements').select('*, items:reimbursement_items(*, account:accounts(code, name))').eq('id', sourceId).eq('org_id', orgId).single()
   }
 
-  if (sourceType === 'SALES_ORDER') {
-    const { data, error } = await supabase
-      .from('sales' as any)
-      .select('*, contacts(name, phone, email), sales_items(*, products(name, sku))')
-      .eq('id', sourceId)
-      .eq('org_id', orgId)
-      .single()
-    return { data, error: error?.message }
-  }
+  if (dataRes.error) return { data: null, error: dataRes.error.message }
 
-  if (sourceType === 'REIMBURSEMENT') {
-    const { data, error } = await supabase
-      .from('reimbursements')
-      .select('*, items:reimbursement_items(*, account:accounts(code, name))')
-      .eq('id', sourceId)
-      .eq('org_id', orgId)
-      .single()
-    return { data, error: error?.message }
-  }
+  // Fetch History Logs
+  const { data: logs } = await supabase
+    .from('approval_requests')
+    .select('*')
+    .eq('source_id', sourceId)
+    .eq('source_type', sourceType)
+    .order('requested_at', { ascending: true })
 
-  // add other types here in the future
-  return { data: null, error: 'Tipe dokumen tidak didukung untuk detail saat ini.' }
+  return { data: dataRes.data, logs: logs || [], error: null }
 }
 
 export async function getPendingApprovalsCount(orgId: string) {

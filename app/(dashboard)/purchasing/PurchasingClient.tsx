@@ -32,8 +32,12 @@ import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { QRCodeSVG } from 'qrcode.react'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
+import { updatePurchaseRequestStatus } from '@/modules/purchasing/actions/purchasing.actions'
 
-export default function PurchasingClient({ orgId, orgName, purchases, vendors, products, coa }: any) {
+export default function PurchasingClient({ orgId, orgName, org, purchases, vendors, products, coa, purchaseRequests = [] }: any) {
+   const [activeTab, setActiveTab] = useState<'PURCHASES' | 'REQUESTS'>('PURCHASES')
+   const orgSettings = org?.settings || {}
+   const logoUrl = org?.logo_url || ''
   const [showModal, setShowModal] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
    const [loading, setLoading] = useState(false)
@@ -100,7 +104,9 @@ export default function PurchasingClient({ orgId, orgName, purchases, vendors, p
     unit_price: 0,
     margin: 20, 
     discount_amount: 0,
-    category: 'Bahan'
+    category: 'Bahan',
+    selling_price: 0,
+    requestId: ''
   }])
 
   // Filter COA for payment accounts (Kas/Bank) if Lunas
@@ -129,7 +135,9 @@ export default function PurchasingClient({ orgId, orgName, purchases, vendors, p
       unit_price: 0,
       margin: 20,
       discount_amount: 0,
-      category: 'Bahan'
+      category: 'Bahan',
+      selling_price: 0,
+      requestId: ''
     }])
   }
 
@@ -161,6 +169,7 @@ export default function PurchasingClient({ orgId, orgName, purchases, vendors, p
           if (updatedLine.unit_price === 0) {
             updatedLine.unit_price = foundProduct.purchase_price || 0
             updatedLine.category = foundProduct.category || 'Bahan'
+            updatedLine.selling_price = foundProduct.selling_price || 0
             if (updatedLine.unit_price > 0 && foundProduct.selling_price) {
               const currentMargin = 100 - ((updatedLine.unit_price / foundProduct.selling_price) * 100)
               updatedLine.margin = Math.round(currentMargin)
@@ -234,7 +243,7 @@ export default function PurchasingClient({ orgId, orgName, purchases, vendors, p
       setSuccess('PO Baru berhasil disimpan!')
       setShowModal(false)
       // Reset form
-      setLines([{ id: Date.now(), product_name: '', product_id: '', quantity: 1, unit: 'Pcs', custom_unit: '', unit_price: 0, margin: 20, discount_amount: 0, category: 'Bahan' }])
+      setLines([{ id: Date.now(), product_name: '', product_id: '', quantity: 1, unit: 'Pcs', custom_unit: '', unit_price: 0, margin: 20, discount_amount: 0, category: 'Bahan', selling_price: 0, requestId: '' }])
       setVendorId('')
       setNotes('')
       setPaymentAccountId('')
@@ -245,6 +254,14 @@ export default function PurchasingClient({ orgId, orgName, purchases, vendors, p
       setShippingAmount('0')
       setInsuranceAmount('0')
       setShariahMode('CASH')
+      
+      // Update linked purchase requests to ORDERED
+      for (const line of lines) {
+        if ((line as any).requestId) {
+          await updatePurchaseRequestStatus(orgId, (line as any).requestId, 'ORDERED')
+        }
+      }
+
       setTimeout(() => setSuccess(null), 3500)
     }
     setLoading(false)
@@ -453,7 +470,28 @@ export default function PurchasingClient({ orgId, orgName, purchases, vendors, p
         />
       </div>
 
-      <SectionCard>
+      <div className="flex bg-slate-100/50 p-1.5 rounded-2xl w-fit border border-slate-100">
+         <button
+            onClick={() => setActiveTab('PURCHASES')}
+            className={`px-8 py-2.5 text-xs font-black rounded-xl transition-all uppercase tracking-widest ${activeTab === 'PURCHASES' ? 'bg-white text-rose-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+         >
+            Purchase Orders
+         </button>
+         <button
+            onClick={() => setActiveTab('REQUESTS')}
+            className={`px-8 py-2.5 text-xs font-black rounded-xl transition-all uppercase tracking-widest flex items-center gap-2 ${activeTab === 'REQUESTS' ? 'bg-white text-rose-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+         >
+            Permintaan Produksi
+            {purchaseRequests.filter((r: any) => r.status === 'PENDING').length > 0 && (
+              <span className="w-5 h-5 bg-rose-500 text-white text-[10px] flex items-center justify-center rounded-full animate-pulse">
+                {purchaseRequests.filter((r: any) => r.status === 'PENDING').length}
+              </span>
+            )}
+         </button>
+      </div>
+
+      {activeTab === 'PURCHASES' ? (
+        <SectionCard>
         <SectionHeader 
           title="Histori Pembelian (Purchase Orders)"
           subtitle="Daftar seluruh transaksi belanja barang dan jasa."
@@ -547,6 +585,99 @@ export default function PurchasingClient({ orgId, orgName, purchases, vendors, p
           </table>
         </div>
       </SectionCard>
+      ) : (
+        <SectionCard>
+          <SectionHeader 
+            title="Permintaan Pembelian (Unit Produksi)"
+            subtitle="Daftar material yang dibutuhkan oleh bagian produksi/pabrik."
+          />
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/50 border-b border-slate-100">
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">No. Request</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Barang & Jumlah</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Sumber / Notes</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {purchaseRequests.length === 0 ? (
+                  <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Belum ada permintaan dari produksi.</td></tr>
+                ) : (
+                  purchaseRequests.map((r: any) => (
+                    <tr key={r.id} className="group hover:bg-slate-50 transition-colors">
+                      <td className="px-8 py-6">
+                        <div className="text-xs font-black text-slate-900">{r.request_number}</div>
+                        <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(r.created_at)}</div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="text-sm font-bold text-slate-900">{r.product_name}</div>
+                        <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">Butuh: {r.quantity} {r.unit}</div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="text-[10px] font-black text-rose-500 uppercase">{r.source_type}</div>
+                        <div className="text-[10px] text-slate-500 italic mt-1">{r.notes || '-'}</div>
+                      </td>
+                      <td className="px-8 py-6 text-center">
+                        <StatusBadge 
+                          label={r.status} 
+                          variant={r.status === 'ORDERED' ? 'success' : r.status === 'REJECTED' ? 'error' : r.status === 'PENDING' ? 'warning' : 'info'} 
+                        />
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                        <div className="flex justify-end gap-2">
+                          {r.status === 'PENDING' && (
+                            <>
+                              <button 
+                                onClick={() => {
+                                  // Pre-fill PO form logic could be added here
+                                  setLines([{
+                                    id: Date.now(),
+                                    product_name: r.product_name,
+                                    product_id: r.product_id || '',
+                                    quantity: r.quantity,
+                                    unit: r.unit || 'Pcs',
+                                    custom_unit: '',
+                                    unit_price: 0,
+                                    margin: 20,
+                                    discount_amount: 0,
+                                    category: 'Bahan',
+                                    selling_price: 0,
+                                    requestId: r.id
+                                  }])
+                                  setShowModal(true)
+                                }}
+                                className="px-3 py-1.5 bg-rose-600 text-white text-[10px] font-black uppercase rounded-lg shadow-sm"
+                              >
+                                Proses ke PO
+                              </button>
+                              <button 
+                                onClick={async () => {
+                                  if (confirm('Tolak permintaan ini?')) {
+                                    await updatePurchaseRequestStatus(orgId, r.id, 'REJECTED')
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-slate-100 text-slate-400 text-[10px] font-black uppercase rounded-lg hover:bg-rose-50 hover:text-rose-600 transition-all"
+                              >
+                                Tolak
+                              </button>
+                            </>
+                          )}
+                          {r.status === 'ORDERED' && (
+                            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest italic">Sudah di-PO</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      )}
 
       <AnimatePresence>
         {/* MODAL BUAT PO BARU (DENGAN LINE ITEMS) */}
@@ -644,14 +775,14 @@ export default function PurchasingClient({ orgId, orgName, purchases, vendors, p
                       ))}
                     </datalist>
 
-                    <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <div className="hidden sm:grid grid-cols-12 gap-3 px-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
                        <div className="col-span-2">Nama Barang</div>
-                       <div className="col-span-1">Jenis</div>
-                       <div className="col-span-1">Qty</div>
-                       <div className="col-span-1">Satuan</div>
-                       <div className="col-span-2">HPP (Modal) / Satuan</div>
-                       <div className="col-span-2">Margin (%)</div>
-                       <div className="col-span-2 text-right">Harga Jual</div>
+                       <div className="col-span-1 text-center">Jenis</div>
+                       <div className="col-span-1 text-center">Qty</div>
+                       <div className="col-span-1 text-center">Unit</div>
+                       <div className="col-span-2 text-center">HPP / Satuan</div>
+                       <div className="col-span-1 text-center">Margin</div>
+                       <div className="col-span-3 text-right">Harga Jual (Final)</div>
                        <div className="col-span-1 text-center">Aksi</div>
                     </div>
 
@@ -662,55 +793,58 @@ export default function PurchasingClient({ orgId, orgName, purchases, vendors, p
                       const trueHpp = line.unit_price + allocatedOverheadPerUnit
                       const suggestedPrice = calculateSuggestedSellingPrice(trueHpp, line.margin)
                       return (
-                      <div key={line.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-white p-3 sm:p-0 border sm:border-0 border-slate-100 rounded-xl sm:rounded-none">
+                      <div key={line.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center bg-white p-4 sm:p-0 border sm:border-0 border-slate-100 rounded-3xl sm:rounded-none mb-4 sm:mb-2 text-left">
                         
-                        <div className="sm:col-span-2">
+                        <div className="sm:col-span-2 min-h-[58px] flex flex-col justify-start">
                           <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Nama Barang</label>
                           <input 
                             required 
                             list="product_suggestions" 
-                            placeholder="Ketik/pilih nama barang..." 
+                            placeholder="Cari..." 
                             value={line.product_name} 
                             onChange={(e) => handleLineChange(line.id, 'product_name', e.target.value)} 
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg outline-none text-sm" 
+                            className="w-full h-[42px] px-4 py-2 border border-slate-200 rounded-xl outline-none text-sm group-hover:border-blue-400 transition-colors" 
                           />
                           {line.product_id ? (
-                            <span className="text-[9px] font-bold text-emerald-600 block mt-1">✓ Terhubung Prod. Master</span>
+                            <span className="text-[9px] font-black text-emerald-600 block mt-1 px-1">✓ Terhubung Prod. Master</span>
                           ) : line.product_name ? (
-                            <span className="text-[9px] font-bold text-amber-500 block mt-1">+ Akan Dibuat Baru</span>
-                          ) : null}
+                            <span className="text-[9px] font-black text-amber-500 block mt-1 px-1">+ Akan Dibuat Baru</span>
+                          ) : <div className="h-[14px]" />}
                         </div>
 
-                        <div className="col-span-1">
+                        <div className="col-span-1 min-h-[58px]">
                           <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Jenis</label>
                           <select 
                             value={line.category} 
                             onChange={(e) => handleLineChange(line.id, 'category', e.target.value)} 
-                            className="w-full h-[38px] px-1 py-1 border border-slate-200 rounded-lg outline-none text-[10px] font-bold bg-slate-50 text-slate-700"
+                            className="w-full h-[42px] px-1 py-1 border border-slate-100 rounded-xl outline-none text-[10px] font-black bg-slate-50 text-slate-700 text-center"
                           >
-                             <option value="Bahan">Bahan</option>
+                             <option value="Bahan">Bahan Baku</option>
                              <option value="Setengah Jadi">Stgh Jadi</option>
-                             <option value="Barang Jadi">Siap Jual</option>
+                             <option value="Pelengkap">Pelengkap / Kemasan</option>
+                             <option value="Siap Jual">Barang Jadi</option>
+                             <option value="Layanan">Jasa / Layanan</option>
+                             <option value="Lainnya">Lain-lain</option>
                           </select>
                         </div>
 
-                        <div className="col-span-1">
+                        <div className="col-span-1 min-h-[58px]">
                           <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Qty</label>
                           <input 
                             type="number" required min="1" step="any"
                             value={line.quantity || ''} 
                             onChange={(e) => handleLineChange(line.id, 'quantity', parseFloat(e.target.value) || 0)} 
-                            className="w-full px-2 py-2 border border-slate-200 rounded-lg outline-none text-sm" 
-                            placeholder="Qty"
+                            className="w-full h-[42px] px-1 py-2 border border-slate-200 rounded-xl outline-none text-xs text-center font-black" 
+                            placeholder="0"
                           />
                         </div>
 
-                        <div className="col-span-1">
+                        <div className="col-span-1 min-h-[58px]">
                           <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Satuan</label>
                           <select
                             value={line.unit}
                             onChange={(e) => handleLineChange(line.id, 'unit', e.target.value)}
-                            className="w-full px-1 py-2 border border-slate-200 rounded-lg outline-none text-[11px] font-bold text-blue-700 bg-white"
+                            className="w-full h-[42px] px-1 py-2 border border-slate-200 rounded-xl outline-none text-[10px] font-black text-blue-700 bg-white text-center"
                           >
                             {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
                           </select>
@@ -725,40 +859,56 @@ export default function PurchasingClient({ orgId, orgName, purchases, vendors, p
                           )}
                         </div>
 
-                        <div className="col-span-2">
+                        <div className="col-span-2 min-h-[58px]">
                           <CurrencyInput 
-                            label={`HPP (Modal) / ${line.unit}`}
+                            label={`HPP / ${line.unit}`}
+                            labelClassName="sm:hidden"
                             value={line.unit_price}
                             onChange={(val) => handleLineChange(line.id, 'unit_price', val)}
                             placeholder="0"
-                            className="sm:px-3 sm:py-2 sm:rounded-lg sm:text-[11px]"
+                            className="h-[42px] px-4 py-2 rounded-xl text-sm"
                           />
                         </div>
 
-                        <div className="col-span-2">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Target Margin (%)</label>
+                        <div className="col-span-1 min-h-[58px]">
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Margin (%)</label>
                           <div className="relative">
                             <input 
                               type="number" required min="0" max="99"
                               value={line.margin || ''} 
                               onChange={(e) => handleLineChange(line.id, 'margin', parseFloat(e.target.value) || 0)} 
-                              className="w-full pl-3 pr-8 py-2 border border-slate-200 rounded-lg outline-none text-sm font-bold text-blue-600" 
-                              placeholder="Contoh: 20"
+                              className="w-[110%] -ml-[5%] h-[42px] px-2 py-2 border border-slate-200 rounded-xl outline-none text-xs font-black text-blue-600 text-center" 
+                              placeholder="20"
                             />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">%</span>
+                            <span className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 text-[9px] font-black">%</span>
                           </div>
                         </div>
 
-                        <div className="col-span-2 sm:text-right pt-2 sm:pt-0">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Harga Jual Saran</label>
-                          <div className="text-sm font-bold text-emerald-600 whitespace-nowrap">
-                             {suggestedPrice > 0 ? formatCurrency(suggestedPrice) : '-'}
+                        <div className="col-span-3 min-h-[58px] sm:text-right flex flex-col justify-start">
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Final Jual</label>
+                          <div className="flex items-center gap-1">
+                            <CurrencyInput 
+                               label="Final Jual"
+                               labelClassName="hidden"
+                               value={line.selling_price || suggestedPrice}
+                               onChange={(val) => handleLineChange(line.id, 'selling_price', val)}
+                               placeholder="0"
+                               className="h-[42px] px-2 py-2 rounded-xl text-xs text-emerald-700 bg-emerald-50/50 border-emerald-100 flex-1"
+                            />
+                            <button 
+                               type="button"
+                               title="Gunakan Harga Saran"
+                               onClick={() => handleLineChange(line.id, 'selling_price', suggestedPrice)}
+                               className="h-[42px] w-8 flex items-center justify-center bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition shadow-sm shadow-emerald-200"
+                            >
+                               <TrendingUp size={14} />
+                            </button>
                           </div>
-                          <div className="text-[9px] text-slate-400 leading-tight mt-1 sm:ml-auto max-w-[120px]">Disimpan otomatis ke Master Produk</div>
+                          <div className="text-[8px] text-slate-400 mt-1 max-w-[140px] truncate">Saran: {formatCurrency(suggestedPrice)}</div>
                         </div>
 
-                        <div className="col-span-1 text-center pt-2 sm:pt-0">
-                          <button type="button" onClick={() => handleRemoveLine(line.id)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+                        <div className="col-span-1 min-h-[58px] text-center flex items-start justify-center pt-2 sm:pt-3">
+                          <button type="button" onClick={() => handleRemoveLine(line.id)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors">
                             <Trash2 size={16}/>
                           </button>
                         </div>
@@ -1101,9 +1251,14 @@ export default function PurchasingClient({ orgId, orgName, purchases, vendors, p
 
                    {/* Header */}
                    <div className="flex justify-between items-start border-b-2 border-slate-900 pb-8 mb-8 relative z-10">
-                      <div>
-                        <h1 className="text-4xl font-black tracking-tighter text-slate-900 mb-2">{orgName}</h1>
-                        <p className="text-sm text-slate-500 max-w-sm">Dokumen ini merupakan pesanan resmi perusahaan yang mengikat secara hukum apabila telah disetujui (Approved).</p>
+                      <div className="flex items-start gap-5">
+                        {logoUrl && (
+                          <img src={logoUrl} alt="Logo" className="w-16 h-16 object-contain" />
+                        )}
+                        <div>
+                          <h1 className="text-4xl font-black tracking-tighter text-slate-900 mb-1">{orgSettings.brand_name || orgName}</h1>
+                          <p className="text-sm text-slate-500 max-w-sm">{orgSettings.company_address || 'Alamat perusahaan belum diatur (Update di Pengaturan Bisnis).'}</p>
+                        </div>
                       </div>
                       <div className="text-right">
                         <h2 className="text-2xl font-black text-blue-600 uppercase tracking-widest mb-1">PURCHASE ORDER</h2>

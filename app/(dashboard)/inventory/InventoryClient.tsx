@@ -57,7 +57,8 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
     unit: 'Pcs',
     custom_unit: '',
     purchase_price: '0',
-    selling_price: '0'
+    selling_price: '0',
+    category: 'Bahan' as any
   })
 
   // Opname / Adjustment Form
@@ -102,14 +103,15 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
       unit: product.unit || 'Pcs',
       custom_unit: UNIT_OPTIONS.includes(product.unit || 'Pcs') ? '' : (product.unit || ''),
       purchase_price: product.purchase_price?.toString() || '0',
-      selling_price: product.selling_price?.toString() || '0'
+      selling_price: product.selling_price?.toString() || '0',
+      category: product.category || 'Bahan'
     })
     setIsModalOpen(true)
   }
 
   const handleOpenNew = () => {
     setEditId(null)
-    setFormData({ name: '', sku: '', barcode: '', type: 'INVENTORY', unit: 'Pcs', custom_unit: '', purchase_price: '0', selling_price: '0' })
+    setFormData({ name: '', sku: '', barcode: '', type: 'INVENTORY', unit: 'Pcs', custom_unit: '', purchase_price: '0', selling_price: '0', category: 'Bahan' })
     setIsModalOpen(true)
   }
 
@@ -205,15 +207,21 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
     setIsSubmitting(true)
 
     try {
+      // Auto-map manufacturing categories to system types
+      let mappedType: 'INVENTORY' | 'NON_INVENTORY' | 'SERVICE' = 'INVENTORY'
+      if (formData.category === 'Layanan') mappedType = 'SERVICE'
+      else if (formData.category === 'Lainnya') mappedType = 'NON_INVENTORY'
+
       if (editId) {
         const updated = await updateProduct(editId, orgId, {
           name: formData.name,
           sku: formData.sku,
           barcode: formData.barcode,
-          type: formData.type,
+          type: mappedType,
           unit: formData.unit === 'Lainnya' ? formData.custom_unit : formData.unit,
           purchase_price: parseFloat(formData.purchase_price) || 0,
           selling_price: parseFloat(formData.selling_price) || 0,
+          category: formData.category
         })
         if (updated) setProducts(products.map(p => p.id === editId ? { ...p, ...updated } : p))
       } else {
@@ -222,10 +230,11 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
           name: formData.name,
           sku: formData.sku,
           barcode: formData.barcode,
-          type: formData.type,
+          type: mappedType,
           unit: formData.unit === 'Lainnya' ? formData.custom_unit : formData.unit,
           purchase_price: parseFloat(formData.purchase_price) || 0,
           selling_price: parseFloat(formData.selling_price) || 0,
+          category: formData.category
         })
         if (newProduct) setProducts([{ ...newProduct, stock_in: 0, stock_out: 0, stock_available: 0, stock_value: 0 }, ...products])
       }
@@ -718,14 +727,24 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
                           <input placeholder="Ketik satuan..." required value={formData.custom_unit} onChange={(e) => setFormData({...formData, custom_unit: e.target.value})} className="w-full mt-2 px-6 py-4 bg-amber-50 rounded-2xl border border-amber-200 font-bold text-amber-700 outline-none focus:border-amber-500 shadow-inner" />
                         )}
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jenis Produk</label>
-                        <select value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value as any})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-bold text-slate-900 outline-none focus:border-blue-500 shadow-inner">
-                           <option value="INVENTORY">Inventory (Barang Fisik)</option>
-                           <option value="NON_INVENTORY">Non-Inventory (Bahan Habis Pakai)</option>
-                           <option value="SERVICE">Jasa/Servis</option>
-                        </select>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Kategori Produk</label>
+                      <select required value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value as any})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-bold text-blue-600 outline-none focus:border-blue-500 shadow-inner">
+                           <option value="Bahan">Bahan Baku</option>
+                           <option value="Setengah Jadi">Barang Setengah Jadi</option>
+                           <option value="Pelengkap">Pelengkap / Kemasan</option>
+                           <option value="Siap Jual">Barang Jadi (Siap Jual)</option>
+                           <option value="Layanan">Jasa / Layanan (Labor)</option>
+                           <option value="Lainnya">Lain-lain / Pendukung</option>
+                      </select>
+                      <div className="px-3 py-1 bg-blue-50/50 rounded-lg text-[8px] font-black text-blue-400 uppercase tracking-tighter w-fit mt-1">
+                        Sistem Mapping: {
+                          formData.category === 'Layanan' ? 'SERVICE' : 
+                          formData.category === 'Lainnya' ? 'NON-INVENTORY' : 
+                          'INVENTORY (STOCKABLE)'
+                        }
                       </div>
+                    </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-5">

@@ -77,7 +77,7 @@ export default async function ChartOfAccountsPage() {
 
             {/* Account rows */}
             <div className="divide-y" style={{ borderColor: '#f3f4f6' }}>
-              {typeAccounts.map((account) => (
+              {typeAccounts.map((account: Account) => (
                 <div
                   key={account.id}
                   className="flex items-center px-5 py-3 hover:bg-gray-50 transition-colors"

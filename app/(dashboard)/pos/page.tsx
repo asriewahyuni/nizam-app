@@ -32,5 +32,5 @@ export default async function POSPage() {
   const { data: accounts } = await supabase.from('accounts').select('id, name, code')
     .eq('org_id', orgId).eq('is_active', true)
     
-  return <POSClient orgId={orgId} products={productsWithStock} customers={customers || []} accounts={accounts || []} currentUser={user} />
+  return <POSClient orgId={orgId} org={orgData.org} products={productsWithStock} customers={customers || []} accounts={accounts || []} currentUser={user} />
 }

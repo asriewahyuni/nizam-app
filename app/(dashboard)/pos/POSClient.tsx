@@ -13,7 +13,9 @@ const PROMOS = [
    { code: 'HARBOLSALE', type: 'PERCENT', value: 15, status: 'EXPIRED' }
 ]
 
-export default function POSClient({ orgId, products, customers, accounts, currentUser }: any) {
+export default function POSClient({ orgId, org, products, customers, accounts, currentUser }: any) {
+    const orgSettings = org?.settings || {}
+    const logoUrl = org?.logo_url || ''
    const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
    const [loading, setLoading] = useState(false)
    const [successData, setSuccessData] = useState<any>(null)
@@ -290,12 +292,15 @@ export default function POSClient({ orgId, products, customers, accounts, curren
          {/* Top Bar Navigation (POS Specific) */}
          <div className="h-16 bg-[#003366] text-white flex items-center justify-between px-4 md:px-6 shadow-md shrink-0 z-50 w-full relative">
             <div className="flex items-center gap-3 md:gap-4">
-               <div className="w-8 h-8 md:w-10 md:h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20">
-                  <MonitorSmartphone size={18} className="text-white md:hidden" />
-                  <MonitorSmartphone size={20} className="text-white hidden md:block" />
-               </div>
-               <div>
-                  <h1 className="text-sm md:text-lg font-black tracking-tight leading-none">Nizam POS</h1>
+                <div className="w-8 h-8 md:w-10 md:h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/20 overflow-hidden">
+                   {logoUrl ? (
+                      <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                   ) : (
+                      <MonitorSmartphone size={20} className="text-white" />
+                   )}
+                </div>
+                <div>
+                   <h1 className="text-sm md:text-lg font-black tracking-tight leading-none">{orgSettings.brand_name || 'Nizam POS'}</h1>
                   <div className="text-[8px] md:text-[10px] font-bold text-white/70 uppercase tracking-widest flex items-center gap-1 mt-0.5">
                      <MapPin size={8} className="md:w-[10px]" /> Cabang Utama
                   </div>
@@ -731,9 +736,12 @@ export default function POSClient({ orgId, products, customers, accounts, curren
                         @page { margin: 0; size: 58mm auto; }
                      }
                   `}</style>
-                  <div className="text-center mb-3">
-                     <h2 className="font-bold text-sm">NIZAM CABANG UTAMA</h2>
-                     <p>Pusat Penjualan Retil</p>
+                  <div className="text-center mb-3 flex flex-col items-center">
+                     {logoUrl && (
+                        <img src={logoUrl} alt="Logo" className="w-12 h-12 object-contain mb-1" />
+                     )}
+                     <h2 className="font-bold text-sm uppercase">{orgSettings.brand_name || 'NIZAM CABANG UTAMA'}</h2>
+                     <p className="text-[8px]">{orgSettings.company_address || 'Pusat Penjualan Retil'}</p>
                   </div>
                   <div className="border-b border-dashed border-black mb-2" />
                   <div className="flex justify-between mb-1">

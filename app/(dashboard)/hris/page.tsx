@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
 import { getEmployees } from '@/modules/hris/actions/employee.actions'

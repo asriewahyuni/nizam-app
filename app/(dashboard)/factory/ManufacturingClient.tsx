@@ -19,10 +19,12 @@ import {
   Package,
   Zap,
   Play,
-  ClipboardList
+  ClipboardList,
+  AlertTriangle,
+  Truck
 } from 'lucide-react'
 import { formatRupiah, formatDate } from '@/lib/utils'
-import { createBom, updateBom, deleteBom, createWorkOrder, updateWorkOrderStatus, deleteWorkOrder, addWorkOrderCost, getFGBins } from '@/modules/factory/actions/factory.actions'
+import { createBom, updateBom, deleteBom, createWorkOrder, updateWorkOrderStatus, deleteWorkOrder, addWorkOrderCost, getFGBins, createPurchaseRequests } from '@/modules/factory/actions/factory.actions'
 
 interface ManufacturingClientProps {
   orgId: string
@@ -57,6 +59,12 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
   const [profitMargin, setProfitMargin] = useState(25) // Default 25% target margin
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>('')
   const [availableBins, setAvailableBins] = useState<any[]>([])
+  
+  // Custom Modal States
+  const [showStockWarningModal, setShowStockWarningModal] = useState(false)
+  const [shortItems, setShortItems] = useState<any[]>([])
+  const [pendingWo, setPendingWo] = useState<any>(null)
+  const [showQuotationPrompt, setShowQuotationPrompt] = useState(false)
 
   // Load bins when warehouse is selected
   const handleWhChange = async (whId: string) => {
@@ -133,10 +141,9 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
 
   const handleRelease = async (wo: any) => {
     setLoading(true)
-    // 1. Check stock of all items in BoM relative to planned quantity
     const items = wo.bom?.items || []
     const qtyPlanned = wo.quantity_planned
-    let shortItems = []
+    let shortItemsList = []
 
     for (const bi of items) {
       const needed = bi.quantity * qtyPlanned
@@ -144,26 +151,52 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
       const product = products.find(p => p.id === productId)
       const available = product?.stock_available || 0
       if (available < needed) {
-        shortItems.push({ name: bi.product?.name || 'Bahan', needed, available })
+        shortItemsList.push({ 
+          name: bi.product?.name || 'Bahan', 
+          productId: productId,
+          needed, 
+          available,
+          unit: bi.unit || bi.product?.unit
+        })
       }
     }
 
-    if (shortItems.length > 0) {
-      const list = shortItems.map(s => `• ${s.name}: Butuh ${s.needed}, Ada ${s.available}`).join('\n')
-      const msg = `⚠️ PERINGATAN STOK KURANG!\n\n${list}\n\nBahan baku tidak mencukupi untuk target produksi ini.\n\nKlik 'OK' untuk tetap Lanjut Produksi (Sistem Backorder),\natau 'Cancel' untuk batalkan dan pertimbangkan Ganti Akad Penjualan (Salam/Istisna).`
-      
-      if (!confirm(msg)) {
-        if (confirm('Apakah Anda ingin beralih ke menu Penawaran (Quotation) untuk membuat akad Pre-Order?')) {
-          window.location.href = '/sales/quotations'
-        }
-        setLoading(false)
-        return
-      }
+    if (shortItemsList.length > 0) {
+      setShortItems(shortItemsList)
+      setPendingWo(wo)
+      setShowStockWarningModal(true)
+      setLoading(false)
+      return
     }
 
-    const res = await updateWorkOrderStatus(orgId, wo.id, 'RELEASED')
+    await proceedWithRelease(wo.id)
+  }
+
+  const proceedWithRelease = async (woId: string) => {
+    setLoading(true)
+    const res = await updateWorkOrderStatus(orgId, woId, 'RELEASED')
     if (res.error) alert(res.error)
     else window.location.reload()
+    setLoading(false)
+  }
+
+  const handleRequestToPurchasing = async () => {
+    setLoading(true)
+    const requests = shortItems.map(item => ({
+      productId: item.productId,
+      productName: item.name,
+      quantity: item.needed - item.available,
+      unit: item.unit,
+      notes: `Permintaan otomatis dari SPK: ${pendingWo?.wo_number}`,
+      sourceId: pendingWo?.id
+    }))
+
+    const res = await createPurchaseRequests(orgId, requests)
+    if (res.error) alert(res.error)
+    else {
+      alert(`Berhasil mengirim ${res.count} permintaan ke Purchasing.`)
+      setShowStockWarningModal(false)
+    }
     setLoading(false)
   }
 
@@ -461,7 +494,7 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Pilih Produk Jadi</label>
                         <select name="product_id" required defaultValue={editingBom?.product?.id} className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none">
                            <option value="">-- Pilih Produk --</option>
-                           {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                           {products.filter(p => ['Siap Jual', 'Layanan'].includes(p.category) || !p.category).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
                      </div>
                      <div className="space-y-2 text-left">
@@ -479,8 +512,17 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
                               (document.getElementById('item-unit') as HTMLSelectElement).value = p.unit;
                            }
                         }}>
-                           <option value="">Pilih Bahan Baku...</option>
-                           {products.map(p => <option key={p.id} value={p.id}>{p.name} {p.unit ? `(${p.unit})` : ''} — {formatRupiah(p.average_cost || p.purchase_price || 0)}</option>)}
+                           <option value="">Pilih Elemen Produksi...</option>
+                           {products.filter(p => ['Bahan', 'Setengah Jadi', 'Pelengkap', 'Layanan', 'Lainnya'].includes(p.category) || !p.category).map(p => (
+                             <option key={p.id} value={p.id}>
+                               {p.name} {p.unit ? `(${p.unit})` : ''} — {formatRupiah(p.average_cost || p.purchase_price || 0)}
+                             </option>
+                           ))}
+                           <optgroup label="Sbg Komponen (Produk Jadi)">
+                             {products.filter(p => p.category === 'Siap Jual').map(p => (
+                               <option key={p.id} value={p.id}>{p.name} (Hasil Produksi)</option>
+                             ))}
+                           </optgroup>
                         </select>
                         <input id="item-qty" type="number" step="any" placeholder="Qty" className="w-20 px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm" />
                         <select id="item-unit" className="w-24 px-2 py-3 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-blue-700">
@@ -528,158 +570,295 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
           </div>
         )}
 
+        {/* FINISH SPK MODAL */}
         {showFinishModal && selectedWo && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowFinishModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8 flex flex-col max-h-[90vh]">
-               <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
-                       <CheckCircle2 size={24} className="text-emerald-500" /> Selesaikan Produksi
-                    </h3>
-                    <p className="text-xs text-slate-400 font-medium">{selectedWo.wo_number} - {selectedWo.bom?.product?.name}</p>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
+                    <CheckCircle2 size={24} className="text-emerald-500" /> Selesaikan Produksi
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium">{selectedWo.wo_number} - {selectedWo.bom?.product?.name}</p>
+                </div>
+                <button onClick={() => setShowFinishModal(false)} className="text-slate-400 hover:text-slate-900"><X size={20} /></button>
+              </div>
+
+              <form onSubmit={handleFinishSpk} className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar text-left">
+                {/* Inventory Section */}
+                <div className="p-6 bg-slate-50 rounded-2xl space-y-4">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Package size={12} /> Tujuan Penyimpanan Stok
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-500 ml-1">Pilih Gudang</label>
+                      <select
+                        required
+                        onChange={(e) => handleWhChange(e.target.value)}
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold"
+                      >
+                        <option value="">-- Pilih --</option>
+                        {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-500 ml-1">Pilih Rak (Bin)</label>
+                      <select name="bin_id" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold">
+                        <option value="">-- Standar --</option>
+                        {availableBins.map((b: any) => <option key={b.id} value={b.id}>{b.code}</option>)}
+                      </select>
+                    </div>
                   </div>
-                  <button onClick={() => setShowFinishModal(false)} className="text-slate-400 hover:text-slate-900"><X size={20} /></button>
-               </div>
-               
-               <form onSubmit={handleFinishSpk} className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar text-left">
-                  {/* Inventory Section */}
-                  <div className="p-6 bg-slate-50 rounded-2xl space-y-4">
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <Package size={12} /> Tujuan Penyimpanan Stok
-                     </p>
-                     <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                           <label className="text-[10px] font-bold text-slate-500 ml-1">Pilih Gudang</label>
-                           <select 
-                            required 
-                            onChange={(e) => handleWhChange(e.target.value)}
-                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold"
-                           >
-                              <option value="">-- Pilih --</option>
-                              {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                           </select>
-                        </div>
-                        <div className="space-y-2">
-                           <label className="text-[10px] font-bold text-slate-500 ml-1">Pilih Rak (Bin)</label>
-                           <select name="bin_id" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold">
-                              <option value="">-- Standar --</option>
-                              {availableBins.map(b => <option key={b.id} value={b.id}>{b.code}</option>)}
-                           </select>
-                        </div>
-                     </div>
-                  </div>
+                </div>
 
-                  {/* Overhead Section & HPP Calculation */}
-                  <div className="p-6 border border-slate-100 rounded-2xl space-y-4">
-                     <div className="flex justify-between items-center">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                           <Zap size={12} /> Biaya Tambahan (Labor/Overhead)
-                        </p>
-                        <button 
-                          type="button"
-                          onClick={() => setOverheadCosts([...overheadCosts, { description: '', amount: 0, cost_type: 'LABOR' }])}
-                          className="text-[10px] font-black text-blue-600 uppercase"
-                        >
-                          + Tambah Biaya
-                        </button>
-                     </div>
-                     
-                     <div className="space-y-3">
-                        {overheadCosts.map((cost, idx) => (
-                          <div key={idx} className="flex gap-2 items-center">
-                             <input 
-                                placeholder="Ket: Listrik, Gaji, dll" 
-                                className="flex-1 px-4 py-2 bg-slate-50 border border-slate-100 rounded-lg text-xs"
-                                value={cost.description}
-                                onChange={(e) => {
-                                  const newCosts = [...overheadCosts]
-                                  newCosts[idx].description = e.target.value
-                                  setOverheadCosts(newCosts)
-                                }}
-                             />
-                             <input 
-                                type="number" 
-                                placeholder="Rp 0" 
-                                className="w-32 px-4 py-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold"
-                                value={cost.amount || ''}
-                                onChange={(e) => {
-                                  const newCosts = [...overheadCosts]
-                                  newCosts[idx].amount = Number(e.target.value)
-                                  setOverheadCosts(newCosts)
-                                }}
-                             />
-                             <button type="button" onClick={() => setOverheadCosts(overheadCosts.filter((_, i) => i !== idx))} className="text-rose-500"><X size={14} /></button>
-                          </div>
-                        ))}
-                        {overheadCosts.length === 0 && (
-                          <p className="text-[10px] text-slate-400 italic text-center py-2">Tidak ada biaya tambahan yang dicatat.</p>
-                        )}
-                     </div>
-
-                     {(() => {
-                       const rawMaterialCost = selectedWo?.bom?.items?.reduce((sum: number, item: any) => {
-                         const cost = item.product?.average_cost || item.product?.purchase_price || 0;
-                         return sum + (item.quantity * selectedWo.quantity_planned * cost)
-                       }, 0) || 0
-                       const totalOverhead = overheadCosts.reduce((s, c) => s + c.amount, 0)
-                       const grandTotalHPP = rawMaterialCost + totalOverhead
-                       const qtyPlanned = selectedWo?.quantity_planned || 1
-                       const hppPerUnit = grandTotalHPP / qtyPlanned
-                       // safe divide by zero if user enters 100% margin
-                       const profitMarginDecimal = Math.max(0.01, (100 - (profitMargin || 0)) / 100)
-                       const suggestedPrice = hppPerUnit / profitMarginDecimal
-
-                       return (
-                         <div className="pt-4 border-t border-slate-100 space-y-3">
-                           <div className="flex justify-between items-center text-xs">
-                             <span className="text-slate-500">Total Biaya Tambahan:</span>
-                             <span className="font-bold text-slate-700">{formatRupiah(totalOverhead)}</span>
-                           </div>
-                           <div className="flex justify-between items-center text-xs">
-                             <span className="text-slate-500">Estimasi Biaya Bahan (Sistem):</span>
-                             <span className="font-bold text-slate-700">{formatRupiah(rawMaterialCost)}</span>
-                           </div>
-                           <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-100">
-                             <span className="font-bold text-slate-800">Total HPP Produksi (Semua Unit):</span>
-                             <span className="font-black text-rose-600">{formatRupiah(grandTotalHPP)}</span>
-                           </div>
-                           <div className="flex justify-between items-center text-sm">
-                             <span className="font-bold text-slate-800">HPP per Unit (Modal Bersih):</span>
-                             <span className="font-black text-rose-600">{formatRupiah(hppPerUnit)}</span>
-                           </div>
-                           
-                           <div className="mt-6 p-4 bg-emerald-50 border border-emerald-100 rounded-xl space-y-3">
-                             <div className="flex justify-between items-center">
-                               <span className="text-xs font-bold text-emerald-800 uppercase tracking-wide">Target Margin (%)</span>
-                               <div className="flex items-center gap-2">
-                                 <input 
-                                   type="number" 
-                                   value={profitMargin} 
-                                   onChange={e => setProfitMargin(Number(e.target.value))} 
-                                   className="w-16 px-2 py-1 text-center font-bold text-emerald-700 bg-white border border-emerald-200 rounded-lg outline-none" 
-                                 />
-                                 <span className="text-sm font-bold text-emerald-700">%</span>
-                               </div>
-                             </div>
-                             <div className="flex justify-between items-center">
-                               <span className="text-sm font-bold text-emerald-900">Rekomendasi Harga Jual:</span>
-                               <span className="text-lg font-black text-emerald-600">{formatRupiah(suggestedPrice)}</span>
-                             </div>
-                             <p className="text-[10px] text-emerald-600/80 leading-snug">Formula: HPP / (100% - Margin%). Harga yang dioptimalkan untuk melindungi margin bersih Anda.</p>
-                           </div>
-                         </div>
-                       )
-                     })()}
-                  </div>
-
-                  <div className="pt-4">
-                    <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-600 text-white font-black rounded-2xl shadow-xl shadow-emerald-100 flex items-center justify-center gap-3">
-                       {loading ? 'Processing...' : <><CheckCircle2 size={20} /> Konfirmasi & Selesaikan Produksi</>}
+                {/* Overhead Section & HPP Calculation */}
+                <div className="p-6 border border-slate-100 rounded-2xl space-y-4">
+                  <div className="flex justify-between items-center">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Zap size={12} /> Biaya Tambahan (Labor/Overhead)
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setOverheadCosts([...overheadCosts, { description: '', amount: 0, cost_type: 'LABOR' }])}
+                      className="text-[10px] font-black text-blue-600 uppercase"
+                    >
+                      + Tambah Biaya
                     </button>
-                    <p className="text-[10px] text-center text-slate-400 mt-4 px-8">Menyelesaikan SPK akan otomatis memotong stok bahan baku dan menambah stok produk jadi sesuai resep.</p>
                   </div>
-               </form>
+
+                  <div className="space-y-3">
+                    {overheadCosts.map((cost, idx) => (
+                      <div key={idx} className="flex gap-2 items-center">
+                        <input
+                          placeholder="Ket: Listrik, Gaji, dll"
+                          className="flex-1 px-4 py-2 bg-slate-50 border border-slate-100 rounded-lg text-xs"
+                          value={cost.description}
+                          onChange={(e) => {
+                            const newCosts = [...overheadCosts]
+                            newCosts[idx].description = e.target.value
+                            setOverheadCosts(newCosts)
+                          }}
+                        />
+                        <input
+                          type="number"
+                          placeholder="Rp 0"
+                          className="w-32 px-4 py-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold"
+                          value={cost.amount || ''}
+                          onChange={(e) => {
+                            const newCosts = [...overheadCosts]
+                            newCosts[idx].amount = Number(e.target.value)
+                            setOverheadCosts(newCosts)
+                          }}
+                        />
+                        <button type="button" onClick={() => setOverheadCosts(overheadCosts.filter((_, i) => i !== idx))} className="text-rose-500"><X size={14} /></button>
+                      </div>
+                    ))}
+                    {overheadCosts.length === 0 && (
+                      <p className="text-[10px] text-slate-400 italic text-center py-2">Tidak ada biaya tambahan yang dicatat.</p>
+                    )}
+                  </div>
+
+                  {(() => {
+                    const rawMaterialCost = selectedWo?.bom?.items?.reduce((sum: number, item: any) => {
+                      const cost = item.product?.average_cost || item.product?.purchase_price || 0;
+                      return sum + (item.quantity * selectedWo.quantity_planned * cost)
+                    }, 0) || 0
+                    const totalOverhead = overheadCosts.reduce((s, c) => s + c.amount, 0)
+                    const grandTotalHPP = rawMaterialCost + totalOverhead
+                    const qtyPlanned = selectedWo?.quantity_planned || 1
+                    const hppPerUnit = grandTotalHPP / qtyPlanned
+                    // safe divide by zero if user enters 100% margin
+                    const profitMarginDecimal = Math.max(0.01, (100 - (profitMargin || 0)) / 100)
+                    const suggestedPrice = hppPerUnit / profitMarginDecimal
+
+                    return (
+                      <div className="pt-4 border-t border-slate-100 space-y-3">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-500">Total Biaya Tambahan:</span>
+                          <span className="font-bold text-slate-700">{formatRupiah(totalOverhead)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-500">Estimasi Biaya Bahan (Sistem):</span>
+                          <span className="font-bold text-slate-700">{formatRupiah(rawMaterialCost)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-100">
+                          <span className="font-bold text-slate-800">Total HPP Produksi (Semua Unit):</span>
+                          <span className="font-black text-rose-600">{formatRupiah(grandTotalHPP)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="font-bold text-slate-800">HPP per Unit (Modal Bersih):</span>
+                          <span className="font-black text-rose-600">{formatRupiah(hppPerUnit)}</span>
+                        </div>
+
+                        <div className="mt-6 p-4 bg-emerald-50 border border-emerald-100 rounded-xl space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-emerald-800 uppercase tracking-wide">Target Margin (%)</span>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                value={profitMargin}
+                                onChange={e => setProfitMargin(Number(e.target.value))}
+                                className="w-16 px-2 py-1 text-center font-bold text-emerald-700 bg-white border border-emerald-200 rounded-lg outline-none"
+                              />
+                              <span className="text-sm font-bold text-emerald-700">%</span>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-bold text-emerald-900">Rekomendasi Harga Jual:</span>
+                            <span className="text-lg font-black text-emerald-600">{formatRupiah(suggestedPrice)}</span>
+                          </div>
+                          <p className="text-[10px] text-emerald-600/80 leading-snug">Formula: HPP / (100% - Margin%). Harga yang dioptimalkan untuk melindungi margin bersih Anda.</p>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+
+                <div className="pt-4">
+                  <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-600 text-white font-black rounded-2xl shadow-xl shadow-emerald-100 flex items-center justify-center gap-3">
+                    {loading ? 'Processing...' : <><CheckCircle2 size={20} /> Konfirmasi & Selesaikan Produksi</>}
+                  </button>
+                  <p className="text-[10px] text-center text-slate-400 mt-4 px-8">Menyelesaikan SPK akan otomatis memotong stok bahan baku dan menambah stok produk jadi sesuai resep.</p>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* BEAUTIFIED STOCK WARNING MODAL */}
+        {showStockWarningModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowStockWarningModal(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden border border-rose-100"
+            >
+              <div className="bg-rose-50 p-8 flex flex-col items-center text-center space-y-4">
+                <div className="w-20 h-20 bg-white rounded-full shadow-xl shadow-rose-200/50 flex items-center justify-center relative overflow-hidden">
+                  <motion.div
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ repeat: Infinity, duration: 2 }}
+                    className="text-rose-500"
+                  >
+                    <AlertTriangle size={40} />
+                  </motion.div>
+                  <div className="absolute inset-0 bg-rose-500/5 animate-pulse" />
+                </div>
+                <div className="space-y-1">
+                  <h2 className="text-2xl font-black text-rose-900 leading-tight uppercase tracking-tight">Kekurangan Stok Bahan!</h2>
+                  <p className="text-rose-600/70 font-bold text-xs uppercase tracking-widest">Peringatan Ketersediaan Inventory</p>
+                </div>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div className="space-y-3">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Daftar Bahan Kurang:</p>
+                  <div className="space-y-2">
+                    {shortItems.map((item, i) => (
+                      <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 transition hover:border-rose-200 group">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-black text-slate-800">{item.name}</span>
+                          <span className="text-[10px] font-bold text-slate-400">Inventory saat ini: {item.available}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-xs font-black text-rose-600">Butuh {item.needed}</span>
+                          <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full mt-1">-{item.needed - item.available}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 rounded-2xl p-5 border border-amber-100 relative overflow-hidden">
+                  <div className="relative z-10 flex gap-4">
+                    <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center shrink-0">
+                      <Layers size={20} className="text-amber-500" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-black text-amber-900">Bahan baku tidak mencukupi.</p>
+                      <p className="text-[10px] font-medium text-amber-700/80 leading-relaxed italic">
+                        Klik <span className="font-black">Lanjut Produksi</span> untuk sistem Backorder (Stok Minus), atau <span className="font-black text-blue-600">Ganti Akad</span> untuk beralih ke Pre-Order (Salam/Istisna).
+                      </p>
+                    </div>
+                  </div>
+                  <div className="absolute top-0 right-0 p-2 opacity-[0.03]">
+                    <Clock size={60} />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => {
+                      setShowStockWarningModal(false)
+                      if (pendingWo) {
+                        proceedWithRelease(pendingWo.id)
+                      }
+                    }}
+                    className="w-full py-5 bg-slate-900 text-white font-black rounded-[24px] shadow-xl hover:bg-black transition-all transform hover:-translate-y-1 active:scale-95 text-xs tracking-widest uppercase"
+                  >
+                    Bypass & Lanjut Produksi
+                  </button>
+                  
+                  <button
+                    disabled={loading}
+                    onClick={handleRequestToPurchasing}
+                    className="w-full py-5 bg-blue-600 text-white font-black rounded-[24px] shadow-xl hover:bg-blue-700 transition-all transform hover:-translate-y-1 active:scale-95 text-xs tracking-widest uppercase flex items-center justify-center gap-2"
+                  >
+                    <Truck size={14} /> {loading ? 'Mengirim...' : 'Kirim Rikues ke Purchasing'}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowStockWarningModal(false)
+                      setShowQuotationPrompt(true)
+                    }}
+                    className="w-full py-4 bg-rose-50 text-rose-600 font-bold rounded-[20px] hover:bg-rose-100 transition-all text-[10px] tracking-widest uppercase border border-rose-100"
+                  >
+                    Batalkan SPK Ini
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* QUOTATION PROMPT MODAL */}
+        {showQuotationPrompt && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowQuotationPrompt(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-md bg-white rounded-[40px] shadow-2xl p-10 text-center space-y-8"
+            >
+              <div className="w-24 h-24 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto shadow-inner border-4 border-white">
+                <TrendingUp size={44} />
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Alihkan ke Akad Pre-Order?</h3>
+                <p className="text-sm font-medium text-slate-500 px-4">
+                  Produksi tertunda karena stok kurang. Ingin beralih ke menu <span className="font-bold text-blue-600 italic">Penawaran (Quotation)</span> untuk mencatat akad Salam/Istisna agar operasional tetap aman?
+                </p>
+              </div>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setShowQuotationPrompt(false)}
+                  className="flex-1 py-5 bg-slate-100 text-slate-600 font-bold rounded-3xl hover:bg-slate-200 transition text-[11px] uppercase tracking-widest"
+                >
+                  Nanti Saja
+                </button>
+                <button
+                  onClick={() => window.location.href = '/sales/quotations'}
+                  className="flex-1 py-5 bg-blue-600 text-white font-black rounded-3xl hover:bg-blue-500 shadow-xl shadow-blue-100 transition text-[11px] uppercase tracking-widest"
+                >
+                  Ya, Alihkan
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

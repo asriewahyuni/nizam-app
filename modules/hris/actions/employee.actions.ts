@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 
 export async function getEmployees(orgId: string) {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('employees')
     .select('*')
     .eq('org_id', orgId)
@@ -27,7 +27,7 @@ export async function createEmployee(orgId: string, formData: FormData) {
   const basicSalary = Number(formData.get('basic_salary') || 0)
   const joinDate = formData.get('join_date') as string || new Date().toISOString().split('T')[0]
 
-  const { error } = await supabase.from('employees').insert({
+  const { error } = await (supabase as any).from('employees').insert({
     org_id: orgId,
     nik,
     first_name: firstName,
@@ -59,7 +59,7 @@ export async function updateEmployee(id: string, orgId: string, formData: FormDa
   const basicSalary = Number(formData.get('basic_salary') || 0)
   const joinDate = formData.get('join_date') as string
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('employees')
     .update({
       nik,

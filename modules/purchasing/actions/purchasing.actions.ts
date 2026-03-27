@@ -449,3 +449,49 @@ export async function createPurchaseReturn(orgId: string, payload: {
   revalidatePath('/inventory')
   return { success: true }
 }
+
+export async function getPurchaseRequests(orgId: string) {
+  const supabase = await createClient()
+  
+  // Try without joins first if it fails with {} error
+  const { data, error } = await supabase
+    .from('purchase_requests')
+    .select(`
+      *,
+      product:products(name, sku, unit)
+    `)
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('DEBUG: getPurchaseRequests fail:', error.message, error.code, error.details)
+    return []
+  }
+  return data
+}
+
+export async function updatePurchaseRequestStatus(orgId: string, requestId: string, status: string) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('purchase_requests')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', requestId)
+    .eq('org_id', orgId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/purchasing')
+  revalidatePath('/factory')
+  return { success: true }
+}
+
+export async function getPendingPurchaseRequestsCount(orgId: string) {
+  const supabase = await createClient()
+  const { count, error } = await supabase
+    .from('purchase_requests')
+    .select('*', { count: 'exact', head: true })
+    .eq('org_id', orgId)
+    .eq('status', 'PENDING')
+
+  if (error) return 0
+  return count || 0
+}

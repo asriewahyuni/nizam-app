@@ -8,7 +8,15 @@ import { updateSession } from '@/lib/supabase/middleware'
  * 2. RBAC / Protected Routes redirects
  */
 export async function middleware(request: NextRequest) {
-  return await updateSession(request)
+  // 1. Let Supabase handle session/auth
+  const response = await updateSession(request)
+
+  // 2. Inject current pathname into headers so Layout can read it
+  // This allows the RBAC Path Guard to work.
+  const url = new URL(request.url)
+  response.headers.set('x-pathname', url.pathname)
+  
+  return response
 }
 
 export const config = {

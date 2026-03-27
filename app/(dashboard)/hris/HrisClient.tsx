@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { requestPasswordReset, resetEmployeePassword } from '@/modules/auth/actions/auth.actions'
 import {
   Plus,
   Users,
@@ -29,6 +30,8 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { createClient } from '@/lib/supabase/client'
+import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
 import { createEmployee, updateEmployee } from '@/modules/hris/actions/employee.actions'
 import { createPayrollComponent, deletePayrollComponent, generatePayrollRun, payPayrollRun, fixEmptyPayrollJournals, getPayrollRunDetails, deletePayrollRun, voidPayrollRun } from '@/modules/hris/actions/payroll.actions'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
@@ -61,18 +64,53 @@ export default function HrisClient({
   settings?: any,
   roles?: any[]
 }) {
+  const supabase = createClient()
   const [employees, setEmployees] = useState(initialEmployees)
   const [payrollComponents, setPayrollComponents] = useState(initialPayrollComponents)
   const [payrollRuns, setPayrollRuns] = useState(initialPayrollRuns || [])
+  const [rolesList, setRolesList] = useState(roles || []) // Local state for roles
   const [activeTab, setActiveTab] = useState<'EMPLOYEES' | 'PAYROLL' | 'ATTENDANCE' | 'RUNS'>('EMPLOYEES')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingEmp, setEditingEmp] = useState<any>(null)
   const [viewingRun, setViewingRun] = useState<any>(null)
   const [viewingRunData, setViewingRunData] = useState<any[]>([])
   const [isPayrollModalOpen, setIsPayrollModalOpen] = useState(false)
+  const [resettingId, setResettingId] = useState<string | null>(null)
+
+  const handleResetPassword = async (emp: any) => {
+    const newPwd = prompt(`Masukkan password baru untuk ${emp.first_name}:`, 'nizam123')
+    if (!newPwd) return
+    
+    setResettingId(emp.id)
+    const res = await resetEmployeePassword(emp.id, newPwd)
+    setResettingId(null)
+    
+    if (res.success) {
+      alert('Password berhasil direset!')
+    } else {
+      alert('Gagal reset: ' + res.error)
+    }
+  }
   const [isRunModalOpen, setIsRunModalOpen] = useState(false)
   const [isPayModalOpen, setIsPayModalOpen] = useState<any>(null) // selected run to pay
   const [loading, setLoading] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<string>('')
+
+  // Use shared hook — same org_id resolution as Settings/Roles and getActiveOrg()
+  const { orgId: activeOrgId } = useActiveOrgId()
+
+  // Sync roles whenever activeOrgId resolves
+  useEffect(() => {
+    if (!activeOrgId) return
+    ;(supabase as any)
+      .from('roles')
+      .select('*')
+      .eq('org_id', activeOrgId)
+      .order('name')
+      .then(({ data }: any) => {
+        if (data && data.length > 0) setRolesList(data)
+      })
+  }, [activeOrgId])
 
   // Basic Form State
   const [basicSalary, setBasicSalary] = useState(0)
@@ -261,7 +299,7 @@ export default function HrisClient({
           />
           <StatCard
             label="Open Roles"
-            value="3"
+            value={rolesList.length.toString()}
             sub="Current Openings"
             icon={Briefcase}
             color="indigo"
@@ -318,12 +356,25 @@ export default function HrisClient({
                             </div>
                           </div>
                         </div>
-                        <button
-                          onClick={(e: any) => { e.stopPropagation(); handleOpenEdit(emp); }}
-                          className="p-3 bg-white text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition shadow-sm border border-slate-100"
-                        >
-                          <Edit2 size={16} />
-                        </button>
+                        <div className="flex flex-col gap-2 items-end">
+                          <button
+                            onClick={(e: any) => { e.stopPropagation(); handleOpenEdit(emp); }}
+                            className="p-3 bg-white text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition shadow-sm border border-slate-100"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          
+                          {emp.reset_requested && (
+                            <button
+                              onClick={(e: any) => { e.stopPropagation(); handleResetPassword(emp); }}
+                              disabled={resettingId === emp.id}
+                              className="p-3 bg-rose-500 text-white hover:bg-rose-600 rounded-2xl transition shadow-lg shadow-rose-200 animate-bounce"
+                              title="Karyawan minta reset password"
+                            >
+                              <Key size={16} className={resettingId === emp.id ? 'animate-spin' : ''} />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -894,17 +945,31 @@ export default function HrisClient({
                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Occupation & Compensation</h4>
                     </div>
                     <div className="grid grid-cols-2 gap-6">
-                      {roles && roles.length > 0 ? (
-                        <select name="job_title" required defaultValue={editingEmp?.job_title || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none">
+                      {rolesList && rolesList.length > 0 ? (
+                        <select
+                          name="job_title"
+                          required
+                          value={selectedRole || editingEmp?.job_title || ''}
+                          onChange={e => setSelectedRole(e.target.value)}
+                          className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none"
+                        >
                           <option value="">Pilih Jabatan (Role) *</option>
-                          {roles.map((r: any) => (
+                          {rolesList.map((r: any) => (
                             <option key={r.id} value={r.name}>{r.name}</option>
                           ))}
                         </select>
                       ) : (
                         <input name="job_title" placeholder="Job Title *" required defaultValue={editingEmp?.job_title || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
                       )}
-                      <input name="department" placeholder="Department" defaultValue={editingEmp?.department || ''} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none" />
+                      {/* Department derived automatically from selected role — no manual input needed */}
+                      <input
+                        type="hidden"
+                        name="department_id"
+                        value={(() => {
+                          const role = rolesList.find((r: any) => r.name === (selectedRole || editingEmp?.job_title))
+                          return role?.department_ids?.[0] || role?.department_id || ''
+                        })()}
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-6">
                       <select name="employment_status" defaultValue={editingEmp?.employment_status || 'FULL_TIME'} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 outline-none">

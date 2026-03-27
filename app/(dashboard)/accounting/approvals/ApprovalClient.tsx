@@ -1,8 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Check, X, Bell, FileText, View, QrCode, ShieldCheck, AlertTriangle } from 'lucide-react'
-import { decideApproval, getApprovalDetail } from '@/modules/organization/actions/approval.actions'
+import { Check, X, Bell, FileText, View, QrCode, ShieldCheck, AlertTriangle, Clock, Shield } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { decideApproval, getApprovalDetail, getApprovalHistory } from '@/modules/organization/actions/approval.actions'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { QRCodeSVG } from 'qrcode.react'
 
@@ -13,12 +14,15 @@ interface ApprovalClientProps {
 
 export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps) {
   const [approvals, setApprovals] = useState(initialApprovals)
+  const [history, setHistory] = useState<any[]>([])
+  const [activeTab, setActiveTab] = useState<'PENDING' | 'HISTORY'>('PENDING')
   const [submitting, setSubmitting] = useState<string | null>(null)
 
   // Detail Modal State
   const [detailOpen, setDetailOpen] = useState(false)
   const [selectedReq, setSelectedReq] = useState<any>(null)
   const [detailData, setDetailData] = useState<any>(null)
+  const [detailLogs, setDetailLogs] = useState<any[]>([])
   const [loadingDetail, setLoadingDetail] = useState(false)
 
   // Confirmation + Notes Modal State
@@ -58,6 +62,17 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
     }
   }
 
+  const loadHistory = async () => {
+    setLoadingDetail(true)
+    const res = await getApprovalHistory(orgId)
+    setHistory(res || [])
+    setLoadingDetail(false)
+  }
+
+  React.useEffect(() => {
+    if (activeTab === 'HISTORY') loadHistory()
+  }, [activeTab])
+
   const handleDetail = async (req: any) => {
     setSelectedReq(req)
     setDetailData(null)
@@ -65,6 +80,7 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
     setLoadingDetail(true)
     const res = await getApprovalDetail(orgId, req.source_id, req.source_type)
     setDetailData(res.data)
+    setDetailLogs(res.logs || [])
     setLoadingDetail(false)
   }
 
@@ -78,7 +94,28 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
         <p className="text-slate-500 font-medium">Pusat kendali persetujuan operasional NIZAM ERP. Tanda Tangan Digital QR akan di-generate otomatis setelah verifikasi.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between border-b border-slate-100">
+           <div className="flex gap-8">
+              <button 
+                onClick={() => setActiveTab('PENDING')}
+                className={`pb-4 text-sm font-black uppercase tracking-widest transition-all relative ${activeTab === 'PENDING' ? 'text-[#003366]' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                Menunggu ({approvals.length})
+                {activeTab === 'PENDING' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-[#003366] rounded-t-full" />}
+              </button>
+              <button 
+                onClick={() => setActiveTab('HISTORY')}
+                className={`pb-4 text-sm font-black uppercase tracking-widest transition-all relative ${activeTab === 'HISTORY' ? 'text-[#003366]' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                Riwayat Selesai
+                {activeTab === 'HISTORY' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-[#003366] rounded-t-full" />}
+              </button>
+           </div>
+        </div>
+
+        {activeTab === 'PENDING' ? (
+          <div className="grid grid-cols-1 gap-6">
         {approvals.length === 0 ? (
           <div className="py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-4">
             <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-500">
@@ -125,6 +162,41 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
             </div>
           ))
         )}
+        </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6">
+            {loadingDetail ? (
+               <div className="py-20 text-center text-slate-400 font-bold animate-pulse">Memuat riwayat...</div>
+            ) : history.length === 0 ? (
+              <div className="py-20 bg-white rounded-3xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-4">
+                <Shield size={48} className="text-slate-200" />
+                <p className="text-slate-400 font-medium">Belum ada riwayat persetujuan.</p>
+              </div>
+            ) : (
+              history.map((req) => (
+                <div key={req.id} className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative group border-l-4 border-l-slate-200">
+                  <div className="flex items-center gap-6">
+                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                        <ShieldCheck size={24} />
+                     </div>
+                     <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                           <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg ${req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{req.status}</span>
+                           <span className="text-slate-400 text-xs font-mono">• {formatDate(req.decided_at || req.updated_at)}</span>
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-900">{req.reason || req.source_type}</h3>
+                        <p className="text-sm text-slate-500">Oleh: <span className="font-bold text-slate-700">{req.approver_id === 'SYSTEM' ? 'Otomasi Sistem' : 'Pejabat Berwenang'}</span></p>
+                     </div>
+                  </div>
+                  <button onClick={() => handleDetail(req)}
+                    className="flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold text-[#003366] bg-[#003366]/5 rounded-2xl hover:bg-[#003366]/10 transition-all">
+                     <View size={18} /> Lihat Log &amp; Dokumen
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       {/* DETAIL MODAL */}
@@ -158,17 +230,67 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                           <p className="text-lg font-black text-slate-900">{detailData.shariah_mode || 'CASH'}</p>
                         </div>
                       </div>
-                      <h3 className="font-bold text-slate-800">Item Pembelian</h3>
+                      <h3 className="font-bold text-slate-800 flex items-center justify-between">
+                        Rincian Item Pembelian
+                        <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-tighter">Verified Items</span>
+                      </h3>
                       <div className="space-y-3">
                         {detailData.purchase_items?.map((item: any) => (
                           <div key={item.id} className="flex justify-between items-center p-4 border border-slate-100 rounded-xl">
                             <div>
-                               <p className="font-bold">{item.products?.name || item.description}</p>
-                               <p className="text-sm text-slate-500">{item.quantity} x {formatRupiah(item.unit_price)}</p>
+                               <p className="font-bold text-slate-900">{item.products?.name || item.description}</p>
+                               <div className="flex items-center gap-2 mt-1">
+                                 <span className="inline-flex h-6 px-3 items-center justify-center bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-lg border border-emerald-100 uppercase tracking-tighter">
+                                   {item.quantity} {item.unit || item.products?.unit || 'Unit/Pcs'}
+                                 </span>
+                                 <span className="text-xs text-slate-400 font-bold">@ {formatRupiah(item.unit_price)}</span>
+                               </div>
                             </div>
                             <div className="font-bold text-[#003366]">{formatRupiah(item.quantity * item.unit_price)}</div>
                           </div>
                         ))}
+                      </div>
+
+                      {/* Financial Summary Breakdown */}
+                      <div className="bg-slate-50 rounded-2xl p-6 space-y-4 border border-slate-100 shadow-inner">
+                        <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-widest">
+                          <span>Keterangan</span>
+                          <span>Total Jurnal</span>
+                        </div>
+                        <div className="space-y-2 pt-2">
+                           <div className="flex justify-between text-sm">
+                             <span className="text-slate-500 font-medium">Subtotal Barang</span>
+                             <span className="font-black text-slate-700">{formatRupiah(detailData.total_amount)}</span>
+                           </div>
+                           {detailData.discount_amount > 0 && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-rose-500 font-medium italic">Diskon Global</span>
+                                <span className="font-black text-rose-600">-{formatRupiah(detailData.discount_amount)}</span>
+                              </div>
+                           )}
+                           {detailData.tax_amount > 0 && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-[#003366] font-medium">Pajak (PPN/PPh)</span>
+                                <span className="font-black text-[#003366]">+{formatRupiah(detailData.tax_amount)}</span>
+                              </div>
+                           )}
+                           {(detailData.shipping_amount > 0 || detailData.insurance_amount > 0) && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-slate-500 font-medium italic">Ongkir & Asuransi</span>
+                                <span className="font-black text-slate-700">+{formatRupiah((detailData.shipping_amount || 0) + (detailData.insurance_amount || 0))}</span>
+                              </div>
+                           )}
+                           <div className="pt-4 border-t border-slate-200 mt-2 flex justify-between items-end">
+                              <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Bayar (Konfirmasi)</p>
+                                <p className="text-2xl font-black text-[#003366] tracking-tighter leading-none">{formatRupiah(detailData.grand_total)}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none mb-1">Status Dana</p>
+                                <p className="text-sm font-black text-slate-900 leading-none">{detailData.payment_status || 'UNPAID'}</p>
+                              </div>
+                           </div>
+                        </div>
                       </div>
                     </>
                   )}
@@ -302,6 +424,58 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                       )}
                     </>
                   )}
+
+                  {/* APPROVAL LOGS / HISTORY */}
+                  <div className="pt-6 border-t border-slate-100">
+                    <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
+                       <Clock size={14} className="text-slate-400" /> Riwayat Persetujuan (Internal Log)
+                    </h3>
+                    <div className="space-y-4">
+                      {detailLogs.length > 0 ? (
+                        detailLogs.map((log, idx) => (
+                          <div key={log.id} className="relative pl-6 pb-2 last:pb-0">
+                            {/* Roadmap Line */}
+                            {idx !== detailLogs.length - 1 && (
+                              <div className="absolute left-[7px] top-4 bottom-0 w-0.5 bg-slate-100" />
+                            )}
+                            {/* Dot */}
+                            <div className={`absolute left-0 top-1.5 w-4 h-4 rounded-full border-2 border-white shadow-sm ${
+                              log.status === 'APPROVED' ? 'bg-emerald-500' : 
+                              log.status === 'REJECTED' ? 'bg-rose-500' : 
+                              'bg-blue-500'
+                            }`} />
+                            
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className={`text-[10px] font-black uppercase tracking-wider ${
+                                  log.status === 'APPROVED' ? 'text-emerald-600' : 
+                                  log.status === 'REJECTED' ? 'text-rose-600' : 
+                                  'text-blue-600'
+                                }`}>
+                                  {log.status === 'PENDING' ? 'PENGAJUAN DOKUMEN' : log.status}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono italic">
+                                  {formatDate(log.decided_at || log.requested_at)}
+                                </span>
+                              </div>
+                              <p className="text-xs font-bold text-slate-700">
+                                {log.status === 'PENDING' ? 'Dokumen diterbitkan untuk persetujuan' : 
+                                 log.status === 'APPROVED' ? 'Dokumen telah disetujui & ditandatangani' : 
+                                 'Dokumen ditolak/dikembalikan'}
+                              </p>
+                              {log.notes && (
+                                <div className="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 italic">
+                                  "{log.notes}"
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-slate-400 italic">Tidak ada riwayat log ditemukan.</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

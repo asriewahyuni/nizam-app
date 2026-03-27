@@ -285,3 +285,33 @@ export async function deleteWorkOrder(orgId: string, woId: string) {
   revalidatePath('/factory')
   return { success: true }
 }
+
+export async function createPurchaseRequests(orgId: string, requests: any[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Unauthorized' }
+
+  const payload = requests.map(req => ({
+    org_id: orgId,
+    requester_id: user.id,
+    product_id: req.productId,
+    product_name: req.productName,
+    quantity: req.quantity,
+    unit: req.unit,
+    notes: req.notes,
+    status: 'PENDING',
+    source_type: 'MANUFACTURING',
+    source_id: req.sourceId
+  }))
+
+  const { error } = await supabase
+    .from('purchase_requests')
+    .insert(payload)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/factory')
+  revalidatePath('/purchasing')
+  return { success: true, count: payload.length }
+}

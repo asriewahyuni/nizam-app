@@ -976,7 +976,12 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
                 {/* Print Business Profile Header */}
                 <div className="hidden print:flex justify-between items-start pb-6 border-b-2 border-slate-900 mb-6 w-full">
                     <div className="flex flex-col text-left">
-                       <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{orgSettings.brand_name || orgName}</h2>
+                       <div className="flex items-center gap-4">
+                          {orgSettings.logo_url && (
+                             <img src={orgSettings.logo_url} alt="Logo" className="w-16 h-16 object-contain" />
+                          )}
+                          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{orgSettings.brand_name || orgName}</h2>
+                       </div>
                        <p className="text-xs font-medium text-slate-700 max-w-[350px] mt-1">{orgSettings.company_address || 'Alamat perusahaan belum diatur (Silakan update di Pengaturan -> Bisnis).'}</p>
                        <div className="flex items-center gap-4 mt-2 text-[10px] font-bold text-slate-500">
                           {orgSettings.hotline && <span>Telp/WA: {orgSettings.hotline}</span>}

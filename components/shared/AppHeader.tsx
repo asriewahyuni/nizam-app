@@ -10,13 +10,14 @@ import type { Organization } from '@/types/database.types'
 
 interface AppHeaderProps {
   user: { fullName?: string; email: string }
+  jobTitle?: string
   org: Organization
   branches: any[]
   pendingApprovals?: number
   cashFlow?: any
 }
 
-function AppHeaderImplementation({ user, org, branches, pendingApprovals = 0, cashFlow }: AppHeaderProps) {
+function AppHeaderImplementation({ user, jobTitle, org, branches, pendingApprovals = 0, cashFlow }: AppHeaderProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -182,8 +183,8 @@ function AppHeaderImplementation({ user, org, branches, pendingApprovals = 0, ca
 
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-slate-900 leading-tight tracking-tight capitalize">{displayName}</p>
-            <p className="text-[10px] text-slate-400 font-medium leading-none mt-1">{user.email}</p>
+            <p className="text-sm font-black text-slate-900 leading-tight tracking-tight">{user.fullName || user.email}</p>
+            <p className="text-[10px] text-blue-600 font-bold leading-none mt-1 uppercase tracking-widest">{jobTitle || 'Enterprise Member'}</p>
           </div>
 
           {/* Avatar */}

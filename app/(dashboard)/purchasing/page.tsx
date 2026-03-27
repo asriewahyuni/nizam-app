@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { getPurchases } from '@/modules/purchasing/actions/purchasing.actions'
+import { getPurchases, getPurchaseRequests } from '@/modules/purchasing/actions/purchasing.actions'
 import { getContacts } from '@/modules/contacts/actions/contact.actions'
 import { getProducts } from '@/modules/inventory/actions/inventory.actions'
 import { getAccountBalances } from '@/modules/accounting/actions/coa.actions'
@@ -21,11 +21,12 @@ export default async function PurchasingPage() {
   const orgId = orgData.org.id
   const orgName = orgData.org.name || 'Nizam'
 
-  const [purchases, vendors, products, coa] = await Promise.all([
+  const [purchases, vendors, products, coa, purchaseRequests] = await Promise.all([
     getPurchases(orgId),
     getContacts(orgId, 'SUPPLIER'),
     getProducts(orgId),
-    getAccountBalances(orgId)
+    getAccountBalances(orgId),
+    getPurchaseRequests(orgId)
   ])
 
   return (
@@ -34,10 +35,12 @@ export default async function PurchasingPage() {
         <PurchasingClient 
           orgId={orgId}
           orgName={orgName}
+          org={orgData.org}
           purchases={purchases}
           vendors={vendors}
           products={products}
           coa={coa}
+          purchaseRequests={purchaseRequests}
         />
       </Suspense>
     </div>
