@@ -145,7 +145,9 @@ export default function SaaSAdminPage() {
       await fetchPackages()
     } catch (err: any) {
       console.error('SavePackage Failed:', err)
-      alert('❌ Gagal menyimpan paket: ' + (err.message || 'Unknown error'))
+      // Tampilkan error lebih detail agar kita tahu biangnya
+      const errMsg = err.message || JSON.stringify(err)
+      alert('❌ Gagal menyimpan paket: ' + errMsg)
     }
   }
 
