@@ -45,6 +45,7 @@ interface NavGroup {
     icon: any
     phase?: string
     permission_key?: string
+    module_key?: string
   }[]
 }
 
@@ -74,47 +75,47 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Operasional',
     items: [
-      { label: 'Pembelian', href: '/purchasing', icon: ShoppingCart, permission_key: 'purchasing' },
-      { label: 'Inventori', href: '/inventory', icon: Package, permission_key: 'inventory' },
-      { label: 'Gudang (WMS)', href: '/inventory/warehouses', icon: Warehouse, permission_key: 'inventory' },
-      { label: 'Manufaktur (BoM)', href: '/factory', icon: Factory, permission_key: 'factory' },
-      { label: 'Fleet & Rental', href: '/fleet', icon: Truck, permission_key: 'fleet' },
-      { label: 'Job Order (Jasa)', href: '/services', icon: Briefcase, permission_key: 'services' },
+      { label: 'Pembelian', href: '/purchasing', icon: ShoppingCart, permission_key: 'purchasing', module_key: 'purchasing' },
+      { label: 'Inventori', href: '/inventory', icon: Package, permission_key: 'inventory', module_key: 'inventory' },
+      { label: 'Gudang (WMS)', href: '/inventory/warehouses', icon: Warehouse, permission_key: 'inventory', module_key: 'inventory' },
+      { label: 'Manufaktur (BoM)', href: '/factory', icon: Factory, permission_key: 'factory', module_key: 'factory' },
+      { label: 'Fleet & Rental', href: '/fleet', icon: Truck, permission_key: 'fleet', module_key: 'fleet' },
+      { label: 'Job Order (Jasa)', href: '/services', icon: Briefcase, permission_key: 'services', module_key: 'services' },
     ]
   },
   {
     group: 'Marketing & Sales',
     items: [
-      { label: 'Pelanggan (CRM)', href: '/contacts', icon: Users, permission_key: 'sales' },
-      { label: 'POS (Kasir)', href: '/pos', icon: Store, permission_key: 'pos' },
-      { label: 'Penawaran (Quotation)', href: '/sales/quotations', icon: FileText, permission_key: 'sales' },
-      { label: 'Penjualan', href: '/sales', icon: TrendingUp, permission_key: 'sales' },
-      { label: 'Sales Pipeline', href: '/sales/pipeline', icon: Activity, permission_key: 'sales' },
-      { label: 'Target & Komisi', href: '/sales/commission', icon: Target, permission_key: 'sales' },
-      { label: 'Promo & Reward', href: '/sales/promos', icon: Zap, permission_key: 'sales' },
+      { label: 'Pelanggan (CRM)', href: '/contacts', icon: Users, permission_key: 'sales', module_key: 'sales' },
+      { label: 'POS (Kasir)', href: '/pos', icon: Store, permission_key: 'pos', module_key: 'pos' },
+      { label: 'Penawaran (Quotation)', href: '/sales/quotations', icon: FileText, permission_key: 'sales', module_key: 'sales' },
+      { label: 'Penjualan', href: '/sales', icon: TrendingUp, permission_key: 'sales', module_key: 'sales' },
+      { label: 'Sales Pipeline', href: '/sales/pipeline', icon: Activity, permission_key: 'sales', module_key: 'sales' },
+      { label: 'Target & Komisi', href: '/sales/commission', icon: Target, permission_key: 'sales', module_key: 'sales' },
+      { label: 'Promo & Reward', href: '/sales/promos', icon: Zap, permission_key: 'sales', module_key: 'sales' },
     ]
   },
   {
     group: 'HRIS',
     items: [
-      { label: 'Karyawan (HRIS)', href: '/hris', icon: Users, permission_key: 'hris' },
-      { label: 'Akses & Jabatan', href: '/settings/roles', icon: ShieldCheck, permission_key: 'hris' },
+      { label: 'Karyawan (HRIS)', href: '/hris', icon: Users, permission_key: 'hris', module_key: 'hris' },
+      { label: 'Akses & Jabatan', href: '/settings/roles', icon: ShieldCheck, permission_key: 'hris', module_key: 'hris' },
     ]
   },
   {
     group: 'Insight',
     items: [
-      { label: 'Laporan', href: '/reports', icon: BarChart3, permission_key: 'reports' },
-      { label: 'Strategi (BSC)', href: '/reports/bsc', icon: PieChart, permission_key: 'reports' },
-      { label: 'Proyeksi Kas', href: '/accounting/forecast', icon: LineChart, permission_key: 'reports' },
+      { label: 'Laporan', href: '/reports', icon: BarChart3, permission_key: 'reports', module_key: 'reports' },
+      { label: 'Strategi (BSC)', href: '/reports/bsc', icon: PieChart, permission_key: 'reports', module_key: 'reports' },
+      { label: 'Proyeksi Kas', href: '/accounting/forecast', icon: LineChart, permission_key: 'reports', module_key: 'reports' },
     ]
   },
   {
     group: 'Config',
     items: [
-      { label: 'Audit Trail', href: '/settings/audit', icon: ShieldCheck, permission_key: 'config' },
-      { label: 'Cabang & Divisi', href: '/settings/branches', icon: MapPin, permission_key: 'config' },
-      { label: 'Pengaturan Bisnis', href: '/settings/business', icon: Settings, permission_key: 'config' },
+      { label: 'Audit Trail', href: '/settings/audit', icon: ShieldCheck, permission_key: 'config', module_key: 'config' },
+      { label: 'Cabang & Divisi', href: '/settings/branches', icon: MapPin, permission_key: 'config', module_key: 'config' },
+      { label: 'Pengaturan Bisnis', href: '/settings/business', icon: Settings, permission_key: 'config', module_key: 'config' },
     ]
   }
 ]
@@ -124,6 +125,7 @@ interface AppSidebarProps {
   jobTitle?: string
   user?: { fullName?: string; email: string }
   permissions?: string[]
+  enabledModules?: string[]
   pendingApprovals?: number
   unpostedJournals?: number
   pendingPurchaseRequests?: number
@@ -136,6 +138,7 @@ export function AppSidebar({
   jobTitle,
   user,
   permissions = [],
+  enabledModules = [],
   pendingApprovals = 0, 
   unpostedJournals = 0, 
   pendingPurchaseRequests = 0,
@@ -199,10 +202,14 @@ export function AppSidebar({
           // Filter items based on permissions
           const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
           const filteredItems = group.items.filter(item => {
+            // 1. SaaS Module Check (Has this organization paid/enabled this module?)
+            if (item.module_key && !enabledModules.some(m => m.toLowerCase() === item.module_key!.toLowerCase())) {
+              return false
+            }
+
+            // 2. RBAC Permission Check
             if (isOwnerOrAdmin) return true
-            if (!item.permission_key) return true // Public menus (Dashboard, etc)
-            
-            // Check if ANY permission key in the list includes this menu's key
+            if (!item.permission_key) return true // Public menus
             return permissions.some(p => p.toLowerCase().includes(item.permission_key!.toLowerCase()))
           })
 

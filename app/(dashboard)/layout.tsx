@@ -59,18 +59,29 @@ export default async function DashboardLayout({
       '/settings': 'config'
     }
 
-    // Identify which module is being accessed
-    const accessedModule = Object.keys(routePermissionMap).find(path => pathname.startsWith(path))
+  // Identify which module is being accessed
+  const accessedModuleEntry = Object.entries(routePermissionMap).find(([path]) => pathname.startsWith(path))
+  
+  if (accessedModuleEntry) {
+    const [modulePath, requiredKey] = accessedModuleEntry
     
-    if (accessedModule) {
-      const requiredKey = routePermissionMap[accessedModule]
-      const hasPermission = orgData.permissions.some(p => p.toLowerCase().includes(requiredKey.toLowerCase()))
+    // 1. SAAS MODULE GUARD (Is this module paid/enabled for this org?)
+    // Module keys are usually the same as the base path (e.g. /hris -> hris)
+    const moduleKey = modulePath.replace('/', '')
+    const isModuleEnabled = orgData.enabledModules?.some((m: string) => m.toLowerCase() === moduleKey.toLowerCase())
 
+    if (!isModuleEnabled) {
+      return redirect('/dashboard')
+    }
+
+    // 2. RBAC PERMISSION GUARD (Does the user have the right role for this module?)
+    if (!isOwnerOrAdmin) {
+      const hasPermission = orgData.permissions.some((p: string) => p.toLowerCase().includes(requiredKey.toLowerCase()))
       if (!hasPermission) {
-        // Forbidden access! Redirect back home.
         return redirect('/dashboard')
       }
     }
+  }
   }
 
   return (
@@ -84,6 +95,7 @@ export default async function DashboardLayout({
           email: orgData.user?.email || ''
         }}
         permissions={orgData.permissions}
+        enabledModules={orgData.enabledModules}
         pendingApprovals={pendingApprovals} 
         unpostedJournals={unpostedJournals} 
         pendingPurchaseRequests={pendingPurchaseRequests}

@@ -71,18 +71,23 @@ export async function getActiveOrg() {
   }
 
   if (!memberData) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('org_members')
-      .select('org_id, role, role_id, organizations(*), roles(permissions)')
+      .select('*, organizations(*), roles(permissions)')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .order('joined_at', { ascending: true })
       .limit(1)
       .maybeSingle()
+    
+    if (error) console.error('GetActiveOrg Error:', error)
     memberData = data
   }
 
-  if (!memberData) return null
+  if (!memberData) {
+    console.log('No Active Org found for user:', user.id)
+    return null
+  }
 
   const activeOrgId = memberData.org_id
 
@@ -100,6 +105,7 @@ export async function getActiveOrg() {
     roleId: memberData.role_id,
     jobTitle: empData?.job_title || memberData.role,
     permissions: (memberData.roles as any)?.permissions || [],
+    enabledModules: (memberData.organizations as any)?.enabled_modules || [],
     user
   }
 }
