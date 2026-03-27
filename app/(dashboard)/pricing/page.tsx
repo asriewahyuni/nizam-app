@@ -120,25 +120,47 @@ export default function PricingPage() {
                 )}
               </div>
 
-              {/* Body: Modules */}
-              <div className="flex-1 bg-white p-6 space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Modul Termasuk</p>
-                <ul className="space-y-2">
-                  {pkg.modules?.slice(0, 8).map((mod: string) => (
-                    <li key={mod} className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                      <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
-                      {mod}
-                    </li>
-                  ))}
-                  {pkg.modules?.length > 8 && (
-                    <li className="text-[10px] font-black text-slate-400 uppercase tracking-wider pl-5">
-                      +{pkg.modules.length - 8} modul lainnya
-                    </li>
-                  )}
-                  {(!pkg.modules || pkg.modules.length === 0) && (
-                    <li className="text-sm text-slate-400 italic">Paket standar</li>
-                  )}
-                </ul>
+              {/* Body: Batas Operasional & Seluruh Modul */}
+              <div className="flex-1 bg-white p-6 space-y-6 flex flex-col border-t border-slate-100">
+                {/* Section: Limits */}
+                <div className="grid grid-cols-2 gap-3 pb-5 border-b border-dashed border-slate-200">
+                  <div className="flex flex-col gap-1">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Entitas</p>
+                    <div className="flex items-center gap-1.5 text-slate-900">
+                      <div className="w-5 h-5 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-100">
+                        <Building2 size={12} className="text-emerald-600" />
+                      </div>
+                      <span className="text-xs font-black italic tracking-tight leading-none">Maks. {pkg.max_orgs}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1 border-l border-slate-100 pl-3">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Gudang/WMS</p>
+                    <div className="flex items-center gap-1.5 text-slate-900">
+                      <div className="w-5 h-5 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-100">
+                        <Warehouse size={12} className="text-emerald-600" />
+                      </div>
+                      <span className="text-xs font-black italic tracking-tight leading-none">Maks. {pkg.max_warehouses}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section: FULL Modules Grid */}
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 px-1">Paket Fitur Lengkap:</p>
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-2">
+                    {pkg.modules?.map((mod: string) => (
+                      <div key={mod} className="flex items-center gap-2 group">
+                        <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 rotate-12 transition-transform group-hover:rotate-0">
+                          <CheckCircle2 size={10} className="text-white" />
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-600 group-hover:text-slate-900 transition-colors uppercase tracking-tight leading-tight">{mod}</span>
+                      </div>
+                    ))}
+                    {(!pkg.modules || pkg.modules.length === 0) && (
+                      <div className="col-span-2 text-xs text-slate-400 italic">Fitur Standar Terintegrasi</div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* CTA */}
