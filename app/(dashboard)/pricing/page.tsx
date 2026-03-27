@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle2, Zap, Crown, Shield, Package, ArrowRight, Loader2 } from 'lucide-react'
+import { CheckCircle2, Zap, Crown, Shield, Package, ArrowRight, Loader2, Building2, Store, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
@@ -173,12 +173,57 @@ export default function PricingPage() {
         })}
       </div>
 
+      {/* Add-ons Section ala Hormozi */}
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="bg-slate-900 rounded-[40px] p-8 md:p-12 text-white relative overflow-hidden"
+      >
+        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-[100px]" />
+        
+        <div className="relative z-10 flex flex-col md:flex-row items-center gap-12">
+          <div className="flex-1 space-y-6 text-center md:text-left">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/20 text-blue-300 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-500/30">
+              Power-ups & Add-ons
+            </div>
+            <h2 className="text-4xl font-black tracking-tighter">Butuh Kekuatan Lebih? <br />Tambah Sesuai Kebutuhan.</h2>
+            <p className="text-slate-400 font-bold max-w-lg">
+              Bayar hanya yang Anda gunakan. Bebas tambah cabang atau perangkat POS kapan saja tanpa harus upgrade paket utama.
+            </p>
+          </div>
+
+          <div className="w-full md:w-auto grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[
+              { icon: Building2, label: 'Tambah Cabang', price: 'Rp 149rb', detail: 'per cabang / bulan' },
+              { icon: Store, label: 'Mesin POS Tambahan', price: 'Rp 99rb', detail: 'per perangkat / bulan' },
+              { icon: Users, label: 'Staff Unlimited', price: 'GRATIS', detail: 'di semua paket' },
+              { icon: Shield, label: 'Custom Dev', price: 'Hubungi Kami', detail: 'fitur khusus enterprise' },
+            ].map((addon, i) => {
+              const Icon = addon.icon
+              return (
+                <div key={i} className="bg-white/5 border border-white/10 p-5 rounded-3xl space-y-3 hover:bg-white/10 transition-colors">
+                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                    <Icon size={20} className="text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{addon.label}</p>
+                    <p className="text-xl font-black text-white">{addon.price}</p>
+                    <p className="text-[10px] text-slate-500 font-bold">{addon.detail}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </motion.div>
+
       {/* Bottom Note */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="text-center">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} className="text-center">
         <p className="text-slate-400 text-sm font-medium">
           Butuh paket khusus atau enterprise custom?{' '}
           <Link href="/settings/business" className="text-[#003366] font-black hover:underline">
-            Hubungi tim kami →
+            Konsultasikan Kebutuhan Anda Sekarang →
           </Link>
         </p>
       </motion.div>
