@@ -369,7 +369,7 @@ export default function SaaSAdminPage() {
                             {pkg.price > 0 && <span className="text-xs text-slate-400 font-bold">/{pkg.billing}</span>}
                           </div>
                           <p className={`text-[10px] font-black uppercase tracking-wider ${pkg.price === 0 ? 'text-orange-500' : 'text-emerald-600'}`}>
-                            Batas Waktu: {pkg.duration_days || 30} Hari
+                            Batas Waktu: {pkg.duration_days !== null && pkg.duration_days !== undefined ? pkg.duration_days : 30} Hari
                           </p>
                         </div>
 
