@@ -10,7 +10,7 @@ import {
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis, AreaChart, Area, ReferenceLine } from 'recharts'
-import { injectShariahPack } from '@/modules/accounting/actions/shariah.actions'
+import { injectShariahPack, setShariahAccountsActive } from '@/modules/accounting/actions/shariah.actions'
 import { getLivePreciousMetalsPrices } from '@/modules/accounting/actions/price.actions'
 import { startZakatHaul, checkAndCancelHaul, payZakat, syncActiveHaulPrices } from '@/modules/accounting/actions/zakat.actions'
 
@@ -579,20 +579,48 @@ export default function ZakatClient({ summary, orgId }: ZakatClientProps) {
           <div className="bg-white p-8 rounded-[48px] border border-slate-100 shadow-sm space-y-4">
             <p className="text-[10px] font-black text-slate-900 uppercase italic tracking-widest">Syariah Add-on (CoAS)</p>
             <p className="text-[11px] font-medium text-slate-500 leading-relaxed italic">
-              Suntikkan akun Permodalan Syirkah, Ijarah, dan Zakat otomatis ke CoA Anda.
+              {summary.isShariahEnabled 
+                ? 'Struktur akun Syariah (Syirkah, Ijarah, Zakat) saat ini AKTIF di CoA Anda.'
+                : 'Suntikkan akun Permodalan Syirkah, Ijarah, dan Zakat otomatis ke CoA Anda.'}
             </p>
-            <button
-              onClick={async () => {
-                if (confirm('Aktifkan struktur akun Syariah (CoAS)?')) {
-                  const res = await injectShariahPack(orgId)
-                  if (res.success) alert('Struktur Akun Syariah Berhasil Disuntikkan!')
-                  else alert(res.error)
-                }
-              }}
-              className="w-full py-3 bg-white border border-indigo-200 text-indigo-600 rounded-2xl text-[10px] font-black hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"
-            >
-              <ShieldCheck size={14}/> AKTIFKAN AKUN SYARIAH
-            </button>
+            
+            {summary.isShariahEnabled ? (
+              <button
+                onClick={async () => {
+                  if (confirm('Matikan fitur Syariah? Akun-akun terkait akan dinonaktifkan dari CoA.')) {
+                    setLoading(true)
+                    const res = await setShariahAccountsActive(orgId, false)
+                    if (res.success) {
+                      alert('Struktur Akun Syariah telah dinonaktifkan.')
+                      router.refresh()
+                    } else alert(res.error)
+                    setLoading(false)
+                  }
+                }}
+                disabled={loading}
+                className="w-full py-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-2xl text-[10px] font-black hover:bg-rose-100 transition-all flex items-center justify-center gap-2"
+              >
+                <XCircle size={14}/> NON-AKTIFKAN FITUR SYARIAH
+              </button>
+            ) : (
+              <button
+                onClick={async () => {
+                  if (confirm('Aktifkan struktur akun Syariah (CoAS)?')) {
+                    setLoading(true)
+                    const res = await injectShariahPack(orgId)
+                    if (res.success) {
+                      alert('Struktur Akun Syariah Berhasil Disuntikkan!')
+                      router.refresh()
+                    } else alert(res.error)
+                    setLoading(false)
+                  }
+                }}
+                disabled={loading}
+                className="w-full py-3 bg-white border border-indigo-200 text-indigo-600 rounded-2xl text-[10px] font-black hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"
+              >
+                <ShieldCheck size={14}/> AKTIFKAN AKUN SYARIAH
+              </button>
+            )}
           </div>
         </div>
       </div>

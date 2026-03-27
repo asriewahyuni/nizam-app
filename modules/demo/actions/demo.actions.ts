@@ -21,7 +21,7 @@ const DEMO_PASSWORD = 'demo-nizam-2026!'
  * 3. Create fresh org with seed data
  * 4. Redirect to dashboard
  */
-export type DemoBusinessType = 'COMPUTER' | 'CATERING' | 'RESTAURANT' | 'SUPPLIER_MBG'
+export type DemoBusinessType = 'COMPUTER' | 'CATERING' | 'RESTAURANT' | 'SUPPLIER_MBG' | 'BLANK'
 
 export async function startDemoSession(businessName?: string, demoType: DemoBusinessType = 'COMPUTER') {
   const supabase = await createClient()
@@ -87,7 +87,8 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
     'COMPUTER': 'NIZAM Computer Assembly',
     'CATERING': 'NIZAM Catering Sehat',
     'RESTAURANT': 'NIZAM Rumah Makan Mantap',
-    'SUPPLIER_MBG': 'NIZAM MBG Supplier Hub'
+    'SUPPLIER_MBG': 'NIZAM MBG Supplier Hub',
+    'BLANK': 'NIZAM Baru (Kosongan)'
   }
   const orgName = businessName || defaultNames[demoType]
 
@@ -103,7 +104,8 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
         fiscal_year_start_month: 1,
         plan: 'Demo', // Paket Demo: Full Access + Auto-Destroy saat logout
         is_demo: true,
-        business_type: demoType
+        business_type: demoType,
+        skip_coa_seed: demoType === 'BLANK' // For BLANK demo, we want to show the "Manual Seed" button
       },
     })
 
@@ -205,6 +207,8 @@ export async function isDemoSession(): Promise<boolean> {
 // SEED DEMO DATA — Products, Warehouses, Contacts, etc.
 // ═══════════════════════════════════════════════════════════
 async function seedDemoData(supabase: any, orgId: string, demoType: DemoBusinessType) {
+  if (demoType === 'BLANK') return // Exit early for blank demo
+
   // --- WAREHOUSES & CONTACTS & PRODUCTS BY TYPE ---
   let warehousesData: any[] = []
   let contactsData: any[] = []

@@ -60,14 +60,14 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Finance',
     items: [
-      { label: 'Buku Besar', href: '/accounting/journal', icon: BookOpen, permission_key: 'finance' },
+      { label: 'Akun (CoA)', href: '/settings/accounts', icon: Layers, permission_key: 'finance' },
       { label: 'Kas & Bank', href: '/cash', icon: Wallet, permission_key: 'finance' },
+      { label: 'Buku Besar', href: '/accounting/journal', icon: BookOpen, permission_key: 'finance' },
       { label: 'Aging (AR/AP)', href: '/accounting/aging', icon: History, permission_key: 'finance' },
       { label: 'Manajemen Zakat', href: '/accounting/zakat', icon: Zap, permission_key: 'finance' },
       { label: 'Manajemen Pajak', href: '/accounting/tax', icon: ShieldCheck, permission_key: 'finance' },
       { label: 'Reimbursement', href: '/accounting/reimburse', icon: FileText, permission_key: 'finance' },
       { label: 'Penutupan Buku', href: '/accounting/closing', icon: Lock, permission_key: 'finance' },
-      { label: 'Akun (CoA)', href: '/settings/accounts', icon: Layers, permission_key: 'finance' },
       { label: 'Aset Tetap', href: '/accounting/assets', icon: Landmark, permission_key: 'finance' },
       { label: 'Anggaran', href: '/accounting/budgets', icon: Target, permission_key: 'finance' },
     ]

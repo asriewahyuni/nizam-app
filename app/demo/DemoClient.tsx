@@ -34,6 +34,13 @@ const BUSINESS_TYPES: { id: DemoBusinessType; label: string; icon: any; descript
     description: 'Simulasi perakitan (PC Assembly) dan inventori barang elektronik.',
     color: 'from-slate-600 to-slate-800'
   },
+  { 
+    id: 'BLANK', 
+    label: 'Kosongan (Manual)', 
+    icon: Building2, 
+    description: 'Mulai dari awal tanpa data sampel. Cocok untuk demo setup mandiri.',
+    color: 'from-slate-400 to-slate-600'
+  },
 ]
 
 export default function DemoClient() {

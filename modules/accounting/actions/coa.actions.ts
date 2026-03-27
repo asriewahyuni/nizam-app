@@ -181,3 +181,27 @@ export async function seedInitialCoA(orgId: string) {
   revalidatePath('/settings/accounts')
   return { success: true }
 }
+
+// ─────────────────────────────────────────────────────────────
+// setShariahAccountsActive — Toggle Syariah Accounts
+// ─────────────────────────────────────────────────────────────
+export async function setShariahAccountsActive(orgId: string, active: boolean) {
+  const supabase = await createClient()
+
+  // Common syariah codes from migration 1006
+  const syariahCodes = ['2600', '2601', '3100', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
+
+  const { error } = await supabase
+    .from('accounts')
+    .update({ is_active: active })
+    .eq('org_id', orgId)
+    .filter('code', 'in', `(${syariahCodes.join(',')})`)
+
+  if (error) {
+    console.error('Toggle Syariah Error:', error)
+    return { error: 'Gagal mengubah status akun Syariah.' }
+  }
+
+  revalidatePath('/settings/accounts')
+  return { success: true }
+}

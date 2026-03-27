@@ -9,7 +9,7 @@ export function DemoBanner() {
     <motion.div 
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="bg-[#003366] px-4 py-2 flex items-center justify-between gap-4 print:hidden border-b border-white/10 relative z-[60]"
+      className="bg-[#003366] px-4 py-2 flex items-center justify-between gap-4 print:hidden border-b border-white/10 relative z-20"
     >
       <div className="flex items-center gap-4">
         {/* DEMO BADGE */}

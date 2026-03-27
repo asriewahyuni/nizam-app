@@ -14,13 +14,11 @@ export interface ProductWithStock extends Product {
 export async function getProducts(orgId: string): Promise<ProductWithStock[]> {
   const supabase = await createClient()
 
-  const [productsRes, movementsRes] = await Promise.all([
-    supabase.from('products').select('*').eq('org_id', orgId).order('name', { ascending: true }),
-    supabase.from('stock_movements').select('product_id, quantity, unit_price').eq('org_id', orgId)
-  ])
+  const { data: productsData } = await (supabase as any).from('products').select('*').eq('org_id', orgId).order('name', { ascending: true })
+  const { data: movementsData } = await (supabase as any).from('stock_movements').select('product_id, quantity, unit_price').eq('org_id', orgId)
 
-  const products = productsRes.data || []
-  const movements = movementsRes.data || []
+  const products = productsData || []
+  const movements = movementsData || []
 
   // Aggregate Movements per Product (Sub-Ledger Logic)
   const aggregation: Record<string, { in: number, out: number, value: number }> = {}
@@ -41,7 +39,7 @@ export async function getProducts(orgId: string): Promise<ProductWithStock[]> {
     aggregation[m.product_id].value += (qty * price)
   })
 
-  return products.map(p => {
+  return products.map((p: any) => {
     const stats = aggregation[p.id] || { in: 0, out: 0, value: 0 }
     const available = stats.in - stats.out
 
@@ -61,7 +59,7 @@ export async function getProducts(orgId: string): Promise<ProductWithStock[]> {
 export async function createProduct(productData: Partial<Product>) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('products')
     .insert([productData])
     .select()
@@ -69,18 +67,17 @@ export async function createProduct(productData: Partial<Product>) {
 
   if (error) {
     console.error('Error creating product:', error.message)
-    throw new Error(error.message)
+    return { error: error.message }
   }
 
   revalidatePath('/inventory')
-  return data
+  return { data: data as Product }
 }
 
 export async function updateProduct(id: string, orgId: string, productData: Partial<Product>) {
   const supabase = await createClient()
 
-  // Pastikan org_id cocok sebagai security check tambahan
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('products')
     .update(productData)
     .eq('id', id)
@@ -93,13 +90,13 @@ export async function updateProduct(id: string, orgId: string, productData: Part
   }
 
   revalidatePath('/inventory')
-  return data
+  return data as Product
 }
 
 export async function deleteProduct(id: string, orgId: string) {
   const supabase = await createClient()
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('products')
     .delete()
     .eq('id', id)
@@ -218,16 +215,16 @@ export async function createInventoryAdjustment(
     notes: it.notes
   }))
 
-  const { error: itemsErr } = await supabase
+  const { error: itemsErr } = await (supabase as any)
     .from('inventory_adjustment_items')
-    .insert(itemsToInsert)
+    .insert(itemsToInsert as any)
 
   if (itemsErr) return { error: itemsErr.message }
 
-  const { error: procErr } = await supabase.rpc('process_inventory_adjustment', {
+  const { error: procErr } = await (supabase as any).rpc('process_inventory_adjustment', {
     p_adj_id: adj.id,
     p_user_id: user.id
-  })
+  } as any)
 
   if (procErr) return { error: 'Gagal memproses penyesuaian: ' + procErr.message }
 
@@ -267,13 +264,13 @@ export async function createInventoryTransfer(
 
   if (adjErr) return { error: 'Transfer Header Error: ' + adjErr.message }
 
-  const { data: products } = await supabase.from('products').select('id, purchase_price').eq('org_id', orgId)
+  const { data: products } = await (supabase as any).from('products').select('id, purchase_price').eq('org_id', orgId)
   if (!products) return { error: 'Gagal mengambil data produk' }
 
   const itemsToInsert: any[] = []
   
   for (const it of payload.items) {
-    const product = products.find(p => p.id === it.product_id)
+    const product = products.find((p: any) => p.id === it.product_id)
     const cost = Number(product?.purchase_price || 1) // Must be > 0 for DB constraint
 
     // A. Source Line (-Qty)
@@ -303,16 +300,16 @@ export async function createInventoryTransfer(
     })
   }
 
-  const { error: itemsErr } = await supabase
+  const { error: itemsErr } = await (supabase as any)
     .from('inventory_adjustment_items')
     .insert(itemsToInsert)
 
   if (itemsErr) return { error: 'Transfer Items Error: ' + itemsErr.message }
 
-  const { error: procErr } = await supabase.rpc('process_inventory_adjustment', {
+  const { error: procErr } = await (supabase as any).rpc('process_inventory_adjustment', {
     p_adj_id: adj.id,
     p_user_id: user.id
-  })
+  } as any)
 
   if (procErr) return { error: 'Gagal memproses mutasi: ' + procErr.message }
 
@@ -336,13 +333,13 @@ export async function createInventoryWriteOff(orgId: string, payload: any) {
 export async function getStockLedger(orgId: string, productId: string) {
   const supabase = await createClient()
   
-  const { data: product } = await supabase
+  const { data: product } = await (supabase as any)
     .from('products')
     .select('name, sku, unit')
     .eq('id', productId)
     .single()
 
-  const { data: movements, error } = await supabase
+  const { data: movements, error } = await (supabase as any)
     .from('stock_movements')
     .select('*')
     .eq('org_id', orgId)
@@ -360,14 +357,14 @@ export async function getStockLedger(orgId: string, productId: string) {
 export async function getWarehouseStocks(orgId: string, productId: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('inventory_stocks')
     .select('warehouse_id, quantity, warehouses(name)')
     .eq('org_id', orgId)
     .eq('product_id', productId)
 
   if (error) return []
-  return data.map(s => ({
+  return data.map((s: any) => ({
     warehouse_id: s.warehouse_id,
     warehouse_name: (s.warehouses as any)?.name || 'Unknown',
     quantity: Number(s.quantity || 0)
@@ -377,14 +374,14 @@ export async function getWarehouseStocks(orgId: string, productId: string) {
 export async function getProductByBarcode(orgId: string, barcode: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('products')
     .select('*')
     .eq('org_id', orgId)
     .eq('barcode', barcode)
-    .single()
+    .maybeSingle()
 
   if (error) return null
-  return data
+  return data as Product | null
 }
 

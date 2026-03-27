@@ -105,6 +105,7 @@ export default async function DashboardLayout({
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
+        {isDemo && <DemoBanner />}
         <AppHeader
           user={{
             fullName: orgData.user?.user_metadata?.full_name || orgData.user?.email,
@@ -116,7 +117,6 @@ export default async function DashboardLayout({
           pendingApprovals={pendingApprovals}
           cashFlow={cashFlow}
         />
-        {isDemo && <DemoBanner />}
         <StartupWizard isDemo={isDemo} />
         <main className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6">
           <div className="max-w-7xl mx-auto">

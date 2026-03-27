@@ -58,3 +58,25 @@ export async function injectShariahPack(orgId: string) {
     return { error: 'Gagal menyuntikkan Akun Syariah: ' + err.message }
   }
 }
+
+export async function setShariahAccountsActive(orgId: string, active: boolean) {
+  const supabase = await createClient()
+
+  // Syariah codes from injectShariahPack
+  const syariahCodes = ['2600', '2601', '3100', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
+
+  const { error } = await supabase
+    .from('accounts' as any)
+    .update({ is_active: active })
+    .eq('org_id', orgId)
+    .in('code', syariahCodes)
+
+  if (error) {
+    console.error('Toggle Syariah Error:', error)
+    return { error: 'Gagal mengubah status akun Syariah.' }
+  }
+
+  revalidatePath('/settings/accounts')
+  revalidatePath('/accounting/zakat')
+  return { success: true }
+}

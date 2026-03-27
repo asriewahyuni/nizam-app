@@ -260,7 +260,16 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
     }
   }
 
+  // 8. Check if Shariah Accounts are enabled/active (at least one root account)
+  const { count: shariahCount } = await supabase
+    .from('accounts' as any)
+    .select('*', { count: 'exact', head: true })
+    .eq('org_id', orgId)
+    .in('code', ['3100', '2600', '6100', '6200'])
+    .eq('is_active', true)
+
   return {
+    isShariahEnabled: (shariahCount || 0) > 0,
     zakatAssets,
     totalAssets,
     nishabGold,

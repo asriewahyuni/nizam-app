@@ -213,7 +213,7 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
       else if (formData.category === 'Lainnya') mappedType = 'NON_INVENTORY'
 
       if (editId) {
-        const updated = await updateProduct(editId, orgId, {
+        const result = (await updateProduct(editId, orgId, {
           name: formData.name,
           sku: formData.sku,
           barcode: formData.barcode,
@@ -222,10 +222,16 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
           purchase_price: parseFloat(formData.purchase_price) || 0,
           selling_price: parseFloat(formData.selling_price) || 0,
           category: formData.category
-        })
-        if (updated) setProducts(products.map(p => p.id === editId ? { ...p, ...updated } : p))
+        })) as any
+        
+        if (result?.error) {
+          alert("Gagal mengupdate produk: " + result.error)
+          return
+        }
+        
+        if (result?.data) setProducts(products.map(p => p.id === editId ? { ...p, ...result.data } : p))
       } else {
-        const newProduct = await createProduct({
+        const result = (await createProduct({
           org_id: orgId,
           name: formData.name,
           sku: formData.sku,
@@ -235,8 +241,14 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
           purchase_price: parseFloat(formData.purchase_price) || 0,
           selling_price: parseFloat(formData.selling_price) || 0,
           category: formData.category
-        })
-        if (newProduct) setProducts([{ ...newProduct, stock_in: 0, stock_out: 0, stock_available: 0, stock_value: 0 }, ...products])
+        })) as any
+
+        if (result?.error) {
+          alert("Gagal menyimpan produk: " + result.error)
+          return
+        }
+
+        if (result?.data) setProducts([{ ...result.data, stock_in: 0, stock_out: 0, stock_available: 0, stock_value: 0 }, ...products])
       }
       setIsModalOpen(false)
     } catch (error: any) {
@@ -503,15 +515,15 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
                       <select required value={adjForm.product_id} 
                         onChange={async (e) => {
                           const id = e.target.value
-                          const p = products.find(x => x.id === id)
+                          const p = products.find((x: any) => x.id === id)
                           const stocks = await handleFetchWhStocks(id)
-                          const curQty = stocks?.find(s => s.warehouse_id === adjForm.warehouse_id)?.quantity || 0
+                          const curQty = stocks?.find((s: any) => s.warehouse_id === adjForm.warehouse_id)?.quantity || 0
                           setAdjForm({...adjForm, product_id: id, current_qty: curQty, unit_cost: p?.purchase_price || 0})
                         }} 
                         className="w-full px-5 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-bold outline-none focus:ring-2 focus:ring-emerald-100 appearance-none"
                       >
                           <option value="">-- Manual Select --</option>
-                          {products.map(p => <option key={p.id} value={p.id}>{p.name} (Stok: {p.stock_available})</option>)}
+                          {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} (Stok: {p.stock_available})</option>)}
                       </select>
                     </div>
 
@@ -776,10 +788,10 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
             if (isModalOpen) {
               setFormData({ ...formData, barcode: code })
             } else if (isAdjustmentModalOpen) {
-              const product = await getProductByBarcode(orgId, code)
+              const product = (await getProductByBarcode(orgId, code)) as any
               if (product) {
                  const stocks = await handleFetchWhStocks(product.id)
-                 const curQty = stocks?.find(s => s.warehouse_id === adjForm.warehouse_id)?.quantity || 0
+                 const curQty = stocks?.find((s: any) => s.warehouse_id === adjForm.warehouse_id)?.quantity || 0
                  setAdjForm({ ...adjForm, product_id: product.id, current_qty: curQty, unit_cost: product.purchase_price || 0 })
               } else {
                  alert("Produk tidak ditemukan!")
