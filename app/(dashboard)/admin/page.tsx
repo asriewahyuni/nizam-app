@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ShieldCheck, 
   Users, 
+  Building2,
   Package, 
   Plus, 
   Search, 
@@ -14,7 +15,16 @@ import {
   Loader2,
   RefreshCw,
   X,
-  Trash2
+  Trash2,
+  ReceiptText,
+  Filter,
+  LayoutGrid,
+  List,
+  MoreVertical,
+  Edit2,
+  XCircle,
+  Mail,
+  Database
 } from 'lucide-react'
 import { PageHeader, SectionCard, SectionHeader, SafeButton, StatusBadge, ConfirmDialog } from '@/components/ui/NizamUI'
 import { createClient } from '@/lib/supabase/client'
@@ -28,10 +38,11 @@ const AVAILABLE_MODULES = [
   'Fleet', 'Audit', 'Job Order', 'CRM', 'Warehouse', 'Consolidation'
 ]
 
-type Tab = 'users' | 'packages'
+type Tab = 'users' | 'packages' | 'invoices'
 
 export default function SaaSAdminPage() {
   const db = supabase as any
+  const [invoices, setInvoices] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<Tab>('users')
   const [searchTxt, setSearchTxt] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'demo' | 'official'>('all')
@@ -88,9 +99,46 @@ export default function SaaSAdminPage() {
     }
   }
 
+  const fetchInvoices = async () => {
+    const { data } = await db.from('saas_invoices').select(`
+      *,
+      organization:organizations(name),
+      package:saas_packages(name, modules, duration_days, max_orgs, max_warehouses)
+    `).order('created_at', { ascending: false })
+    if (data) setInvoices(data)
+  }
+
+  const approveInvoice = async (invoice: any) => {
+    const pkg = invoice.package
+    const expiresAt = new Date()
+    expiresAt.setDate(expiresAt.getDate() + (pkg.duration_days || 30))
+
+    // 1. Update status invoice jadi PAID
+    const { error: invErr } = await db.from('saas_invoices').update({ status: 'PAID' }).eq('id', invoice.id)
+    if (invErr) return alert('Gagal update invoice: ' + invErr.message)
+
+    // 2. Update organisasi: Plan, Modul, dan Limitasi!
+    const { error: orgErr } = await db.from('organizations').update({
+      settings: {
+        plan: pkg.name,
+        expires_at: expiresAt.toISOString()
+      },
+      package_limit: {
+        max_orgs: pkg.max_orgs || 1,
+        max_warehouses: pkg.max_warehouses || 1
+      }
+    }).eq('id', invoice.org_id)
+
+    if (orgErr) return alert('Gagal update organisasi: ' + orgErr.message)
+
+    alert('✅ Pembayaran Berhasil Dikonfirmasi & Paket Aktif!')
+    fetchInvoices()
+  }
+
   useEffect(() => {
     fetchOrganizations()
     fetchPackages()
+    fetchInvoices()
   }, [])
 
   // ==================== CRUD PACKAGES ====================
@@ -233,6 +281,12 @@ export default function SaaSAdminPage() {
           <Users size={18} /> Tenant Manager
         </button>
         <button 
+          onClick={() => setActiveTab('invoices')}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'invoices' ? 'bg-white text-blue-600 shadow-md scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          <ReceiptText size={18} /> Tagihan SaaS
+        </button>
+        <button 
           onClick={() => setActiveTab('packages')}
           className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'packages' ? 'bg-white text-blue-600 shadow-md scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
         >
@@ -248,7 +302,7 @@ export default function SaaSAdminPage() {
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
         >
-          {activeTab === 'users' ? (
+          {activeTab === 'users' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
                 <div className="lg:col-span-2 relative">
@@ -341,7 +395,9 @@ export default function SaaSAdminPage() {
                 </div>
               </SectionCard>
             </div>
-          ) : (
+          )}
+
+          {activeTab === 'packages' && (
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                  <p className="text-sm font-bold text-slate-500 italic">Daftar Paket SaaS Aktif</p>
@@ -413,6 +469,82 @@ export default function SaaSAdminPage() {
             </div>
           )}
         </motion.div>
+
+        {/* ======================= VIEW: INVOICES ======================= */}
+        {activeTab === 'invoices' && (
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+            <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden">
+               <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-50/50">
+                     <tr className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                        <th className="px-8 py-5">Tanggal</th>
+                        <th className="px-8 py-5">Bisnis / Org</th>
+                        <th className="px-8 py-5">Paket</th>
+                        <th className="px-8 py-5 text-right">Nominal</th>
+                        <th className="px-8 py-5 text-center">Status</th>
+                        <th className="px-8 py-5 text-right w-48">Aksi</th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                     {invoices.map((inv) => (
+                        <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group">
+                           <td className="px-8 py-5 text-xs font-bold text-slate-500 whitespace-nowrap">
+                              {new Date(inv.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                           </td>
+                           <td className="px-8 py-5">
+                              <p className="text-sm font-black text-slate-900 leading-none">{inv.organization?.name || 'Unknown Org'}</p>
+                              <code className="text-[9px] text-slate-400 font-mono mt-1 block uppercase">{inv.invoice_number}</code>
+                           </td>
+                           <td className="px-8 py-5">
+                              <div className="flex items-center gap-2">
+                                 <span className="px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-wider rounded-lg border border-indigo-100">
+                                    {inv.package?.name}
+                                 </span>
+                              </div>
+                           </td>
+                           <td className="px-8 py-5 text-sm font-black text-slate-900 text-right tracking-tight tabular-nums">
+                              Rp {inv.amount?.toLocaleString('id-ID')}
+                           </td>
+                           <td className="px-8 py-5 text-center">
+                              <div className="flex justify-center">
+                                 <StatusBadge 
+                                    label={inv.status} 
+                                    variant={inv.status === 'PAID' ? 'success' : 'warning'} 
+                                 />
+                              </div>
+                           </td>
+                           <td className="px-8 py-5 text-right">
+                              {inv.status === 'UNPAID' ? (
+                                 <button 
+                                   onClick={() => approveInvoice(inv)}
+                                   className="px-4 py-2 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-emerald-600 transition-all hover:scale-105 shadow-xl shadow-slate-900/10"
+                                 >
+                                   Setujui Pembayaran
+                                 </button>
+                              ) : (
+                                 <div className="flex items-center justify-end gap-1.5 text-emerald-600 text-[10px] font-black uppercase tracking-widest">
+                                    <CheckCircle2 size={12} /> Terverifikasi
+                                 </div>
+                              )}
+                           </td>
+                        </tr>
+                     ))}
+                     {invoices.length === 0 && (
+                        <tr>
+                           <td colSpan={6} className="px-8 py-32 text-center">
+                              <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                                 <ReceiptText size={32} className="text-slate-200" />
+                              </div>
+                              <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Belum Ada Tagihan</h4>
+                              <p className="text-xs text-slate-400 font-bold mt-1">Invoice pendaftaran baru akan muncul di sini.</p>
+                           </td>
+                        </tr>
+                     )}
+                  </tbody>
+               </table>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* ===================== PACKAGE MODAL ===================== */}
