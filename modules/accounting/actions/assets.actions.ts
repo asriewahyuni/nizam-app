@@ -46,10 +46,13 @@ export async function createFixedAsset(orgId: string, assetData: any) {
        ...finalAssetData,
        org_id: orgId,
        acquisition_method,
-       source_account_id: acquisition_method !== 'SPLIT' ? source_account_id : null
+       source_account_id: (acquisition_method !== 'SPLIT' && source_account_id) ? source_account_id : null,
+       asset_account_id: finalAssetData.asset_account_id || null,
+       accum_dep_account_id: finalAssetData.accum_dep_account_id || null,
+       dep_expense_account_id: finalAssetData.dep_expense_account_id || null
     })
     .select()
-    .single()
+    .single() as any
 
   if (assetError) {
     console.error('Error creating fixed asset:', assetError)
@@ -134,7 +137,7 @@ export async function previewOrganizationDepreciation(orgId: string) {
     .from('fixed_assets')
     .select('*')
     .eq('org_id', orgId)
-    .eq('status', 'ACTIVE')
+    .eq('status', 'ACTIVE') as any
 
   if (fetchError || !assets) return { error: 'Gagal mengambil data aset.' }
 
@@ -188,7 +191,7 @@ export async function runOrganizationDepreciation(orgId: string) {
     .select('*')
     .eq('org_id', orgId)
     .eq('status', 'ACTIVE')
-    .neq('depreciation_method', 'NON_DEPRECIABLE')
+    .neq('depreciation_method', 'NON_DEPRECIABLE') as any
 
   if (assetError) {
     console.error('Depreciation Error:', assetError)
@@ -269,7 +272,7 @@ export async function runOrganizationDepreciation(orgId: string) {
             accumulated_depreciation: updatedAccum,
             current_book_value: updatedBook,
             last_depreciation_date: nextRunDate.toISOString().split('T')[0]
-          })
+          } as any)
           .eq('id', asset.id)
 
         if (updateError) console.error('Error updating asset state:', updateError)
@@ -281,7 +284,7 @@ export async function runOrganizationDepreciation(orgId: string) {
           period_date: nextRunDate.toISOString().split('T')[0],
           amount: monthlyAmount,
           journal_entry_id: journalRes.entryId
-        })
+        } as any)
 
         totalProcessed++
         
@@ -342,9 +345,16 @@ export async function updateFixedAsset(assetId: string, orgId: string, assetData
      }
   }
 
+  const sanitizedData = {
+    ...cleanData,
+    asset_account_id: cleanData.asset_account_id || undefined,
+    accum_dep_account_id: cleanData.accum_dep_account_id || undefined,
+    dep_expense_account_id: cleanData.dep_expense_account_id || undefined,
+  }
+
   const { data, error } = await supabase
     .from('fixed_assets')
-    .update(cleanData)
+    .update(sanitizedData)
     .eq('id', assetId)
     .eq('org_id', orgId)
     .select()

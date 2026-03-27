@@ -141,6 +141,24 @@ export function AssetClient({ orgId, orgName, initialAssets, coa }: AssetClientP
     e.preventDefault()
     setLoading(true)
 
+    if (!formData.asset_account_id || !formData.accum_dep_account_id || !formData.dep_expense_account_id) {
+      alert("Harap pilih semua akun pemetaan (Akun Biaya, Aset, dan Akumulasi)!")
+      setLoading(false)
+      return
+    }
+
+    if (formData.payment_method !== 'SPLIT' && !formData.source_account_id) {
+      alert("Harap pilih akun sumber dana / rekening pembayaran!")
+      setLoading(false)
+      return
+    }
+
+    if (formData.payment_method === 'SPLIT' && (!formData.cash_account_id || !formData.liability_account_id)) {
+      alert("Harap pilih akun Kas dan Hutang untuk metode pembayaran SPLIT!")
+      setLoading(false)
+      return
+    }
+
     const source_lines = []
     if (formData.payment_method === 'SPLIT') {
       if (formData.cash_account_id && parseFloat(formData.cash_amount) > 0) {
