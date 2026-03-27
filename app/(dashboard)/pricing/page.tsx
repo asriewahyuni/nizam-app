@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle2, Zap, Crown, Shield, Package, ArrowRight, Loader2, Building2, Store, Users } from 'lucide-react'
+import { CheckCircle2, Zap, Crown, Shield, Package, ArrowRight, Loader2, Building2, Store, Users, Warehouse } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
@@ -195,10 +195,10 @@ export default function PricingPage() {
 
           <div className="w-full md:w-auto grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
-              { icon: Building2, label: 'Tambah Cabang', price: 'Rp 149rb', detail: 'per cabang / bulan' },
+              { icon: Building2, label: 'Tambah Bisnis Baru', price: 'Rp 249rb', detail: 'per entitas baru / bulan' },
+              { icon: Warehouse, label: 'Tambah Lokasi (WMS)', price: 'Rp 149rb', detail: 'per gudang / cabang / bulan' },
               { icon: Store, label: 'Mesin POS Tambahan', price: 'Rp 99rb', detail: 'per perangkat / bulan' },
               { icon: Users, label: 'Staff Unlimited', price: 'GRATIS', detail: 'di semua paket' },
-              { icon: Shield, label: 'Custom Dev', price: 'Hubungi Kami', detail: 'fitur khusus enterprise' },
             ].map((addon, i) => {
               const Icon = addon.icon
               return (
