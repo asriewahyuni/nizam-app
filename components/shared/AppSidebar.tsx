@@ -202,9 +202,32 @@ export function AppSidebar({
           // Filter items based on permissions
           const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
           const filteredItems = group.items.filter(item => {
-            // 1. SaaS Module Check (Has this organization paid/enabled this module?)
-            if (item.module_key && !enabledModules.some(m => m.toLowerCase() === item.module_key!.toLowerCase())) {
-              return false
+            // 0. DEMO BYPASS: Tampilkan SEMUA modul di mode Demo/Latihan agar klien bisa eksplorasi fitur penuh
+            if (isDemo) return true
+
+            // 1. SaaS Module Check
+            if (item.module_key) {
+               const key = item.module_key.toLowerCase()
+               
+               // OWNER/ADMIN BYPASS: Jika owner sedang mencoba paket, jangan sembunyikan modul inti 
+               // agar mereka tidak bingung saat setup awal
+               const coreKeys = ['sales', 'accounting', 'inventory', 'purchasing', 'factory', 'fleet', 'services', 'pos', 'hris', 'config', 'reports', 'audit']
+               if (isOwnerOrAdmin && coreKeys.some(ck => ck === key)) return true
+
+               const matches = enabledModules.some(m => {
+                  const mm = m.toLowerCase()
+                  // Flexible mapping for SaaS modules vs Sidebar keys
+                  if (key === 'sales' && (mm === 'marketing' || mm === 'sales')) return true
+                  if (key === 'marketing' && (mm === 'sales' || mm === 'marketing')) return true
+                  if (key === 'accounting' && (mm === 'finance' || mm === 'accounting')) return true
+                  if (key === 'finance' && (mm === 'accounting' || mm === 'finance')) return true
+                  if (key === 'factory' && (mm === 'manufacturing' || mm === 'factory')) return true
+                  if (key === 'manufacturing' && (mm === 'factory' || mm === 'manufacturing')) return true
+                  if (key === 'inventory' && (mm === 'warehouse' || mm === 'inventory')) return true
+                  if (key === 'warehouse' && (mm === 'inventory' || mm === 'warehouse')) return true
+                  return mm === key
+               })
+               if (!matches) return false
             }
 
             // 2. RBAC Permission Check

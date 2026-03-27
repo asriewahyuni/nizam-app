@@ -24,8 +24,8 @@ const supabase = createClient()
 
 const AVAILABLE_MODULES = [
   'Accounting', 'Finance', 'Inventory', 'Purchasing', 
-  'Sales', 'POS', 'HRIS', 'Manufacturing', 
-  'Fleet', 'CRM', 'Audit', 'Job Order'
+  'Sales', 'Marketing', 'POS', 'HRIS', 'Manufacturing', 
+  'Fleet', 'Audit', 'Job Order'
 ]
 
 type Tab = 'users' | 'packages'
@@ -273,7 +273,7 @@ export default function SaaSAdminPage() {
 
               <div className="flex flex-wrap gap-3">
                  <SafeButton variant="primary" onClick={() => setOrgModal({ open: true, editData: null })} icon={<Plus size={18} />}>Registrasi Tenant Baru</SafeButton>
-                 <SafeButton variant="danger-ghost" onClick={bulkDeleteDemos} icon={<Trash2 size={18} />}>Bersihkan Akun Demo</SafeButton>
+                 <SafeButton variant="ghost" onClick={bulkDeleteDemos} icon={<Trash2 size={18} />}>Bersihkan Akun Demo</SafeButton>
                  <button onClick={fetchOrganizations} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors shadow-sm"><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></button>
               </div>
 
@@ -308,7 +308,7 @@ export default function SaaSAdminPage() {
                             <span className="text-sm font-bold text-slate-700">{(org.settings as any)?.plan || 'Basic'}</span>
                           </td>
                           <td className="py-4 px-6">
-                            <StatusBadge status={org.is_active ? 'active' : 'inactive'} label={org.is_active ? 'Running' : 'Suspended'} />
+                            <StatusBadge variant={org.is_active ? 'success' : 'neutral'} label={org.is_active ? 'Running' : 'Suspended'} />
                           </td>
                           <td className="py-4 px-6 text-right">
                             <div className="flex justify-end gap-2">

@@ -101,6 +101,7 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
         currency: 'IDR',
         timezone: 'Asia/Jakarta',
         fiscal_year_start_month: 1,
+        plan: 'Enterprise', // 👑 SEMUA DEMO ADALAH ENTERPRISE!
         is_demo: true,
         business_type: demoType
       },
