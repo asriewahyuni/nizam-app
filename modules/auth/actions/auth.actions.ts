@@ -5,6 +5,36 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 // ─────────────────────────────────────────────────────────────
+// signUp — Create a new Business Owner account
+// ─────────────────────────────────────────────────────────────
+export async function signUp(formData: FormData) {
+  const supabase = await createClient()
+
+  const email = formData.get('email') as string
+  const password = formData.get('password') as string
+  const fullName = formData.get('fullName') as string
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { 
+        full_name: fullName,
+        login_type: 'owner' 
+      },
+    },
+  })
+
+  if (error) {
+    const msg = encodeURIComponent(error.message)
+    redirect(`/register?error=${msg}`)
+  }
+
+  revalidatePath('/', 'layout')
+  redirect('/onboarding')
+}
+
+// ─────────────────────────────────────────────────────────────
 // signIn — Regular Business Owner/Admin login via email
 // ─────────────────────────────────────────────────────────────
 export async function signIn(formData: FormData) {
