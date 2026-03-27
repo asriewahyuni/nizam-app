@@ -150,7 +150,7 @@ export default function PricingPage() {
                 ) : (
                   <Link
                     href="/settings/business"
-                    className={`group flex items-center justify-center gap-2 w-full py-4 text-sm font-black rounded-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
+                    className={`group flex items-center justify-center text-center px-4 py-4 rounded-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
                       ${isEnterprise
                         ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/20 hover:shadow-orange-500/40'
                         : pkg.name === 'Trial' 
@@ -159,10 +159,12 @@ export default function PricingPage() {
                       }
                     `}
                   >
-                    {pkg.name === 'Trial' ? 'Mulai Langkah Berkah Sekarang →' : 
-                     pkg.name === 'Basic' ? 'Dapatkan Akses Operasional →' :
-                     isEnterprise ? 'Dapatkan Full Power Expansion →' :
-                     'Hubungi Tim Kami →'}
+                    <span className="text-xs font-black leading-tight tracking-tight">
+                      {pkg.name === 'Trial' ? 'Mulai Langkah Berkah Sekarang →' : 
+                       pkg.name === 'Basic' ? 'Dapatkan Akses Operasional →' :
+                       isEnterprise ? 'Dapatkan Full Power Expansion →' :
+                       'Hubungi Tim Kami →'}
+                    </span>
                   </Link>
                 )}
               </div>
