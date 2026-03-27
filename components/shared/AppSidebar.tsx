@@ -342,6 +342,30 @@ export function AppSidebar({
             </form>
           </div>
         </div>
+      {/* Upgrade Banner */}
+      {!isCollapsed && (
+        <div className="px-4 pb-3">
+          <Link
+            href="/pricing"
+            className="group flex items-center gap-3 w-full px-4 py-3 rounded-2xl bg-gradient-to-r from-[#003366] to-indigo-700 text-white hover:shadow-lg hover:shadow-[#003366]/20 hover:-translate-y-0.5 transition-all duration-300"
+          >
+            <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+              <Zap size={16} className="text-amber-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/60">Paket Aktif</p>
+              <p className="text-sm font-black text-white truncate group-hover:text-amber-300 transition-colors">Upgrade Paket →</p>
+            </div>
+          </Link>
+        </div>
+      )}
+      {isCollapsed && (
+        <div className="px-3 pb-2">
+          <Link href="/pricing" title="Upgrade Paket" className="flex items-center justify-center w-full p-2.5 rounded-xl bg-[#003366]/10 text-[#003366] hover:bg-[#003366] hover:text-white transition-all">
+            <Zap size={16} />
+          </Link>
+        </div>
+      )}
       </div>
     </aside>
   )
