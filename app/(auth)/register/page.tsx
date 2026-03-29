@@ -1,13 +1,40 @@
 'use client'
 
-import React, { useState, useTransition } from 'react'
+import React, { Suspense, useState, useTransition } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { signUp } from '@/modules/auth/actions/auth.actions'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { User, Mail, Lock, ArrowRight, AlertCircle, CheckCircle2, Building, ShieldCheck } from 'lucide-react'
 
+type SignUpResult = Awaited<ReturnType<typeof signUp>>
+
 export default function RegisterPage() {
+  return (
+    <Suspense fallback={<RegisterPageFallback />}>
+      <RegisterPageContent />
+    </Suspense>
+  )
+}
+
+function RegisterPageFallback() {
+  return (
+    <div className="w-full max-w-md">
+      <div className="mb-10 text-center">
+        <div className="w-16 h-16 bg-blue-600 rounded-[24px] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-200">
+          <ShieldCheck className="text-white" size={32} />
+        </div>
+        <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase italic">Daftar Akun NIZAM</h1>
+        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">SaaS ENTERPRISE SOLUTION • FREE TRIAL</p>
+      </div>
+      <div className="rounded-3xl border border-slate-100 bg-slate-50 px-6 py-8 text-center text-sm font-bold text-slate-500">
+        Memuat formulir pendaftaran...
+      </div>
+    </div>
+  )
+}
+
+function RegisterPageContent() {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -15,8 +42,6 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({ fullName: '', email: '', password: '' })
   
   const plan = searchParams.get('plan')
-  const demoType = searchParams.get('type')
-  const defaultBusinessName = searchParams.get('businessName') || ''
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -28,8 +53,8 @@ export default function RegisterPage() {
       fd.append('email', formData.email)
       fd.append('password', formData.password)
       
-      const res = await (signUp as any)(fd)
-      if (res?.error) {
+      const res: SignUpResult = await signUp(fd)
+      if ('error' in res && res.error) {
         if (res.error.includes('already registered')) {
            setError(`Email "${formData.email}" sudah terdaftar sebelumnya. Silakan gunakan email lain atau Login.`)
         } else {

@@ -1,13 +1,40 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { Suspense, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Building2, ArrowRight, ShieldCheck, Sparkles, Globe, Wallet, CheckCircle2, AlertCircle } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { createOrganization } from '@/modules/organization/actions/org.actions'
 import { SafeButton } from '@/components/ui/NizamUI'
 
+type CreateOrganizationResult = Awaited<ReturnType<typeof createOrganization>>
+
 export default function OnboardingPage() {
+  return (
+    <Suspense fallback={<OnboardingFallback />}>
+      <OnboardingContent />
+    </Suspense>
+  )
+}
+
+function OnboardingFallback() {
+  return (
+    <div className="min-h-screen relative flex items-center justify-center p-6 overflow-hidden bg-[#0a0c10]">
+      <div className="w-full max-w-md relative z-10 rounded-[40px] border border-white/10 bg-white/95 px-10 py-12 text-center shadow-[0_24px_64px_-16px_rgba(0,0,0,0.3)]">
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-[24px] bg-slate-900 text-white shadow-xl">
+          <Building2 size={28} />
+        </div>
+        <h1 className="text-2xl font-black uppercase italic tracking-tighter text-slate-900">NIZAM Setup</h1>
+        <p className="mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Mempersiapkan Lingkungan ERP Anda</p>
+        <div className="mt-8 rounded-3xl border border-slate-100 bg-slate-50 px-6 py-8 text-sm font-bold text-slate-500">
+          Memuat onboarding perusahaan...
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OnboardingContent() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -23,19 +50,19 @@ export default function OnboardingPage() {
     
     const formData = new FormData(e.currentTarget)
     try {
-      const res = await createOrganization(formData)
-      if (res && (res as any).error) {
-        setError((res as any).error)
+      const res: CreateOrganizationResult = await createOrganization(formData)
+      if (res && typeof res === 'object' && 'error' in res && typeof res.error === 'string') {
+        setError(res.error)
         setLoading(false)
       } else {
         // If no error, it likely redirected or success.
         // If it returns nothing (redirect internally), it will be handled by router.
         setSuccess(true)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Next.js redirect "error" shouldn't be caught here if possible, 
       // but if it is, it's the router's job.
-      if (err.message === 'NEXT_REDIRECT') throw err
+      if (err instanceof Error && err.message === 'NEXT_REDIRECT') throw err
       setError("Terjadi kesalahan sistem. Silakan coba lagi.")
       setLoading(false)
     }
