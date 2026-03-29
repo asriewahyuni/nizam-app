@@ -22,6 +22,8 @@ export async function createContact(orgId: string, formData: FormData) {
   const email = formData.get('email') as string
   const phone = formData.get('phone') as string
   const address = formData.get('address') as string
+  const phone_wa = formData.get('phone_wa') as string
+  const instagram = formData.get('instagram') as string
 
   if (!name || !type) return { error: 'Nama dan Tipe wajib diisi.' }
 
@@ -31,6 +33,8 @@ export async function createContact(orgId: string, formData: FormData) {
     type,
     email,
     phone,
+    phone_wa,
+    instagram,
     address,
     is_active: true
   }).select().single()

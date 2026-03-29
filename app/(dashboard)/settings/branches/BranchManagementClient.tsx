@@ -39,7 +39,7 @@ export function BranchManagementClient({ orgId, branches }: BranchManagementClie
     e.preventDefault()
     setLoading(true)
     const res = await createBranch(orgId, new FormData(e.currentTarget))
-    if (res.error) alert(res.error)
+    if ((res as any).error) alert((res as any).error)
     else {
       setShowModal(false)
       window.location.reload()

@@ -12,6 +12,7 @@ const DEMO_EMAIL = 'demo@nizam.app'
  */
 export async function getActiveOrgIdAction(): Promise<string | null> {
   const supabase = await createClient()
+  const db = supabase as any
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
@@ -22,7 +23,7 @@ export async function getActiveOrgIdAction(): Promise<string | null> {
 
   if (isDemoUser && demoOrgId) {
     // Verify this demo org still exists and belongs to this user
-    const { data } = await supabase
+    const { data } = await db
       .from('org_members')
       .select('org_id')
       .eq('user_id', user.id)
@@ -33,7 +34,7 @@ export async function getActiveOrgIdAction(): Promise<string | null> {
   }
 
   // Regular lookup: oldest joined active org (consistent with getActiveOrg)
-  const { data } = await supabase
+  const { data } = await db
     .from('org_members')
     .select('org_id')
     .eq('user_id', user.id)

@@ -22,7 +22,7 @@ export async function getBoms(orgId: string) {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching BoM:', error)
+    (console as any).error('Error fetching BoM:', error)
     return []
   }
 
@@ -41,7 +41,7 @@ export async function getBomItems(bomId: string) {
     .eq('bom_id', bomId)
 
   if (error) {
-    console.error('Error fetching BoM items:', error)
+    (console as any).error('Error fetching BoM items:', error)
     return []
   }
 
@@ -66,7 +66,7 @@ export async function createBom(orgId: string, payload: { productId: string; cod
 
   if (bomError) return { error: bomError.message }
 
-  const bomItems = payload.items.map(item => ({
+  const bomItems = payload.items.map((item: any) => ({
     bom_id: bom.id,
     product_id: item.productId,
     quantity: item.quantity,
@@ -108,7 +108,7 @@ export async function updateBom(orgId: string, bomId: string, payload: { product
 
   if (deleteError) return { error: deleteError.message }
 
-  const bomItems = payload.items.map(item => ({
+  const bomItems = payload.items.map((item: any) => ({
     bom_id: bomId,
     product_id: item.productId,
     quantity: item.quantity,
@@ -147,7 +147,7 @@ export async function getWorkOrders(orgId: string) {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching Work Orders:', error)
+    (console as any).error('Error fetching Work Orders:', error)
     return []
   }
 
@@ -221,7 +221,7 @@ export async function updateWorkOrderStatus(orgId: string, woId: string, status:
     const { data: userData } = await supabase.auth.getUser()
     
     // Use V2 (with overhead support)
-    const { data, error } = await supabase.rpc('process_work_order_completion_v2', {
+    const { data, error } = await (supabase as any).rpc('process_work_order_completion_v2', {
       p_wo_id: woId,
       p_user_id: userData.user?.id,
       p_warehouse_id: options?.warehouseId,
@@ -231,7 +231,7 @@ export async function updateWorkOrderStatus(orgId: string, woId: string, status:
     if (error) {
       // Fallback to V1 if RPC V2 is not found/active
       console.warn('RPC V2 not found, falling back to V1')
-      const { data: v1Data, error: v1Err } = await supabase.rpc('process_work_order_completion', {
+      const { data: v1Data, error: v1Err } = await (supabase as any).rpc('process_work_order_completion', {
         p_wo_id: woId,
         p_user_id: userData.user?.id
       })
@@ -292,7 +292,7 @@ export async function createPurchaseRequests(orgId: string, requests: any[]) {
 
   if (!user) return { error: 'Unauthorized' }
 
-  const payload = requests.map(req => ({
+  const payload = requests.map((req: any) => ({
     org_id: orgId,
     requester_id: user.id,
     product_id: req.productId,

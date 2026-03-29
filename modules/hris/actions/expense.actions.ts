@@ -30,7 +30,7 @@ export async function createExpenseClaim(orgId: string, formData: FormData) {
   const description = formData.get('description') as string
   const claimDate = formData.get('claim_date') as string || new Date().toISOString().split('T')[0]
 
-  const { error } = await supabase.from('expense_claims').insert({
+  const { error } = await (supabase as any).from('expense_claims').insert({
     org_id: orgId,
     employee_id: employeeId,
     amount,
@@ -55,7 +55,7 @@ export async function approveExpenseClaim(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
-  const { error } = await supabase.rpc('process_expense_claim', {
+  const { error } = await (supabase as any).rpc('process_expense_claim', {
     p_claim_id: claimId,
     p_approved_by: user.id,
     p_expense_account_id: expenseAccountId,
@@ -69,7 +69,7 @@ export async function approveExpenseClaim(
 
 export async function deleteExpenseClaim(claimId: string) {
   const supabase = await createClient()
-  const { error } = await supabase.from('expense_claims').delete().eq('id', claimId)
+  const { error } = await (supabase as any).from('expense_claims').delete().eq('id', claimId)
   if (error) return { error: error.message }
   revalidatePath('/hris')
   return { success: true }

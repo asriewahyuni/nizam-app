@@ -16,21 +16,25 @@ function LoginForm() {
   const [showPass, setShowPass] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
   const [resetMsg, setResetMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false)
+  const [resetNik, setResetNik] = useState('')
 
-  const handleRequestReset = async () => {
-    const nik = prompt('Masukkan NIK Anda untuk meminta reset password:')
-    if (!nik) return
+  const submitResetRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resetNik.trim()) return
 
+    setIsResetModalOpen(false)
     setResetLoading(true)
-    const res = await requestPasswordReset(nik)
+    const res = await requestPasswordReset(resetNik)
     setResetLoading(false)
 
     if (res.success) {
-      setResetMsg({ type: 'success', text: `Permintaan reset terkirim. Silakan hubungi Admin HRD untuk mendapatkan password baru.` })
+      setResetMsg({ type: 'success', text: `Permintaan reset terkirim. Silakan hubungi Admin HRD untuk mendapatkan sandi baru.` })
     } else {
       setResetMsg({ type: 'error', text: res.error || 'Gagal mengirim permintaan.' })
     }
     
+    setResetNik('')
     setTimeout(() => setResetMsg(null), 10000)
   }
 
@@ -183,7 +187,7 @@ function LoginForm() {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Password</label>
                   <button 
                     type="button"
-                    onClick={handleRequestReset}
+                    onClick={() => setIsResetModalOpen(true)}
                     disabled={resetLoading}
                     className="text-[10px] text-emerald-600 font-bold hover:text-emerald-700 uppercase tracking-wider"
                   >
@@ -221,6 +225,44 @@ function LoginForm() {
               </button>
             </p>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── CUSTOM RESET PASSWORD MODAL ── */}
+      <AnimatePresence>
+        {isResetModalOpen && (
+           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+             <motion.div key="backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsResetModalOpen(false)} />
+             <motion.div key="content" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-sm bg-white rounded-[40px] p-10 shadow-2xl overflow-hidden border border-white">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-emerald-600" />
+                <div className="flex flex-col items-center text-center gap-4 mb-8 mt-2">
+                   <div className="w-16 h-16 rounded-[24px] bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner">
+                      <ShieldCheck size={32} />
+                   </div>
+                   <div>
+                      <h3 className="text-xl font-black text-slate-900 tracking-tight">Otorisasi Reset</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-2">Sinkronisasi Ke Admin HRD</p>
+                   </div>
+                </div>
+                <form onSubmit={submitResetRequest} className="space-y-6">
+                   <div className="space-y-2 text-left">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ketik NIK Anda</label>
+                      <input 
+                         required
+                         autoFocus
+                         value={resetNik}
+                         onChange={(e) => setResetNik(e.target.value)}
+                         placeholder="Cth: K-0042"
+                         className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black uppercase text-slate-900 focus:outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 transition-all placeholder:normal-case placeholder:font-medium placeholder:text-slate-300"
+                      />
+                   </div>
+                   <div className="flex gap-4 pt-2">
+                      <button type="button" onClick={() => setIsResetModalOpen(false)} className="flex-1 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">Batal</button>
+                      <button type="submit" className="flex-1 py-4 bg-emerald-600 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50">Kirim Panggilan</button>
+                   </div>
+                </form>
+             </motion.div>
+           </div>
         )}
       </AnimatePresence>
     </div>

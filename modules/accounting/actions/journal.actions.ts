@@ -25,14 +25,14 @@ export interface CreateJournalEntryInput {
 
 export async function getUnpostedJournalsCount(orgId: string): Promise<number> {
   const supabase = await createClient()
-  const { count, error } = await supabase
+  const { count, error } = await (supabase as any)
     .from('journal_entries')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'DRAFT')
 
   if (error) {
-    console.error('Error fetching unposted journals count:', error)
+    (console as any).error('Error fetching unposted journals count:', error)
     return 0
   }
   return count || 0
@@ -54,14 +54,14 @@ export async function createJournalEntry(input: CreateJournalEntryInput) {
   }
 
   // Validate: balanced entry
-  const totalDebit = input.lines.reduce((s, l) => s + (l.debit || 0), 0)
-  const totalCredit = input.lines.reduce((s, l) => s + (l.credit || 0), 0)
+  const totalDebit = input.lines.reduce((s: any, l: any) => s + (l.debit || 0), 0)
+  const totalCredit = input.lines.reduce((s: any, l: any) => s + (l.credit || 0), 0)
   if (Math.abs(totalDebit - totalCredit) > 0.01) {
     return { error: `Jurnal tidak balance: debit ${totalDebit} ≠ credit ${totalCredit}` }
   }
 
   // Insert header
-  const { data: entry, error: entryError } = await supabase
+  const { data: entry, error: entryError } = await (supabase as any)
     .from('journal_entries')
     .insert({
       org_id: input.org_id,
@@ -82,7 +82,7 @@ export async function createJournalEntry(input: CreateJournalEntryInput) {
   }
 
   // Insert lines
-  const { error: linesError } = await supabase
+  const { error: linesError } = await (supabase as any)
     .from('journal_lines')
     .insert(
       input.lines.map((line) => ({
@@ -96,14 +96,14 @@ export async function createJournalEntry(input: CreateJournalEntryInput) {
 
   if (linesError) {
     // Clean up orphaned header
-    await supabase.from('journal_entries').delete().eq('id', entry.id)
+    await (supabase as any).from('journal_entries').delete().eq('id', entry.id)
     return { error: 'Gagal menyimpan baris jurnal.' }
   }
 
   // Auto-post if requested
   if (input.auto_post) {
     const result = await postJournalEntry(entry.id, input.org_id)
-    if (result.error) return result
+    if ((result as any).error) return result
   }
 
   revalidatePath('/accounting/journal')
@@ -117,7 +117,7 @@ export async function createJournalEntry(input: CreateJournalEntryInput) {
 export async function postJournalEntry(entryId: string, orgId: string) {
   const supabase = await createClient()
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('journal_entries')
     .update({ status: 'POSTED' })
     .eq('id', entryId)
@@ -145,14 +145,14 @@ export async function voidJournalEntry(
   if (!user) return { error: 'Tidak terautentikasi.' }
 
   // 1. Fetch info for potential sync before voiding
-  const { data: entry } = await supabase
+  const { data: entry } = await (supabase as any)
     .from('journal_entries')
     .select('reference_type, reference_id')
     .eq('id', entryId)
     .single()
 
   // 2. VOID operation
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('journal_entries')
     .update({
       status: 'VOIDED',
@@ -173,42 +173,42 @@ export async function voidJournalEntry(
 
     // A. SALES RETURN REVERSAL
     if (refType === 'SALES_RETURN') {
-       await supabase.from('sales_returns').update({ status: 'VOIDED' }).eq('id', refId);
+       await (supabase as any).from('sales_returns').update({ status: 'VOIDED' }).eq('id', refId);
        // Revert Stock
-       await supabase.from('stock_movements').delete().eq('reference_id', refId).eq('reference_type', 'SALES_RETURN');
+       await (supabase as any).from('stock_movements').delete().eq('reference_id', refId).eq('reference_type', 'SALES_RETURN');
     }
 
     // B. INVENTORY ADJUSTMENT (WRITE-OFF) REVERSAL
     if (refType === 'ADJUSTMENT') {
-       await supabase.from('inventory_adjustments').update({ status: 'VOIDED' }).eq('id', refId);
+       await (supabase as any).from('inventory_adjustments').update({ status: 'VOIDED' }).eq('id', refId);
        // Revert Stock
-       await supabase.from('stock_movements').delete().eq('reference_id', refId).eq('reference_type', 'ADJUSTMENT');
+       await (supabase as any).from('stock_movements').delete().eq('reference_id', refId).eq('reference_type', 'ADJUSTMENT');
        
        // Handle Fixed Asset link if any (Check CTO Challenge case)
-       const { data: asset } = await supabase.from('fixed_assets').select('id').eq('id', refId).single();
+       const { data: asset } = await (supabase as any).from('fixed_assets').select('id').eq('id', refId).single();
        if (asset) {
-          await supabase.from('fixed_assets').update({ status: 'VOIDED' }).eq('id', asset.id);
+          await (supabase as any).from('fixed_assets').update({ status: 'VOIDED' }).eq('id', asset.id);
        }
     }
 
     // C. PURCHASE RETURN REVERSAL
     // C. PURCHASE RETURN REVERSAL
     if (refType === 'PURCHASE_RETURN') {
-       await supabase.from('purchase_returns').update({ status: 'VOIDED' }).eq('id', refId);
-       await supabase.from('stock_movements').delete().eq('reference_id', refId).eq('reference_type', 'PURCHASE_RETURN');
+       await (supabase as any).from('purchase_returns').update({ status: 'VOIDED' }).eq('id', refId);
+       await (supabase as any).from('stock_movements').delete().eq('reference_id', refId).eq('reference_type', 'PURCHASE_RETURN');
     }
 
     // D. PAYMENT REVERSAL (AR/AP)
     if (refType === 'PAYMENT_IN') {
-       const { data: pay } = await supabase.from('sales_payments').select('sale_id').eq('id', refId).single();
+       const { data: pay } = await (supabase as any).from('sales_payments').select('sale_id').eq('id', refId).single();
        if (pay) {
-          await supabase.from('sales').update({ payment_status: 'PARTIAL' }).eq('id', pay.sale_id);
+          await (supabase as any).from('sales').update({ payment_status: 'PARTIAL' }).eq('id', pay.sale_id);
        }
     }
     if (refType === 'PAYMENT_OUT') {
-       const { data: pay } = await supabase.from('purchase_payments').select('purchase_id').eq('id', refId).single();
+       const { data: pay } = await (supabase as any).from('purchase_payments').select('purchase_id').eq('id', refId).single();
        if (pay) {
-          await supabase.from('purchases').update({ payment_status: 'PARTIAL' }).eq('id', pay.purchase_id);
+          await (supabase as any).from('purchases').update({ payment_status: 'PARTIAL' }).eq('id', pay.purchase_id);
        }
     }
   }
@@ -232,7 +232,7 @@ export async function deleteJournalEntry(entryId: string, orgId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('journal_entries')
     .update({ 
       status: 'VOIDED', 
@@ -259,7 +259,7 @@ export async function hardDeleteDraftJournal(entryId: string, orgId: string) {
 
   // We explicitly check for DRAFT status to prevent deleting posted data
   // Using .select() to verify if any rows were actually affected (RLS check)
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('journal_entries')
     .delete()
     .eq('id', entryId)
@@ -292,7 +292,7 @@ export async function getJournalEntries(
 ) {
   const supabase = await createClient()
 
-  let query = supabase
+  let query = (supabase as any)
     .from('journal_entries')
     .select(`
       *,
@@ -327,7 +327,7 @@ export async function getJournalEntries(
   if (error || !data) return []
 
   // Sort helper: Debit > 0 appears first, then Credit > 0
-  data.forEach(entry => {
+  data.forEach((entry: any) => {
     if (entry.journal_lines) {
       entry.journal_lines.sort((a: any, b: any) => (b.debit || 0) - (a.debit || 0))
     }

@@ -36,7 +36,7 @@ export async function createBankAccount(orgId: string, formData: FormData) {
     return { error: 'Akun GL dan Nama Bank wajib diisi.' }
   }
 
-  const { error } = await supabase.from('bank_accounts').insert({
+  const { error } = await (supabase as any).from('bank_accounts').insert({
     org_id: orgId,
     account_id: accountId,
     bank_name: bankName,
@@ -75,7 +75,7 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
     return { error: 'Semua field wajib diisi.' }
   }
 
-  const { error } = await supabase.from('bank_transactions').insert({
+  const { error } = await (supabase as any).from('bank_transactions').insert({
     org_id: orgId,
     bank_account_id: bankAccountId,
     transaction_date: transDate,

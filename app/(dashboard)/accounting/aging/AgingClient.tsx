@@ -20,6 +20,7 @@ import {
   Filter,
   CheckCircle2
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { formatRupiah, formatDate } from '@/lib/utils'
 
 interface AgingClientProps {
@@ -29,6 +30,7 @@ interface AgingClientProps {
 }
 
 export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingClientProps) {
+  const router = useRouter()
   const [activeView, setActiveView] = useState<'AR' | 'AP'>(initialView)
 
   const container = {
@@ -194,11 +196,14 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
                         <td className="px-10 py-6 text-right">
                            <button 
                              onClick={() => {
-                               if (row.source_type === 'SALES') window.location.href = `/sales?pay=${row.id}`
-                               else if (row.source_type === 'PURCHASING') window.location.href = `/purchasing?pay=${row.id}`
-                               else if (row.source_type === 'TAX') window.location.href = `/accounting/tax`
-                               else if (row.source_type === 'JOURNAL') window.location.href = `/accounting/journal`
-                               else window.location.href = `/accounting/journal`
+                               if (row.source_type === 'SALES') router.push(`/sales?pay=${row.id}`)
+                               else if (row.source_type === 'PURCHASING') router.push(`/purchasing?pay=${row.id}`)
+                               else if (row.source_type === 'TAX') router.push(`/accounting/tax`)
+                               else if (row.source_type === 'JOURNAL') {
+                                 const side = activeView === 'AR' ? 'IN' : 'OUT'
+                                 router.push(`/cash?pay=${row.id}&type=${side}&amount=${Math.abs(row.outstanding)}&desc=Pelunasan ${row.doc_number}`)
+                               }
+                               else router.push(`/accounting/journal`)
                              }}
                              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm ${
                                activeView === 'AR' 

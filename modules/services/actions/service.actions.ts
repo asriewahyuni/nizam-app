@@ -5,18 +5,19 @@ import { revalidatePath } from 'next/cache'
 
 export async function getServiceOrders(orgId: string) {
   const supabase = await createClient()
+  const db = supabase as any
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('service_orders')
     .select(`
       *,
-      contact:customer:contacts(id, name)
+      contact:contacts(id, name)
     `)
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching Service Orders:', error)
+    (console as any).error('Error fetching Service Orders:', error)
     return []
   }
 
@@ -25,6 +26,7 @@ export async function getServiceOrders(orgId: string) {
 
 export async function createServiceOrder(orgId: string, formData: FormData) {
   const supabase = await createClient()
+  const db = supabase as any
 
   const payload = {
     org_id: orgId,
@@ -37,7 +39,7 @@ export async function createServiceOrder(orgId: string, formData: FormData) {
     estimated_cost: Number(formData.get('estimated_cost'))
   }
 
-  const { error } = await supabase.from('service_orders').insert(payload)
+  const { error } = await db.from('service_orders').insert(payload)
 
   if (error) return { error: error.message }
 
@@ -47,8 +49,9 @@ export async function createServiceOrder(orgId: string, formData: FormData) {
 
 export async function updateServiceStatus(orgId: string, orderId: string, status: string) {
   const supabase = await createClient()
+  const db = supabase as any
 
-  const { error } = await supabase
+  const { error } = await db
     .from('service_orders')
     .update({ status })
     .eq('id', orderId)

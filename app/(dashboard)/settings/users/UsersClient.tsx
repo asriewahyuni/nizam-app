@@ -20,7 +20,7 @@ export default function UsersClient({ orgId, initialMembers }: { orgId: string, 
   const handleDelete = async (memberId: string) => {
     if (!confirm('Hapus pengguna ini dari organisasi?')) return
     setLoading(true)
-    const { error } = await supabase.from('org_members').delete().eq('id', memberId)
+    const { error } = await (supabase as any).from('org_members').delete().eq('id', memberId)
     if (!error) {
       setMembers(members.filter((m: any) => m.id !== memberId))
     } else {
@@ -38,7 +38,7 @@ export default function UsersClient({ orgId, initialMembers }: { orgId: string, 
     }
 
     setLoading(true)
-    const { error } = await supabase.from('org_members').update({ role: newRole }).eq('id', memberId)
+    const { error } = await (supabase as any).from('org_members').update({ role: newRole }).eq('id', memberId)
     if (!error) {
       setMembers(members.map((m: any) => m.id === memberId ? { ...m, role: newRole } : m))
     } else {

@@ -8,10 +8,10 @@ export async function injectShariahPack(orgId: string) {
 
   // --- Helper: upsert one account, return its ID ---
   const upsert = async (code: string, name: string, type: string, normal_balance: string, parent_id: string | null) => {
-    const { data, error } = await supabase
-      .from('accounts' as any)
+    const { data, error } = await (supabase as any)
+      .from('accounts')
       .upsert(
-        { org_id: orgId, code, name, type, normal_balance, parent_id: parent_id ?? undefined, is_system: false },
+        { org_id: orgId, code, name, type, normal_balance, parent_id: parent_id || null, is_system: false },
         { onConflict: 'org_id,code', ignoreDuplicates: false }
       )
       .select('id')
@@ -22,8 +22,8 @@ export async function injectShariahPack(orgId: string) {
 
   try {
     // Get root parent IDs
-    const { data: roots } = await supabase
-      .from('accounts' as any)
+    const { data: roots } = await (supabase as any)
+      .from('accounts')
       .select('id, code')
       .eq('org_id', orgId)
       .in('code', ['2000', '3000', '6000'])
@@ -65,14 +65,14 @@ export async function setShariahAccountsActive(orgId: string, active: boolean) {
   // Syariah codes from injectShariahPack
   const syariahCodes = ['2600', '2601', '3100', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
 
-  const { error } = await supabase
-    .from('accounts' as any)
+  const { error } = await (supabase as any)
+    .from('accounts')
     .update({ is_active: active })
     .eq('org_id', orgId)
-    .in('code', syariahCodes)
+    .filter('code', 'in', `(${syariahCodes.join(',')})`)
 
   if (error) {
-    console.error('Toggle Syariah Error:', error)
+    (console as any).error('Toggle Syariah Error:', error)
     return { error: 'Gagal mengubah status akun Syariah.' }
   }
 

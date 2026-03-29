@@ -2,8 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function getGeneralLedger(orgId: string) {
   const supabase = await createClient()
+  const db = supabase as any
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('journal_entries')
     .select(`
       *,
@@ -22,9 +23,10 @@ export async function getGeneralLedger(orgId: string) {
 
 export async function getBalanceSheet(orgId: string, asOfDate: string = new Date().toISOString().split('T')[0]) {
   const supabase = await createClient()
+  const db = supabase as any
 
   // Anchor: only fetch journal_entries for THIS org, then get their lines
-  const { data: entries, error: entErr } = await supabase
+  const { data: entries, error: entErr } = await db
     .from('journal_entries')
     .select('id')
     .eq('org_id', orgId)
@@ -36,9 +38,9 @@ export async function getBalanceSheet(orgId: string, asOfDate: string = new Date
     return { assets: [], liabilities: [], equity: [{ code: '9999', name: 'Laba Ditahan / Periode Berjalan', balance: pl.netProfit, type: 'EQUITY' }] }
   }
 
-  const entryIds = entries.map(e => e.id)
+  const entryIds = entries.map((e: any) => e.id)
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('journal_lines')
     .select('debit, credit, accounts!inner(id, code, name, type, normal_balance)')
     .in('entry_id', entryIds) as any
@@ -76,13 +78,14 @@ export async function getBalanceSheet(orgId: string, asOfDate: string = new Date
 
 export async function getProfitLoss(orgId: string, startDate?: string, endDate?: string) {
   const supabase = await createClient()
+  const db = supabase as any
 
   const now = new Date()
   const sDate = startDate || new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
   const eDate = endDate || new Date().toISOString().split('T')[0]
 
   // Anchor by org_id first via journal_entries, then fetch lines
-  const { data: entries, error: entErr } = await supabase
+  const { data: entries, error: entErr } = await db
     .from('journal_entries')
     .select('id')
     .eq('org_id', orgId)
@@ -94,9 +97,9 @@ export async function getProfitLoss(orgId: string, startDate?: string, endDate?:
     return { revenue: [], expenses: [], totalRevenue: 0, totalExpenses: 0, netProfit: 0 }
   }
 
-  const entryIds = entries.map(e => e.id)
+  const entryIds = entries.map((e: any) => e.id)
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('journal_lines')
     .select('debit, credit, accounts!inner(id, code, name, type, normal_balance)')
     .in('entry_id', entryIds) as any
@@ -129,6 +132,7 @@ export async function getProfitLoss(orgId: string, startDate?: string, endDate?:
 
 export async function getCashFlow(orgId: string) {
   const supabase = await createClient()
+  const db = supabase as any
 
   const now = new Date()
   const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
@@ -136,7 +140,7 @@ export async function getCashFlow(orgId: string) {
   const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0]
 
   // Get all accounts linked to bank/cash module to treat them as cash accounts
-  const { data: linkedAccounts } = await supabase.from('bank_accounts').select('account_id, accounts(code)')
+  const { data: linkedAccounts } = await (supabase as any).from('bank_accounts').select('account_id, accounts(code)')
   const cashAccountCodes = (linkedAccounts || [])
     .map((la: any) => la.accounts?.code)
     .filter(Boolean)
@@ -146,7 +150,7 @@ export async function getCashFlow(orgId: string) {
     cashAccountCodes.push('1101', '1102', '1103', '1104', '1105')
   }
 
-  const { data: accounts, error } = await supabase
+  const { data: accounts, error } = await db
     .from('account_balances')
     .select('*')
     .eq('org_id', orgId)
@@ -154,27 +158,27 @@ export async function getCashFlow(orgId: string) {
   if (error || !accounts) return { ocf: 0, icf: 0, fcf: 0, netChange: 0, ocfItems: [], icfItems: [], fcfItems: [] }
 
   // 1. Calculate Periods for Trend — anchor by org via journal_entries first
-  const { data: currentEntries } = await supabase
+  const { data: currentEntries } = await db
     .from('journal_entries').select('id')
     .eq('org_id', orgId).eq('status', 'POSTED')
     .gte('entry_date', currentMonthStart)
 
   const currentEntryIds = (currentEntries || []).map((e: any) => e.id)
   const currentMonthLines = currentEntryIds.length > 0
-    ? (await supabase.from('journal_lines')
+    ? (await (supabase as any).from('journal_lines')
         .select('debit, credit, accounts!inner(code)')
         .in('entry_id', currentEntryIds)
         .in('accounts.code', cashAccountCodes) as any).data || []
     : []
 
-  const { data: lastEntries } = await supabase
+  const { data: lastEntries } = await db
     .from('journal_entries').select('id')
     .eq('org_id', orgId).eq('status', 'POSTED')
     .gte('entry_date', lastMonthStart).lte('entry_date', lastMonthEnd)
 
   const lastEntryIds = (lastEntries || []).map((e: any) => e.id)
   const lastMonthLines = lastEntryIds.length > 0
-    ? (await supabase.from('journal_lines')
+    ? (await (supabase as any).from('journal_lines')
         .select('debit, credit, accounts!inner(code)')
         .in('entry_id', lastEntryIds)
         .in('accounts.code', cashAccountCodes) as any).data || []

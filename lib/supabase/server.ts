@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import type { NizamDatabase } from '@/types/database.types'
+import type { Database } from '@/types/database.types'
 
 /**
  * Supabase client for use in:
@@ -17,7 +17,7 @@ export async function createClient() {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY')
   }
 
-  return createServerClient<NizamDatabase>(
+  return createServerClient<Database>(
     url,
     key,
     {
@@ -47,7 +47,7 @@ export async function createAdminClient() {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
   }
 
-  return createServerClient<NizamDatabase>(
+  return createServerClient<Database>(
     url,
     key,
     {

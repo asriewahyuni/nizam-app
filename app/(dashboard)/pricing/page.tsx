@@ -166,12 +166,15 @@ export default function PricingPage() {
               {/* CTA */}
               <div className="bg-white px-6 pb-6">
                 {isCurrentPlan ? (
-                  <div className="w-full py-3 text-center text-sm font-black text-[#003366] bg-[#003366]/5 rounded-2xl border border-[#003366]/20">
-                    ✓ Paket Anda Saat Ini
-                  </div>
+                  <Link 
+                    href="/billing"
+                    className="group flex items-center justify-center w-full py-4 text-center text-sm font-black text-[#003366] bg-[#003366]/5 rounded-2xl border border-[#003366]/20 hover:bg-[#003366] hover:text-white transition-all shadow-sm"
+                  >
+                    <CheckCircle2 size={16} className="mr-2" /> Kelola Plan Aktif →
+                  </Link>
                 ) : (
                   <Link
-                    href="/settings/business"
+                    href={`/billing?pkg=${pkg.id}`}
                     className={`group flex items-center justify-center text-center px-4 py-4 rounded-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
                       ${isEnterprise
                         ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/20 hover:shadow-orange-500/40'
@@ -185,7 +188,7 @@ export default function PricingPage() {
                       {pkg.name === 'Trial' ? 'Mulai Langkah Berkah Sekarang →' : 
                        pkg.name === 'Basic' ? 'Dapatkan Akses Operasional →' :
                        isEnterprise ? 'Dapatkan Full Power Expansion →' :
-                       'Hubungi Tim Kami →'}
+                       'Pilih Paket Ini →'}
                     </span>
                   </Link>
                 )}

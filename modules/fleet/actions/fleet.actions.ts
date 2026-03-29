@@ -15,7 +15,7 @@ export async function getAssets(orgId: string) {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching Fleet Assets:', error)
+    (console as any).error('Error fetching Fleet Assets:', error)
     return []
   }
 
@@ -37,7 +37,7 @@ export async function createAsset(orgId: string, formData: FormData) {
     notes: formData.get('notes') as string
   }
 
-  const { error } = await supabase.from('fleet_assets').insert(payload)
+  const { error } = await (supabase as any).from('fleet_assets').insert(payload)
 
   if (error) return { error: error.message }
 
@@ -61,7 +61,7 @@ export async function getBookings(orgId: string) {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching Bookings:', error)
+    (console as any).error('Error fetching Bookings:', error)
     return []
   }
 
@@ -135,7 +135,7 @@ export async function updateBookingStatus(orgId: string, bookingId: string, asse
 
 export async function getRoutes(orgId: string) {
   const supabase = await createClient()
-  const { data, error } = await supabase.from('fleet_routes').select('*').eq('org_id', orgId).order('name', { ascending: true })
+  const { data, error } = await (supabase as any).from('fleet_routes').select('*').eq('org_id', orgId).order('name', { ascending: true })
   if (error) return []
   return (data as any)
 }
@@ -150,7 +150,7 @@ export async function createRoute(orgId: string, formData: FormData) {
     distance_km: Number(formData.get('distance_km')),
     base_price: Number(formData.get('base_price'))
   }
-  const { error } = await supabase.from('fleet_routes').insert(payload)
+  const { error } = await (supabase as any).from('fleet_routes').insert(payload)
   if (error) return { error: error.message }
   revalidatePath('/fleet')
   return { success: true }
@@ -186,7 +186,7 @@ export async function createSchedule(orgId: string, formData: FormData) {
     departure_time: new Date(formData.get('departure_time') as string).toISOString(),
     status: 'WAITING'
   }
-  const { error } = await supabase.from('fleet_schedules').insert(payload)
+  const { error } = await (supabase as any).from('fleet_schedules').insert(payload)
   if (error) return { error: error.message }
   revalidatePath('/fleet')
   return { success: true }
@@ -200,9 +200,9 @@ export async function createTicket(orgId: string, payload: {
   notes?: string
 }) {
   const supabase = await createClient()
-  const { error } = await supabase.from('fleet_tickets').insert({
+  const { error } = await (supabase as any).from('fleet_tickets').insert({
     org_id: orgId,
-    ...payload,
+    .payload,
     status: 'PAID'
   })
   if (error) return { error: error.message }
@@ -242,7 +242,7 @@ export async function getAllMedicalRecords(orgId: string) {
     .order('service_date', { ascending: false })
 
   if (error) {
-    console.error('Error fetching all medical records:', error)
+    (console as any).error('Error fetching all medical records:', error)
     return []
   }
   return data
@@ -289,14 +289,14 @@ export async function createMedicalRecord(orgId: string, payload: {
   const supabase = await createClient()
 
   // 1. Mark asset as MAINTENANCE
-  await supabase.from('fleet_assets').update({ status: 'MAINTENANCE' }).eq('id', payload.asset_id)
+  await (supabase as any).from('fleet_assets').update({ status: 'MAINTENANCE' }).eq('id', payload.asset_id)
 
   // 2. Insert record
   const { error } = await supabase
     .from('fleet_maintenance_labs')
     .insert({
       org_id: orgId,
-      ...payload,
+      .payload,
       parts_replaced: JSON.stringify(payload.parts_replaced || [])
     })
 
@@ -362,7 +362,7 @@ export async function recordCrewAttendance(orgId: string, payload: {
   if (payload.type === 'IN') {
     if (existing) return { error: 'Anda sudah Clock-In hari ini.' }
     
-    const { error } = await supabase.from('attendance').insert([{
+    const { error } = await (supabase as any).from('attendance').insert([{
       org_id: orgId,
       employee_id: payload.employee_id,
       record_date: date,

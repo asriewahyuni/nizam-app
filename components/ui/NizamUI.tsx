@@ -138,7 +138,12 @@ export function PageHeader({ tag, title, subtitle, actions, icon, iconColor = 't
         <div className="flex items-center gap-4">
           {icon && (
             <div className={`p-3.5 rounded-2xl bg-white shadow-xl shadow-slate-100 border border-slate-100 ${iconColor}`}>
-              {React.cloneElement(icon as React.ReactElement<any>, { size: 28, strokeWidth: 2.5 })}
+              {typeof icon === 'function' ? 
+                React.createElement(icon as React.ComponentType<any>, { size: 28, strokeWidth: 2.5 }) :
+                React.isValidElement(icon) ? 
+                React.cloneElement(icon as React.ReactElement<any>, { size: 28, strokeWidth: 2.5 }) :
+                null
+              }
             </div>
           )}
           <div className="space-y-0.5">
@@ -272,11 +277,19 @@ export function SectionCard({ children, className = '', glass = false }: { child
 }
 
 export function SectionHeader({ title, subtitle, actions, icon }: { title: React.ReactNode; subtitle?: string; actions?: React.ReactNode; icon?: any }) {
-  const Icon = icon;
   return (
     <div className="px-10 py-7 border-b border-slate-100/80 bg-slate-50/40 flex items-center justify-between gap-4">
       <div className="flex items-center gap-4">
-        {Icon && <div className="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400"><Icon size={20} /></div>}
+        {icon && (
+          <div className="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400">
+            {typeof icon === 'function' ? 
+              React.createElement(icon as React.ComponentType<any>, { size: 20 }) :
+              React.isValidElement(icon) ? 
+              React.cloneElement(icon as React.ReactElement<any>, { size: 20 }) :
+              null
+            }
+          </div>
+        )}
         <div>
           <div className="font-black text-slate-900 text-sm uppercase tracking-widest">{title}</div>
           {subtitle && <div className="text-[10px] text-slate-400 font-bold italic mt-0.5 tracking-tight">{subtitle}</div>}

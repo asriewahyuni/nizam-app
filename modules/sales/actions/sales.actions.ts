@@ -57,13 +57,13 @@ export async function createSaleEntry(orgId: string, payload: any) {
 
   if (linesErr) {
     // Cleanup if lines fail
-    await supabase.from('sales').delete().eq('id', sale.id)
+    await (supabase as any).from('sales').delete().eq('id', sale.id)
     return { error: linesErr.message }
   }
 
   // Insert to approval flow
   const computedTotal = payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0) - (payload.discount_amount || 0) + (payload.tax_amount || 0)
-  await supabase.from('approval_requests' as any).insert({
+  await (supabase as any).from('approval_requests' as any).insert({
     org_id: orgId,
     requester_id: user.id,
     source_type: 'SALES_ORDER',
@@ -78,7 +78,7 @@ export async function createSaleEntry(orgId: string, payload: any) {
 
 export async function deliverSale(orgId: string, saleId: string) {
   const supabase = await createClient()
-  const { data: sale } = await supabase.from('sales' as any).select('status').eq('id', saleId).single()
+  const { data: sale } = await (supabase as any).from('sales' as any).select('status').eq('id', saleId).single()
   if (!sale) return { error: 'Order tidak ditemukan.' }
   if (sale.status === 'FINISHED') return { success: true }
 
@@ -88,7 +88,7 @@ export async function deliverSale(orgId: string, saleId: string) {
   })
 
   if (error) {
-    console.error('Failed to deliver sale via atomic engine:', error)
+    (console as any).error('Failed to deliver sale via atomic engine:', error)
     return { error: `[RPC ERROR]: ${error.message} (Code: ${error.code})` }
   }
 
@@ -137,7 +137,7 @@ export async function voidSale(orgId: string, saleId: string) {
     .eq('reference_type', 'SALE')
 
   // 4. Update sales status
-  await supabase.from('sales' as any).update({ status: 'VOIDED' }).eq('id', saleId).eq('org_id', orgId)
+  await (supabase as any).from('sales' as any).update({ status: 'VOIDED' }).eq('id', saleId).eq('org_id', orgId)
 
   // 5. Cancel any pending approval requests for this order
   await supabase
@@ -157,7 +157,7 @@ export async function paySale(orgId: string, saleId: string) {
   // ⚠️ Deprecated: gunakan processSalesPayment() untuk mencatat pembayaran dengan jurnal yang benar.
   // Fungsi ini hanya update flag dan TIDAK membuat jurnal penerimaan kas.
   const supabase = await createClient()
-  await supabase.from('sales' as any).update({ payment_status: 'PAID' }).eq('id', saleId).eq('org_id', orgId)
+  await (supabase as any).from('sales' as any).update({ payment_status: 'PAID' }).eq('id', saleId).eq('org_id', orgId)
   revalidatePath('/sales')
   return { success: true }
 }

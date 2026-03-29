@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from "react"
-import { Html5QrcodeScanner, Html5QrcodeScannerConfig } from "html5-qrcode"
+import { Html5QrcodeScanner } from "html5-qrcode"
 import { X, Camera } from "lucide-react"
 
 interface BarcodeScannerProps {
@@ -15,7 +15,7 @@ export const BarcodeScanner = ({ onScan, onClose, title = "Scan Barcode" }: Barc
   const scannerRef = useRef<Html5QrcodeScanner | null>(null)
 
   useEffect(() => {
-    const config: Html5QrcodeScannerConfig = {
+    const config = {
       fps: 10,
       qrbox: { width: 250, height: 150 },
       aspectRatio: 1.0,

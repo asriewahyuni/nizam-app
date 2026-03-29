@@ -18,19 +18,20 @@ export async function getBankAccountsWithBalance(orgId: string) {
     .order('bank_name', { ascending: true })
 
   if (accError || !accounts) return []
+  const accountsTyped = accounts as any[]
 
   // Fetch balances for these specific GL accounts from the account_balances view
-  const accountIds = accounts.map(a => a.account_id)
+  const accountIds = accountsTyped.map(a => a.account_id)
   const { data: balances, error: balError } = await supabase
     .from('account_balances')
     .select('account_id, balance')
     .in('account_id', accountIds)
 
-  if (balError) return accounts.map(a => ({ ...a, balances: { balance: 0 } }))
+  if (balError) return accountsTyped.map(a => ({ ...a, balances: { balance: 0 } }))
 
   // Map balances back to accounts
-  return accounts.map((acc: any) => {
-    const balData = balances?.find(b => b.account_id === acc.account_id)
+  return accountsTyped.map((acc: any) => {
+    const balData = (balances as any[])?.find(b => b.account_id === acc.account_id)
     return {
       ...acc,
       balances: balData || { balance: 0 }

@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Plus, 
@@ -80,9 +81,25 @@ export function CashClient({ orgId, orgName, bankAccounts, categoryAccounts, ban
   // Form states for transaction
   const [txType, setTxType] = useState<'IN' | 'OUT' | 'TRANSFER'>('OUT')
   const [txAmount, setTxAmount] = useState(0)
+  const [txDescription, setTxDescription] = useState('')
   const [filterStatus, setFilterStatus] = useState<'POSTED' | 'VOIDED'>('POSTED')
   const [filterAccountId, setFilterAccountId] = useState<string | null>(null)
+  const searchParams = useSearchParams()
   const isOwner = userRole === 'owner'
+
+  useEffect(() => {
+    const pay = searchParams.get('pay')
+    const type = searchParams.get('type')
+    const amount = searchParams.get('amount')
+    const desc = searchParams.get('desc')
+
+    if (pay) {
+      if (type === 'IN' || type === 'OUT' || type === 'TRANSFER') setTxType(type)
+      if (amount) setTxAmount(Number(amount))
+      if (desc) setTxDescription(desc)
+      setShowTransactionModal(true)
+    }
+  }, [searchParams])
 
   const handleCreateAccount = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -205,7 +222,12 @@ export function CashClient({ orgId, orgName, bankAccounts, categoryAccounts, ban
             <SafeButton 
               variant="primary"
               icon={<Plus size={18} />}
-              onClick={() => { setTxType('OUT'); setShowTransactionModal(true); }}
+              onClick={() => { 
+                setTxType('OUT'); 
+                setTxAmount(0);
+                setTxDescription('');
+                setShowTransactionModal(true); 
+              }}
             >
               Transaksi
             </SafeButton>
@@ -645,7 +667,14 @@ export function CashClient({ orgId, orgName, bankAccounts, categoryAccounts, ban
 
                  <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Transaction Description</label>
-                    <input name="description" required placeholder="e.g. Payment for Store Rent / Office Supplies" defaultValue={txType === 'TRANSFER' ? 'Internal Transfer between accounts' : ''} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold shadow-inner outline-none focus:bg-white focus:border-blue-500 transition-all" />
+                     <input 
+                        name="description" 
+                        required 
+                        placeholder="e.g. Payment for Store Rent / Office Supplies" 
+                        value={txDescription}
+                        onChange={(e) => setTxDescription(e.target.value)}
+                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold shadow-inner outline-none focus:bg-white focus:border-blue-500 transition-all" 
+                     />
                  </div>
 
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">

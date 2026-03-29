@@ -13,7 +13,7 @@ export async function processPosTransaction(orgId: string, payload: any) {
   
   if (!finalCustomerId && payload.new_customer_name) {
     // A. Buat pelanggan baru untuk disimpan di CRM
-    const { data: newCust } = await supabase.from('contacts').insert({
+    const { data: newCust } = await (supabase as any).from('contacts').insert({
       org_id: orgId,
       name: payload.new_customer_name,
       phone: payload.new_customer_phone || '-',
@@ -24,13 +24,13 @@ export async function processPosTransaction(orgId: string, payload: any) {
 
   if (!finalCustomerId) {
     // B. Tangkap pelanggan numpang lewat / Walk-in
-    const { data: walkIn } = await supabase.from('contacts')
+    const { data: walkIn } = await (supabase as any).from('contacts')
       .select('id').eq('org_id', orgId).eq('name', 'Pelanggan Umum (Walk-In)').single()
 
     if (walkIn) {
       finalCustomerId = walkIn.id
     } else {
-      const { data: newWalkIn } = await supabase.from('contacts').insert({
+      const { data: newWalkIn } = await (supabase as any).from('contacts').insert({
         org_id: orgId,
         name: 'Pelanggan Umum (Walk-In)',
         phone: '-',
@@ -83,7 +83,7 @@ export async function processPosTransaction(orgId: string, payload: any) {
     })))
 
   if (linesErr) {
-    await supabase.from('sales').delete().eq('id', sale.id)
+    await (supabase as any).from('sales').delete().eq('id', sale.id)
     return { error: linesErr.message }
   }
 
@@ -106,7 +106,7 @@ export async function processPosTransaction(orgId: string, payload: any) {
       p_user_id: user.id
     })
   } else if (deliverErr) {
-      console.error("Delivery error:", deliverErr)
+      (console as any).error("Delivery error:", deliverErr)
   }
 
   revalidatePath('/pos')

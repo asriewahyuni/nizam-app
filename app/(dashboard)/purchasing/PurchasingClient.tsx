@@ -536,10 +536,27 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
                        </div>
                     </td>
                     <td className="px-8 py-6 text-right">
-                       <div className="text-sm font-black text-slate-900 font-mono tracking-tighter">{formatRupiah(p.grand_total)}</div>
-                       <div className={`text-[9px] font-black uppercase tracking-widest mt-1 ${p.payment_status === 'PAID' ? 'text-emerald-500' : 'text-amber-500'}`}>
-                         {p.payment_status === 'PAID' ? 'Lunas' : 'Belum Lunas'}
-                       </div>
+                       {(() => {
+                         const paid = (p.purchase_payments || []).reduce((sum: number, pay: any) => sum + (Number(pay.amount) + Number(pay.discount_amount)), 0)
+                         const returned = (p.purchase_returns || []).reduce((sum: number, ret: any) => sum + Number(ret.total_amount), 0)
+                         const outstanding = p.grand_total - paid - returned
+                         
+                         return (
+                           <div className="flex flex-col items-end gap-1">
+                             <div className="text-sm font-black text-slate-900 font-mono tracking-tighter">
+                               {outstanding > 0 && outstanding < p.grand_total ? formatRupiah(outstanding) : formatRupiah(p.grand_total)}
+                             </div>
+                             {outstanding > 0 && outstanding < p.grand_total && (
+                               <div className="text-[10px] text-slate-400 line-through opacity-50 font-bold">
+                                 Faktur: {formatRupiah(p.grand_total)}
+                               </div>
+                             )}
+                             <div className={`text-[9px] font-black uppercase tracking-widest ${p.payment_status === 'PAID' ? 'text-emerald-500' : 'text-amber-500'}`}>
+                               {p.payment_status === 'PAID' ? 'Lunas' : outstanding < p.grand_total ? 'Cicilan / Sisa' : 'Belum Lunas'}
+                             </div>
+                           </div>
+                         )
+                       })()}
                     </td>
                     <td className="px-8 py-6 text-center">
                        <StatusBadge 
@@ -1010,8 +1027,16 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8">
                 <h3 className="text-xl font-bold mb-8">Tambah Vendor Rekanan</h3>
                 <form onSubmit={handleCreateVendor} className="space-y-6">
-                   <input name="name" required placeholder="Nama Perusahaan / Supplier" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm font-medium" />
-                   <textarea name="address" placeholder="Alamat Gudang / Kantor" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm min-h-[100px]" />
+                   <input name="name" required placeholder="Nama Perusahaan / Supplier" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm font-bold text-slate-900 focus:border-rose-500 transition-all" />
+                   <div className="grid grid-cols-2 gap-4">
+                     <input name="email" type="email" placeholder="Email (Opsional)" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm font-medium" />
+                     <input name="phone" placeholder="No. Telepon / Mobile" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm font-medium" />
+                   </div>
+                   <div className="grid grid-cols-2 gap-4">
+                     <input name="phone_wa" placeholder="WhatsApp (62xxx)" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm font-medium" />
+                     <input name="instagram" placeholder="Username Instagram" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm font-medium" />
+                   </div>
+                   <textarea name="address" placeholder="Alamat Gudang / Kantor" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm min-h-[80px]" />
                    <div className="flex gap-3 pt-4">
                     <button type="button" onClick={() => setShowContactModal(false)} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 rounded-2xl">Batal</button>
                     <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-2xl shadow-lg shadow-rose-100">{loading ? 'Menyimpan...' : 'Simpan Vendor'}</button>
@@ -1411,12 +1436,12 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
       <div className="fixed bottom-8 right-8 z-[100] flex flex-col gap-2">
         <AnimatePresence>
           {error && (
-            <motion.div initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-red-50 border border-red-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-red-600 text-sm font-bold">
+            <motion.div key="error-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-red-50 border border-red-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-red-600 text-sm font-bold">
               <AlertCircle size={18} /> {error}
             </motion.div>
           )}
           {success && (
-            <motion.div initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-emerald-50 border border-emerald-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
+            <motion.div key="success-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-emerald-50 border border-emerald-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
               <CheckCircle2 size={18} /> {success}
             </motion.div>
           )}

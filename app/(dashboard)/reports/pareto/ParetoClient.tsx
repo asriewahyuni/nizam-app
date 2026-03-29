@@ -141,7 +141,7 @@ export function ParetoClient({ orgId, data }: ParetoClientProps) {
                   <YAxis yAxisId="right" orientation="right" domain={[0, 100]} hide />
                   <Tooltip 
                     contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.1)' }}
-                    formatter={(value: any, name: string) => [name === 'cumulative' ? `${value.toFixed(1)}%` : formatRupiah(value), name === 'cumulative' ? 'Cumulative' : 'Revenue']}
+                    formatter={(value: any, name: any) => [name === 'cumulative' ? `${(value as number).toFixed(1)}%` : formatRupiah(value as number), name === 'cumulative' ? 'Cumulative' : 'Revenue'] as any}
                   />
                   <Bar yAxisId="left" dataKey="revenue" radius={[12, 12, 0, 0]}>
                      {chartData.map((entry: any, index: number) => (

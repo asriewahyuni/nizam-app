@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function getBSCMetrics(orgId: string) {
   const supabase = await createClient()
+  const db = supabase as any
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
   const monthEnd = now.toISOString().split('T')[0]
@@ -12,7 +13,7 @@ export async function getBSCMetrics(orgId: string) {
 
   // ===== PERSPECTIVE 1: FINANCIAL =====
   // Anchor by org via journal_entries, then get P&L lines
-  const { data: thisMonthEntries } = await supabase
+  const { data: thisMonthEntries } = await db
     .from('journal_entries')
     .select('id')
     .eq('org_id', orgId)
@@ -20,11 +21,11 @@ export async function getBSCMetrics(orgId: string) {
     .gte('entry_date', monthStart)
     .lte('entry_date', monthEnd)
 
-  const thisIds = (thisMonthEntries || []).map(e => e.id)
+  const thisIds = (thisMonthEntries || []).map((e: any) => e.id)
 
   let currentRevenue = 0, currentExpenses = 0
   if (thisIds.length > 0) {
-    const { data: lines } = await supabase
+    const { data: lines } = await db
       .from('journal_lines')
       .select('debit, credit, accounts!inner(type, code)')
       .in('entry_id', thisIds) as any
@@ -37,7 +38,7 @@ export async function getBSCMetrics(orgId: string) {
   }
 
   // Last month for comparison
-  const { data: lastMonthEntries } = await supabase
+  const { data: lastMonthEntries } = await db
     .from('journal_entries')
     .select('id')
     .eq('org_id', orgId)
@@ -45,10 +46,10 @@ export async function getBSCMetrics(orgId: string) {
     .gte('entry_date', lastMonthStart)
     .lte('entry_date', lastMonthEnd)
 
-  const lastIds = (lastMonthEntries || []).map(e => e.id)
+  const lastIds = (lastMonthEntries || []).map((e: any) => e.id)
   let lastRevenue = 0
   if (lastIds.length > 0) {
-    const { data: lastLines } = await supabase
+    const { data: lastLines } = await db
       .from('journal_lines')
       .select('debit, credit, accounts!inner(type, code)')
       .in('entry_id', lastIds) as any
@@ -64,37 +65,37 @@ export async function getBSCMetrics(orgId: string) {
   const revenueGrowth = lastRevenue > 0 ? ((currentRevenue - lastRevenue) / lastRevenue) * 100 : 0
 
   // ===== PERSPECTIVE 2: CUSTOMER (Sales) =====
-  const { data: salesData } = await supabase
+  const { data: salesData } = await db
     .from('sales')
     .select('id, grand_total, status, customer_id')
     .eq('org_id', orgId)
     .gte('created_at', monthStart)
 
-  const mtdSales = (salesData || []).reduce((s, x) => s + Number(x.grand_total), 0)
+  const mtdSales = (salesData || []).reduce((s: any, x: any) => s + Number(x.grand_total), 0)
   const totalOrders = (salesData || []).length
-  const uniqueCustomers = new Set((salesData || []).map(s => s.customer_id)).size
+  const uniqueCustomers = new Set((salesData || []).map((s: any) => s.customer_id)).size
 
   // ===== PERSPECTIVE 3: INTERNAL PROCESS (Operational efficiency) =====
   // Pending approvals / drafts (bottleneck indicator)
-  const { count: pendingPurchases } = await supabase
+  const { count: pendingPurchases } = await db
     .from('purchases')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'DRAFT')
 
-  const { count: pendingSales } = await supabase
+  const { count: pendingSales } = await db
     .from('sales')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'DRAFT')
 
-  const { count: totalAssets } = await supabase
+  const { count: totalAssets } = await db
     .from('fixed_assets')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'ACTIVE')
 
-  const { count: overdueAssets } = await supabase
+  const { count: overdueAssets } = await db
     .from('fixed_assets')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
@@ -102,13 +103,13 @@ export async function getBSCMetrics(orgId: string) {
     .or(`last_depreciation_date.is.null,last_depreciation_date.lt.${lastMonthEnd}`)
 
   // ===== PERSPECTIVE 4: LEARNING & GROWTH =====
-  const { count: employees } = await supabase
+  const { count: employees } = await db
     .from('employees')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'ACTIVE')
 
-  const { count: payrollRuns } = await supabase
+  const { count: payrollRuns } = await db
     .from('payroll_runs')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)

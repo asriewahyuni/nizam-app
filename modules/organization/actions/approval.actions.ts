@@ -14,7 +14,7 @@ export async function getPendingApprovals(orgId: string) {
     .order('requested_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching approvals:', error)
+    (console as any).error('Error fetching approvals:', error)
     return []
   }
   
@@ -33,7 +33,7 @@ export async function getApprovalHistory(orgId: string) {
     .limit(50)
 
   if (error) {
-    console.error('Error fetching approval history:', error)
+    (console as any).error('Error fetching approval history:', error)
     return []
   }
   
@@ -45,14 +45,14 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
   let dataRes: any = { data: null, error: null }
   
   if (sourceType === 'PURCHASE_ORDER') {
-    dataRes = await supabase.from('purchases' as any).select('*, purchase_items(*, products(name, unit))').eq('id', sourceId).eq('org_id', orgId).single()
+    dataRes = await (supabase as any).from('purchases' as any).select('*, purchase_items(*, products(name, unit))').eq('id', sourceId).eq('org_id', orgId).single()
   } else if (sourceType === 'SALES_ORDER') {
-    dataRes = await supabase.from('sales' as any).select('*, contacts(name, phone, email), sales_items(*, products(name, sku, unit))').eq('id', sourceId).eq('org_id', orgId).single()
+    dataRes = await (supabase as any).from('sales' as any).select('*, contacts(name, phone, email), sales_items(*, products(name, sku, unit))').eq('id', sourceId).eq('org_id', orgId).single()
   } else if (sourceType === 'REIMBURSEMENT') {
-    dataRes = await supabase.from('reimbursements').select('*, items:reimbursement_items(*, account:accounts(code, name))').eq('id', sourceId).eq('org_id', orgId).single()
+    dataRes = await (supabase as any).from('reimbursements').select('*, items:reimbursement_items(*, account:accounts(code, name))').eq('id', sourceId).eq('org_id', orgId).single()
   }
 
-  if (dataRes.error) return { data: null, error: dataRes.error.message }
+  if ((dataRes as any).error) return { data: null, error: (dataRes as any).error.message }
 
   // Fetch History Logs
   const { data: logs } = await supabase
@@ -75,7 +75,7 @@ export async function getPendingApprovalsCount(orgId: string) {
     .eq('status', 'PENDING')
 
   if (error) {
-    console.error('Error fetching approval counts:', error)
+    (console as any).error('Error fetching approval counts:', error)
     return 0
   }
   

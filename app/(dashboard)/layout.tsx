@@ -12,6 +12,7 @@ import { AppSidebar } from '@/components/shared/AppSidebar'
 import { AppHeader } from '@/components/shared/AppHeader'
 import { DemoBanner } from '@/components/shared/DemoBanner'
 import { StartupWizard } from '@/components/shared/StartupWizard'
+import { FloatingPlanBadge } from '@/components/shared/FloatingPlanBadge'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 
 export default async function DashboardLayout({
@@ -36,52 +37,57 @@ export default async function DashboardLayout({
   ])
 
   // ─────────────────────────────────────────────────────────────
-  // 3. RBAC PATH GUARD (Protect direct URL access)
+  // 3. SAAS MODULE & RBAC GUARD (Protect direct URL access)
   // ─────────────────────────────────────────────────────────────
   const isOwnerOrAdmin = orgData.role === 'owner' || orgData.role === 'admin'
   const pathname = (await headers()).get('x-pathname') || ''
 
-  // Only guard if NOT owner/admin
-  if (!isOwnerOrAdmin) {
-    // Map paths to their required permission keys
-    const routePermissionMap: Record<string, string> = {
-      '/accounting': 'accounting',
-      '/finance': 'finance',
-      '/inventory': 'inventory',
-      '/factory': 'factory',
-      '/purchasing': 'purchasing',
-      '/sales': 'sales',
-      '/pos': 'pos',
-      '/fleet': 'fleet',
-      '/hris': 'hris',
-      '/audit': 'audit',
-      '/reports': 'reports',
-      '/settings': 'config'
-    }
+  // Map paths to their required module names (matching saas_packages.modules)
+  const routeModuleMap: Record<string, string> = {
+    '/accounting': 'Accounting',
+    '/finance': 'Finance',
+    '/inventory': 'Inventory',
+    '/factory': 'Manufacturing',
+    '/purchasing': 'Purchasing',
+    '/sales': 'Sales',
+    '/pos': 'POS',
+    '/fleet': 'Fleet & Rental',
+    '/hris': 'HRIS',
+    '/audit': 'Audit',
+    '/reports': 'Reports',
+    '/marketing': 'Marketing',
+    '/crm': 'CRM',
+    '/warehouse': 'Warehouse',
+    '/consolidation': 'Consolidation',
+    '/services': 'Job Order (Jasa)'
+  }
 
   // Identify which module is being accessed
-  const accessedModuleEntry = Object.entries(routePermissionMap).find(([path]) => pathname.startsWith(path))
+  const accessedEntry = Object.entries(routeModuleMap).find(([path]) => pathname.startsWith(path))
   
-  if (accessedModuleEntry) {
-    const [modulePath, requiredKey] = accessedModuleEntry
+  if (accessedEntry) {
+    const [_, requiredModule] = accessedEntry
     
-    // 1. SAAS MODULE GUARD (Is this module paid/enabled for this org?)
-    // Module keys are usually the same as the base path (e.g. /hris -> hris)
-    const moduleKey = modulePath.replace('/', '')
-    const isModuleEnabled = orgData.enabledModules?.some((m: string) => m.toLowerCase() === moduleKey.toLowerCase())
+    // 1. SAAS MODULE GUARD (Check for EVERYONE, including owner)
+    const isModulePaid = orgData.enabledModules?.some(
+      (m: string) => m.toLowerCase().trim() === requiredModule.toLowerCase().trim()
+    )
 
-    if (!isModuleEnabled) {
+    if (!isModulePaid) {
+      console.log(`[ACL] Redirecting - Module not paid: ${requiredModule} for path: ${pathname}`)
       return redirect('/dashboard')
     }
 
-    // 2. RBAC PERMISSION GUARD (Does the user have the right role for this module?)
+    // 2. RBAC PERMISSION GUARD (Only check if NOT owner/admin)
     if (!isOwnerOrAdmin) {
-      const hasPermission = orgData.permissions.some((p: string) => p.toLowerCase().includes(requiredKey.toLowerCase()))
+      const hasPermission = orgData.permissions.some(
+        (p: string) => p.toLowerCase().includes(requiredModule.toLowerCase())
+      )
       if (!hasPermission) {
+        console.log(`[ACL] Redirecting - No permission for: ${requiredModule} for path: ${pathname}`)
         return redirect('/dashboard')
       }
     }
-  }
   }
 
   return (
@@ -101,6 +107,7 @@ export default async function DashboardLayout({
         pendingPurchaseRequests={pendingPurchaseRequests}
         hrisNotifications={resetRequests}
         isDemo={isDemo}
+        planName={orgData.org.settings?.plan}
       />
 
       {/* Main content */}
@@ -124,6 +131,7 @@ export default async function DashboardLayout({
           </div>
         </main>
         <MobileBottomNav />
+        <FloatingPlanBadge planName={orgData.org.settings?.plan} />
       </div>
     </div>
   )

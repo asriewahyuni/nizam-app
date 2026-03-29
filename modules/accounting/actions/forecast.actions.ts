@@ -5,15 +5,16 @@ import { getAccountBalances } from './coa.actions'
 
 export async function getCashFlowForecast(orgId: string, days: number = 90) {
   const supabase = await createClient()
+  const db = supabase as any
 
   // 1. Current Total Cash (Balances for 1101-1105)
   const balances = await getAccountBalances(orgId)
   const currentCash = balances
-    .filter(b => b.code >= '1101' && b.code <= '1105')
-    .reduce((sum, b) => sum + (b.balance || 0), 0)
+    .filter((b: any) => b.code >= '1101' && b.code <= '1105')
+    .reduce((sum: any, b: any) => sum + (b.balance || 0), 0)
 
   // 2. Projected Inflow (Sales)
-  const { data: sales, error: sErr } = await supabase
+  const { data: sales, error: sErr } = await db
     .from('sales')
     .select('grand_total, due_date, sale_number')
     .eq('org_id', orgId)
@@ -21,7 +22,7 @@ export async function getCashFlowForecast(orgId: string, days: number = 90) {
     .neq('status', 'VOIDED')
 
   // 3. Projected Outflow (Purchases)
-  const { data: purchases, error: pErr } = await supabase
+  const { data: purchases, error: pErr } = await db
     .from('purchases')
     .select('grand_total, due_date, purchase_number')
     .eq('org_id', orgId)
@@ -42,20 +43,20 @@ export async function getCashFlowForecast(orgId: string, days: number = 90) {
 
     // Calculate delta for this day
     const dayInflow = (sales || [])
-        .filter(s => {
+        .filter((s: any) => {
            // For Day 0, include ALL overdue (past dates) AND null due dates
            if (i === 0) return !s.due_date || s.due_date <= dateStr;
            return s.due_date === dateStr;
         })
-        .reduce((sum, s) => sum + Number(s.grand_total), 0)
+        .reduce((sum: any, s: any) => sum + Number(s.grand_total), 0)
     
     const dayOutflow = (purchases || [])
-        .filter(p => {
+        .filter((p: any) => {
            // For Day 0, include ALL overdue (past dates) AND null due dates
            if (i === 0) return !p.due_date || p.due_date <= dateStr;
            return p.due_date === dateStr;
         })
-        .reduce((sum, p) => sum + Number(p.grand_total), 0)
+        .reduce((sum: any, p: any) => sum + Number(p.grand_total), 0)
 
     runningBalance += (dayInflow - dayOutflow)
 
@@ -71,9 +72,9 @@ export async function getCashFlowForecast(orgId: string, days: number = 90) {
   return {
     currentCash,
     forecast,
-    totalProjectedInflow: (sales || []).reduce((s, x) => s + Number(x.grand_total), 0),
-    totalProjectedOutflow: (purchases || []).reduce((s, x) => s + Number(x.grand_total), 0),
-    lowestPoint: Math.min(...forecast.map(f => f.balance)),
+    totalProjectedInflow: (sales || []).reduce((s: any, x: any) => s + Number(x.grand_total), 0),
+    totalProjectedOutflow: (purchases || []).reduce((s: any, x: any) => s + Number(x.grand_total), 0),
+    lowestPoint: Math.min(...forecast.map((f: any) => f.balance)),
     days
   }
 }

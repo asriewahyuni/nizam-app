@@ -9,7 +9,7 @@ export async function getAuditLogs(limit: number = 50) {
   if (!user) throw new Error('Unauthorized')
 
   // 1. Try specialized RPC first (Phase 1)
-  const { data: rpcData, error: rpcError } = await supabase
+  const { data: rpcData, error: rpcError } = await (supabase as any)
     .rpc('get_admin_audit_trail', { p_limit: limit })
 
   if (!rpcError && rpcData) {
@@ -18,8 +18,8 @@ export async function getAuditLogs(limit: number = 50) {
 
   // 2. Fallback: Direct Query (Phase 2)
   // If RPC is missing (PGRST202/PGRST205), we fetch directly to ensure the UI doesn't crash
-  console.warn('RPC Audit failed, using fallback query...')
-  const { data: directData, error: directError } = await supabase
+  console.warn('RPC Audit failed, using fallback query.')
+  const { data: directData, error: directError } = await (supabase as any)
     .from('audit_logs')
     .select(`
       id,
@@ -35,12 +35,12 @@ export async function getAuditLogs(limit: number = 50) {
     .limit(limit)
 
   if (directError) {
-    console.error('Audit Fallback Error:', directError)
+    (console as any).error('Audit Fallback Error:', directError)
     return []
   }
 
   // Map to the format expected by the UI (v_admin_audit_trail format)
-  return directData.map(log => ({
+  return directData.map((log: any) => ({
     ...log,
     user_email: 'System / User', // auth.users isn't directly joinable via anon/direct query easily
     user_name: 'Logged Actor',

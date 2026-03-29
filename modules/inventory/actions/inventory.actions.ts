@@ -14,8 +14,8 @@ export interface ProductWithStock extends Product {
 export async function getProducts(orgId: string): Promise<ProductWithStock[]> {
   const supabase = await createClient()
 
-  const { data: productsData } = await (supabase as any).from('products').select('*').eq('org_id', orgId).order('name', { ascending: true })
-  const { data: movementsData } = await (supabase as any).from('stock_movements').select('product_id, quantity, unit_price').eq('org_id', orgId)
+  const { data: productsData } = await supabase.from('products').select('*').eq('org_id', orgId).order('name', { ascending: true })
+  const { data: movementsData } = await supabase.from('stock_movements').select('product_id, quantity, unit_price').eq('org_id', orgId)
 
   const products = productsData || []
   const movements = movementsData || []
@@ -66,7 +66,7 @@ export async function createProduct(productData: Partial<Product>) {
     .single()
 
   if (error) {
-    console.error('Error creating product:', error.message)
+    (console as any).error('Error creating product:', error.message)
     return { error: error.message }
   }
 
@@ -86,17 +86,18 @@ export async function updateProduct(id: string, orgId: string, productData: Part
     .single()
 
   if (error) {
-    throw new Error(error.message)
+    (console as any).error('Error updating product:', error.message)
+    return { error: error.message }
   }
 
   revalidatePath('/inventory')
-  return data as Product
+  return { data: data as Product }
 }
 
 export async function deleteProduct(id: string, orgId: string) {
   const supabase = await createClient()
 
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('products')
     .delete()
     .eq('id', id)
@@ -164,7 +165,7 @@ async function insertAdjustmentWithRetry(
       return { data: null, error }
     }
 
-    console.warn(`[ADJ] Attempt ${attempt + 1} failed (collision). Retrying...`)
+    console.warn(`[ADJ] Attempt ${attempt + 1} failed (collision). Retrying.`)
   }
 
   return { data: null, error: { message: 'Gagal membuat adjustment setelah ' + maxRetries + ' percobaan. Silakan hubungi admin.' } }
@@ -196,14 +197,14 @@ export async function createInventoryAdjustment(
     adj_date: payload.adj_date,
     type: payload.type,
     status: 'DRAFT',
-    total_value: payload.items.reduce((sum, it) => sum + (Math.abs(it.diff_quantity) * it.unit_cost), 0),
+    total_value: payload.items.reduce((sum: any, it: any) => sum + (Math.abs(it.diff_quantity) * it.unit_cost), 0),
     notes: payload.notes,
     created_by: user.id
   })
 
   if (adjErr) return { error: adjErr.message }
 
-  const itemsToInsert = payload.items.map(it => ({
+  const itemsToInsert = payload.items.map((it: any) => ({
     org_id: orgId, 
     adjustment_id: adj.id,
     product_id: it.product_id,
@@ -215,7 +216,7 @@ export async function createInventoryAdjustment(
     notes: it.notes
   }))
 
-  const { error: itemsErr } = await (supabase as any)
+  const { error: itemsErr } = await supabase
     .from('inventory_adjustment_items')
     .insert(itemsToInsert as any)
 
@@ -224,7 +225,7 @@ export async function createInventoryAdjustment(
   const { error: procErr } = await (supabase as any).rpc('process_inventory_adjustment', {
     p_adj_id: adj.id,
     p_user_id: user.id
-  } as any)
+  })
 
   if (procErr) return { error: 'Gagal memproses penyesuaian: ' + procErr.message }
 
@@ -265,8 +266,14 @@ export async function createInventoryTransfer(
   if (adjErr) return { error: 'Transfer Header Error: ' + adjErr.message }
 
   const { data: products } = await (supabase as any).from('products').select('id, purchase_price').eq('org_id', orgId)
-  if (!products) return { error: 'Gagal mengambil data produk' }
-
+  
+  if (!products) return { error: 'Gagal memvalidasi data produk.' }
+  
+  const productsWithCosts = (products as any[]).map((p: any) => ({
+    id: p.id,
+    cost: Number(p.purchase_price) || 0
+  }))
+  
   const itemsToInsert: any[] = []
   
   for (const it of payload.items) {
@@ -333,13 +340,13 @@ export async function createInventoryWriteOff(orgId: string, payload: any) {
 export async function getStockLedger(orgId: string, productId: string) {
   const supabase = await createClient()
   
-  const { data: product } = await (supabase as any)
+  const { data: product } = await supabase
     .from('products')
     .select('name, sku, unit')
     .eq('id', productId)
     .single()
 
-  const { data: movements, error } = await (supabase as any)
+  const { data: movements, error } = await supabase
     .from('stock_movements')
     .select('*')
     .eq('org_id', orgId)
@@ -357,7 +364,7 @@ export async function getStockLedger(orgId: string, productId: string) {
 export async function getWarehouseStocks(orgId: string, productId: string) {
   const supabase = await createClient()
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('inventory_stocks')
     .select('warehouse_id, quantity, warehouses(name)')
     .eq('org_id', orgId)
@@ -374,7 +381,7 @@ export async function getWarehouseStocks(orgId: string, productId: string) {
 export async function getProductByBarcode(orgId: string, barcode: string) {
   const supabase = await createClient()
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('products')
     .select('*')
     .eq('org_id', orgId)

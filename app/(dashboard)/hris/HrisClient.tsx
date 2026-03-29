@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { requestPasswordReset, resetEmployeePassword } from '@/modules/auth/actions/auth.actions'
+import { uploadEmployeeAvatar } from '@/modules/hris/actions/employee.actions'
 import {
   Plus,
   Users,
@@ -27,7 +28,10 @@ import {
   AlertTriangle,
   ClipboardList,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Key,
+  FileText,
+  MessageCircle
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
@@ -54,7 +58,9 @@ export default function HrisClient({
   initialPayrollRuns = [],
   accounts = [],
   settings = {},
-  roles = []
+  roles = [],
+  initialInvitations = [],
+  defaultTab
 }: {
   orgId: string,
   initialEmployees: any[],
@@ -62,33 +68,95 @@ export default function HrisClient({
   initialPayrollRuns?: any[],
   accounts?: any[],
   settings?: any,
-  roles?: any[]
+  roles?: any[],
+  initialInvitations?: any[],
+  defaultTab?: string
 }) {
   const supabase = createClient()
   const [employees, setEmployees] = useState(initialEmployees)
   const [payrollComponents, setPayrollComponents] = useState(initialPayrollComponents)
   const [payrollRuns, setPayrollRuns] = useState(initialPayrollRuns || [])
-  const [rolesList, setRolesList] = useState(roles || []) // Local state for roles
-  const [activeTab, setActiveTab] = useState<'EMPLOYEES' | 'PAYROLL' | 'ATTENDANCE' | 'RUNS'>('EMPLOYEES')
+  const [invitations, setInvitations] = useState(initialInvitations || [])
+  const [rolesList, setRolesList] = useState(roles || []) 
+  const [activeTab, setActiveTab] = useState<'EMPLOYEES' | 'POSITIONS' | 'PAYROLL' | 'ATTENDANCE' | 'RUNS' | 'ACTIVATION'>(defaultTab as any || 'EMPLOYEES')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
+  const [isPositionModalOpen, setIsPositionModalOpen] = useState(false)
+  const [editingPosition, setEditingPosition] = useState<any>(null)
+  const [baseUrl, setBaseUrl] = useState('https://nizam.app')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setBaseUrl(window.location.origin)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (defaultTab) setActiveTab(defaultTab as any)
+  }, [defaultTab])
+
+  useEffect(() => {
+    setEmployees(initialEmployees)
+  }, [initialEmployees])
+
+  useEffect(() => {
+    setPayrollComponents(initialPayrollComponents || [])
+  }, [initialPayrollComponents])
+
+  useEffect(() => {
+    setPayrollRuns(initialPayrollRuns || [])
+  }, [initialPayrollRuns])
+
+  useEffect(() => {
+    setInvitations(initialInvitations || [])
+  }, [initialInvitations])
   const [editingEmp, setEditingEmp] = useState<any>(null)
   const [viewingRun, setViewingRun] = useState<any>(null)
   const [viewingRunData, setViewingRunData] = useState<any[]>([])
   const [isPayrollModalOpen, setIsPayrollModalOpen] = useState(false)
   const [resettingId, setResettingId] = useState<string | null>(null)
+  const [resetModalEmp, setResetModalEmp] = useState<any>(null)
+  const [resetModalPwd, setResetModalPwd] = useState('nizam123')
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
 
-  const handleResetPassword = async (emp: any) => {
-    const newPwd = prompt(`Masukkan password baru untuk ${emp.first_name}:`, 'nizam123')
-    if (!newPwd) return
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAvatarFile(file)
+    setAvatarPreview(URL.createObjectURL(file))
+  }
+  const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'info'} | null>(null)
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  const handleResetPassword = (emp: any) => {
+    setResetModalEmp(emp)
+    setResetModalPwd('nizam123')
+  }
+
+  const submitPasswordReset = async (sendToWa: boolean = false) => {
+    if (!resetModalEmp || !resetModalPwd) return
+    const empId = resetModalEmp.id
+    const empName = resetModalEmp.first_name
     
-    setResettingId(emp.id)
-    const res = await resetEmployeePassword(emp.id, newPwd)
+    setResettingId(empId)
+    const res = await resetEmployeePassword(empId, resetModalPwd)
     setResettingId(null)
     
-    if (res.success) {
-      alert('Password berhasil direset!')
+    if (res.error) {
+      showToast('Gagal reset: ' + res.error, 'error')
     } else {
-      alert('Gagal reset: ' + res.error)
+      showToast('Password berhasil direset!', 'success')
+      if (sendToWa) {
+         const text = `Halo *${empName}*,\n\nSaya Admin HR.\nPassword akun HRIS NIZAM Anda telah direset sementara menjadi:\n\n🔐 *${resetModalPwd}*\n\nSilakan login menggunakan NIK Anda di aplikasi dan segera ubah password Anda demi keamanan.`
+         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank')
+      }
+      setResetModalEmp(null)
     }
   }
   const [isRunModalOpen, setIsRunModalOpen] = useState(false)
@@ -142,32 +210,53 @@ export default function HrisClient({
     }
   }
 
-  const handleOpenEdit = (emp: any) => {
-    setEditingEmp(emp)
-    setBasicSalary(emp.basic_salary)
-    setIsAddModalOpen(true)
-  }
-
   const handleOpenNew = () => {
     setEditingEmp(null)
     setBasicSalary(0)
+    setSelectedRole('')
+    setAvatarFile(null)
+    setAvatarPreview(null)
+    setIsAddModalOpen(true)
+  }
+
+  const handleOpenEdit = (emp: any) => {
+    setEditingEmp(emp)
+    setBasicSalary(emp.basic_salary || 0)
+    setSelectedRole(emp.job_title || '')
+    setAvatarFile(null)
+    setAvatarPreview(emp.avatar_url || null)
     setIsAddModalOpen(true)
   }
 
   const handleCreateEmp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
-    const formData = new FormData(e.currentTarget)
+    const formData = new FormData(e.currentTarget as HTMLFormElement)
+    const formTarget = e.currentTarget as HTMLFormElement
+
+    // Upload avatar first if one was selected
+    if (avatarFile) {
+      const tempId = editingEmp?.id || `new-${Date.now()}`
+      const res = await uploadEmployeeAvatar(avatarFile, tempId)
+      if (res.url) formData.set('avatar_url', res.url)
+    } 
     formData.append('basic_salary', basicSalary.toString())
 
     const res = editingEmp
       ? await updateEmployee(editingEmp.id, orgId, formData)
       : await createEmployee(orgId, formData)
 
-    if (res.error) alert(res.error)
+    if (res.error) showToast(res.error, 'error')
     else {
-      setIsAddModalOpen(false)
-      window.location.reload()
+      if (editingEmp) {
+        setIsAddModalOpen(false)
+      } else {
+        const formTarget = e.target as HTMLFormElement;
+        formTarget.reset();
+        setBasicSalary(0);
+        // Alert non-intrusif memberitahu berhasil
+        showToast('Data Karyawan berhasil disimpan!', 'success')
+      }
     }
     setLoading(false)
   }
@@ -179,16 +268,70 @@ export default function HrisClient({
     formData.append('amount', payrollAmount.toString())
 
     const res = await createPayrollComponent(orgId, formData)
-    if (res.error) alert(res.error)
-    else window.location.reload()
+    if (res.error) showToast(res.error, 'error')
+    else {
+      setIsPayrollModalOpen(false)
+    }
     setLoading(false)
+  }
+
+  const handleCreateInvite = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+    const formData = new FormData(e.currentTarget)
+    const { createInvitationToken } = await import('@/modules/organization/actions/org.actions')
+    const res = await createInvitationToken(orgId, formData)
+    
+    if (res.error) showToast(res.error, 'error')
+    else {
+      setIsInviteModalOpen(false)
+    }
+    setLoading(false)
+  }
+
+  const fetchRoles = async () => {
+    const { data } = await (supabase as any).from('roles').select('*').eq('org_id', activeOrgId).order('name')
+    if (data) setRolesList(data)
+  }
+
+  const handleSavePosition = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+    const formData = new FormData(e.currentTarget)
+    const name = formData.get('name') as string
+
+    if (editingPosition) {
+       const { error } = await (supabase as any).from('roles').update({ name }).eq('id', editingPosition.id)
+       if (error) showToast(error.message, 'error')
+       else { setIsPositionModalOpen(false); fetchRoles(); }
+    } else {
+       const { error } = await (supabase as any).from('roles').insert({ org_id: orgId, name, permissions: [], priority: rolesList.length })
+       if (error) showToast(error.message, 'error')
+       else { setIsPositionModalOpen(false); fetchRoles(); }
+    }
+    setLoading(false)
+  }
+
+  const handleDeletePosition = async (id: string, isSystem: boolean) => {
+    if (isSystem) return showToast('Role sistem ini tidak dapat dihapus.', 'error')
+    if (!confirm('Yakin ingin menghapus Posisi/Jabatan ini?')) return
+    const { error } = await (supabase as any).from('roles').delete().eq('id', id)
+    if (error) showToast(error.message, 'error')
+    else fetchRoles()
+  }
+
+  const handleDeleteInvite = async (id: string) => {
+    if (!confirm('Hapus link aktivasi ini?')) return
+    const { deleteInvitation } = await import('@/modules/organization/actions/org.actions')
+    const res = await deleteInvitation(id)
+    if (res.success) setInvitations(invitations.filter((i: any) => i.id !== id))
   }
 
   const handleDeletePayrollComponent = async (id: string) => {
     if (!confirm('Yakin ingin menghapus komponen ini? Semua keterkaitan karyawan dengan tunjangan/potongan ini bisa terpengaruh.')) return
     setLoading(true)
     const res = await deletePayrollComponent(id)
-    if (res.error) alert(res.error)
+    if (res.error) showToast(res.error, 'error')
     else setPayrollComponents(payrollComponents.filter((p: any) => p.id !== id))
     setLoading(false)
   }
@@ -245,7 +388,7 @@ export default function HrisClient({
 
     setLoading(true)
     const res = isPaid ? await voidPayrollRun(id) : await deletePayrollRun(id)
-    if (res.error) alert(res.error)
+    if (res.error) showToast(res.error, 'error')
     else {
       setPayrollRuns(payrollRuns.filter((r: any) => r.id !== id))
     }
@@ -255,35 +398,63 @@ export default function HrisClient({
   return (
     <div className="space-y-10 pb-20">
       <PageHeader
-        title="Human Resources"
-        subtitle="Manage employees, positions, and automated payroll systems."
-        icon={<Users />}
+        title={
+          activeTab === 'ATTENDANCE' ? 'Absensi & Cuti' :
+          activeTab === 'PAYROLL' ? 'Payroll Components' :
+          activeTab === 'RUNS' ? 'Proses Penggajian' :
+          'HRIS Dashboard'
+        }
+        subtitle={
+          activeTab === 'ATTENDANCE' ? 'Manajemen daftar kehadiran, jadwal, dan cuti karyawan.' :
+          activeTab === 'PAYROLL' ? 'Atur template gaji, tunjangan, dan potongan karyawan.' :
+          activeTab === 'RUNS' ? 'Lakukan generate slip gaji otomatis dan pencatatan kas jurnal.' :
+          'Manajemen sumber daya manusia, karyawan, dan hierarki akses organisasi.'
+        }
+        icon={
+          activeTab === 'ATTENDANCE' ? <Clock /> :
+          activeTab === 'PAYROLL' ? <FileText /> :
+          activeTab === 'RUNS' ? <Wallet /> :
+          <Users />
+        }
         actions={
           <div className="flex bg-slate-100 p-1.5 rounded-3xl border border-slate-200 shadow-inner overflow-x-auto scrollbar-hide max-w-[90vw] md:max-w-none">
-            <button
-              onClick={() => setActiveTab('EMPLOYEES')}
-              className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'EMPLOYEES' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Employees
-            </button>
-            <button
-              onClick={() => setActiveTab('ATTENDANCE')}
-              className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'ATTENDANCE' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Attendance
-            </button>
-            <button
-              onClick={() => setActiveTab('PAYROLL')}
-              className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'PAYROLL' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Payroll Components
-            </button>
-            <button
-              onClick={() => setActiveTab('RUNS')}
-              className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'RUNS' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              Payroll Processing
-            </button>
+            {['EMPLOYEES', 'POSITIONS', 'ACTIVATION'].includes(activeTab) && (
+              <>
+                <button
+                  onClick={() => setActiveTab('POSITIONS')}
+                  className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'POSITIONS' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  Positions & Roles
+                </button>
+                <button
+                  onClick={() => setActiveTab('EMPLOYEES')}
+                  className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'EMPLOYEES' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  Employees
+                </button>
+                <button
+                   onClick={() => setActiveTab('ACTIVATION')}
+                   className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'ACTIVATION' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                   Activation Center
+                </button>
+              </>
+            )}
+            {activeTab === 'ATTENDANCE' && (
+              <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
+                Mesin Absensi Terpusat
+              </button>
+            )}
+            {activeTab === 'PAYROLL' && (
+              <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
+                Master Komponen Gaji
+              </button>
+            )}
+            {activeTab === 'RUNS' && (
+              <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
+                Siklus Penggajian
+              </button>
+            )}
           </div>
         }
       />
@@ -323,7 +494,7 @@ export default function HrisClient({
 
       <AnimatePresence mode="wait">
         {activeTab === 'EMPLOYEES' && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">
+          <motion.div key="employees-tab" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">
             <SectionCard>
               <SectionHeader
                 title="Active Personnel"
@@ -345,8 +516,14 @@ export default function HrisClient({
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 rounded-[24px] bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xl font-black text-white shadow-xl shadow-blue-100">
-                            {emp.first_name[0]}{emp.last_name?.[0]}
+                          <div className="w-16 h-16 rounded-[24px] overflow-hidden flex items-center justify-center shadow-xl shadow-blue-100">
+                            {emp.avatar_url ? (
+                              <img src={emp.avatar_url} alt={emp.first_name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xl font-black text-white">
+                                {emp.first_name[0]}{emp.last_name?.[0]}
+                              </div>
+                            )}
                           </div>
                           <div className="space-y-0.5">
                             <h4 className="font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight">{emp.first_name} {emp.last_name}</h4>
@@ -420,8 +597,67 @@ export default function HrisClient({
           </motion.div>
         )}
 
+        {activeTab === 'POSITIONS' && (
+          <motion.div key="positions-tab" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">
+            <SectionCard>
+               <SectionHeader 
+                  title="Organizational Structure (Roles)"
+                  subtitle="Define job titles to assign to your workforce. Technical access control can be managed centrally in Settings > Access Control."
+                  icon={Briefcase}
+                  actions={
+                    <SafeButton onClick={() => { setEditingPosition(null); setIsPositionModalOpen(true); }} variant="primary" size="sm" icon={<Plus size={16} />}>
+                       ADD POSITION
+                    </SafeButton>
+                  }
+               />
+               
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
+                  {rolesList.map((role: any) => (
+                    <div key={role.id} className="bg-slate-50 border border-slate-100 p-6 rounded-[32px] group hover:border-blue-200 transition-all">
+                       <div className="flex justify-between items-start mb-4">
+                          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-blue-600">
+                             <Briefcase size={20} />
+                          </div>
+                          {!role.is_system && (
+                            <div className="flex gap-2">
+                              <button onClick={() => { setEditingPosition(role); setIsPositionModalOpen(true); }} className="p-2 text-slate-300 hover:text-blue-600 bg-white rounded-xl shadow-sm"><Edit2 size={14}/></button>
+                              <button onClick={() => handleDeletePosition(role.id, role.is_system)} className="p-2 text-slate-300 hover:text-rose-500 bg-white rounded-xl shadow-sm"><Trash2 size={14}/></button>
+                            </div>
+                          )}
+                          {role.is_system && <StatusBadge label="SYSTEM PROTECTED" variant="warning" />}
+                       </div>
+                       <h4 className="font-black text-lg text-slate-900">{role.name}</h4>
+                       
+                       <div className="mt-4 pt-4 border-t border-slate-200/50 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                             <ShieldCheck size={14} className="text-emerald-500" />
+                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{role.permissions?.length || 0} PERMISSIONS</span>
+                          </div>
+                          {role.priority !== undefined && (
+                             <span className="text-[10px] font-black font-mono text-slate-300">P-{role.priority}</span>
+                          )}
+                       </div>
+                    </div>
+                  ))}
+               </div>
+            </SectionCard>
+          </motion.div>
+        )}
+
+        {activeTab === 'ATTENDANCE' && (
+          <motion.div key="attendance-tab" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="py-20 text-center">
+            <div className="w-32 h-32 bg-slate-50 text-slate-200 rounded-[48px] flex items-center justify-center mx-auto mb-10 shadow-inner border border-slate-100">
+              <ClipboardList size={64} strokeWidth={1} />
+            </div>
+            <h3 className="text-3xl font-black text-slate-900 tracking-tighter mb-4">Enterprise Attendance Engine</h3>
+            <p className="text-slate-400 max-w-md mx-auto font-medium text-sm leading-relaxed">
+              Automated biometric sync, leave management, and shift scheduling are currently in the final testing phase of Nizam ERP 2.1.
+            </p>
+          </motion.div>
+        )}
+
         {activeTab === 'PAYROLL' && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">
+          <motion.div key="payroll-tab" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">
             <SectionCard>
               <SectionHeader
                 title="Payroll Engine Configuration"
@@ -507,7 +743,7 @@ export default function HrisClient({
         )}
 
         {activeTab === 'RUNS' && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">
+          <motion.div key="runs-tab" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">
             <SectionCard>
               <SectionHeader
                 title="Payroll Run History"
@@ -520,7 +756,7 @@ export default function HrisClient({
                         setLoading(true)
                         const res = await fixEmptyPayrollJournals(orgId)
                         setLoading(false)
-                        if (res.success) alert(`Success: Fixed ${res.count} journals!`)
+                        if (res.success) showToast(`Success: Fixed ${res.count} journals!`, 'success')
                       }}
                       variant="secondary"
                       size="sm"
@@ -628,27 +864,185 @@ export default function HrisClient({
           </motion.div>
         )}
 
-        {/* Placeholder for other tabs */}
-        {activeTab === 'ATTENDANCE' && (
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="py-20 text-center">
-            <div className="w-32 h-32 bg-slate-50 text-slate-200 rounded-[48px] flex items-center justify-center mx-auto mb-10 shadow-inner border border-slate-100">
-              <ClipboardList size={64} strokeWidth={1} />
-            </div>
-            <h3 className="text-3xl font-black text-slate-900 tracking-tighter mb-4">Enterprise Attendance Engine</h3>
-            <p className="text-slate-400 max-w-md mx-auto font-medium text-sm leading-relaxed">
-              Automated biometric sync, leave management, and shift scheduling are currently in the final testing phase of Nizam ERP 2.1.
-            </p>
+        {/* ACTIVATION CENTER TAB */}
+        {activeTab === 'ACTIVATION' && (
+          <motion.div key="activation-tab" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">
+            <SectionCard>
+               <SectionHeader 
+                  title="Pusat Aktivasi Karyawan"
+                  subtitle="Gunakan link token unik di bawah untuk mengundang karyawan baru."
+                  icon={Key}
+                  actions={
+                    <SafeButton onClick={() => setIsInviteModalOpen(true)} variant="primary" size="sm" icon={<Plus size={16} />}>
+                       BUAT LINK BARU
+                    </SafeButton>
+                  }
+               />
+               
+               <div className="overflow-hidden rounded-[32px] border border-slate-100 bg-white">
+                  <table className="w-full text-left">
+                     <thead>
+                        <tr className="bg-slate-900 text-white">
+                           <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">Label Undangan</th>
+                           <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">Role & Masa Berlaku</th>
+                           <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-center">Token</th>
+                           <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-right">Aksi</th>
+                        </tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-100">
+                        {invitations.length === 0 ? (
+                           <tr>
+                              <td colSpan={4} className="px-8 py-12 text-center text-slate-400 italic font-medium">Belum ada link aktivasi yang dibuat. Klik tombol di atas untuk membuat.</td>
+                           </tr>
+                        ) : invitations.map((inv: any) => (
+                           <tr key={inv.id} className="hover:bg-slate-50 transition-all group">
+                              <td className="px-8 py-6">
+                                 <div className="font-black text-slate-900 text-[13px] tracking-tight">{inv.label}</div>
+                                 <div className="text-[9px] text-slate-400 font-bold uppercase mt-1">Dibuat: {new Date(inv.created_at).toLocaleDateString()}</div>
+                              </td>
+                              <td className="px-8 py-6">
+                                 <div className="flex flex-col gap-2">
+                                    <div className="px-4 py-1.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded-lg inline-flex items-center gap-2 border border-slate-200 w-fit">
+                                       <ShieldCheck size={12} className="text-slate-400" /> {inv.roles?.name || 'Staff Umum'}
+                                    </div>
+                                    <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5 ml-1">
+                                       <Clock size={10} /> Expired: {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : '∞ Unlimited'}
+                                    </div>
+                                 </div>
+                              </td>
+                              <td className="px-8 py-6 text-center">
+                                 <code className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl font-black text-sm border-2 border-blue-100 border-dashed">{inv.invitation_code}</code>
+                              </td>
+                              <td className="px-8 py-6">
+                                 <div className="flex items-center justify-end gap-3 translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all">
+                                    <button 
+                                      type="button" 
+                                      onClick={() => {
+                                         const url = `${baseUrl}/join/${inv.invitation_code}`;
+                                         navigator.clipboard.writeText(url);
+                                         showToast('Link pendaftaran berhasil disalin!', 'success');
+                                      }}
+                                      className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                                    >
+                                       <LinkIcon size={16} />
+                                    </button>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => handleDeleteInvite(inv.id)}
+                                      className="p-3 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+                                    >
+                                       <Trash2 size={16} />
+                                    </button>
+                                 </div>
+                              </td>
+                           </tr>
+                        ))}
+                     </tbody>
+                  </table>
+               </div>
+            </SectionCard>
           </motion.div>
-        )}
+         )}
       </AnimatePresence>
+
+      {/* ACTIVATION MODAL */}
+        <AnimatePresence>
+          {isInviteModalOpen && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                <motion.div key="invite-modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsInviteModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+                <motion.div key="invite-modal-content" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
+                    <div className="p-10 space-y-8">
+                      <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-[24px] flex items-center justify-center shadow-inner">
+                            <LinkIcon size={28} />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-black text-slate-900 leading-none">BUAT LINK AKTIVASI</h3>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Token-based invitation system</p>
+                          </div>
+                      </div>
+
+                      <form onSubmit={handleCreateInvite} className="space-y-6">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Label / Nama Link</label>
+                            <input name="label" required placeholder="Cth: Rekrutmen Staff Gudang" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Role Otomatis</label>
+                                <select name="role_id" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all">
+                                  <option value="">-- Staff Umum --</option>
+                                  {rolesList.map((r: any) => (
+                                      <option key={r.id} value={r.id}>{r.name.toUpperCase()}</option>
+                                  ))}
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Masa Berlaku</label>
+                                <select name="duration" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all">
+                                  <option value="0">∞ Selamanya</option>
+                                  <option value="1">1 Hari</option>
+                                  <option value="7">7 Hari</option>
+                                  <option value="30">30 Hari</option>
+                                </select>
+                            </div>
+                          </div>
+                          
+                          <div className="flex gap-4 pt-4 border-t border-slate-100">
+                            <button type="button" onClick={() => setIsInviteModalOpen(false)} className="flex-1 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 rounded-2xl transition-all">Batal</button>
+                            <button type="submit" disabled={loading} className="flex-1 py-4 bg-blue-600 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50">
+                                {loading ? "Menyimpan..." : "Buat Link"}
+                            </button>
+                          </div>
+                      </form>
+                    </div>
+                </motion.div>
+              </div>
+          )}
+        </AnimatePresence>
+        {/* POSITION MODAL */}
+        <AnimatePresence>
+          {isPositionModalOpen && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsPositionModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
+                    <div className="p-10 space-y-8">
+                      <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-[24px] flex items-center justify-center shadow-inner">
+                            <Briefcase size={28} />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-black text-slate-900 leading-none">{editingPosition ? 'EDIT POSISI' : 'BUAT POSISI BARU'}</h3>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Struktur Organisasi NIZAM</p>
+                          </div>
+                      </div>
+
+                      <form onSubmit={handleSavePosition} className="space-y-6">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Jabatan</label>
+                            <input name="name" defaultValue={editingPosition?.name} required placeholder="Cth: Kepala Mekanik / Sales" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 transition-all" />
+                          </div>
+                          
+                          <div className="flex gap-4 pt-4 border-t border-slate-100">
+                            <button type="button" onClick={() => setIsPositionModalOpen(false)} className="flex-1 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 rounded-2xl transition-all">Batal</button>
+                            <button type="submit" disabled={loading} className="flex-1 py-4 bg-indigo-600 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50">
+                                {loading ? "Menyimpan..." : "Simpan Posisi"}
+                            </button>
+                          </div>
+                      </form>
+                    </div>
+                </motion.div>
+              </div>
+          )}
+        </AnimatePresence>
 
       {/* Add Payroll Component Modal */}
       <AnimatePresence>
         {isPayrollModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsPayrollModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-xl bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
-              <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
+              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center shadow-inner">
                     <Banknote size={24} />
@@ -658,12 +1052,12 @@ export default function HrisClient({
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Configuration & GL Mapping</p>
                   </div>
                 </div>
-                <button onClick={() => setIsPayrollModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
+                <button type="button" onClick={() => setIsPayrollModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
                   <X size={18} />
                 </button>
               </div>
 
-              <div className="p-10">
+              <div className="p-8">
                 <form id="payroll-form" onSubmit={handleCreatePayrollComponent} className="space-y-8">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Component Template</label>
@@ -754,7 +1148,7 @@ export default function HrisClient({
                 </form>
               </div>
 
-              <div className="px-10 py-8 border-t border-slate-50 bg-slate-50/30 flex justify-end gap-4">
+              <div className="px-8 py-6 border-t border-slate-50 bg-slate-50/30 flex justify-end gap-4">
                 <button type="button" onClick={() => setIsPayrollModalOpen(false)} className="px-8 py-3 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-widest">CANCEL</button>
                 <SafeButton
                   form="payroll-form"
@@ -795,7 +1189,7 @@ export default function HrisClient({
                 e.preventDefault()
                 setLoading(true)
                 const res = await generatePayrollRun(orgId, new FormData(e.currentTarget))
-                if (res.error) alert(res.error)
+                if (res.error) showToast(res.error, 'error')
                 else window.location.reload()
               }} className="p-10 space-y-8">
                 <div className="grid grid-cols-2 gap-6">
@@ -832,8 +1226,69 @@ export default function HrisClient({
       </AnimatePresence>
 
       <AnimatePresence>
+        {resetModalEmp && (
+          <div key="reset-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setResetModalEmp(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-sm bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
+              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center shadow-inner">
+                    <Key size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-[16px] font-black text-slate-900 tracking-tight uppercase italic">{resetModalEmp.first_name}</h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Force Reset Password</p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setResetModalEmp(null)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">New Password</label>
+                  <input 
+                    type="text" 
+                    value={resetModalPwd}
+                    onChange={(e) => setResetModalPwd(e.target.value)}
+                    className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-amber-500 transition-all" 
+                  />
+                  <p className="text-[10px] text-amber-600 font-bold px-1 py-1 italic">
+                    Karyawan harus mengganti password ini setelah berhasil login.
+                  </p>
+                </div>
+                
+                <div className="space-y-3 pt-2">
+                  <SafeButton
+                    onClick={() => submitPasswordReset(true)}
+                    variant="primary"
+                    size="xl"
+                    isLoading={resettingId === resetModalEmp.id}
+                    icon={<MessageCircle size={20} />}
+                    className="w-full rounded-[20px] bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200"
+                  >
+                    RESET & KIRIM WHATSAPP
+                  </SafeButton>
+                  
+                  <button
+                    type="button"
+                    onClick={() => submitPasswordReset(false)}
+                    disabled={resettingId === resetModalEmp.id}
+                    className="w-full py-4 rounded-[20px] bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 font-bold tracking-widest uppercase text-[11px] flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  >
+                    RESET SAJA (TANPA WA)
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {isPayModalOpen && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div key="pay-modal" className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsPayModalOpen(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
             <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
               <div className="p-10 text-center space-y-8">
@@ -862,10 +1317,10 @@ export default function HrisClient({
                   <SafeButton
                     onClick={async () => {
                       const accId = (document.getElementById('pay-account') as HTMLSelectElement).value
-                      if (!accId) return alert('Please select a source account.')
+                      if (!accId) return showToast('Please select a source account.', 'error')
                       setLoading(true)
                       const res = await payPayrollRun(isPayModalOpen.id, orgId, accId)
-                      if (res.error) alert(res.error)
+                      if (res.error) showToast(res.error, 'error')
                       else window.location.reload()
                     }}
                     isLoading={loading}
@@ -886,7 +1341,7 @@ export default function HrisClient({
 
       <AnimatePresence>
         {isAddModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div key="add-emp-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAddModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -915,6 +1370,30 @@ export default function HrisClient({
                       <div className="h-4 w-1 bg-blue-600 rounded-full" />
                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Personal Identity</h4>
                     </div>
+
+                    {/* Avatar upload */}
+                    <div className="flex items-center gap-6">
+                      <button type="button" onClick={() => avatarInputRef.current?.click()} className="relative group shrink-0">
+                        <div className="w-20 h-20 rounded-[24px] overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                          {avatarPreview ? (
+                            <img src={avatarPreview} className="w-full h-full object-cover" alt="avatar" />
+                          ) : (
+                            <span className="text-2xl font-black text-white">{(editingEmp?.first_name || 'K')[0]}</span>
+                          )}
+                        </div>
+                        <div className="absolute inset-0 bg-black/40 rounded-[24px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                          <Users size={20} className="text-white" />
+                        </div>
+                      </button>
+                      <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                      <div>
+                        <p className="text-sm font-black text-slate-700">Foto Karyawan</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Klik untuk upload gambar (JPG, PNG)</p>
+                        {avatarPreview && (
+                          <button type="button" onClick={() => { setAvatarFile(null); setAvatarPreview(null) }} className="text-[10px] text-rose-500 font-bold mt-1 hover:underline">Hapus Foto</button>
+                        )}
+                      </div>
+                    </div>
                     <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">NIK / ID</label>
@@ -936,6 +1415,10 @@ export default function HrisClient({
                         <option value="M">MALE</option>
                         <option value="F">FEMALE</option>
                       </select>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-6 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-sm">📱</span>
+                      <input name="whatsapp" type="tel" placeholder="Nomor WhatsApp (cth: 628123456789)" defaultValue={editingEmp?.whatsapp || ''} className="w-full pl-12 pr-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-emerald-500 outline-none transition-all" />
                     </div>
                   </div>
 
@@ -1031,12 +1514,13 @@ export default function HrisClient({
         )}
       </AnimatePresence>
 
-      {/* Run Detail Modal (NEW) */}
+      {/* Run Detail Modal */}
       <AnimatePresence>
         {viewingRun && (
-          <div className="fixed inset-0 z-50 flex items-center justify-end p-0 md:p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setViewingRun(null)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+          <div key="run-detail-modal" className="fixed inset-0 z-50 flex items-center justify-end p-0 md:p-4">
+            <motion.div key="run-detail-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setViewingRun(null)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
             <motion.div
+              key="run-detail-content"
               initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
               className="relative w-full max-w-2xl h-full md:h-auto md:max-h-[90vh] bg-white md:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
             >
@@ -1197,6 +1681,29 @@ export default function HrisClient({
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className={`fixed bottom-8 right-8 z-[9000] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border ${
+              toast.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-800 shadow-emerald-200/50' :
+              toast.type === 'error' ? 'bg-rose-50 border-rose-100 text-rose-800 shadow-rose-200/50' :
+              'bg-blue-50 border-blue-100 text-blue-800 shadow-blue-200/50'
+            }`}
+          >
+            {toast.type === 'success' && <CheckCircle size={24} className="text-emerald-500 shrink-0" />}
+            {toast.type === 'error' && <AlertCircle size={24} className="text-rose-500 shrink-0" />}
+            {toast.type === 'info' && <AlertCircle size={24} className="text-blue-500 shrink-0" />}
+            <p className="text-sm font-bold tracking-tight leading-tight max-w-sm">{toast.message}</p>
+            <button onClick={() => setToast(null)} className="ml-2 pl-4 border-l border-current opacity-60 hover:opacity-100 transition-opacity">
+              <X size={16} />
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

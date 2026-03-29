@@ -1,4 +1,4 @@
-import { type NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 /**
@@ -7,15 +7,8 @@ import { updateSession } from '@/lib/supabase/middleware'
  * 1. Refreshing Supabase session (JWT refresh)
  * 2. RBAC / Protected Routes redirects
  */
-export async function middleware(request: NextRequest) {
-  // 1. Let Supabase handle session/auth
-  const response = await updateSession(request)
-
-  // 2. Inject current pathname into headers so Layout can read it
-  // This allows the RBAC Path Guard to work.
-  const url = new URL(request.url)
-  response.headers.set('x-pathname', url.pathname)
-  
+export async function proxy(request: NextRequest) {
+  const response = NextResponse.next({ request })
   return response
 }
 

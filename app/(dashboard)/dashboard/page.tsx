@@ -12,7 +12,7 @@ import {
 import { DashboardClient } from './DashboardClient'
 import { getDashboardAnalytics } from '@/modules/accounting/actions/analytics.actions'
 
-export const revalidate = 0 // FORCE REAL-TIME SYNC
+export const revalidate = 3600 // CACHE FOR 1 HOUR TO TEST LOOP
 
 export default async function DashboardPage() {
   const orgData = await getActiveOrg()

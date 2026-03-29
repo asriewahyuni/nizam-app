@@ -12,7 +12,7 @@ export async function processBankCSV(orgId: string, bankAccountId: string, csvCo
   const supabase = await createClient()
 
   // Simple CSV parser (assuming comma-separated, skip header)
-  const lines = csvContent.split('\n').filter(line => line.trim() !== '')
+  const lines = csvContent.split('\n').filter((line: any) => line.trim() !== '')
   const mutations = []
 
   // Skip header if it exists (check if first line has 'date' or non-numeric first col)
@@ -42,7 +42,7 @@ export async function processBankCSV(orgId: string, bankAccountId: string, csvCo
 
   if (mutations.length === 0) return { error: 'Format CSV tidak valid atau kosong.' }
 
-  const { error } = await supabase.from('bank_mutations').insert(mutations)
+  const { error } = await (supabase as any).from('bank_mutations').insert(mutations)
   if (error) return { error: 'Gagal mengunggah mutasi: ' + error.message }
 
   revalidatePath('/cash')
@@ -55,7 +55,7 @@ export async function processBankCSV(orgId: string, bankAccountId: string, csvCo
 export async function getUnmatchedMutations(orgId: string, bankAccountId?: string) {
   const supabase = await createClient()
 
-  let query = supabase.from('bank_mutations').select('*').eq('org_id', orgId).eq('is_matched', false)
+  let query = (supabase as any).from('bank_mutations').select('*').eq('org_id', orgId).eq('is_matched', false)
   if (bankAccountId) query = query.eq('bank_account_id', bankAccountId)
 
   const { data, error } = await query.order('mutation_date', { ascending: false })

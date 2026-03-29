@@ -46,7 +46,7 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
     })
 
     if (signUpErr || !signUpData.user) {
-      console.error('Demo signup failed:', signUpErr)
+      (console as any).error('Demo signup failed:', signUpErr)
       redirect('/login?error=' + encodeURIComponent('Gagal membuat akun demo. Coba lagi.'))
     }
     userId = signUpData.user.id
@@ -110,7 +110,7 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
     })
 
   if (orgErr) {
-    console.error('Demo org creation failed:', orgErr)
+    (console as any).error('Demo org creation failed:', orgErr)
     redirect('/login?error=' + encodeURIComponent('Gagal membuat organisasi demo.'))
   }
 
@@ -123,7 +123,7 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
   })
 
   if (memberErr) {
-    console.error('Demo member creation failed:', memberErr)
+    (console as any).error('Demo member creation failed:', memberErr)
     redirect('/login?error=' + encodeURIComponent('Gagal mendaftarkan anggota demo.'))
   }
 
@@ -167,7 +167,7 @@ export async function signOutDemo() {
     if (demoOrgId) {
       // Delete specifically THE session org (cascade delete removes all related data)
       const { error: delErr } = await authedClient.from('organizations').delete().eq('id', demoOrgId)
-      if (delErr) console.error('SignOutDemo: Failed to delete org:', delErr)
+      if (delErr) (console as any).error('SignOutDemo: Failed to delete org:', delErr)
     }
 
     // Also clean up ANY remaining demo orgs for this user (belt + suspenders)
@@ -179,7 +179,7 @@ export async function signOutDemo() {
     if (remainingMemberships) {
       for (const m of remainingMemberships as any[]) {
         const { error: delErr } = await authedClient.from('organizations').delete().eq('id', m.org_id)
-        if (delErr) console.error('SignOutDemo: Cleanup delete failed for org', m.org_id, delErr)
+        if (delErr) (console as any).error('SignOutDemo: Cleanup delete failed for org', m.org_id, delErr)
       }
     }
   }
@@ -206,7 +206,7 @@ export async function isDemoSession(): Promise<boolean> {
 // ═══════════════════════════════════════════════════════════
 // SEED DEMO DATA — Products, Warehouses, Contacts, etc.
 // ═══════════════════════════════════════════════════════════
-async function seedDemoData(supabase: any, orgId: string, demoType: DemoBusinessType) {
+export async function seedDemoData(supabase: any, orgId: string, demoType: DemoBusinessType) {
   // 🔴 AUTHENTIC BLANK DEMO: No products, no warehouses, no contacts.
   if (demoType === 'BLANK') return 
 
@@ -308,7 +308,7 @@ async function seedDemoData(supabase: any, orgId: string, demoType: DemoBusiness
   const bankAccId = accounts?.find((a: any) => a.code === '1201')?.id
 
   // --- MAP PRODUCTS WITH ACCOUNTS & INSERT ---
-  const finalProducts = productsData.map(p => ({
+  const finalProducts = productsData.map((p: any) => ({
     ...p,
     asset_account_id: p.type === 'INVENTORY' ? invAccId : null,
     income_account_id: incomeAccId,
@@ -323,7 +323,7 @@ async function seedDemoData(supabase: any, orgId: string, demoType: DemoBusiness
   const wh1Id = warehousesData[0].id
   
   // --- INITIAL STOCK & JOURNAL ENTRY (Double Entry Accounting) ---
-  const stockItems = finalProducts.filter(p => p.type === 'INVENTORY').map(p => ({
+  const stockItems = finalProducts.filter((p: any) => p.type === 'INVENTORY').map((p: any) => ({
     org_id: orgId,
     product_id: p.id,
     warehouse_id: wh1Id,
@@ -335,8 +335,8 @@ async function seedDemoData(supabase: any, orgId: string, demoType: DemoBusiness
     await supabase.from('inventory_stocks').insert(stockItems)
 
     // 2. Journal Entry (Ledger) for Financial Visibility
-    const totalValue = stockItems.reduce((sum, s) => {
-      const p = finalProducts.find(prod => prod.id === s.product_id)
+    const totalValue = stockItems.reduce((sum: any, s: any) => {
+      const p = finalProducts.find((prod: any) => prod.id === s.product_id)
       return sum + (s.quantity * (p?.purchase_price || 0))
     }, 0)
 
@@ -359,12 +359,12 @@ async function seedDemoData(supabase: any, orgId: string, demoType: DemoBusiness
       await supabase.from('journal_entries').update({ status: 'POSTED' }).eq('id', entry.id)
 
       // 3. Stock Movements (Sub-Ledger) - Link to Journal Entry
-      const movements = stockItems.map(s => ({
+      const movements = stockItems.map((s: any) => ({
         org_id: orgId,
         product_id: s.product_id,
         movement_date: new Date().toISOString().split('T')[0],
         quantity: s.quantity,
-        unit_price: finalProducts.find(p => p.id === s.product_id)?.purchase_price || 0,
+        unit_price: finalProducts.find((p: any) => p.id === s.product_id)?.purchase_price || 0,
         reference_type: 'INITIAL',
         reference_id: entry.id,
         notes: 'Saldo awal demo (' + demoType + ')'

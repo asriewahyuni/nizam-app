@@ -1,6 +1,4 @@
-export const dynamic = 'force-dynamic'
-
-import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getActiveOrg, getInvitations } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
 import { getEmployees } from '@/modules/hris/actions/employee.actions'
 import { getPayrollComponents, getPayrollRuns } from '@/modules/hris/actions/payroll.actions'
@@ -8,18 +6,22 @@ import { getAccountBalances } from '@/modules/accounting/actions/coa.actions'
 import { createClient } from '@/lib/supabase/server'
 import HrisClient from './HrisClient'
 
-export default async function HrisPage() {
+export default async function HrisPage(props: { searchParams: Promise<{ tab?: string }> }) {
+  const searchParams = await props.searchParams
+  const defaultTab = (searchParams.tab || 'EMPLOYEES').toUpperCase()
+
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
 
   const supabase = await createClient()
   const { data: roles } = await supabase.from('roles').select('*').eq('org_id', orgData.org.id).order('name')
 
-  const [employees, payrollComponents, accounts, payrollRuns] = await Promise.all([
+  const [employees, payrollComponents, accounts, payrollRuns, invitations] = await Promise.all([
     getEmployees(orgData.org.id),
     getPayrollComponents(orgData.org.id),
     getAccountBalances(orgData.org.id),
-    getPayrollRuns(orgData.org.id)
+    getPayrollRuns(orgData.org.id),
+    getInvitations(orgData.org.id)
   ])
 
   return <HrisClient 
@@ -30,5 +32,7 @@ export default async function HrisPage() {
     accounts={accounts}
     settings={orgData.org.settings}
     roles={roles || []}
+    initialInvitations={invitations || []}
+    defaultTab={defaultTab as any}
   />
 }

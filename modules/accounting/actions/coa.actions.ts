@@ -10,7 +10,7 @@ import type { Account, AccountType, NormalBalance, AccountBalance } from '@/type
 export async function getChartOfAccounts(orgId: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('accounts')
     .select('*')
     .eq('org_id', orgId)
@@ -37,7 +37,7 @@ export async function createAccount(orgId: string, formData: FormData) {
     return { error: 'Kode, nama, tipe, dan saldo normal wajib diisi.' }
   }
 
-  const { error } = await supabase.from('accounts').insert({
+  const { error } = await (supabase as any).from('accounts').insert({
     org_id: orgId,
     code,
     name,
@@ -79,7 +79,7 @@ export async function updateAccount(
   const supabase = await createClient()
 
   // Prevent editing system accounts' critical fields
-  const { data: existing } = await supabase
+  const { data: existing } = await (supabase as any)
     .from('accounts')
     .select('is_system')
     .eq('id', accountId)
@@ -88,7 +88,7 @@ export async function updateAccount(
 
   if (!existing) return { error: 'Akun tidak ditemukan.' }
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('accounts')
     .update(updates)
     .eq('id', accountId)
@@ -106,7 +106,7 @@ export async function updateAccount(
 export async function deleteAccount(accountId: string, orgId: string) {
   const supabase = await createClient()
 
-  const { data: existing } = await supabase
+  const { data: existing } = await (supabase as any)
     .from('accounts')
     .select('is_system')
     .eq('id', accountId)
@@ -117,7 +117,7 @@ export async function deleteAccount(accountId: string, orgId: string) {
   if (existing.is_system) return { error: 'Akun sistem tidak dapat dihapus.' }
 
   // Check for existing journal lines
-  const { count } = await supabase
+  const { count } = await (supabase as any)
     .from('journal_lines')
     .select('*', { count: 'exact', head: true })
     .eq('account_id', accountId)
@@ -126,7 +126,7 @@ export async function deleteAccount(accountId: string, orgId: string) {
     return { error: 'Akun ini sudah memiliki transaksi. Nonaktifkan saja, jangan hapus.' }
   }
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('accounts')
     .delete()
     .eq('id', accountId)
@@ -144,7 +144,7 @@ export async function deleteAccount(accountId: string, orgId: string) {
 export async function getAccountBalances(orgId: string): Promise<AccountBalance[]> {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('account_balances')
     .select('*')
     .eq('org_id', orgId)
@@ -160,7 +160,7 @@ export async function seedInitialCoA(orgId: string) {
   const supabase = await createClient()
 
   // First check if already has accounts to prevent double seeding
-  const { data: existing } = await supabase
+  const { data: existing } = await (supabase as any)
     .from('accounts')
     .select('id')
     .eq('org_id', orgId)
@@ -171,10 +171,10 @@ export async function seedInitialCoA(orgId: string) {
   }
 
   // Use RPC if available, or just call the seed function
-  const { error } = await supabase.rpc('seed_default_coa', { p_org_id: orgId })
+  const { error } = await (supabase as any).rpc('seed_default_coa', { p_org_id: orgId })
 
   if (error) {
-    console.error('Seed CoA Error:', error)
+    (console as any).error('Seed CoA Error:', error)
     return { error: 'Gagal menyiapkan akun standar. Silakan hubungi dukungan.' }
   }
 
@@ -191,14 +191,14 @@ export async function setShariahAccountsActive(orgId: string, active: boolean) {
   // Common syariah codes from migration 1006
   const syariahCodes = ['2600', '2601', '3100', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('accounts')
     .update({ is_active: active })
     .eq('org_id', orgId)
     .filter('code', 'in', `(${syariahCodes.join(',')})`)
 
   if (error) {
-    console.error('Toggle Syariah Error:', error)
+    (console as any).error('Toggle Syariah Error:', error)
     return { error: 'Gagal mengubah status akun Syariah.' }
   }
 

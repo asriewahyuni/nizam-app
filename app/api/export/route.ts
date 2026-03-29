@@ -9,6 +9,7 @@ import {
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
+  const db = supabase as any
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
   if (!orgId) return NextResponse.json({ error: 'orgId diperlukan' }, { status: 400 })
 
   // Verify user has access to this org
-  const { data: member } = await supabase
+  const { data: member } = await db
     .from('org_members')
     .select('org_id')
     .eq('org_id', orgId)
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // Get org name for header
-  const { data: org } = await supabase.from('organizations').select('name').eq('id', orgId).single()
+  const { data: org } = await (supabase as any).from('organizations').select('name').eq('id', orgId).single()
   const orgName = org?.name || 'Organisasi'
 
   try {
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error: any) {
-    console.error('[Export] Error:', error.message)
+    (console as any).error('[Export] Error:', error.message)
     return NextResponse.json({ error: 'Gagal menghasilkan export: ' + error.message }, { status: 500 })
   }
 }

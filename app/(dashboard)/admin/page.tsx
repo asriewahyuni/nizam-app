@@ -24,21 +24,32 @@ import {
   Edit2,
   XCircle,
   Mail,
-  Database
+  Database,
+  Zap,
+  ExternalLink
 } from 'lucide-react'
 import { PageHeader, SectionCard, SectionHeader, SafeButton, StatusBadge, ConfirmDialog } from '@/components/ui/NizamUI'
 import { createClient } from '@/lib/supabase/client'
 import { Organization } from '@/types/database.types'
+import Link from 'next/link'
 
 const supabase = createClient()
 
-const AVAILABLE_MODULES = [
-  'Accounting', 'Finance', 'Inventory', 'Purchasing', 
-  'Sales', 'Marketing', 'POS', 'HRIS', 'Manufacturing', 
-  'Fleet', 'Audit', 'Job Order', 'CRM', 'Warehouse', 'Consolidation'
+const CORE_MODULES = [
+  'Dashboard', 'Audit Integritas',
+  'Akun (CoA)', 'Kas & Bank', 'Buku Besar', 'Aging (AR/AP)', 'Manajemen Zakat', 'Manajemen Pajak', 'Reimbursement', 'Penutupan Buku', 'Aset Tetap', 'Anggaran',
+  'Pembelian', 'Inventori', 'Gudang (WMS)', 'Manufaktur (BoM)', 
+  'Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward',
+  'Karyawan (HRIS)', 'Akses & Jabatan',
+  'Laporan', 'Strategi (BSC)', 'Proyeksi Kas',
+  'Audit Trail', 'Cabang & Divisi', 'Pengaturan Bisnis'
 ]
 
-type Tab = 'users' | 'packages' | 'invoices'
+const ADDON_MODULES = [
+  'Fleet & Rental', 'Job Order (Jasa)'
+]
+
+type Tab = 'users' | 'packages' | 'invoices' | 'settings'
 
 export default function SaaSAdminPage() {
   const db = supabase as any
@@ -47,6 +58,45 @@ export default function SaaSAdminPage() {
   const [searchTxt, setSearchTxt] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'demo' | 'official'>('all')
   const [packageFilter, setPackageFilter] = useState<string>('all')
+  const [saasSettings, setSaasSettings] = useState<any>({ bank_info: {}, support_info: {} })
+
+  useEffect(() => {
+    async function fetchConfig() {
+      const { data } = await db.from('saas_config').select('*')
+      if (data) {
+        const config: any = {}
+        data.forEach((item: any) => config[item.key] = item.value)
+        setSaasSettings(config)
+      }
+    }
+    fetchConfig()
+  }, [])
+
+  const saveSettings = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget as HTMLFormElement)
+    const bank = { 
+      bank: fd.get('bank_name'), 
+      account: fd.get('bank_acc'), 
+      name: fd.get('bank_user') 
+    }
+    const support = { 
+      wa: fd.get('wa_num'), 
+      label: fd.get('wa_label') 
+    }
+    
+    const { error } = await db.from('saas_config').upsert([
+      { key: 'bank_info', value: bank }, 
+      { key: 'support_info', value: support }
+    ])
+    
+    if (!error) {
+      alert('✅ Pengaturan Global Berhasil Disimpan!')
+      setSaasSettings({ bank_info: bank, support_info: support })
+    } else {
+      alert('❌ Gagal: ' + error.message)
+    }
+  }
   
   const [packages, setPackages] = useState<any[]>([])
   const [loadingPackages, setLoadingPackages] = useState(true)
@@ -59,10 +109,13 @@ export default function SaaSAdminPage() {
   const [pkgModal, setPkgModal] = useState<{ open: boolean; editData: any | null }>({ open: false, editData: null })
   const [orgModal, setOrgModal] = useState<{ open: boolean; editData: any | null }>({ open: false, editData: null })
   
-  // ======== CONFIRM DIALOG STATE ========
   const [confirmState, setConfirmState] = useState<{ open: boolean, title: string, message: string, action: () => Promise<void> }>({
     open: false, title: '', message: '', action: async () => {}
   })
+
+  // State local untuk helper set date di modal org
+  const [modalExpireDate, setModalExpireDate] = useState('')
+  
 
   const fetchOrganizations = async () => {
     try {
@@ -83,8 +136,6 @@ export default function SaaSAdminPage() {
       const { data, error } = await db.from('saas_packages').select('*').order('price', { ascending: true })
       
       if (error) throw error
-
-      console.log("RAW PACKAGES FROM DATABASE:", data) // 🕵️ LIHAT APAKAH ADA COLUMN duration_days?
 
       const formatted = (data || []).map((p: any) => ({
         ...p,
@@ -110,29 +161,69 @@ export default function SaaSAdminPage() {
 
   const approveInvoice = async (invoice: any) => {
     const pkg = invoice.package
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + (pkg.duration_days || 30))
-
+    const isAddon = !invoice.package_id
+    
     // 1. Update status invoice jadi PAID
     const { error: invErr } = await db.from('saas_invoices').update({ status: 'PAID' }).eq('id', invoice.id)
     if (invErr) return alert('Gagal update invoice: ' + invErr.message)
 
-    // 2. Update organisasi: Plan, Modul, dan Limitasi!
-    const { error: orgErr } = await db.from('organizations').update({
-      settings: {
-        plan: pkg.name,
-        expires_at: expiresAt.toISOString()
-      },
-      package_limit: {
-        max_orgs: pkg.max_orgs || 1,
-        max_warehouses: pkg.max_warehouses || 1
+    if (isAddon) {
+      // HANDLE ADDON ACTIVATION
+      const { data: org } = await db.from('organizations').select('active_addons').eq('id', invoice.org_id).single()
+      const currentAddons = Array.isArray(org?.active_addons) ? org.active_addons : []
+      const newAddon = {
+        id: invoice.id, // linked to invoice
+        name: invoice.item_name,
+        activated_at: new Date().toISOString()
       }
-    }).eq('id', invoice.org_id)
+      
+      const { error: addonErr } = await db.from('organizations').update({
+        active_addons: [...currentAddons, newAddon]
+      }).eq('id', invoice.org_id)
+      
+      if (addonErr) return alert('Gagal aktivasi add-on: ' + addonErr.message)
+    } else {
+      // HANDLE PLAN UPGRADE
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + (pkg?.duration_days || 30))
 
-    if (orgErr) return alert('Gagal update organisasi: ' + orgErr.message)
+      const { error: orgErr } = await db.from('organizations').update({
+        settings: {
+          plan: pkg?.name || 'Pro',
+          expires_at: expiresAt.toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        package_limit: {
+          max_orgs: pkg?.max_orgs || 1,
+          max_warehouses: pkg?.max_warehouses || 1
+        }
+      }).eq('id', invoice.org_id)
 
-    alert('✅ Pembayaran Berhasil Dikonfirmasi & Paket Aktif!')
+      if (orgErr) return alert('Gagal update plan organisasi: ' + orgErr.message)
+    }
+
+    alert('✅ Pembayaran Berhasil Dikonfirmasi & Item Aktif!')
     fetchInvoices()
+  }
+
+  const cancelInvoice = async (id: string) => {
+    const { error } = await db.from('saas_invoices').update({ status: 'CANCELLED' }).eq('id', id)
+    if (error) alert('Gagal membatalkan: ' + error.message)
+    else fetchInvoices()
+  }
+
+  const deleteInvoice = async (id: string) => {
+    setConfirmState({
+      open: true,
+      title: "Hapus Tagihan?",
+      message: "Data tagihan akan dihapus permanen dari sistem (Soft-delete not applied). Lanjutkan?",
+      action: async () => {
+        const { error } = await db.from('saas_invoices').delete().eq('id', id)
+        if (error) alert(error.message)
+        else fetchInvoices()
+        setConfirmState(prev => ({ ...prev, open: false }))
+      }
+    })
   }
 
   useEffect(() => {
@@ -141,7 +232,6 @@ export default function SaaSAdminPage() {
     fetchInvoices()
   }, [])
 
-  // ==================== CRUD PACKAGES ====================
   const togglePackageStatus = async (pkgId: string, currentStatus: boolean) => {
     setPackages(packages.map(p => p.id === pkgId ? { ...p, active: !p.active } : p))
     try {
@@ -170,128 +260,99 @@ export default function SaaSAdminPage() {
     try {
       const fd = new FormData(e.currentTarget)
       const modules = fd.getAll('modules') as string[]
-      const addonsRaw = fd.get('addons') as string | null
       const payload = {
         name: fd.get('name') as string,
         price: Number(fd.get('price')),
         billing: fd.get('billing') as string,
         is_active: true,
         modules: modules,
-        addons: addonsRaw ? addonsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
         duration_days: Number(fd.get('duration_days') || 30),
         max_orgs: Number(fd.get('max_orgs') || 1),
         max_warehouses: Number(fd.get('max_warehouses') || 1)
       }
 
       const { error } = pkgModal.editData?.id
-        ? await db.from('saas_packages').update(payload).eq('id', pkgModal.editData.id)
-        : await db.from('saas_packages').upsert([payload], { onConflict: 'name' })
+        ? await (db.from('saas_packages').update(payload).eq('id', pkgModal.editData.id) as any)
+        : await (db.from('saas_packages').upsert([payload], { onConflict: 'name' }) as any)
 
       if (error) throw error
-
+      alert('✅ Paket Berhasil Disimpan!')
       setPkgModal({ open: false, editData: null })
-      await fetchPackages()
+      fetchPackages()
     } catch (err: any) {
-      console.error('SavePackage Failed:', err)
-      // Tampilkan error lebih detail agar kita tahu biangnya
-      const errMsg = err.message || JSON.stringify(err)
-      alert('❌ Gagal menyimpan paket: ' + errMsg)
+      alert('❌ Gagal: ' + err.message)
     }
-  }
-
-
-  // ==================== CRUD ORGANIZATIONS ====================
-  const handleDeleteOrg = (id: string, name: string) => {
-    setConfirmState({
-      open: true,
-      title: "Hapus Organisasi?",
-      message: `Tindakan ini akan menghapus permanen data "${name}" beserta seluruh isinya secara aman dan tuntas. Anda yakin?`,
-      action: async () => {
-        const { error } = await db.rpc('delete_org_cascade', { target_org_id: id })
-        if (error) {
-           alert("Gagal menghapus organisasi sakti:\n\n" + error.message)
-        }
-        await fetchOrganizations()
-        setConfirmState(prev => ({ ...prev, open: false }))
-      }
-    })
-  }
-
-  const bulkDeleteDemos = () => {
-    setConfirmState({
-      open: true,
-      title: "Hapus Semua Akun Demo?",
-      message: "Ini akan menghapus seluruh organisasi yang ditandai sebagai Akun Demo/Latihan secara aman.",
-      action: async () => {
-        const demos = orgs.filter(o => (o as any).is_demo)
-        for(const d of demos) {
-          await db.rpc('delete_org_cascade', { target_org_id: d.id })
-        }
-        await fetchOrganizations()
-        setConfirmState(prev => ({ ...prev, open: false }))
-      }
-    })
   }
 
   const saveOrgForm = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const fd = new FormData(e.currentTarget)
-    const payload = {
-      name: fd.get('name') as string,
-      settings: { 
-        plan: fd.get('plan') as string,
-        subscription_start: new Date().toISOString()
-      },
-      is_active: fd.get('is_active') === 'on',
-      is_demo: fd.get('is_demo') === 'on'
-    }
+    try {
+      const fd = new FormData(e.currentTarget)
+      const expiresVal = fd.get('expires_at') as string
+      
+      const payload = {
+         name: fd.get('name'),
+         is_active: fd.get('is_active') === 'on',
+         is_demo: fd.get('is_demo') === 'on',
+         owner_email: fd.get('owner_email'),
+         settings: {
+            ...orgModal.editData?.settings,
+            plan: fd.get('plan'),
+            expires_at: expiresVal ? new Date(expiresVal).toISOString() : (orgModal.editData?.settings?.expires_at || null)
+         }
+      }
 
-    if (orgModal.editData?.id) {
-      await db.from('organizations').update(payload).eq('id', orgModal.editData.id)
-    } else {
-      const slug = payload.name.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.random().toString(36).substring(7)
-      await db.from('organizations').insert([{ ...payload, slug }])
+      if (orgModal.editData?.id) {
+         await db.from('organizations').update(payload).eq('id', orgModal.editData.id)
+      } else {
+         const slug = (fd.get('name') as string).toLowerCase().replace(/ /g, '-') + '-' + Math.random().toString(36).substring(2,5)
+         await db.from('organizations').insert([{ ...payload, slug }])
+      }
+
+      setOrgModal({ open: false, editData: null })
+      setModalExpireDate('') // Reset local state
+      fetchOrganizations()
+    } catch (err: any) {
+       alert(err.message)
     }
-    setOrgModal({ open: false, editData: null })
-    fetchOrganizations()
+  }
+
+  const handleDeleteOrg = (id: string, name: string) => {
+     setConfirmState({
+        open: true,
+        title: "Hapus Tenant?",
+        message: `PERINGATAN: Menghapus organisasi "${name}" akan menghapus seluruh data yang terkait di dalamnya. Lanjutkan?`,
+        action: async () => {
+           const { error } = await db.from('organizations').delete().eq('id', id)
+           if (error) alert(error.message)
+           else fetchOrganizations()
+           setConfirmState(prev => ({ ...prev, open: false }))
+        }
+     })
   }
 
   const filteredOrgs = orgs.filter(o => {
-    const matchesSearch = o.name.toLowerCase().includes(searchTxt.toLowerCase())
-    const matchesType = typeFilter === 'all' || 
-                       (typeFilter === 'demo' && (o as any).is_demo) || 
-                       (typeFilter === 'official' && !(o as any).is_demo)
-    const matchesPkg = packageFilter === 'all' || (o.settings as any)?.plan === packageFilter
-    return matchesSearch && matchesType && matchesPkg
+     const matchesSearch = o.name.toLowerCase().includes(searchTxt.toLowerCase()) || (o as any).owner_email?.toLowerCase().includes(searchTxt.toLowerCase())
+     const matchesType = typeFilter === 'all' ? true : (typeFilter === 'demo' ? (o as any).is_demo : !(o as any).is_demo)
+     const matchesPkg = packageFilter === 'all' ? true : (o.settings as any)?.plan === packageFilter
+     return matchesSearch && matchesType && matchesPkg
   })
 
   return (
-    <div className="p-8 max-w-[1400px] mx-auto space-y-8 min-h-screen bg-[#F8F9FA]/30 pb-32">
-      <PageHeader 
-        title="Admin Control Center" 
-        subtitle="SaaS Management & Tenant Registry"
-        icon={<ShieldCheck className="text-blue-600" size={32} />}
-      />
-
-      <div className="flex gap-2 p-1.5 bg-slate-100/80 backdrop-blur-sm rounded-2xl w-fit border border-slate-200 shadow-sm">
-        <button 
-          onClick={() => setActiveTab('users')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'users' ? 'bg-white text-blue-600 shadow-md scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          <Users size={18} /> Tenant Manager
-        </button>
-        <button 
-          onClick={() => setActiveTab('invoices')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'invoices' ? 'bg-white text-blue-600 shadow-md scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          <ReceiptText size={18} /> Tagihan SaaS
-        </button>
-        <button 
-          onClick={() => setActiveTab('packages')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'packages' ? 'bg-white text-blue-600 shadow-md scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          <Package size={18} /> SaaS Packages
-        </button>
+    <div className="p-8 pb-32 max-w-[1600px] mx-auto space-y-12">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+         <div>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tighter flex items-center gap-4 italic uppercase">
+               <ShieldCheck size={48} className="text-blue-600" /> Control Center
+            </h1>
+            <p className="text-slate-400 font-bold text-sm tracking-widest mt-1 uppercase">NIZAM SaaS Platform Administration</p>
+         </div>
+         <div className="flex gap-4">
+            <button onClick={() => setActiveTab('users')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Tenants</button>
+            <button onClick={() => setActiveTab('packages')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'packages' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>SaaS Plans</button>
+            <button onClick={() => setActiveTab('invoices')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'invoices' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Billing</button>
+            <button onClick={() => setActiveTab('settings')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Settings</button>
+         </div>
       </div>
 
       <AnimatePresence mode="wait">
@@ -302,6 +363,56 @@ export default function SaaSAdminPage() {
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
         >
+          {activeTab === 'settings' && (
+            <div className="max-w-4xl space-y-8">
+               <SectionHeader title="SaaS Platform Settings" subtitle="Konfigurasi rekening bank & bantuan WA secara global." />
+               <form onSubmit={saveSettings} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <SectionCard>
+                    <div className="p-6 space-y-4">
+                       <h4 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-indigo-600 border-b pb-3 mb-4">
+                          <Building2 size={18} /> Bank Info (Main Account)
+                       </h4>
+                       <div className="space-y-4">
+                          <div>
+                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Nama Bank</label>
+                             <input name="bank_name" defaultValue={saasSettings.bank_info?.bank} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold" />
+                          </div>
+                          <div>
+                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Nomor Rekening</label>
+                             <input name="bank_acc" defaultValue={saasSettings.bank_info?.account} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-mono text-lg font-black tracking-widest" />
+                          </div>
+                          <div>
+                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Atas Nama (Pemilik)</label>
+                             <input name="bank_user" defaultValue={saasSettings.bank_info?.name} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold" />
+                          </div>
+                       </div>
+                    </div>
+                  </SectionCard>
+
+                  <SectionCard>
+                    <div className="p-6 space-y-4">
+                       <h4 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-emerald-600 border-b pb-3 mb-4">
+                          <Mail size={18} /> Support Contacts
+                       </h4>
+                       <div className="space-y-4">
+                          <div>
+                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">WhatsApp (62xxx)</label>
+                             <input name="wa_num" defaultValue={saasSettings.support_info?.wa} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold" />
+                          </div>
+                          <div>
+                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Label / Nama CS</label>
+                             <input name="wa_label" defaultValue={saasSettings.support_info?.label} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold" />
+                          </div>
+                          <div className="pt-6">
+                            <SafeButton type="submit" variant="primary" size="lg" className="w-full">Simpan Pengaturan</SafeButton>
+                          </div>
+                       </div>
+                    </div>
+                  </SectionCard>
+               </form>
+            </div>
+          )}
+
           {activeTab === 'users' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
@@ -310,7 +421,7 @@ export default function SaaSAdminPage() {
                   <input 
                     value={searchTxt}
                     onChange={(e) => setSearchTxt(e.target.value)}
-                    placeholder="Cari tenant / organisasi..." 
+                    placeholder="Cari tenant / email pemilik..." 
                     className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-slate-700"
                   />
                 </div>
@@ -341,7 +452,6 @@ export default function SaaSAdminPage() {
 
               <div className="flex flex-wrap gap-3">
                  <SafeButton variant="primary" onClick={() => setOrgModal({ open: true, editData: null })} icon={<Plus size={18} />}>Registrasi Tenant Baru</SafeButton>
-                 <SafeButton variant="ghost" onClick={bulkDeleteDemos} icon={<Trash2 size={18} />}>Bersihkan Akun Demo</SafeButton>
                  <button onClick={fetchOrganizations} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors shadow-sm"><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></button>
               </div>
 
@@ -350,9 +460,10 @@ export default function SaaSAdminPage() {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="border-b border-slate-100">
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Organisasi</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Organisasi / Pemilik</th>
                         <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Tipe</th>
                         <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Paket / Plan</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Masa Berlaku</th>
                         <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Status</th>
                         <th className="text-right py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Aksi</th>
                       </tr>
@@ -363,7 +474,9 @@ export default function SaaSAdminPage() {
                           <td className="py-4 px-6">
                             <div>
                                <p className="font-bold text-slate-900">{org.name}</p>
-                               <p className="text-[10px] text-slate-400 font-mono">{org.id.slice(0,8)}...</p>
+                               <p className="text-[10px] text-blue-600 font-black flex items-center gap-1.5 mt-0.5">
+                                  <Mail size={12} /> {(org as any).owner_email || 'No Email'}
+                               </p>
                             </div>
                           </td>
                           <td className="py-4 px-6">
@@ -374,6 +487,24 @@ export default function SaaSAdminPage() {
                           </td>
                           <td className="py-4 px-6">
                             <span className="text-sm font-bold text-slate-700">{(org.settings as any)?.plan || 'Basic'}</span>
+                          </td>
+                          <td className="py-4 px-6">
+                            {(org.settings as any)?.expires_at ? (
+                              <div className="flex flex-col gap-0.5">
+                                <p className={`text-xs font-black tabular-nums ${
+                                  new Date((org.settings as any).expires_at).getTime() < new Date().getTime() 
+                                    ? 'text-rose-600' 
+                                    : (new Date((org.settings as any).expires_at).getTime() - new Date().getTime() < 7 * 24 * 60 * 60 * 1000 ? 'text-orange-500' : 'text-slate-900')
+                                }`}>
+                                  {Math.ceil((new Date((org.settings as any).expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} Hari
+                                </p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight italic">
+                                  s/d {new Date((org.settings as any).expires_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="text-xs font-bold text-slate-300 italic">Unlimited / No Data</span>
+                            )}
                           </td>
                           <td className="py-4 px-6">
                             <StatusBadge variant={org.is_active ? 'success' : 'neutral'} label={org.is_active ? 'Running' : 'Suspended'} />
@@ -427,7 +558,7 @@ export default function SaaSAdminPage() {
                         <div className="mb-6 space-y-1">
                           <div className="flex items-baseline gap-1">
                             <span className="text-2xl font-black font-mono text-slate-900 tracking-tighter">
-                              {pkg.price === 0 ? `${pkg.name} / Free` : `Rp ${pkg.price.toLocaleString('id-ID')}`}
+                              {pkg.price === 0 ? `Free` : `Rp ${pkg.price.toLocaleString('id-ID')}`}
                             </span>
                             {pkg.price > 0 && <span className="text-xs text-slate-400 font-bold">/{pkg.billing}</span>}
                           </div>
@@ -436,223 +567,303 @@ export default function SaaSAdminPage() {
                           </p>
                         </div>
 
-                        <div className="space-y-4 mb-8">
-                          <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Modul Inti</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {pkg.modules?.length > 0 ? pkg.modules.map((mod: string) => (
-                                 <span key={mod} className="flex items-center gap-1 text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-1 rounded-lg">
-                                   <CheckCircle2 size={12} className="text-emerald-500" /> {mod}
+                        <div className="space-y-4 mb-4">
+                           <div className="flex flex-wrap gap-1.5">
+                              {pkg.modules?.slice(0, 4).map((mod: string) => (
+                                 <span key={mod} className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                                   {mod}
                                  </span>
-                              )) : <span className="text-xs text-slate-400 italic">Standard</span>}
-                            </div>
-                          </div>
+                              ))}
+                              {pkg.modules?.length > 4 && <span className="text-[9px] font-bold text-slate-400">+{pkg.modules.length - 4} more</span>}
+                           </div>
                         </div>
                       </div>
-                      <div className="pt-4 border-t border-slate-100 mt-auto flex items-center justify-between">
-                         <span className="text-xs font-bold text-slate-600">Status Paket</span>
+                      <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                         <span className="text-xs font-bold text-slate-600">Status</span>
                          <button
                             onClick={() => togglePackageStatus(pkg.id, pkg.active)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${pkg.active ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${pkg.active ? 'bg-emerald-500' : 'bg-slate-300'}`}
                          >
-                           <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${pkg.active ? 'translate-x-6' : 'translate-x-1'}`} />
+                           <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${pkg.active ? 'translate-x-6' : 'translate-x-1'}`} />
                          </button>
                       </div>
-                      
-                      {/* 🛡️ RAW DATA (Hanya untuk kita pantau isi DB-nya) */}
-                      <pre className="mt-4 p-2 bg-slate-900 text-[8px] text-emerald-400 font-mono rounded-lg overflow-hidden opacity-30 group-hover:opacity-100 transition-opacity">
-                        {JSON.stringify({ dur: pkg.duration_days, name: pkg.name }, null, 2)}
-                      </pre>
                     </div>
                  ))}
               </div>
             </div>
           )}
-        </motion.div>
 
-        {/* ======================= VIEW: INVOICES ======================= */}
-        {activeTab === 'invoices' && (
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+          {activeTab === 'invoices' && (
             <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden">
                <table className="w-full text-left border-collapse">
                   <thead className="bg-slate-50/50">
-                     <tr className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                     <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                         <th className="px-8 py-5">Tanggal</th>
-                        <th className="px-8 py-5">Bisnis / Org</th>
-                        <th className="px-8 py-5">Paket</th>
+                        <th className="px-8 py-5">Tenant / Bisnis</th>
+                        <th className="px-8 py-5">Paket / Add-on</th>
                         <th className="px-8 py-5 text-right">Nominal</th>
                         <th className="px-8 py-5 text-center">Status</th>
-                        <th className="px-8 py-5 text-right w-48">Aksi</th>
+                        <th className="px-8 py-5 text-right">Aksi</th>
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                      {invoices.map((inv) => (
                         <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group">
-                           <td className="px-8 py-5 text-xs font-bold text-slate-500 whitespace-nowrap">
+                           <td className="px-8 py-5 text-xs font-bold text-slate-500">
                               {new Date(inv.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
                            </td>
                            <td className="px-8 py-5">
-                              <p className="text-sm font-black text-slate-900 leading-none">{inv.organization?.name || 'Unknown Org'}</p>
-                              <code className="text-[9px] text-slate-400 font-mono mt-1 block uppercase">{inv.invoice_number}</code>
+                              <p className="text-sm font-black text-slate-900">{inv.organization?.name || 'Unknown'}</p>
+                              <code className="text-[9px] text-slate-400 font-mono">#{inv.invoice_number}</code>
                            </td>
                            <td className="px-8 py-5">
-                              <div className="flex items-center gap-2">
-                                 <span className="px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-wider rounded-lg border border-indigo-100">
-                                    {inv.package?.name}
-                                 </span>
-                              </div>
+                              <span className="px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase rounded-lg border border-indigo-100 italic">
+                                 {inv.item_name || inv.package?.name || 'Nizam Package'}
+                              </span>
                            </td>
-                           <td className="px-8 py-5 text-sm font-black text-slate-900 text-right tracking-tight tabular-nums">
+                           <td className="px-8 py-5 text-sm font-black text-slate-900 text-right tabular-nums">
                               Rp {inv.amount?.toLocaleString('id-ID')}
                            </td>
                            <td className="px-8 py-5 text-center">
-                              <div className="flex justify-center">
-                                 <StatusBadge 
-                                    label={inv.status} 
-                                    variant={inv.status === 'PAID' ? 'success' : 'warning'} 
-                                 />
+                              <div className="flex flex-col items-center gap-1">
+                                 <StatusBadge label={inv.status} variant={inv.status === 'PAID' ? 'success' : 'warning'} />
+                                 {inv.payment_proof_url && (
+                                    <a href={inv.payment_proof_url} target="_blank" className="text-[9px] font-black text-blue-600 hover:underline uppercase flex items-center gap-1">
+                                       <ExternalLink size={10} /> Lihat Bukti
+                                    </a>
+                                 )}
                               </div>
                            </td>
                            <td className="px-8 py-5 text-right">
-                              {inv.status === 'UNPAID' ? (
+                              <div className="flex items-center justify-end gap-2">
+                                 {inv.status !== 'PAID' && inv.status !== 'CANCELLED' && (
+                                    <button 
+                                       onClick={() => approveInvoice(inv)} 
+                                       className="px-4 py-2 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all active:scale-95"
+                                    >
+                                       Konfirmasi
+                                    </button>
+                                 )}
+                                 
+                                 {inv.status !== 'PAID' && inv.status !== 'CANCELLED' && (
+                                    <button 
+                                       onClick={() => cancelInvoice(inv.id)} 
+                                       title="Batalkan Invoice"
+                                       className="p-2 text-slate-300 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all"
+                                    >
+                                       <XCircle size={18} />
+                                    </button>
+                                 )}
+
                                  <button 
-                                   onClick={() => approveInvoice(inv)}
-                                   className="px-4 py-2 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-emerald-600 transition-all hover:scale-105 shadow-xl shadow-slate-900/10"
+                                    onClick={() => deleteInvoice(inv.id)} 
+                                    title="Hapus Permanen"
+                                    className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
                                  >
-                                   Setujui Pembayaran
+                                    <Trash2 size={18} />
                                  </button>
-                              ) : (
-                                 <div className="flex items-center justify-end gap-1.5 text-emerald-600 text-[10px] font-black uppercase tracking-widest">
-                                    <CheckCircle2 size={12} /> Terverifikasi
-                                 </div>
-                              )}
+                              </div>
                            </td>
                         </tr>
                      ))}
-                     {invoices.length === 0 && (
-                        <tr>
-                           <td colSpan={6} className="px-8 py-32 text-center">
-                              <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-slate-100">
-                                 <ReceiptText size={32} className="text-slate-200" />
-                              </div>
-                              <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Belum Ada Tagihan</h4>
-                              <p className="text-xs text-slate-400 font-bold mt-1">Invoice pendaftaran baru akan muncul di sini.</p>
-                           </td>
-                        </tr>
-                     )}
                   </tbody>
                </table>
             </div>
-          </motion.div>
-        )}
+          )}
+        </motion.div>
       </AnimatePresence>
 
-      {/* ===================== PACKAGE MODAL ===================== */}
+      {/* ORG MODAL */}
       <AnimatePresence>
-        {pkgModal.open && (
-           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setPkgModal({ open: false, editData: null })} />
-               <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100">
-                  <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                     <h3 className="text-xl font-black text-slate-900">{pkgModal.editData ? 'Edit Paket SaaS' : 'Tambah Paket Baru'}</h3>
-                     <button onClick={() => setPkgModal({ open: false, editData: null })} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors"><X size={20} /></button>
-                  </div>
-                  <form onSubmit={savePackageForm} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
-                     <div>
-                       <label className="block text-xs font-black uppercase text-slate-500 mb-2">Nama Paket</label>
-                       <input name="name" required defaultValue={pkgModal.editData?.name} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Cth: Trial / Pro" />
-                     </div>
-                     <div className="grid grid-cols-2 gap-4">
-                       <div>
-                         <label className="block text-xs font-black uppercase text-slate-500 mb-2">Harga (0 untuk Trial)</label>
-                         <input name="price" type="number" required defaultValue={pkgModal.editData?.price} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="0" />
-                       </div>
-                       <div>
-                         <label className="block text-xs font-black uppercase text-slate-500 mb-2">Batas Waktu (Hari)</label>
-                         <input name="duration_days" type="number" required defaultValue={pkgModal.editData?.duration_days || 30} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="14" />
-                       </div>
-                     </div>
-                     <div>
-                       <label className="block text-xs font-black uppercase text-slate-500 mb-2">Siklus Penagihan</label>
-                       <input name="billing" defaultValue={pkgModal.editData?.billing || 'Bulan'} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Cth: Sekali / Bulan" />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-black uppercase text-slate-500 mb-2 text-[#003366]">Maks Bisnis (Entitas)</label>
-                          <input name="max_orgs" type="number" defaultValue={pkgModal.editData?.max_orgs || 1} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#003366]/30 font-bold" placeholder="1" />
+         {orgModal.open && (
+           <div key="org-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div key="org-modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOrgModal({ open: false, editData: null })} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+              <motion.div key="org-modal-content" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-xl bg-white rounded-[40px] shadow-2xl p-10 overflow-hidden border border-white">
+                 <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight mb-8">
+                    {orgModal.editData ? 'Edit Data Tenant' : 'Registrasi Tenant Manual'}
+                 </h2>
+                 <form onSubmit={saveOrgForm} className="space-y-6">
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Organisasi</label>
+                       <input name="name" required defaultValue={orgModal.editData?.name} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Pemilik (Login Akun)</label>
+                       <input name="owner_email" required type="email" defaultValue={orgModal.editData?.owner_email} placeholder="email@perusahaan.com" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Paket SaaS</label>
+                           <select name="plan" defaultValue={orgModal.editData?.settings?.plan || 'Demo'} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold">
+                              <option value="Demo">Demo</option>
+                              {packages.map(p => (
+                                 <option key={p.id} value={p.name}>{p.name}</option>
+                              ))}
+                           </select>
                         </div>
-                        <div>
-                          <label className="block text-xs font-black uppercase text-slate-500 mb-2 text-[#003366]">Maks Lokasi (Gudang)</label>
-                          <input name="max_warehouses" type="number" defaultValue={pkgModal.editData?.max_warehouses || 1} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#003366]/30 font-bold" placeholder="1" />
+                        <div className="space-y-2">
+                           <div className="flex justify-between items-center ml-1">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Masa Berlaku (Expire Date)</label>
+                              <div className="flex gap-1">
+                                 {[3, 5, 30].map(days => (
+                                    <button 
+                                       key={days}
+                                       type="button"
+                                       onClick={() => {
+                                          const d = new Date()
+                                          d.setDate(d.getDate() + days)
+                                          setModalExpireDate(d.toISOString().split('T')[0])
+                                       }}
+                                       className="px-1.5 py-0.5 bg-slate-100 hover:bg-indigo-600 hover:text-white rounded text-[8px] font-black transition-colors"
+                                    >
+                                       +{days} Hari
+                                    </button>
+                                 ))}
+                              </div>
+                           </div>
+                           <input 
+                              name="expires_at" 
+                              type="date" 
+                              value={modalExpireDate || (orgModal.editData?.settings?.expires_at ? new Date(orgModal.editData.settings.expires_at).toISOString().split('T')[0] : '')} 
+                              onChange={(e) => setModalExpireDate(e.target.value)}
+                              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" 
+                           />
                         </div>
-                      </div>
-                     <div>
-                        <label className="block text-xs font-black uppercase text-slate-500 mb-3 tracking-widest flex items-center justify-between">Pilih Modul Aktif</label>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                           {AVAILABLE_MODULES.map(mod => (
-                              <label key={mod} className="flex items-center gap-2 p-2 hover:bg-white rounded-xl cursor-pointer border border-transparent hover:border-slate-200 group">
-                                 <input type="checkbox" name="modules" value={mod} defaultChecked={pkgModal.editData?.modules?.includes(mod)} className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                                 <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900">{mod}</span>
-                              </label>
-                           ))}
-                        </div>
-                     </div>
-                     <div className="pt-2 flex justify-end">
-                       <SafeButton type="submit" variant="primary" size="lg">Simpan Paket</SafeButton>
-                     </div>
-                  </form>
-               </motion.div>
+                    </div>
+                    <div className="flex gap-4 items-center h-full pt-6">
+                           <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" name="is_demo" defaultChecked={orgModal.editData?.is_demo} className="w-5 h-5 rounded-lg text-orange-500" />
+                              <span className="text-[10px] font-bold uppercase text-slate-500">Demo?</span>
+                           </label>
+                           <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" name="is_active" defaultChecked={orgModal.editData?.is_active ?? true} className="w-5 h-5 rounded-lg text-emerald-500" />
+                              <span className="text-[10px] font-bold uppercase text-slate-500">Active?</span>
+                           </label>
+                    </div>
+                    <div className="flex justify-end gap-4 pt-6">
+                       <button type="button" onClick={() => setOrgModal({ open: false, editData: null })} className="px-6 py-4 text-xs font-black uppercase text-slate-400">Batal</button>
+                       <SafeButton type="submit" variant="primary">Simpan Tenant</SafeButton>
+                    </div>
+                 </form>
+              </motion.div>
            </div>
-        )}
+         )}
       </AnimatePresence>
 
+      {/* PKG MODAL */}
       <AnimatePresence>
-        {orgModal.open && (
-           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setOrgModal({ open: false, editData: null })} />
-               <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative bg-white rounded-[32px] shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100">
-                  <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                     <h3 className="text-xl font-black text-slate-900">{orgModal.editData ? 'Edit Tenant' : 'Registrasi Tenant Baru'}</h3>
-                     <button onClick={() => setOrgModal({ open: false, editData: null })} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors"><X size={20} /></button>
-                  </div>
-                  <form onSubmit={saveOrgForm} className="p-8 space-y-6">
-                     <div>
-                       <label className="block text-xs font-black uppercase text-slate-500 mb-2">Nama Perusahaan / Org</label>
-                       <input name="name" required defaultValue={orgModal.editData?.name} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Cth: PT Makmur Sentosa" />
-                     </div>
-                     <div>
-                       <label className="block text-xs font-black uppercase text-slate-500 mb-2">Pilih Paket</label>
-                       <select name="plan" defaultValue={orgModal.editData?.settings?.plan || 'Basic'} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                         {packages.map(p => <option key={p.id||p.name} value={p.name}>{p.name} — Rp {p.price.toLocaleString()}</option>)}
-                       </select>
-                     </div>
-                     <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                           <span className="text-xs font-black uppercase text-slate-500">Demo</span>
-                           <input type="checkbox" name="is_demo" defaultChecked={(orgModal.editData as any)?.is_demo} className="w-5 h-5" />
-                        </div>
-                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                           <span className="text-xs font-black uppercase text-slate-500">Aktif</span>
-                           <input type="checkbox" name="is_active" defaultChecked={orgModal.editData ? orgModal.editData.is_active : true} className="w-5 h-5" />
-                        </div>
-                     </div>
-                     <div className="pt-2 flex justify-end">
-                       <SafeButton type="submit" variant="primary" size="lg">Simpan Perubahan</SafeButton>
-                     </div>
-                  </form>
-               </motion.div>
+         {pkgModal.open && (
+           <div key="pkg-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div key="pkg-modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPkgModal({ open: false, editData: null })} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+              <motion.div key="pkg-modal-content" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-2xl bg-white rounded-[40px] shadow-2xl p-10 overflow-hidden border border-white">
+                 <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight mb-8">
+                    {pkgModal.editData ? 'Edit Paket SaaS' : 'Buat Paket SaaS Baru'}
+                 </h2>
+                 <form onSubmit={savePackageForm} className="space-y-6 max-h-[70vh] overflow-y-auto px-1 pr-4">
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Paket</label>
+                          <input name="name" required defaultValue={pkgModal.editData?.name} placeholder="e.g. Basic, Pro" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipe Billing</label>
+                          <select name="billing" defaultValue={pkgModal.editData?.billing || 'Bulan'} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold">
+                             <option value="Bulan">Bulan</option>
+                             <option value="Tahun">Tahun</option>
+                             <option value="Sekali">Sekali</option>
+                          </select>
+                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Harga (Angka)</label>
+                          <input name="price" type="number" required defaultValue={pkgModal.editData?.price ?? 0} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Durasi (Hari)</label>
+                          <input name="duration_days" type="number" required defaultValue={pkgModal.editData?.duration_days ?? 30} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Org</label>
+                          <input name="max_orgs" type="number" required defaultValue={pkgModal.editData?.max_orgs ?? 1} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Warehouse</label>
+                          <input name="max_warehouses" type="number" required defaultValue={pkgModal.editData?.max_warehouses ?? 1} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+                       </div>
+                    </div>
+
+                    <div className="space-y-6">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Konfigurasi Fitur & Modul</label>
+                       
+                       <div className="space-y-6 p-6 bg-slate-50 border border-slate-100 rounded-[32px]">
+                          {[
+                             { group: 'Utama', items: ['Dashboard', 'Audit Integritas'] },
+                             { group: 'Finance', items: ['Akun (CoA)', 'Kas & Bank', 'Buku Besar', 'Aging (AR/AP)', 'Manajemen Zakat', 'Manajemen Pajak', 'Reimbursement', 'Penutupan Buku', 'Aset Tetap', 'Anggaran'] },
+                             { group: 'Operasional', items: ['Pembelian', 'Inventori', 'Gudang (WMS)', 'Manufaktur (BoM)'] },
+                             { group: 'Tambahan (Premium)', items: ['Fleet & Rental', 'Job Order (Jasa)'] },
+                             { group: 'Marketing & Sales', items: ['Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward'] },
+                             { group: 'HRIS', items: ['Karyawan (HRIS)', 'Akses & Jabatan'] },
+                             { group: 'Insight', items: ['Laporan', 'Strategi (BSC)', 'Proyeksi Kas'] },
+                             { group: 'Config', items: ['Audit Trail', 'Cabang & Divisi', 'Pengaturan Bisnis'] }
+                          ].map(cat => (
+                             <div key={cat.group} className="space-y-2">
+                                <div className="flex items-center gap-2 px-2">
+                                   <div className="h-[1px] flex-1 bg-slate-200" />
+                                   <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{cat.group}</span>
+                                   <div className="h-[1px] flex-1 bg-slate-200" />
+                                </div>
+                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                                   {/* Opsi untuk centang "SATU GRUP" sekaligus */}
+                                   <label className="flex items-center gap-2 p-2.5 bg-indigo-50/50 rounded-xl border border-indigo-100/50 cursor-pointer hover:bg-indigo-100/50 transition-colors group">
+                                      <input 
+                                         type="checkbox" 
+                                         name="modules" 
+                                         value={cat.group} 
+                                         defaultChecked={pkgModal.editData?.modules?.includes(cat.group)}
+                                         className="w-4 h-4 rounded text-indigo-600" 
+                                      />
+                                      <span className="text-[9px] font-black uppercase text-indigo-600 group-hover:underline italic">Pilih Semua {cat.group}</span>
+                                   </label>
+
+                                   {cat.items.map(item => (
+                                      <label key={item} className="flex items-center gap-2 p-2.5 bg-white rounded-xl border border-slate-100 hover:border-blue-200 cursor-pointer transition-all group">
+                                         <input 
+                                            type="checkbox" 
+                                            name="modules" 
+                                            value={item} 
+                                            defaultChecked={pkgModal.editData?.modules?.includes(item)}
+                                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                                         />
+                                         <span className="text-[9px] font-black uppercase text-slate-500 group-hover:text-blue-600 truncate">{item}</span>
+                                      </label>
+                                   ))}
+                                </div>
+                             </div>
+                          ))}
+                       </div>
+                    </div>
+
+                    <div className="flex justify-end gap-4 pt-4">
+                       <button type="button" onClick={() => setPkgModal({ open: false, editData: null })} className="px-6 py-4 text-xs font-black uppercase text-slate-400">Batal</button>
+                       <SafeButton type="submit" variant="primary">Simpan Paket</SafeButton>
+                    </div>
+                 </form>
+              </motion.div>
            </div>
-        )}
+         )}
       </AnimatePresence>
 
       <ConfirmDialog 
         isOpen={confirmState.open} 
+        title={confirmState.title} 
+        message={confirmState.message} 
+        onConfirm={confirmState.action} 
         onClose={() => setConfirmState(prev => ({ ...prev, open: false }))} 
-        onConfirm={confirmState.action}
-        title={confirmState.title}
-        message={confirmState.message}
-        variant="danger"
-        confirmLabel="Ya, Hapus"
       />
     </div>
   )

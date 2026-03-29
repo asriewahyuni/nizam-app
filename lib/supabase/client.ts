@@ -1,7 +1,7 @@
 'use client'
 
 import { createBrowserClient } from '@supabase/ssr'
-import type { NizamDatabase } from '@/types/database.types'
+import type { Database } from '@/types/database.types'
 
 /**
  * Supabase client for use in Client Components.
@@ -15,5 +15,5 @@ export function createClient() {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY')
   }
 
-  return createBrowserClient<NizamDatabase>(url, key)
+  return createBrowserClient<Database>(url, key)
 }

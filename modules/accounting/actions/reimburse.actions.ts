@@ -29,7 +29,7 @@ export async function uploadReceipt(formData: FormData): Promise<{ success: bool
 export async function getReimbursements(orgId: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('reimbursements')
     .select(`
       *,
@@ -42,7 +42,7 @@ export async function getReimbursements(orgId: string) {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('getReimbursements error:', error)
+    (console as any).error('getReimbursements error:', error)
     return []
   }
   console.log(`Fetched ${data?.length || 0} reimbursements for org ${orgId}`)
@@ -63,13 +63,13 @@ export async function submitReimbursement(orgId: string, input: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
 
-  const totalAmount = input.items.reduce((sum, item) => sum + item.amount, 0)
+  const totalAmount = input.items.reduce((sum: any, item: any) => sum + item.amount, 0)
   
   // 1. Generate claim number
   const claimNumber = `REIMB-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`
 
   // 2. Insert Header
-  const { data: reimbursement, error: rError } = await supabase
+  const { data: reimbursement, error: rError } = await (supabase as any)
     .from('reimbursements')
     .insert({
       org_id: orgId,
@@ -83,26 +83,26 @@ export async function submitReimbursement(orgId: string, input: {
     .single()
 
   if (rError || !reimbursement) {
-    console.error('Insert reimbursement error:', rError)
+    (console as any).error('Insert reimbursement error:', rError)
     return { error: `Gagal membuat pengajuan reimburse. ${rError?.message || ''}` }
   }
 
   // 3. Insert Items
-  const { error: iError } = await supabase
+  const { error: iError } = await (supabase as any)
     .from('reimbursement_items')
-    .insert(input.items.map(it => ({
+    .insert(input.items.map((it: any) => ({
       reimbursement_id: reimbursement.id,
       ...it
     })))
 
   if (iError) {
-    console.error('Insert reimbursement items error:', iError)
-    await supabase.from('reimbursements').delete().eq('id', reimbursement.id)
+    (console as any).error('Insert reimbursement items error:', iError)
+    await (supabase as any).from('reimbursements').delete().eq('id', reimbursement.id)
     return { error: `Gagal menyimpan detail biaya. ${iError.message}` }
   }
 
   // 4. Buat Permintaan Approval ke Approval Center
-  const { error: appErr } = await supabase
+  const { error: appErr } = await (supabase as any)
     .from('approval_requests')
     .insert({
       org_id: orgId,
@@ -115,7 +115,7 @@ export async function submitReimbursement(orgId: string, input: {
     })
 
   if (appErr) {
-    console.error('Failed to create approval request:', appErr)
+    (console as any).error('Failed to create approval request:', appErr)
     // Kita tetap biarkan reimbursement terbuat walau approval center gagal (bisa manual nanti)
   }
 
@@ -126,7 +126,7 @@ export async function submitReimbursement(orgId: string, input: {
 
 export async function approveReimbursement(id: string, orgId: string) {
   const supabase = await createClient()
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('reimbursements')
     .update({ status: 'APPROVED' })
     .eq('id', id)
@@ -139,7 +139,7 @@ export async function approveReimbursement(id: string, orgId: string) {
 
 export async function rejectReimbursement(id: string, orgId: string, reason: string) {
   const supabase = await createClient()
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('reimbursements')
     .update({ status: 'REJECTED', notes: reason })
     .eq('id', id)
@@ -154,7 +154,7 @@ export async function payReimbursement(id: string, orgId: string, bankAccountId:
   const supabase = await createClient()
 
   // 1. Fetch reimbursement data
-  const { data: reim, error: rErr } = await supabase
+  const { data: reim, error: rErr } = await (supabase as any)
     .from('reimbursements')
     .select(`
       *,
@@ -168,7 +168,7 @@ export async function payReimbursement(id: string, orgId: string, bankAccountId:
   if (reim.status !== 'APPROVED') return { error: 'Hanya reimbursement status APPROVED yang bisa dibayar.' }
 
   // 2. Fetch Bank Account to get CoA Linked Account
-  const { data: bank, error: bErr } = await supabase
+  const { data: bank, error: bErr } = await (supabase as any)
     .from('bank_accounts')
     .select('account_id')
     .eq('id', bankAccountId)
@@ -212,14 +212,14 @@ export async function payReimbursement(id: string, orgId: string, bankAccountId:
     auto_post: true
   })
 
-  if (journalResult.error) return journalResult
+  if ((journalResult as any).error) return journalResult
 
   // 5. Update Status to PAID
-  await supabase
+  await (supabase as any)
     .from('reimbursements')
     .update({ 
       status: 'PAID', 
-      journal_id: journalResult.entryId,
+      journal_id: (journalResult as any).entryId,
       updated_at: new Date().toISOString()
     })
     .eq('id', id)

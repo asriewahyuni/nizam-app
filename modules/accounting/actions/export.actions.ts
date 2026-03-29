@@ -219,8 +219,8 @@ export async function exportBalanceSheetXLSX(
 
   const assets = data.assets.filter((a: any) => Math.abs(a.balance) > 0.01)
   const liabEquity = [
-    ...data.liabilities.filter((l: any) => Math.abs(l.balance) > 0.01),
-    ...data.equity.filter((e: any) => Math.abs(e.balance) > 0.01)
+    .data.liabilities.filter((l: any) => Math.abs(l.balance) > 0.01),
+    .data.equity.filter((e: any) => Math.abs(e.balance) > 0.01)
   ]
   const maxRows = Math.max(assets.length, liabEquity.length)
 
@@ -363,7 +363,7 @@ export async function exportZakatReportXLSX(
     ['Tarif Zakat', '2.5%', 'Standar Zakat Tijarah'],
     ['Sumber Harga', data.activeHaul?.gold_price_source || 'Manual Input', data.activeHaul?.gold_price_evidence_url || 'Tidak ada bukti URL'],
   ]
-  fiqhRows.forEach((r, i) => {
+  fiqhRows.forEach((r: any, i: any) => {
     const row = sheet.addRow(r)
     styleDataRow(row, i % 2 === 0)
   })
@@ -402,7 +402,7 @@ export async function exportZakatReportXLSX(
     ['Hari Haul Berjalan', `${data.haulDaysElapsed} hari`, `Sisa: ${data.haulDaysRemaining} hari menuju 354 hari (1 tahun Hijriah)`],
   ]
 
-  verdictRows.forEach((r, i) => {
+  verdictRows.forEach((r: any, i: any) => {
     const row = sheet.addRow(r)
     styleDataRow(row, i % 2 === 0)
     row.getCell(2).font = { bold: true, size: 10 }

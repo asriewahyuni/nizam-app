@@ -14,24 +14,31 @@ export async function signUp(formData: FormData) {
   const password = formData.get('password') as string
   const fullName = formData.get('fullName') as string
 
+  // Use regular signUp for owners so they get logged in automatically
+  // and are prompted for email confirmation if enabled in dashboard.
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: { 
         full_name: fullName,
-        login_type: 'owner' 
+        login_type: 'owner',
+        is_demo: formData.get('plan') === 'demo'
       },
     },
   })
 
   if (error) {
-    const msg = encodeURIComponent(error.message)
-    redirect(`/register?error=${msg}`)
+     // Identifikasi error jika email sudah terdaftar. (Terkadang Supabase mengeluarkan "Database error saving new user" karena trigger atau batas duplikasi).
+     if (error.message.includes("Database error saving new user") || error.message.includes("already registered")) {
+        return { error: 'Gagal: Email ini sudah pernah didaftarkan. Silakan Login atau gunakan email lain.' }
+     }
+     
+     // Error lainnya
+     return { error: error.message }
   }
 
-  revalidatePath('/', 'layout')
-  redirect('/onboarding')
+  return { success: true, email }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -56,99 +63,59 @@ export async function signIn(formData: FormData) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// signOut — Standard sign out
-// ─────────────────────────────────────────────────────────────
-export async function signOut() {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
-  revalidatePath('/', 'layout')
-  redirect('/login')
-}
-
-// ─────────────────────────────────────────────────────────────
-// getSession — Server-side session check
-// ─────────────────────────────────────────────────────────────
-export async function getSession() {
-  const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) return null
-  return user
-}
-
-// ─────────────────────────────────────────────────────────────
-// verifyEmployeeNikBySlug — Used during custom registration flow
-// ─────────────────────────────────────────────────────────────
-export async function verifyEmployeeNikBySlug(slug: string, nik: string) {
-  const adminClient = await createAdminClient()
-
-  // 1. Get Organization ID from Slug (Case Insensitive)
-  const { data: org, error: orgErr } = await (adminClient as any)
-    .from('organizations')
-    .select('id')
-    .eq('slug', slug.toLowerCase().trim())
-    .single()
-
-  if (orgErr || !org) return { error: 'Organisasi tidak ditemukan' }
-
-  // 2. Check if NIK belongs to this Org AND is not registered yet
-  const { data: emp, error: empErr } = await (adminClient as any)
-    .from('employees')
-    .select('id, first_name, last_name, user_id')
-    .eq('org_id', org.id)
-    .eq('nik', nik.trim())
-    .maybeSingle()
-
-  if (empErr) return { error: 'Database error' }
-  if (!emp) return { error: 'NIK tidak terdaftar di organisasi ini' }
-  if (emp.user_id) return { error: 'NIK ini sudah memiliki akun aktif' }
-
-  return { success: true, employee: emp }
-}
-
-// ─────────────────────────────────────────────────────────────
 // registerEmployeeAccount — Converts employee to auth user
 // ─────────────────────────────────────────────────────────────
 export async function registerEmployeeAccount(formData: FormData) {
   const adminClient = await createAdminClient()
   const publicClient = await createClient()
 
-  const nik = (formData.get('nik') as string)?.trim()
-  const password = formData.get('password') as string
+  const nik = (formData.get('nik') as string)?.trim().toUpperCase()
+  const password = (formData.get('password') as string)
+  const inviteId = (formData.get('invite_id') as string)
 
-  // 1. Re-verify NIK
+  // 1. Get Employee Data
   const { data: emp, error: empErr } = await (adminClient as any)
     .from('employees')
     .select('*')
     .eq('nik', nik)
-    .single()
+    .maybeSingle()
 
-  if (empErr || !emp) throw new Error('NIK Invalid')
-  if (emp.user_id) throw new Error('Already Registered')
+  if (empErr || !emp) throw new Error('NIK tidak valid atau tidak ditemukan.')
+  if (emp.user_id) throw new Error('NIK ini sudah memiliki akun aktif. Silakan Login.')
 
-  // 2. Generate internal email from NIK + org_id (unique, not user-facing)
+  // 2. Get Invitation Data
+  const { data: invite } = await (adminClient as any)
+    .from('org_invitations')
+    .select('*, roles(name)')
+    .eq('id', inviteId)
+    .maybeSingle()
+
+  // 3. Generate Internal Email
   const orgPrefix = (emp.org_id as string).replace(/-/g, '').toLowerCase().slice(0, 8)
   const nikSlug = nik.toLowerCase().replace(/[^a-z0-9]/g, '-')
   const internalEmail = `${nikSlug}@${orgPrefix}.staff.nizam`
 
-  // 3. Create Supabase Auth User
-  const { data: authData, error: authErr } = await publicClient.auth.signUp({
+  // 4. Create Auth User via ADMIN to bypass SMTP/Confirmation hurdles for internal staff
+  const { data: authData, error: authErr } = await adminClient.auth.admin.createUser({
     email: internalEmail,
     password,
-    options: {
-      data: { 
-        full_name: `${emp.first_name} ${emp.last_name}`,
-        nik,
-        login_type: 'employee'
-      },
-    },
+    email_confirm: true, // AUTO-CONFIRM for staff
+    user_metadata: { 
+      full_name: `${emp.first_name} ${emp.last_name}`,
+      nik,
+      login_type: 'employee'
+    }
   })
 
-  if (authErr) throw new Error(authErr.message)
-  const userId = authData.user?.id
-  if (!userId) throw new Error('Failed to create account')
+  if (authErr) {
+     throw new Error(authErr.message)
+  }
 
-  // 4. Update Employee table with user_id & activate
-  await (adminClient as any)
+  const userId = authData.user?.id
+  if (!userId) throw new Error('Gagal membuat user ID.')
+
+  // 5. Update Employee Record
+  const { error: updateErr } = await (adminClient as any)
     .from('employees')
     .update({ 
       user_id: userId,
@@ -156,52 +123,91 @@ export async function registerEmployeeAccount(formData: FormData) {
     })
     .eq('id', emp.id)
 
-  // 5. Create Org Member with role from job_title (Case Insensitive)
-  const { data: allRoles } = await (adminClient as any)
-    .from('roles')
-    .select('id, name')
-    .eq('org_id', emp.org_id)
+  if (updateErr) throw new Error('Gagal menautkan user ke data karyawan.')
 
-  const matchingRole = allRoles?.find((r: any) => 
-    r.name.toLowerCase().trim() === emp.job_title?.toLowerCase().trim()
-  )
+  // 6. Map Role
+  let roleId = invite?.role_id
+  if (!roleId) {
+     const { data: allRoles } = await (adminClient as any)
+       .from('roles')
+       .select('id, name')
+       .eq('org_id', emp.org_id)
+  
+     const matchingRole = allRoles?.find((r: any) => 
+       r.name.toLowerCase().trim() === emp.job_title?.toLowerCase().trim()
+     )
+     roleId = matchingRole?.id || null
+  }
 
-  await (adminClient as any)
+  // 7. Insert Organization Membership
+  const { error: memberErr } = await (adminClient as any)
     .from('org_members')
     .insert({
       org_id: emp.org_id,
       user_id: userId,
       role: 'staff',
-      role_id: matchingRole?.id || null,
+      role_id: roleId,
       is_active: true
     })
 
+  if (memberErr) throw new Error('Gagal mendaftarkan keanggotaan organisasi.')
+
+  // 8. Track Usage
+  if (invite) {
+     await (adminClient as any)
+       .from('org_invitations')
+       .update({ use_count: (invite.use_count || 0) + 1 })
+       .eq('id', invite.id)
+  }
+
+  // 9. Now Log in the user on the client side
+  // Since we used admin.createUser, they are NOT logged in yet.
+  // We'll perform a silent login or redirect to login.
+  // BUT for better UX, we'll login them now.
+  const { error: loginErr } = await publicClient.auth.signInWithPassword({ 
+    email: internalEmail, 
+    password 
+  })
+
+  if (loginErr) {
+     redirect(`/login?tab=karyawan&nik=${nik}&msg=success`)
+  }
+
+  revalidatePath('/', 'layout')
   redirect('/dashboard')
 }
 
 // ─────────────────────────────────────────────────────────────
-// signInWithNik — Employee login via NIK + password
+// signInWithNik — Standard login for staff
 // ─────────────────────────────────────────────────────────────
 export async function signInWithNik(formData: FormData) {
   const adminClient = await createAdminClient()
   const publicClient = await createClient()
 
-  const nik = (formData.get('nik') as string)?.trim()
+  let nik = (formData.get('nik') as string)?.trim()
   const password = (formData.get('password') as string)
-  const redirectTo = formData.get('redirectTo') as string | null
+  const redirectTo = (formData.get('redirectTo') as string)
 
   if (!nik || !password) {
      redirect(`/login?error=${encodeURIComponent('NIK dan Password wajib diisi.')}&tab=karyawan`)
   }
 
-  // Lookup employee by NIK to get org_id (needed to reconstruct email)
+  nik = nik.toUpperCase()
+
   const { data: emp, error: empErr } = await (adminClient as any)
     .from('employees')
     .select('org_id, user_id')
     .eq('nik', nik)
-    .single()
+    .limit(1)
+    .maybeSingle()
 
-  if (empErr || !emp) {
+  if (empErr && empErr.code === 'PGRST116') {
+     redirect(`/login?error=${encodeURIComponent('Terdeteksi duplikasi NIK di database. Harap hubungi Admin.')}&tab=karyawan`)
+  }
+  if (empErr) {
+     redirect(`/login?error=${encodeURIComponent(`Database Error: ${empErr.message}`)}&tab=karyawan`)
+  }
+  if (!emp) {
     redirect(`/login?error=${encodeURIComponent('NIK tidak ditemukan.')}&tab=karyawan`)
   }
 
@@ -222,14 +228,54 @@ export async function signInWithNik(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent('NIK atau password salah.')}&tab=karyawan`)
   }
 
+  revalidatePath('/', 'layout')
   redirect(redirectTo || '/dashboard')
 }
 
-// ─────────────────────────────────────────────────────────────
-// requestPasswordReset — Employee signals they need a reset
-// ─────────────────────────────────────────────────────────────
+// REST REMAINING (signOut, verifyEmployeeNikByToken, etc.)
+export async function signOut() {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  revalidatePath('/', 'layout')
+  redirect('/login')
+}
+
+export async function getSession() {
+  const supabase = await createClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) return null
+  return user
+}
+
+export async function verifyEmployeeNikByToken(token: string, nik: string) {
+  const adminClient = await createAdminClient()
+
+  const { data: invite, error: inviteErr } = await (adminClient as any)
+    .from('org_invitations')
+    .select('*, organizations(*), roles(*)')
+    .eq('invitation_code', token.toUpperCase().trim())
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (inviteErr || !invite) return { error: 'Link aktivasi tidak valid atau sudah non-aktif.' }
+
+  const { data: emp, error: empErr } = await (adminClient as any)
+    .from('employees')
+    .select('id, first_name, last_name, user_id, org_id')
+    .eq('org_id', invite.org_id)
+    .eq('nik', nik.trim())
+    .maybeSingle()
+
+  if (empErr) return { error: 'Database connection error' }
+  if (!emp) return { error: 'NIK Anda tidak terdaftar di bisnis ini.' }
+  if (emp.user_id) return { error: 'NIK ini sudah memiliki akun aktif. Silakan Login.' }
+
+  return { success: true, employee: emp, org: invite.organizations, invite }
+}
+
 export async function requestPasswordReset(nik: string) {
   const adminClient = await createAdminClient()
+  const formattedNik = nik.trim().toUpperCase()
   
   const { data: emp, error } = await (adminClient as any)
     .from('employees')
@@ -237,23 +283,26 @@ export async function requestPasswordReset(nik: string) {
       reset_requested: true,
       reset_requested_at: new Date().toISOString()
     })
-    .eq('nik', nik.trim())
+    .eq('nik', formattedNik)
     .select('id, first_name')
+    .limit(1)
     .maybeSingle()
 
-  if (error || !emp) return { error: 'Gagal mengajukan reset. Pastikan NIK terdaftar.' }
+  if (error && error.code !== 'PGRST116') {
+     return { error: `Database Error: ${error.message}` }
+  }
+  if (!emp && error?.code === 'PGRST116') {
+     return { error: 'Terdeteksi Duplikat NIK di Database. Hubungi Administrator System.' }
+  }
+  if (!emp) return { error: 'Gagal mengajukan reset. Pastikan NIK terdaftar atau periksa huruf/angkanya.' }
   
   revalidatePath('/hris')
   return { success: true, name: emp.first_name }
 }
 
-// ─────────────────────────────────────────────────────────────
-// resetEmployeePassword — Owner/Admin resets password manually
-// ─────────────────────────────────────────────────────────────
 export async function resetEmployeePassword(employeeId: string, newPassword: string) {
   const adminClient = await createAdminClient()
   
-  // 1. Get user_id from employee record
   const { data: emp, error: empErr } = await (adminClient as any)
     .from('employees')
     .select('user_id, nik')
@@ -262,14 +311,12 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
 
   if (empErr || !emp.user_id) return { error: 'User tidak ditemukan.' }
 
-  // 2. Update Auth User password
   const { error: authErr } = await adminClient.auth.admin.updateUserById(emp.user_id, {
     password: newPassword
   })
 
   if (authErr) return { error: 'Gagal mereset: ' + authErr.message }
 
-  // 3. Clear reset request flag
   await (adminClient as any)
     .from('employees')
     .update({ 
@@ -279,5 +326,23 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
     .eq('id', employeeId)
 
   revalidatePath('/hris')
+  return { success: true }
+}
+
+export async function sendPasswordResetEmail(formData: FormData) {
+  const supabase = await createClient()
+  const email = formData.get('email') as string
+  
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || 
+                 (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/update-password`,
+  })
+
+  if (error) {
+    return { error: `Gagal: ${error.message}` }
+  }
+
   return { success: true }
 }

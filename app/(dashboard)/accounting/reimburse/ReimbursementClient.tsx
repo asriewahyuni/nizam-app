@@ -205,7 +205,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
         setIsPayModalOpen(false)
         setSelectedReimbursement(null)
     } else {
-        alert(result.error)
+        alert((result as any).error)
     }
   }
 

@@ -28,7 +28,7 @@ export async function getPurchases(orgId: string) {
     .order('purchase_date', { ascending: false })
 
   if (error) {
-    console.error("DEBUG: getPurchases error:", error)
+    (console as any).error("DEBUG: getPurchases error:", error)
     // If it's a field error, try pulling without the new tables
     const { data: fallback, error: fallbackErr } = await supabase
       .from('purchases' as any)
@@ -93,7 +93,7 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
 
   // 1. Calculate Subtotals to perform Value-Based Allocation for Landed Costs
   const totalOverhead = (payload.shipping_amount || 0) + (payload.insurance_amount || 0)
-  const grossSubTotal = payload.lines.reduce((acc, l) => acc + (l.quantity * l.unit_price) - (l.discount_amount || 0), 0)
+  const grossSubTotal = payload.lines.reduce((acc: any, l: any) => acc + (l.quantity * l.unit_price) - (l.discount_amount || 0), 0)
 
   // 2. Pre-process Products
   const processedLines: any[] = []
@@ -123,7 +123,7 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
       if (!prodErr && newProd) finalProductId = newProd.id
     } else if (finalProductId) {
        // Update EXISTING products master data directly using Landed Cost HPP!
-       await supabase.from('products' as any)
+       await (supabase as any).from('products' as any)
          .update({
             purchase_price: trueHpp,
             selling_price: line.selling_price || trueHpp * 1.25,
@@ -145,9 +145,9 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
   }
 
   // 2. ATOMIC TRANSACTION
-  const headerSubtotal = processedLines.reduce((acc, l) => acc + (l.quantity * l.unit_price), 0)
-  const headerDiscount = payload.discount_amount || processedLines.reduce((acc, l) => acc + l.discount_amount, 0)
-  const headerTax = payload.tax_amount || processedLines.reduce((acc, l) => acc + l.tax_amount, 0)
+  const headerSubtotal = processedLines.reduce((acc: any, l: any) => acc + (l.quantity * l.unit_price), 0)
+  const headerDiscount = payload.discount_amount || processedLines.reduce((acc: any, l: any) => acc + l.discount_amount, 0)
+  const headerTax = payload.tax_amount || processedLines.reduce((acc: any, l: any) => acc + l.tax_amount, 0)
   const headerShipping = payload.shipping_amount || 0
   const headerGrand = headerSubtotal - headerDiscount + headerTax + headerShipping
 
@@ -215,10 +215,10 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     const landedUnitPrice = (itemSubtotal + allocatedOverhead) / item.quantity
 
     // A. Update Average Cost (HPP) in Master Data
-    await supabase.rpc('update_product_average_cost', {
+    await (supabase as any).rpc('update_product_average_cost', {
         p_product_id: item.product_id,
         p_new_cost: landedUnitPrice
-    }).then(({ error }) => { if (error) console.error("WAC error", error) })
+    }).then(({ error }) => { if (error) (console as any).error("WAC error", error) })
 
     // B. Replaced by direct update in PO Creation (createPurchaseEntry)
     // No action needed here anymore since selling price is established upfront.
@@ -236,15 +236,15 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 
   // 4. Persistence: Stock Movements (Sub-Ledger) & WMS Sync (Physical Stock)
   if (stockMovements.length > 0) {
-     const { error: smErr } = await supabase.from('stock_movements').insert(stockMovements)
-     if (smErr) console.error("Stock Movement insert failed:", smErr)
+     const { error: smErr } = await (supabase as any).from('stock_movements').insert(stockMovements)
+     if (smErr) (console as any).error("Stock Movement insert failed:", smErr)
      
      // CRITICAL: Sync with physical inventory (inventory_stocks)
-     const whId = purchase.warehouse_id || (await supabase.from('warehouses').select('id').eq('org_id', orgId).limit(1).single().then(r => r.data?.id))
+     const whId = purchase.warehouse_id || (await (supabase as any).from('warehouses').select('id').eq('org_id', orgId).limit(1).single().then((r: any) => r.data?.id))
      
      if (whId) {
         for (const m of stockMovements) {
-           await supabase.from('inventory_stocks').upsert({
+           await (supabase as any).from('inventory_stocks').upsert({
               org_id: orgId,
               product_id: m.product_id,
               warehouse_id: whId,
@@ -255,12 +255,12 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
            // Since we are in a server action, it's safer to use an RPC or do a Get-then-Set.
            // However, most entries for 'inventory_stocks' in this DB use the increment logic.
            
-           await supabase.rpc('adjust_inventory_stock', {
+           await (supabase as any).rpc('adjust_inventory_stock', {
               p_org_id: orgId,
               p_product_id: m.product_id,
               p_warehouse_id: whId,
               p_diff: m.quantity
-           }).then(({ error }) => { if (error) console.error("WMS sync error", error) })
+           }).then(({ error }) => { if (error) (console as any).error("WMS sync error", error) })
         }
      }
   }
@@ -327,11 +327,11 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     }
 
     // Sanity check just to be safe
-    const totalDebit = journalLines.reduce((acc, l) => acc + l.debit, 0)
-    const totalCredit = journalLines.reduce((acc, l) => acc + l.credit, 0)
+    const totalDebit = journalLines.reduce((acc: any, l: any) => acc + l.debit, 0)
+    const totalCredit = journalLines.reduce((acc: any, l: any) => acc + l.credit, 0)
     
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
-       console.error("JOURNAL IMBALANCE IN PO:", { totalDebit, totalCredit, journalLines })
+       (console as any).error("JOURNAL IMBALANCE IN PO:", { totalDebit, totalCredit, journalLines })
     }
 
     const { error: jErr } = await createJournalEntry({
@@ -343,7 +343,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
       lines: journalLines,
       auto_post: true
     })
-    if (jErr) console.error("Journal creation failed:", jErr)
+    if (jErr) (console as any).error("Journal creation failed:", jErr)
     
     // Auto-Lunas Payment trigger for Bank history & AP clearing
     if (LunasAccountId && vendorApAmount > 0) {
@@ -464,7 +464,7 @@ export async function getPurchaseRequests(orgId: string) {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('DEBUG: getPurchaseRequests fail:', error.message, error.code, error.details)
+    (console as any).error('DEBUG: getPurchaseRequests fail:', error.message, error.code, error.details)
     return []
   }
   return data

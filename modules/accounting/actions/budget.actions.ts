@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 
 export async function getBudgets(orgId: string, period: string) {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('budgets')
     .select('*, accounts(code, name, type)')
     .eq('org_id', orgId)
@@ -16,7 +16,7 @@ export async function getBudgets(orgId: string, period: string) {
 
 export async function saveBudget(orgId: string, accountId: string, period: string, amount: number) {
   const supabase = await createClient()
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('budgets')
     .upsert({
       org_id: orgId,
@@ -34,7 +34,7 @@ export async function getBudgetVsActual(orgId: string, startDate: string, endDat
   const supabase = await createClient()
 
   // 1. Get ALL relevant accounts
-  const { data: accounts } = await supabase
+  const { data: accounts } = await (supabase as any)
     .from('accounts')
     .select('id, code, name, type, normal_balance')
     .eq('org_id', orgId)
@@ -43,7 +43,7 @@ export async function getBudgetVsActual(orgId: string, startDate: string, endDat
   if (!accounts || accounts.length === 0) return []
 
   // 2. Get budgets
-  const { data: budgets } = await supabase
+  const { data: budgets } = await (supabase as any)
     .from('budgets')
     .select('*')
     .eq('org_id', orgId)
@@ -56,7 +56,7 @@ export async function getBudgetVsActual(orgId: string, startDate: string, endDat
   }
 
   // 3. Get actuals
-  const { data: entries } = await supabase
+  const { data: entries } = await (supabase as any)
     .from('journal_entries')
     .select('id')
     .eq('org_id', orgId)
@@ -64,11 +64,11 @@ export async function getBudgetVsActual(orgId: string, startDate: string, endDat
     .gte('entry_date', startDate)
     .lte('entry_date', endDate)
 
-  const entryIds = (entries || []).map(e => e.id)
+  const entryIds = (entries || []).map((e: any) => e.id)
   const actualByAccount: Record<string, number> = {}
   
   if (entryIds.length > 0) {
-    const { data: lines } = await supabase
+    const { data: lines } = await (supabase as any)
       .from('journal_lines')
       .select('account_id, debit, credit')
       .in('entry_id', entryIds)
@@ -106,12 +106,12 @@ export async function getBudgetVsActual(orgId: string, startDate: string, endDat
     })
   }
 
-  return result.sort((a, b) => a.account_code.localeCompare(b.account_code))
+  return result.sort((a: any, b: any) => a.account_code.localeCompare(b.account_code))
 }
 
 export async function getChartOfAccountsForBudget(orgId: string) {
   const supabase = await createClient()
-  const { data } = await supabase
+  const { data } = await (supabase as any)
     .from('accounts')
     .select('id, code, name, type')
     .eq('org_id', orgId)

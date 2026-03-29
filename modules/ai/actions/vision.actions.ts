@@ -88,7 +88,7 @@ Return ONLY valid JSON (no markdown, no explanation):
     };
 
   } catch (error: any) {
-    console.error('[AI Vision] Error:', error.message);
+    (console as any).error('[AI Vision] Error:', error.message);
     return { success: false, error: 'AI gagal membaca nota. Silakan isi nominal secara manual.' };
   }
 }

@@ -25,7 +25,7 @@ export async function createPayrollComponent(orgId: string, formData: FormData) 
   const isPercentage = formData.get('is_percentage') === 'on'
   const isTaxable = formData.get('is_taxable') === 'on'
 
-  const { error } = await supabase.from('payroll_components').insert({
+  const { error } = await (supabase as any).from('payroll_components').insert({
     org_id: orgId,
     name: formData.get('name') as string,
     type: formData.get('type') as string,
@@ -43,7 +43,7 @@ export async function createPayrollComponent(orgId: string, formData: FormData) 
 
 export async function deletePayrollComponent(componentId: string) {
   const supabase = await createClient()
-  const { error } = await supabase.from('payroll_components').delete().eq('id', componentId)
+  const { error } = await (supabase as any).from('payroll_components').delete().eq('id', componentId)
   if (error) return { error: error.message }
   revalidatePath('/hris')
   return { success: true }
@@ -83,7 +83,7 @@ export async function generatePayrollRun(orgId: string, formData: FormData) {
   if (runErr) return { error: runErr.message }
 
   // 2. Execute SQL generation function
-  const { error: genErr } = await supabase.rpc('generate_payslips_for_run', { 
+  const { error: genErr } = await (supabase as any).rpc('generate_payslips_for_run', { 
     p_run_id: run.id 
   })
 
@@ -107,7 +107,7 @@ export async function payPayrollRun(runId: string, orgId: string, accountId: str
     .eq('id', runId);
 
   // 2. Execute SQL payment/journalizing function
-  const { error } = await supabase.rpc('process_payroll_payment', {
+  const { error } = await (supabase as any).rpc('process_payroll_payment', {
     p_run_id: runId,
     p_bank_account_id: accountId, // This is now a fallback in the SQL function
     p_created_by: user.id
@@ -122,19 +122,19 @@ export async function payPayrollRun(runId: string, orgId: string, accountId: str
 
 export async function fixEmptyPayrollJournals(orgId: string) {
   const supabase = await createClient()
-  const { data: runs } = await supabase.from('payroll_runs').select('*').eq('org_id', orgId).eq('status', 'PAID')
+  const { data: runs } = await (supabase as any).from('payroll_runs').select('*').eq('org_id', orgId).eq('status', 'PAID')
 
   if (!runs) return { success: true, count: 0 }
 
   let fixedCount = 0
   // 1. SMART ACCOUNT LOOKUP (CDO Logic: No Hardcode)
-  let { data: accExpense } = await supabase.from('accounts').select('id').eq('org_id', orgId).eq('code', '6001').maybeSingle()
+  let { data: accExpense } = await (supabase as any).from('accounts').select('id').eq('org_id', orgId).eq('code', '6001').maybeSingle()
   if (!accExpense) {
-     const { data: altAcc } = await supabase.from('accounts').select('id').eq('org_id', orgId).ilike('name', '%Beban Gaji%').limit(1).maybeSingle()
+     const { data: altAcc } = await (supabase as any).from('accounts').select('id').eq('org_id', orgId).ilike('name', '%Beban Gaji%').limit(1).maybeSingle()
      accExpense = altAcc
   }
   
-  const { data: firstBank } = await supabase.from('bank_accounts').select('account_id').eq('org_id', orgId).limit(1).maybeSingle()
+  const { data: firstBank } = await (supabase as any).from('bank_accounts').select('account_id').eq('org_id', orgId).limit(1).maybeSingle()
 
   if (!accExpense || !firstBank) {
       console.warn('Fallback Account for Payroll not found (Code 6001 or "Beban Gaji") or Bank Account missing.');
@@ -145,24 +145,24 @@ export async function fixEmptyPayrollJournals(orgId: string) {
     if (!run.journal_entry_id) continue
     
     // Check if lines are truly missing or just have basic 2 lines while should have more
-    const { count } = await supabase.from('journal_lines').select('*', { count: 'exact', head: true }).eq('entry_id', run.journal_entry_id)
+    const { count } = await (supabase as any).from('journal_lines').select('*', { count: 'exact', head: true }).eq('entry_id', run.journal_entry_id)
 
     // Get Payslip Data to see if we HAVE more details than currently in JE
-    const { data: slips } = await supabase.from('payslips').select('id').eq('run_id', run.id)
-    const slipIds = slips?.map(s => s.id) || []
-    const { data: allLines } = await supabase.from('payslip_lines').select('id').in('payslip_id', slipIds)
+    const { data: slips } = await (supabase as any).from('payslips').select('id').eq('run_id', run.id)
+    const slipIds = slips?.map((s: any) => s.id) || []
+    const { data: allLines } = await (supabase as any).from('payslip_lines').select('id').in('payslip_id', slipIds)
 
     const detailCount = allLines?.length || 0
     
     // CONDITION: Either missing (count=0) OR only has 2 lines while we have many detail lines
     if ((count ?? 0) === 0 || ((count ?? 0) === 2 && detailCount > 0)) {
        // Proceed to fix (VOID old, create new)
-       await supabase.from('journal_entries').update({ 
+       await (supabase as any).from('journal_entries').update({ 
          status: 'VOIDED', 
          void_reason: 'Deep-reconciliation to include detailed PPh/Components' 
        }).eq('id', run.journal_entry_id)
 
-       const { data: newEntry } = await supabase.from('journal_entries').insert({
+       const { data: newEntry } = await (supabase as any).from('journal_entries').insert({
          org_id: orgId,
          entry_date: run.payment_date,
          description: `[RE-SYNC] Pembayaran Gaji Periode ${run.period_start} s/d ${run.period_end}`,
@@ -174,9 +174,9 @@ export async function fixEmptyPayrollJournals(orgId: string) {
 
        if (newEntry) {
           // 2.1 Get and Aggregate Detailed Lines if they exist
-          const { data: slips } = await supabase.from('payslips').select('id').eq('run_id', run.id)
-          const slipIds = slips?.map(s => s.id) || []
-          const { data: allLines } = await supabase.from('payslip_lines').select('*').in('payslip_id', slipIds)
+          const { data: slips } = await (supabase as any).from('payslips').select('id').eq('run_id', run.id)
+          const slipIds = slips?.map((s: any) => s.id) || []
+          const { data: allLines } = await (supabase as any).from('payslip_lines').select('*').in('payslip_id', slipIds)
 
           const journalLinesBody: any[] = []
           
@@ -191,7 +191,7 @@ export async function fixEmptyPayrollJournals(orgId: string) {
                 accountTotals.set(accId, current)
              }
 
-             accountTotals.forEach((val, accId) => {
+             accountTotals.forEach((val: any, accId: any) => {
                if (val.debit > 0) journalLinesBody.push({ entry_id: newEntry.id, account_id: accId, debit: val.debit, credit: 0, memo: '[AUTO-FIX] Beban Komponen' })
                if (val.credit > 0) journalLinesBody.push({ entry_id: newEntry.id, account_id: accId, debit: 0, credit: val.credit, memo: '[AUTO-FIX] Potongan/Pajak' })
              })
@@ -208,18 +208,18 @@ export async function fixEmptyPayrollJournals(orgId: string) {
           }
 
           // Insert Ledger Lines
-          const { error: linesErr } = await supabase.from('journal_lines').insert(journalLinesBody)
+          const { error: linesErr } = await (supabase as any).from('journal_lines').insert(journalLinesBody)
 
           if (linesErr) {
-            await supabase.from('journal_entries').delete().eq('id', newEntry.id)
+            await (supabase as any).from('journal_entries').delete().eq('id', newEntry.id)
             continue
           }
 
           // Post it!
-          await supabase.from('journal_entries').update({ status: 'POSTED' }).eq('id', newEntry.id)
+          await (supabase as any).from('journal_entries').update({ status: 'POSTED' }).eq('id', newEntry.id)
 
           // 3. Update Run Link
-          await supabase.from('payroll_runs').update({ journal_entry_id: newEntry.id }).eq('id', run.id)
+          await (supabase as any).from('payroll_runs').update({ journal_entry_id: newEntry.id }).eq('id', run.id)
           fixedCount++
        }
     }
@@ -247,7 +247,7 @@ export async function getPayrollRunDetails(runId: string) {
 
 export async function deletePayrollRun(runId: string) {
   const supabase = await createClient()
-  const { error } = await supabase.from('payroll_runs').delete().eq('id', runId)
+  const { error } = await (supabase as any).from('payroll_runs').delete().eq('id', runId)
   if (error) return { error: error.message }
   revalidatePath('/hris')
   return { success: true }
@@ -255,7 +255,7 @@ export async function deletePayrollRun(runId: string) {
 
 export async function voidPayrollRun(runId: string) {
   const supabase = await createClient()
-  const { error } = await supabase.rpc('void_payroll_run', { p_run_id: runId })
+  const { error } = await (supabase as any).rpc('void_payroll_run', { p_run_id: runId })
   if (error) return { error: error.message }
   revalidatePath('/hris')
   return { success: true }

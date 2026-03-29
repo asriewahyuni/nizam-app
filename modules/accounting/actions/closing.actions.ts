@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 export async function getFiscalPeriods(orgId: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('fiscal_periods')
     .select('*')
     .eq('org_id', orgId)
@@ -23,7 +23,7 @@ export async function createFiscalPeriod(orgId: string, input: {
 }) {
   const supabase = await createClient()
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('fiscal_periods')
     .insert({
       org_id: orgId,
@@ -34,8 +34,9 @@ export async function createFiscalPeriod(orgId: string, input: {
     })
 
   if (error) {
+    console.error('Create fiscal period error:', error)
     if (error.code === '23505') return { error: 'Nama periode ini sudah ada.' }
-    return { error: 'Gagal membuat periode fiskal.' }
+    return { error: `Gagal membuat periode fiskal: ${error.message}` }
   }
 
   revalidatePath('/accounting/closing')
@@ -47,7 +48,7 @@ export async function closeFiscalPeriod(id: string, orgId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('fiscal_periods')
     .update({ 
       is_closed: true,
@@ -66,7 +67,7 @@ export async function closeFiscalPeriod(id: string, orgId: string) {
 export async function openFiscalPeriod(id: string, orgId: string) {
   const supabase = await createClient()
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('fiscal_periods')
     .update({ 
       is_closed: false,

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import {
   LayoutDashboard,
   BookOpen,
@@ -32,7 +32,8 @@ import {
   Lock,
   LineChart,
   Zap,
-  Store
+  Store,
+  Clock
 } from 'lucide-react'
 import { signOut } from '@/modules/auth/actions/auth.actions'
 import { signOutDemo } from '@/modules/demo/actions/demo.actions'
@@ -54,68 +55,71 @@ const NAV_GROUPS: NavGroup[] = [
     group: 'Utama',
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-      { label: 'Audit Integritas', href: '/accounting/audit', icon: ShieldCheck, permission_key: 'audit' },
+      { label: 'Audit Integritas', href: '/accounting/audit', icon: ShieldCheck, permission_key: 'audit', module_key: 'Audit' },
     ]
   },
   {
     group: 'Finance',
     items: [
-      { label: 'Akun (CoA)', href: '/settings/accounts', icon: Layers, permission_key: 'finance' },
-      { label: 'Kas & Bank', href: '/cash', icon: Wallet, permission_key: 'finance' },
-      { label: 'Buku Besar', href: '/accounting/journal', icon: BookOpen, permission_key: 'finance' },
-      { label: 'Aging (AR/AP)', href: '/accounting/aging', icon: History, permission_key: 'finance' },
-      { label: 'Manajemen Zakat', href: '/accounting/zakat', icon: Zap, permission_key: 'finance' },
-      { label: 'Manajemen Pajak', href: '/accounting/tax', icon: ShieldCheck, permission_key: 'finance' },
-      { label: 'Reimbursement', href: '/accounting/reimburse', icon: FileText, permission_key: 'finance' },
-      { label: 'Penutupan Buku', href: '/accounting/closing', icon: Lock, permission_key: 'finance' },
-      { label: 'Aset Tetap', href: '/accounting/assets', icon: Landmark, permission_key: 'finance' },
-      { label: 'Anggaran', href: '/accounting/budgets', icon: Target, permission_key: 'finance' },
+      { label: 'Akun (CoA)', href: '/settings/accounts', icon: Layers, permission_key: 'finance', module_key: 'Finance' },
+      { label: 'Kas & Bank', href: '/cash', icon: Wallet, permission_key: 'finance', module_key: 'Finance' },
+      { label: 'Buku Besar', href: '/accounting/journal', icon: BookOpen, permission_key: 'finance', module_key: 'Accounting' },
+      { label: 'Aging (AR/AP)', href: '/accounting/aging', icon: History, permission_key: 'finance', module_key: 'Finance' },
+      { label: 'Manajemen Zakat', href: '/accounting/zakat', icon: Zap, permission_key: 'finance', module_key: 'Accounting' },
+      { label: 'Manajemen Pajak', href: '/accounting/tax', icon: ShieldCheck, permission_key: 'finance', module_key: 'Accounting' },
+      { label: 'Reimbursement', href: '/accounting/reimburse', icon: FileText, permission_key: 'finance', module_key: 'Finance' },
+      { label: 'Penutupan Buku', href: '/accounting/closing', icon: Lock, permission_key: 'finance', module_key: 'Accounting' },
+      { label: 'Aset Tetap', href: '/accounting/assets', icon: Landmark, permission_key: 'finance', module_key: 'Finance' },
+      { label: 'Anggaran', href: '/accounting/budgets', icon: Target, permission_key: 'finance', module_key: 'Accounting' },
     ]
   },
   {
     group: 'Operasional',
     items: [
-      { label: 'Pembelian', href: '/purchasing', icon: ShoppingCart, permission_key: 'purchasing', module_key: 'purchasing' },
-      { label: 'Inventori', href: '/inventory', icon: Package, permission_key: 'inventory', module_key: 'inventory' },
-      { label: 'Gudang (WMS)', href: '/inventory/warehouses', icon: Warehouse, permission_key: 'inventory', module_key: 'inventory' },
-      { label: 'Manufaktur (BoM)', href: '/factory', icon: Factory, permission_key: 'factory', module_key: 'factory' },
-      { label: 'Fleet & Rental', href: '/fleet', icon: Truck, permission_key: 'fleet', module_key: 'fleet' },
-      { label: 'Job Order (Jasa)', href: '/services', icon: Briefcase, permission_key: 'services', module_key: 'services' },
+      { label: 'Pembelian', href: '/purchasing', icon: ShoppingCart, permission_key: 'purchasing', module_key: 'Purchasing' },
+      { label: 'Inventori', href: '/inventory', icon: Package, permission_key: 'inventory', module_key: 'Inventory' },
+      { label: 'Gudang (WMS)', href: '/inventory/warehouses', icon: Warehouse, permission_key: 'inventory', module_key: 'Warehouse' },
+      { label: 'Manufaktur (BoM)', href: '/factory', icon: Factory, permission_key: 'factory', module_key: 'Manufacturing' },
+      { label: 'Fleet & Rental', href: '/fleet', icon: Truck, permission_key: 'fleet', module_key: 'Fleet Management' },
+      { label: 'Job Order (Jasa)', href: '/services', icon: Briefcase, permission_key: 'services', module_key: 'Industrial Job Order' },
     ]
   },
   {
     group: 'Marketing & Sales',
     items: [
-      { label: 'Pelanggan (CRM)', href: '/contacts', icon: Users, permission_key: 'sales', module_key: 'sales' },
-      { label: 'POS (Kasir)', href: '/pos', icon: Store, permission_key: 'pos', module_key: 'pos' },
-      { label: 'Penawaran (Quotation)', href: '/sales/quotations', icon: FileText, permission_key: 'sales', module_key: 'sales' },
-      { label: 'Penjualan', href: '/sales', icon: TrendingUp, permission_key: 'sales', module_key: 'sales' },
-      { label: 'Sales Pipeline', href: '/sales/pipeline', icon: Activity, permission_key: 'sales', module_key: 'sales' },
-      { label: 'Target & Komisi', href: '/sales/commission', icon: Target, permission_key: 'sales', module_key: 'sales' },
-      { label: 'Promo & Reward', href: '/sales/promos', icon: Zap, permission_key: 'sales', module_key: 'sales' },
+      { label: 'Pelanggan (CRM)', href: '/contacts', icon: Users, permission_key: 'sales', module_key: 'CRM' },
+      { label: 'POS (Kasir)', href: '/pos', icon: Store, permission_key: 'pos', module_key: 'POS' },
+      { label: 'Penawaran (Quotation)', href: '/sales/quotations', icon: FileText, permission_key: 'sales', module_key: 'Sales' },
+      { label: 'Penjualan', href: '/sales', icon: TrendingUp, permission_key: 'sales', module_key: 'Sales' },
+      { label: 'Sales Pipeline', href: '/sales/pipeline', icon: Activity, permission_key: 'sales', module_key: 'Sales' },
+      { label: 'Target & Komisi', href: '/sales/commission', icon: Target, permission_key: 'sales', module_key: 'Sales' },
+      { label: 'Promo & Reward', href: '/sales/promos', icon: Zap, permission_key: 'sales', module_key: 'Sales' },
     ]
   },
   {
     group: 'HRIS',
     items: [
-      { label: 'Karyawan (HRIS)', href: '/hris', icon: Users, permission_key: 'hris', module_key: 'hris' },
-      { label: 'Akses & Jabatan', href: '/settings/roles', icon: ShieldCheck, permission_key: 'hris', module_key: 'hris' },
+      { label: 'Karyawan (SDM)', href: '/hris', icon: Users, permission_key: 'hris', module_key: 'HRIS' },
+      { label: 'Absensi & Cuti', href: '/hris?tab=attendance', icon: Clock, permission_key: 'attendance', module_key: 'Attendance' },
+      { label: 'Payroll Components', href: '/hris?tab=payroll', icon: FileText, permission_key: 'payroll', module_key: 'Payroll' },
+      { label: 'Proses Penggajian', href: '/hris?tab=runs', icon: Wallet, permission_key: 'payroll_process', module_key: 'Payroll' },
+      { label: 'Hak Akses', href: '/settings/roles', icon: ShieldCheck, permission_key: 'hris', module_key: 'HRIS' },
     ]
   },
   {
     group: 'Insight',
     items: [
-      { label: 'Laporan', href: '/reports', icon: BarChart3, permission_key: 'reports', module_key: 'reports' },
-      { label: 'Strategi (BSC)', href: '/reports/bsc', icon: PieChart, permission_key: 'reports', module_key: 'reports' },
-      { label: 'Proyeksi Kas', href: '/accounting/forecast', icon: LineChart, permission_key: 'reports', module_key: 'reports' },
+      { label: 'Laporan', href: '/reports', icon: BarChart3, permission_key: 'reports', module_key: 'Reports' },
+      { label: 'Strategi (BSC)', href: '/reports/bsc', icon: PieChart, permission_key: 'reports', module_key: 'Reports' },
+      { label: 'Proyeksi Kas', href: '/accounting/forecast', icon: LineChart, permission_key: 'reports', module_key: 'Finance' },
     ]
   },
   {
     group: 'Config',
     items: [
-      { label: 'Audit Trail', href: '/settings/audit', icon: ShieldCheck, permission_key: 'config', module_key: 'config' },
-      { label: 'Cabang & Divisi', href: '/settings/branches', icon: MapPin, permission_key: 'config', module_key: 'config' },
-      { label: 'Pengaturan Bisnis', href: '/settings/business', icon: Settings, permission_key: 'config', module_key: 'config' },
+      { label: 'Audit Trail', href: '/settings/audit', icon: ShieldCheck, permission_key: 'config', module_key: 'Audit' },
+      { label: 'Cabang & Divisi', href: '/settings/branches', icon: MapPin, permission_key: 'config', module_key: 'Consolidation' },
+      { label: 'Pengaturan Bisnis', href: '/settings/business', icon: Settings, permission_key: 'config' },
     ]
   }
 ]
@@ -131,6 +135,7 @@ interface AppSidebarProps {
   pendingPurchaseRequests?: number
   hrisNotifications?: number
   isDemo?: boolean
+  planName?: string
 }
 
 export function AppSidebar({ 
@@ -143,11 +148,17 @@ export function AppSidebar({
   unpostedJournals = 0, 
   pendingPurchaseRequests = 0,
   hrisNotifications = 0,
-  isDemo = false 
+  isDemo = false,
+  planName = 'Trial'
 }: AppSidebarProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const tabQuery = searchParams?.get('tab')
+  const fullPath = pathname + (tabQuery ? `?tab=${tabQuery}` : '')
+
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
 
   // Persist collapse state
   useEffect(() => {
@@ -206,26 +217,34 @@ export function AppSidebar({
             if (isDemo) return true
 
             // 1. SaaS Module Check
-            if (item.module_key) {
-               const key = item.module_key.toLowerCase()
+            if (item.module_key || group.group) {
+               const internalKey = item.module_key?.toLowerCase().trim();
+               const labelKey = item.label.toLowerCase().trim();
+               const categoryKey = group.group.toLowerCase().trim();
                
-               // OWNER/ADMIN BYPASS: Jika owner sedang mencoba paket, jangan sembunyikan modul inti 
-               // agar mereka tidak bingung saat setup awal
-               const coreKeys = ['sales', 'accounting', 'inventory', 'purchasing', 'factory', 'fleet', 'services', 'pos', 'hris', 'config', 'reports', 'audit']
-               if (isOwnerOrAdmin && coreKeys.some(ck => ck === key)) return true
-
+               // STRICT SAAS CHECK: Honor enabledModules (Plan + Add-ons)
                const matches = enabledModules.some(m => {
-                  const mm = m.toLowerCase()
-                  // Flexible mapping for SaaS modules vs Sidebar keys
-                  if (key === 'sales' && (mm === 'marketing' || mm === 'sales')) return true
-                  if (key === 'marketing' && (mm === 'sales' || mm === 'marketing')) return true
-                  if (key === 'accounting' && (mm === 'finance' || mm === 'accounting')) return true
-                  if (key === 'finance' && (mm === 'accounting' || mm === 'finance')) return true
-                  if (key === 'factory' && (mm === 'manufacturing' || mm === 'factory')) return true
-                  if (key === 'manufacturing' && (mm === 'factory' || mm === 'manufacturing')) return true
-                  if (key === 'inventory' && (mm === 'warehouse' || mm === 'inventory')) return true
-                  if (key === 'warehouse' && (mm === 'inventory' || mm === 'warehouse')) return true
-                  return mm === key
+                  const mm = m.toLowerCase().trim()
+                  // Category-level access: e.g. 'Finance' enables all items in Finance group
+                  if (mm === categoryKey) return true
+                  // Feature-level access: e.g. 'Akun (CoA)'
+                  if (mm === labelKey) return true
+                  // Internal-key access: e.g. 'Accounting'
+                  if (internalKey && mm === internalKey) return true
+                  
+                  // Flexible mapping for legacy/shorthand names
+                  const key = internalKey || labelKey;
+                  if (key.includes('sales') && (mm.includes('marketing') || mm.includes('sales'))) return true
+                  if (key.includes('marketing') && (mm.includes('sales') || mm.includes('marketing'))) return true
+                  if (key.includes('accounting') && (mm.includes('finance') || mm.includes('accounting'))) return true
+                  if (key.includes('finance') && (mm.includes('accounting') || mm.includes('finance'))) return true
+                  if (key.includes('factory') && (mm.includes('manufacturing') || mm.includes('factory'))) return true
+                  if (key.includes('manufacturing') && (mm.includes('factory') || mm.includes('manufacturing'))) return true
+                  
+                  // HRIS sub-modules: Attendance & Payroll are bundled under HRIS
+                  if ((key.includes('attendance') || key.includes('payroll') || key.includes('payroll_process')) && mm.includes('hris')) return true
+                  
+                  return false
                })
                if (!matches) return false
             }
@@ -246,7 +265,16 @@ export function AppSidebar({
               <ul className="space-y-1.5">
                 {filteredItems.map((item) => {
                   const Icon = item.icon
-                  const isActive = item.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.href)
+                  let isActive = false
+                  
+                  if (item.href === '/dashboard') {
+                     isActive = pathname === '/dashboard'
+                  } else if (item.href.includes('?')) {
+                     isActive = fullPath === item.href
+                  } else {
+                     // For exact base matches like /hris without any query tabs
+                     isActive = pathname.startsWith(item.href) && (!item.href.startsWith('/hris') || !tabQuery)
+                  }
 
                   // Define Notification Badges Mapping
                   let badgeCount = 0
@@ -315,10 +343,10 @@ export function AppSidebar({
       <div className={`p-4 border-t border-slate-50 bg-slate-50/30 ${isCollapsed ? 'items-center' : ''}`}>
         <div className={`flex items-center ${isCollapsed ? 'flex-col gap-4' : 'justify-between'}`}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 shrink-0 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-xs font-black text-slate-800 shadow-sm relative">
+          <Link href="/profil-saya" className="w-10 h-10 shrink-0 rounded-2xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center text-xs font-black text-slate-800 shadow-sm relative hover:ring-2 hover:ring-blue-400 transition-all" title="Edit Profil Saya">
               {userRole?.slice(0, 1).toUpperCase()}
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#003366] border-2 border-white" />
-            </div>
+            </Link>
             {!isCollapsed && (
               <div className="flex flex-col overflow-hidden max-w-[120px]">
                 <p className="text-sm font-black text-slate-900 truncate mb-1 leading-tight tracking-tight">{user?.fullName || userRole}</p>
@@ -328,7 +356,11 @@ export function AppSidebar({
           </div>
 
           <div className={`flex items-center ${isCollapsed ? 'flex-col gap-1' : 'gap-1'}`}>
-            <Link href="/settings/business" className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
+            <Link 
+              href={isOwnerOrAdmin ? '/settings/business' : '/profil-saya'} 
+              title={isOwnerOrAdmin ? 'Pengaturan Bisnis' : 'Profil & Password Saya'}
+              className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+            >
               <Settings size={18} strokeWidth={1.5} />
             </Link>
             <form action={isDemo ? signOutDemo : signOut}>
@@ -342,26 +374,9 @@ export function AppSidebar({
             </form>
           </div>
         </div>
-      {/* Upgrade Banner */}
-      {!isCollapsed && (
-        <div className="px-4 pb-3">
-          <Link
-            href="/pricing"
-            className="group flex items-center gap-3 w-full px-4 py-3 rounded-2xl bg-gradient-to-r from-[#003366] to-indigo-700 text-white hover:shadow-lg hover:shadow-[#003366]/20 hover:-translate-y-0.5 transition-all duration-300"
-          >
-            <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-              <Zap size={16} className="text-amber-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/60">Paket Aktif</p>
-              <p className="text-sm font-black text-white truncate group-hover:text-amber-300 transition-colors">Upgrade Paket →</p>
-            </div>
-          </Link>
-        </div>
-      )}
       {isCollapsed && (
-        <div className="px-3 pb-2">
-          <Link href="/pricing" title="Upgrade Paket" className="flex items-center justify-center w-full p-2.5 rounded-xl bg-[#003366]/10 text-[#003366] hover:bg-[#003366] hover:text-white transition-all">
+        <div className="px-3 pb-3">
+          <Link href="/billing" title="Langganan & Billing" className="flex items-center justify-center w-full p-2.5 rounded-xl bg-[#003366]/5 text-[#003366] hover:bg-[#003366] hover:text-white transition-all shadow-sm">
             <Zap size={16} />
           </Link>
         </div>

@@ -3,11 +3,12 @@ import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns'
 
 export async function getDashboardAnalytics(orgId: string, branchId?: string) {
   const supabase = await createClient()
+  const db = supabase as any
 
   const startDate = format(subMonths(new Date(), 5), 'yyyy-MM-01')
 
   // 1. Financial Analytics (Journal Entries)
-  let entriesQuery = supabase
+  let entriesQuery = (supabase as any)
     .from('journal_entries')
     .select('id, entry_date')
     .eq('org_id', orgId)
@@ -24,11 +25,11 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
   let topExpenses: any[] = []
 
   if (entries && entries.length > 0) {
-    const entryIds = entries.map(e => e.id)
+    const entryIds = entries.map((e: any) => e.id)
     const entryDateMap: Record<string, string> = {}
-    entries.forEach(e => { entryDateMap[e.id] = e.entry_date })
+    entries.forEach((e: any) => { entryDateMap[e.id] = e.entry_date })
 
-    const { data: lines } = await supabase
+    const { data: lines } = await db
       .from('journal_lines')
       .select('debit, credit, entry_id, accounts!inner(code, name, type)')
       .in('entry_id', entryIds) as any
@@ -57,11 +58,11 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
 
       chartData = Object.entries(monthlyData)
         .map(([name, vals]) => ({ name, revenue: vals.revenue, expense: vals.expense, profit: vals.revenue - vals.expense }))
-        .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime())
+        .sort((a: any, b: any) => new Date(a.name).getTime() - new Date(b.name).getTime())
 
       topExpenses = Object.entries(expenseBreakdown)
         .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
+        .sort((a: any, b: any) => b.value - a.value)
         .slice(0, 5)
     }
   }
@@ -70,7 +71,7 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
   // Get sales in last 3 months for better Pareto sample
   const paretoStartDate = format(subMonths(new Date(), 3), 'yyyy-MM-01')
   
-  let salesQuery = supabase
+  let salesQuery = (supabase as any)
     .from('sales_items')
     .select(`
       quantity,
@@ -109,14 +110,14 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
   }
 
   const sortedProducts = Object.values(productStats)
-    .sort((a, b) => b.revenue - a.revenue)
+    .sort((a: any, b: any) => b.revenue - a.revenue)
 
   // Top 10 Products
   const topProducts = sortedProducts.slice(0, 10)
 
   // Pareto Logic: Top 20% of products that generate 80% of revenue
   let runningRevenue = 0
-  const paretoTop20 = sortedProducts.filter((p, idx) => {
+  const paretoTop20 = sortedProducts.filter((p: any, idx: any) => {
     runningRevenue += p.revenue
     const isUnder80Percent = runningRevenue <= (totalRevenue * 0.8)
     const isInTop20PercentCount = (idx + 1) <= Math.ceil(sortedProducts.length * 0.2)
@@ -125,7 +126,7 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
 
   // 3. Customer Pareto Analytics (Pelanggan Penyumbang Untung Terbesar)
   // Join sales items to get profit per customer
-  let customerSalesQuery = supabase
+  let customerSalesQuery = (supabase as any)
     .from('sales_items')
     .select(`
       total_amount,
@@ -168,10 +169,10 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
   }
 
   const sortedCustomers = Object.values(customerStats)
-    .sort((a, b) => b.revenue - a.revenue)
+    .sort((a: any, b: any) => b.revenue - a.revenue)
 
   let cRunningRevenue = 0
-  const paretoTopCustomers = sortedCustomers.filter((c, idx) => {
+  const paretoTopCustomers = sortedCustomers.filter((c: any, idx: any) => {
     cRunningRevenue += c.revenue
     const isUnder80Percent = cRunningRevenue <= (totalCustomerRevenue * 0.8)
     const isInTop20PercentCount = (idx + 1) <= Math.ceil(sortedCustomers.length * 0.2)
@@ -185,8 +186,8 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
     paretoAnalysis: {
       totalProducts: sortedProducts.length,
       top20Count: paretoTop20.length,
-      top20Revenue: paretoTop20.reduce((s, p) => s + p.revenue, 0),
-      top20Profit: paretoTop20.reduce((s, p) => s + p.profit, 0),
+      top20Revenue: paretoTop20.reduce((s: any, p: any) => s + p.revenue, 0),
+      top20Profit: paretoTop20.reduce((s: any, p: any) => s + p.profit, 0),
       totalRevenue,
       totalProfit,
       paretoProducts: paretoTop20
@@ -194,8 +195,8 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
     customerPareto: {
       totalCustomers: sortedCustomers.length,
       top20Count: paretoTopCustomers.length,
-      top20Revenue: paretoTopCustomers.reduce((s, c) => s + c.revenue, 0),
-      top20Profit: paretoTopCustomers.reduce((s, c) => s + c.profit, 0),
+      top20Revenue: paretoTopCustomers.reduce((s: any, c: any) => s + c.revenue, 0),
+      top20Profit: paretoTopCustomers.reduce((s: any, c: any) => s + c.profit, 0),
       totalRevenue: totalCustomerRevenue,
       totalProfit: totalCustomerProfit,
       paretoCustomers: paretoTopCustomers

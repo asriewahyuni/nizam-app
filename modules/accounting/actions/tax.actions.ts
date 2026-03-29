@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function getTaxSummary(orgId: string, startDate?: string, endDate?: string) {
   const supabase = await createClient()
+  const db = supabase as any
 
   const now = new Date()
   const sDate = startDate || new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
@@ -11,7 +12,7 @@ export async function getTaxSummary(orgId: string, startDate?: string, endDate?:
   // Cannot filter journal_lines by accounts.code directly via PostgREST .or()
   // so we first fetch the account IDs for org, then filter lines by those IDs.
   const TAX_CODES = ['1401', '2201', '2202', '2203']
-  const { data: taxAccounts, error: accErr } = await supabase
+  const { data: taxAccounts, error: accErr } = await db
     .from('accounts')
     .select('id, code')
     .eq('org_id', orgId)
@@ -30,11 +31,11 @@ export async function getTaxSummary(orgId: string, startDate?: string, endDate?:
   }
 
   const accIdMap: Record<string, string> = {} // code → account_id
-  taxAccounts.forEach(a => { accIdMap[a.code] = a.id })
-  const taxAccountIds = taxAccounts.map(a => a.id)
+  taxAccounts.forEach((a: any) => { accIdMap[a.code] = a.id })
+  const taxAccountIds = taxAccounts.map((a: any) => a.id)
 
   // ── STEP 2: Get relevant journal entry IDs in date range ─────────────────
-  const { data: entries, error: entErr } = await supabase
+  const { data: entries, error: entErr } = await db
     .from('journal_entries')
     .select('id')
     .eq('org_id', orgId)
@@ -54,10 +55,10 @@ export async function getTaxSummary(orgId: string, startDate?: string, endDate?:
     }
   }
 
-  const entryIds = entries.map(e => e.id)
+  const entryIds = entries.map((e: any) => e.id)
 
   // ── STEP 3: Fetch journal lines filtered by tax account IDs ───────────────
-  const { data: lines, error: lineErr } = await supabase
+  const { data: lines, error: lineErr } = await db
     .from('journal_lines')
     .select(`
       debit, credit, memo, entry_id, account_id,

@@ -19,7 +19,7 @@ export default async function POSPage() {
     .eq('org_id', orgId)
 
   // Sub-process: manually aggregate quantity if needed or use the first record if POS uses single WH
-  const productsWithStock = products?.map(p => ({
+  const productsWithStock = (products as any[])?.map(p => ({
      ...p,
      stock: p.inventory_stocks?.reduce((acc: number, s: any) => acc + s.quantity, 0) || 0
   })) || []

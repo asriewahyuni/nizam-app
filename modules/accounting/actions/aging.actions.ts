@@ -18,12 +18,13 @@ function agingBucket(dueDateStr: string): string {
 
 export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
   const supabase = await createClient()
+  const db = supabase as any
 
   let results: any[] = []
 
   if (type === 'AR') {
     // 1. Trade AR from Sales Module
-    const { data: sales } = await supabase
+    const { data: sales } = await db
       .from('sales')
       .select('id, sale_number, sale_date, due_date, grand_total, customer_id, contacts!customer_id(name)')
       .eq('org_id', orgId)
@@ -31,8 +32,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
       .neq('payment_status', 'PAID')
 
     if (sales && sales.length > 0) {
-      const saleIds = sales.map(s => s.id)
-      const { data: payments } = await supabase
+      const saleIds = sales.map((s: any) => s.id)
+      const { data: payments } = await db
         .from('sales_payments')
         .select('sale_id, amount, discount_amount')
         .in('sale_id', saleIds)
@@ -40,7 +41,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
       for (const p of payments || []) {
         paidBySale[p.sale_id] = (paidBySale[p.sale_id] || 0) + Number(p.amount) + Number(p.discount_amount || 0)
       }
-      const { data: returns } = await supabase
+      const { data: returns } = await db
         .from('sales_returns')
         .select('sale_id, grand_total')
         .in('sale_id', saleIds)
@@ -68,11 +69,11 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
             source_type: 'SALES'
           }
         })
-        .filter(r => r.outstanding > 0.01)
+        .filter((r: any) => r.outstanding > 0.01)
     }
 
     // 2. Reconciliation with GL (1201)
-    const { data: balanceData } = await supabase
+    const { data: balanceData } = await db
       .from('account_balances')
       .select('balance')
       .eq('org_id', orgId)
@@ -80,7 +81,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
       .single();
 
     const glBalance = Number(balanceData?.balance || 0);
-    const moduleTotal = results.reduce((s, r) => s + r.outstanding, 0);
+    const moduleTotal = results.reduce((s: any, r: any) => s + r.outstanding, 0);
     const diff = glBalance - moduleTotal;
 
     if (Math.abs(diff) > 10) {
@@ -101,7 +102,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
 
   } else {
     // 1. Trade AP from Purchases Module
-    const { data: purchases } = await supabase
+    const { data: purchases } = await db
       .from('purchases')
       .select('id, purchase_number, purchase_date, due_date, grand_total, vendor_id, contacts!vendor_id(name)')
       .eq('org_id', orgId)
@@ -109,8 +110,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
       .neq('payment_status', 'PAID')
 
     if (purchases && purchases.length > 0) {
-      const purchaseIds = purchases.map(p => p.id)
-      const { data: payments } = await supabase
+      const purchaseIds = purchases.map((p: any) => p.id)
+      const { data: payments } = await db
         .from('purchase_payments')
         .select('purchase_id, amount, discount_amount')
         .in('purchase_id', purchaseIds)
@@ -118,7 +119,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
       for (const p of payments || []) {
         paidByPurchase[p.purchase_id] = (paidByPurchase[p.purchase_id] || 0) + Number(p.amount) + Number(p.discount_amount || 0)
       }
-      const { data: returns } = await supabase
+      const { data: returns } = await db
         .from('purchase_returns')
         .select('purchase_id, total_amount')
         .in('purchase_id', purchaseIds)
@@ -145,12 +146,12 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
             source_type: 'PURCHASING'
           }
         })
-        .filter(r => r.outstanding > 0.01)
+        .filter((r: any) => r.outstanding > 0.01)
     }
 
     // 2. Direct AP (Non-Trade) & Taxes from GL (2101, 2201, 2301, 2401)
     // Account 2201: Tax (PPN), 21XX: Other Payables
-    const { data: balances } = await supabase
+    const { data: balances } = await db
       .from('account_balances')
       .select('code, balance, name')
       .eq('org_id', orgId)
@@ -159,7 +160,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
 
     for (const b of balances || []) {
       if (b.code === '2101') {
-        const tradeModuleTotal = results.filter(r => r.source_type === 'PURCHASING').reduce((s, r) => s + r.outstanding, 0);
+        const tradeModuleTotal = results.filter((r: any) => r.source_type === 'PURCHASING').reduce((s: any, r: any) => s + r.outstanding, 0);
         const diff = Number(b.balance) - tradeModuleTotal;
         if (Math.abs(diff) > 10) {
           results.push({
@@ -194,7 +195,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
     }
   }
 
-  return results.sort((a, b) => b.days_overdue - a.days_overdue)
+  return results.sort((a: any, b: any) => b.days_overdue - a.days_overdue)
 }
 
 
@@ -204,12 +205,12 @@ export async function getAgingSummary(orgId: string) {
 
   const buckets = ['Current', '0-30 Days', '31-60 Days', '61-90 Days', '> 90 Days']
 
-  const arSummary = buckets.map(b => ({
+  const arSummary = buckets.map((b: any) => ({
     bucket: b,
     amount: ar.filter((x: any) => x.aging_bucket === b).reduce((s: number, x: any) => s + Number(x.outstanding), 0)
   }))
 
-  const apSummary = buckets.map(b => ({
+  const apSummary = buckets.map((b: any) => ({
     bucket: b,
     amount: ap.filter((x: any) => x.aging_bucket === b).reduce((s: number, x: any) => s + Number(x.outstanding), 0)
   }))

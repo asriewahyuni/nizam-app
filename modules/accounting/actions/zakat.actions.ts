@@ -15,7 +15,7 @@ function getIslamicToday(timeZone: string = 'Asia/Jakarta'): string {
   };
   const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(now);
 
-  const getPart = (type: string) => parts.find(p => p.type === type)?.value;
+  const getPart = (type: string) => parts.find((p: any) => p.type === type)?.value;
   const year = parseInt(getPart('year') || '1970', 10);
   const month = parseInt(getPart('month') || '1', 10) - 1; 
   const day = parseInt(getPart('day') || '1', 10);
@@ -64,37 +64,37 @@ async function getTotalZakatAssets(orgId: string) {
 
   // 1. Kas & Bank (1101–1199)
   const cashAccounts = balances
-    .filter(b => b.code >= '1101' && b.code <= '1199')
-    .map(b => ({ name: b.name, code: b.code, balance: b.balance || 0, type: 'CASH' as const }))
-  const totalCash = cashAccounts.reduce((s, a) => s + a.balance, 0)
+    .filter((b: any) => b.code >= '1101' && b.code <= '1199')
+    .map((b: any) => ({ name: b.name, code: b.code, balance: b.balance || 0, type: 'CASH' as const }))
+  const totalCash = cashAccounts.reduce((s: any, a: any) => s + a.balance, 0)
 
   // 2. Piutang Dagang / AR (1201–1299) — yang diharapkan kembali
   const arAccounts = balances
-    .filter(b => b.code >= '1201' && b.code <= '1299')
-    .map(b => ({ name: b.name, code: b.code, balance: b.balance || 0, type: 'AR' as const }))
-  const totalAR = arAccounts.reduce((s, a) => s + a.balance, 0)
+    .filter((b: any) => b.code >= '1201' && b.code <= '1299')
+    .map((b: any) => ({ name: b.name, code: b.code, balance: b.balance || 0, type: 'AR' as const }))
+  const totalAR = arAccounts.reduce((s: any, a: any) => s + a.balance, 0)
 
   // 3. Persediaan / Inventory (1301–1399)
   const inventoryAccounts = balances
-    .filter(b => b.code >= '1301' && b.code <= '1399')
-    .map(b => ({ name: b.name, code: b.code, balance: b.balance || 0, type: 'INVENTORY' as const }))
-  const totalInventory = inventoryAccounts.reduce((s, a) => s + a.balance, 0)
+    .filter((b: any) => b.code >= '1301' && b.code <= '1399')
+    .map((b: any) => ({ name: b.name, code: b.code, balance: b.balance || 0, type: 'INVENTORY' as const }))
+  const totalInventory = inventoryAccounts.reduce((s: any, a: any) => s + a.balance, 0)
 
   // 4. Laba Bersih (Hanya sebagai info, JANGAN DITAMBAH ke Harta Zakat!)
   // Karena wujud laba sudah nyata berada di Kas, Piutang, atau Persediaan. Menambahkan laba = double counting.
   const totalRevenue = balances
-    .filter(b => b.code >= '4000' && b.code <= '4999')
-    .reduce((s, b) => s + (b.balance || 0), 0)
+    .filter((b: any) => b.code >= '4000' && b.code <= '4999')
+    .reduce((s: any, b: any) => s + (b.balance || 0), 0)
   const totalExpenses = balances
-    .filter(b => b.code >= '5000' && b.code <= '7999')
-    .reduce((s, b) => s + (b.balance || 0), 0)
+    .filter((b: any) => b.code >= '5000' && b.code <= '7999')
+    .reduce((s: any, b: any) => s + (b.balance || 0), 0)
   const netProfit = Math.max(0, totalRevenue - totalExpenses)
 
   // 5. Hutang Lancar / AP (2101-2199) - Mengurangi kewajiban zakat
   const apAccounts = balances
-    .filter(b => b.code >= '2101' && b.code <= '2199')
-    .map(b => ({ name: b.name, code: b.code, balance: Math.abs(b.balance || 0), type: 'AP' as const }))
-  const totalAP = apAccounts.reduce((s, a) => s + a.balance, 0)
+    .filter((b: any) => b.code >= '2101' && b.code <= '2199')
+    .map((b: any) => ({ name: b.name, code: b.code, balance: Math.abs(b.balance || 0), type: 'AP' as const }))
+  const totalAP = apAccounts.reduce((s: any, a: any) => s + a.balance, 0)
 
   // 6. Total Harta Zakat = (Kas + Piutang + Persediaan) - Hutang Lancar
   // Aset Tetap (1401+) TIDAK dihitung. Laba bersih TIDAK ditambahkan ulang.
@@ -104,7 +104,7 @@ async function getTotalZakatAssets(orgId: string) {
     ...cashAccounts,
     ...arAccounts,
     ...inventoryAccounts,
-    ...apAccounts.map(a => ({ ...a, balance: -a.balance })) // minus sign for display
+    ...apAccounts.map((a: any) => ({ ...a, balance: -a.balance })) // minus sign for display
   ]
 
   return {
@@ -132,27 +132,24 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
   const { zakatAssets, totalAssets, breakdown } = await getTotalZakatAssets(orgId)
 
   // 2. Check for active haul
-  let { data: activeHaul } = await supabase
-    .from('zakat_haul' as any)
+  let { data: activeHaul } = await (supabase as any)
+    .from('zakat_haul')
     .select('*')
     .eq('org_id', orgId)
     .eq('status', 'ACTIVE')
     .maybeSingle()
 
   // 3. Determine which prices to use for nishab
-  // Fiqh: Nishab dievaluasi berdasarkan harga emas/perak pada AWAL HAUL
-  // Jika belum ada haul aktif, gunakan harga sekarang sebagai referensi
   const hauledPrices = activeHaul
     ? { goldPerGram: Number(activeHaul.gold_price_per_gram), silverPerGram: Number(activeHaul.silver_price_per_gram) }
     : currentPrices
 
-  const nishabGold   = NISHAB_GOLD_GRAMS   * hauledPrices.goldPerGram    // 85g × harga emas awal haul
-  const nishabSilver = NISHAB_SILVER_GRAMS * hauledPrices.silverPerGram   // 595g × harga perak awal haul
+  const nishabGold   = NISHAB_GOLD_GRAMS   * hauledPrices.goldPerGram
+  const nishabSilver = NISHAB_SILVER_GRAMS * hauledPrices.silverPerGram
 
   const isReachedGold   = totalAssets >= nishabGold
   const isReachedSilver = totalAssets >= nishabSilver
 
-  // Zakat wajib minimum jika mencapai SALAH SATU nishab (Nishab perak lebih rendah = lebih konservatif)
   const isZakatObligated = isReachedSilver || isReachedGold
   const zakatAmount = isZakatObligated ? totalAssets * ZAKAT_RATE : 0
 
@@ -164,18 +161,16 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
   let haulBatalReason: string | null = null
 
   if (activeHaul) {
-    // REAL-TIME FIQH CHECK:
-    // Jika Harta Kena Zakat aktual saat ini anjlok di bawah Nishab (Perak), haul otomatis batal
     if (!isZakatObligated) {
       const formatRupiah = (v: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(v)
       haulBatalReason = `Otomatis: Harta (${formatRupiah(totalAssets)}) turun di bawah nishab perak pada ${new Date().toLocaleString('id-ID')}`
       
-      await supabase.from('zakat_haul' as any)
+      await (supabase as any).from('zakat_haul')
         .update({ status: 'BATAL', batal_reason: haulBatalReason })
         .eq('id', activeHaul.id)
 
       haulStatus = 'BATAL'
-      activeHaul = null // Stop tracking as active
+      activeHaul = null
     } else {
       haulStartDate = activeHaul.haul_start_date
       const start = new Date(activeHaul.haul_start_date + 'T00:00:00Z')
@@ -187,9 +182,8 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
   } 
   
   if (!activeHaul) {
-    // Check for cancelled (BATAL) haul
-    const { data: batalHaul } = await supabase
-      .from('zakat_haul' as any)
+    const { data: batalHaul } = await (supabase as any)
+      .from('zakat_haul')
       .select('*')
       .eq('org_id', orgId)
       .eq('status', 'BATAL')
@@ -203,26 +197,24 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
   }
 
   // 5. Get haul history events
-  const { data: haulHistory } = await supabase
-    .from('zakat_haul' as any)
+  const { data: haulHistory } = await (supabase as any)
+    .from('zakat_haul')
     .select('id, haul_start_date, status, nishab_gold, nishab_silver, gold_price_per_gram, silver_price_per_gram, batal_reason, created_at')
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
     .limit(5)
 
-  // 6. Record to org-level timeline (SELALU direkam, termasuk saat di bawah nishab)
-  // Ini memungkinkan grafik menampilkan SELURUH perjalanan harta, lintas haul.
-  const { data: lastTimelineEvent } = await supabase
-    .from('zakat_asset_timeline' as any)
+  // 6. Record to org-level timeline
+  const { data: lastTimelineEvent } = await (supabase as any)
+    .from('zakat_asset_timeline')
     .select('total_assets')
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
-  // Hanya rekam jika nilainya berubah dari snapshot terakhir
   if (!lastTimelineEvent || Number(lastTimelineEvent.total_assets) !== totalAssets) {
-    await supabase.from('zakat_asset_timeline' as any).insert({
+    await (supabase as any).from('zakat_asset_timeline').insert({
       org_id: orgId,
       total_assets: totalAssets,
       nishab_silver: nishabSilver,
@@ -231,14 +223,14 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
     })
   }
 
-  // 7. Fetch ALL timeline points for the graph (org-level, not filtered by haul)
+  // 7. Fetch timeline points
   let dailyAssetsChart: { name: string; value: number; aboveNishab: boolean }[] = []
-  const { data: timelineEvents } = await supabase
-    .from('zakat_asset_timeline' as any)
+  const { data: timelineEvents } = await (supabase as any)
+    .from('zakat_asset_timeline')
     .select('created_at, total_assets, is_above_nishab')
     .eq('org_id', orgId)
     .order('created_at', { ascending: true })
-    .limit(200) // Ambil max 200 titik terakhir
+    .limit(200)
 
   if (timelineEvents && timelineEvents.length > 0) {
     dailyAssetsChart = timelineEvents.map((e: any) => {
@@ -254,15 +246,14 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
       }
     })
 
-    // Jika hanya ada 1 titik, duplikasi agar grafik terbentuk
     if (dailyAssetsChart.length === 1) {
       dailyAssetsChart.unshift({ ...dailyAssetsChart[0], name: 'Start' })
     }
   }
 
-  // 8. Check if Shariah Accounts are enabled/active (at least one root account)
-  const { count: shariahCount } = await supabase
-    .from('accounts' as any)
+  // 8. Check if Shariah Accounts are active
+  const { count: shariahCount } = await (supabase as any)
+    .from('accounts')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .in('code', ['3100', '2600', '6100', '6200'])
@@ -280,18 +271,17 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
     isReachedSilver,
     isZakatObligated,
     zakatAmount,
-    hauledPrices,        // Prices used for nishab (from haul start)
-    currentPrices,       // Current real-time prices (for display)
-    haulStatus,          // 'NO_HAUL' | 'ACTIVE' | 'COMPLETED' | 'BATAL'
+    hauledPrices,
+    currentPrices,
+    haulStatus,
     haulStartDate,
     haulDaysElapsed,
     haulDaysRemaining,
     haulBatalReason,
     haulHistory: haulHistory || [],
-    dailyAssetsChart,    // Daily tracking chart!
+    dailyAssetsChart,
     activeHaul,
-    breakdown,           // { totalInventory, totalRevenue, totalExpenses, netProfit }
-    // Fiqh constants
+    breakdown,
     fiqh: {
       dinarCount: NISHAB_DINAR_COUNT,
       gramsPerDinar: GRAMS_PER_DINAR,
@@ -301,17 +291,12 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
   }
 }
 
-// ============================================================
-// ACTION: Start a new Haul
-// Fiqh: Haul dimulai saat aset PERTAMA KALI mencapai nishab
-// Harga emas/perak dikunci pada hari ini sebagai referensi sepanjang haul
-// ============================================================
 export async function startZakatHaul(
   orgId: string, 
   goldPrice: number, 
   silverPrice: number,
-  goldPriceSource: string = 'Manual Input',      // CFO audit: sumber harga
-  goldPriceEvidenceUrl?: string                   // CFO audit: URL bukti harga
+  goldPriceSource: string = 'Manual Input',
+  goldPriceEvidenceUrl?: string
 ) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -325,10 +310,9 @@ export async function startZakatHaul(
     return { error: `Aset saat ini (${totalAssets.toLocaleString('id-ID')}) masih di bawah nishab. Haul baru belum dapat dimulai.` }
   }
 
-  // Cancel existing BATAL ones (cleanup)
-  await supabase.from('zakat_haul' as any).update({ status: 'ARCHIVED' }).eq('org_id', orgId).eq('status', 'BATAL')
+  await (supabase as any).from('zakat_haul').update({ status: 'ARCHIVED' }).eq('org_id', orgId).eq('status', 'BATAL')
 
-  const { error } = await supabase.from('zakat_haul' as any).insert({
+  const { error } = await (supabase as any).from('zakat_haul').insert({
     org_id: orgId,
     haul_start_date: getIslamicToday(),
     gold_price_per_gram: goldPrice,
@@ -336,7 +320,6 @@ export async function startZakatHaul(
     nishab_gold: nishabGold,
     nishab_silver: nishabSilver,
     status: 'ACTIVE',
-    // CFO Audit Trail — "Anda dapat angka ini dari mana?"
     gold_price_source: goldPriceSource,
     gold_price_evidence_url: goldPriceEvidenceUrl || null,
     gold_price_set_by: user?.id || null,
@@ -349,16 +332,11 @@ export async function startZakatHaul(
   return { success: true }
 }
 
-// ============================================================
-// ACTION: Check + Cancel haul if assets fell below nishab
-// Fiqh: Jika sempat under-nishab, haul batal.
-// Haul baru dimulai saat aset menyentuh nishab lagi.
-// ============================================================
 export async function checkAndCancelHaul(orgId: string) {
   const supabase = await createClient()
 
-  const { data: activeHaul } = await supabase
-    .from('zakat_haul' as any)
+  const { data: activeHaul } = await (supabase as any)
+    .from('zakat_haul')
     .select('*')
     .eq('org_id', orgId)
     .eq('status', 'ACTIVE')
@@ -371,9 +349,8 @@ export async function checkAndCancelHaul(orgId: string) {
   const nishabSilver = Number(activeHaul.nishab_silver)
 
   if (totalAssets < nishabSilver && totalAssets < nishabGold) {
-    // BATAL — assets under nishab
     const today = getIslamicToday()
-    await supabase.from('zakat_haul' as any).update({
+    await (supabase as any).from('zakat_haul').update({
       status: 'BATAL',
       batal_reason: `Aset turun di bawah nishab pada ${today}. Aset: Rp ${totalAssets.toLocaleString('id-ID')}. Haul baru dimulai saat aset kembali di atas nishab.`
     }).eq('id', activeHaul.id)
@@ -385,17 +362,13 @@ export async function checkAndCancelHaul(orgId: string) {
   return { active: true, totalAssets }
 }
 
-// ============================================================
-// ACTION: Evaluate Zakat Daily
-// ============================================================
 export async function evaluateZakatDaily(orgId: string, currentPrices: { gold: number, silver: number }) {
   const supabase = await createClient()
 
   const { totalAssets } = await getTotalZakatAssets(orgId)
 
-  // 2. Check active haul
-  const { data: activeHaul } = await supabase
-    .from('zakat_haul' as any)
+  const { data: activeHaul } = await (supabase as any)
+    .from('zakat_haul')
     .select('*')
     .eq('org_id', orgId)
     .eq('status', 'ACTIVE')
@@ -409,16 +382,15 @@ export async function evaluateZakatDaily(orgId: string, currentPrices: { gold: n
   
   if (activeHaul) {
     if (isUnderNishab) {
-      await supabase.from('zakat_haul' as any).update({
+      await (supabase as any).from('zakat_haul').update({
         status: 'BATAL',
         batal_reason: `Aset turun di bawah nishab pada ${today}. Aset: Rp ${totalAssets.toLocaleString('id-ID')}`
       }).eq('id', activeHaul.id)
-      activeId = undefined // Haul is cancelled
+      activeId = undefined
     }
   } else {
     if (!isUnderNishab) {
-      // AUTO START NEW HAUL
-      const { data: newHaul } = await supabase.from('zakat_haul' as any).insert({
+      const { data: newHaul } = await (supabase as any).from('zakat_haul').insert({
         org_id: orgId,
         haul_start_date: today,
         gold_price_per_gram: currentPrices.gold,
@@ -431,16 +403,14 @@ export async function evaluateZakatDaily(orgId: string, currentPrices: { gold: n
     }
   }
 
-  // 3. Log to historical events if activeId exists (to track graph visually)
   if (activeId) {
-    // avoid duplicates for the same day
-    const { count } = await supabase.from('zakat_haul_events' as any)
+    const { count } = await (supabase as any).from('zakat_haul_events')
       .select('*', { count: 'exact', head: true })
       .eq('haul_id', activeId)
       .eq('event_date', today)
     
     if (!count || count === 0) {
-      await supabase.from('zakat_haul_events' as any).insert({
+      await (supabase as any).from('zakat_haul_events').insert({
         haul_id: activeId,
         org_id: orgId,
         event_date: today,
@@ -451,16 +421,12 @@ export async function evaluateZakatDaily(orgId: string, currentPrices: { gold: n
   }
 }
 
-// ============================================================
-// ACTION: Pay Zakat
-// ============================================================
 export async function payZakat(orgId: string, accountId: string, amount: number) {
   const supabase = await createClient()
 
-  // Find Zakat Expense account
-  let { data: zakatAcc } = await supabase.from('accounts' as any).select('id').eq('org_id', orgId).ilike('name', '%Zakat Tijarah%').single()
+  let { data: zakatAcc } = await (supabase as any).from('accounts').select('id').eq('org_id', orgId).ilike('name', '%Zakat Tijarah%').single()
   if (!zakatAcc) {
-     const { data: alt } = await supabase.from('accounts' as any).select('id').eq('org_id', orgId).ilike('name', '%Zakat%').limit(1).single()
+     const { data: alt } = await (supabase as any).from('accounts').select('id').eq('org_id', orgId).ilike('name', '%Zakat%').limit(1).single()
      zakatAcc = alt
   }
   
@@ -480,28 +446,22 @@ export async function payZakat(orgId: string, accountId: string, amount: number)
     ]
   })
 
-  if (res.error) return res
+  if ('error' in res) return res
 
-  // Mark haul as COMPLETE/PAID
-  await supabase.from('zakat_haul' as any).update({ status: 'COMPLETED' }).eq('org_id', orgId).eq('status', 'ACTIVE')
+  await (supabase as any).from('zakat_haul').update({ status: 'COMPLETED' }).eq('org_id', orgId).eq('status', 'ACTIVE')
 
   revalidatePath('/accounting/zakat')
   revalidatePath('/accounting/journal')
   return { success: true }
 }
 
-// ============================================================
-// ACTION: Temporary Fix / Force Sync Haul to Global Price
-// Digunakan khusus untuk memperbaiki data saat fase testing / setup.
-// Mengupdate semua riwayat haul (Active & Batal) agar menggunakan nishab baru.
-// ============================================================
 export async function syncActiveHaulPrices(orgId: string, goldPrice: number, silverPrice: number) {
   const supabase = await createClient()
 
   const nishabGold = 85 * goldPrice
   const nishabSilver = 595 * silverPrice
 
-  const { error } = await supabase.from('zakat_haul' as any)
+  const { data, error } = await (supabase as any).from('zakat_haul')
     .update({
       gold_price_per_gram: goldPrice,
       silver_price_per_gram: silverPrice,
@@ -510,9 +470,10 @@ export async function syncActiveHaulPrices(orgId: string, goldPrice: number, sil
     })
     .eq('org_id', orgId)
     .in('status', ['ACTIVE', 'BATAL'])
+    .select('id')
 
-  if (error) return { error: error.message }
-  
+    if (error) throw new Error(`Failed to sync prices: ${error.message}`)
+    
   revalidatePath('/accounting/zakat')
   return { success: true }
 }

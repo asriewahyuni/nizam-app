@@ -23,6 +23,7 @@ interface AuditLog {
   action: string
   table_name: string
   description: string
+  record_id?: string | null
   old_data?: any
   new_data?: any
 }
@@ -138,7 +139,7 @@ export function AuditTrailClient({ initialLogs }: { initialLogs: AuditLog[] }) {
                   </div>
                   <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg">
                     <Clock size={12} className="text-slate-300" />
-                    ID: {log.record_id.slice(0, 8)}...
+                    ID: {log.record_id?.slice(0, 8) || 'N/A'}...
                   </div>
                   <button className="flex items-center gap-1 text-blue-600 font-bold hover:underline ml-auto">
                     Detil Data <ExternalLink size={12} />

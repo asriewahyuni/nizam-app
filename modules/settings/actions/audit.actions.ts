@@ -10,7 +10,7 @@ export async function getAuditLogs(orgId: string) {
     .rpc('get_audit_logs_with_users', { p_org_id: orgId })
 
   if (error) {
-    console.error('Error fetching audit logs with users:', error)
+    (console as any).error('Error fetching audit logs with users:', error)
     return []
   }
   
@@ -28,7 +28,7 @@ export async function createAuditLog(
    newData?: any
 ) {
    const supabase = await createClient()
-   await supabase.from('audit_logs').insert({
+   await (supabase as any).from('audit_logs').insert({
       org_id: orgId,
       user_id: userId,
       action,
@@ -47,7 +47,7 @@ export async function resetOrganizationData(orgId: string) {
       console.log('⚡ Attempting High-Performance Reset via RPC for org:', orgId)
       
       // 1. Try to use the SQL Function first (Server-side & Atomic)
-      const { data: rpcRes, error: rpcError } = await supabase.rpc('reset_org_data', { p_org_id: orgId })
+      const { data: rpcRes, error: rpcError } = await (supabase as any).rpc('reset_org_data', { p_org_id: orgId })
       
       if (!rpcError && rpcRes?.success) {
          console.log('✅ RPC Reset Success:', rpcRes.message)
@@ -73,12 +73,12 @@ export async function resetOrganizationData(orgId: string) {
 
       for (const table of tables) {
          console.log(`🧹 Clearing table: ${table}`)
-         const { error } = await supabase.from(table).delete().eq('org_id', orgId)
+         const { error } = await (supabase as any).from(table).delete().eq('org_id', orgId)
          
          if (error && error.code !== '42P01') { 
             // Only stop if it's a real data error, not a missing table
             if (error.code !== '42703') { // ignore missing org_id column
-               console.error(`❌ Gagal di ${table}:`, error)
+               (console as any).error(`❌ Gagal di ${table}:`, error)
                return { success: false, error: `Error di tabel ${table}: ${error.message}` }
             }
          }
@@ -91,7 +91,7 @@ export async function resetOrganizationData(orgId: string) {
       return { success: true }
 
    } catch (error: any) {
-      console.error('💣 Critical Reset Failure:', error)
+      (console as any).error('💣 Critical Reset Failure:', error)
       return { success: false, error: 'Internal Error: ' + error.message }
    }
 }

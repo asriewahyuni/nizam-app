@@ -58,7 +58,7 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
   // Fetch approval QR when a document is opened for viewing/printing
   useEffect(() => {
     if (viewSale) {
-      getApprovalForSource(orgId, viewSale.id, 'SALES_ORDER').then(approval => {
+      getApprovalForSource(orgId, viewSale.id, 'SALES_ORDER').then((approval: any) => {
         if (approval && approval.status === 'APPROVED') {
           setApprovalQr(`APPROVED|REQ-SO:${viewSale.id}|DATE:${approval.decided_at}|ORG:${orgId}`)
         } else {
@@ -482,18 +482,28 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
                        </div>
                     </td>
                     <td className="px-8 py-6 text-right">
-                       <div className="text-sm font-black text-slate-900 font-mono tracking-tighter">{formatRupiah(s.grand_total)}</div>
                        {(() => {
                           const activeReturns = s.sales_returns?.filter((r: any) => r.status !== 'VOIDED') || [];
                           const totalReturned = activeReturns.reduce((acc: number, r: any) => acc + Number(r.grand_total), 0) || 0;
+                          const paid = (s.sales_payments || [])?.reduce((acc: number, p: any) => acc + Number(p.amount) + Number(p.discount_amount || 0), 0) || 0;
+                          const outstanding = s.grand_total - totalReturned - paid;
+
                           return (
-                             <div className="flex flex-col gap-0.5 mt-1">
+                             <div className="flex flex-col items-end gap-1">
+                                <div className="text-sm font-black text-slate-900 font-mono tracking-tighter">
+                                  {outstanding > 0 && outstanding < (s.grand_total - totalReturned) ? formatRupiah(outstanding) : formatRupiah(s.grand_total - totalReturned)}
+                                </div>
+                                {outstanding > 0 && outstanding < (s.grand_total - totalReturned) && (
+                                   <div className="text-[10px] text-slate-400 line-through opacity-50 font-bold">
+                                     Faktur: {formatRupiah(s.grand_total - totalReturned)}
+                                   </div>
+                                )}
                                 <div className={`text-[9px] font-black uppercase tracking-widest ${s.payment_status === 'PAID' ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                  {s.payment_status === 'PAID' ? 'Lunas' : s.payment_status === 'PARTIAL' ? 'Angsuran' : 'Unpaid'}
+                                  {s.payment_status === 'PAID' ? 'Lunas' : s.payment_status === 'PARTIAL' ? 'Angsuran / Sisa' : 'Unpaid'}
                                 </div>
                                 {totalReturned > 0 && (
-                                   <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
-                                     (Terdapat Retur: -{formatRupiah(totalReturned)})
+                                   <div className="text-[9px] font-bold text-rose-500 uppercase tracking-tighter bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-100">
+                                     Ada Retur: -{formatRupiah(totalReturned)}
                                    </div>
                                 )}
                              </div>
@@ -831,8 +841,16 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8">
                 <h3 className="text-xl font-bold mb-8">Daftarkan Customer Baru</h3>
                 <form onSubmit={handleCreateCustomer} className="space-y-6">
-                   <input name="name" required placeholder="Nama Klien / Perusahaan" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm font-medium" />
-                   <textarea name="address" placeholder="Alamat Pengiriman/Penagihan" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm min-h-[100px]" />
+                   <input name="name" required placeholder="Nama Klien / Perusahaan" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm font-bold text-slate-900 focus:border-blue-500 transition-all" />
+                   <div className="grid grid-cols-2 gap-4">
+                     <input name="email" type="email" placeholder="Email (Opsional)" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm font-medium" />
+                     <input name="phone" placeholder="No. Telepon" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm font-medium" />
+                   </div>
+                   <div className="grid grid-cols-2 gap-4">
+                     <input name="phone_wa" placeholder="WhatsApp (62xxx)" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm font-medium" />
+                     <input name="instagram" placeholder="Username Instagram" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm font-medium" />
+                   </div>
+                   <textarea name="address" placeholder="Alamat Pengiriman/Penagihan" className="w-full px-5 py-3.5 border border-slate-200 rounded-xl outline-none text-sm min-h-[80px]" />
                    <div className="flex gap-3 pt-4">
                     <button type="button" onClick={() => setShowCustomerModal(false)} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 rounded-2xl">Batal</button>
                     <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-2xl shadow-lg shadow-blue-100">{loading ? 'Menyimpan...' : 'Simpan Customer'}</button>

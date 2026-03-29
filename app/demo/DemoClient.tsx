@@ -51,7 +51,9 @@ export default function DemoClient() {
 
   const handleStart = async () => {
     setLoading(true)
-    await startDemoSession(businessName.trim(), selectedType)
+    // Redirect ke registrasi dengan parameter plan
+    const url = `/register?plan=demo&type=${selectedType}&businessName=${encodeURIComponent(businessName)}`
+    window.location.href = url
   }
 
   return (
@@ -146,11 +148,11 @@ export default function DemoClient() {
                 className="group relative px-10 py-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-lg rounded-2xl shadow-2xl shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-3 mx-auto"
               >
                 <Play size={22} className="group-hover:scale-110 transition-transform" />
-                Mulai Demo Gratis
+                Daftar & Mulai Demo Gratis
                 <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
               </button>
-              <p className="text-slate-500 text-xs mt-4">
-                Tanpa registrasi • Tanpa kartu kredit • Data auto-reset
+              <p className="text-slate-500 text-xs mt-4 uppercase tracking-widest font-black">
+                Registrasi Cepat • Akses Instan • Data Sample
               </p>
             </motion.div>
           </div>

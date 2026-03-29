@@ -5,21 +5,22 @@ import { revalidatePath } from 'next/cache'
 
 export async function getAuditOverview(orgId: string) {
   const supabase = await createClient()
+  const db = supabase as any
 
   // ======================================================
   // 1. Unbalanced Journals (POSTED)
   // ======================================================
-  const { data: postedEntries } = await supabase
+  const { data: postedEntries } = await db
     .from('journal_entries')
     .select('id, entry_date, description, reference_type')
     .eq('org_id', orgId)
     .eq('status', 'POSTED')
 
-  const entryIds = (postedEntries || []).map(e => e.id)
+  const entryIds = (postedEntries || []).map((e: any) => e.id)
   let unbalanced: any[] = []
 
   if (entryIds.length > 0) {
-    const { data: lines } = await supabase
+    const { data: lines } = await db
       .from('journal_lines')
       .select('entry_id, debit, credit')
       .in('entry_id', entryIds)
@@ -32,12 +33,12 @@ export async function getAuditOverview(orgId: string) {
     }
 
     unbalanced = (postedEntries || [])
-      .filter(e => {
+      .filter((e: any) => {
         const t = entryTotals[e.id]
         if (!t) return true
         return Math.abs(t.debit - t.credit) > 0.01
       })
-      .map(e => {
+      .map((e: any) => {
         const t = entryTotals[e.id] || { debit: 0, credit: 0 }
         return {
           entry_id: e.id,
@@ -56,16 +57,16 @@ export async function getAuditOverview(orgId: string) {
   // ======================================================
   const lastMonthEnd = new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().split('T')[0]
 
-  const { data: assets } = await supabase
+  const { data: assets } = await db
     .from('fixed_assets')
     .select('id, code, name, purchase_date, last_depreciation_date, current_book_value, current_value')
     .eq('org_id', orgId)
     .eq('status', 'ACTIVE')
 
-  const overdueAssets = (assets || []).filter(a => {
+  const overdueAssets = ((assets as any[]) || []).filter((a: any) => {
     if (!a.last_depreciation_date) return true
     return a.last_depreciation_date < lastMonthEnd
-  }).map(a => ({
+  }).map((a: any) => ({
     ...a,
     current_book_value: a.current_book_value ?? a.current_value ?? 0
   }))
@@ -73,15 +74,15 @@ export async function getAuditOverview(orgId: string) {
   // ======================================================
   // 3. Inventory Sub-Ledger (Movements) vs General Ledger (1301)
   // ======================================================
-  const { data: products } = await supabase
+  const { data: products } = await db
     .from('products')
     .select('id, name, average_cost')
     .eq('org_id', orgId)
 
-  const productIds = (products || []).map(p => p.id)
+  const productIds = (products || []).map((p: any) => p.id)
 
   // Sub-Ledger Truth: Stock Movements
-  const { data: movements } = await supabase
+  const { data: movements } = await db
     .from('stock_movements')
     .select('product_id, quantity')
     .in('product_id', productIds)
@@ -92,7 +93,7 @@ export async function getAuditOverview(orgId: string) {
   }
 
   // GL Inventory balance (account 1301)
-  const { data: invAcc } = await supabase
+  const { data: invAcc } = await db
     .from('accounts')
     .select('id')
     .eq('org_id', orgId)
@@ -101,7 +102,7 @@ export async function getAuditOverview(orgId: string) {
 
   let glInventoryBalance = 0
   if (invAcc && entryIds.length > 0) {
-    const { data: invLines } = await supabase
+    const { data: invLines } = await db
       .from('journal_lines')
       .select('debit, credit')
       .eq('account_id', invAcc.id)
@@ -112,12 +113,12 @@ export async function getAuditOverview(orgId: string) {
     }
   }
 
-  const totalSubLedgerValue = (products || []).reduce((sum, p) => {
+  const totalSubLedgerValue = (products || []).reduce((sum: any, p: any) => {
     return sum + ((stockByProduct[p.id] || 0) * Number(p.average_cost || 0))
   }, 0)
 
   // Distributed GL value per product
-  const inventory = (products || []).map(p => {
+  const inventory = (products || []).map((p: any) => {
     const qty = stockByProduct[p.id] || 0
     const subLedgerValue = qty * Number(p.average_cost || 0)
     const proportion = totalSubLedgerValue > 0 ? subLedgerValue / totalSubLedgerValue : 0
