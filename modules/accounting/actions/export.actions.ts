@@ -219,8 +219,8 @@ export async function exportBalanceSheetXLSX(
 
   const assets = data.assets.filter((a: any) => Math.abs(a.balance) > 0.01)
   const liabEquity = [
-    .data.liabilities.filter((l: any) => Math.abs(l.balance) > 0.01),
-    .data.equity.filter((e: any) => Math.abs(e.balance) > 0.01)
+    ...data.liabilities.filter((l: any) => Math.abs(l.balance) > 0.01),
+    ...data.equity.filter((e: any) => Math.abs(e.balance) > 0.01)
   ]
   const maxRows = Math.max(assets.length, liabEquity.length)
 
