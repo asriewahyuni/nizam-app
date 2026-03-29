@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { startTransition, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { 
   Plus, 
   Truck, 
@@ -70,6 +71,7 @@ const getFleetIcon = (type: string) => {
 }
 
 export function FleetClient({ orgId, assets, bookings, routes, schedules, medicalRecords, crew, terminals, attendanceToday, contacts }: FleetClientProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<'UNITS' | 'BOOKINGS' | 'PO_BUS' | 'LABS'>('PO_BUS')
   const [poSubTab, setPoSubTab] = useState<'ROUTES' | 'SCHEDULES' | 'TICKETING' | 'CREW' | 'ATTENDANCE'>('SCHEDULES')
   const [showAssetModal, setShowAssetModal] = useState(false)
@@ -85,6 +87,12 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
   const [selectedCrewForAttendance, setSelectedCrewForAttendance] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const scannerRef = useRef<any>(null)
+
+  const refreshFleetPage = () => {
+    startTransition(() => {
+      router.refresh()
+    })
+  }
 
   useEffect(() => {
     if (showScanModal && selectedCrewForAttendance) {
@@ -126,7 +134,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
       else {
         setShowScanModal(false)
         setSelectedCrewForAttendance('')
-        window.location.reload()
+        refreshFleetPage()
       }
       setLoading(false)
     }, (err) => {
@@ -143,7 +151,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
     if (res.error) alert(res.error)
     else {
       setShowAssetModal(false)
-      window.location.reload()
+      refreshFleetPage()
     }
     setLoading(false)
   }
@@ -155,7 +163,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
     if (res.error) alert(res.error)
     else {
       setShowBookingModal(false)
-      window.location.reload()
+      refreshFleetPage()
     }
     setLoading(false)
   }
@@ -167,7 +175,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
     if (res.error) alert(res.error)
     else {
       setShowRouteModal(false)
-      window.location.reload()
+      refreshFleetPage()
     }
     setLoading(false)
   }
@@ -179,7 +187,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
     if (res.error) alert(res.error)
     else {
       setShowScheduleModal(false)
-      window.location.reload()
+      refreshFleetPage()
     }
     setLoading(false)
   }
@@ -198,7 +206,8 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
     if (res.error) alert(res.error)
     else {
       setShowTicketModal(false)
-      window.location.reload()
+      setSelectedSchedule(null)
+      refreshFleetPage()
     }
     setLoading(false)
   }
@@ -222,7 +231,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
     if (res.error) alert(res.error)
     else {
       setShowMedicalModal(false)
-      window.location.reload()
+      refreshFleetPage()
     }
     setLoading(false)
   }
@@ -245,7 +254,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
     if (res.error) alert(res.error)
     else {
       setShowCrewModal(false)
-      window.location.reload()
+      refreshFleetPage()
     }
     setLoading(false)
   }

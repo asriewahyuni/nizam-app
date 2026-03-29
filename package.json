@@ -11,6 +11,8 @@
     "start": "next start -p ${PORT:-3000}",
     "lint": "eslint",
     "test": "vitest run",
+    "test:erp": "vitest run __tests__/accounting.test.ts __tests__/auth.actions.test.ts __tests__/fleet.actions.test.ts __tests__/middleware.test.ts __tests__/proxy.test.ts",
+    "test:erp:coverage": "vitest run --coverage __tests__/accounting.test.ts __tests__/auth.actions.test.ts __tests__/fleet.actions.test.ts __tests__/middleware.test.ts __tests__/proxy.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },

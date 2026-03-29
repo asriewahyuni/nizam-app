@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from 'next/server'
+import type { NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 /**
@@ -8,8 +8,7 @@ import { updateSession } from '@/lib/supabase/middleware'
  * 2. RBAC / Protected Routes redirects
  */
 export async function proxy(request: NextRequest) {
-  const response = NextResponse.next({ request })
-  return response
+  return updateSession(request)
 }
 
 export const config = {

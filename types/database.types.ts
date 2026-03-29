@@ -96,6 +96,71 @@ export type AuditLog = {
   old_data: Json | null; new_data: Json | null
   ip_address: string | null; user_agent: string | null; created_at: string
 }
+export type Employee = {
+  id: string; org_id: string; user_id: string | null
+  nik: string; first_name: string; last_name: string | null
+  email: string | null; phone: string | null
+  date_of_birth: string | null; gender: string | null
+  marital_status: string | null; tax_status: string | null
+  job_title: string; department: string | null; department_id: string | null
+  join_date: string; end_date: string | null
+  employment_status: string; registration_status: string
+  bank_name: string | null; bank_account_number: string | null; bank_account_holder: string | null
+  basic_salary: number; license_number: string | null; license_expiry: string | null
+  blood_type: string | null; created_at: string; updated_at: string
+}
+export type Attendance = {
+  id: string; org_id: string; employee_id: string
+  record_date: string; check_in: string | null; check_out: string | null
+  status: string; notes: string | null
+  location_gps: string | null; qr_scanned_payload: string | null; meta: Json
+  created_at: string; updated_at: string
+}
+export type FleetAsset = {
+  id: string; org_id: string; plate_number: string; model: string
+  brand: string | null; type: string; status: string
+  odometer: number; daily_rate: number; notes: string | null
+  metadata: Json | null; capacity: number | null
+  created_at: string; updated_at: string
+}
+export type FleetBooking = {
+  id: string; org_id: string; asset_id: string; contact_id: string
+  start_date: string; end_date: string; status: string
+  total_amount: number; deposit: number; payment_status: string | null
+  notes: string | null; created_at: string; updated_at: string
+}
+export type FleetRoute = {
+  id: string; org_id: string; name: string
+  origin: string; destination: string
+  distance_km: number | null; base_price: number
+  created_at: string; updated_at: string
+}
+export type FleetSchedule = {
+  id: string; org_id: string; route_id: string; asset_id: string
+  driver_id: string | null; helper_id: string | null
+  departure_time: string; arrival_time: string | null
+  status: string; created_at: string; updated_at: string
+}
+export type FleetTicket = {
+  id: string; org_id: string; schedule_id: string; passenger_id: string
+  seat_number: string; price: number; status: string
+  notes: string | null; created_at: string; updated_at: string
+}
+export type FleetMaintenanceLab = {
+  id: string; org_id: string; asset_id: string; service_date: string
+  description: string; cost: number; odometer_at: number | null
+  next_service_km: number | null; maintenance_number: string | null
+  maintenance_type: string | null; vendor_name: string | null; technician_name: string | null
+  parts_replaced: Json; lab_notes: string | null; next_service_date: string | null
+  attachment_url: string | null; technician_rating: number | null
+  created_at: string
+}
+export type FleetTerminal = {
+  id: string; org_id: string; name: string
+  location_name: string | null; gps_coords: string | null
+  radius_meters: number | null; qr_code_token: string | null
+  created_at: string
+}
 
 export interface Database {
   public: {
@@ -172,6 +237,60 @@ export interface Database {
         Update: Partial<Contact>
         Relationships: []
       }
+      employees: {
+        Row: Employee
+        Insert: Omit<Employee, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<Employee>
+        Relationships: []
+      }
+      attendance: {
+        Row: Attendance
+        Insert: Omit<Attendance, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<Attendance>
+        Relationships: []
+      }
+      fleet_assets: {
+        Row: FleetAsset
+        Insert: Omit<FleetAsset, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<FleetAsset>
+        Relationships: []
+      }
+      fleet_bookings: {
+        Row: FleetBooking
+        Insert: Omit<FleetBooking, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<FleetBooking>
+        Relationships: []
+      }
+      fleet_routes: {
+        Row: FleetRoute
+        Insert: Omit<FleetRoute, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<FleetRoute>
+        Relationships: []
+      }
+      fleet_schedules: {
+        Row: FleetSchedule
+        Insert: Omit<FleetSchedule, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<FleetSchedule>
+        Relationships: []
+      }
+      fleet_tickets: {
+        Row: FleetTicket
+        Insert: Omit<FleetTicket, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<FleetTicket>
+        Relationships: []
+      }
+      fleet_maintenance_labs: {
+        Row: FleetMaintenanceLab
+        Insert: Omit<FleetMaintenanceLab, 'id' | 'maintenance_number' | 'created_at'> & { id?: string; maintenance_number?: string | null; created_at?: string }
+        Update: Partial<FleetMaintenanceLab>
+        Relationships: []
+      }
+      fleet_terminals: {
+        Row: FleetTerminal
+        Insert: Omit<FleetTerminal, 'id' | 'created_at'> & { id?: string; created_at?: string }
+        Update: Partial<FleetTerminal>
+        Relationships: []
+      }
       saas_vouchers: {
         Row: { id: string; code: string; discount_percent: number; package_id: string | null; max_uses: number; uses_count: number; is_active: boolean; expires_at: string; created_at: string }
         Insert: { id?: string; code: string; discount_percent?: number; package_id?: string | null; max_uses?: number; uses_count?: number; is_active?: boolean; expires_at?: string; created_at?: string }
@@ -209,6 +328,24 @@ export interface Database {
     Functions: {
       seed_default_coa: { Args: { p_org_id: string }; Returns: any }
       process_inventory_adjustment: { Args: { p_adj_id: string; p_user_id: string }; Returns: any }
+      create_fleet_medical_record: {
+        Args: {
+          p_org_id: string
+          p_asset_id: string
+          p_service_date: string
+          p_description: string
+          p_maintenance_type: string
+          p_cost: number
+          p_odometer_at: number
+          p_technician_name?: string | null
+          p_vendor_name?: string | null
+          p_parts_replaced?: Json
+          p_next_service_km?: number | null
+          p_next_service_date?: string | null
+          p_attachment_url?: string | null
+        }
+        Returns: string
+      }
       // All other RPC functions — typed permissively to avoid TS2345 errors
       [key: string]: { Args: Record<string, any>; Returns: any }
     }
