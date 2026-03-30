@@ -37,7 +37,14 @@ import { updatePurchaseRequestStatus } from '@/modules/purchasing/actions/purcha
 export default function PurchasingClient({ orgId, orgName, org, purchases, vendors, products, coa, purchaseRequests = [] }: any) {
    const [activeTab, setActiveTab] = useState<'PURCHASES' | 'REQUESTS'>('PURCHASES')
    const orgSettings = org?.settings || {}
-   const logoUrl = org?.logo_url || ''
+   const companyProfile = {
+     name: orgSettings.brand_name || orgName || 'Perusahaan',
+     logo: org?.logo_url || '/logo.png',
+     address: orgSettings.company_address || 'Alamat perusahaan belum diatur (Update di Pengaturan Bisnis).',
+     hotline: orgSettings.hotline || '',
+     email: orgSettings.email || '',
+     website: orgSettings.website || '',
+   }
   const [showModal, setShowModal] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
    const [loading, setLoading] = useState(false)
@@ -1244,9 +1251,27 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
                 {/* Print Styles for PO */}
                 <style>{`
                   @media print {
-                    body * { visibility: hidden; }
-                    #po-print-area, #po-print-area * { visibility: visible; }
-                    #po-print-area { position: absolute; left: 0; top: 0; width: 100%; }
+                    @page { size: A4; margin: 12mm; }
+                    body {
+                      background: #fff !important;
+                      -webkit-print-color-adjust: exact;
+                      print-color-adjust: exact;
+                    }
+                    body * { visibility: hidden !important; }
+                    #po-print-area, #po-print-area * { visibility: visible !important; }
+                    #po-print-area {
+                      position: absolute;
+                      left: 0;
+                      top: 0;
+                      width: 100%;
+                      max-width: none;
+                      margin: 0;
+                      padding: 0;
+                      border: none;
+                      box-shadow: none;
+                      overflow: visible;
+                      background: #fff;
+                    }
                     .no-print { display: none !important; }
                   }
                 `}</style>
@@ -1266,7 +1291,7 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
                    </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-12 relative bg-white" id="po-print-area">
+                <div className="flex-1 overflow-y-auto p-10 relative bg-white print:p-0 print:text-[11px] print:leading-relaxed" id="po-print-area">
                    {/* Watermark/Status Background */}
                    {selectedDetailPurchase.status === 'VOIDED' && (
                      <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-0 opacity-10">
@@ -1277,12 +1302,15 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
                    {/* Header */}
                    <div className="flex justify-between items-start border-b-2 border-slate-900 pb-8 mb-8 relative z-10">
                       <div className="flex items-start gap-5">
-                        {logoUrl && (
-                          <img src={logoUrl} alt="Logo" className="w-16 h-16 object-contain" />
-                        )}
+                        <img src={companyProfile.logo} alt="Logo Perusahaan" className="w-14 h-14 object-contain" />
                         <div>
-                          <h1 className="text-4xl font-black tracking-tighter text-slate-900 mb-1">{orgSettings.brand_name || orgName}</h1>
-                          <p className="text-sm text-slate-500 max-w-sm">{orgSettings.company_address || 'Alamat perusahaan belum diatur (Update di Pengaturan Bisnis).'}</p>
+                          <h1 className="text-3xl font-black tracking-tighter text-slate-900 mb-1">{companyProfile.name}</h1>
+                          <p className="text-sm text-slate-500 max-w-sm">{companyProfile.address}</p>
+                          <div className="flex items-center flex-wrap gap-3 mt-1.5 text-[10px] font-bold text-slate-500">
+                            {companyProfile.hotline && <span>Telp/WA: {companyProfile.hotline}</span>}
+                            {companyProfile.email && <span>Email: {companyProfile.email}</span>}
+                            {companyProfile.website && <span>Web: {companyProfile.website}</span>}
+                          </div>
                         </div>
                       </div>
                       <div className="text-right">
@@ -1390,7 +1418,7 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
                          <p className="text-xs text-slate-500 mt-2">Tanda Tangan & Cap Perusahaan</p>
                       </div>
                       <div className="text-center relative">
-                         <p className="font-bold text-slate-900 mb-6">{orgName}</p>
+                         <p className="font-bold text-slate-900 mb-6">{companyProfile.name}</p>
                          
                          <div className="h-32 flex flex-col items-center justify-center">
                             {loadingDetail ? (

@@ -91,6 +91,15 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
 
   // Print Mode State
   const [printMode, setPrintMode] = useState<'INVOICE' | 'DELIVERY_ORDER'>('INVOICE')
+
+  const companyProfile = {
+    name: orgSettings.brand_name || orgName || 'Perusahaan',
+    logo: orgSettings.logo_url || '/logo.png',
+    address: orgSettings.company_address || 'Alamat perusahaan belum diatur (Silakan update di Pengaturan -> Bisnis).',
+    hotline: orgSettings.hotline || '',
+    email: orgSettings.email || '',
+    website: orgSettings.website || '',
+  }
   
   const [lines, setLines] = useState([{
     id: Date.now(),
@@ -989,32 +998,52 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
 
         {viewSale && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 print:static print:block print:p-0">
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setViewSale(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col print:shadow-none print:max-h-none print:h-auto print:max-w-none print:w-full print:mx-auto print:rounded-none">
+             <style>{`
+               @media print {
+                 @page { size: A4; margin: 12mm; }
+                 body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                 body * { visibility: hidden !important; }
+                 #so-print-area, #so-print-area * { visibility: visible !important; }
+                 #so-print-area {
+                   position: absolute;
+                   left: 0;
+                   top: 0;
+                   width: 100%;
+                   max-width: none;
+                   margin: 0;
+                   padding: 0;
+                   border: none;
+                   box-shadow: none;
+                   overflow: visible;
+                   background: #fff;
+                 }
+                 .so-no-print { display: none !important; }
+               }
+             `}</style>
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setViewSale(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden so-no-print" />
+             <motion.div id="so-print-area" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col print:shadow-none print:max-h-none print:h-auto print:max-w-none print:w-full print:mx-auto print:rounded-none print:text-[11px] print:leading-relaxed">
                 {/* Print Business Profile Header */}
                 <div className="hidden print:flex justify-between items-start pb-6 border-b-2 border-slate-900 mb-6 w-full">
                     <div className="flex flex-col text-left">
                        <div className="flex items-center gap-4">
-                          {orgSettings.logo_url && (
-                             <img src={orgSettings.logo_url} alt="Logo" className="w-16 h-16 object-contain" />
-                          )}
-                          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{orgSettings.brand_name || orgName}</h2>
+                          <img src={companyProfile.logo} alt="Logo Perusahaan" className="w-14 h-14 object-contain" />
+                          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{companyProfile.name}</h2>
                        </div>
-                       <p className="text-xs font-medium text-slate-700 max-w-[350px] mt-1">{orgSettings.company_address || 'Alamat perusahaan belum diatur (Silakan update di Pengaturan -> Bisnis).'}</p>
+                       <p className="text-xs font-medium text-slate-700 max-w-[350px] mt-1">{companyProfile.address}</p>
                        <div className="flex items-center gap-4 mt-2 text-[10px] font-bold text-slate-500">
-                          {orgSettings.hotline && <span>Telp/WA: {orgSettings.hotline}</span>}
-                          {orgSettings.email && <span>Email: {orgSettings.email}</span>}
-                          {orgSettings.website && <span>Web: {orgSettings.website}</span>}
+                          {companyProfile.hotline && <span>Telp/WA: {companyProfile.hotline}</span>}
+                          {companyProfile.email && <span>Email: {companyProfile.email}</span>}
+                          {companyProfile.website && <span>Web: {companyProfile.website}</span>}
                        </div>
                     </div>
                 </div>
 
                 <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center print:bg-transparent print:border-none print:px-0 print:pt-0 print:mb-0">
                    <div className="print:text-center print:w-full">
-                      <h3 className="text-xl font-bold text-slate-900 print:text-2xl print:tracking-widest">{printMode === 'DELIVERY_ORDER' ? 'SURAT JALAN / MANIFEST PENGIRIMAN' : 'INVOICE / TAGIHAN PENJUALAN'}</h3>
+                      <h3 className="text-xl font-bold text-slate-900 print:text-2xl print:tracking-widest">{printMode === 'DELIVERY_ORDER' ? 'SURAT JALAN / MANIFEST PENGIRIMAN' : 'SALES ORDER / INVOICE'}</h3>
                       <p className="text-sm font-semibold text-blue-600 print:text-slate-900 print:mt-1">{viewSale.sale_number}</p>
                    </div>
-                   <button onClick={() => setViewSale(null)} className="p-2 text-slate-400 hover:text-slate-600 bg-white rounded-full hover:bg-slate-200 transition-colors print:hidden">
+                   <button onClick={() => setViewSale(null)} className="p-2 text-slate-400 hover:text-slate-600 bg-white rounded-full hover:bg-slate-200 transition-colors print:hidden so-no-print">
                      <XCircle size={24}/>
                    </button>
                 </div>
@@ -1103,7 +1132,7 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
                        {/* Pengirim */}
                        <div className="text-center">
                           <p className="text-xs font-bold mb-14 text-slate-600">Pengirim,</p>
-                          <p className="text-sm font-bold border-b-2 border-slate-900 px-6 mb-1">({orgSettings.brand_name || orgName})</p>
+                          <p className="text-sm font-bold border-b-2 border-slate-900 px-6 mb-1">({companyProfile.name})</p>
                        </div>
 
                        {/* QR Code Area */}
@@ -1130,9 +1159,9 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
                    </div>
                 </div>
                 
-                <div className="p-4 border-t border-slate-100 bg-white flex justify-end gap-2 print:hidden">
+                <div className="p-4 border-t border-slate-100 bg-white flex justify-end gap-2 print:hidden so-no-print">
                    <button onClick={() => { setPrintMode('INVOICE'); setTimeout(() => window.print(), 100); }} className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all border border-slate-200">
-                      Cetak Invoice
+                      Cetak SO / Invoice
                    </button>
                    <button onClick={() => { setPrintMode('DELIVERY_ORDER'); setTimeout(() => window.print(), 100); }} className="px-4 py-2 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all border border-blue-200">
                       Cetak Surat Jalan

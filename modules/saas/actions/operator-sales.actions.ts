@@ -501,11 +501,12 @@ function buildSalesNumber() {
 
 export async function getOperatorSaasSnapshot(): Promise<OperatorSnapshot> {
   await assertPlatformAdmin()
+  const scoped = (await createClient()) as any
   const admin = await createAdminClient()
 
   const [orgRes, pkgRes, invoiceRes] = await Promise.all([
-    admin.from('organizations').select('id, name').order('name', { ascending: true }),
-    admin.from('saas_packages').select('id, name, price, billing, modules, addons').eq('is_active', true).order('price', { ascending: true }),
+    scoped.from('organizations').select('id, name').order('name', { ascending: true }),
+    scoped.from('saas_packages').select('id, name, price, billing, modules, addons').order('price', { ascending: true }),
     admin
       .from('saas_invoices')
       .select(SAAS_INVOICE_SELECT_WITH_PRICING_COLUMNS)

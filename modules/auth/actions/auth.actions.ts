@@ -249,28 +249,69 @@ export async function getSession() {
 
 export async function verifyEmployeeNikByToken(token: string, nik: string) {
   const adminClient = await createAdminClient()
+  const normalizedToken = token.toUpperCase().trim()
+  const normalizedNik = nik.trim().toUpperCase()
 
   const { data: invite, error: inviteErr } = await (adminClient as any)
     .from('org_invitations')
-    .select('*, organizations(*), roles(*)')
-    .eq('invitation_code', token.toUpperCase().trim())
-    .eq('is_active', true)
+    .select('id, org_id, role_id, label, invitation_code, expires_at, is_active, max_uses, use_count, created_at')
+    .eq('invitation_code', normalizedToken)
     .maybeSingle()
 
-  if (inviteErr || !invite) return { error: 'Link aktivasi tidak valid atau sudah non-aktif.' }
+  if (inviteErr) {
+    const inviteMessage = String(inviteErr.message || '')
+    if (inviteMessage.toLowerCase().includes('permission')) {
+      return { error: 'Link ditemukan, tetapi layanan verifikasi token belum berizin di server. Hubungi admin sistem.' }
+    }
+    return { error: `Gagal memverifikasi link aktivasi: ${inviteMessage}` }
+  }
+  if (!invite) return { error: 'Link aktivasi tidak ditemukan.' }
+  if (!invite.is_active) return { error: 'Link aktivasi sudah dinonaktifkan oleh admin.' }
+  if (invite.expires_at && new Date(invite.expires_at).getTime() <= Date.now()) {
+    return { error: 'Link aktivasi sudah kadaluarsa.' }
+  }
+  if (Number(invite.max_uses || 0) > 0 && Number(invite.use_count || 0) >= Number(invite.max_uses || 0)) {
+    return { error: 'Link aktivasi sudah mencapai batas penggunaan.' }
+  }
 
   const { data: emp, error: empErr } = await (adminClient as any)
     .from('employees')
     .select('id, first_name, last_name, user_id, org_id')
     .eq('org_id', invite.org_id)
-    .eq('nik', nik.trim())
+    .eq('nik', normalizedNik)
     .maybeSingle()
 
-  if (empErr) return { error: 'Database connection error' }
+  if (empErr) {
+    const empMessage = String(empErr.message || '')
+    if (empMessage.toLowerCase().includes('permission')) {
+      return { error: 'NIK tidak bisa diverifikasi karena layanan aktivasi belum berizin di server. Hubungi admin sistem.' }
+    }
+    return { error: `Gagal validasi NIK: ${empMessage}` }
+  }
   if (!emp) return { error: 'NIK Anda tidak terdaftar di bisnis ini.' }
   if (emp.user_id) return { error: 'NIK ini sudah memiliki akun aktif. Silakan Login.' }
 
-  return { success: true, employee: emp, org: invite.organizations, invite }
+  const [orgRes, roleRes] = await Promise.all([
+    (adminClient as any)
+      .from('organizations')
+      .select('id, name, logo_url')
+      .eq('id', invite.org_id)
+      .maybeSingle(),
+    invite.role_id
+      ? (adminClient as any)
+          .from('roles')
+          .select('id, name')
+          .eq('id', invite.role_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ])
+
+  const invitePayload = {
+    ...invite,
+    roles: roleRes?.data || null,
+  }
+
+  return { success: true, employee: emp, org: orgRes?.data || null, invite: invitePayload }
 }
 
 export async function requestPasswordReset(nik: string) {

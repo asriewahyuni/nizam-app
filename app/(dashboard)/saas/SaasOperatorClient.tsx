@@ -231,6 +231,11 @@ export default function SaasOperatorClient({
         <div className="rounded-3xl border border-slate-200 bg-white p-5">
           <h2 className="text-sm font-black uppercase tracking-wider text-slate-700">Buat Penawaran SaaS Baru</h2>
           <form action={handleCreateQuote} className="mt-4 space-y-4">
+            {(snapshot.orgs.length === 0 || snapshot.packages.length === 0) && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700">
+                Data tenant/paket belum terbaca. Pastikan daftar tenant & paket tersedia di halaman Admin dan akun ini punya akses ke data tersebut.
+              </div>
+            )}
             <section className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
               <div className="mb-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">1. Target & Paket</p>
