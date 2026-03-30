@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
@@ -128,6 +128,61 @@ const NAV_GROUPS: NavGroup[] = [
   }
 ]
 
+const SAAS_OPERATOR_GROUP: NavGroup = {
+  group: 'SaaS Operator',
+  items: [
+    { label: 'Penawaran SaaS', href: '/saas/penawaran', icon: FileText, permission_key: 'sales' },
+    { label: 'Penjualan SaaS', href: '/saas/penjualan', icon: TrendingUp, permission_key: 'sales' },
+  ],
+}
+
+const SIDEBAR_COLLAPSED_KEY = 'nizam_sidebar_collapsed'
+const SIDEBAR_STATE_EVENT = 'nizam_sidebar_state_change'
+const SIDEBAR_TOGGLE_EVENT = 'nizam_sidebar_toggle'
+
+function getSidebarCollapsedSnapshot() {
+  if (typeof window === 'undefined') return false
+  return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'
+}
+
+function subscribeSidebarCollapsed(onStoreChange: () => void) {
+  if (typeof window === 'undefined') return () => {}
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === SIDEBAR_COLLAPSED_KEY) {
+      onStoreChange()
+    }
+  }
+
+  const handleStateChange = () => {
+    onStoreChange()
+  }
+
+  const handleMobileToggle = () => {
+    const current = getSidebarCollapsedSnapshot()
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, (!current).toString())
+    onStoreChange()
+  }
+
+  window.addEventListener('storage', handleStorage)
+  window.addEventListener(SIDEBAR_STATE_EVENT, handleStateChange)
+  window.addEventListener(SIDEBAR_TOGGLE_EVENT, handleMobileToggle)
+
+  return () => {
+    window.removeEventListener('storage', handleStorage)
+    window.removeEventListener(SIDEBAR_STATE_EVENT, handleStateChange)
+    window.removeEventListener(SIDEBAR_TOGGLE_EVENT, handleMobileToggle)
+  }
+}
+
+function subscribeHydration(onStoreChange: () => void) {
+  if (typeof window === 'undefined') return () => {}
+
+  // Trigger exactly once after hydration to switch from server snapshot to client snapshot.
+  onStoreChange()
+  return () => {}
+}
+
 interface AppSidebarProps {
   userRole: string
   jobTitle?: string
@@ -160,37 +215,29 @@ export function AppSidebar({
   const tabQuery = searchParams?.get('tab')
   const fullPath = pathname + (tabQuery ? `?tab=${tabQuery}` : '')
 
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem('nizam_sidebar_collapsed') === 'true'
-  })
+  const isCollapsed = useSyncExternalStore(
+    subscribeSidebarCollapsed,
+    getSidebarCollapsedSnapshot,
+    () => false
+  )
+  const isHydrated = useSyncExternalStore(
+    subscribeHydration,
+    () => true,
+    () => false
+  )
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
   const isPlatformAdmin = isPlatformAdminEmail(user?.email)
-  const navGroups = isPlatformAdmin
-    ? [
-        ...NAV_GROUPS,
-        {
-          group: 'SaaS Operator',
-          items: [
-            { label: 'Penawaran SaaS', href: '/saas/penawaran', icon: FileText, permission_key: 'sales' },
-            { label: 'Penjualan SaaS', href: '/saas/penjualan', icon: TrendingUp, permission_key: 'sales' },
-          ],
-        },
-      ]
+  const showSaasOperatorGroup = isHydrated && isPlatformAdmin
+  const navGroups = showSaasOperatorGroup
+    ? [...NAV_GROUPS, SAAS_OPERATOR_GROUP]
     : NAV_GROUPS
-
-  // Persist collapse state
-  useEffect(() => {
-    // Listen for mobile toggle
-    const handleMobileToggle = () => setIsCollapsed(prev => !prev)
-    window.addEventListener('nizam_sidebar_toggle', handleMobileToggle)
-    return () => window.removeEventListener('nizam_sidebar_toggle', handleMobileToggle)
-  }, [])
 
   const toggleCollapse = () => {
     const next = !isCollapsed
-    setIsCollapsed(next)
-    localStorage.setItem('nizam_sidebar_collapsed', next.toString())
+    if (typeof window === 'undefined') return
+
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next.toString())
+    window.dispatchEvent(new Event(SIDEBAR_STATE_EVENT))
   }
 
   return (
@@ -225,7 +272,7 @@ export function AppSidebar({
           const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
           const filteredItems = group.items.filter(item => {
             // Platform admin should always see SaaS operator shortcuts
-            if (isPlatformAdmin && group.group === 'SaaS Operator') return true
+            if (showSaasOperatorGroup && group.group === 'SaaS Operator') return true
 
             // 0. DEMO BYPASS: Tampilkan SEMUA modul di mode Demo/Latihan agar klien bisa eksplorasi fitur penuh
             if (isDemo) return true

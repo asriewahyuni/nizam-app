@@ -1258,3 +1258,19 @@ Update ini menambahkan modul operasional SaaS owner yang berdiri sendiri, sehing
 
 - **Verifikasi**:
   - lint file baru/terkait lulus (tanpa error; ada warning lama `<img>` di sidebar yang tidak terkait modul baru).
+
+### 16.19 Perbaikan Hydration mismatch pada Sidebar (`/saas/*`)
+
+Perbaikan dilakukan untuk kasus `Hydration failed` di `components/shared/AppSidebar.tsx` saat membuka modul `/saas/penawaran` atau `/saas/penjualan`.
+
+- **Akar masalah yang ditangani**:
+  - state sidebar (`isCollapsed`) sebelumnya membaca `localStorage` saat inisialisasi render client, sehingga berpotensi tidak sinkron dengan HTML server.
+  - grup menu `SaaS Operator` dirender kondisional langsung saat render awal, sehingga berisiko berbeda antara snapshot server dan render client awal.
+
+- **Perubahan implementasi** (`components/shared/AppSidebar.tsx`):
+  - menambahkan sinkronisasi snapshot SSR/CSR menggunakan `useSyncExternalStore`:
+    - hydration flag (`subscribeHydration`) dengan server snapshot `false` dan client snapshot `true`,
+    - sidebar collapsed store (`subscribeSidebarCollapsed`) berbasis `localStorage` key `nizam_sidebar_collapsed`.
+  - visibilitas grup `SaaS Operator` di-sidebar kini bergantung pada `showSaasOperatorGroup = isHydrated && isPlatformAdmin`, agar struktur HTML awal server/client tetap konsisten.
+  - toggle collapsed sidebar kini menulis ke `localStorage` + broadcast event internal (`nizam_sidebar_state_change`) sehingga state tetap sinkron tanpa memicu pola `setState` sinkron di effect.
+  - grup `SaaS Operator` diekstrak ke konstanta `SAAS_OPERATOR_GROUP` agar struktur menu stabil dan eksplisit.
