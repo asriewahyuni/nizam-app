@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Zap, CreditCard, History, Package, Plus, CheckCircle2, 
   Building2, Warehouse, Store, Users, ExternalLink, 
-  ArrowUpRight, ShieldCheck, AlertCircle, Clock, Truck, Edit3
+  ArrowUpRight, ShieldCheck, AlertCircle, Clock, Truck, Edit3, Coins
 } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -72,10 +72,13 @@ const AVAILABLE_ADDONS = [
 function BillingContent() {
   const searchParams = useSearchParams()
   const pkgId = searchParams.get('pkg')
+  const section = searchParams.get('section')
   
   const [activeOrg, setActiveOrg] = useState<any>(null)
   const [invoices, setInvoices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [aiTokenBalance, setAiTokenBalance] = useState(0)
+  const [aiTokenPackages, setAiTokenPackages] = useState<any[]>([])
 
   // SaaS Dynamic Config
   const [bankInfo, setBankInfo] = useState(BANK_INFO)
@@ -113,6 +116,14 @@ function BillingContent() {
     return () => clearInterval(timer)
   }, [showCheckoutModal])
 
+  useEffect(() => {
+    if (loading || section !== 'ai-token') return
+    const timer = window.setTimeout(() => {
+      document.getElementById('ai-token')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 200)
+    return () => window.clearTimeout(timer)
+  }, [loading, section])
+
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
     const s = seconds % 60
@@ -149,6 +160,15 @@ function BillingContent() {
 
   useEffect(() => {
     async function loadData() {
+      const { data: tokenPackages } = await db
+        .from('ai_token_topup_packages')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+        .order('tokens', { ascending: true })
+
+      setAiTokenPackages(tokenPackages || [])
+
       const { data: { user } } = await db.auth.getUser()
       if (user) {
         const { data: member } = await db.from('org_members')
@@ -160,6 +180,14 @@ function BillingContent() {
         if (member?.organizations) {
           const org = member.organizations
           setActiveOrg(org)
+
+          const { data: walletData } = await db
+            .from('ai_token_wallets')
+            .select('balance_tokens')
+            .eq('org_id', org.id)
+            .maybeSingle()
+
+          setAiTokenBalance(Number(walletData?.balance_tokens || 0))
           
           // --- CALCULATE MONTHLY COST ---
           const { data: pkgs } = await db.from('saas_packages').select('*')
@@ -458,6 +486,66 @@ function BillingContent() {
                  >
                    {processing ? 'Processing...' : 'Aktivasi Add-On'}
                  </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* AI Token Topup */}
+      <section id="ai-token" className="space-y-8">
+        <div className="flex flex-col gap-3 text-center">
+          <div className="inline-flex items-center justify-center gap-2 px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-100 mx-auto">
+            <Coins size={12} /> AI Token Economy
+          </div>
+          <h2 className="text-4xl font-black text-slate-900 tracking-tighter">Top Up Token AI</h2>
+          <p className="text-slate-500 font-bold">Saldo token digunakan untuk generator AI seperti Sales Page. Saat habis, Anda bisa top up kapan saja.</p>
+        </div>
+
+        <div className="bg-white rounded-[36px] border border-slate-100 p-6 md:p-8 shadow-lg">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Saldo Token AI Saat Ini</p>
+              <p className="mt-2 text-4xl font-black tracking-tighter text-slate-900">{aiTokenBalance.toLocaleString('id-ID')}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Estimasi Generate</p>
+              <p className="mt-1 text-lg font-black text-slate-900">{Math.floor(aiTokenBalance / 4000).toLocaleString('id-ID')}x generate</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {aiTokenPackages.map((pkg: any) => (
+            <div key={pkg.id} className="bg-white rounded-[32px] border border-slate-100 p-6 flex flex-col transition-all hover:-translate-y-1 hover:shadow-xl">
+              <div className="flex items-center justify-between">
+                <div className="px-3 py-1 rounded-xl bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-widest border border-indigo-100">
+                  {pkg.name}
+                </div>
+                <Coins size={18} className="text-indigo-400" />
+              </div>
+              <p className="mt-4 text-4xl font-black tracking-tighter text-slate-900">{Number(pkg.tokens || 0).toLocaleString('id-ID')}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Token</p>
+              <p className="mt-4 text-xs font-bold text-slate-500 leading-relaxed">{pkg.description || 'Tambahan saldo token AI untuk kebutuhan generate konten.'}</p>
+              <div className="mt-6 pt-5 border-t border-slate-100 flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Harga</p>
+                  <p className="text-xl font-black text-slate-900">{formatRupiah(Number(pkg.price_idr || 0))}</p>
+                </div>
+                <button
+                  disabled={processing || !activeOrg}
+                  onClick={() => activeOrg && handleBuyItem(activeOrg.id, {
+                    id: pkg.id,
+                    name: pkg.name,
+                    price: Number(pkg.price_idr || 0),
+                    type: 'AI_TOKEN_TOPUP',
+                    topupPackageId: pkg.id,
+                    tokens: Number(pkg.tokens || 0),
+                  })}
+                  className="px-5 py-3 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-600 transition-all disabled:opacity-50"
+                >
+                  {processing ? 'Processing...' : 'Top Up'}
+                </button>
               </div>
             </div>
           ))}

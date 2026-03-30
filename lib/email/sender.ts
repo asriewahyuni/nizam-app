@@ -1,14 +1,27 @@
+import 'server-only'
 import { Resend } from 'resend';
 
-// Menggunakan API Key dari Environment Variable (Disarankan)
-// Atau bisa langsung pakai kunci Anda untuk testing sementara:
-const resend = new Resend(process.env.RESEND_API_KEY || 're_Wq3sByt9_3E5GAVPyku2Q8rnytd59QNna');
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY
+
+  if (!apiKey) {
+    throw new Error('Missing RESEND_API_KEY')
+  }
+
+  return new Resend(apiKey)
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message
+  return 'Unknown email delivery error'
+}
 
 /**
  * Utilitas untuk mengirim Invoice / Tagihan ke email pelanggan
  */
 export async function sendInvoiceEmail(toEmail: string, invoiceNumber: string, amount: number) {
   try {
+    const resend = getResendClient()
     const data = await resend.emails.send({
       from: 'Nizam SaaS <team-noreply@nizam.xales.id>', // Pastikan domain ini verified di Resend
       to: [toEmail],
@@ -25,11 +38,11 @@ export async function sendInvoiceEmail(toEmail: string, invoiceNumber: string, a
           <br/>
           <p>Salam hangat,<br/><strong>Tim Operasional NIZAM</strong></p>
         </div>
-      `
+      `,
     });
     return { success: true, data };
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
   }
 }
 
@@ -38,6 +51,7 @@ export async function sendInvoiceEmail(toEmail: string, invoiceNumber: string, a
  */
 export async function sendPromoBroadcast(toEmail: string, promoTitle: string) {
   try {
+    const resend = getResendClient()
     const data = await resend.emails.send({
       from: 'Promo Nizam <team-noreply@nizam.xales.id>',
       to: [toEmail],
@@ -50,10 +64,10 @@ export async function sendPromoBroadcast(toEmail: string, promoTitle: string) {
             Klaim Sekarang
           </a>
         </div>
-      `
+      `,
     });
     return { success: true, data };
-  } catch (error: any) {
-    return { error: error.message };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
   }
 }

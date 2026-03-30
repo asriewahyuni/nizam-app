@@ -5,7 +5,7 @@ import StockLedgerClient from './StockLedgerClient'
 
 export default async function StockLedgerPage({ params }: { params: { id: string } }) {
   const orgData = await getActiveOrg()
-  if (!orgData) return redirect('/onboard')
+  if (!orgData) return redirect('/onboarding')
 
   const productId = params.id
   const data = await getStockLedger(orgData.org.id, productId)

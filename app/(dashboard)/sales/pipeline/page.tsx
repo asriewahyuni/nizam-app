@@ -14,7 +14,7 @@ export default async function PipelinePage() {
 
   const orgId = orgData.org.id
 
-  const { data: sales } = await supabase.from('sales').select('*, contacts(name)')
+  const { data: sales } = await supabase.from('sales').select('*, contacts(name, phone, email)')
     .eq('org_id', orgId)
     .in('status', ['QUOTATION', 'DRAFT', 'ORDERED', 'FINISHED'])
     .order('created_at', { ascending: false })

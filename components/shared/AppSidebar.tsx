@@ -33,7 +33,9 @@ import {
   LineChart,
   Zap,
   Store,
-  Clock
+  Clock,
+  Megaphone,
+  type LucideIcon
 } from 'lucide-react'
 import { signOut } from '@/modules/auth/actions/auth.actions'
 import { signOutDemo } from '@/modules/demo/actions/demo.actions'
@@ -43,7 +45,7 @@ interface NavGroup {
   items: {
     label: string
     href: string
-    icon: any
+    icon: LucideIcon
     phase?: string
     permission_key?: string
     module_key?: string
@@ -94,6 +96,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Sales Pipeline', href: '/sales/pipeline', icon: Activity, permission_key: 'sales', module_key: 'Sales' },
       { label: 'Target & Komisi', href: '/sales/commission', icon: Target, permission_key: 'sales', module_key: 'Sales' },
       { label: 'Promo & Reward', href: '/sales/promos', icon: Zap, permission_key: 'sales', module_key: 'Sales' },
+      { label: 'Sales Page', href: '/sales/pages', icon: Megaphone, permission_key: 'sales', module_key: 'Sales Page' },
     ]
   },
   {
@@ -156,16 +159,14 @@ export function AppSidebar({
   const tabQuery = searchParams?.get('tab')
   const fullPath = pathname + (tabQuery ? `?tab=${tabQuery}` : '')
 
-  const [isCollapsed, setIsCollapsed] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('nizam_sidebar_collapsed') === 'true'
+  })
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
 
   // Persist collapse state
   useEffect(() => {
-    const saved = localStorage.getItem('nizam_sidebar_collapsed')
-    if (saved === 'true') setIsCollapsed(true)
-    setMounted(true)
-
     // Listen for mobile toggle
     const handleMobileToggle = () => setIsCollapsed(prev => !prev)
     window.addEventListener('nizam_sidebar_toggle', handleMobileToggle)
@@ -190,26 +191,22 @@ export function AppSidebar({
 
       {/* Logo Section */}
       <div className={`h-20 flex items-center px-6 ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-        {mounted ? (
-          <>
-            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-md shrink-0 overflow-hidden group-hover:scale-110 transition-transform">
-              <img src="/logo.png" alt="NIZAM Logo" className="w-full h-full object-cover scale-[1.3]" />
+        <>
+          <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-md shrink-0 overflow-hidden group-hover:scale-110 transition-transform">
+            <img src="/logo.png" alt="NIZAM Logo" className="w-full h-full object-cover scale-[1.3]" />
+          </div>
+          {!isCollapsed && (
+            <div className="flex flex-col justify-center overflow-hidden animate-in fade-in duration-500">
+              <span className="font-black text-slate-900 text-lg tracking-tighter leading-tight uppercase">NIZAM</span>
+              <span className="text-[10px] text-slate-400 font-black tracking-[0.2em] uppercase opacity-80">Cloud ERP</span>
             </div>
-            {!isCollapsed && (
-              <div className="flex flex-col justify-center overflow-hidden animate-in fade-in duration-500">
-                <span className="font-black text-slate-900 text-lg tracking-tighter leading-tight uppercase">NIZAM</span>
-                <span className="text-[10px] text-slate-400 font-black tracking-[0.2em] uppercase opacity-80">Cloud ERP</span>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="w-10 h-10 rounded-2xl bg-slate-100 animate-pulse shrink-0" />
-        )}
+          )}
+        </>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 overflow-y-auto no-scrollbar scroll-smooth">
-        {NAV_GROUPS.map((group, gIdx) => {
+        {NAV_GROUPS.map((group) => {
           // Filter items based on permissions
           const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
           const filteredItems = group.items.filter(item => {
@@ -234,6 +231,7 @@ export function AppSidebar({
                   
                   // Flexible mapping for legacy/shorthand names
                   const key = internalKey || labelKey;
+                  if (key.includes('sales page')) return mm.includes('sales page')
                   if (key.includes('sales') && (mm.includes('marketing') || mm.includes('sales'))) return true
                   if (key.includes('marketing') && (mm.includes('sales') || mm.includes('marketing'))) return true
                   if (key.includes('accounting') && (mm.includes('finance') || mm.includes('accounting'))) return true
@@ -351,6 +349,7 @@ export function AppSidebar({
               <div className="flex flex-col overflow-hidden max-w-[120px]">
                 <p className="text-sm font-black text-slate-900 truncate mb-1 leading-tight tracking-tight">{user?.fullName || userRole}</p>
                 <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest truncate">{jobTitle || userRole}</p>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em] truncate mt-1">{planName}</p>
               </div>
             )}
           </div>

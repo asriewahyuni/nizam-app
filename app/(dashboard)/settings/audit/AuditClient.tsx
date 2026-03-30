@@ -34,8 +34,8 @@ interface AuditLog {
   action: string
   table_name: string
   description: string
-  old_data?: any
-  new_data?: any
+  old_data?: unknown
+  new_data?: unknown
   record_id: string
 }
 
@@ -83,10 +83,10 @@ export function AuditClient({ logs, orgName, orgId }: { logs: AuditLog[], orgNam
         <div className="flex items-center gap-3">
             <button 
               onClick={async () => {
-                if (confirm('⚠️ PERHATIAN: Semua data Jurnal, Aset Tetap, dan Transaksi untuk organisasi ini akan DIHAPUS PERMANEN. Anda tidak dapat membatalkan ini.\n\nKetik "RESET" untuk melanjutkan.')) {
-                   const check = prompt('Ketik "RESET" (huruf besar) untuk konfirmasi pembersihan total:')
-                   if (check === 'RESET') {
-                      const res = await resetOrganizationData(orgId)
+                if (confirm('⚠️ PERHATIAN: Semua transaksi untuk organisasi ini akan dihapus permanen. Data master utama tetap dipertahankan.')) {
+                   const check = prompt('Ketik "RESET TRANSAKSI" untuk konfirmasi:')
+                   if (check === 'RESET TRANSAKSI') {
+                      const res = await resetOrganizationData(orgId, { mode: 'transactions', confirmationText: check })
                       if (res.success) {
                          alert('Data telah dibersihkan. Memuat ulang sistem...')
                          window.location.reload()
@@ -99,7 +99,7 @@ export function AuditClient({ logs, orgName, orgId }: { logs: AuditLog[], orgNam
               className="px-6 py-4 bg-rose-50 hover:bg-rose-100 text-rose-600 font-black rounded-3xl transition-all flex items-center gap-2 border border-rose-200"
             >
               <Zap size={20} />
-              RESET DATA
+              RESET TRANSAKSI
             </button>
 
             <button 

@@ -8,6 +8,7 @@ import { getPendingPurchaseRequestsCount } from '@/modules/purchasing/actions/pu
 import { getResetRequestsCount } from '@/modules/organization/actions/hris.actions'
 import { getCashFlow } from '@/modules/accounting/actions/reports.actions'
 import { isDemoSession } from '@/modules/demo/actions/demo.actions'
+import { getAiTokenHeaderSummary } from '@/modules/ai/lib/ai-token.server'
 import { AppSidebar } from '@/components/shared/AppSidebar'
 import { AppHeader } from '@/components/shared/AppHeader'
 import { DemoBanner } from '@/components/shared/DemoBanner'
@@ -26,14 +27,15 @@ export default async function DashboardLayout({
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
 
-  const [pendingApprovals, unpostedJournals, pendingPurchaseRequests, resetRequests, cashFlow, branches, isDemo] = await Promise.all([
+  const [pendingApprovals, unpostedJournals, pendingPurchaseRequests, resetRequests, cashFlow, branches, isDemo, aiTokens] = await Promise.all([
     getPendingApprovalsCount(orgData.org.id),
     getUnpostedJournalsCount(orgData.org.id),
     getPendingPurchaseRequestsCount(orgData.org.id),
     getResetRequestsCount(orgData.org.id),
     getCashFlow(orgData.org.id),
     getBranches(orgData.org.id),
-    isDemoSession()
+    isDemoSession(),
+    getAiTokenHeaderSummary(orgData.org.id),
   ])
 
   // ─────────────────────────────────────────────────────────────
@@ -43,30 +45,31 @@ export default async function DashboardLayout({
   const pathname = (await headers()).get('x-pathname') || ''
 
   // Map paths to their required module names (matching saas_packages.modules)
-  const routeModuleMap: Record<string, string> = {
-    '/accounting': 'Accounting',
-    '/finance': 'Finance',
-    '/inventory': 'Inventory',
-    '/factory': 'Manufacturing',
-    '/purchasing': 'Purchasing',
-    '/sales': 'Sales',
-    '/pos': 'POS',
-    '/fleet': 'Fleet & Rental',
-    '/hris': 'HRIS',
-    '/audit': 'Audit',
-    '/reports': 'Reports',
-    '/marketing': 'Marketing',
-    '/crm': 'CRM',
-    '/warehouse': 'Warehouse',
-    '/consolidation': 'Consolidation',
-    '/services': 'Job Order (Jasa)'
-  }
+  const routeModuleMap: Array<{ path: string; requiredModule: string; permissionKey?: string }> = [
+    { path: '/sales/pages', requiredModule: 'Sales Page', permissionKey: 'sales' },
+    { path: '/accounting', requiredModule: 'Accounting' },
+    { path: '/finance', requiredModule: 'Finance' },
+    { path: '/inventory', requiredModule: 'Inventory' },
+    { path: '/factory', requiredModule: 'Manufacturing' },
+    { path: '/purchasing', requiredModule: 'Purchasing' },
+    { path: '/sales', requiredModule: 'Sales', permissionKey: 'sales' },
+    { path: '/pos', requiredModule: 'POS', permissionKey: 'pos' },
+    { path: '/fleet', requiredModule: 'Fleet & Rental', permissionKey: 'fleet' },
+    { path: '/hris', requiredModule: 'HRIS', permissionKey: 'hris' },
+    { path: '/audit', requiredModule: 'Audit' },
+    { path: '/reports', requiredModule: 'Reports', permissionKey: 'reports' },
+    { path: '/marketing', requiredModule: 'Marketing' },
+    { path: '/crm', requiredModule: 'CRM', permissionKey: 'sales' },
+    { path: '/warehouse', requiredModule: 'Warehouse', permissionKey: 'inventory' },
+    { path: '/consolidation', requiredModule: 'Consolidation' },
+    { path: '/services', requiredModule: 'Job Order (Jasa)', permissionKey: 'services' },
+  ]
 
   // Identify which module is being accessed
-  const accessedEntry = Object.entries(routeModuleMap).find(([path]) => pathname.startsWith(path))
+  const accessedEntry = routeModuleMap.find((entry) => pathname.startsWith(entry.path))
   
   if (accessedEntry) {
-    const [_, requiredModule] = accessedEntry
+    const { requiredModule, permissionKey = requiredModule } = accessedEntry
     
     // 1. SAAS MODULE GUARD (Check for EVERYONE, including owner)
     const isModulePaid = orgData.enabledModules?.some(
@@ -81,7 +84,7 @@ export default async function DashboardLayout({
     // 2. RBAC PERMISSION GUARD (Only check if NOT owner/admin)
     if (!isOwnerOrAdmin) {
       const hasPermission = orgData.permissions.some(
-        (p: string) => p.toLowerCase().includes(requiredModule.toLowerCase())
+        (p: string) => p.toLowerCase().includes(permissionKey.toLowerCase())
       )
       if (!hasPermission) {
         console.log(`[ACL] Redirecting - No permission for: ${requiredModule} for path: ${pathname}`)
@@ -123,6 +126,7 @@ export default async function DashboardLayout({
           branches={branches || []}
           pendingApprovals={pendingApprovals}
           cashFlow={cashFlow}
+          aiTokens={aiTokens}
         />
         <StartupWizard isDemo={isDemo} />
         <main className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6">

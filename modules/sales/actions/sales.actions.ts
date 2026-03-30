@@ -299,3 +299,51 @@ export async function updateSaleStatus(orgId: string, saleId: string, status: st
   revalidatePath('/sales')
   return { success: true }
 }
+
+export async function createQuickKanbanCard(
+  orgId: string, 
+  payload: { name: string; phone: string; email: string; amount: number; notes: string; status: string }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  // 1. Create a rapid generic contact
+  const { data: contact, error: contactErr } = await (supabase as any)
+    .from('contacts')
+    .insert({
+      org_id: orgId,
+      name: payload.name || 'Anonymous Lead',
+      type: 'CUSTOMER',
+      phone: payload.phone || null,
+      email: payload.email || null,
+    })
+    .select('id')
+    .single()
+
+  if (contactErr) return { error: 'Gagal membuat kontak: ' + contactErr.message }
+
+  // 2. Create the Sale (Kanban Card)
+  const { data: sale, error: saleErr } = await (supabase as any)
+    .from('sales')
+    .insert({
+      org_id: orgId,
+      customer_id: contact.id,
+      sale_date: new Date().toISOString().split('T')[0],
+      total_amount: payload.amount,
+      tax_amount: 0,
+      discount_amount: 0,
+      grand_total: payload.amount,
+      status: payload.status,
+      shariah_mode: 'CASH',
+      notes: payload.notes || 'via Kanban Add Card',
+      created_by: user.id
+    })
+    .select('id')
+    .single()
+
+  if (saleErr) return { error: 'Gagal membuat card: ' + saleErr.message }
+
+  revalidatePath('/sales/pipeline')
+  return { success: true, saleId: sale.id }
+}

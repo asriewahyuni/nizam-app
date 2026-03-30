@@ -266,11 +266,18 @@ export async function createInvitationToken(orgId: string, formData: FormData) {
     is_active: true
   }
 
-  const { error } = await db.from('org_invitations').insert(payload)
+  const { data, error } = await db
+    .from('org_invitations')
+    .insert(payload)
+    .select('*, roles(name)')
+    .single()
+
   if (error) return { error: error.message }
   
   revalidatePath('/settings/business')
-  return { success: true, code }
+  revalidatePath('/settings/users')
+  revalidatePath('/hris')
+  return { success: true, code, invitation: data }
 }
 
 export async function deleteInvitation(id: string) {
@@ -278,6 +285,8 @@ export async function deleteInvitation(id: string) {
   const db = supabase as any
   await db.from('org_invitations').delete().eq('id', id)
   revalidatePath('/settings/business')
+  revalidatePath('/settings/users')
+  revalidatePath('/hris')
   return { success: true }
 }
 

@@ -26,12 +26,19 @@ import {
   Mail,
   Database,
   Zap,
-  ExternalLink
+  ExternalLink,
+  Coins
 } from 'lucide-react'
 import { PageHeader, SectionCard, SectionHeader, SafeButton, StatusBadge, ConfirmDialog } from '@/components/ui/NizamUI'
 import { createClient } from '@/lib/supabase/client'
 import { Organization } from '@/types/database.types'
 import Link from 'next/link'
+import {
+  calculateAiHppPerGeneration,
+  calculateAiRecommendedSellPer1kTokens,
+  calculateAiRecommendedSellPerGeneration,
+  normalizeAiTokenPolicy,
+} from '@/modules/ai/lib/ai-token'
 
 const supabase = createClient()
 
@@ -39,7 +46,7 @@ const CORE_MODULES = [
   'Dashboard', 'Audit Integritas',
   'Akun (CoA)', 'Kas & Bank', 'Buku Besar', 'Aging (AR/AP)', 'Manajemen Zakat', 'Manajemen Pajak', 'Reimbursement', 'Penutupan Buku', 'Aset Tetap', 'Anggaran',
   'Pembelian', 'Inventori', 'Gudang (WMS)', 'Manufaktur (BoM)', 
-  'Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward',
+  'Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward', 'Sales Page',
   'Karyawan (HRIS)', 'Akses & Jabatan',
   'Laporan', 'Strategi (BSC)', 'Proyeksi Kas',
   'Audit Trail', 'Cabang & Divisi', 'Pengaturan Bisnis'
@@ -49,7 +56,7 @@ const ADDON_MODULES = [
   'Fleet & Rental', 'Job Order (Jasa)'
 ]
 
-type Tab = 'users' | 'packages' | 'invoices' | 'settings'
+type Tab = 'users' | 'packages' | 'invoices' | 'settings' | 'ai_tokens'
 
 export default function SaaSAdminPage() {
   const db = supabase as any
@@ -59,6 +66,21 @@ export default function SaaSAdminPage() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'demo' | 'official'>('all')
   const [packageFilter, setPackageFilter] = useState<string>('all')
   const [saasSettings, setSaasSettings] = useState<any>({ bank_info: {}, support_info: {} })
+  const [aiTokenPolicyRaw, setAiTokenPolicyRaw] = useState<any>({})
+  const [aiTokenInventory, setAiTokenInventory] = useState<any>({ total_stock_tokens: 0 })
+  const [aiTopupPackages, setAiTopupPackages] = useState<any[]>([])
+  const [aiWalletSummary, setAiWalletSummary] = useState({
+    totalBalance: 0,
+    totalPurchased: 0,
+    totalUsed: 0,
+  })
+  const [aiTopupModal, setAiTopupModal] = useState<{ open: boolean; editData: any | null }>({ open: false, editData: null })
+
+  const aiPolicy = normalizeAiTokenPolicy(aiTokenPolicyRaw)
+  const aiHppPerGenerate = calculateAiHppPerGeneration(aiPolicy)
+  const aiRecommendedPerGenerate = calculateAiRecommendedSellPerGeneration(aiPolicy)
+  const aiRecommendedPer1kToken = calculateAiRecommendedSellPer1kTokens(aiPolicy)
+  const aiAvailableStock = Math.max(0, Number(aiTokenInventory?.total_stock_tokens || 0) - aiWalletSummary.totalBalance)
 
   useEffect(() => {
     async function fetchConfig() {
@@ -159,6 +181,137 @@ export default function SaaSAdminPage() {
     if (data) setInvoices(data)
   }
 
+  const fetchAiTokenData = async () => {
+    const { data: configRows } = await db
+      .from('saas_config')
+      .select('*')
+      .in('key', ['ai_token_policy', 'ai_token_inventory'])
+
+    const config: any = {}
+    ;(configRows || []).forEach((row: any) => {
+      config[row.key] = row.value
+    })
+    setAiTokenPolicyRaw(config.ai_token_policy || {})
+    setAiTokenInventory(config.ai_token_inventory || { total_stock_tokens: 0 })
+
+    const { data: topupRows } = await db
+      .from('ai_token_topup_packages')
+      .select('*')
+      .order('sort_order', { ascending: true })
+      .order('tokens', { ascending: true })
+
+    setAiTopupPackages(topupRows || [])
+
+    const { data: walletRows } = await db
+      .from('ai_token_wallets')
+      .select('balance_tokens, total_purchased_tokens, total_used_tokens')
+
+    const summary = (walletRows || []).reduce(
+      (acc: { totalBalance: number; totalPurchased: number; totalUsed: number }, wallet: any) => {
+        acc.totalBalance += Number(wallet.balance_tokens || 0)
+        acc.totalPurchased += Number(wallet.total_purchased_tokens || 0)
+        acc.totalUsed += Number(wallet.total_used_tokens || 0)
+        return acc
+      },
+      { totalBalance: 0, totalPurchased: 0, totalUsed: 0 },
+    )
+
+    setAiWalletSummary(summary)
+  }
+
+  const saveAiTokenConfig = async () => {
+    const policyValue = {
+      cost_per_1k_input_idr: Number(aiPolicy.costPer1kInputIdr || 0),
+      cost_per_1k_output_idr: Number(aiPolicy.costPer1kOutputIdr || 0),
+      avg_input_tokens: Number(aiPolicy.avgInputTokens || 0),
+      avg_output_tokens: Number(aiPolicy.avgOutputTokens || 0),
+      tokens_per_generation: Number(aiPolicy.tokensPerGeneration || 0),
+      overhead_percent: Number(aiPolicy.overheadPercent || 0),
+      margin_percent: Number(aiPolicy.marginPercent || 0),
+      low_balance_threshold: Number(aiPolicy.lowBalanceThreshold || 0),
+    }
+
+    const inventoryValue = {
+      total_stock_tokens: Number(aiTokenInventory?.total_stock_tokens || 0),
+    }
+
+    const { error } = await db.from('saas_config').upsert([
+      { key: 'ai_token_policy', value: policyValue },
+      { key: 'ai_token_inventory', value: inventoryValue },
+    ])
+
+    if (error) {
+      alert('❌ Gagal menyimpan pengaturan token AI: ' + error.message)
+      return
+    }
+
+    alert('✅ Konfigurasi token AI berhasil disimpan.')
+    await fetchAiTokenData()
+  }
+
+  const saveAiTopupPackageForm = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget)
+    const payload = {
+      name: String(fd.get('name') || '').trim(),
+      description: String(fd.get('description') || '').trim(),
+      tokens: Number(fd.get('tokens') || 0),
+      price_idr: Number(fd.get('price_idr') || 0),
+      cost_idr: Number(fd.get('cost_idr') || 0),
+      sort_order: Number(fd.get('sort_order') || 0),
+      is_active: fd.get('is_active') === 'on',
+    }
+
+    if (!payload.name || payload.tokens <= 0) {
+      alert('Nama paket dan jumlah token wajib valid.')
+      return
+    }
+
+    const { error } = aiTopupModal.editData?.id
+      ? await db.from('ai_token_topup_packages').update(payload).eq('id', aiTopupModal.editData.id)
+      : await db.from('ai_token_topup_packages').insert(payload)
+
+    if (error) {
+      alert('❌ Gagal menyimpan paket topup: ' + error.message)
+      return
+    }
+
+    alert('✅ Paket topup token berhasil disimpan.')
+    setAiTopupModal({ open: false, editData: null })
+    await fetchAiTokenData()
+  }
+
+  const toggleAiTopupStatus = async (id: string, currentStatus: boolean) => {
+    const { error } = await db
+      .from('ai_token_topup_packages')
+      .update({ is_active: !currentStatus })
+      .eq('id', id)
+
+    if (error) {
+      alert('❌ Gagal mengubah status paket topup: ' + error.message)
+      return
+    }
+
+    await fetchAiTokenData()
+  }
+
+  const handleDeleteAiTopupPackage = (id: string, name: string) => {
+    setConfirmState({
+      open: true,
+      title: 'Hapus Paket Topup?',
+      message: `Paket token "${name}" akan dihapus permanen. Lanjutkan?`,
+      action: async () => {
+        const { error } = await db.from('ai_token_topup_packages').delete().eq('id', id)
+        if (error) {
+          alert(error.message)
+        } else {
+          await fetchAiTokenData()
+        }
+        setConfirmState(prev => ({ ...prev, open: false }))
+      },
+    })
+  }
+
   const approveInvoice = async (invoice: any) => {
     const pkg = invoice.package
     const isAddon = !invoice.package_id
@@ -166,6 +319,78 @@ export default function SaaSAdminPage() {
     // 1. Update status invoice jadi PAID
     const { error: invErr } = await db.from('saas_invoices').update({ status: 'PAID' }).eq('id', invoice.id)
     if (invErr) return alert('Gagal update invoice: ' + invErr.message)
+
+    // 1.1 Jika ini invoice topup token AI, lakukan kredit token ke wallet org
+    const { data: tokenOrder } = await db
+      .from('ai_token_topup_orders')
+      .select('*')
+      .eq('invoice_id', invoice.id)
+      .maybeSingle()
+
+    if (tokenOrder) {
+      const tokenAmount = Number(tokenOrder.tokens || 0)
+      const { data: wallet } = await db
+        .from('ai_token_wallets')
+        .select('*')
+        .eq('org_id', invoice.org_id)
+        .maybeSingle()
+
+      if (wallet?.org_id) {
+        const { error: walletUpdateError } = await db
+          .from('ai_token_wallets')
+          .update({
+            balance_tokens: Number(wallet.balance_tokens || 0) + tokenAmount,
+            total_purchased_tokens: Number(wallet.total_purchased_tokens || 0) + tokenAmount,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('org_id', invoice.org_id)
+
+        if (walletUpdateError) {
+          return alert('Gagal update saldo token AI: ' + walletUpdateError.message)
+        }
+      } else {
+        const { error: walletCreateError } = await db
+          .from('ai_token_wallets')
+          .insert({
+            org_id: invoice.org_id,
+            balance_tokens: tokenAmount,
+            total_purchased_tokens: tokenAmount,
+            total_used_tokens: 0,
+            low_balance_threshold: aiPolicy.lowBalanceThreshold,
+          })
+
+        if (walletCreateError) {
+          return alert('Gagal membuat wallet token AI: ' + walletCreateError.message)
+        }
+      }
+
+      await db.from('ai_token_usage_logs').insert({
+        org_id: invoice.org_id,
+        source: 'topup',
+        direction: 'CREDIT',
+        tokens: tokenAmount,
+        related_invoice_id: invoice.id,
+        note: `Topup AI token dari paket ${tokenOrder.package_id}`,
+        meta: {
+          topup_order_id: tokenOrder.id,
+          package_id: tokenOrder.package_id,
+        },
+      })
+
+      await db
+        .from('ai_token_topup_orders')
+        .update({
+          status: 'PAID',
+          paid_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', tokenOrder.id)
+
+      alert('✅ Topup token AI berhasil dikonfirmasi dan saldo tenant sudah ditambahkan.')
+      fetchInvoices()
+      fetchAiTokenData()
+      return
+    }
 
     if (isAddon) {
       // HANDLE ADDON ACTIVATION
@@ -204,6 +429,7 @@ export default function SaaSAdminPage() {
 
     alert('✅ Pembayaran Berhasil Dikonfirmasi & Item Aktif!')
     fetchInvoices()
+    fetchAiTokenData()
   }
 
   const cancelInvoice = async (id: string) => {
@@ -230,6 +456,7 @@ export default function SaaSAdminPage() {
     fetchOrganizations()
     fetchPackages()
     fetchInvoices()
+    fetchAiTokenData()
   }, [])
 
   const togglePackageStatus = async (pkgId: string, currentStatus: boolean) => {
@@ -348,11 +575,12 @@ export default function SaaSAdminPage() {
             <p className="text-slate-400 font-bold text-sm tracking-widest mt-1 uppercase">NIZAM SaaS Platform Administration</p>
          </div>
          <div className="flex gap-4">
-            <button onClick={() => setActiveTab('users')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Tenants</button>
-            <button onClick={() => setActiveTab('packages')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'packages' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>SaaS Plans</button>
-            <button onClick={() => setActiveTab('invoices')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'invoices' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Billing</button>
-            <button onClick={() => setActiveTab('settings')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Settings</button>
-         </div>
+	            <button onClick={() => setActiveTab('users')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Tenants</button>
+	            <button onClick={() => setActiveTab('packages')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'packages' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>SaaS Plans</button>
+	            <button onClick={() => setActiveTab('ai_tokens')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'ai_tokens' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>AI Tokens</button>
+	            <button onClick={() => setActiveTab('invoices')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'invoices' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Billing</button>
+	            <button onClick={() => setActiveTab('settings')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Settings</button>
+	         </div>
       </div>
 
       <AnimatePresence mode="wait">
@@ -363,7 +591,194 @@ export default function SaaSAdminPage() {
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
         >
-          {activeTab === 'settings' && (
+	          {activeTab === 'ai_tokens' && (
+	            <div className="space-y-8">
+	              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+	                <SectionCard>
+	                  <div className="p-5 space-y-2">
+	                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stok Provider</p>
+	                    <p className="text-2xl font-black text-slate-900 tracking-tight">{Number(aiTokenInventory?.total_stock_tokens || 0).toLocaleString('id-ID')}</p>
+	                  </div>
+	                </SectionCard>
+	                <SectionCard>
+	                  <div className="p-5 space-y-2">
+	                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Saldo Tenant Aktif</p>
+	                    <p className="text-2xl font-black text-slate-900 tracking-tight">{aiWalletSummary.totalBalance.toLocaleString('id-ID')}</p>
+	                  </div>
+	                </SectionCard>
+	                <SectionCard>
+	                  <div className="p-5 space-y-2">
+	                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stok Tersedia</p>
+	                    <p className={`text-2xl font-black tracking-tight ${aiAvailableStock < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+	                      {aiAvailableStock.toLocaleString('id-ID')}
+	                    </p>
+	                  </div>
+	                </SectionCard>
+	                <SectionCard>
+	                  <div className="p-5 space-y-2">
+	                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pemakaian Total</p>
+	                    <p className="text-2xl font-black text-slate-900 tracking-tight">{aiWalletSummary.totalUsed.toLocaleString('id-ID')}</p>
+	                  </div>
+	                </SectionCard>
+	              </div>
+
+	              <SectionCard>
+	                <div className="p-6 space-y-6">
+	                  <div>
+	                    <h3 className="text-xl font-black text-slate-900 tracking-tight">Konfigurasi Biaya & Pricing Token AI</h3>
+	                    <p className="text-sm font-medium text-slate-500 mt-1">Atur input cost, overhead, margin, dan stok global token untuk kalkulasi HPP otomatis.</p>
+	                  </div>
+	                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+	                    <div>
+	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Biaya Input / 1K (IDR)</label>
+	                      <input
+	                        type="number"
+	                        value={aiPolicy.costPer1kInputIdr}
+	                        onChange={(e) => setAiTokenPolicyRaw((prev: any) => ({ ...prev, cost_per_1k_input_idr: Number(e.target.value || 0) }))}
+	                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold"
+	                      />
+	                    </div>
+	                    <div>
+	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Biaya Output / 1K (IDR)</label>
+	                      <input
+	                        type="number"
+	                        value={aiPolicy.costPer1kOutputIdr}
+	                        onChange={(e) => setAiTokenPolicyRaw((prev: any) => ({ ...prev, cost_per_1k_output_idr: Number(e.target.value || 0) }))}
+	                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold"
+	                      />
+	                    </div>
+	                    <div>
+	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Avg Input Tokens</label>
+	                      <input
+	                        type="number"
+	                        value={aiPolicy.avgInputTokens}
+	                        onChange={(e) => setAiTokenPolicyRaw((prev: any) => ({ ...prev, avg_input_tokens: Number(e.target.value || 0) }))}
+	                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold"
+	                      />
+	                    </div>
+	                    <div>
+	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Avg Output Tokens</label>
+	                      <input
+	                        type="number"
+	                        value={aiPolicy.avgOutputTokens}
+	                        onChange={(e) => setAiTokenPolicyRaw((prev: any) => ({ ...prev, avg_output_tokens: Number(e.target.value || 0) }))}
+	                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold"
+	                      />
+	                    </div>
+	                  </div>
+
+	                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+	                    <div>
+	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Token / Generate</label>
+	                      <input
+	                        type="number"
+	                        value={aiPolicy.tokensPerGeneration}
+	                        onChange={(e) => setAiTokenPolicyRaw((prev: any) => ({ ...prev, tokens_per_generation: Number(e.target.value || 0) }))}
+	                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold"
+	                      />
+	                    </div>
+	                    <div>
+	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Overhead (%)</label>
+	                      <input
+	                        type="number"
+	                        value={aiPolicy.overheadPercent}
+	                        onChange={(e) => setAiTokenPolicyRaw((prev: any) => ({ ...prev, overhead_percent: Number(e.target.value || 0) }))}
+	                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold"
+	                      />
+	                    </div>
+	                    <div>
+	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Margin (%)</label>
+	                      <input
+	                        type="number"
+	                        value={aiPolicy.marginPercent}
+	                        onChange={(e) => setAiTokenPolicyRaw((prev: any) => ({ ...prev, margin_percent: Number(e.target.value || 0) }))}
+	                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold"
+	                      />
+	                    </div>
+	                    <div>
+	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Stok Token Global</label>
+	                      <input
+	                        type="number"
+	                        value={Number(aiTokenInventory?.total_stock_tokens || 0)}
+	                        onChange={(e) => setAiTokenInventory((prev: any) => ({ ...prev, total_stock_tokens: Number(e.target.value || 0) }))}
+	                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold"
+	                      />
+	                    </div>
+	                  </div>
+
+	                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+	                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+	                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">HPP / Generate</div>
+	                      <div className="mt-1 text-lg font-black text-slate-900">Rp {Math.ceil(aiHppPerGenerate).toLocaleString('id-ID')}</div>
+	                    </div>
+	                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+	                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rekomendasi / Generate</div>
+	                      <div className="mt-1 text-lg font-black text-emerald-700">Rp {Math.ceil(aiRecommendedPerGenerate).toLocaleString('id-ID')}</div>
+	                    </div>
+	                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+	                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rekomendasi / 1K Token</div>
+	                      <div className="mt-1 text-lg font-black text-indigo-700">Rp {Math.ceil(aiRecommendedPer1kToken).toLocaleString('id-ID')}</div>
+	                    </div>
+	                  </div>
+
+	                  <div className="flex justify-end">
+	                    <SafeButton variant="primary" onClick={saveAiTokenConfig} icon={<Coins size={16} />}>
+	                      Simpan Konfigurasi Token AI
+	                    </SafeButton>
+	                  </div>
+	                </div>
+	              </SectionCard>
+
+	              <SectionCard>
+	                <div className="p-6 space-y-5">
+	                  <div className="flex items-center justify-between gap-4">
+	                    <div>
+	                      <h3 className="text-xl font-black text-slate-900 tracking-tight">Paket Top Up Token AI</h3>
+	                      <p className="text-sm font-medium text-slate-500 mt-1">Kelola paket yang akan tampil di halaman billing tenant.</p>
+	                    </div>
+	                    <SafeButton variant="primary" onClick={() => setAiTopupModal({ open: true, editData: null })} icon={<Plus size={16} />}>
+	                      Tambah Paket Token
+	                    </SafeButton>
+	                  </div>
+
+	                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+	                    {aiTopupPackages.map((pkg) => (
+	                      <div key={pkg.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+	                        <div className="flex items-center justify-between gap-3">
+	                          <div className="text-sm font-black text-slate-900">{pkg.name}</div>
+	                          <button
+	                            onClick={() => toggleAiTopupStatus(pkg.id, Boolean(pkg.is_active))}
+	                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${pkg.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`}
+	                          >
+	                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${pkg.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
+	                          </button>
+	                        </div>
+	                        <div className="mt-4 text-3xl font-black tracking-tighter text-slate-900">{Number(pkg.tokens || 0).toLocaleString('id-ID')}</div>
+	                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Token</div>
+	                        <div className="mt-3 text-xs font-bold text-slate-500">{pkg.description || '-'}</div>
+	                        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+	                          <div>
+	                            <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">Sell Price</div>
+	                            <div className="text-sm font-black text-slate-900">Rp {Number(pkg.price_idr || 0).toLocaleString('id-ID')}</div>
+	                          </div>
+	                          <div className="flex gap-2">
+	                            <button onClick={() => setAiTopupModal({ open: true, editData: pkg })} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
+	                              <Edit3 size={16} />
+	                            </button>
+	                            <button onClick={() => handleDeleteAiTopupPackage(pkg.id, pkg.name)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
+	                              <Trash2 size={16} />
+	                            </button>
+	                          </div>
+	                        </div>
+	                      </div>
+	                    ))}
+	                  </div>
+	                </div>
+	              </SectionCard>
+	            </div>
+	          )}
+
+	          {activeTab === 'settings' && (
             <div className="max-w-4xl space-y-8">
                <SectionHeader title="SaaS Platform Settings" subtitle="Konfigurasi rekening bank & bantuan WA secara global." />
                <form onSubmit={saveSettings} className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -806,7 +1221,7 @@ export default function SaaSAdminPage() {
                              { group: 'Finance', items: ['Akun (CoA)', 'Kas & Bank', 'Buku Besar', 'Aging (AR/AP)', 'Manajemen Zakat', 'Manajemen Pajak', 'Reimbursement', 'Penutupan Buku', 'Aset Tetap', 'Anggaran'] },
                              { group: 'Operasional', items: ['Pembelian', 'Inventori', 'Gudang (WMS)', 'Manufaktur (BoM)'] },
                              { group: 'Tambahan (Premium)', items: ['Fleet & Rental', 'Job Order (Jasa)'] },
-                             { group: 'Marketing & Sales', items: ['Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward'] },
+                             { group: 'Marketing & Sales', items: ['Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward', 'Sales Page'] },
                              { group: 'HRIS', items: ['Karyawan (HRIS)', 'Akses & Jabatan'] },
                              { group: 'Insight', items: ['Laporan', 'Strategi (BSC)', 'Proyeksi Kas'] },
                              { group: 'Config', items: ['Audit Trail', 'Cabang & Divisi', 'Pengaturan Bisnis'] }
@@ -856,10 +1271,76 @@ export default function SaaSAdminPage() {
               </motion.div>
            </div>
          )}
-      </AnimatePresence>
+	      </AnimatePresence>
 
-      <ConfirmDialog 
-        isOpen={confirmState.open} 
+	      {/* AI TOPUP MODAL */}
+	      <AnimatePresence>
+	        {aiTopupModal.open && (
+	          <div key="ai-topup-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+	            <motion.div
+	              key="ai-topup-modal-backdrop"
+	              initial={{ opacity: 0 }}
+	              animate={{ opacity: 1 }}
+	              exit={{ opacity: 0 }}
+	              onClick={() => setAiTopupModal({ open: false, editData: null })}
+	              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+	            />
+	            <motion.div
+	              key="ai-topup-modal-content"
+	              initial={{ scale: 0.9, opacity: 0 }}
+	              animate={{ scale: 1, opacity: 1 }}
+	              exit={{ scale: 0.9, opacity: 0 }}
+	              className="relative w-full max-w-xl bg-white rounded-[40px] shadow-2xl p-8 border border-white"
+	            >
+	              <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6">
+	                {aiTopupModal.editData ? 'Edit Paket Topup Token' : 'Tambah Paket Topup Token'}
+	              </h2>
+
+	              <form onSubmit={saveAiTopupPackageForm} className="space-y-4">
+	                <div>
+	                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Nama Paket</label>
+	                  <input name="name" required defaultValue={aiTopupModal.editData?.name} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
+	                </div>
+	                <div>
+	                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Deskripsi</label>
+	                  <textarea name="description" rows={3} defaultValue={aiTopupModal.editData?.description} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
+	                </div>
+	                <div className="grid grid-cols-2 gap-4">
+	                  <div>
+	                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Jumlah Token</label>
+	                    <input name="tokens" type="number" min={1} required defaultValue={aiTopupModal.editData?.tokens || 50000} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
+	                  </div>
+	                  <div>
+	                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Sort Order</label>
+	                    <input name="sort_order" type="number" defaultValue={aiTopupModal.editData?.sort_order || 0} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
+	                  </div>
+	                </div>
+	                <div className="grid grid-cols-2 gap-4">
+	                  <div>
+	                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Harga Jual (IDR)</label>
+	                    <input name="price_idr" type="number" min={0} required defaultValue={aiTopupModal.editData?.price_idr || 0} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
+	                  </div>
+	                  <div>
+	                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">HPP Paket (IDR)</label>
+	                    <input name="cost_idr" type="number" min={0} defaultValue={aiTopupModal.editData?.cost_idr || 0} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
+	                  </div>
+	                </div>
+	                <label className="inline-flex items-center gap-2 cursor-pointer">
+	                  <input type="checkbox" name="is_active" defaultChecked={aiTopupModal.editData?.is_active ?? true} className="w-4 h-4 rounded" />
+	                  <span className="text-xs font-bold text-slate-600">Aktifkan paket ini</span>
+	                </label>
+	                <div className="flex justify-end gap-3 pt-2">
+	                  <button type="button" onClick={() => setAiTopupModal({ open: false, editData: null })} className="px-4 py-3 text-xs font-black uppercase text-slate-400">Batal</button>
+	                  <SafeButton type="submit" variant="primary">Simpan Paket</SafeButton>
+	                </div>
+	              </form>
+	            </motion.div>
+	          </div>
+	        )}
+	      </AnimatePresence>
+
+	      <ConfirmDialog 
+	        isOpen={confirmState.open} 
         title={confirmState.title} 
         message={confirmState.message} 
         onConfirm={confirmState.action} 

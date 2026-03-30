@@ -1,30 +1,39 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { Settings, Save, Fingerprint, Building, Receipt, FileText, Upload, Check, AlertCircle, Plus, Trash2, Link as LinkIcon, Copy, X, Key, ShieldCheck, Clock } from 'lucide-react'
+import React, { useState } from 'react'
+import { Settings, Save, Fingerprint, Building, Receipt, FileText, Upload, Check, AlertCircle, Plus, Trash2, Link as LinkIcon, Copy, X, Key, ShieldCheck, Clock, Zap, RotateCcw } from 'lucide-react'
 import { updateOrgSettings, uploadLogo, checkSlugAvailability } from '@/modules/organization/actions/org.actions'
+import { resetOrganizationData, type ResetOrganizationMode } from '@/modules/settings/actions/audit.actions'
 import { motion, AnimatePresence } from 'framer-motion'
+
+type BusinessSettingsMap = Record<string, string | number | boolean | null | undefined>
+type BusinessProfile = {
+  name?: string
+  slug?: string
+  logo_url?: string | null
+  settings?: BusinessSettingsMap
+}
 
 export default function BusinessClient({ 
   orgId, 
-  initialSettings, 
-  roles = []
+  currentRole,
+  initialSettings
 }: { 
   orgId: string, 
-  initialSettings: any, 
-  roles?: any[]
+  currentRole: string,
+  initialSettings: BusinessProfile
 }) {
-  const [settings, setSettings] = useState(initialSettings?.settings || {})
+  const [settings, setSettings] = useState<BusinessSettingsMap>(initialSettings?.settings || {})
   const [currentSlug, setCurrentSlug] = useState(initialSettings?.slug || '')
   const [loading, setLoading] = useState(false)
-  const [baseUrl, setBaseUrl] = useState('https://nizam.app')
+  const [baseUrl] = useState(() => {
+    if (typeof window !== 'undefined') return window.location.origin
+    return 'https://nizam.app'
+  })
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
-  
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setBaseUrl(window.location.origin)
-    }
-  }, [])
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false)
+  const [resetMode, setResetMode] = useState<ResetOrganizationMode>('transactions')
+  const [resetConfirmation, setResetConfirmation] = useState('')
 
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -49,7 +58,7 @@ export default function BusinessClient({
     
     const logoUrl = formData.get('logo_url') as string
 
-    const res = await (updateOrgSettings as any)(orgId, { 
+    const res = await updateOrgSettings(orgId, { 
        settings: newSettings,
        logo_url: logoUrl,
        slug: newSlug
@@ -63,6 +72,39 @@ export default function BusinessClient({
       alert('Pengaturan Bisnis berhasil disimpan!')
     }
     setLoading(false)
+  }
+
+  const expectedResetConfirmation = resetMode === 'all_data'
+    ? (initialSettings?.name || '').trim()
+    : 'RESET TRANSAKSI'
+
+  const handleResetOrganizationData = async () => {
+    if (currentRole !== 'owner') {
+      alert('Hanya owner yang dapat menjalankan reset data organisasi.')
+      return
+    }
+
+    if (resetConfirmation.trim() !== expectedResetConfirmation) {
+      alert(`Konfirmasi belum cocok. Ketik "${expectedResetConfirmation}" untuk melanjutkan.`)
+      return
+    }
+
+    setLoading(true)
+    const res = await resetOrganizationData(orgId, {
+      mode: resetMode,
+      confirmationText: resetConfirmation.trim(),
+    })
+
+    if (!res.success) {
+      alert(res.error)
+      setLoading(false)
+      return
+    }
+
+    alert(res.message || 'Reset data selesai.')
+    setIsResetModalOpen(false)
+    setResetConfirmation('')
+    window.location.reload()
   }
 
   return (
@@ -153,7 +195,7 @@ export default function BusinessClient({
                        <button 
                           type="button" 
                           onClick={() => {
-                             (updateOrgSettings as any)(orgId, { slug: currentSlug }).then(() => {
+                             updateOrgSettings(orgId, { slug: currentSlug }).then(() => {
                                 setSlugStatus('idle');
                                 alert('Identitas bisnis berhasil dikunci!');
                              });
@@ -211,6 +253,168 @@ export default function BusinessClient({
            </button>
         </div>
       </form>
+
+      <div className="bg-white rounded-[40px] border border-rose-100 shadow-xl shadow-rose-100/40 p-10 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <h3 className="text-lg font-black text-rose-700 uppercase tracking-tight flex items-center gap-3">
+              <Zap size={20} />
+              Danger Zone
+            </h3>
+            <p className="text-sm text-slate-500 mt-2 max-w-2xl leading-6">
+              Pakai fitur ini jika tim ingin mengulang input dari nol tanpa menghapus organisasi. Reset hanya tersedia untuk owner dan wajib melalui konfirmasi manual.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setResetMode('transactions')
+              setResetConfirmation('')
+              setIsResetModalOpen(true)
+            }}
+            disabled={currentRole !== 'owner'}
+            className="px-6 py-4 bg-rose-600 text-white rounded-3xl text-xs font-black uppercase tracking-[0.2em] hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 disabled:opacity-50"
+          >
+            Buka Reset Data
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 space-y-3">
+            <div className="flex items-center gap-3 text-slate-900 font-black uppercase text-sm tracking-tight">
+              <RotateCcw size={18} className="text-blue-600" />
+              Reset Transaksi
+            </div>
+            <p className="text-sm text-slate-500 leading-6">
+              Menghapus jurnal, kas/bank, inventory movement, sales, purchasing, payroll run, reimbursement, audit log, approval, dan transaksi operasional lain. Data master utama tetap disimpan.
+            </p>
+          </div>
+
+          <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-6 space-y-3">
+            <div className="flex items-center gap-3 text-rose-700 font-black uppercase text-sm tracking-tight">
+              <Zap size={18} />
+              Reset Semua Data Operasional
+            </div>
+            <p className="text-sm text-rose-700/80 leading-6">
+              Selain transaksi, mode ini juga menghapus produk, kontak, karyawan, bank account, gudang, cabang, fleet master, invitation link, dan master operasional lain. Profil bisnis, owner, role, akun, serta billing tetap dipertahankan.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {isResetModalOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !loading && setIsResetModalOpen(false)}
+              className="absolute inset-0 bg-slate-950/70 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              className="relative w-full max-w-2xl rounded-[40px] border border-white/70 bg-white shadow-2xl overflow-hidden"
+            >
+              <div className="p-8 md:p-10 space-y-8">
+                <div className="flex items-start justify-between gap-6">
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">Reset Data Organisasi</h3>
+                    <p className="text-sm text-slate-500 leading-6">
+                      Pilih mode reset yang sesuai. Aksi ini tidak bisa di-undo dan hanya dapat dijalankan oleh owner organisasi.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => !loading && setIsResetModalOpen(false)}
+                    className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-400 hover:bg-slate-200 transition-all flex items-center justify-center"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setResetMode('transactions')}
+                    className={`text-left rounded-[28px] border p-6 transition-all ${
+                      resetMode === 'transactions'
+                        ? 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-100'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Reset Transaksi</p>
+                    <p className="text-sm text-slate-500 mt-3 leading-6">
+                      Menjaga master data inti seperti produk, kontak, karyawan, rekening, gudang, dan role tetap ada.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setResetMode('all_data')}
+                    className={`text-left rounded-[28px] border p-6 transition-all ${
+                      resetMode === 'all_data'
+                        ? 'border-rose-500 bg-rose-50 shadow-lg shadow-rose-100'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Reset Semua Data Operasional</p>
+                    <p className="text-sm text-slate-500 mt-3 leading-6">
+                      Menghapus transaksi sekaligus master operasional sehingga organisasi terasa kembali ke fase awal, namun profil bisnis, akun, role, dan billing tetap aman.
+                    </p>
+                  </button>
+                </div>
+
+                <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-6 space-y-3">
+                  <p className="text-xs font-black text-amber-700 uppercase tracking-[0.2em]">Konfirmasi Wajib</p>
+                  <p className="text-sm text-amber-900 leading-6">
+                    {resetMode === 'all_data'
+                      ? `Untuk melanjutkan, ketik nama organisasi persis seperti ini: ${initialSettings?.name}`
+                      : 'Untuk melanjutkan, ketik persis: RESET TRANSAKSI'}
+                  </p>
+                  <input
+                    value={resetConfirmation}
+                    onChange={(e) => setResetConfirmation(e.target.value)}
+                    placeholder={expectedResetConfirmation}
+                    className="w-full px-5 py-4 rounded-2xl border border-amber-200 bg-white text-sm font-bold outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 space-y-3">
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-[0.2em]">Yang Tetap Dipertahankan</p>
+                  <p className="text-sm text-slate-700 leading-6">
+                    Profil bisnis, slug, owner membership, role, chart of accounts, dan data billing SaaS.
+                  </p>
+                </div>
+
+                <div className="flex flex-col-reverse md:flex-row md:justify-end gap-4">
+                  <button
+                    type="button"
+                    onClick={() => !loading && setIsResetModalOpen(false)}
+                    className="px-6 py-4 rounded-2xl bg-slate-100 text-slate-500 font-black text-xs uppercase tracking-[0.2em] hover:bg-slate-200 transition-all"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetOrganizationData}
+                    disabled={loading || currentRole !== 'owner'}
+                    className={`px-6 py-4 rounded-2xl text-white font-black text-xs uppercase tracking-[0.2em] transition-all shadow-lg disabled:opacity-50 ${
+                      resetMode === 'all_data'
+                        ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200'
+                        : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
+                    }`}
+                  >
+                    {loading ? 'Memproses Reset...' : resetMode === 'all_data' ? 'Reset Semua Data Operasional' : 'Reset Transaksi'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

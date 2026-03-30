@@ -284,7 +284,11 @@ export default function HrisClient({
     
     if (res.error) showToast(res.error, 'error')
     else {
+      if (res.invitation) {
+        setInvitations((current: any[]) => [res.invitation, ...current.filter((invite: any) => invite.id !== res.invitation.id)])
+      }
       setIsInviteModalOpen(false)
+      showToast('Link aktivasi berhasil dibuat.', 'success')
     }
     setLoading(false)
   }

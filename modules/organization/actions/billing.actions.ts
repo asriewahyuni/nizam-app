@@ -3,34 +3,57 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export async function createBillingInvoice(orgId: string, item: { id: string, name: string, price: number, type: 'PACKAGE' | 'ADDON' }) {
+export async function createBillingInvoice(
+  orgId: string,
+  item: {
+    id: string
+    name: string
+    price: number
+    type: 'PACKAGE' | 'ADDON' | 'AI_TOKEN_TOPUP'
+    topupPackageId?: string
+    tokens?: number
+  },
+) {
   const supabase = await createClient()
+  const invoiceKey = `${item.type}-${item.id}`
+  const isPackage = item.type === 'PACKAGE'
+  const isTopup = item.type === 'AI_TOKEN_TOPUP'
 
   // 1. Cek apakah sudah ada invoice UNPAID untuk item ini di org ini (agar tidak double)
   const { data: existing } = await (supabase as any)
     .from('saas_invoices')
     .select('id, invoice_number, amount')
     .eq('org_id', orgId)
-    .eq('package_id', item.type === 'PACKAGE' ? item.id : (null as any))
+    .eq('package_id', isPackage ? item.id : (null as any))
     .eq('status', 'UNPAID')
-    .ilike('invoice_number', `%${item.id}%`) 
+    .ilike('invoice_number', `%${invoiceKey}%`)
     .maybeSingle()
 
   if (existing) {
-    return { success: true, invoiceNumber: (existing as any).invoice_number, amount: Number((existing as any).amount), message: 'Harap selesaikan pembayaran invoice sebelumnya.' }
+    return {
+      success: true,
+      id: (existing as any).id,
+      invoiceNumber: (existing as any).invoice_number,
+      amount: Number((existing as any).amount),
+      message: 'Harap selesaikan pembayaran invoice sebelumnya.',
+    }
   }
 
-  // 2. Generate Concise Invoice Number (e.g., INV-8Q1V8X)
+  // 2. Generate Concise Invoice Number
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase()
-  const invoiceNumber = `INV-${randomStr}`
+  const prefix = isPackage ? 'PKG' : isTopup ? 'TOK' : 'ADD'
+  const invoiceNumber = `INV-${prefix}-${invoiceKey}-${randomStr}`
+  const itemName = isTopup && item.tokens
+    ? `AI Token Topup: ${item.name} (${Number(item.tokens).toLocaleString('id-ID')} token)`
+    : item.name
 
   // 3. Insert Invoice
   const { data, error } = await (supabase as any)
     .from('saas_invoices')
     .insert({
       org_id: orgId,
-      package_id: item.type === 'PACKAGE' ? item.id : null,
-      item_name: item.name,
+      package_id: isPackage ? item.id : null,
+      item_name: itemName,
       invoice_number: invoiceNumber,
       amount: item.price,
       status: 'UNPAID',
@@ -44,7 +67,29 @@ export async function createBillingInvoice(orgId: string, item: { id: string, na
     return { error: 'Gagal membuat tagihan: ' + error.message }
   }
 
+  if (isTopup) {
+    if (!item.topupPackageId || !item.tokens) {
+      return { error: 'Konfigurasi paket token tidak lengkap.' }
+    }
+
+    const { error: topupError } = await (supabase as any)
+      .from('ai_token_topup_orders')
+      .insert({
+        org_id: orgId,
+        package_id: item.topupPackageId,
+        invoice_id: (data as any).id,
+        status: 'PENDING',
+        tokens: Math.max(1, Number(item.tokens)),
+        price_idr: item.price,
+      })
+
+    if (topupError) {
+      return { error: 'Tagihan dibuat, tetapi gagal membuat order topup token: ' + topupError.message }
+    }
+  }
+
   revalidatePath('/billing')
+  revalidatePath('/', 'layout')
   return { success: true, id: (data as any).id, invoiceNumber: (data as any).invoice_number, amount: Number((data as any).amount) }
 }
 
@@ -58,6 +103,12 @@ export async function submitPaymentProof(orgId: string, invoiceId: string, proof
     .eq('id', invoiceId)
     .single()
 
+  const { data: topupOrder } = await (supabase as any)
+    .from('ai_token_topup_orders')
+    .select('*')
+    .eq('invoice_id', invoiceId)
+    .maybeSingle()
+
   // 2. Update Invoice to PAID
   await (supabase as any).from('saas_invoices')
     .update({ 
@@ -67,6 +118,67 @@ export async function submitPaymentProof(orgId: string, invoiceId: string, proof
       updated_at: new Date().toISOString()
     } as any)
     .eq('id', invoiceId)
+
+  // 2.1 Apply token topup if invoice linked to ai_token_topup_orders
+  if (topupOrder) {
+    if ((topupOrder as any).status === 'PAID') {
+      revalidatePath('/billing')
+      revalidatePath('/', 'layout')
+      return { success: true }
+    }
+
+    const tokenAmount = Number((topupOrder as any).tokens || 0)
+    const { data: wallet } = await (supabase as any)
+      .from('ai_token_wallets')
+      .select('*')
+      .eq('org_id', orgId)
+      .maybeSingle()
+
+    if ((wallet as any)?.org_id) {
+      await (supabase as any)
+        .from('ai_token_wallets')
+        .update({
+          balance_tokens: Number((wallet as any).balance_tokens || 0) + tokenAmount,
+          total_purchased_tokens: Number((wallet as any).total_purchased_tokens || 0) + tokenAmount,
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('org_id', orgId)
+    } else {
+      await (supabase as any)
+        .from('ai_token_wallets')
+        .insert({
+          org_id: orgId,
+          balance_tokens: tokenAmount,
+          total_purchased_tokens: tokenAmount,
+          total_used_tokens: 0,
+        } as any)
+    }
+
+    await (supabase as any)
+      .from('ai_token_usage_logs')
+      .insert({
+        org_id: orgId,
+        source: 'topup',
+        direction: 'CREDIT',
+        tokens: tokenAmount,
+        related_invoice_id: invoiceId,
+        note: `Topup token AI dari invoice ${invoiceId}`,
+        meta: { topup_order_id: (topupOrder as any).id, package_id: (topupOrder as any).package_id },
+      } as any)
+
+    await (supabase as any)
+      .from('ai_token_topup_orders')
+      .update({
+        status: 'PAID',
+        paid_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any)
+      .eq('id', (topupOrder as any).id)
+
+    revalidatePath('/billing')
+    revalidatePath('/', 'layout')
+    return { success: true }
+  }
 
   // 3. Update Org Settings (Instant Upgrade for Demo)
   if ((inv as any)?.saas_packages && (inv as any).saas_packages.name) {

@@ -1,10 +1,10 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Activity, PlayCircle, CircleDashed, CheckCircle2, TrendingUp, DollarSign } from 'lucide-react'
-import { PageHeader } from '@/components/ui/NizamUI'
+import { Activity, PlayCircle, CircleDashed, CheckCircle2, TrendingUp, DollarSign, Maximize2, Minimize2, Plus, Phone, Mail, ExternalLink } from 'lucide-react'
+import { PageHeader, SafeButton } from '@/components/ui/NizamUI'
 import { formatRupiah } from '@/lib/utils'
-import { updateSaleStatus } from '@/modules/sales/actions/sales.actions'
+import { updateSaleStatus, createQuickKanbanCard } from '@/modules/sales/actions/sales.actions'
 import { motion } from 'framer-motion'
 
 const PIPELINE_STAGES = [
@@ -17,10 +17,13 @@ const PIPELINE_STAGES = [
 export default function PipelineClient({ orgId, sales }: any) {
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  
+  // Add Card Form State
+  const [formState, setFormState] = useState({ name: '', phone: '', email: '', amount: 0, notes: '', status: 'QUOTATION' })
 
-  const handleDragStart = (id: string) => {
-    setDraggedId(id)
-  }
+  const handleDragStart = (id: string) => setDraggedId(id)
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -36,7 +39,6 @@ export default function PipelineClient({ orgId, sales }: any) {
     e.currentTarget.classList.remove('bg-black/5')
     if (!draggedId) return
 
-    // Don't update if same stage
     const draggedItem = sales.find((s: any) => s.id === draggedId)
     if (draggedItem.status === stageId) return
 
@@ -47,16 +49,56 @@ export default function PipelineClient({ orgId, sales }: any) {
     setDraggedId(null)
   }
 
-  return (
-    <div className={`max-w-7xl mx-auto pb-24 space-y-12 h-[calc(100vh-100px)] flex flex-col transition-opacity ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}>
-      <PageHeader
-        icon={<Activity />}
-        title="Sales Pipeline"
-        subtitle="Papan KanBan progres calon pendapatan dari penawaran s/d barang dikirim lunas."
-        tag="Revenue Engine"
-      />
+  const handleAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsUpdating(true)
+    const res = await createQuickKanbanCard(orgId, formState)
+    if (res?.error) alert(res.error)
+    else {
+      setShowAddModal(false)
+      setFormState({ name: '', phone: '', email: '', amount: 0, notes: '', status: 'QUOTATION' })
+    }
+    setIsUpdating(false)
+  }
 
-      <div className="flex-1 grid grid-cols-4 gap-6 overflow-hidden">
+  return (
+    <div className={`transition-all duration-300 flex flex-col ${isFullscreen ? 'fixed inset-0 z-50 bg-slate-50 p-6 overscroll-none' : 'max-w-7xl mx-auto pb-24 h-[calc(100vh-100px)] space-y-12'}`}>
+      
+      {!isFullscreen ? (
+        <PageHeader
+          icon={<Activity />}
+          title="Sales Pipeline"
+          subtitle="Papan KanBan progres calon pendapatan dari penawaran s/d barang dikirim lunas."
+          tag="Revenue Engine"
+          actions={
+            <div className="flex gap-2">
+              <SafeButton variant="white" icon={<Plus size={16} />} onClick={() => setShowAddModal(true)}>
+                Tambah Card
+              </SafeButton>
+              <SafeButton variant="ghost" icon={<Maximize2 size={16} />} onClick={() => setIsFullscreen(true)}>
+                Fullscreen
+              </SafeButton>
+            </div>
+          }
+        />
+      ) : (
+        <div className="flex items-center justify-between mb-6 pb-4 border-b">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900">Pipeline Fullscreen</h1>
+            <p className="text-slate-500 text-sm font-medium">Kelola drag-and-drop prospek dengan lebih leluasa.</p>
+          </div>
+          <div className="flex gap-2">
+            <SafeButton variant="primary" icon={<Plus size={16} />} onClick={() => setShowAddModal(true)}>
+              Tambah Card
+            </SafeButton>
+            <SafeButton variant="ghost" icon={<Minimize2 size={16} />} onClick={() => setIsFullscreen(false)}>
+              Tutup Fullscreen
+            </SafeButton>
+          </div>
+        </div>
+      )}
+
+      <div className={`flex-1 grid grid-cols-4 gap-6 overflow-hidden ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}>
         {PIPELINE_STAGES.map(stage => {
            const items = sales.filter((s: any) => s.status === stage.id)
            const totalValue = items.reduce((acc: number, item: any) => acc + item.grand_total, 0)
@@ -86,24 +128,65 @@ export default function PipelineClient({ orgId, sales }: any) {
                 </div>
 
                 <div className="flex-1 p-4 space-y-4 overflow-y-auto no-scrollbar">
-                  {items.map((item: any) => (
-                    <motion.div 
-                      key={item.id} 
-                      draggable 
-                      onDragStart={() => handleDragStart(item.id)}
-                      layoutId={item.id}
-                      className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group"
-                    >
-                      <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 group-hover:text-blue-500 transition-colors">{item.sale_number || `DOC-${item.id.slice(0,5)}`}</div>
-                      <div className="font-bold text-sm text-slate-800 leading-tight mb-3">{item.contacts?.name || 'Unknown Client'}</div>
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-50">
-                        <span className="text-[10px] font-bold text-slate-400">{item.sale_date}</span>
-                        <div className="flex items-center gap-1 text-[11px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                          <DollarSign size={10} /> {new Intl.NumberFormat('id-ID').format(item.grand_total)}
+                  {items.map((item: any) => {
+                    const contacts = item.contacts || {}
+                    const waPhone = contacts.phone ? contacts.phone.replace(/[^0-9]/g, '') : ''
+                    const isSalesPage = String(item.notes || '').toLowerCase().includes('salespage')
+                    
+                    return (
+                      <motion.div 
+                        key={item.id} 
+                        draggable 
+                        onDragStart={() => handleDragStart(item.id)}
+                        layoutId={item.id}
+                        className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative"
+                      >
+                        <div className="flex justify-between items-start mb-1.5">
+                          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest group-hover:text-blue-500 transition-colors">
+                            {item.sale_number || `DOC-${item.id.slice(0,5)}`}
+                          </div>
+                          {isSalesPage ? (
+                            <span className="bg-amber-100 text-amber-700 text-[8px] px-2 py-0.5 rounded-full font-bold">Sales Page</span>
+                          ) : (
+                            <span className="bg-blue-100 text-blue-700 text-[8px] px-2 py-0.5 rounded-full font-bold">Quotation</span>
+                          )}
                         </div>
-                      </div>
-                    </motion.div>
-                  ))}
+                        
+                        <div className="font-bold text-sm text-slate-800 leading-tight mb-3">
+                          {contacts.name || 'Unknown Client'}
+                        </div>
+                        
+                        {(contacts.phone || contacts.email) && (
+                          <div className="flex gap-2 mb-3">
+                            {contacts.phone && (
+                              <a 
+                                href={`https://wa.me/${waPhone}?text=Halo%20${encodeURIComponent(contacts.name)}%2C%20saya%20menghubungi%20terkait%20penawaran%20kami...`} 
+                                target="_blank" rel="noreferrer"
+                                className="flex-1 inline-flex justify-center items-center gap-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-colors"
+                              >
+                                <Phone size={12} /> WhatsApp
+                              </a>
+                            )}
+                            {contacts.email && (
+                              <a 
+                                href={`mailto:${contacts.email}?subject=Follow%20Up%20Penawaran`} 
+                                className="flex-1 inline-flex justify-center items-center gap-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-colors"
+                              >
+                                <Mail size={12} /> Email
+                              </a>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                          <span className="text-[10px] font-bold text-slate-400">{item.sale_date}</span>
+                          <div className="flex items-center gap-1 text-[11px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                            <DollarSign size={10} /> {new Intl.NumberFormat('id-ID').format(item.grand_total)}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )
+                  })}
                   {items.length === 0 && (
                     <div className="h-40 flex items-center justify-center text-[10px] uppercase font-bold text-slate-400 italic">Drop di sini...</div>
                   )}
@@ -112,6 +195,54 @@ export default function PipelineClient({ orgId, sales }: any) {
            )
         })}
       </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
+            <div className="p-6 border-b">
+              <h3 className="text-xl font-black text-slate-900">Tambah Card Cepat</h3>
+            </div>
+            <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500">Nama Pelanggan/Lead *</label>
+                <input required type="text" className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.name} onChange={e => setFormState({...formState, name: e.target.value})} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500">Grup / Status</label>
+                  <select className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500 bg-white" value={formState.status} onChange={e => setFormState({...formState, status: e.target.value})}>
+                    {PIPELINE_STAGES.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500">Nilai Prospek (Rp)</label>
+                  <input type="number" className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.amount} onChange={e => setFormState({...formState, amount: Number(e.target.value)})} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500">Nomor WA</label>
+                  <input type="text" placeholder="0812..." className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.phone} onChange={e => setFormState({...formState, phone: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500">Email</label>
+                  <input type="email" placeholder="nama@email.com" className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.email} onChange={e => setFormState({...formState, email: e.target.value})} />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500">Catatan / Sumber</label>
+                <input type="text" placeholder="Misal: Dari Web, IG, atau Salespage" className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.notes} onChange={e => setFormState({...formState, notes: e.target.value})} />
+              </div>
+              
+              <div className="pt-4 flex justify-end gap-2">
+                <SafeButton variant="ghost" onClick={() => setShowAddModal(false)}>Batal</SafeButton>
+                <SafeButton variant="primary" type="submit" isLoading={isUpdating}>Simpan Card</SafeButton>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
