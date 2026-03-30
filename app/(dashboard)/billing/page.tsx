@@ -5,13 +5,16 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Zap, CreditCard, History, Package, Plus, CheckCircle2, 
   Building2, Warehouse, Store, Users, ExternalLink, 
-  ArrowUpRight, ShieldCheck, AlertCircle, Clock, Truck, Edit3, Coins
+  ArrowUpRight, ShieldCheck, AlertCircle, Clock, Truck, Edit3, Coins, Megaphone,
+  type LucideIcon
 } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { createBillingInvoice, submitPaymentProof, applyVoucher } from '@/modules/organization/actions/billing.actions'
+import { normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
+import { OPERATOR_ADDON_OPTIONS } from '@/lib/saas/operator-pricing'
 
 const db = createClient() as any
 
@@ -26,48 +29,41 @@ const SUPPORT_INFO = {
   label: 'Admin Nizam Support'
 }
 
-const AVAILABLE_ADDONS = [
-  { 
-    id: 'addon_fleet', 
-    name: 'Smart Fleet Management', 
-    price: 349000, 
-    billing: 'Bulan',
+const ADDON_UI_META: Record<string, { icon: LucideIcon; color: string; benefits: string[] }> = {
+  addon_fleet: {
     icon: Truck,
     color: 'amber',
-    desc: 'Kelola aset kendaraan, jadwal driver, dan tracking bahan bakar dalam satu sistem.',
-    benefits: ['Maintenance Scheduler', 'Driver Digital Logbooks', 'Fuel Consumption Tracking']
+    benefits: ['Maintenance Scheduler', 'Driver Digital Logbooks', 'Fuel Consumption Tracking'],
   },
-  { 
-    id: 'addon_job_order', 
-    name: 'Industrial Job Order', 
-    price: 299000, 
-    billing: 'Bulan',
-    icon: Edit3, 
+  addon_job_order: {
+    icon: Edit3,
     color: 'emerald',
-    desc: 'Sistem perintah kerja workshop & jasa untuk tracking progress & material terpakai.',
-    benefits: ['Service Progress Tracker', 'Material Usage Breakdown', 'Worker Performance Log']
+    benefits: ['Service Progress Tracker', 'Material Usage Breakdown', 'Worker Performance Log'],
   },
-  { 
-    id: 'addon_warehouse', 
-    name: 'WMS Expansion Pack', 
-    price: 149000, 
-    billing: 'Bulan',
+  addon_warehouse: {
     icon: Warehouse,
     color: 'emerald',
-    desc: 'Tambah 1 Lokasi Gudang / Cabang untuk ekspansi jangkauan operasional Anda.',
-    benefits: ['Inventory Real-time per Lokasi', 'Surat Jalan Antar Cabang', 'Stok Opname per Area']
+    benefits: ['Inventory Real-time per Lokasi', 'Surat Jalan Antar Cabang', 'Stok Opname per Area'],
   },
-  { 
-    id: 'addon_org', 
-    name: 'Multi-Entity (PT/CV)', 
-    price: 249000, 
-    billing: 'Bulan',
+  addon_org: {
     icon: Building2,
     color: 'indigo',
-    desc: 'Kelola brand atau perusahaan berbeda dalam satu dashboard NIZAM terintegrasi.',
-    benefits: ['Konsolidasi Laporan Keuangan', 'NPWP & Branding Terpisah', 'Shared Supplier List']
-  }
-]
+    benefits: ['Konsolidasi Laporan Keuangan', 'NPWP & Branding Terpisah', 'Shared Supplier List'],
+  },
+  addon_sales_page: {
+    icon: Megaphone,
+    color: 'blue',
+    benefits: ['Template Landing Page', 'Lead Capture Form', 'Integrasi Pipeline Sales'],
+  },
+}
+
+const AVAILABLE_ADDONS = OPERATOR_ADDON_OPTIONS.map((addon) => ({
+  ...addon,
+  icon: ADDON_UI_META[addon.id]?.icon || Package,
+  color: ADDON_UI_META[addon.id]?.color || 'slate',
+  desc: addon.description,
+  benefits: ADDON_UI_META[addon.id]?.benefits || [],
+}))
 
 function BillingContent() {
   const searchParams = useSearchParams()
@@ -197,7 +193,8 @@ function BillingContent() {
           // Sum Addons
           const activeAddons = Array.isArray(org.active_addons) ? org.active_addons : []
           activeAddons.forEach((a: any) => {
-            const addonPrice = AVAILABLE_ADDONS.find(ma => ma.name === a.name)?.price || 0
+            const addonName = normalizeSaasEntitlementName(String(a?.name || ''))
+            const addonPrice = AVAILABLE_ADDONS.find((ma) => ma.name === addonName)?.price || 0
             total += addonPrice
           })
           setTotalMonthly(total)

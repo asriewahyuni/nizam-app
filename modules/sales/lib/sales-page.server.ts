@@ -1,4 +1,5 @@
 import { cache } from 'react'
+import type { LooseDb } from '@/lib/supabase/loose'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import {
   consumeAiTokensForGeneration,
@@ -32,26 +33,6 @@ type OrgSummary = {
   name: string
   slug: string
   logo_url: string | null
-}
-
-type LooseQueryResult = Promise<{ data: any; error: any }>
-
-interface LooseQuery extends Promise<{ data: any; error: any }> {
-  select: (columns?: string) => LooseQuery
-  eq: (column: string, value: any) => LooseQuery
-  neq: (column: string, value: any) => LooseQuery
-  order: (column: string, options?: { ascending: boolean }) => LooseQuery
-  limit: (count: number) => LooseQuery
-  insert: (values: any) => LooseQuery
-  update: (values: any) => LooseQuery
-  upsert: (values: any) => LooseQuery
-  delete: () => LooseQuery
-  single: () => LooseQueryResult
-  maybeSingle: () => LooseQueryResult
-}
-
-type LooseDb = {
-  from: (table: string) => LooseQuery
 }
 
 function normalizePublicOrgIdentifier(value: string) {

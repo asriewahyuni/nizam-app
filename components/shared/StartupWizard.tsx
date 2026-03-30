@@ -87,7 +87,7 @@ export function StartupWizard({ isDemo = false }: { isDemo?: boolean }) {
       initial={{ height: 0, opacity: 0 }}
       animate={{ height: 'auto', opacity: 1 }}
       exit={{ height: 0, opacity: 0 }}
-      className="bg-white border-b border-slate-100 overflow-hidden relative"
+      className="print:hidden bg-white border-b border-slate-100 overflow-hidden relative"
     >
       <div className="max-w-7xl mx-auto px-8 py-4">
         <div className="flex items-center justify-between gap-8">

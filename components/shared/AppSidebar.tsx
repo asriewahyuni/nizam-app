@@ -4,6 +4,7 @@ import { useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
+import { saasModuleMatches } from '@/lib/saas/module-catalog'
 import {
   LayoutDashboard,
   BookOpen,
@@ -83,8 +84,8 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Inventori', href: '/inventory', icon: Package, permission_key: 'inventory', module_key: 'Inventory' },
       { label: 'Gudang (WMS)', href: '/inventory/warehouses', icon: Warehouse, permission_key: 'inventory', module_key: 'Warehouse' },
       { label: 'Manufaktur (BoM)', href: '/factory', icon: Factory, permission_key: 'factory', module_key: 'Manufacturing' },
-      { label: 'Fleet & Rental', href: '/fleet', icon: Truck, permission_key: 'fleet', module_key: 'Fleet Management' },
-      { label: 'Job Order (Jasa)', href: '/services', icon: Briefcase, permission_key: 'services', module_key: 'Industrial Job Order' },
+      { label: 'Fleet & Rental', href: '/fleet', icon: Truck, permission_key: 'fleet', module_key: 'Fleet & Rental' },
+      { label: 'Job Order (Jasa)', href: '/services', icon: Briefcase, permission_key: 'services', module_key: 'Job Order (Jasa)' },
     ]
   },
   {
@@ -241,7 +242,7 @@ export function AppSidebar({
   }
 
   return (
-    <aside className={`${isCollapsed ? 'w-20' : 'w-64'} transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col h-full bg-white border-r border-slate-100 relative group/sidebar z-40 hidden md:flex`}>
+    <aside className={`${isCollapsed ? 'w-20' : 'w-64'} transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col h-full bg-white border-r border-slate-100 relative group/sidebar z-40 hidden md:flex print:hidden`}>
       {/* Collapse Toggle Button */}
       <button
         onClick={toggleCollapse}
@@ -278,36 +279,11 @@ export function AppSidebar({
             if (isDemo) return true
 
             // 1. SaaS Module Check
-            if (item.module_key || group.group) {
-               const internalKey = item.module_key?.toLowerCase().trim();
-               const labelKey = item.label.toLowerCase().trim();
-               const categoryKey = group.group.toLowerCase().trim();
-               
-               // STRICT SAAS CHECK: Honor enabledModules (Plan + Add-ons)
-               const matches = enabledModules.some(m => {
-                  const mm = m.toLowerCase().trim()
-                  // Category-level access: e.g. 'Finance' enables all items in Finance group
-                  if (mm === categoryKey) return true
-                  // Feature-level access: e.g. 'Akun (CoA)'
-                  if (mm === labelKey) return true
-                  // Internal-key access: e.g. 'Accounting'
-                  if (internalKey && mm === internalKey) return true
-                  
-                  // Flexible mapping for legacy/shorthand names
-                  const key = internalKey || labelKey;
-                  if (key.includes('sales page')) return mm.includes('sales page')
-                  if (key.includes('sales') && (mm.includes('marketing') || mm.includes('sales'))) return true
-                  if (key.includes('marketing') && (mm.includes('sales') || mm.includes('marketing'))) return true
-                  if (key.includes('accounting') && (mm.includes('finance') || mm.includes('accounting'))) return true
-                  if (key.includes('finance') && (mm.includes('accounting') || mm.includes('finance'))) return true
-                  if (key.includes('factory') && (mm.includes('manufacturing') || mm.includes('factory'))) return true
-                  if (key.includes('manufacturing') && (mm.includes('factory') || mm.includes('manufacturing'))) return true
-                  
-                  // HRIS sub-modules: Attendance & Payroll are bundled under HRIS
-                  if ((key.includes('attendance') || key.includes('payroll') || key.includes('payroll_process')) && mm.includes('hris')) return true
-                  
-                  return false
-               })
+            if (item.module_key) {
+               const entitlementCandidates = [item.module_key, item.label]
+               const matches = enabledModules.some((moduleName) => (
+                 entitlementCandidates.some((candidate) => saasModuleMatches(moduleName, candidate))
+               ))
                if (!matches) return false
             }
 

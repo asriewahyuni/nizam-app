@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
 import { generateSlug } from '@/lib/utils'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -141,11 +142,11 @@ export async function getActiveOrg() {
   // ADD INDUSTRIAL ADD-ONS
   const activeAddons = Array.isArray(org.active_addons) ? org.active_addons : []
   activeAddons.forEach((a: any) => {
-    if (a.name) enabledModules.push(a.name)
+    if (a.name) enabledModules.push(normalizeSaasEntitlementName(String(a.name)))
   })
 
   // Clean and unique
-  enabledModules = Array.from(new Set(enabledModules.map((m: string) => m.trim())))
+  enabledModules = Array.from(new Set(enabledModules.map((m: string) => normalizeSaasEntitlementName(String(m))).filter(Boolean)))
 
   // Fetch Job Title from employees table
   const { data: empData } = await db

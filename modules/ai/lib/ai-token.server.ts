@@ -1,33 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
+import type { LooseDb } from '@/lib/supabase/loose'
 import {
   DEFAULT_AI_TOKEN_POLICY,
   normalizeAiTokenPolicy,
   type AiTokenHeaderSummary,
   type AiTokenPolicy,
 } from './ai-token'
-
-type LooseQueryResult = Promise<{ data: any; error: { message: string } | null }>
-
-type LooseQuery = {
-  select: (columns: string) => LooseQuery
-  eq: (column: string, value: unknown) => LooseQuery
-  neq: (column: string, value: unknown) => LooseQuery
-  order: (column: string, options?: { ascending: boolean }) => LooseQuery
-  limit: (count: number) => LooseQuery
-  insert: (values: Record<string, unknown> | Record<string, unknown>[]) => LooseQuery
-  update: (values: Record<string, unknown>) => LooseQuery
-  upsert: (values: Record<string, unknown> | Record<string, unknown>[], options?: Record<string, unknown>) => LooseQuery
-  maybeSingle: () => LooseQueryResult
-  single: () => LooseQueryResult
-  // Allow `const { data, error } = await query.from(...)...`
-  then: <T>(resolve: (value: { data: any; error: { message: string } | null }) => T) => Promise<T>
-  data: any
-  error: { message: string } | null
-}
-
-type LooseDb = {
-  from: (table: string) => LooseQuery
-}
 
 type AiTokenWalletRow = {
   org_id: string

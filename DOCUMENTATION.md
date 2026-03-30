@@ -1274,3 +1274,193 @@ Perbaikan dilakukan untuk kasus `Hydration failed` di `components/shared/AppSide
   - visibilitas grup `SaaS Operator` di-sidebar kini bergantung pada `showSaasOperatorGroup = isHydrated && isPlatformAdmin`, agar struktur HTML awal server/client tetap konsisten.
   - toggle collapsed sidebar kini menulis ke `localStorage` + broadcast event internal (`nizam_sidebar_state_change`) sehingga state tetap sinkron tanpa memicu pola `setState` sinkron di effect.
   - grup `SaaS Operator` diekstrak ke konstanta `SAAS_OPERATOR_GROUP` agar struktur menu stabil dan eksplisit.
+
+### 16.20 Hotfix error `item_description` pada SaaS Operator Penawaran
+
+Perbaikan untuk error runtime:
+`Gagal membuat penawaran: Could not find the 'item_description' column of 'saas_invoices' in the schema cache`
+
+- **Akar masalah**:
+  - beberapa environment masih menggunakan skema `saas_invoices` lama (tanpa `item_name` / `item_description`) atau PostgREST schema cache belum refresh.
+
+- **Perubahan aplikasi** (`modules/saas/actions/operator-sales.actions.ts`):
+  - menambahkan fallback query snapshot invoice:
+    - default mencoba select dengan `item_name` + `item_description`,
+    - jika terdeteksi missing column, otomatis fallback ke select legacy (tanpa kolom item).
+  - menambahkan fallback insert saat membuat penawaran:
+    - prioritas insert dengan `item_name` + `item_description`,
+    - fallback ke `item_name` saja jika `item_description` belum ada,
+    - fallback terakhir ke payload legacy jika `item_name` juga belum ada.
+  - dampak: modul `/saas/penawaran` dan `/saas/penjualan` tetap berjalan pada skema lama maupun baru.
+
+- **Perubahan migrasi database**:
+  - menambahkan file `supabase/migrations/1083_fix_saas_invoice_item_columns_and_schema_cache.sql`:
+    - memastikan kolom `item_name` dan `item_description` ada (idempotent),
+    - mengirim `NOTIFY pgrst, 'reload schema'` untuk refresh cache schema PostgREST.
+
+### 16.21 Download Dokumen Penawaran & Invoice untuk SaaS Operator
+
+Fitur baru agar tim pengelola SaaS dapat mengunduh dokumen penawaran maupun invoice langsung dari modul `/saas`.
+
+- **Halaman dokumen baru**:
+  - route: `/saas/dokumen/[id]`
+  - file:
+    - `app/(dashboard)/saas/dokumen/[id]/page.tsx`
+    - `app/(dashboard)/saas/dokumen/[id]/SaasDocumentView.tsx`
+  - mendukung dua jenis dokumen dari tabel yang sama:
+    - `QTN-SAAS-*` => label dokumen **PENAWARAN**
+    - selain itu => label dokumen **INVOICE**
+  - tersedia aksi:
+    - `Print / Download PDF` (via print dialog browser),
+    - `Download HTML` (arsip file langsung).
+
+- **Integrasi tombol download di daftar operator**:
+  - `app/(dashboard)/saas/SaasOperatorClient.tsx`
+  - pada tab Penawaran dan Penjualan, tiap baris sekarang memiliki tombol `Download` menuju `/saas/dokumen/{invoiceId}`.
+
+- **Server action baru untuk detail dokumen**:
+  - `modules/saas/actions/operator-sales.actions.ts`
+  - menambahkan `getOperatorInvoiceDocument(invoiceId)`:
+    - guard platform admin tetap aktif,
+    - fetch detail invoice + org + package + konfigurasi `saas_config`,
+    - fallback otomatis jika environment belum punya kolom `item_name/item_description`.
+
+### 16.22 Opsi Modul, Add-on, dan Token AI di Halaman Surat Penawaran
+
+Update ini menambahkan pilihan komersial langsung di halaman surat penawaran (`/saas/dokumen/[id]`) agar tim SaaS bisa menyiapkan penawaran yang lebih fleksibel.
+
+- **Perubahan server action dokumen**:
+  - `modules/saas/actions/operator-sales.actions.ts`
+  - `getOperatorInvoiceDocument(...)` sekarang mengembalikan tambahan data:
+    - `packageModules`: daftar modul dari paket SaaS terkait invoice,
+    - `packageAddons`: daftar add-on bawaan paket (jika ada),
+    - `aiTokenPackages`: daftar paket topup AI token aktif (`ai_token_topup_packages`).
+  - detail relasi paket invoice diperluas menjadi `name, price, billing, modules, addons`.
+  - parsing array modul/add-on dibuat robust untuk format JSON array maupun string.
+
+- **Perubahan UI surat penawaran**:
+  - `app/(dashboard)/saas/dokumen/[id]/SaasDocumentView.tsx`
+  - khusus dokumen tipe `QTN-SAAS-*` kini tampil section:
+    - **Modul Paket** (badge modul yang termasuk dalam paket),
+    - **Pilihan Add-on** (checkbox dengan harga),
+    - **Pilihan Token AI** (radio dari paket topup aktif).
+  - ringkasan total otomatis menghitung:
+    - subtotal invoice dasar,
+    - total add-on terpilih,
+    - paket token AI terpilih,
+    - grand total estimasi penawaran.
+
+### 16.23 Penambahan Entitas Bisnis & Cabang Berharga di Surat Penawaran
+
+Menanggapi kebutuhan pricing expansion, surat penawaran sekarang punya kalkulasi khusus untuk:
+- **Entitas Bisnis Tambahan**
+- **Cabang Tambahan**
+
+- **Implementasi UI**:
+  - file: `app/(dashboard)/saas/dokumen/[id]/SaasDocumentView.tsx`
+  - pada dokumen tipe `QTN-SAAS-*`, ditambahkan panel baru:
+    - `Entitas Bisnis Tambahan` (stepper +/-),
+    - `Cabang Tambahan` (stepper +/-).
+  - harga satuan yang digunakan:
+    - Entitas Bisnis: `Rp 249.000` / entitas / bulan
+    - Cabang: `Rp 149.000` / cabang / bulan
+
+- **Perhitungan total**:
+  - menambahkan state quantity untuk kedua item (minimum `0`),
+  - total kalkulasi penawaran kini mencakup:
+    - subtotal invoice dasar,
+    - add-on terpilih,
+    - token AI terpilih,
+    - total entitas tambahan,
+    - total cabang tambahan.
+  - breakdown baru ditampilkan di summary total (kanan bawah dokumen) agar transparan sebelum print/download.
+
+### 16.24 Opsi Lengkap Langsung di Halaman `/saas/penawaran` + Kolom Pajak & Diskon
+
+Menindaklanjuti kebutuhan operasional, opsi yang sebelumnya hanya terlihat di surat dokumen sekarang dipindahkan juga ke form utama `/saas/penawaran`.
+
+- **Perubahan form penawaran operator**:
+  - file: `app/(dashboard)/saas/SaasOperatorClient.tsx`
+  - form `Buat Penawaran SaaS Baru` kini memuat langsung:
+    - pilihan **modul** (checkbox berdasarkan paket terpilih),
+    - pilihan **add-on** berharga,
+    - pilihan **paket token AI**,
+    - input jumlah **entitas bisnis tambahan**,
+    - input jumlah **cabang tambahan**,
+    - input **diskon (%)**,
+    - input **pajak (%)**.
+  - ditambahkan panel **estimasi total real-time** (subtotal, diskon, pajak, grand total) sebelum submit.
+
+- **Perubahan server action kalkulasi penawaran**:
+  - file: `modules/saas/actions/operator-sales.actions.ts`
+  - `createOperatorQuotation(...)` sekarang menerima field baru dari form:
+    - `selected_modules[]`,
+    - `selected_addons[]`,
+    - `ai_token_package_id`,
+    - `extra_entity_qty`,
+    - `extra_branch_qty`,
+    - `discount_percent`,
+    - `tax_percent`.
+  - total invoice dihitung otomatis dari kombinasi paket dasar + add-on + token AI + entitas/cabang + diskon/pajak.
+  - detail komposisi harga ditulis ke `item_description` agar dapat diaudit saat buka dokumen.
+
+- **Kolom pajak & diskon pada data penawaran/penjualan**:
+  - `SaasOperatorClient` tabel list kini menampilkan kolom:
+    - `Diskon` (amount + %)
+    - `Pajak` (amount + %)
+  - server action snapshot/doc menambahkan fallback select untuk environment yang belum memiliki kolom pricing baru.
+
+- **Migrasi database baru**:
+  - file: `supabase/migrations/1084_add_discount_and_tax_columns_to_saas_invoices.sql`
+  - menambah kolom idempotent pada `saas_invoices`:
+    - `discount_percent`,
+    - `discount_amount`,
+    - `tax_percent`,
+    - `tax_amount`.
+  - melakukan `NOTIFY pgrst, 'reload schema'` untuk refresh schema cache.
+
+- **Konstanta pricing dipusatkan**:
+  - file baru: `lib/saas/operator-pricing.ts`
+  - berisi daftar add-on operator SaaS serta harga satuan:
+    - entitas bisnis tambahan,
+    - cabang tambahan.
+
+### 16.25 Sales Page dijadikan Add-on resmi
+
+Permintaan update: `Sales Page` dimasukkan sebagai add-on (bukan hanya fitur paket).
+
+- **Konstanta add-on operator SaaS**:
+  - file: `lib/saas/operator-pricing.ts`
+  - menambahkan item baru:
+    - `id`: `addon_sales_page`
+    - `name`: `Sales Page`
+    - `price`: `Rp 199.000 / bulan`
+    - deskripsi: builder landing page + lead capture.
+  - dampak: otomatis muncul pada opsi add-on di form `/saas/penawaran` dan surat penawaran `/saas/dokumen/[id]`.
+
+- **Sinkronisasi halaman billing tenant**:
+  - file: `app/(dashboard)/billing/page.tsx`
+  - menambahkan kartu add-on `Sales Page` ke `AVAILABLE_ADDONS` agar tenant dapat membeli add-on ini dari halaman billing.
+
+### 16.26 Editable Harga Coret/Jual Add-on di Form `/saas/penawaran`
+
+Menindaklanjuti request agar harga bisa diedit ulang, form penawaran operator sekarang mendukung override harga langsung sebelum submit.
+
+- **Perubahan UI form penawaran** (`app/(dashboard)/saas/SaasOperatorClient.tsx`):
+  - tiap add-on sekarang memiliki input:
+    - `Harga coret` (anchor/before),
+    - `Harga jual` (effective/sesudah coret).
+  - harga satuan `Entitas Tambahan` dan `Cabang Tambahan` juga bisa diedit.
+  - nilai override dikirim sebagai hidden payload:
+    - `addon_price_overrides_json`,
+    - `addon_anchor_overrides_json`,
+    - `extra_entity_unit_price`,
+    - `extra_branch_unit_price`.
+
+- **Perubahan kalkulasi server** (`modules/saas/actions/operator-sales.actions.ts`):
+  - `createOperatorQuotation(...)` membaca override JSON harga add-on + override harga satuan entitas/cabang.
+  - total penawaran menggunakan harga override tersebut.
+  - detail `item_description` menyimpan breakdown termasuk format harga coret -> harga jual per add-on.
+
+- **Pusat konfigurasi pricing**:
+  - `lib/saas/operator-pricing.ts` kini menambahkan `anchorPrice` per add-on (default rekomendasi harga coret).
