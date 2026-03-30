@@ -4,6 +4,7 @@ import React, { useState, use } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ShieldCheck, UserCheck, Key, ArrowRight, CheckCircle2, AlertCircle, Users, Building2, Lock } from 'lucide-react'
 import { verifyEmployeeNikByToken, registerEmployeeAccount } from '@/modules/auth/actions/auth.actions'
+import { useRouter } from 'next/navigation'
 
 export default function JoinByTokenPage({ 
   params: paramsPromise 
@@ -12,6 +13,7 @@ export default function JoinByTokenPage({
 }) {
   const params = use(paramsPromise)
   const token = params.token
+  const router = useRouter()
 
   const [step, setStep] = useState(1) // 1: NIK, 2: Account Creation
   const [nik, setNik] = useState('')
@@ -47,7 +49,20 @@ export default function JoinByTokenPage({
      formData.append('invite_id', invite?.id)
      
      try {
-        await registerEmployeeAccount(formData)
+        const res = await registerEmployeeAccount(formData)
+        if (res?.error) {
+          setError(res.error)
+          setLoading(false)
+          return
+        }
+
+        if (res?.success) {
+          router.push(res.redirectTo || '/dashboard')
+          return
+        }
+
+        setError('Aktivasi akun gagal. Silakan coba lagi.')
+        setLoading(false)
      } catch (err: any) {
         setError(err.message)
         setLoading(false)

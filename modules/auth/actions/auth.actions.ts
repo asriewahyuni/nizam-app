@@ -73,22 +73,40 @@ export async function registerEmployeeAccount(formData: FormData) {
   const password = (formData.get('password') as string)
   const inviteId = (formData.get('invite_id') as string)
 
-  // 1. Get Employee Data
+  if (!nik || !password || password.length < 8 || !inviteId) {
+    return { error: 'Data aktivasi tidak lengkap. Pastikan NIK, password, dan token valid.' }
+  }
+
+  // 1. Validate invitation first
+  const { data: invite, error: inviteErr } = await (adminClient as any)
+    .from('org_invitations')
+    .select('id, org_id, role_id, use_count, max_uses, is_active, expires_at')
+    .eq('id', inviteId)
+    .maybeSingle()
+
+  if (inviteErr) {
+    return { error: `Gagal memverifikasi token aktivasi: ${inviteErr.message}` }
+  }
+  if (!invite) return { error: 'Link aktivasi tidak ditemukan.' }
+  if (!invite.is_active) return { error: 'Link aktivasi sudah dinonaktifkan.' }
+  if (invite.expires_at && new Date(invite.expires_at).getTime() <= Date.now()) {
+    return { error: 'Link aktivasi sudah kadaluarsa.' }
+  }
+  if (Number(invite.max_uses || 0) > 0 && Number(invite.use_count || 0) >= Number(invite.max_uses || 0)) {
+    return { error: 'Link aktivasi sudah mencapai batas penggunaan.' }
+  }
+
+  // 2. Get employee scoped by invitation org
   const { data: emp, error: empErr } = await (adminClient as any)
     .from('employees')
     .select('*')
+    .eq('org_id', invite.org_id)
     .eq('nik', nik)
     .maybeSingle()
 
-  if (empErr || !emp) throw new Error('NIK tidak valid atau tidak ditemukan.')
-  if (emp.user_id) throw new Error('NIK ini sudah memiliki akun aktif. Silakan Login.')
-
-  // 2. Get Invitation Data
-  const { data: invite } = await (adminClient as any)
-    .from('org_invitations')
-    .select('*, roles(name)')
-    .eq('id', inviteId)
-    .maybeSingle()
+  if (empErr) return { error: `Gagal verifikasi NIK: ${empErr.message}` }
+  if (!emp) return { error: 'NIK tidak valid atau tidak ditemukan di organisasi ini.' }
+  if (emp.user_id) return { error: 'NIK ini sudah memiliki akun aktif. Silakan Login.' }
 
   // 3. Generate Internal Email
   const orgPrefix = (emp.org_id as string).replace(/-/g, '').toLowerCase().slice(0, 8)
@@ -108,22 +126,23 @@ export async function registerEmployeeAccount(formData: FormData) {
   })
 
   if (authErr) {
-     throw new Error(authErr.message)
+     return { error: authErr.message || 'Gagal membuat akun autentikasi.' }
   }
 
   const userId = authData.user?.id
-  if (!userId) throw new Error('Gagal membuat user ID.')
+  if (!userId) return { error: 'Gagal membuat user ID.' }
 
   // 5. Update Employee Record
   const { error: updateErr } = await (adminClient as any)
     .from('employees')
     .update({ 
       user_id: userId,
-      employment_status: emp.employment_status || 'PROBATION'
+      employment_status: emp.employment_status || 'PROBATION',
+      registration_status: 'REGISTERED',
     })
     .eq('id', emp.id)
 
-  if (updateErr) throw new Error('Gagal menautkan user ke data karyawan.')
+  if (updateErr) return { error: 'Gagal menautkan user ke data karyawan.' }
 
   // 6. Map Role
   let roleId = invite?.role_id
@@ -142,21 +161,27 @@ export async function registerEmployeeAccount(formData: FormData) {
   // 7. Insert Organization Membership
   const { error: memberErr } = await (adminClient as any)
     .from('org_members')
-    .insert({
+    .upsert({
       org_id: emp.org_id,
       user_id: userId,
       role: 'staff',
       role_id: roleId,
       is_active: true
-    })
+    }, { onConflict: 'org_id,user_id' })
 
-  if (memberErr) throw new Error('Gagal mendaftarkan keanggotaan organisasi.')
+  if (memberErr) return { error: 'Gagal mendaftarkan keanggotaan organisasi.' }
 
   // 8. Track Usage
   if (invite) {
+     const nextUseCount = Number(invite.use_count || 0) + 1
+     const maxUses = Number(invite.max_uses || 0)
+     const shouldDeactivate = maxUses > 0 && nextUseCount >= maxUses
      await (adminClient as any)
        .from('org_invitations')
-       .update({ use_count: (invite.use_count || 0) + 1 })
+       .update({
+         use_count: nextUseCount,
+         ...(shouldDeactivate ? { is_active: false } : {})
+       })
        .eq('id', invite.id)
   }
 
@@ -170,11 +195,11 @@ export async function registerEmployeeAccount(formData: FormData) {
   })
 
   if (loginErr) {
-     redirect(`/login?tab=karyawan&nik=${nik}&msg=success`)
+     return { error: 'Akun berhasil dibuat, tapi login otomatis gagal. Silakan login manual pakai NIK & password baru.' }
   }
 
   revalidatePath('/', 'layout')
-  redirect('/dashboard')
+  return { success: true, redirectTo: '/dashboard' }
 }
 
 // ─────────────────────────────────────────────────────────────

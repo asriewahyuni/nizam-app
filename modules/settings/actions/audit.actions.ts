@@ -76,13 +76,38 @@ function getExpectedConfirmationText(orgName: string, mode: ResetOrganizationMod
 }
 
 async function clearTablesByOrg(db: AdminDbClient, orgId: string, tables: readonly string[]) {
+  const isSkippableMissingObjectError = (error: { code?: string; message?: string } | null | undefined) => {
+    if (!error) return false
+
+    const code = String(error.code || '').toUpperCase()
+    const message = String(error.message || '').toLowerCase()
+
+    // postgres
+    if (code === '42P01' || code === '42703') return true
+
+    // postgrest schema-cache misses
+    if (code === 'PGRST205' || code === 'PGRST204') return true
+
+    // fallback by message (in case code differs across env)
+    if (
+      message.includes('could not find the table') ||
+      message.includes('schema cache') ||
+      message.includes('does not exist') ||
+      message.includes('could not find the') && message.includes('column')
+    ) {
+      return true
+    }
+
+    return false
+  }
+
   for (const table of tables) {
     const { error } = await db
       .from(table)
       .delete()
       .eq('org_id', orgId)
 
-    if (error && error.code !== '42P01' && error.code !== '42703') {
+    if (error && !isSkippableMissingObjectError(error)) {
       return { success: false, error: `Error di tabel ${table}: ${error.message}` }
     }
   }
