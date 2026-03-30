@@ -20,8 +20,8 @@ export async function createSaleEntry(orgId: string, payload: any) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { data: sale, error: saleErr } = await supabase
-    .from('sales' as any)
+  const { data: sale, error: saleErr } = await (supabase as any)
+    .from('sales')
     .insert({
       org_id: orgId,
       customer_id: payload.customer_id,
@@ -42,8 +42,8 @@ export async function createSaleEntry(orgId: string, payload: any) {
 
   if (saleErr) return { error: saleErr.message }
 
-  const { error: linesErr } = await supabase
-    .from('sales_items' as any)
+  const { error: linesErr } = await (supabase as any)
+    .from('sales_items')
     .insert(payload.lines.map((l: any) => ({
       org_id: orgId,
       sale_id: sale.id,
@@ -103,8 +103,8 @@ export async function voidSale(orgId: string, saleId: string) {
   if (!user) return { error: 'Tidak terautentikasi.' }
 
   // 1. Check current status — only DRAFT or FINISHED can be voided
-  const { data: sale } = await supabase
-    .from('sales' as any)
+  const { data: sale } = await (supabase as any)
+    .from('sales')
     .select('status')
     .eq('id', saleId)
     .eq('org_id', orgId)
@@ -114,7 +114,7 @@ export async function voidSale(orgId: string, saleId: string) {
   if (sale.status === 'VOIDED') return { success: true }
 
   // 2. Void related journal entry (find by reference)
-  const { data: journalEntry } = await supabase
+  const { data: journalEntry } = await (supabase as any)
     .from('journal_entries')
     .select('id')
     .eq('reference_id', saleId)
@@ -123,7 +123,7 @@ export async function voidSale(orgId: string, saleId: string) {
     .maybeSingle()
 
   if (journalEntry) {
-    await supabase
+    await (supabase as any)
       .from('journal_entries')
       .update({ status: 'VOIDED', void_reason: 'Pembatalan Sales Order', voided_by: user.id, voided_at: new Date().toISOString() })
       .eq('id', journalEntry.id)
@@ -140,7 +140,7 @@ export async function voidSale(orgId: string, saleId: string) {
   await (supabase as any).from('sales' as any).update({ status: 'VOIDED' }).eq('id', saleId).eq('org_id', orgId)
 
   // 5. Cancel any pending approval requests for this order
-  await supabase
+  await (supabase as any)
     .from('approval_requests')
     .update({ status: 'VOIDED', reason: 'Sales Order Dibatalkan', decided_at: new Date().toISOString() })
     .eq('source_type', 'SALES_ORDER')
@@ -230,8 +230,8 @@ export async function createQuotation(orgId: string, payload: any) {
   const total = payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)
   const grandTotal = total - (payload.discount_amount || 0) + (payload.tax_amount || 0)
 
-  const { data: quote, error: quoteErr } = await supabase
-    .from('sales' as any)
+  const { data: quote, error: quoteErr } = await (supabase as any)
+    .from('sales')
     .insert({
       org_id: orgId,
       customer_id: payload.customer_id,
@@ -252,8 +252,8 @@ export async function createQuotation(orgId: string, payload: any) {
 
   if (quoteErr) return { error: quoteErr.message }
 
-  const { error: linesErr } = await supabase
-    .from('sales_items' as any)
+  const { error: linesErr } = await (supabase as any)
+    .from('sales_items')
     .insert(payload.lines.map((l: any) => ({
       org_id: orgId,
       sale_id: quote.id,
@@ -272,8 +272,8 @@ export async function createQuotation(orgId: string, payload: any) {
 
 export async function convertQuotationToOrder(orgId: string, quoteId: string) {
   const supabase = await createClient()
-  const { error } = await supabase
-    .from('sales' as any)
+  const { error } = await (supabase as any)
+    .from('sales')
     .update({ status: 'DRAFT', updated_at: new Date().toISOString() })
     .eq('id', quoteId)
     .eq('org_id', orgId)
@@ -287,8 +287,8 @@ export async function convertQuotationToOrder(orgId: string, quoteId: string) {
 
 export async function updateSaleStatus(orgId: string, saleId: string, status: string) {
   const supabase = await createClient()
-  const { error } = await supabase
-    .from('sales' as any)
+  const { error } = await (supabase as any)
+    .from('sales')
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', saleId)
     .eq('org_id', orgId)
@@ -346,4 +346,67 @@ export async function createQuickKanbanCard(
 
   revalidatePath('/sales/pipeline')
   return { success: true, saleId: sale.id }
+}
+
+export async function updateSalesCard(
+  orgId: string,
+  saleId: string,
+  payload: { name: string; phone: string; email: string; amount: number; notes: string; status: string }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: sale } = await (supabase as any)
+    .from('sales')
+    .select('customer_id')
+    .eq('id', saleId)
+    .eq('org_id', orgId)
+    .single()
+
+  if (!sale) return { error: 'Card tidak ditemukan' }
+
+  // Update contact
+  await (supabase as any)
+    .from('contacts')
+    .update({
+      name: payload.name,
+      phone: payload.phone || null,
+      email: payload.email || null,
+    })
+    .eq('id', sale.customer_id)
+    .eq('org_id', orgId)
+
+  // Update sale
+  const { error: saleErr } = await (supabase as any)
+    .from('sales')
+    .update({
+      total_amount: payload.amount,
+      grand_total: payload.amount,
+      notes: payload.notes,
+      status: payload.status,
+    })
+    .eq('id', saleId)
+    .eq('org_id', orgId)
+
+  if (saleErr) return { error: 'Gagal mengedit card: ' + saleErr.message }
+
+  revalidatePath('/sales/pipeline')
+  return { success: true }
+}
+
+export async function deleteSalesCard(orgId: string, saleId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await (supabase as any)
+    .from('sales')
+    .delete()
+    .eq('id', saleId)
+    .eq('org_id', orgId)
+
+  if (error) return { error: 'Gagal menghapus card: ' + error.message }
+  revalidatePath('/sales/pipeline')
+  return { success: true }
 }

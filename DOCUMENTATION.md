@@ -1154,3 +1154,70 @@ Update ini dilakukan setelah implementasi awal modul Sales Page selesai, dengan 
   - kalkulasi otomatis HPP per generate dan rekomendasi harga jual (per generate / per 1K token),
   - CRUD paket topup token AI (aktif/nonaktif, harga, token, cost/HPP paket).
 - Approval invoice di admin kini mendeteksi invoice topup token dan mengkredit saldo wallet tenant otomatis.
+
+### 16.15 Integrasi Kanban, Custom Domain DNS, dan Realtime Notifications
+
+- **Sales Pipeline Kanban Enhancements**:
+  - `PipelineClient.tsx` ditambah fitur *Fullscreen Mode* untuk keleluasaan pengelolaan prospek dan drag-and-drop.
+  - Form Quick Add Card dimasukkan agar sales rep bisa manual entri tanpa membuat SPK baru.
+  - Setiap Kanban Card dilengkapi aksi cepat 1-klik Follow-Up (WhatsApp & Email).
+  - Implementasi *Supabase Realtime WebSocket* untuk mendengar `INSERT` record `sales`. Kanban langsung memunculkan Toast hijau "Lead Masuk!" dan me-refresh view tanpa perlu di-reload secara manual.
+- **Custom Domain (DNS) pada Sales Page**:
+  - `SalesPageStudioClient.tsx` dipindahkan UI "Domain Khusus (DNS)" ke panel "Ringkasan Aktif". User bisa dengan mudah mengisi domain custom (contoh: `promo.domain.com`) tanpa harus membuka Editor berukuran besar.
+  - Diberikan panduan pengarahan A Record/CNAME ke IP NIZAM Server.
+- **Automasi CRM Landing Page -> Pipeline**:
+  - `createPublicSalesPageLead` diubah perilakunya. Saat lead publik (kunjungan ke `/sp`) melakukan submit landing page, sistem akan *Otomatis Membuat Contact* dan *Membuat Sales Card (Kanban) berstatus NEW*, lalu menyinkronkannya dengan `created_by` milik kreator Sales Page.
+- **Perbaikan Environment Rendering**:
+  - `next.config.mjs` diubah untuk *Next 16 Turbopack compatibility* dengan memastikan tidak ada konfigurasi `webpack watchOptions` yang berbenturan dengan Turbopack caching. Endless re-rendering loops berhasil dikurangi signifikan pada arsitektur bawaan Next.js 16.
+
+### 16.16 Hardening auth redirect, proxy matcher, dan stabilisasi akses halaman terakhir
+
+Update ini dilakukan untuk menutup isu operasional: setelah input/navigasi user, aplikasi kadang terasa compile/render berulang, perlu refresh manual, dan setelah refresh kembali ke `/dashboard` alih-alih ke halaman terakhir.
+
+- **Perubahan utama di `lib/supabase/middleware.ts`**:
+  - Menambahkan pemisahan path yang jelas:
+    - `AUTH_PAGE_PREFIXES` (login/register),
+    - `PROTECTED_PAGE_PREFIXES` (dashboard + modul privat),
+    - path bypass internal (`/_next`, `/api`, metadata file).
+  - Menambahkan short-circuit agar middleware **tidak melakukan auth lookup berat** untuk route publik/internal yang tidak perlu.
+  - Menambahkan sanitasi `redirectTo` via `normalizeRedirectTarget(...)` untuk mencegah open redirect path berbahaya.
+  - Redirect dari route privat ke login sekarang menyimpan path lengkap berikut query (`pathname + search`), sehingga konteks tab/filter tetap pulih setelah login.
+  - Jika user sudah login tetapi mengakses `/login`/`/register`, middleware sekarang memprioritaskan:
+    1. `redirectTo` dari query (jika valid),
+    2. fallback referer internal yang valid,
+    3. fallback akhir `/dashboard`.
+
+- **Perubahan `proxy.ts` matcher**:
+  - Menambahkan pengecualian route yang tidak perlu diproses proxy:
+    - `api`,
+    - `_next/static`,
+    - `_next/image`,
+    - `_next/webpack-hmr`,
+    - metadata (`favicon.ico`, `robots.txt`, `sitemap.xml`, `manifest.json`),
+    - path file berekstensi.
+  - Menambahkan rule `missing` header prefetch (`next-router-prefetch`, `purpose=prefetch`) agar request prefetch tidak memicu jalur auth/proxy utama.
+
+### 16.17 Sinkronisasi ACL dashboard layout + verifikasi test
+
+- **Perubahan `app/(dashboard)/layout.tsx`**:
+  - Guard modul/RBAC diperluas agar lebih selaras dengan route aktual dan nomenklatur modul pada sidebar/paket SaaS.
+  - Menambahkan `RouteModuleEntry` dengan:
+    - `aliases` modul (contoh: Finance/Accounting, Inventory/Warehouse, Marketing/Sales),
+    - `permissionKeys` jamak per route family.
+  - Menambahkan helper `moduleNameMatches(...)` untuk matching modul yang lebih toleran terhadap variasi label plan/add-on.
+  - Menambahkan coverage path yang sebelumnya rawan mismatch guard:
+    - `/inventory/warehouses`,
+    - `/cash`,
+    - `/contacts`,
+    - serta penguatan mapping untuk family `/accounting`, `/reports`, `/hris`, `/services`.
+  - Dampak: menurunkan false redirect ke `/dashboard` pada akses halaman yang sebenarnya valid menurut paket/role.
+
+- **Perubahan test (`__tests__/middleware.test.ts`)**:
+  - Menambah skenario:
+    - `redirectTo` mempertahankan query params untuk route privat,
+    - user terautentikasi pada `/login` dengan `redirectTo` diarahkan ke halaman target (bukan selalu dashboard),
+    - request internal `/_next/webpack-hmr` dibypass tanpa auth lookup.
+
+- **Verifikasi pasca perubahan**:
+  - `npm run test -- __tests__/middleware.test.ts __tests__/proxy.test.ts` lulus (`2` file test, `7` test case).
+  - `npx eslint lib/supabase/middleware.ts proxy.ts app/(dashboard)/layout.tsx __tests__/middleware.test.ts` lulus.

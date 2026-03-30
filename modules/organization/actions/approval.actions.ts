@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 export async function getPendingApprovals(orgId: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('approval_requests')
     .select('*')
     .eq('org_id', orgId)
@@ -24,7 +24,7 @@ export async function getPendingApprovals(orgId: string) {
 export async function getApprovalHistory(orgId: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('approval_requests')
     .select('*')
     .eq('org_id', orgId)
@@ -55,7 +55,7 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
   if ((dataRes as any).error) return { data: null, error: (dataRes as any).error.message }
 
   // Fetch History Logs
-  const { data: logs } = await supabase
+  const { data: logs } = await (supabase as any)
     .from('approval_requests')
     .select('*')
     .eq('source_id', sourceId)
@@ -68,7 +68,7 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
 export async function getPendingApprovalsCount(orgId: string) {
   const supabase = await createClient()
 
-  const { count, error } = await supabase
+  const { count, error } = await (supabase as any)
     .from('approval_requests')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
@@ -84,11 +84,11 @@ export async function getPendingApprovalsCount(orgId: string) {
 
 export async function decideApproval(id: string, orgId: string, status: 'APPROVED' | 'REJECTED', notes?: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
   // 1. Ambil info request terlebih dahulu untuk mengetahui source_type dan source_id
-  const { data: reqData, error: reqErr } = await supabase
+  const { data: reqData, error: reqErr } = await (supabase as any)
     .from('approval_requests')
     .select('source_type, source_id')
     .eq('id', id)
@@ -97,7 +97,7 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
   if (reqErr || !reqData) return { error: 'Request tidak ditemukan' }
 
   // 2. Update status di tabel approval
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('approval_requests')
     .update({ 
       status, 
@@ -113,7 +113,7 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
   // 3. Efek Samping (Side Effects) ke dokumen asli
   if (reqData.source_type === 'PURCHASE_ORDER') {
       const newPoStatus = status === 'APPROVED' ? 'ORDERED' : 'VOIDED'
-      await supabase
+      await (supabase as any)
         .from('purchases' as any)
         .update({ status: newPoStatus })
         .eq('id', reqData.source_id)
@@ -122,7 +122,7 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
 
   if (reqData.source_type === 'SALES_ORDER') {
       const newSoStatus = status === 'APPROVED' ? 'ORDERED' : 'VOIDED'
-      await supabase
+      await (supabase as any)
         .from('sales' as any)
         .update({ status: newSoStatus })
         .eq('id', reqData.source_id)
@@ -130,7 +130,7 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
   }
 
   if (reqData.source_type === 'REIMBURSEMENT') {
-      await supabase
+      await (supabase as any)
         .from('reimbursements')
         .update({ status: status }) // APPROVED or REJECTED
         .eq('id', reqData.source_id)
@@ -144,7 +144,7 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
 export async function getApprovalForSource(orgId: string, sourceId: string, sourceType: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('approval_requests')
     .select('status, approver_id, decided_at')
     .eq('source_id', sourceId)

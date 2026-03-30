@@ -34,16 +34,17 @@ type OrgSummary = {
   logo_url: string | null
 }
 
-type LooseQueryResult = Promise<{ data: unknown; error: { message: string } | null }>
+type LooseQueryResult = Promise<{ data: any; error: any }>
 
-type LooseQuery = {
-  select: (columns: string) => LooseQuery
-  eq: (column: string, value: unknown) => LooseQuery
-  neq: (column: string, value: unknown) => LooseQuery
+interface LooseQuery extends Promise<{ data: any; error: any }> {
+  select: (columns?: string) => LooseQuery
+  eq: (column: string, value: any) => LooseQuery
+  neq: (column: string, value: any) => LooseQuery
   order: (column: string, options?: { ascending: boolean }) => LooseQuery
   limit: (count: number) => LooseQuery
-  insert: (values: Record<string, unknown>) => LooseQuery
-  update: (values: Record<string, unknown>) => LooseQuery
+  insert: (values: any) => LooseQuery
+  update: (values: any) => LooseQuery
+  upsert: (values: any) => LooseQuery
   delete: () => LooseQuery
   single: () => LooseQueryResult
   maybeSingle: () => LooseQueryResult
@@ -151,11 +152,10 @@ async function ensureUniqueSlug(db: LooseDb, orgId: string, baseSlug: string, ig
       .select('id')
       .eq('org_id', orgId)
       .eq('slug', candidate)
-      .maybeSingle()
 
     if (ignoreId) query = query.neq('id', ignoreId)
 
-    const { data } = await query
+    const { data } = await query.maybeSingle()
     if (!data) return candidate
     counter += 1
     candidate = `${normalizedBase}-${counter}`
@@ -607,6 +607,59 @@ export async function createPublicSalesPageLead(input: {
     .single()
 
   if (error) throw new Error(error.message)
+
+  let contactId = null
+  if (input.phone) {
+    const { data: existing } = await admin
+      .from('contacts')
+      .select('id')
+      .eq('org_id', publicPage.org.id)
+      .eq('phone', input.phone.trim())
+      .maybeSingle()
+    if (existing) contactId = existing.id
+  }
+
+  if (!contactId && input.email) {
+    const { data: existing } = await admin
+      .from('contacts')
+      .select('id')
+      .eq('org_id', publicPage.org.id)
+      .eq('email', input.email.trim())
+      .maybeSingle()
+    if (existing) contactId = existing.id
+  }
+
+  if (!contactId) {
+    const { data: contact } = await admin
+      .from('contacts')
+      .insert({
+        org_id: publicPage.org.id,
+        name: input.fullName.trim(),
+        type: 'CUSTOMER',
+        phone: input.phone?.trim() || null,
+        email: input.email?.trim() || null,
+      })
+      .select('id')
+      .maybeSingle()
+    if (contact) contactId = contact.id
+  }
+
+  if (contactId) {
+    await admin.from('sales').insert({
+      org_id: publicPage.org.id,
+      customer_id: contactId,
+      sale_date: new Date().toISOString().split('T')[0],
+      total_amount: 0,
+      tax_amount: 0,
+      discount_amount: 0,
+      grand_total: 0,
+      status: 'QUOTATION',
+      shariah_mode: 'CASH',
+      notes: `[SalesPage Lead] ${publicPage.page.title}\nMsg: ${input.message || '-'}`,
+      created_by: publicPage.page.createdBy || null,
+    })
+  }
+
   return {
     page: publicPage.page,
     org: publicPage.org,

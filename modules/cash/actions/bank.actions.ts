@@ -10,7 +10,7 @@ import type { BankAccount, BankTransaction } from '@/types/database.types'
 export async function getBankAccounts(orgId: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('bank_accounts')
     .select('*, account:accounts(*)')
     .eq('org_id', orgId)
@@ -102,7 +102,7 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
 export async function getRecentBankTransactions(orgId: string, limit = 10) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('bank_transactions')
     .select('*, bank_account:bank_accounts(bank_name, account_number), category:accounts(name, code)')
     .eq('org_id', orgId)
@@ -121,7 +121,7 @@ export async function deleteBankAccount(orgId: string, accountId: string) {
   const supabase = await createClient()
 
   // Note: This will fail if there are existing transactions (CASCADE protection is usually OFF by default for financial safety)
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('bank_accounts')
     .delete()
     .eq('id', accountId)
@@ -143,11 +143,11 @@ export async function deleteBankAccount(orgId: string, accountId: string) {
 // ─────────────────────────────────────────────────────────────
 export async function deleteBankTransaction(orgId: string, transactionId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
 
   // 1. Fetch the linked journal entry BEFORE deleting (SET NULL on delete)
-  const { data: tx } = await supabase
+  const { data: tx } = await (supabase as any)
     .from('bank_transactions')
     .select('journal_entry_id')
     .eq('id', transactionId)
@@ -156,7 +156,7 @@ export async function deleteBankTransaction(orgId: string, transactionId: string
 
   // 2. Void the linked journal entry so GL stays balanced
   if (tx?.journal_entry_id) {
-    await supabase
+    await (supabase as any)
       .from('journal_entries')
       .update({
         status: 'VOIDED',
@@ -168,7 +168,7 @@ export async function deleteBankTransaction(orgId: string, transactionId: string
   }
 
   // 3. Delete the transaction
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('bank_transactions')
     .delete()
     .eq('id', transactionId)

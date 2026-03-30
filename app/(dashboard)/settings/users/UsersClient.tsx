@@ -79,7 +79,7 @@ export default function UsersClient({
       setInvitations((current: any[]) => [res.invitation, ...current.filter((invite: any) => invite.id !== res.invitation.id)])
     }
 
-    const nextUrl = getInvitationUrl(res.code)
+    const nextUrl = getInvitationUrl(res.code ?? '')
     setLatestInviteUrl(nextUrl)
     setInviteLabel('')
     setRoleIdToInvite('')

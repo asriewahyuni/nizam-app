@@ -107,6 +107,7 @@ export type SalesPageRecord = {
   testimonials: unknown
   faq_items: unknown
   form_settings: unknown
+  created_by: string | null
   published_at: string | null
   created_at: string
   updated_at: string
@@ -176,6 +177,7 @@ export type SalesPageView = {
   testimonials: SalesPageTestimonial[]
   faqItems: SalesPageFaqItem[]
   formSettings: SalesPageFormSettings
+  createdBy: string | null
   publishedAt: string | null
   createdAt: string
   updatedAt: string
@@ -594,6 +596,7 @@ export function mapSalesPageRecord(row: SalesPageRecord): SalesPageView {
       return question && answer ? { question, answer } : null
     }),
     formSettings: sanitizeFormSettings(row.form_settings),
+    createdBy: row.created_by,
     publishedAt: row.published_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

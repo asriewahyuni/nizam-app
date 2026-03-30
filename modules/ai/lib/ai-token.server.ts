@@ -19,6 +19,10 @@ type LooseQuery = {
   upsert: (values: Record<string, unknown> | Record<string, unknown>[], options?: Record<string, unknown>) => LooseQuery
   maybeSingle: () => LooseQueryResult
   single: () => LooseQueryResult
+  // Allow `const { data, error } = await query.from(...)...`
+  then: <T>(resolve: (value: { data: any; error: { message: string } | null }) => T) => Promise<T>
+  data: any
+  error: { message: string } | null
 }
 
 type LooseDb = {

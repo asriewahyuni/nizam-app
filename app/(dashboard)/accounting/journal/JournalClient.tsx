@@ -121,7 +121,7 @@ export default function JournalClient({ orgId, initialEntries, accounts, userRol
         }))
       })
 
-      if (res.error) throw new Error(res.error)
+      if ((res as any).error) throw new Error((res as any).error)
       window.location.reload()
     } catch (error: any) {
       alert(error.message || "Gagal membuat jurnal")

@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 
 export async function processPosTransaction(orgId: string, payload: any) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
   // 1. Tuntaskan CRM dan Relational Integrity untuk Pelanggan (Cegah Not Null Constraints)
@@ -46,7 +46,7 @@ export async function processPosTransaction(orgId: string, payload: any) {
   const discountAmount = payload.discount_amount || 0
   const grandTotal = totalAmount + taxAmount - discountAmount
   
-  const { data: sale, error: saleErr } = await supabase
+  const { data: sale, error: saleErr } = await (supabase as any)
     .from('sales' as any)
     .insert({
       org_id: orgId,
@@ -69,7 +69,7 @@ export async function processPosTransaction(orgId: string, payload: any) {
 
   if (saleErr) return { error: saleErr.message }
 
-  const { error: linesErr } = await supabase
+  const { error: linesErr } = await (supabase as any)
     .from('sales_items' as any)
     .insert(payload.lines.map((l: any) => ({
       org_id: orgId,

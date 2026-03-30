@@ -93,7 +93,7 @@ async function clearTablesByOrg(db: AdminDbClient, orgId: string, tables: readon
 export async function getAuditLogs(orgId: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .rpc('get_audit_logs_with_users', { p_org_id: orgId })
 
   if (error) {
@@ -115,7 +115,7 @@ export async function createAuditLog(
    newData?: unknown
 ) {
    const supabase = await createClient()
-   await supabase.from('audit_logs').insert({
+   await (supabase as any).from('audit_logs').insert({
       org_id: orgId,
       user_id: userId,
       action,
@@ -133,7 +133,7 @@ export async function resetOrganizationData(orgId: string, options: ResetOrganiz
   const mode = options.mode || 'transactions'
 
   try {
-    const { data: authData } = await supabase.auth.getUser()
+    const { data: authData } = await (supabase as any).auth.getUser()
     const user = authData.user
 
     if (!user) {
@@ -141,14 +141,14 @@ export async function resetOrganizationData(orgId: string, options: ResetOrganiz
     }
 
     const [{ data: membership }, { data: organization }] = await Promise.all([
-      adminClient
+      (adminClient as any)
         .from('org_members')
         .select('role')
         .eq('org_id', orgId)
         .eq('user_id', user.id)
         .eq('is_active', true)
         .maybeSingle(),
-      adminClient
+      (adminClient as any)
         .from('organizations')
         .select('name')
         .eq('id', orgId)
@@ -180,7 +180,7 @@ export async function resetOrganizationData(orgId: string, options: ResetOrganiz
       }
     }
 
-    await adminClient.from('audit_logs').insert({
+    await (adminClient as any).from('audit_logs').insert({
       org_id: orgId,
       user_id: user.id,
       action: 'DELETE',

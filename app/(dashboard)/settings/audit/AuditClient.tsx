@@ -249,15 +249,15 @@ export function AuditClient({ logs, orgName, orgId }: { logs: AuditLog[], orgNam
 
                     <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
                         <p className="text-[9px] font-black text-slate-500 uppercase mb-2">User Context</p>
-                        <p className="text-xs font-black text-white">{selectedLog.user_name}</p>
-                        <p className="text-[10px] font-mono font-bold text-slate-400 mt-0.5">{selectedLog.user_email}</p>
+                        <p className="text-xs font-black text-white">{String(selectedLog.user_name ?? '')}</p>
+                        <p className="text-[10px] font-mono font-bold text-slate-400 mt-0.5">{String(selectedLog.user_email ?? '')}</p>
                     </div>
 
                     {selectedLog.old_data && (
                       <div className="space-y-2">
                         <p className="text-[10px] font-black text-rose-500 uppercase flex items-center gap-2"><AlertTriangle size={12}/> Original State (OLD)</p>
                         <pre className="text-[10px] font-mono p-4 bg-rose-950/50 rounded-2xl border border-rose-900/30 overflow-x-auto leading-relaxed shadow-inner max-h-48 text-rose-100">
-                          {JSON.stringify(selectedLog.old_data, null, 2)}
+                          {JSON.stringify(selectedLog.old_data, null, 2) as string}
                         </pre>
                       </div>
                     )}
@@ -266,7 +266,7 @@ export function AuditClient({ logs, orgName, orgId }: { logs: AuditLog[], orgNam
                       <div className="space-y-2">
                         <p className="text-[10px] font-black text-emerald-500 uppercase flex items-center gap-2"><ShieldCheck size={12}/> Updated State (NEW)</p>
                         <pre className="text-[10px] font-mono p-4 bg-emerald-950/50 rounded-2xl border border-emerald-900/30 overflow-x-auto leading-relaxed shadow-inner max-h-48 text-emerald-100">
-                          {JSON.stringify(selectedLog.new_data, null, 2)}
+                          {JSON.stringify(selectedLog.new_data, null, 2) as string}
                         </pre>
                       </div>
                     )}

@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 
 export async function getWarehouses(orgId: string) {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('warehouses')
     .select('*')
     .eq('org_id', orgId)
@@ -33,7 +33,7 @@ export async function getWarehouseBins(orgId: string, warehouseId?: string) {
 
 export async function createWarehouseBin(orgId: string, payload: { warehouse_id: string; code: string; description?: string }) {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('warehouse_bins')
     .insert([{ ...payload, org_id: orgId }])
     .select()
@@ -46,7 +46,7 @@ export async function createWarehouseBin(orgId: string, payload: { warehouse_id:
 
 export async function createWarehouse(orgId: string, payload: { name: string; code: string; is_active?: boolean }) {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('warehouses')
     .insert([{ ...payload, org_id: orgId }])
     .select()
@@ -59,7 +59,7 @@ export async function createWarehouse(orgId: string, payload: { name: string; co
 
 export async function deleteWarehouse(orgId: string, id: string) {
   const supabase = await createClient()
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('warehouses')
     .delete()
     .eq('id', id)
@@ -72,7 +72,7 @@ export async function deleteWarehouse(orgId: string, id: string) {
 
 export async function deleteWarehouseBin(orgId: string, id: string) {
   const supabase = await createClient()
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('warehouse_bins')
     .delete()
     .eq('id', id)

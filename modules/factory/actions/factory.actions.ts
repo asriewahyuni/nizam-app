@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 export async function getBoms(orgId: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('production_boms')
     .select(`
       *,
@@ -32,7 +32,7 @@ export async function getBoms(orgId: string) {
 export async function getBomItems(bomId: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('production_bom_items')
     .select(`
       *,
@@ -53,7 +53,7 @@ export async function createBom(orgId: string, payload: { productId: string; cod
 
   // Start Transaction (via manual check or RPC)
   // For simplicity using sequential inserts (but in real production we use RPC)
-  const { data: bom, error: bomError } = await supabase
+  const { data: bom, error: bomError } = await (supabase as any)
     .from('production_boms')
     .insert({
       org_id: orgId,
@@ -73,7 +73,7 @@ export async function createBom(orgId: string, payload: { productId: string; cod
     unit: item.unit
   }))
 
-  const { error: itemsError } = await supabase
+  const { error: itemsError } = await (supabase as any)
     .from('production_bom_items')
     .insert(bomItems)
 
@@ -87,7 +87,7 @@ export async function updateBom(orgId: string, bomId: string, payload: { product
   const supabase = await createClient()
 
   // 1. Update BoM Header
-  const { error: bomError } = await supabase
+  const { error: bomError } = await (supabase as any)
     .from('production_boms')
     .update({
       product_id: payload.productId,
@@ -101,7 +101,7 @@ export async function updateBom(orgId: string, bomId: string, payload: { product
   if (bomError) return { error: bomError.message }
 
   // 2. Refresh Items: Delete and Re-insert
-  const { error: deleteError } = await supabase
+  const { error: deleteError } = await (supabase as any)
     .from('production_bom_items')
     .delete()
     .eq('bom_id', bomId)
@@ -115,7 +115,7 @@ export async function updateBom(orgId: string, bomId: string, payload: { product
     unit: item.unit
   }))
 
-  const { error: itemsError } = await supabase
+  const { error: itemsError } = await (supabase as any)
     .from('production_bom_items')
     .insert(bomItems)
 
@@ -129,7 +129,7 @@ export async function updateBom(orgId: string, bomId: string, payload: { product
 export async function getWorkOrders(orgId: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('production_work_orders')
     .select(`
       *,
@@ -162,7 +162,7 @@ export async function createWorkOrder(orgId: string, formData: FormData) {
   const quantity_planned = Number(formData.get('quantity_planned'))
   const notes = formData.get('notes') as string
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('production_work_orders')
     .insert({
       org_id: orgId,
@@ -181,7 +181,7 @@ export async function createWorkOrder(orgId: string, formData: FormData) {
 
 export async function getWorkOrderCosts(woId: string) {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('production_wo_costs')
     .select('*')
     .eq('wo_id', woId)
@@ -193,7 +193,7 @@ export async function getWorkOrderCosts(woId: string) {
 
 export async function addWorkOrderCost(orgId: string, woId: string, payload: { description: string; amount: number; cost_type: string }) {
   const supabase = await createClient()
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('production_wo_costs')
     .insert([{ ...payload, wo_id: woId }])
 
@@ -204,7 +204,7 @@ export async function addWorkOrderCost(orgId: string, woId: string, payload: { d
 
 export async function getFGBins(orgId: string, warehouseId: string) {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('warehouse_bins')
     .select('id, code')
     .eq('org_id', orgId)
@@ -218,7 +218,7 @@ export async function updateWorkOrderStatus(orgId: string, woId: string, status:
   const supabase = await createClient()
 
   if (status === 'COMPLETED') {
-    const { data: userData } = await supabase.auth.getUser()
+    const { data: userData } = await (supabase as any).auth.getUser()
     
     // Use V2 (with overhead support)
     const { data, error } = await (supabase as any).rpc('process_work_order_completion_v2', {
@@ -248,7 +248,7 @@ export async function updateWorkOrderStatus(orgId: string, woId: string, status:
   const payload: any = { status }
   if (status === 'RELEASED') payload.released_at = new Date().toISOString()
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('production_work_orders')
     .update(payload)
     .eq('id', woId)
@@ -262,7 +262,7 @@ export async function updateWorkOrderStatus(orgId: string, woId: string, status:
 
 export async function deleteBom(orgId: string, bomId: string) {
   const supabase = await createClient()
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('production_boms')
     .delete()
     .eq('id', bomId)
@@ -275,7 +275,7 @@ export async function deleteBom(orgId: string, bomId: string) {
 
 export async function deleteWorkOrder(orgId: string, woId: string) {
   const supabase = await createClient()
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('production_work_orders')
     .delete()
     .eq('id', woId)
@@ -288,7 +288,7 @@ export async function deleteWorkOrder(orgId: string, woId: string) {
 
 export async function createPurchaseRequests(orgId: string, requests: any[]) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await (supabase as any).auth.getUser()
 
   if (!user) return { error: 'Unauthorized' }
 
@@ -305,7 +305,7 @@ export async function createPurchaseRequests(orgId: string, requests: any[]) {
     source_id: req.sourceId
   }))
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('purchase_requests')
     .insert(payload)
 

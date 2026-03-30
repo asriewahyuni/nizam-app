@@ -120,7 +120,8 @@ export async function getActiveOrg() {
   const activeOrgId = memberData.org_id
   const org = memberData.organizations as any
   const planName = org?.settings?.plan
-  let enabledModules = org?.enabled_modules || []
+  // Note: enabled_modules column may not exist in DB; rely on saas_packages + active_addons
+  let enabledModules: string[] = []
 
   // DYNAMIC MODULE RESOLUTION FROM SaaS PACKAGE
   if (planName) {

@@ -14,7 +14,7 @@ export default async function WarehouseDetailPage({ params }: { params: Promise<
   if (!orgData) redirect('/onboarding')
 
   const warehouses = await getWarehouses(orgData.org.id)
-  const warehouse = warehouses.find(w => w.id === id)
+  const warehouse = warehouses.find((w: any) => w.id === id)
   
   if (!warehouse) {
     redirect('/inventory/warehouses')

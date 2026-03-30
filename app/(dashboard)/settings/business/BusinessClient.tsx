@@ -45,15 +45,15 @@ export default function BusinessClient({
     
     const newSettings = {
       ...settings,
-      brand_name: formData.get('brand_name') || '',
-      company_address: formData.get('company_address') || '',
-      hotline: formData.get('hotline') || '',
-      email: formData.get('email') || '',
-      website: formData.get('website') || '',
-      emp_format: formData.get('emp_format') || 'EMP{MM}{YY}{0000}',
-      po_format: formData.get('po_format') || 'PO-{YYYY}{MM}-{0000}',
-      so_format: formData.get('so_format') || 'SO/{YY}/{MM}/{000}',
-      inv_format: formData.get('inv_format') || 'INV/NIZ/{YYYY}/{0000}',
+      brand_name: (formData.get('brand_name') as string) || '',
+      company_address: (formData.get('company_address') as string) || '',
+      hotline: (formData.get('hotline') as string) || '',
+      email: (formData.get('email') as string) || '',
+      website: (formData.get('website') as string) || '',
+      emp_format: (formData.get('emp_format') as string) || 'EMP{MM}{YY}{0000}',
+      po_format: (formData.get('po_format') as string) || 'PO-{YYYY}{MM}-{0000}',
+      so_format: (formData.get('so_format') as string) || 'SO/{YY}/{MM}/{000}',
+      inv_format: (formData.get('inv_format') as string) || 'INV/NIZ/{YYYY}/{0000}',
     }
     
     const logoUrl = formData.get('logo_url') as string
@@ -95,13 +95,14 @@ export default function BusinessClient({
       confirmationText: resetConfirmation.trim(),
     })
 
-    if (!res.success) {
-      alert(res.error)
+    const resAny = res as any
+    if (!resAny.success) {
+      alert(resAny.error)
       setLoading(false)
       return
     }
 
-    alert(res.message || 'Reset data selesai.')
+    alert(resAny.message || 'Reset data selesai.')
     setIsResetModalOpen(false)
     setResetConfirmation('')
     window.location.reload()
@@ -170,7 +171,7 @@ export default function BusinessClient({
 
               <div className="space-y-2 md:col-span-1">
                  <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Nama Brand / Merk</label>
-                 <input name="brand_name" defaultValue={settings.brand_name || initialSettings.name} placeholder="Nama Bisnis Anda" className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-black text-slate-800 bg-white shadow-sm" />
+                 <input name="brand_name" defaultValue={String(settings.brand_name ?? initialSettings.name ?? '')} placeholder="Nama Bisnis Anda" className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-black text-slate-800 bg-white shadow-sm" />
               </div>
 
               <div className="space-y-2 md:col-span-2">
@@ -230,19 +231,19 @@ export default function BusinessClient({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
            <div className="space-y-2">
               <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">WhatsApp Hotline</label>
-              <input name="hotline" defaultValue={settings.hotline || ''} placeholder="0812..." className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold" />
+              <input name="hotline" defaultValue={String(settings.hotline ?? '')} placeholder="0812..." className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold" />
            </div>
            <div className="space-y-2">
               <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Official Email</label>
-              <input name="email" type="email" defaultValue={settings.email || ''} placeholder="hello@company.com" className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold" />
+              <input name="email" type="email" defaultValue={String(settings.email ?? '')} placeholder="hello@company.com" className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold" />
            </div>
            <div className="space-y-2">
               <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Website</label>
-              <input name="website" defaultValue={settings.website || ''} placeholder="www..." className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold" />
+              <input name="website" defaultValue={String(settings.website ?? '')} placeholder="www..." className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold" />
            </div>
            <div className="space-y-2 md:col-span-3">
               <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Alamat Headquarter</label>
-              <textarea name="company_address" defaultValue={settings.company_address || ''} placeholder="Jl..." className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold min-h-[100px]" />
+              <textarea name="company_address" defaultValue={String(settings.company_address ?? '')} placeholder="Jl..." className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold min-h-[100px]" />
            </div>
         </div>
 

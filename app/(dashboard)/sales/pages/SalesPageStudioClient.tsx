@@ -272,7 +272,8 @@ export default function SalesPageStudioClient({
   const [editState, setEditState] = useState<EditorFormState | null>(pages[0] ? toEditorState(pages[0]) : null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [busyAction, setBusyAction] = useState<'create' | 'update' | 'duplicate' | 'delete' | 'publish' | null>(null)
+  const [busyAction, setBusyAction] = useState<'create' | 'update' | 'duplicate' | 'delete' | 'publish' | 'domain' | null>(null)
+  const [quickDomain, setQuickDomain] = useState<string>('')
 
   const selectedTemplate = useMemo(
     () => SALES_PAGE_TEMPLATE_OPTIONS.find((template) => template.id === createState.templateId) || SALES_PAGE_TEMPLATE_OPTIONS[0],
@@ -290,6 +291,12 @@ export default function SalesPageStudioClient({
     () => (selectedPage ? leads.filter((lead) => lead.salesPageId === selectedPage.id) : leads),
     [leads, selectedPage],
   )
+
+  useEffect(() => {
+    if (selectedPage) {
+      setQuickDomain(selectedPage.formSettings?.customDomain || '')
+    }
+  }, [selectedPage])
 
   const publishedCount = pages.filter((page) => page.status === 'PUBLISHED').length
   const pixelReadyCount = pages.filter((page) => Boolean(page.metaPixelId)).length
@@ -413,6 +420,24 @@ export default function SalesPageStudioClient({
       refreshPage()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal menyimpan perubahan.')
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const handleUpdateDomain = async () => {
+    if (!selectedPage) return
+    setError(null)
+    setBusyAction('domain')
+    try {
+      const editMode = toEditorState(selectedPage)
+      editMode.customDomain = quickDomain
+      const payload = editorStateToPayload(editMode, selectedPage)
+      await updateSalesPage(orgId, selectedPage.id, payload, orgSlug, selectedPage.slug)
+      setSuccess('Domain khusus berhasil diperbarui.')
+      refreshPage()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal menyimpan domain khusus.')
     } finally {
       setBusyAction(null)
     }
@@ -689,6 +714,31 @@ export default function SalesPageStudioClient({
                       {selectedPage.metaPixelId ? selectedPage.metaPixelId : 'Belum diisi'}
                     </div>
                   </div>
+                </div>
+
+                <div className="rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-4 space-y-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Custom Domain (DNS)</div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                     <input
+                        value={quickDomain}
+                        onChange={(e) => setQuickDomain(e.target.value)}
+                        placeholder="Cth: promo.bisnisanda.com"
+                        className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500 shadow-sm"
+                     />
+                     <SafeButton
+                        variant="primary"
+                        icon={<Globe size={14} />}
+                        isLoading={busyAction === 'domain'}
+                        onClick={handleUpdateDomain}
+                     >
+                        Terapkan
+                     </SafeButton>
+                  </div>
+                  {quickDomain && quickDomain === selectedPage.formSettings?.customDomain && (
+                    <p className="text-[10px] font-bold text-slate-500 mt-2 bg-slate-100 p-2 rounded-xl">
+                      Arahkan <strong>A Record / CNAME</strong> domain ini ke server ERP NIZAM agar bisa diakses.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-3">
@@ -1348,23 +1398,6 @@ export default function SalesPageStudioClient({
                   rows={7}
                   className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium outline-none focus:border-indigo-500"
                 />
-              </div>
-
-              <div className="space-y-2 pt-6 border-t border-slate-100">
-                <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Domain Khusus (DNS)</label>
-                <input
-                  value={editState.customDomain}
-                  onChange={(event) => setEditState((prev) => (prev ? { ...prev, customDomain: event.target.value } : prev))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-500"
-                  placeholder="Misal: promo.bisnisanda.com"
-                />
-                <div className="mt-2 text-xs font-medium text-slate-600 space-y-1">
-                  <p><strong>Cara Setting:</strong> Hubungkan domain Anda dengan mengarahkan DNS record secara eksternal:</p>
-                  <ul className="list-disc pl-5">
-                    <li>Buat <strong>A Record</strong> atau <strong>CNAME Record</strong> di pengelola domain (Niagahoster, Cloudflare, dll) yang diarahkan ke sistem ERP NIZAM.</li>
-                    <li>Pastikan SSL/HTTPS telah menyala otomatis via platform hosting ERP NIZAM Anda (jika deploy mandiri).</li>
-                  </ul>
-                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">

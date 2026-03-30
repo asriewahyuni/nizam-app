@@ -1,11 +1,13 @@
 'use client'
 
-import React, { useState } from 'react'
-import { Activity, PlayCircle, CircleDashed, CheckCircle2, TrendingUp, DollarSign, Maximize2, Minimize2, Plus, Phone, Mail, ExternalLink } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Activity, PlayCircle, CircleDashed, CheckCircle2, TrendingUp, DollarSign, Maximize2, Minimize2, Plus, Phone, Mail, ExternalLink, Bell, Edit2, Trash2 } from 'lucide-react'
 import { PageHeader, SafeButton } from '@/components/ui/NizamUI'
 import { formatRupiah } from '@/lib/utils'
-import { updateSaleStatus, createQuickKanbanCard } from '@/modules/sales/actions/sales.actions'
-import { motion } from 'framer-motion'
+import { updateSaleStatus, createQuickKanbanCard, deleteSalesCard, updateSalesCard } from '@/modules/sales/actions/sales.actions'
+import { motion, AnimatePresence } from 'framer-motion'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
 const PIPELINE_STAGES = [
   { id: 'QUOTATION', title: 'Penawaran', icon: CircleDashed, col: 'border-blue-200 bg-blue-50/30' },
@@ -15,13 +17,41 @@ const PIPELINE_STAGES = [
 ]
 
 export default function PipelineClient({ orgId, sales }: any) {
+  const router = useRouter()
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
   
-  // Add Card Form State
-  const [formState, setFormState] = useState({ name: '', phone: '', email: '', amount: 0, notes: '', status: 'QUOTATION' })
+  // Toast State
+  const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' } | null>(null)
+  
+  const showToast = (message: string, type: 'info' | 'success' = 'info') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 4000)
+  }
+
+  // Realtime notification for new leads entering pipeline
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase.channel('realtime_sales_pipeline')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'sales', filter: `org_id=eq.${orgId}` },
+        (payload) => {
+           showToast('Lead Baru / Penawaran masuk ke Pipeline!', 'success')
+           // User must manually refresh to see it to avoid Next.js dev loops
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [orgId])
+
+  // Add / Edit Card Form State
+  const [formState, setFormState] = useState({ id: '', name: '', phone: '', email: '', amount: 0, notes: '', status: 'QUOTATION' })
 
   const handleDragStart = (id: string) => setDraggedId(id)
 
@@ -44,7 +74,7 @@ export default function PipelineClient({ orgId, sales }: any) {
 
     setIsUpdating(true)
     const res = await updateSaleStatus(orgId, draggedId, stageId)
-    if (res?.error) alert(res.error)
+    if (res?.error) showToast(res.error, 'info')
     setIsUpdating(false)
     setDraggedId(null)
   }
@@ -52,12 +82,41 @@ export default function PipelineClient({ orgId, sales }: any) {
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsUpdating(true)
-    const res = await createQuickKanbanCard(orgId, formState)
-    if (res?.error) alert(res.error)
+    let res;
+    if (formState.id) {
+      res = await updateSalesCard(orgId, formState.id, formState)
+    } else {
+      res = await createQuickKanbanCard(orgId, formState)
+    }
+    
+    if (res?.error) showToast(res.error, 'info')
     else {
       setShowAddModal(false)
-      setFormState({ name: '', phone: '', email: '', amount: 0, notes: '', status: 'QUOTATION' })
+      showToast(formState.id ? 'Card berhasil diubah' : 'Card berhasil dibuat', 'success')
+      setFormState({ id: '', name: '', phone: '', email: '', amount: 0, notes: '', status: 'QUOTATION' })
     }
+    setIsUpdating(false)
+  }
+
+  const handleEditClick = (item: any) => {
+    setFormState({
+      id: item.id,
+      name: item.contacts?.name || '',
+      phone: item.contacts?.phone || '',
+      email: item.contacts?.email || '',
+      amount: item.grand_total,
+      notes: item.notes || '',
+      status: item.status
+    })
+    setShowAddModal(true)
+  }
+
+  const handleDeleteCard = async (id: string) => {
+    if (!confirm('Hapus card ink permanen?')) return
+    setIsUpdating(true)
+    const res = await deleteSalesCard(orgId, id)
+    if (res?.error) showToast(res.error, 'info')
+    else showToast('Card dibuang', 'success')
     setIsUpdating(false)
   }
 
@@ -145,11 +204,19 @@ export default function PipelineClient({ orgId, sales }: any) {
                           <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest group-hover:text-blue-500 transition-colors">
                             {item.sale_number || `DOC-${item.id.slice(0,5)}`}
                           </div>
-                          {isSalesPage ? (
-                            <span className="bg-amber-100 text-amber-700 text-[8px] px-2 py-0.5 rounded-full font-bold">Sales Page</span>
-                          ) : (
-                            <span className="bg-blue-100 text-blue-700 text-[8px] px-2 py-0.5 rounded-full font-bold">Quotation</span>
-                          )}
+                          <div className="flex items-center gap-1 group/actions">
+                            {isSalesPage ? (
+                              <span className="bg-amber-100 text-amber-700 text-[8px] px-2 py-0.5 rounded-full font-bold">Sales Page</span>
+                            ) : (
+                              <span className="bg-blue-100 text-blue-700 text-[8px] px-2 py-0.5 rounded-full font-bold">Quotation</span>
+                            )}
+                            <button onClick={() => handleEditClick(item)} className="p-1 text-slate-300 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100">
+                              <Edit2 size={12} />
+                            </button>
+                            <button onClick={() => handleDeleteCard(item.id)} className="p-1 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
                         </div>
                         
                         <div className="font-bold text-sm text-slate-800 leading-tight mb-3">
@@ -243,6 +310,23 @@ export default function PipelineClient({ orgId, sales }: any) {
           </div>
         </div>
       )}
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div 
+            initial={{ y: 50, opacity: 0 }} 
+            animate={{ y: 0, opacity: 1 }} 
+            exit={{ y: 50, opacity: 0 }}
+            className={`fixed bottom-8 right-8 z-[200] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border ${
+              toast.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-blue-50 border-blue-100 text-blue-800'
+            }`}
+          >
+            {toast.type === 'success' ? <CheckCircle2 size={24} className="text-emerald-500 shrink-0" /> : <Bell size={24} className="text-blue-500 shrink-0" />}
+            <p className="font-bold text-sm tracking-tight">{toast.message}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

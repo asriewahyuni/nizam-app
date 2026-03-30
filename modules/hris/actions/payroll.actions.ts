@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 
 export async function getPayrollComponents(orgId: string) {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('payroll_components')
     .select(`
       *,
@@ -50,7 +50,7 @@ export async function deletePayrollComponent(componentId: string) {
 }
 export async function getPayrollRuns(orgId: string) {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('payroll_runs')
     .select('*')
     .eq('org_id', orgId)
@@ -68,7 +68,7 @@ export async function generatePayrollRun(orgId: string, formData: FormData) {
   const paymentDate = formData.get('payment_date') as string
 
   // 1. Create the Run Header
-  const { data: run, error: runErr } = await supabase
+  const { data: run, error: runErr } = await (supabase as any)
     .from('payroll_runs')
     .insert({
       org_id: orgId,
@@ -97,11 +97,11 @@ export async function generatePayrollRun(orgId: string, formData: FormData) {
 export async function payPayrollRun(runId: string, orgId: string, accountId: string) {
   const supabase = await createClient()
   
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
   // 1. Update the run with selected bank account before processing
-  await supabase
+  await (supabase as any)
     .from('payroll_runs')
     .update({ disbursement_account_id: accountId })
     .eq('id', runId);
@@ -232,7 +232,7 @@ export async function fixEmptyPayrollJournals(orgId: string) {
 export async function getPayrollRunDetails(runId: string) {
   const supabase = await createClient()
   
-  const { data: slips, error } = await supabase
+  const { data: slips, error } = await (supabase as any)
     .from('payslips')
     .select(`
       *,

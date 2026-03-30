@@ -7,7 +7,7 @@ import { createJournalEntry } from '@/modules/accounting/actions/journal.actions
 export async function getPurchases(orgId: string) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('purchases' as any)
     .select(`
       *,
@@ -30,7 +30,7 @@ export async function getPurchases(orgId: string) {
   if (error) {
     (console as any).error("DEBUG: getPurchases error:", error)
     // If it's a field error, try pulling without the new tables
-    const { data: fallback, error: fallbackErr } = await supabase
+    const { data: fallback, error: fallbackErr } = await (supabase as any)
       .from('purchases' as any)
       .select(`
         *,
@@ -84,7 +84,7 @@ export interface CreatePurchaseData {
 export async function createPurchaseEntry(orgId: string, payload: CreatePurchaseData) {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
   if (!payload.vendor_id || payload.lines.length === 0) {
@@ -106,7 +106,7 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
     const trueHpp = line.quantity > 0 ? line.unit_price + (allocatedOverhead / line.quantity) : line.unit_price
 
     if (!finalProductId && line.product_name) {
-      const { data: newProd, error: prodErr } = await supabase
+      const { data: newProd, error: prodErr } = await (supabase as any)
         .from('products' as any)
         .insert({
           org_id: orgId,
@@ -181,7 +181,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
   const supabase = await createClient()
   
   // 1. Fetch info
-  const { data: purchase } = await supabase
+  const { data: purchase } = await (supabase as any)
     .from('purchases' as any)
     .select('*, purchase_items(*)')
     .eq('id', purchaseId)
@@ -192,7 +192,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
   if (purchase.status === 'RECEIVED') return { success: true }
 
   // 2. TRANSACTION START: Update Status PO (Audit Lock)
-  const { error: statusErr } = await supabase
+  const { error: statusErr } = await (supabase as any)
     .from('purchases' as any)
     .update({ status: 'RECEIVED' })
     .eq('id', purchaseId)
@@ -218,7 +218,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     await (supabase as any).rpc('update_product_average_cost', {
         p_product_id: item.product_id,
         p_new_cost: landedUnitPrice
-    }).then(({ error }) => { if (error) (console as any).error("WAC error", error) })
+    }).then((r: any) => { if (r.error) (console as any).error("WAC error", r.error) })
 
     // B. Replaced by direct update in PO Creation (createPurchaseEntry)
     // No action needed here anymore since selling price is established upfront.
@@ -260,13 +260,13 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
               p_product_id: m.product_id,
               p_warehouse_id: whId,
               p_diff: m.quantity
-           }).then(({ error }) => { if (error) (console as any).error("WMS sync error", error) })
+           }).then((r: any) => { if (r.error) (console as any).error("WMS sync error", r.error) })
         }
      }
   }
 
   // 5. GL Synchronization (Journal)
-  const { data: accounts } = await supabase
+  const { data: accounts } = await (supabase as any)
     .from('accounts' as any)
     .select('id, code')
     .eq('org_id', orgId)
@@ -334,7 +334,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
        (console as any).error("JOURNAL IMBALANCE IN PO:", { totalDebit, totalCredit, journalLines })
     }
 
-    const { error: jErr } = await createJournalEntry({
+    const journalResult = await createJournalEntry({
       org_id: orgId,
       entry_date: new Date().toISOString().split('T')[0],
       description: 'Penerimaan Pembelian & Stok ' + (purchase.purchase_number || ''),
@@ -343,6 +343,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
       lines: journalLines,
       auto_post: true
     })
+    const jErr = (journalResult as any).error
     if (jErr) (console as any).error("Journal creation failed:", jErr)
     
     // Auto-Lunas Payment trigger for Bank history & AP clearing
@@ -366,7 +367,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 export async function voidPurchase(orgId: string, purchaseId: string) {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
 
   // Gunakan RPC agar berjalan di level DB dengan security definer (admin) 
@@ -398,7 +399,7 @@ export async function createPurchasePayment(orgId: string, payload: {
   notes: string
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
   const { data, error } = await (supabase as any).rpc('process_purchase_payment_atomic', {
@@ -428,7 +429,7 @@ export async function createPurchaseReturn(orgId: string, payload: {
   items: any[]
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
   const { data, error } = await (supabase as any).rpc('process_purchase_return_atomic', {
@@ -454,7 +455,7 @@ export async function getPurchaseRequests(orgId: string) {
   const supabase = await createClient()
   
   // Try without joins first if it fails with {} error
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('purchase_requests')
     .select(`
       *,
@@ -472,7 +473,7 @@ export async function getPurchaseRequests(orgId: string) {
 
 export async function updatePurchaseRequestStatus(orgId: string, requestId: string, status: string) {
   const supabase = await createClient()
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('purchase_requests')
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', requestId)
@@ -486,7 +487,7 @@ export async function updatePurchaseRequestStatus(orgId: string, requestId: stri
 
 export async function getPendingPurchaseRequestsCount(orgId: string) {
   const supabase = await createClient()
-  const { count, error } = await supabase
+  const { count, error } = await (supabase as any)
     .from('purchase_requests')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)

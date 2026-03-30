@@ -2,12 +2,69 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { Database } from '@/types/database.types'
 
+const AUTH_PAGE_PREFIXES = ['/login', '/register']
+
+const PROTECTED_PAGE_PREFIXES = [
+  '/dashboard',
+  '/admin',
+  '/audit',
+  '/billing',
+  '/cash',
+  '/contacts',
+  '/factory',
+  '/fleet',
+  '/hris',
+  '/pos',
+  '/pricing',
+  '/profil-saya',
+  '/reports',
+  '/services',
+  '/settings',
+  '/accounting',
+  '/inventory',
+  '/sales',
+  '/purchasing',
+]
+
+const BYPASS_PREFIXES = ['/_next', '/api']
+const BYPASS_EXACT_PATHS = new Set([
+  '/favicon.ico',
+  '/manifest.json',
+  '/robots.txt',
+  '/sitemap.xml',
+])
+
+function isAuthPage(pathname: string) {
+  return AUTH_PAGE_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+}
+
+function isProtectedPage(pathname: string) {
+  return PROTECTED_PAGE_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+}
+
+function isBypassedPath(pathname: string) {
+  return BYPASS_PREFIXES.some((prefix) => pathname.startsWith(prefix)) || BYPASS_EXACT_PATHS.has(pathname)
+}
+
+function normalizeRedirectTarget(rawPath: string | null) {
+  if (!rawPath) return null
+
+  const path = rawPath.trim()
+
+  // Prevent open redirects (e.g. //evil.com or https://evil.com)
+  if (!path.startsWith('/') || path.startsWith('//')) return null
+  if (isAuthPage(path)) return null
+
+  return path
+}
+
 /**
  * Supabase middleware — runs on every request.
  */
 export async function updateSession(request: NextRequest) {
+  const { pathname, search } = request.nextUrl
   const requestHeaders = new Headers(request.headers)
-  requestHeaders.set('x-pathname', request.nextUrl.pathname)
+  requestHeaders.set('x-pathname', pathname)
 
   let supabaseResponse = NextResponse.next({
     request: {
@@ -18,7 +75,15 @@ export async function updateSession(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  if (!url || !key) {
+  if (!url || !key || isBypassedPath(pathname)) {
+    return supabaseResponse
+  }
+
+  const authPage = isAuthPage(pathname)
+  const protectedPage = isProtectedPage(pathname)
+
+  // Avoid expensive auth lookup on public routes.
+  if (!authPage && !protectedPage) {
     return supabaseResponse
   }
 
@@ -49,39 +114,30 @@ export async function updateSession(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { pathname } = request.nextUrl
-
   // Auth pages: redirect to dashboard if already logged in
-  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register')
-  if (isAuthPage && user) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  if (authPage && user) {
+    const redirectFromQuery = normalizeRedirectTarget(request.nextUrl.searchParams.get('redirectTo'))
+    let redirectFromReferer: string | null = null
+
+    const referer = request.headers.get('referer')
+    if (referer) {
+      try {
+        const refererUrl = new URL(referer)
+        if (refererUrl.origin === request.nextUrl.origin) {
+          redirectFromReferer = normalizeRedirectTarget(`${refererUrl.pathname}${refererUrl.search}`)
+        }
+      } catch {
+        // Ignore malformed referer
+      }
+    }
+
+    return NextResponse.redirect(new URL(redirectFromQuery || redirectFromReferer || '/dashboard', request.url))
   }
 
   // Protected pages: redirect to login if not authenticated
-  const isProtectedPage =
-    pathname.startsWith('/dashboard') ||
-    pathname.startsWith('/admin') ||
-    pathname.startsWith('/audit') ||
-    pathname.startsWith('/billing') ||
-    pathname.startsWith('/cash') ||
-    pathname.startsWith('/contacts') ||
-    pathname.startsWith('/factory') ||
-    pathname.startsWith('/fleet') ||
-    pathname.startsWith('/hris') ||
-    pathname.startsWith('/pos') ||
-    pathname.startsWith('/pricing') ||
-    pathname.startsWith('/profil-saya') ||
-    pathname.startsWith('/reports') ||
-    pathname.startsWith('/services') ||
-    pathname.startsWith('/settings') ||
-    pathname.startsWith('/accounting') ||
-    pathname.startsWith('/inventory') ||
-    pathname.startsWith('/sales') ||
-    pathname.startsWith('/purchasing')
-
-  if (isProtectedPage && !user) {
+  if (protectedPage && !user) {
     const redirectUrl = new URL('/login', request.url)
-    redirectUrl.searchParams.set('redirectTo', pathname)
+    redirectUrl.searchParams.set('redirectTo', `${pathname}${search}`)
     return NextResponse.redirect(redirectUrl)
   }
 
