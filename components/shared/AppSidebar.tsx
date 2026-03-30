@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import {
   LayoutDashboard,
   BookOpen,
@@ -164,6 +165,19 @@ export function AppSidebar({
     return localStorage.getItem('nizam_sidebar_collapsed') === 'true'
   })
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
+  const isPlatformAdmin = isPlatformAdminEmail(user?.email)
+  const navGroups = isPlatformAdmin
+    ? [
+        ...NAV_GROUPS,
+        {
+          group: 'SaaS Operator',
+          items: [
+            { label: 'Penawaran SaaS', href: '/saas/penawaran', icon: FileText, permission_key: 'sales' },
+            { label: 'Penjualan SaaS', href: '/saas/penjualan', icon: TrendingUp, permission_key: 'sales' },
+          ],
+        },
+      ]
+    : NAV_GROUPS
 
   // Persist collapse state
   useEffect(() => {
@@ -206,10 +220,13 @@ export function AppSidebar({
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 overflow-y-auto no-scrollbar scroll-smooth">
-        {NAV_GROUPS.map((group) => {
+        {navGroups.map((group) => {
           // Filter items based on permissions
           const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
           const filteredItems = group.items.filter(item => {
+            // Platform admin should always see SaaS operator shortcuts
+            if (isPlatformAdmin && group.group === 'SaaS Operator') return true
+
             // 0. DEMO BYPASS: Tampilkan SEMUA modul di mode Demo/Latihan agar klien bisa eksplorasi fitur penuh
             if (isDemo) return true
 

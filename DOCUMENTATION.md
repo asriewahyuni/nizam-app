@@ -1221,3 +1221,40 @@ Update ini dilakukan untuk menutup isu operasional: setelah input/navigasi user,
 - **Verifikasi pasca perubahan**:
   - `npm run test -- __tests__/middleware.test.ts __tests__/proxy.test.ts` lulus (`2` file test, `7` test case).
   - `npx eslint lib/supabase/middleware.ts proxy.ts app/(dashboard)/layout.tsx __tests__/middleware.test.ts` lulus.
+
+### 16.18 Modul Penawaran & Penjualan Khusus Pengelola SaaS (tanpa buka Admin page)
+
+Update ini menambahkan modul operasional SaaS owner yang berdiri sendiri, sehingga tim pengelola platform bisa mengelola pipeline komersial tanpa harus masuk ke halaman `/admin`.
+
+- **Route baru khusus operator SaaS**:
+  - `/saas` (redirect ke `/saas/penjualan`)
+  - `/saas/penawaran`
+  - `/saas/penjualan`
+- Implementasi file:
+  - `app/(dashboard)/saas/layout.tsx`
+  - `app/(dashboard)/saas/page.tsx`
+  - `app/(dashboard)/saas/penawaran/page.tsx`
+  - `app/(dashboard)/saas/penjualan/page.tsx`
+  - `app/(dashboard)/saas/SaasOperatorClient.tsx`
+
+- **Hak akses platform admin dipusatkan**:
+  - util baru `lib/saas/platform-admin.ts` (`isPlatformAdminEmail`)
+  - `app/(dashboard)/admin/layout.tsx` dipindahkan menggunakan util ini agar konsisten dengan modul operator SaaS baru.
+
+- **Server Actions baru untuk operator SaaS**:
+  - `modules/saas/actions/operator-sales.actions.ts`
+  - Fitur:
+    - ambil snapshot data tenant/paket/invoice lintas tenant (`getOperatorSaasSnapshot`)
+    - buat penawaran SaaS (`createOperatorQuotation`)
+    - konversi penawaran menjadi penjualan (`convertQuotationToSale`)
+    - tandai penjualan paid + aktivasi plan tenant (`markOperatorSalePaid`)
+
+- **Akses cepat tanpa membuka halaman admin**:
+  - `components/shared/AppSidebar.tsx` sekarang menampilkan grup menu `SaaS Operator` (Penawaran SaaS + Penjualan SaaS) hanya untuk email platform admin.
+  - Guard tambahan: grup `SaaS Operator` dibypass dari filter `enabledModules`/`permission` tenant biasa agar selalu terlihat untuk platform admin.
+
+- **Hardening proteksi route**:
+  - `lib/supabase/middleware.ts` menambah prefix privat `/saas` agar flow redirect login konsisten untuk modul baru.
+
+- **Verifikasi**:
+  - lint file baru/terkait lulus (tanpa error; ada warning lama `<img>` di sidebar yang tidak terkait modul baru).

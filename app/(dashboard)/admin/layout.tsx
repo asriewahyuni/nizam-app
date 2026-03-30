@@ -1,13 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/modules/auth/actions/auth.actions'
-
-// Daftar Email Tim Inti (SYSADMIN) yang berhak mengakses dashboard SaaS Admin
-const SUPER_ADMIN_EMAILS = [
-  'bob@executive.id',
-  // Anda bisa menambahkan email tim inti lainnya di sini, contoh:
-  // 'cto@executive.id',
-  // 'support@executive.id'
-]
+import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 
 export default async function AdminLayout({
   children,
@@ -23,9 +16,9 @@ export default async function AdminLayout({
   // Ambil email dari data auth pengguna saat ini
   const userEmail = session.email || ''
 
-  // Pengecekan krusial: Jika email tidak ada di daftar SUPER_ADMIN_EMAILS,
+  // Pengecekan krusial: Jika email bukan platform admin,
   // maka segera tendang kembali ke halaman dashboard umum!
-  if (!SUPER_ADMIN_EMAILS.includes(userEmail)) {
+  if (!isPlatformAdminEmail(userEmail)) {
     console.warn(`[SECURITY] Percobaan akses tanpa izin ke /admin oleh: ${userEmail}`)
     redirect('/dashboard')
   }

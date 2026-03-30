@@ -24,6 +24,7 @@ const PROTECTED_PAGE_PREFIXES = [
   '/inventory',
   '/sales',
   '/purchasing',
+  '/saas',
 ]
 
 const BYPASS_PREFIXES = ['/_next', '/api']
