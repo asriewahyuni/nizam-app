@@ -65,16 +65,16 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Finance',
     items: [
-      { label: 'Akun (CoA)', href: '/settings/accounts', icon: Layers, permission_key: 'finance', module_key: 'Finance' },
-      { label: 'Kas & Bank', href: '/cash', icon: Wallet, permission_key: 'finance', module_key: 'Finance' },
-      { label: 'Buku Besar', href: '/accounting/journal', icon: BookOpen, permission_key: 'finance', module_key: 'Accounting' },
-      { label: 'Aging (AR/AP)', href: '/accounting/aging', icon: History, permission_key: 'finance', module_key: 'Finance' },
-      { label: 'Manajemen Zakat', href: '/accounting/zakat', icon: Zap, permission_key: 'finance', module_key: 'Accounting' },
-      { label: 'Manajemen Pajak', href: '/accounting/tax', icon: ShieldCheck, permission_key: 'finance', module_key: 'Accounting' },
-      { label: 'Reimbursement', href: '/accounting/reimburse', icon: FileText, permission_key: 'finance', module_key: 'Finance' },
-      { label: 'Penutupan Buku', href: '/accounting/closing', icon: Lock, permission_key: 'finance', module_key: 'Accounting' },
-      { label: 'Aset Tetap', href: '/accounting/assets', icon: Landmark, permission_key: 'finance', module_key: 'Finance' },
-      { label: 'Anggaran', href: '/accounting/budgets', icon: Target, permission_key: 'finance', module_key: 'Accounting' },
+      { label: 'Akun (CoA)', href: '/settings/accounts', icon: Layers, permission_key: 'journal', module_key: 'Finance' },
+      { label: 'Kas & Bank', href: '/cash', icon: Wallet, permission_key: 'bank', module_key: 'Finance' },
+      { label: 'Buku Besar', href: '/accounting/journal', icon: BookOpen, permission_key: 'journal', module_key: 'Accounting' },
+      { label: 'Aging (AR/AP)', href: '/accounting/aging', icon: History, permission_key: 'journal', module_key: 'Finance' },
+      { label: 'Manajemen Zakat', href: '/accounting/zakat', icon: Zap, permission_key: 'zakat', module_key: 'Accounting' },
+      { label: 'Manajemen Pajak', href: '/accounting/tax', icon: ShieldCheck, permission_key: 'tax', module_key: 'Accounting' },
+      { label: 'Reimbursement', href: '/accounting/reimburse', icon: FileText, permission_key: 'bank', module_key: 'Finance' },
+      { label: 'Penutupan Buku', href: '/accounting/closing', icon: Lock, permission_key: 'journal', module_key: 'Accounting' },
+      { label: 'Aset Tetap', href: '/accounting/assets', icon: Landmark, permission_key: 'assets', module_key: 'Finance' },
+      { label: 'Anggaran', href: '/accounting/budgets', icon: Target, permission_key: 'journal', module_key: 'Accounting' },
     ]
   },
   {
@@ -104,11 +104,11 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'HRIS',
     items: [
-      { label: 'Karyawan (SDM)', href: '/hris', icon: Users, permission_key: 'hris', module_key: 'HRIS' },
+      { label: 'Karyawan (SDM)', href: '/hris', icon: Users, permission_key: 'employees', module_key: 'HRIS' },
       { label: 'Absensi & Cuti', href: '/hris?tab=attendance', icon: Clock, permission_key: 'attendance', module_key: 'Attendance' },
       { label: 'Payroll Components', href: '/hris?tab=payroll', icon: FileText, permission_key: 'payroll', module_key: 'Payroll' },
-      { label: 'Proses Penggajian', href: '/hris?tab=runs', icon: Wallet, permission_key: 'payroll_process', module_key: 'Payroll' },
-      { label: 'Hak Akses', href: '/settings/roles', icon: ShieldCheck, permission_key: 'hris', module_key: 'HRIS' },
+      { label: 'Proses Penggajian', href: '/hris?tab=runs', icon: Wallet, permission_key: 'payroll', module_key: 'Payroll' },
+      { label: 'Hak Akses', href: '/settings/roles', icon: ShieldCheck, permission_key: 'business', module_key: 'HRIS' },
     ]
   },
   {
@@ -303,7 +303,12 @@ export function AppSidebar({
             // 2. RBAC Permission Check
             if (isOwnerOrAdmin) return true
             if (!item.permission_key) return true // Public menus
-            return permissions.some(p => p.toLowerCase().includes(item.permission_key!.toLowerCase()))
+            
+            const reqPerms = item.permission_key.split(',').map(k => k.trim().toLowerCase())
+            return permissions.some(p => {
+               const pLower = p.toLowerCase()
+               return reqPerms.some(req => pLower.includes(req))
+            })
           })
 
           if (filteredItems.length === 0) return null
