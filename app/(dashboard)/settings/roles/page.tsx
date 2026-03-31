@@ -41,11 +41,16 @@ const MODULE_CATEGORIES = [
     category: 'Finance',
     val: 'FINANCE',
     modules: [
-      { id: 'journal', name: 'Buku Besar & Jurnal', perms: ['journal:read', 'journal:write'] },
+      { id: 'coa', name: 'Akun (CoA)', perms: ['coa:read', 'coa:write'] },
       { id: 'bank', name: 'Kas & Bank', perms: ['bank:read', 'bank:write'] },
+      { id: 'journal', name: 'Buku Besar & Jurnal', perms: ['journal:read', 'journal:write'] },
+      { id: 'aging', name: 'Aging (AR/AP)', perms: ['aging:read', 'aging:write'] },
       { id: 'tax', name: 'Manajemen Pajak', perms: ['tax:read', 'tax:write'] },
       { id: 'zakat', name: 'Manajemen Zakat', perms: ['zakat:read', 'zakat:write'] },
+      { id: 'reimburse', name: 'Reimbursement', perms: ['reimburse:read', 'reimburse:write'] },
       { id: 'assets', name: 'Aset Tetap', perms: ['assets:read', 'assets:write'] },
+      { id: 'budget', name: 'Anggaran', perms: ['budget:read', 'budget:write'] },
+      { id: 'closing', name: 'Penutupan Buku', perms: ['closing:read', 'closing:write'] }
     ]
   },
   {

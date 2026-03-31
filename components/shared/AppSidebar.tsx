@@ -65,16 +65,16 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Finance',
     items: [
-      { label: 'Akun (CoA)', href: '/settings/accounts', icon: Layers, permission_key: 'journal', module_key: 'Finance' },
+      { label: 'Akun (CoA)', href: '/settings/accounts', icon: Layers, permission_key: 'coa', module_key: 'Finance' },
       { label: 'Kas & Bank', href: '/cash', icon: Wallet, permission_key: 'bank', module_key: 'Finance' },
       { label: 'Buku Besar', href: '/accounting/journal', icon: BookOpen, permission_key: 'journal', module_key: 'Accounting' },
-      { label: 'Aging (AR/AP)', href: '/accounting/aging', icon: History, permission_key: 'journal', module_key: 'Finance' },
+      { label: 'Aging (AR/AP)', href: '/accounting/aging', icon: History, permission_key: 'aging', module_key: 'Finance' },
       { label: 'Manajemen Zakat', href: '/accounting/zakat', icon: Zap, permission_key: 'zakat', module_key: 'Accounting' },
       { label: 'Manajemen Pajak', href: '/accounting/tax', icon: ShieldCheck, permission_key: 'tax', module_key: 'Accounting' },
-      { label: 'Reimbursement', href: '/accounting/reimburse', icon: FileText, permission_key: 'bank', module_key: 'Finance' },
-      { label: 'Penutupan Buku', href: '/accounting/closing', icon: Lock, permission_key: 'journal', module_key: 'Accounting' },
+      { label: 'Reimbursement', href: '/accounting/reimburse', icon: FileText, permission_key: 'reimburse', module_key: 'Finance' },
+      { label: 'Penutupan Buku', href: '/accounting/closing', icon: Lock, permission_key: 'closing', module_key: 'Accounting' },
       { label: 'Aset Tetap', href: '/accounting/assets', icon: Landmark, permission_key: 'assets', module_key: 'Finance' },
-      { label: 'Anggaran', href: '/accounting/budgets', icon: Target, permission_key: 'journal', module_key: 'Accounting' },
+      { label: 'Anggaran', href: '/accounting/budgets', icon: Target, permission_key: 'budget', module_key: 'Accounting' },
     ]
   },
   {
@@ -91,9 +91,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Marketing & Sales',
     items: [
-      { label: 'Pelanggan (CRM)', href: '/contacts', icon: Users, permission_key: 'sales', module_key: 'CRM' },
+      { label: 'Pelanggan (CRM)', href: '/contacts', icon: Users, permission_key: 'crm', module_key: 'CRM' },
       { label: 'POS (Kasir)', href: '/pos', icon: Store, permission_key: 'pos', module_key: 'POS' },
-      { label: 'Penawaran (Quotation)', href: '/sales/quotations', icon: FileText, permission_key: 'sales', module_key: 'Sales' },
+      { label: 'Penawaran (Quotation)', href: '/sales/quotations', icon: FileText, permission_key: 'quotation', module_key: 'Sales' },
       { label: 'Penjualan', href: '/sales', icon: TrendingUp, permission_key: 'sales', module_key: 'Sales' },
       { label: 'Sales Pipeline', href: '/sales/pipeline', icon: Activity, permission_key: 'sales', module_key: 'Sales' },
       { label: 'Target & Komisi', href: '/sales/commission', icon: Target, permission_key: 'sales', module_key: 'Sales' },
@@ -115,16 +115,16 @@ const NAV_GROUPS: NavGroup[] = [
     group: 'Insight',
     items: [
       { label: 'Laporan', href: '/reports', icon: BarChart3, permission_key: 'reports', module_key: 'Reports' },
-      { label: 'Strategi (BSC)', href: '/reports/bsc', icon: PieChart, permission_key: 'reports', module_key: 'Reports' },
-      { label: 'Proyeksi Kas', href: '/accounting/forecast', icon: LineChart, permission_key: 'reports', module_key: 'Finance' },
+      { label: 'Strategi (BSC)', href: '/reports/bsc', icon: PieChart, permission_key: 'strategy', module_key: 'Reports' },
+      { label: 'Proyeksi Kas', href: '/accounting/forecast', icon: LineChart, permission_key: 'forecast', module_key: 'Finance' },
     ]
   },
   {
     group: 'Config',
     items: [
-      { label: 'Audit Trail', href: '/settings/audit', icon: ShieldCheck, permission_key: 'config', module_key: 'Audit' },
-      { label: 'Cabang & Divisi', href: '/settings/branches', icon: MapPin, permission_key: 'config', module_key: 'Consolidation' },
-      { label: 'Pengaturan Bisnis', href: '/settings/business', icon: Settings, permission_key: 'config' },
+      { label: 'Audit Trail', href: '/settings/audit', icon: ShieldCheck, permission_key: 'audit_trail', module_key: 'Audit' },
+      { label: 'Cabang & Divisi', href: '/settings/branches', icon: MapPin, permission_key: 'branch', module_key: 'Consolidation' },
+      { label: 'Pengaturan Bisnis', href: '/settings/business', icon: Settings, permission_key: 'business', module_key: 'Config' },
     ]
   }
 ]
