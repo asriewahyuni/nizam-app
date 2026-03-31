@@ -1,6 +1,6 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
+import { useSyncExternalStore, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
@@ -159,20 +159,12 @@ function subscribeSidebarCollapsed(onStoreChange: () => void) {
     onStoreChange()
   }
 
-  const handleMobileToggle = () => {
-    const current = getSidebarCollapsedSnapshot()
-    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, (!current).toString())
-    onStoreChange()
-  }
-
   window.addEventListener('storage', handleStorage)
   window.addEventListener(SIDEBAR_STATE_EVENT, handleStateChange)
-  window.addEventListener(SIDEBAR_TOGGLE_EVENT, handleMobileToggle)
 
   return () => {
     window.removeEventListener('storage', handleStorage)
     window.removeEventListener(SIDEBAR_STATE_EVENT, handleStateChange)
-    window.removeEventListener(SIDEBAR_TOGGLE_EVENT, handleMobileToggle)
   }
 }
 
@@ -216,6 +208,14 @@ export function AppSidebar({
   const tabQuery = searchParams?.get('tab')
   const fullPath = pathname + (tabQuery ? `?tab=${tabQuery}` : '')
 
+  const [isMobileOpen, setIsMobileOpen] = useState(false)
+
+  useEffect(() => {
+    const handleMobileToggle = () => setIsMobileOpen((prev) => !prev)
+    window.addEventListener(SIDEBAR_TOGGLE_EVENT, handleMobileToggle)
+    return () => window.removeEventListener(SIDEBAR_TOGGLE_EVENT, handleMobileToggle)
+  }, [])
+
   const isCollapsed = useSyncExternalStore(
     subscribeSidebarCollapsed,
     getSidebarCollapsedSnapshot,
@@ -242,11 +242,24 @@ export function AppSidebar({
   }
 
   return (
-    <aside className={`${isCollapsed ? 'w-20' : 'w-64'} transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col h-full bg-white border-r border-slate-100 relative group/sidebar z-40 hidden md:flex print:hidden`}>
+    <>
+      {/* Mobile Overlay */}
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+      
+      <aside className={`
+        ${isCollapsed ? 'w-20' : 'w-64'} 
+        transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col h-full bg-white border-r border-slate-100 group/sidebar z-50 print:hidden
+        ${isMobileOpen ? 'fixed inset-y-0 left-0 shadow-2xl translate-x-0' : 'fixed inset-y-0 left-0 -translate-x-full md:relative md:translate-x-0 md:flex'}
+      `}>
       {/* Collapse Toggle Button */}
       <button
         onClick={toggleCollapse}
-        className="absolute -right-3 top-24 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-emerald-600 shadow-sm z-50 transition-transform hover:scale-110"
+        className="absolute -right-3 top-24 w-6 h-6 bg-white border border-slate-200 rounded-full hidden md:flex items-center justify-center text-slate-400 hover:text-emerald-600 shadow-sm z-50 transition-transform hover:scale-110"
       >
         <ChevronLeft size={14} className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
       </button>
@@ -325,6 +338,7 @@ export function AppSidebar({
                     <li key={item.href}>
                       <Link
                         href={item.href}
+                        onClick={() => setIsMobileOpen(false)}
                         title={isCollapsed ? item.label : ''}
                         className={`flex items-center rounded-2xl text-sm font-bold transition-all duration-200 group/item relative
                           ${isCollapsed ? 'justify-center p-3' : 'justify-between px-4 py-3'}
@@ -381,7 +395,7 @@ export function AppSidebar({
       <div className={`p-4 border-t border-slate-50 bg-slate-50/30 ${isCollapsed ? 'items-center' : ''}`}>
         <div className={`flex items-center ${isCollapsed ? 'flex-col gap-4' : 'justify-between'}`}>
           <div className="flex items-center gap-3">
-          <Link href="/profil-saya" className="w-10 h-10 shrink-0 rounded-2xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center text-xs font-black text-slate-800 shadow-sm relative hover:ring-2 hover:ring-blue-400 transition-all" title="Edit Profil Saya">
+          <Link href="/profil-saya" onClick={() => setIsMobileOpen(false)} className="w-10 h-10 shrink-0 rounded-2xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center text-xs font-black text-slate-800 shadow-sm relative hover:ring-2 hover:ring-blue-400 transition-all" title="Edit Profil Saya">
               {userRole?.slice(0, 1).toUpperCase()}
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#003366] border-2 border-white" />
             </Link>
@@ -397,6 +411,7 @@ export function AppSidebar({
           <div className={`flex items-center ${isCollapsed ? 'flex-col gap-1' : 'gap-1'}`}>
             <Link 
               href={isOwnerOrAdmin ? '/settings/business' : '/profil-saya'} 
+              onClick={() => setIsMobileOpen(false)}
               title={isOwnerOrAdmin ? 'Pengaturan Bisnis' : 'Profil & Password Saya'}
               className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
             >
@@ -415,12 +430,13 @@ export function AppSidebar({
         </div>
       {isCollapsed && (
         <div className="px-3 pb-3">
-          <Link href="/billing" title="Langganan & Billing" className="flex items-center justify-center w-full p-2.5 rounded-xl bg-[#003366]/5 text-[#003366] hover:bg-[#003366] hover:text-white transition-all shadow-sm">
+          <Link href="/billing" onClick={() => setIsMobileOpen(false)} title="Langganan & Billing" className="flex items-center justify-center w-full p-2.5 rounded-xl bg-[#003366]/5 text-[#003366] hover:bg-[#003366] hover:text-white transition-all shadow-sm">
             <Zap size={16} />
           </Link>
         </div>
       )}
       </div>
     </aside>
+    </>
   )
 }
