@@ -81,7 +81,16 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
     }
     dataRes = await query.single()
   } else if (sourceType === 'REIMBURSEMENT') {
-    dataRes = await (supabase as any).from('reimbursements').select('*, items:reimbursement_items(*, account:accounts(code, name))').eq('id', sourceId).eq('org_id', orgId).single()
+    let query = (supabase as any)
+      .from('reimbursements')
+      .select('*, items:reimbursement_items(*, account:accounts(code, name))')
+      .eq('id', sourceId)
+      .eq('org_id', orgId)
+
+    if (effectiveBranchId) {
+      query = query.eq('branch_id', effectiveBranchId)
+    }
+    dataRes = await query.single()
   }
 
   if ((dataRes as any).error) return { data: null, error: (dataRes as any).error.message }
@@ -166,30 +175,40 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
   // 3. Efek Samping (Side Effects) ke dokumen asli
   if (reqData.source_type === 'PURCHASE_ORDER') {
       const newPoStatus = status === 'APPROVED' ? 'ORDERED' : 'VOIDED'
-      await (supabase as any)
+      let query = (supabase as any)
         .from('purchases' as any)
         .update({ status: newPoStatus })
         .eq('id', reqData.source_id)
         .eq('org_id', orgId)
-        .eq('branch_id', reqData.branch_id)
+      if (reqData.branch_id) {
+        query = query.eq('branch_id', reqData.branch_id)
+      }
+      await query
   }
 
   if (reqData.source_type === 'SALES_ORDER') {
       const newSoStatus = status === 'APPROVED' ? 'ORDERED' : 'VOIDED'
-      await (supabase as any)
+      let query = (supabase as any)
         .from('sales' as any)
         .update({ status: newSoStatus })
         .eq('id', reqData.source_id)
         .eq('org_id', orgId)
-        .eq('branch_id', reqData.branch_id)
+      if (reqData.branch_id) {
+        query = query.eq('branch_id', reqData.branch_id)
+      }
+      await query
   }
 
   if (reqData.source_type === 'REIMBURSEMENT') {
-      await (supabase as any)
+      let query = (supabase as any)
         .from('reimbursements')
         .update({ status: status }) // APPROVED or REJECTED
         .eq('id', reqData.source_id)
         .eq('org_id', orgId)
+      if (reqData.branch_id) {
+        query = query.eq('branch_id', reqData.branch_id)
+      }
+      await query
   }
 
   revalidatePath('/', 'layout') // Global refresh agar indikator lonceng berubah

@@ -99,4 +99,54 @@ describe('Approval Branch Context', () => {
     expect(approvalUpdateEq).toHaveBeenCalledWith('branch_id', 'branch-1')
     expect(salesUpdateEq).toHaveBeenCalledWith('branch_id', 'branch-1')
   })
+
+  it('scopes reimbursement approval side effects to the active branch', async () => {
+    const requestLookup = {
+      select: vi.fn(() => requestLookup),
+      eq: vi.fn(() => requestLookup),
+      single: vi.fn().mockResolvedValue({
+        data: {
+          source_type: 'REIMBURSEMENT',
+          source_id: 'reim-1',
+          branch_id: 'branch-1',
+        },
+        error: null,
+      }),
+    }
+    const approvalUpdateEq = vi.fn(() => approvalUpdate)
+    const approvalUpdate = {
+      eq: approvalUpdateEq,
+    }
+    const approvalTable = {
+      select: vi.fn(() => requestLookup),
+      update: vi.fn(() => approvalUpdate),
+    }
+    const reimburseUpdateEq = vi.fn(() => reimburseUpdate)
+    const reimburseUpdate = {
+      eq: reimburseUpdateEq,
+    }
+    const reimbursementsTable = {
+      update: vi.fn(() => reimburseUpdate),
+    }
+
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'approver-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'approval_requests') return approvalTable
+        if (table === 'reimbursements') return reimbursementsTable
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const result = await decideApproval('req-2', 'org-1', 'REJECTED', 'No', 'branch-1')
+
+    expect(result).toEqual({ success: true })
+    expect(requestLookup.eq).toHaveBeenCalledWith('branch_id', 'branch-1')
+    expect(approvalUpdateEq).toHaveBeenCalledWith('branch_id', 'branch-1')
+    expect(reimburseUpdateEq).toHaveBeenCalledWith('branch_id', 'branch-1')
+  })
 })

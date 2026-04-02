@@ -1,4 +1,4 @@
-import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getReimbursements } from '@/modules/accounting/actions/reimburse.actions'
 import { getBankAccounts } from '@/modules/cash/actions/bank.actions'
 import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
@@ -10,9 +10,10 @@ export default async function ReimbursePage() {
   if (!activeOrg) redirect('/onboarding')
 
   const orgId = activeOrg.org.id
+  const activeBranch = await getActiveBranch(orgId)
   
   const [reimbursements, bankAccounts, allAccounts] = await Promise.all([
-    getReimbursements(orgId),
+    getReimbursements(orgId, activeBranch?.id),
     getBankAccounts(orgId),
     getChartOfAccounts(orgId)
   ])
