@@ -34,7 +34,18 @@ import { QRCodeSVG } from 'qrcode.react'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
 import { updatePurchaseRequestStatus } from '@/modules/purchasing/actions/purchasing.actions'
 
-export default function PurchasingClient({ orgId, orgName, org, purchases, vendors, products, coa, purchaseRequests = [] }: any) {
+export default function PurchasingClient({
+  orgId,
+  orgName,
+  org,
+  activeBranchId = null,
+  activeBranchName = null,
+  purchases,
+  vendors,
+  products,
+  coa,
+  purchaseRequests = [],
+}: any) {
    const [activeTab, setActiveTab] = useState<'PURCHASES' | 'REQUESTS'>('PURCHASES')
    const orgSettings = org?.settings || {}
    const companyProfile = {
@@ -214,6 +225,7 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
 
     const payload = {
       vendor_id: vendorId,
+      branch_id: activeBranchId || undefined,
       purchase_date: purchaseDate,
       due_date: paymentTerm === 'TEMPO' ? dueDate : undefined,
       notes: finalNotes,
@@ -265,7 +277,7 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
       // Update linked purchase requests to ORDERED
       for (const line of lines) {
         if ((line as any).requestId) {
-          await updatePurchaseRequestStatus(orgId, (line as any).requestId, 'ORDERED')
+          await updatePurchaseRequestStatus(orgId, (line as any).requestId, 'ORDERED', activeBranchId || undefined)
         }
       }
 
@@ -429,7 +441,7 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
       <PageHeader 
         icon={<Truck />}
         title="Purchasing"
-        subtitle="Manage inventory procurement, vendor relations, and landing costs."
+        subtitle={activeBranchName ? `Manage inventory procurement for unit ${activeBranchName}.` : 'Manage inventory procurement across all units.'}
         tag="Logistics Module"
         actions={
           <>
@@ -687,7 +699,7 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
                               <button 
                                 onClick={async () => {
                                   if (confirm('Tolak permintaan ini?')) {
-                                    await updatePurchaseRequestStatus(orgId, r.id, 'REJECTED')
+                                    await updatePurchaseRequestStatus(orgId, r.id, 'REJECTED', activeBranchId || undefined)
                                   }
                                 }}
                                 className="px-3 py-1.5 bg-slate-100 text-slate-400 text-[10px] font-black uppercase rounded-lg hover:bg-rose-50 hover:text-rose-600 transition-all"

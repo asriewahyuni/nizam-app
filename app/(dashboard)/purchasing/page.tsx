@@ -7,7 +7,7 @@ import { getProducts } from '@/modules/inventory/actions/inventory.actions'
 import { getAccountBalances } from '@/modules/accounting/actions/coa.actions'
 import PurchasingClient from './PurchasingClient'
 
-import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 export default async function PurchasingPage() {
   const supabase = await createClient()
@@ -20,13 +20,14 @@ export default async function PurchasingPage() {
 
   const orgId = orgData.org.id
   const orgName = orgData.org.name || 'Nizam'
+  const activeBranch = await getActiveBranch(orgId)
 
   const [purchases, vendors, products, coa, purchaseRequests] = await Promise.all([
-    getPurchases(orgId),
+    getPurchases(orgId, activeBranch?.id),
     getContacts(orgId, 'SUPPLIER'),
     getProducts(orgId),
     getAccountBalances(orgId),
-    getPurchaseRequests(orgId)
+    getPurchaseRequests(orgId, activeBranch?.id)
   ])
 
   return (
@@ -36,6 +37,8 @@ export default async function PurchasingPage() {
           orgId={orgId}
           orgName={orgName}
           org={orgData.org}
+          activeBranchId={activeBranch?.id || null}
+          activeBranchName={activeBranch?.name || null}
           purchases={purchases}
           vendors={vendors}
           products={products}
