@@ -40,7 +40,7 @@ vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   canAccessAllBranchesForOrg: vi.fn(),
 }))
 
-import { createOrganization, getActiveBranch } from '@/modules/organization/actions/org.actions'
+import { createBranch, createOrganization, getActiveBranch } from '@/modules/organization/actions/org.actions'
 import { getActiveBranchIdAction } from '@/modules/organization/actions/org-id.actions'
 
 function createCookieStore(initial: Record<string, string> = {}) {
@@ -170,5 +170,106 @@ describe('Organization Branch Bootstrap', () => {
     expect(mocks.redirect).toHaveBeenCalledWith('/dashboard')
 
     randomUuidMock.mockRestore()
+  })
+
+  it('creates a new branch and makes it the active unit immediately', async () => {
+    const cookieStore = createCookieStore()
+    mocks.cookies.mockResolvedValue(cookieStore)
+
+    const insertedBranch = {
+      id: 'branch-2',
+      org_id: 'org-1',
+      name: 'Cabang Bandung',
+      code: 'BDG',
+      address: 'Jl. Merdeka',
+      is_active: true,
+    }
+
+    const orgMembersBuilder = {
+      select: vi.fn(() => orgMembersBuilder),
+      eq: vi.fn(() => orgMembersBuilder),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { role: 'owner' },
+        error: null,
+      }),
+    }
+
+    const duplicateNameBuilder = {
+      select: vi.fn(() => duplicateNameBuilder),
+      eq: vi.fn(() => duplicateNameBuilder),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: null,
+        error: null,
+      }),
+    }
+
+    const duplicateCodeBuilder = {
+      select: vi.fn(() => duplicateCodeBuilder),
+      eq: vi.fn(() => duplicateCodeBuilder),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: null,
+        error: null,
+      }),
+    }
+
+    const branchInsertBuilder = {
+      insert: vi.fn(() => branchInsertBuilder),
+      select: vi.fn(() => branchInsertBuilder),
+      single: vi.fn().mockResolvedValue({
+        data: insertedBranch,
+        error: null,
+      }),
+    }
+
+    let branchReadCount = 0
+
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1', email: 'owner@example.com' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'org_members') return orgMembersBuilder
+        if (table === 'branches') {
+          branchReadCount += 1
+          if (branchReadCount === 1) return duplicateNameBuilder
+          if (branchReadCount === 2) return duplicateCodeBuilder
+          return branchInsertBuilder
+        }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const formData = new FormData()
+    formData.set('name', 'Cabang Bandung')
+    formData.set('code', 'bdg')
+    formData.set('address', 'Jl. Merdeka')
+
+    const result = await createBranch('org-1', formData)
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        branchId: 'branch-2',
+      })
+    )
+    expect(branchInsertBuilder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: 'org-1',
+        name: 'Cabang Bandung',
+        code: 'BDG',
+        address: 'Jl. Merdeka',
+        is_active: true,
+      })
+    )
+    expect(cookieStore.set).toHaveBeenCalledWith(
+      'nizam_active_branch_id',
+      'branch-2',
+      expect.objectContaining({
+        path: '/',
+        httpOnly: true,
+      })
+    )
   })
 })

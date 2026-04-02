@@ -451,10 +451,82 @@ export async function canSelectAllBranches(orgId: string) {
 export async function createBranch(orgId: string, formData: FormData) {
   const supabase = await createClient()
   const db = supabase as any
-  await db.from('branches').insert({ org_id: orgId, name: formData.get('name'), code: formData.get('code'), address: formData.get('address'), is_active: true })
+  const cookieStore = await cookies()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Tidak terautentikasi.' }
+
+  const trimmedOrgId = String(orgId || '').trim()
+  const name = String(formData.get('name') || '').trim()
+  const code = String(formData.get('code') || '').trim().toUpperCase()
+  const addressRaw = String(formData.get('address') || '').trim()
+  const address = addressRaw || null
+
+  if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
+  if (!name) return { error: 'Nama unit wajib diisi.' }
+  if (!code) return { error: 'Kode unit wajib diisi.' }
+
+  const { data: actorMembership } = await db
+    .from('org_members')
+    .select('role')
+    .eq('org_id', trimmedOrgId)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!actorMembership || !['owner', 'admin'].includes(String(actorMembership.role || ''))) {
+    return { error: 'Hanya owner atau admin yang dapat menambahkan unit.' }
+  }
+
+  const { data: duplicateNameBranch } = await db
+    .from('branches')
+    .select('id')
+    .eq('org_id', trimmedOrgId)
+    .eq('name', name)
+    .maybeSingle()
+
+  if (duplicateNameBranch?.id) {
+    return { error: 'Nama unit sudah digunakan pada organisasi ini.' }
+  }
+
+  const { data: duplicateCodeBranch } = await db
+    .from('branches')
+    .select('id')
+    .eq('org_id', trimmedOrgId)
+    .eq('code', code)
+    .maybeSingle()
+
+  if (duplicateCodeBranch?.id) {
+    return { error: 'Kode unit sudah digunakan pada organisasi ini.' }
+  }
+
+  const { data: insertedBranch, error: insertError } = await db
+    .from('branches')
+    .insert({
+      org_id: trimmedOrgId,
+      name,
+      code,
+      address,
+      is_active: true,
+    })
+    .select('id, org_id, name, code, address, is_active')
+    .single()
+
+  if (insertError || !insertedBranch?.id) {
+    return { error: insertError?.message || 'Gagal menambahkan unit baru.' }
+  }
+
+  cookieStore.set(ACTIVE_BRANCH_COOKIE, insertedBranch.id, getActiveContextCookieOptions())
+  revalidatePath('/', 'layout')
   revalidatePath('/settings/branches')
   revalidatePath('/settings/users')
-  return { success: true }
+  return {
+    success: true,
+    branch: insertedBranch,
+    branchId: insertedBranch.id,
+  }
 }
 
 export async function updateMemberUnitAccess(orgId: string, memberId: string, branchIds: string[]) {

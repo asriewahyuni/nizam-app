@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Plus, 
@@ -32,6 +33,7 @@ const item = {
 }
 
 export function BranchManagementClient({ orgId, branches }: BranchManagementClientProps) {
+  const router = useRouter()
   const [showModal, setShowModal] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -42,7 +44,7 @@ export function BranchManagementClient({ orgId, branches }: BranchManagementClie
     if ((res as any).error) alert((res as any).error)
     else {
       setShowModal(false)
-      window.location.reload()
+      router.refresh()
     }
     setLoading(false)
   }
