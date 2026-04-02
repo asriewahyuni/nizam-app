@@ -15,21 +15,32 @@ CREATE INDEX IF NOT EXISTS idx_warehouses_org_branch_active
 CREATE INDEX IF NOT EXISTS idx_stock_movements_org_branch_product_date
   ON public.stock_movements(org_id, branch_id, product_id, movement_date DESC);
 
-WITH purchase_branch_map AS (
-  SELECT
-    p.warehouse_id,
-    MIN(p.branch_id::text)::UUID AS branch_id
-  FROM public.purchases p
-  WHERE p.warehouse_id IS NOT NULL
-    AND p.branch_id IS NOT NULL
-  GROUP BY p.warehouse_id
-  HAVING COUNT(DISTINCT p.branch_id) = 1
-)
-UPDATE public.warehouses w
-SET branch_id = purchase_branch_map.branch_id
-FROM purchase_branch_map
-WHERE w.id = purchase_branch_map.warehouse_id
-  AND w.branch_id IS NULL;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'purchases'
+      AND column_name = 'warehouse_id'
+  ) THEN
+    WITH purchase_branch_map AS (
+      SELECT
+        p.warehouse_id,
+        MIN(p.branch_id::text)::UUID AS branch_id
+      FROM public.purchases p
+      WHERE p.warehouse_id IS NOT NULL
+        AND p.branch_id IS NOT NULL
+      GROUP BY p.warehouse_id
+      HAVING COUNT(DISTINCT p.branch_id) = 1
+    )
+    UPDATE public.warehouses w
+    SET branch_id = purchase_branch_map.branch_id
+    FROM purchase_branch_map
+    WHERE w.id = purchase_branch_map.warehouse_id
+      AND w.branch_id IS NULL;
+  END IF;
+END $$;
 
 WITH single_active_branch AS (
   SELECT
@@ -46,12 +57,23 @@ FROM single_active_branch
 WHERE w.org_id = single_active_branch.org_id
   AND w.branch_id IS NULL;
 
-UPDATE public.purchases p
-SET branch_id = w.branch_id
-FROM public.warehouses w
-WHERE p.warehouse_id = w.id
-  AND p.branch_id IS NULL
-  AND w.branch_id IS NOT NULL;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'purchases'
+      AND column_name = 'warehouse_id'
+  ) THEN
+    UPDATE public.purchases p
+    SET branch_id = w.branch_id
+    FROM public.warehouses w
+    WHERE p.warehouse_id = w.id
+      AND p.branch_id IS NULL
+      AND w.branch_id IS NOT NULL;
+  END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.resolve_stock_movement_branch_id(
   p_reference_type TEXT,
