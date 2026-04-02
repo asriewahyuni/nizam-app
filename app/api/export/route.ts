@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const type = searchParams.get('type') // pl | bs | gl | zakat
   const orgId = searchParams.get('orgId')
+  const branchId = searchParams.get('branchId')
   const startDate = searchParams.get('startDate') || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
   const endDate = searchParams.get('endDate') || new Date().toISOString().split('T')[0]
   const asOfDate = searchParams.get('asOfDate') || endDate
@@ -35,6 +36,20 @@ export async function GET(request: NextRequest) {
 
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  if (branchId) {
+    const { data: branch } = await db
+      .from('branches')
+      .select('id')
+      .eq('id', branchId)
+      .eq('org_id', orgId)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (!branch) {
+      return NextResponse.json({ error: 'Branch tidak valid untuk organisasi ini' }, { status: 400 })
+    }
+  }
+
   // Get org name for header
   const { data: org } = await (supabase as any).from('organizations').select('name').eq('id', orgId).single()
   const orgName = org?.name || 'Organisasi'
@@ -45,15 +60,15 @@ export async function GET(request: NextRequest) {
 
     switch (type) {
       case 'pl':
-        buffer = await exportProfitLossXLSX(orgId, startDate, endDate, orgName)
+        buffer = await exportProfitLossXLSX(orgId, startDate, endDate, orgName, branchId)
         filename = `Laba-Rugi_${orgName}_${startDate}_${endDate}.xlsx`
         break
       case 'bs':
-        buffer = await exportBalanceSheetXLSX(orgId, asOfDate, orgName)
+        buffer = await exportBalanceSheetXLSX(orgId, asOfDate, orgName, branchId)
         filename = `Neraca_${orgName}_${asOfDate}.xlsx`
         break
       case 'gl':
-        buffer = await exportGeneralLedgerXLSX(orgId, orgName)
+        buffer = await exportGeneralLedgerXLSX(orgId, orgName, branchId)
         filename = `Buku-Besar_${orgName}_${new Date().toISOString().split('T')[0]}.xlsx`
         break
       case 'zakat':

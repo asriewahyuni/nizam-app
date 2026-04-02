@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 
 const TODAY = new Date().toISOString().split('T')[0]
 
+type BranchFilter = string | null | undefined
+
 function agingBucket(dueDateStr: string): string {
   if (!dueDateStr) return '> 90 Days'
   const due = new Date(dueDateStr)
@@ -16,7 +18,59 @@ function agingBucket(dueDateStr: string): string {
   return '> 90 Days'
 }
 
-export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
+async function getPostedEntryIds(
+  db: any,
+  orgId: string,
+  branchId?: BranchFilter
+) {
+  let query = db
+    .from('journal_entries')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('status', 'POSTED')
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId)
+  }
+
+  const { data, error } = await query
+  if (error || !Array.isArray(data)) return []
+  return data.map((entry: any) => entry.id)
+}
+
+async function getAccountCodeBalances(
+  db: any,
+  orgId: string,
+  codes: string[],
+  branchId?: BranchFilter
+) {
+  const entryIds = await getPostedEntryIds(db, orgId, branchId)
+  if (entryIds.length === 0 || codes.length === 0) return {}
+
+  const { data, error } = await (db
+    .from('journal_lines')
+    .select('debit, credit, accounts!inner(code, type)')
+    .in('entry_id', entryIds)
+    .in('accounts.code', codes) as any)
+
+  if (error || !Array.isArray(data)) return {}
+
+  const balances: Record<string, number> = {}
+  data.forEach((line: any) => {
+    const account = line.accounts
+    if (!account?.code) return
+
+    const delta = ['LIABILITY', 'EQUITY', 'REVENUE'].includes(account.type)
+      ? Number(line.credit || 0) - Number(line.debit || 0)
+      : Number(line.debit || 0) - Number(line.credit || 0)
+
+    balances[account.code] = (balances[account.code] || 0) + delta
+  })
+
+  return balances
+}
+
+export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?: BranchFilter) {
   const supabase = await createClient()
   const db = supabase as any
 
@@ -24,28 +78,42 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
 
   if (type === 'AR') {
     // 1. Trade AR from Sales Module
-    const { data: sales } = await db
+    let salesQuery = db
       .from('sales')
       .select('id, sale_number, sale_date, due_date, grand_total, customer_id, contacts!customer_id(name)')
       .eq('org_id', orgId)
       .not('status', 'in', '("DRAFT","VOIDED")')
       .neq('payment_status', 'PAID')
 
+    if (branchId) {
+      salesQuery = salesQuery.eq('branch_id', branchId)
+    }
+
+    const { data: sales } = await salesQuery
+
     if (sales && sales.length > 0) {
       const saleIds = sales.map((s: any) => s.id)
-      const { data: payments } = await db
+      let paymentsQuery = db
         .from('sales_payments')
         .select('sale_id, amount, discount_amount')
         .in('sale_id', saleIds)
+      if (branchId) {
+        paymentsQuery = paymentsQuery.eq('branch_id', branchId)
+      }
+      const { data: payments } = await paymentsQuery
       const paidBySale: Record<string, number> = {}
       for (const p of payments || []) {
         paidBySale[p.sale_id] = (paidBySale[p.sale_id] || 0) + Number(p.amount) + Number(p.discount_amount || 0)
       }
-      const { data: returns } = await db
+      let returnsQuery = db
         .from('sales_returns')
         .select('sale_id, grand_total')
         .in('sale_id', saleIds)
         .neq('status', 'VOIDED')
+      if (branchId) {
+        returnsQuery = returnsQuery.eq('branch_id', branchId)
+      }
+      const { data: returns } = await returnsQuery
       const returnedBySale: Record<string, number> = {}
       for (const r of returns || []) {
         returnedBySale[r.sale_id] = (returnedBySale[r.sale_id] || 0) + Number(r.grand_total)
@@ -73,14 +141,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
     }
 
     // 2. Reconciliation with GL (1201)
-    const { data: balanceData } = await db
-      .from('account_balances')
-      .select('balance')
-      .eq('org_id', orgId)
-      .eq('code', '1201')
-      .single();
-
-    const glBalance = Number(balanceData?.balance || 0);
+    const balances = await getAccountCodeBalances(db, orgId, ['1201'], branchId)
+    const glBalance = Number(balances['1201'] || 0);
     const moduleTotal = results.reduce((s: any, r: any) => s + r.outstanding, 0);
     const diff = glBalance - moduleTotal;
 
@@ -102,12 +164,18 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
 
   } else {
     // 1. Trade AP from Purchases Module
-    const { data: purchases } = await db
+    let purchasesQuery = db
       .from('purchases')
       .select('id, purchase_number, purchase_date, due_date, grand_total, vendor_id, contacts!vendor_id(name)')
       .eq('org_id', orgId)
       .not('status', 'in', '("DRAFT","VOIDED")')
       .neq('payment_status', 'PAID')
+
+    if (branchId) {
+      purchasesQuery = purchasesQuery.eq('branch_id', branchId)
+    }
+
+    const { data: purchases } = await purchasesQuery
 
     if (purchases && purchases.length > 0) {
       const purchaseIds = purchases.map((p: any) => p.id)
@@ -151,14 +219,15 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
 
     // 2. Direct AP (Non-Trade) & Taxes from GL (2101, 2201, 2301, 2401)
     // Account 2201: Tax (PPN), 21XX: Other Payables
-    const { data: balances } = await db
-      .from('account_balances')
-      .select('code, balance, name')
-      .eq('org_id', orgId)
-      .in('code', ['2101', '2201', '2301', '2401'])
-      .neq('balance', 0);
+    const balances = await getAccountCodeBalances(db, orgId, ['2101', '2201', '2301', '2401'], branchId)
+    const namedBalances = [
+      { code: '2101', balance: balances['2101'] || 0, name: 'Hutang Usaha' },
+      { code: '2201', balance: balances['2201'] || 0, name: 'PPN Keluaran (Pajak Dipungut)' },
+      { code: '2301', balance: balances['2301'] || 0, name: 'Pendapatan Diterima di Muka' },
+      { code: '2401', balance: balances['2401'] || 0, name: 'Hutang Gaji' },
+    ].filter((balance) => Math.abs(balance.balance) > 0.01)
 
-    for (const b of balances || []) {
+    for (const b of namedBalances) {
       if (b.code === '2101') {
         const tradeModuleTotal = results.filter((r: any) => r.source_type === 'PURCHASING').reduce((s: any, r: any) => s + r.outstanding, 0);
         const diff = Number(b.balance) - tradeModuleTotal;
@@ -199,9 +268,9 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP') {
 }
 
 
-export async function getAgingSummary(orgId: string) {
-  const ar = await getAgingReport(orgId, 'AR')
-  const ap = await getAgingReport(orgId, 'AP')
+export async function getAgingSummary(orgId: string, branchId?: BranchFilter) {
+  const ar = await getAgingReport(orgId, 'AR', branchId)
+  const ap = await getAgingReport(orgId, 'AP', branchId)
 
   const buckets = ['Current', '0-30 Days', '31-60 Days', '61-90 Days', '> 90 Days']
 

@@ -1,4 +1,4 @@
-import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
 import { getAgingSummary } from '@/modules/accounting/actions/aging.actions'
 import { AgingClient } from '@/app/(dashboard)/accounting/aging/AgingClient'
@@ -9,7 +9,8 @@ export default async function AgingPage({ searchParams }: { searchParams: { view
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
 
-  const summary = await getAgingSummary(orgData.org.id)
+  const activeBranch = await getActiveBranch(orgData.org.id)
+  const summary = await getAgingSummary(orgData.org.id, activeBranch?.id)
   const initialView = (searchParams.view as 'AR' | 'AP') || 'AR'
 
   return (

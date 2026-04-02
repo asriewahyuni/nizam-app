@@ -58,7 +58,7 @@ export default async function DashboardLayout({
     getUnpostedJournalsCount(orgData.org.id),
     getPendingPurchaseRequestsCount(orgData.org.id, activeBranch?.id),
     getResetRequestsCount(orgData.org.id),
-    getCashFlow(orgData.org.id),
+    getCashFlow(orgData.org.id, activeBranch?.id),
     getBranches(orgData.org.id),
     getMyOrganizations(),
     isDemoSession(),

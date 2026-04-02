@@ -23,6 +23,7 @@ import { formatRupiah, formatDate } from '@/lib/utils'
 interface ReportsClientProps {
   orgId: string
   orgName: string
+  branchId?: string | null
   balanceSheet: any
   profitLoss: any
   cashFlow: {
@@ -38,7 +39,7 @@ interface ReportsClientProps {
   }
 }
 
-export default function ReportsClient({ orgId, orgName, balanceSheet, profitLoss, cashFlow }: ReportsClientProps) {
+export default function ReportsClient({ orgId, orgName, branchId, balanceSheet, profitLoss, cashFlow }: ReportsClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<'PL' | 'BS' | 'CF'>('PL')
@@ -55,6 +56,9 @@ export default function ReportsClient({ orgId, orgName, balanceSheet, profitLoss
         endDate: searchParams.get('endDate') || new Date().toISOString().split('T')[0],
         asOfDate: searchParams.get('endDate') || new Date().toISOString().split('T')[0],
       })
+      if (branchId) {
+        params.set('branchId', branchId)
+      }
       const url = `/api/export?${params.toString()}`
       const a = document.createElement('a')
       a.href = url

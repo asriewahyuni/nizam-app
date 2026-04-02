@@ -1,10 +1,85 @@
 import { createClient } from '@/lib/supabase/server'
 
-export async function getGeneralLedger(orgId: string) {
+type BranchFilter = string | null | undefined
+
+async function getPostedEntryIds(
+  db: any,
+  orgId: string,
+  options: {
+    branchId?: BranchFilter
+    startDate?: string
+    endDate?: string
+    asOfDate?: string
+  } = {}
+) {
+  let query = db
+    .from('journal_entries')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('status', 'POSTED')
+
+  if (options.branchId) {
+    query = query.eq('branch_id', options.branchId)
+  }
+  if (options.startDate) {
+    query = query.gte('entry_date', options.startDate)
+  }
+  if (options.endDate) {
+    query = query.lte('entry_date', options.endDate)
+  }
+  if (options.asOfDate) {
+    query = query.lte('entry_date', options.asOfDate)
+  }
+
+  const { data, error } = await query
+  if (error || !Array.isArray(data)) return []
+  return data.map((entry: any) => entry.id)
+}
+
+async function getAccountBalancesFromEntries(
+  db: any,
+  entryIds: string[],
+  codeFilter?: string[]
+) {
+  if (entryIds.length === 0) return []
+
+  let query = db
+    .from('journal_lines')
+    .select('debit, credit, accounts!inner(id, code, name, type, normal_balance, cash_flow_category)')
+    .in('entry_id', entryIds) as any
+
+  if (codeFilter && codeFilter.length > 0) {
+    query = query.in('accounts.code', codeFilter)
+  }
+
+  const { data, error } = await query
+  if (error || !Array.isArray(data)) return []
+
+  const accountMap: Record<string, any> = {}
+  data.forEach((line: any) => {
+    const account = line.accounts
+    if (!account) return
+
+    if (!accountMap[account.id]) {
+      accountMap[account.id] = {
+        ...account,
+        total_debit: 0,
+        total_credit: 0,
+      }
+    }
+
+    accountMap[account.id].total_debit += Number(line.debit || 0)
+    accountMap[account.id].total_credit += Number(line.credit || 0)
+  })
+
+  return Object.values(accountMap)
+}
+
+export async function getGeneralLedger(orgId: string, branchId?: BranchFilter) {
   const supabase = await createClient()
   const db = supabase as any
 
-  const { data, error } = await db
+  let query = db
     .from('journal_entries')
     .select(`
       *,
@@ -15,68 +90,57 @@ export async function getGeneralLedger(orgId: string) {
     `)
     .eq('org_id', orgId)
     .eq('status', 'POSTED')
-    .order('entry_date', { ascending: true })
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId)
+  }
+
+  const { data, error } = await query.order('entry_date', { ascending: true })
 
   if (error || !data) return []
   return data
 }
 
-export async function getBalanceSheet(orgId: string, asOfDate: string = new Date().toISOString().split('T')[0]) {
+export async function getBalanceSheet(
+  orgId: string,
+  asOfDate: string = new Date().toISOString().split('T')[0],
+  branchId?: BranchFilter
+) {
   const supabase = await createClient()
   const db = supabase as any
 
-  // Anchor: only fetch journal_entries for THIS org, then get their lines
-  const { data: entries, error: entErr } = await db
-    .from('journal_entries')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('status', 'POSTED')
-    .lte('entry_date', asOfDate)
+  const entryIds = await getPostedEntryIds(db, orgId, { branchId, asOfDate })
 
-  if (entErr || !entries || entries.length === 0) {
-    const pl = await getProfitLoss(orgId, '1970-01-01', asOfDate)
+  if (entryIds.length === 0) {
+    const pl = await getProfitLoss(orgId, '1970-01-01', asOfDate, branchId)
     return { assets: [], liabilities: [], equity: [{ code: '9999', name: 'Laba Ditahan / Periode Berjalan', balance: pl.netProfit, type: 'EQUITY' }] }
   }
 
-  const entryIds = entries.map((e: any) => e.id)
+  const balances = await getAccountBalancesFromEntries(db, entryIds)
+  if (balances.length === 0) return { assets: [], liabilities: [], equity: [] }
 
-  const { data, error } = await db
-    .from('journal_lines')
-    .select('debit, credit, accounts!inner(id, code, name, type, normal_balance)')
-    .in('entry_id', entryIds) as any
-
-  if (error || !data) return { assets: [], liabilities: [], equity: [] }
-
-  const accountMap: Record<string, any> = {}
-  data.forEach((l: any) => {
-    const acc = l.accounts
-    if (!accountMap[acc.id]) accountMap[acc.id] = { ...acc, total_debit: 0, total_credit: 0 }
-    accountMap[acc.id].total_debit += Number(l.debit)
-    accountMap[acc.id].total_credit += Number(l.credit)
-  })
-
-  const assets = Object.values(accountMap)
+  const assets = balances
     .filter((a: any) => a.type === 'ASSET' || a.code.startsWith('1'))
     .map((a: any) => ({ ...a, balance: a.total_debit - a.total_credit }))
     .sort((a: any, b: any) => a.code.localeCompare(b.code))
 
-  const liabilities = Object.values(accountMap)
+  const liabilities = balances
     .filter((a: any) => a.type === 'LIABILITY' || a.code.startsWith('2'))
     .map((a: any) => ({ ...a, balance: a.total_credit - a.total_debit }))
     .sort((a: any, b: any) => a.code.localeCompare(b.code))
 
-  const equity = Object.values(accountMap)
+  const equity = balances
     .filter((a: any) => a.type === 'EQUITY' || a.code.startsWith('3'))
     .map((a: any) => ({ ...a, balance: a.total_credit - a.total_debit }))
     .sort((a: any, b: any) => a.code.localeCompare(b.code))
 
-  const pl = await getProfitLoss(orgId, '1970-01-01', asOfDate)
+  const pl = await getProfitLoss(orgId, '1970-01-01', asOfDate, branchId)
   equity.push({ code: '9999', name: 'Laba Ditahan / Periode Berjalan', balance: pl.netProfit, type: 'EQUITY' })
 
   return { assets, liabilities, equity }
 }
 
-export async function getProfitLoss(orgId: string, startDate?: string, endDate?: string) {
+export async function getProfitLoss(orgId: string, startDate?: string, endDate?: string, branchId?: BranchFilter) {
   const supabase = await createClient()
   const db = supabase as any
 
@@ -84,41 +148,24 @@ export async function getProfitLoss(orgId: string, startDate?: string, endDate?:
   const sDate = startDate || new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
   const eDate = endDate || new Date().toISOString().split('T')[0]
 
-  // Anchor by org_id first via journal_entries, then fetch lines
-  const { data: entries, error: entErr } = await db
-    .from('journal_entries')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('status', 'POSTED')
-    .gte('entry_date', sDate)
-    .lte('entry_date', eDate)
+  const entryIds = await getPostedEntryIds(db, orgId, {
+    branchId,
+    startDate: sDate,
+    endDate: eDate,
+  })
 
-  if (entErr || !entries || entries.length === 0) {
+  if (entryIds.length === 0) {
     return { revenue: [], expenses: [], totalRevenue: 0, totalExpenses: 0, netProfit: 0 }
   }
 
-  const entryIds = entries.map((e: any) => e.id)
+  const balances = await getAccountBalancesFromEntries(db, entryIds)
+  if (balances.length === 0) return { revenue: [], expenses: [], totalRevenue: 0, totalExpenses: 0, netProfit: 0 }
 
-  const { data, error } = await db
-    .from('journal_lines')
-    .select('debit, credit, accounts!inner(id, code, name, type, normal_balance)')
-    .in('entry_id', entryIds) as any
-
-  if (error || !data) return { revenue: [], expenses: [], totalRevenue: 0, totalExpenses: 0, netProfit: 0 }
-
-  const accMap: Record<string, any> = {}
-  data.forEach((l: any) => {
-    const acc = l.accounts
-    if (!accMap[acc.id]) accMap[acc.id] = { ...acc, debit: 0, credit: 0 }
-    accMap[acc.id].debit += Number(l.debit)
-    accMap[acc.id].credit += Number(l.credit)
-  })
-
-  const results = Object.values(accMap).map((a: any) => ({
+  const results = balances.map((a: any) => ({
     ...a,
     balance: ['REVENUE', 'LIABILITY', 'EQUITY'].includes(a.type) || ['4', '7', '8'].includes(a.code[0])
-      ? a.credit - a.debit
-      : a.debit - a.credit
+      ? a.total_credit - a.total_debit
+      : a.total_debit - a.total_credit
   }))
 
   const revenue = results.filter((a: any) => a.type === 'REVENUE' || ['4', '7', '8'].includes(a.code[0])).sort((a: any, b: any) => a.code.localeCompare(b.code))
@@ -130,7 +177,7 @@ export async function getProfitLoss(orgId: string, startDate?: string, endDate?:
   return { revenue, expenses, totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses }
 }
 
-export async function getCashFlow(orgId: string) {
+export async function getCashFlow(orgId: string, branchId?: BranchFilter) {
   const supabase = await createClient()
   const db = supabase as any
 
@@ -150,20 +197,16 @@ export async function getCashFlow(orgId: string) {
     cashAccountCodes.push('1101', '1102', '1103', '1104', '1105')
   }
 
-  const { data: accounts, error } = await db
-    .from('account_balances')
-    .select('*')
-    .eq('org_id', orgId)
+  const allEntryIds = await getPostedEntryIds(db, orgId, { branchId })
+  const accounts = await getAccountBalancesFromEntries(db, allEntryIds)
 
-  if (error || !accounts) return { ocf: 0, icf: 0, fcf: 0, netChange: 0, ocfItems: [], icfItems: [], fcfItems: [] }
+  if (accounts.length === 0) return { ocf: 0, icf: 0, fcf: 0, netChange: 0, ocfItems: [], icfItems: [], fcfItems: [] }
 
   // 1. Calculate Periods for Trend — anchor by org via journal_entries first
-  const { data: currentEntries } = await db
-    .from('journal_entries').select('id')
-    .eq('org_id', orgId).eq('status', 'POSTED')
-    .gte('entry_date', currentMonthStart)
-
-  const currentEntryIds = (currentEntries || []).map((e: any) => e.id)
+  const currentEntryIds = await getPostedEntryIds(db, orgId, {
+    branchId,
+    startDate: currentMonthStart,
+  })
   const currentMonthLines = currentEntryIds.length > 0
     ? (await (supabase as any).from('journal_lines')
         .select('debit, credit, accounts!inner(code)')
@@ -171,12 +214,11 @@ export async function getCashFlow(orgId: string) {
         .in('accounts.code', cashAccountCodes) as any).data || []
     : []
 
-  const { data: lastEntries } = await db
-    .from('journal_entries').select('id')
-    .eq('org_id', orgId).eq('status', 'POSTED')
-    .gte('entry_date', lastMonthStart).lte('entry_date', lastMonthEnd)
-
-  const lastEntryIds = (lastEntries || []).map((e: any) => e.id)
+  const lastEntryIds = await getPostedEntryIds(db, orgId, {
+    branchId,
+    startDate: lastMonthStart,
+    endDate: lastMonthEnd,
+  })
   const lastMonthLines = lastEntryIds.length > 0
     ? (await (supabase as any).from('journal_lines')
         .select('debit, credit, accounts!inner(code)')
@@ -236,5 +278,4 @@ export async function getCashFlow(orgId: string) {
     changePercent
   }
 }
-
 

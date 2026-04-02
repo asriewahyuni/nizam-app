@@ -87,8 +87,20 @@ export function createSupabaseMock(config: MockConfig = {}) {
         operations.push({ method: 'eq', args: [column, value] })
         return builder
       },
+      in(column: string, values: unknown[]) {
+        operations.push({ method: 'in', args: [column, values] })
+        return builder
+      },
       not(column: string, operator: string, value: unknown) {
         operations.push({ method: 'not', args: [column, operator, value] })
+        return builder
+      },
+      gte(column: string, value: unknown) {
+        operations.push({ method: 'gte', args: [column, value] })
+        return builder
+      },
+      lte(column: string, value: unknown) {
+        operations.push({ method: 'lte', args: [column, value] })
         return builder
       },
       lt(column: string, value: unknown) {
