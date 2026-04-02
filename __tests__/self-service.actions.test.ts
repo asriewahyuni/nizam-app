@@ -18,8 +18,11 @@ vi.mock('next/cache', () => ({
 import {
   cancelMyLeaveRequest,
   clockMyAttendance,
+  deleteMyExpenseClaim,
   getMyAttendanceRecords,
+  getMyExpenseClaims,
   getMyLeaveRequests,
+  submitMyExpenseClaim,
   submitMyLeaveRequest,
 } from '@/modules/hris/actions/self-service.actions'
 
@@ -40,6 +43,18 @@ function buildLeaveForm(overrides: Record<string, string> = {}) {
   formData.set('start_date', overrides.start_date || '2026-04-10')
   formData.set('end_date', overrides.end_date || '2026-04-12')
   formData.set('reason', overrides.reason || 'Acara keluarga')
+  return formData
+}
+
+function buildExpenseForm(overrides: Record<string, string> = {}) {
+  const formData = new FormData()
+  formData.set('claim_date', overrides.claim_date || '2026-04-11')
+  formData.set('category', overrides.category || 'Transport')
+  formData.set('amount', overrides.amount || '185000')
+  formData.set('description', overrides.description || 'Taksi meeting klien')
+  if (overrides.receipt_url) {
+    formData.set('receipt_url', overrides.receipt_url)
+  }
   return formData
 }
 
@@ -231,6 +246,117 @@ describe('Employee Self Service Actions', () => {
     expect(insertPayload.employee_id).toBe('emp-2')
     expect(insertPayload.branch_id).toBe('branch-3')
     expect(insertPayload.days_taken).toBe(3)
+  })
+
+  it('loads only the current employee expense claims', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        employees: [
+          {
+            maybeSingleResult: success({
+              id: 'emp-3',
+              branch_id: 'branch-4',
+              first_name: 'Alya',
+              last_name: 'Sari',
+              job_title: 'Sales',
+              nik: 'EMP-003',
+            }),
+          },
+        ],
+        expense_claims: [
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+
+    await getMyExpenseClaims('org-1')
+
+    const employeeFilter = supabase.calls[1]?.operations.find(
+      (operation) => operation.method === 'eq' && operation.args[0] === 'employee_id'
+    )
+    expect(employeeFilter?.args[1]).toBe('emp-3')
+  })
+
+  it('submits an expense claim for the current employee only', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        employees: [
+          {
+            maybeSingleResult: success({
+              id: 'emp-3',
+              branch_id: 'branch-4',
+              first_name: 'Alya',
+              last_name: 'Sari',
+              job_title: 'Sales',
+              nik: 'EMP-003',
+            }),
+          },
+        ],
+        expense_claims: [
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+
+    const result = await submitMyExpenseClaim('org-1', buildExpenseForm({ receipt_url: 'https://example.com/nota.jpg' }))
+    const insertPayload = supabase.calls[1]?.operations.find(
+      (operation) => operation.method === 'insert'
+    )?.args[0] as Record<string, string | number | null>
+
+    expect(result).toEqual({ success: true })
+    expect(insertPayload.employee_id).toBe('emp-3')
+    expect(insertPayload.branch_id).toBe('branch-4')
+    expect(insertPayload.receipt_url).toBe('https://example.com/nota.jpg')
+  })
+
+  it('deletes only the current employee pending or rejected expense claims', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        employees: [
+          {
+            maybeSingleResult: success({
+              id: 'emp-3',
+              branch_id: 'branch-4',
+              first_name: 'Alya',
+              last_name: 'Sari',
+              job_title: 'Sales',
+              nik: 'EMP-003',
+            }),
+          },
+        ],
+        expense_claims: [
+          {
+            maybeSingleResult: success({
+              id: 'claim-1',
+              status: 'PENDING',
+            }),
+          },
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+
+    const result = await deleteMyExpenseClaim('org-1', 'claim-1')
+    const deleteCall = supabase.calls[2]
+    const employeeFilter = deleteCall?.operations.find(
+      (operation) => operation.method === 'eq' && operation.args[0] === 'employee_id'
+    )
+
+    expect(result).toEqual({ success: true })
+    expect(deleteCall?.operations.some((operation) => operation.method === 'delete')).toBe(true)
+    expect(employeeFilter?.args[1]).toBe('emp-3')
   })
 
   it('cancels only the current employee pending leave request', async () => {

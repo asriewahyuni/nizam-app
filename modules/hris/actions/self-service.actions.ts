@@ -102,6 +102,24 @@ export async function getMyLeaveRequests(orgId: string) {
   return data
 }
 
+export async function getMyExpenseClaims(orgId: string) {
+  const selfEmployee = await getAuthenticatedEmployee(orgId)
+  if ('error' in selfEmployee) return []
+
+  const supabase = await createClient()
+  const db = supabase as any
+  const { data, error } = await db
+    .from('expense_claims')
+    .select('*, branch:branches(id, name, code)')
+    .eq('org_id', orgId)
+    .eq('employee_id', selfEmployee.employee.id)
+    .order('claim_date', { ascending: false })
+    .limit(10)
+
+  if (error) return []
+  return data
+}
+
 export async function clockMyAttendance(orgId: string, payload: { type: 'IN' | 'OUT'; notes?: string }) {
   const selfEmployee = await getAuthenticatedEmployee(orgId)
   if ('error' in selfEmployee) return { error: selfEmployee.error }
@@ -212,6 +230,45 @@ export async function submitMyLeaveRequest(orgId: string, formData: FormData) {
   return { success: true }
 }
 
+export async function submitMyExpenseClaim(orgId: string, formData: FormData) {
+  const selfEmployee = await getAuthenticatedEmployee(orgId)
+  if ('error' in selfEmployee) return { error: selfEmployee.error }
+
+  const supabase = await createClient()
+  const db = supabase as any
+  const claimDate = normalizeDateOnly(String(formData.get('claim_date') || ''))
+  const category = String(formData.get('category') || '').trim()
+  const amount = Number(formData.get('amount') || 0)
+  const description = String(formData.get('description') || '').trim()
+  const receiptUrlRaw = String(formData.get('receipt_url') || '').trim()
+  const receiptUrl = receiptUrlRaw || null
+
+  if (!claimDate) return { error: 'Tanggal klaim tidak valid.' }
+  if (!category) return { error: 'Kategori klaim wajib diisi.' }
+  if (!Number.isFinite(amount) || amount <= 0) return { error: 'Nominal klaim wajib lebih besar dari nol.' }
+  if (!description) return { error: 'Deskripsi klaim wajib diisi.' }
+
+  const { error } = await db
+    .from('expense_claims')
+    .insert({
+      org_id: orgId,
+      branch_id: selfEmployee.employee.branch_id,
+      employee_id: selfEmployee.employee.id,
+      claim_date: claimDate,
+      category,
+      amount,
+      description,
+      receipt_url: receiptUrl,
+      status: 'PENDING',
+    })
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/profil-saya')
+  revalidatePath('/hris')
+  return { success: true }
+}
+
 export async function cancelMyLeaveRequest(orgId: string, leaveId: string) {
   const selfEmployee = await getAuthenticatedEmployee(orgId)
   if ('error' in selfEmployee) return { error: selfEmployee.error }
@@ -239,6 +296,42 @@ export async function cancelMyLeaveRequest(orgId: string, leaveId: string) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', leaveId)
+    .eq('org_id', orgId)
+    .eq('employee_id', selfEmployee.employee.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/profil-saya')
+  revalidatePath('/hris')
+  return { success: true }
+}
+
+export async function deleteMyExpenseClaim(orgId: string, claimId: string) {
+  const selfEmployee = await getAuthenticatedEmployee(orgId)
+  if ('error' in selfEmployee) return { error: selfEmployee.error }
+
+  const supabase = await createClient()
+  const db = supabase as any
+  const { data: claim, error: claimError } = await db
+    .from('expense_claims')
+    .select('id, status')
+    .eq('id', claimId)
+    .eq('org_id', orgId)
+    .eq('employee_id', selfEmployee.employee.id)
+    .maybeSingle()
+
+  if (claimError) return { error: claimError.message }
+  if (!claim?.id) return { error: 'Klaim biaya tidak ditemukan.' }
+
+  const normalizedStatus = String(claim.status || '').toUpperCase()
+  if (!['PENDING', 'REJECTED'].includes(normalizedStatus)) {
+    return { error: 'Hanya klaim berstatus pending atau rejected yang bisa dihapus.' }
+  }
+
+  const { error } = await db
+    .from('expense_claims')
+    .delete()
+    .eq('id', claimId)
     .eq('org_id', orgId)
     .eq('employee_id', selfEmployee.employee.id)
 

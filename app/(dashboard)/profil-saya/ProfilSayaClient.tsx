@@ -3,9 +3,10 @@
 import React, { startTransition, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { Camera, Lock, CheckCircle, AlertCircle, Eye, EyeOff, Phone, User, Briefcase, Shield, X, Clock, CalendarDays } from 'lucide-react'
+import { Camera, Lock, CheckCircle, AlertCircle, Eye, EyeOff, Phone, User, Briefcase, Shield, X, Clock, CalendarDays, ReceiptText, Trash2, Image as ImageIcon } from 'lucide-react'
 import { uploadEmployeeAvatar, updateEmployeeProfile, updateEmployeePasswordSelf } from '@/modules/hris/actions/employee.actions'
-import { cancelMyLeaveRequest, clockMyAttendance, submitMyLeaveRequest } from '@/modules/hris/actions/self-service.actions'
+import { uploadReceipt } from '@/modules/accounting/actions/reimburse.actions'
+import { cancelMyLeaveRequest, clockMyAttendance, deleteMyExpenseClaim, submitMyExpenseClaim, submitMyLeaveRequest } from '@/modules/hris/actions/self-service.actions'
 import { formatDate } from '@/lib/utils'
 
 interface Props {
@@ -14,19 +15,23 @@ interface Props {
   userName: string
   initialAttendanceRecords: any[]
   initialLeaveRequests: any[]
+  initialExpenseClaims: any[]
 }
 
-export default function ProfilSayaClient({ employee, orgId, userName, initialAttendanceRecords, initialLeaveRequests }: Props) {
+export default function ProfilSayaClient({ employee, orgId, userName, initialAttendanceRecords, initialLeaveRequests, initialExpenseClaims }: Props) {
   const router = useRouter()
   const [avatarPreview, setAvatarPreview] = useState<string | null>(employee?.avatar_url || null)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [whatsapp, setWhatsapp] = useState(employee?.whatsapp || '')
   const [attendanceRecords, setAttendanceRecords] = useState(initialAttendanceRecords || [])
   const [leaveRequests, setLeaveRequests] = useState(initialLeaveRequests || [])
+  const [expenseClaims, setExpenseClaims] = useState(initialExpenseClaims || [])
   const [saving, setSaving] = useState(false)
   const [pwdSaving, setPwdSaving] = useState(false)
   const [attendanceSaving, setAttendanceSaving] = useState(false)
   const [leaveSaving, setLeaveSaving] = useState(false)
+  const [expenseSaving, setExpenseSaving] = useState(false)
+  const [receiptUploading, setReceiptUploading] = useState(false)
   const [showOldPwd, setShowOldPwd] = useState(false)
   const [showNewPwd, setShowNewPwd] = useState(false)
   const [showConfirmPwd, setShowConfirmPwd] = useState(false)
@@ -37,8 +42,15 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
   const [leaveStartDate, setLeaveStartDate] = useState(new Date().toISOString().split('T')[0])
   const [leaveEndDate, setLeaveEndDate] = useState(new Date().toISOString().split('T')[0])
   const [leaveReason, setLeaveReason] = useState('')
+  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0])
+  const [expenseCategory, setExpenseCategory] = useState('Transport')
+  const [expenseAmount, setExpenseAmount] = useState('')
+  const [expenseDescription, setExpenseDescription] = useState('')
+  const [expenseReceiptUrl, setExpenseReceiptUrl] = useState('')
+  const [expenseReceiptPreview, setExpenseReceiptPreview] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const avatarInputRef = useRef<HTMLInputElement>(null)
+  const expenseReceiptInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setAttendanceRecords(initialAttendanceRecords || [])
@@ -47,6 +59,10 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
   useEffect(() => {
     setLeaveRequests(initialLeaveRequests || [])
   }, [initialLeaveRequests])
+
+  useEffect(() => {
+    setExpenseClaims(initialExpenseClaims || [])
+  }, [initialExpenseClaims])
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type })
@@ -149,6 +165,69 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
     }
 
     showToast('Pengajuan cuti berhasil dibatalkan.', 'success')
+    refreshSelfService()
+  }
+
+  const handleUploadExpenseReceipt = async (file: File) => {
+    const preview = URL.createObjectURL(file)
+    setExpenseReceiptPreview(preview)
+    setReceiptUploading(true)
+
+    const formData = new FormData()
+    formData.set('file', file)
+    const result = await uploadReceipt(formData)
+
+    setReceiptUploading(false)
+    if (!result.success || !result.url) {
+      setExpenseReceiptUrl('')
+      showToast(result.error || 'Gagal upload nota.', 'error')
+      return
+    }
+
+    setExpenseReceiptUrl(result.url)
+    showToast('Nota berhasil diupload.', 'success')
+  }
+
+  const handleSubmitExpenseClaim = async () => {
+    const formData = new FormData()
+    formData.set('claim_date', expenseDate)
+    formData.set('category', expenseCategory)
+    formData.set('amount', expenseAmount)
+    formData.set('description', expenseDescription)
+    if (expenseReceiptUrl) {
+      formData.set('receipt_url', expenseReceiptUrl)
+    }
+
+    setExpenseSaving(true)
+    const res = await submitMyExpenseClaim(orgId, formData)
+    setExpenseSaving(false)
+
+    if (res.error) {
+      showToast(res.error, 'error')
+      return
+    }
+
+    setExpenseDate(new Date().toISOString().split('T')[0])
+    setExpenseCategory('Transport')
+    setExpenseAmount('')
+    setExpenseDescription('')
+    setExpenseReceiptUrl('')
+    setExpenseReceiptPreview(null)
+    showToast('Klaim biaya berhasil dikirim.', 'success')
+    refreshSelfService()
+  }
+
+  const handleDeleteExpenseClaim = async (claimId: string) => {
+    setExpenseSaving(true)
+    const res = await deleteMyExpenseClaim(orgId, claimId)
+    setExpenseSaving(false)
+
+    if (res.error) {
+      showToast(res.error, 'error')
+      return
+    }
+
+    showToast('Klaim biaya berhasil dihapus.', 'success')
     refreshSelfService()
   }
 
@@ -334,6 +413,154 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
                       {' · '}
                       {record.check_out ? new Date(record.check_out).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                     </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* === SELF SERVICE EXPENSE CLAIM === */}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
+        <div className="h-2 bg-gradient-to-r from-amber-400 via-orange-400 to-rose-500" />
+        <div className="p-10 space-y-8">
+          <div className="flex items-center gap-4">
+            <div className="w-8 h-8 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
+              <ReceiptText size={18} />
+            </div>
+            <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Klaim Biaya Mandiri</h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tanggal Klaim</label>
+              <input
+                type="date"
+                value={expenseDate}
+                onChange={(e) => setExpenseDate(e.target.value)}
+                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-amber-500 outline-none transition-all"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Kategori</label>
+              <select
+                value={expenseCategory}
+                onChange={(e) => setExpenseCategory(e.target.value)}
+                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-amber-500 outline-none transition-all"
+              >
+                <option value="Transport">Transport</option>
+                <option value="Meal">Meal</option>
+                <option value="Medical">Medical</option>
+                <option value="Supplies">Supplies</option>
+                <option value="Travel">Travel</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Nominal</label>
+              <input
+                type="number"
+                min="0"
+                value={expenseAmount}
+                onChange={(e) => setExpenseAmount(e.target.value)}
+                placeholder="150000"
+                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-amber-500 outline-none transition-all"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Foto Nota</label>
+              <div className="flex items-center gap-4">
+                <input
+                  ref={expenseReceiptInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    await handleUploadExpenseReceipt(file)
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => expenseReceiptInputRef.current?.click()}
+                  className="px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 hover:bg-white hover:border-amber-300 text-sm font-black text-slate-700 transition-all flex items-center gap-2"
+                >
+                  <ImageIcon size={16} />
+                  {receiptUploading ? 'Uploading...' : expenseReceiptUrl ? 'Ganti Nota' : 'Upload Nota'}
+                </button>
+                {expenseReceiptPreview && (
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden border border-slate-100 shadow-sm">
+                    <img src={expenseReceiptPreview} alt="Nota" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Deskripsi</label>
+            <textarea
+              value={expenseDescription}
+              onChange={(e) => setExpenseDescription(e.target.value)}
+              rows={4}
+              placeholder="Contoh: Ongkos taksi meeting klien, pembelian ATK, makan dinas."
+              className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 focus:bg-white focus:border-amber-500 outline-none transition-all resize-none"
+            />
+          </div>
+
+          <button
+            onClick={handleSubmitExpenseClaim}
+            disabled={expenseSaving || receiptUploading || !employee}
+            className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-amber-200 active:scale-[0.98]"
+          >
+            {expenseSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <ReceiptText size={16} />}
+            KIRIM KLAIM BIAYA
+          </button>
+
+          <div className="space-y-3">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Klaim Terbaru</p>
+            {expenseClaims.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-5 text-sm font-bold text-slate-400">
+                Belum ada klaim biaya.
+              </div>
+            ) : (
+              expenseClaims.map((claim: any) => (
+                <div key={claim.id} className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-black text-slate-800">{claim.category} • {claim.amount?.toLocaleString('id-ID')}</p>
+                    <p className="text-[11px] font-bold text-slate-500">{formatDate(claim.claim_date)} • {claim.branch?.name || employee?.branch?.name || 'Unit tidak diketahui'}</p>
+                    <p className="text-[11px] font-medium text-slate-500">{claim.description}</p>
+                    {claim.receipt_url && (
+                      <a href={claim.receipt_url} target="_blank" rel="noreferrer" className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700">
+                        Lihat Nota
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-[0.18em] border ${
+                      claim.status === 'APPROVED'
+                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                        : claim.status === 'REJECTED'
+                          ? 'bg-rose-50 text-rose-600 border-rose-100'
+                          : 'bg-amber-50 text-amber-600 border-amber-100'
+                    }`}>
+                      {claim.status}
+                    </span>
+                    {['PENDING', 'REJECTED'].includes(claim.status) && (
+                      <button
+                        onClick={() => handleDeleteExpenseClaim(claim.id)}
+                        disabled={expenseSaving}
+                        className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 disabled:opacity-40 flex items-center gap-1"
+                      >
+                        <Trash2 size={12} />
+                        Hapus
+                      </button>
+                    )}
                   </div>
                 </div>
               ))

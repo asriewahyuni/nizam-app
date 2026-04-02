@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-import { getMyAttendanceRecords, getMyLeaveRequests } from '@/modules/hris/actions/self-service.actions'
+import { getMyAttendanceRecords, getMyExpenseClaims, getMyLeaveRequests } from '@/modules/hris/actions/self-service.actions'
 import ProfilSayaClient from './ProfilSayaClient'
 
 export default async function ProfilSayaPage() {
@@ -21,9 +21,10 @@ export default async function ProfilSayaPage() {
     .eq('user_id', user?.id)
     .maybeSingle()
 
-  const [attendanceRecords, leaveRequests] = await Promise.all([
+  const [attendanceRecords, leaveRequests, expenseClaims] = await Promise.all([
     getMyAttendanceRecords(orgData.org.id),
     getMyLeaveRequests(orgData.org.id),
+    getMyExpenseClaims(orgData.org.id),
   ])
 
   return (
@@ -33,6 +34,7 @@ export default async function ProfilSayaPage() {
       userName={orgData.user?.user_metadata?.full_name || orgData.user?.email || ''}
       initialAttendanceRecords={attendanceRecords}
       initialLeaveRequests={leaveRequests}
+      initialExpenseClaims={expenseClaims}
     />
   )
 }
