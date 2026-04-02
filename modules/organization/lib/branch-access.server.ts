@@ -3,6 +3,8 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { ACTIVE_BRANCH_COOKIE, type BranchSummary } from './org-context'
 
 const FULL_BRANCH_ACCESS_ROLES = new Set(['owner', 'admin'])
+const DEFAULT_BRANCH_NAME = 'Unit Utama'
+const DEFAULT_BRANCH_CODE = 'MAIN'
 
 export type BranchAccessScope = {
   membershipId: string | null
@@ -64,6 +66,71 @@ function pickBranchFromCookie(scope: BranchAccessScope, branchIdFromCookie?: str
   return scope.accessibleBranches.find((branch) => branch.id === trimmedBranchId) ?? null
 }
 
+async function fetchActiveBranches(admin: any, orgId: string): Promise<BranchSummary[] | null> {
+  const { data: activeBranches, error } = await admin
+    .from('branches')
+    .select('id, org_id, name, code, address, is_active')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .order('name', { ascending: true })
+
+  if (error || !Array.isArray(activeBranches)) {
+    return null
+  }
+
+  return normalizeBranchRows(activeBranches)
+}
+
+async function ensureUsableBranchesForPrivilegedMember(admin: any, orgId: string): Promise<BranchSummary[]> {
+  const { data: earliestBranch, error: earliestBranchError } = await admin
+    .from('branches')
+    .select('id, org_id, name, code, address, is_active')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (!earliestBranchError && earliestBranch?.id) {
+    if (earliestBranch.is_active) {
+      return normalizeBranchRows([earliestBranch])
+    }
+
+    const { data: activatedBranch, error: activateError } = await admin
+      .from('branches')
+      .update({
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', earliestBranch.id)
+      .eq('org_id', orgId)
+      .select('id, org_id, name, code, address, is_active')
+      .single()
+
+    if (!activateError && activatedBranch?.id) {
+      return normalizeBranchRows([activatedBranch])
+    }
+  }
+
+  const { data: insertedBranch, error: insertError } = await admin
+    .from('branches')
+    .insert({
+      org_id: orgId,
+      name: DEFAULT_BRANCH_NAME,
+      code: DEFAULT_BRANCH_CODE,
+      address: null,
+      is_active: true,
+    })
+    .select('id, org_id, name, code, address, is_active')
+    .single()
+
+  if (insertError || !insertedBranch?.id) {
+    return []
+  }
+
+  return normalizeBranchRows([insertedBranch])
+}
+
 export async function getBranchAccessScope(orgId: string): Promise<BranchAccessScope> {
   const trimmedOrgId = orgId.trim()
   if (!trimmedOrgId) return emptyScope()
@@ -88,25 +155,23 @@ export async function getBranchAccessScope(orgId: string): Promise<BranchAccessS
 
   if (!membership?.id) return emptyScope()
 
-  const { data: allBranches, error: branchesError } = await admin
-    .from('branches')
-    .select('id, org_id, name, code, address, is_active')
-    .eq('org_id', trimmedOrgId)
-    .eq('is_active', true)
-    .order('name', { ascending: true })
+  const role = String(membership.role || 'staff')
 
-  if (branchesError || !Array.isArray(allBranches) || allBranches.length === 0) {
+  let normalizedBranches = await fetchActiveBranches(admin, trimmedOrgId)
+
+  if ((!normalizedBranches || normalizedBranches.length === 0) && FULL_BRANCH_ACCESS_ROLES.has(role)) {
+    normalizedBranches = await ensureUsableBranchesForPrivilegedMember(admin, trimmedOrgId)
+  }
+
+  if (!normalizedBranches || normalizedBranches.length === 0) {
     return {
       membershipId: String(membership.id),
-      role: String(membership.role || 'staff'),
+      role,
       accessibleBranches: [],
       accessibleBranchIds: [],
       canAccessAllBranches: false,
     }
   }
-
-  const normalizedBranches = normalizeBranchRows(allBranches)
-  const role = String(membership.role || 'staff')
 
   if (FULL_BRANCH_ACCESS_ROLES.has(role)) {
     return {
@@ -213,6 +278,11 @@ export async function resolveAccessibleBranchSelection(
   const activeBranch = pickBranchFromCookie(scope, cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value)
   if (activeBranch) {
     return { scope, branchId: activeBranch.id }
+  }
+
+  const defaultBranch = pickDefaultBranch(scope)
+  if (defaultBranch) {
+    return { scope, branchId: defaultBranch.id }
   }
 
   if (scope.canAccessAllBranches) {

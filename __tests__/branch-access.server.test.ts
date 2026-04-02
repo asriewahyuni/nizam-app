@@ -157,4 +157,132 @@ describe('Branch Access Server Helper', () => {
       })
     )
   })
+
+  it('defaults owner/admin writes to the sole accessible branch when only one branch exists', async () => {
+    const createScopedClient = () => {
+      const supabase = createSupabaseMock({
+        tables: {
+          org_members: [
+            {
+              maybeSingleResult: success({
+                id: 'member-1',
+                role: 'owner',
+              }),
+            },
+          ],
+          branches: [
+            {
+              result: success([
+                { id: 'branch-1', org_id: 'org-1', name: 'Unit Utama', code: 'MAIN', address: null, is_active: true },
+              ]),
+            },
+          ],
+        },
+      })
+
+      return {
+        authed: {
+          ...supabase.client,
+          auth: {
+            getUser: vi.fn().mockResolvedValue({
+              data: { user: { id: 'owner-1' } },
+            }),
+          },
+        },
+        admin: supabase.client,
+      }
+    }
+
+    mocks.createClient.mockImplementation(async () => createScopedClient().authed)
+    mocks.createAdminClient.mockImplementation(async () => createScopedClient().admin)
+
+    const currentBranch = await getCurrentAccessibleBranch('org-1')
+    const selection = await resolveAccessibleBranchSelection('org-1')
+
+    expect(currentBranch?.id).toBe('branch-1')
+    expect(selection).toEqual(
+      expect.objectContaining({
+        branchId: 'branch-1',
+      })
+    )
+  })
+
+  it('self-heals legacy owner orgs by creating the default branch when no active branch exists', async () => {
+    const createScopedClient = () => {
+      const supabase = createSupabaseMock({
+        tables: {
+          org_members: [
+            {
+              maybeSingleResult: success({
+                id: 'member-1',
+                role: 'owner',
+              }),
+            },
+          ],
+          branches: [
+            {
+              result: success([]),
+            },
+            {
+              maybeSingleResult: success(null),
+            },
+            {
+              singleResult: success({
+                id: 'branch-1',
+                org_id: 'org-1',
+                name: 'Unit Utama',
+                code: 'MAIN',
+                address: null,
+                is_active: true,
+              }),
+            },
+          ],
+        },
+      })
+
+      return {
+        authed: {
+          ...supabase.client,
+          auth: {
+            getUser: vi.fn().mockResolvedValue({
+              data: { user: { id: 'owner-1' } },
+            }),
+          },
+        },
+        admin: supabase.client,
+        calls: supabase.calls,
+      }
+    }
+
+    const scopedClient = createScopedClient()
+    mocks.createClient.mockImplementation(async () => scopedClient.authed)
+    mocks.createAdminClient.mockImplementation(async () => scopedClient.admin)
+
+    const scope = await getBranchAccessScope('org-1')
+
+    expect(scope.accessibleBranchIds).toEqual(['branch-1'])
+    expect(scope.canAccessAllBranches).toBe(true)
+
+    const branchCalls = scopedClient.calls.filter((call) => call.table === 'branches')
+    const insertCall = branchCalls.find((call) =>
+      call.operations.some((operation) => operation.method === 'insert')
+    )
+
+    expect(insertCall).toBeTruthy()
+    expect(insertCall?.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: 'insert',
+          args: [
+            expect.objectContaining({
+              org_id: 'org-1',
+              name: 'Unit Utama',
+              code: 'MAIN',
+              is_active: true,
+            }),
+          ],
+        }),
+      ])
+    )
+  })
 })
