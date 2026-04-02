@@ -10,6 +10,7 @@ import { seedDemoData, type DemoBusinessType } from '@/modules/demo/actions/demo
 import { applyVoucher } from './billing.actions'
 
 const DEMO_EMAIL = 'demo@nizam.app'
+const ACTIVE_ORG_COOKIE = 'nizam_active_org_id'
 
 export async function createOrganization(formData: FormData) {
   const supabase = await createClient()
@@ -88,6 +89,7 @@ export async function getActiveOrg() {
   const isDemoUser = user.email === DEMO_EMAIL || user.user_metadata?.is_demo
   const cookieStore = await cookies()
   const demoOrgId = cookieStore.get('nizam_demo_org_id')?.value
+  const activeOrgIdCookie = cookieStore.get(ACTIVE_ORG_COOKIE)?.value
 
   let memberData = null
 
@@ -97,6 +99,17 @@ export async function getActiveOrg() {
       .select('org_id, role, role_id, organizations(*), roles(permissions)')
       .eq('user_id', user.id)
       .eq('org_id', demoOrgId)
+      .eq('is_active', true)
+      .maybeSingle()
+    memberData = data
+  }
+
+  if (!memberData && activeOrgIdCookie) {
+    const { data } = await db
+      .from('org_members')
+      .select('*, organizations(*), roles(permissions)')
+      .eq('user_id', user.id)
+      .eq('org_id', activeOrgIdCookie)
       .eq('is_active', true)
       .maybeSingle()
     memberData = data

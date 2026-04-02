@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useTransition } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ShieldCheck, 
@@ -27,12 +27,14 @@ import {
   Database,
   Zap,
   ExternalLink,
-  Coins
+  Coins,
+  LogIn
 } from 'lucide-react'
 import { PageHeader, SectionCard, SectionHeader, SafeButton, StatusBadge, ConfirmDialog } from '@/components/ui/NizamUI'
 import { createClient } from '@/lib/supabase/client'
 import { Organization } from '@/types/database.types'
 import Link from 'next/link'
+import { signInAsTenantOwner } from '@/modules/auth/actions/auth.actions'
 import {
   calculateAiHppPerGeneration,
   calculateAiRecommendedSellPer1kTokens,
@@ -134,6 +136,8 @@ export default function SaaSAdminPage() {
   const [confirmState, setConfirmState] = useState<{ open: boolean, title: string, message: string, action: () => Promise<void> }>({
     open: false, title: '', message: '', action: async () => {}
   })
+  const [loginAsPending, startLoginAsTransition] = useTransition()
+  const [loginAsOrgId, setLoginAsOrgId] = useState<string | null>(null)
 
   // State local untuk helper set date di modal org
   const [modalExpireDate, setModalExpireDate] = useState('')
@@ -565,6 +569,27 @@ export default function SaaSAdminPage() {
      return matchesSearch && matchesType && matchesPkg
   })
 
+  const handleLoginAsTenant = (org: Organization) => {
+    const ownerEmail = String((org as any).owner_email || '').trim()
+    const confirmText = ownerEmail
+      ? `Sesi admin saat ini akan diganti dengan sesi tenant ${org.name} (${ownerEmail}). Lanjutkan login as owner?`
+      : `Sesi admin saat ini akan diganti dengan sesi tenant ${org.name}. Lanjutkan login as owner?`
+
+    if (!window.confirm(confirmText)) {
+      return
+    }
+
+    setLoginAsOrgId(org.id)
+    startLoginAsTransition(async () => {
+      const result = await signInAsTenantOwner(org.id)
+
+      if (result?.error) {
+        alert(result.error)
+        setLoginAsOrgId(null)
+      }
+    })
+  }
+
   return (
     <div className="p-8 pb-32 max-w-[1600px] mx-auto space-y-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -926,6 +951,19 @@ export default function SaaSAdminPage() {
                           </td>
                           <td className="py-4 px-6 text-right">
                             <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => handleLoginAsTenant(org)}
+                                disabled={loginAsPending}
+                                title="Login sebagai owner tenant ini"
+                                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-black uppercase tracking-wide text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60"
+                              >
+                                {loginAsPending && loginAsOrgId === org.id ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  <LogIn size={14} />
+                                )}
+                                <span>Login As</span>
+                              </button>
                               <button onClick={() => setOrgModal({ open: true, editData: org })} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
                                  <Edit3 size={18} />
                               </button>

@@ -45,6 +45,7 @@ export async function getPurchases(orgId: string) {
     ` as any)
     .eq('org_id', orgId)
     .order('purchase_date', { ascending: false })
+    .order('created_at', { ascending: false })
 
   if (error) {
     (console as any).error("DEBUG: getPurchases error:", error)
@@ -66,6 +67,7 @@ export async function getPurchases(orgId: string) {
       ` as any)
       .eq('org_id', orgId)
       .order('purchase_date', { ascending: false })
+      .order('created_at', { ascending: false })
       
     if (fallbackErr) return []
     return fallback

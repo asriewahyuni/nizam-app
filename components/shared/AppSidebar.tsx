@@ -1,6 +1,6 @@
 'use client'
 
-import { useSyncExternalStore, useState, useEffect } from 'react'
+import { useSyncExternalStore, useState, useEffect, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useSearchParams } from 'next/navigation'
@@ -204,6 +204,7 @@ export function AppSidebar({
   isDemo = false,
   planName = 'Trial'
 }: AppSidebarProps) {
+  const [isSigningOut, startSignOutTransition] = useTransition()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const tabQuery = searchParams?.get('tab')
@@ -233,6 +234,17 @@ export function AppSidebar({
   const navGroups = showSaasOperatorGroup
     ? [...NAV_GROUPS, SAAS_OPERATOR_GROUP]
     : NAV_GROUPS
+
+  const handleClientSignOut = () => {
+    startSignOutTransition(async () => {
+      if (isDemo) {
+        await signOutDemo()
+        return
+      }
+
+      await signOut()
+    })
+  }
 
   const isNavItemActive = (href: string) => {
     if (href === '/dashboard') {
@@ -489,15 +501,15 @@ export function AppSidebar({
             >
               <Settings size={18} strokeWidth={1.5} />
             </Link>
-            <form action={isDemo ? signOutDemo : signOut}>
-              <button 
-                type="submit" 
-                title={isDemo ? "Keluar & Reset Demo" : "Keluar"}
-                className={`p-2.5 rounded-xl transition-all ${isDemo ? 'text-orange-500 hover:text-orange-600 hover:bg-orange-50' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
-              >
-                <LogOut size={18} strokeWidth={2} />
-              </button>
-            </form>
+            <button 
+              type="button"
+              onClick={handleClientSignOut}
+              disabled={isSigningOut}
+              title={isDemo ? "Keluar & Reset Demo" : "Keluar"}
+              className={`p-2.5 rounded-xl transition-all disabled:cursor-wait disabled:opacity-60 ${isDemo ? 'text-orange-500 hover:text-orange-600 hover:bg-orange-50' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
+            >
+              <LogOut size={18} strokeWidth={2} className={isSigningOut ? 'animate-pulse' : ''} />
+            </button>
           </div>
         </div>
       {isCollapsed && (
