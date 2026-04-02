@@ -13,6 +13,7 @@ import type {
   FleetTicket,
 } from '@/types/database.types'
 import { revalidatePath } from 'next/cache'
+import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
 type BookingStatus = 'RESERVED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED'
 type FleetAssetStatus = 'AVAILABLE' | 'RENTED' | 'MAINTENANCE' | 'OUT_OF_SERVICE'
@@ -96,6 +97,48 @@ type FleetDb = {
 
 async function createFleetDb(): Promise<FleetDb> {
   return (await createClient()) as unknown as FleetDb
+}
+
+type BranchSelectionResult =
+  | { branchId: string | null }
+  | { error: string }
+
+type AssetBranchRecord = Pick<FleetAsset, 'id' | 'status' | 'branch_id'> | null
+type RouteBranchRecord = Pick<FleetRoute, 'id' | 'branch_id'> | null
+type ScheduleBranchRecord = Pick<FleetSchedule, 'id' | 'branch_id' | 'asset_id'> | null
+type BookingBranchRecord = Pick<FleetBooking, 'id' | 'branch_id' | 'asset_id' | 'status'> | null
+type CrewBranchRecord = Pick<Employee, 'id' | 'branch_id'> | null
+
+async function resolveFleetBranchSelection(orgId: string, branchId?: string | null): Promise<BranchSelectionResult> {
+  const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) {
+    return { error: branchSelection.error || 'Akses unit tidak valid.' }
+  }
+
+  return { branchId: branchSelection.branchId }
+}
+
+async function requireFleetCreateBranchId(orgId: string, errorMessage: string): Promise<{ branchId: string } | { error: string }> {
+  const branchSelection = await resolveFleetBranchSelection(orgId)
+  if ('error' in branchSelection || !branchSelection.branchId) {
+    return { error: errorMessage }
+  }
+
+  return { branchId: branchSelection.branchId as string }
+}
+
+async function ensureFleetBranchAccess(orgId: string, branchId: string | null, notFoundMessage: string) {
+  const trimmedBranchId = String(branchId || '').trim()
+  if (!trimmedBranchId) {
+    return { error: notFoundMessage }
+  }
+
+  const branchSelection = await resolveFleetBranchSelection(orgId, trimmedBranchId)
+  if ('error' in branchSelection) {
+    return { error: branchSelection.error }
+  }
+
+  return { branchId: trimmedBranchId }
 }
 
 function parseNumber(value: FormDataEntryValue | string | number | null | undefined) {
@@ -206,14 +249,21 @@ async function syncAssetBookingStatus(
 
 /** ASSET MANAGEMENT **/
 
-export async function getAssets(orgId: string) {
+export async function getAssets(orgId: string, branchId?: string | null) {
   const supabase = await createFleetDb()
+  const branchSelection = await resolveFleetBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) return []
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('fleet_assets')
     .select('*')
     .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
+
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) {
     console.error('Error fetching Fleet Assets:', error)
@@ -225,9 +275,15 @@ export async function getAssets(orgId: string) {
 
 export async function createAsset(orgId: string, formData: FormData) {
   const supabase = await createFleetDb()
+  const activeBranch = await requireFleetCreateBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk menambahkan armada.'
+  )
+  if ('error' in activeBranch) return { error: activeBranch.error }
 
   const payload = {
     org_id: orgId,
+    branch_id: activeBranch.branchId,
     plate_number: formData.get('plate_number') as string,
     model: formData.get('model') as string,
     brand: formData.get('brand') as string,
@@ -248,10 +304,12 @@ export async function createAsset(orgId: string, formData: FormData) {
 
 /** BOOKING MANAGEMENT **/
 
-export async function getBookings(orgId: string) {
+export async function getBookings(orgId: string, branchId?: string | null) {
   const supabase = await createFleetDb()
+  const branchSelection = await resolveFleetBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) return []
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('fleet_bookings')
     .select(`
       *,
@@ -259,7 +317,12 @@ export async function getBookings(orgId: string) {
       contact:contacts(id, name)
     `)
     .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
+
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) {
     console.error('Error fetching Bookings:', error)
@@ -285,18 +348,20 @@ export async function createBooking(orgId: string, formData: FormData) {
 
   const dateRange = normalizeBookingRange(start_date, end_date)
   if ('error' in dateRange) {
-    return dateRange
+    return { error: dateRange.error }
   }
 
   const { data: asset, error: assetError } = await supabase
     .from('fleet_assets')
-    .select('id, status')
+    .select('id, status, branch_id')
     .eq('org_id', orgId)
     .eq('id', asset_id)
-    .maybeSingle()
+    .maybeSingle() as { data: AssetBranchRecord; error: DbError | null }
 
   if (assetError) return { error: assetError.message }
   if (!asset) return { error: 'Armada tidak ditemukan.' }
+  const branchAccess = await ensureFleetBranchAccess(orgId, asset.branch_id, 'Armada tidak ditemukan.')
+  if ('error' in branchAccess) return { error: branchAccess.error }
 
   if (asset.status === 'MAINTENANCE' || asset.status === 'OUT_OF_SERVICE') {
     return { error: 'Armada sedang tidak tersedia untuk dibooking.' }
@@ -320,6 +385,7 @@ export async function createBooking(orgId: string, formData: FormData) {
     .from('fleet_bookings')
     .insert({
       org_id: orgId,
+      branch_id: branchAccess.branchId,
       asset_id,
       contact_id,
       start_date: dateRange.startIso,
@@ -347,12 +413,27 @@ export async function updateBookingStatus(orgId: string, bookingId: string, asse
     return { error: 'Status booking tidak valid.' }
   }
 
+  const { data: booking, error: bookingFetchError } = await supabase
+    .from('fleet_bookings')
+    .select('id, branch_id, asset_id, status')
+    .eq('id', bookingId)
+    .eq('org_id', orgId)
+    .maybeSingle() as { data: BookingBranchRecord; error: DbError | null }
+
+  if (bookingFetchError) return { error: bookingFetchError.message }
+  if (!booking) return { error: 'Booking tidak ditemukan.' }
+
+  const branchAccess = await ensureFleetBranchAccess(orgId, booking.branch_id, 'Booking tidak ditemukan.')
+  if ('error' in branchAccess) return { error: branchAccess.error }
+  const effectiveAssetId = booking.asset_id || assetId
+
   // Update Booking
   const { error: bookingErr } = await supabase
     .from('fleet_bookings')
     .update({ status })
     .eq('id', bookingId)
     .eq('org_id', orgId)
+    .eq('branch_id', branchAccess.branchId)
 
   if (bookingErr) return { error: bookingErr.message }
 
@@ -361,11 +442,12 @@ export async function updateBookingStatus(orgId: string, bookingId: string, asse
       .from('fleet_assets')
       .update({ status: 'RENTED' })
       .eq('org_id', orgId)
-      .eq('id', assetId)
+      .eq('branch_id', branchAccess.branchId)
+      .eq('id', effectiveAssetId)
 
     if (assetErr) return { error: assetErr.message }
   } else {
-    const syncError = await syncAssetBookingStatus(supabase, orgId, assetId)
+    const syncError = await syncAssetBookingStatus(supabase, orgId, effectiveAssetId)
     if (syncError) return { error: syncError }
   }
 
@@ -375,17 +457,31 @@ export async function updateBookingStatus(orgId: string, bookingId: string, asse
 
 /** PO BUS MANAGEMENT **/
 
-export async function getRoutes(orgId: string) {
+export async function getRoutes(orgId: string, branchId?: string | null) {
   const supabase = await createFleetDb()
-  const { data, error } = await supabase.from('fleet_routes').select('*').eq('org_id', orgId).order('name', { ascending: true })
+  const branchSelection = await resolveFleetBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) return []
+
+  let query = supabase.from('fleet_routes').select('*').eq('org_id', orgId)
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data, error } = await query.order('name', { ascending: true })
   if (error) return []
   return data
 }
 
 export async function createRoute(orgId: string, formData: FormData) {
   const supabase = await createFleetDb()
+  const activeBranch = await requireFleetCreateBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk membuat rute.'
+  )
+  if ('error' in activeBranch) return { error: activeBranch.error }
   const payload = {
     org_id: orgId,
+    branch_id: activeBranch.branchId,
     name: formData.get('name') as string,
     origin: formData.get('origin') as string,
     destination: formData.get('destination') as string,
@@ -398,9 +494,12 @@ export async function createRoute(orgId: string, formData: FormData) {
   return { success: true }
 }
 
-export async function getSchedules(orgId: string) {
+export async function getSchedules(orgId: string, branchId?: string | null) {
   const supabase = await createFleetDb()
-  const { data, error } = await supabase
+  const branchSelection = await resolveFleetBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) return []
+
+  let query = supabase
     .from('fleet_schedules')
     .select(`
       *,
@@ -411,7 +510,12 @@ export async function getSchedules(orgId: string) {
       tickets:fleet_tickets(count)
     `)
     .eq('org_id', orgId)
-    .order('departure_time', { ascending: true })
+
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data, error } = await query.order('departure_time', { ascending: true })
   
   if (error) return []
   return data
@@ -425,12 +529,62 @@ export async function createSchedule(orgId: string, formData: FormData) {
     return { error: 'Tanggal keberangkatan tidak valid.' }
   }
 
+  const assetId = formData.get('asset_id') as string
+  const routeId = formData.get('route_id') as string
+  const { data: asset, error: assetError } = await supabase
+    .from('fleet_assets')
+    .select('id, branch_id')
+    .eq('org_id', orgId)
+    .eq('id', assetId)
+    .maybeSingle() as { data: AssetBranchRecord; error: DbError | null }
+
+  if (assetError) return { error: assetError.message }
+  if (!asset?.branch_id) return { error: 'Armada tidak ditemukan.' }
+
+  const { data: route, error: routeError } = await supabase
+    .from('fleet_routes')
+    .select('id, branch_id')
+    .eq('org_id', orgId)
+    .eq('id', routeId)
+    .maybeSingle() as { data: RouteBranchRecord; error: DbError | null }
+
+  if (routeError) return { error: routeError.message }
+  if (!route?.branch_id) return { error: 'Rute tidak ditemukan.' }
+  if (route.branch_id !== asset.branch_id) {
+    return { error: 'Rute dan armada harus berasal dari unit yang sama.' }
+  }
+
+  const branchAccess = await ensureFleetBranchAccess(orgId, asset.branch_id, 'Unit armada tidak dapat diakses.')
+  if ('error' in branchAccess) return { error: branchAccess.error }
+  const driverId = formData.get('driver_id') as string || null
+  const helperId = formData.get('helper_id') as string || null
+
+  for (const [crewRole, crewId] of [['driver', driverId], ['helper', helperId]] as const) {
+    if (!crewId) continue
+
+    const { data: crew, error: crewError } = await supabase
+      .from('employees')
+      .select('id, branch_id')
+      .eq('org_id', orgId)
+      .eq('id', crewId)
+      .maybeSingle() as { data: CrewBranchRecord; error: DbError | null }
+
+    if (crewError) return { error: crewError.message }
+    if (!crew) {
+      return { error: `Data ${crewRole} tidak ditemukan.` }
+    }
+    if (crew.branch_id && crew.branch_id !== branchAccess.branchId) {
+      return { error: `${crewRole === 'driver' ? 'Driver' : 'Helper'} harus berasal dari unit yang sama.` }
+    }
+  }
+
   const payload = {
     org_id: orgId,
-    route_id: formData.get('route_id') as string,
-    asset_id: formData.get('asset_id') as string,
-    driver_id: formData.get('driver_id') as string || null,
-    helper_id: formData.get('helper_id') as string || null,
+    branch_id: branchAccess.branchId,
+    route_id: routeId,
+    asset_id: assetId,
+    driver_id: driverId,
+    helper_id: helperId,
     departure_time: departureTime,
     status: 'SCHEDULED' as ScheduleStatus
   }
@@ -448,8 +602,22 @@ export async function createTicket(orgId: string, payload: {
   notes?: string
 }) {
   const supabase = await createFleetDb()
+  const { data: schedule, error: scheduleError } = await supabase
+    .from('fleet_schedules')
+    .select('id, branch_id')
+    .eq('org_id', orgId)
+    .eq('id', payload.schedule_id)
+    .maybeSingle() as { data: ScheduleBranchRecord; error: DbError | null }
+
+  if (scheduleError) return { error: scheduleError.message }
+  if (!schedule?.branch_id) return { error: 'Jadwal tidak ditemukan.' }
+
+  const branchAccess = await ensureFleetBranchAccess(orgId, schedule.branch_id, 'Jadwal tidak ditemukan.')
+  if ('error' in branchAccess) return { error: branchAccess.error }
+
   const { error } = await supabase.from('fleet_tickets').insert({
     org_id: orgId,
+    branch_id: branchAccess.branchId,
     ...payload,
     status: 'PAID'
   })
@@ -477,17 +645,24 @@ export async function getMedicalRecords(assetId: string) {
   return data
 }
 
-export async function getAllMedicalRecords(orgId: string) {
+export async function getAllMedicalRecords(orgId: string, branchId?: string | null) {
   const supabase = await createFleetDb()
+  const branchSelection = await resolveFleetBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) return []
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('fleet_maintenance_labs')
     .select(`
       *,
       asset:fleet_assets(id, plate_number, model)
     `)
     .eq('org_id', orgId)
-    .order('service_date', { ascending: false })
+
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data, error } = await query.order('service_date', { ascending: false })
 
   if (error) {
     console.error('Error fetching all medical records:', error)
@@ -496,14 +671,22 @@ export async function getAllMedicalRecords(orgId: string) {
   return data
 }
 
-export async function getFleetCrew(orgId: string) {
+export async function getFleetCrew(orgId: string, branchId?: string | null) {
   const supabase = await createFleetDb()
-  const { data, error } = await supabase
+  const branchSelection = await resolveFleetBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) return []
+
+  let query = supabase
     .from('employees')
     .select('*')
     .eq('org_id', orgId)
     .or('job_title.ilike.%sopir%,job_title.ilike.%driver%,job_title.ilike.%kernet%,job_title.ilike.%helper%')
-    .order('first_name', { ascending: true })
+
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data, error } = await query.order('first_name', { ascending: true })
 
   if (error) return []
   return data
@@ -511,9 +694,14 @@ export async function getFleetCrew(orgId: string) {
 
 export async function createCrew(orgId: string, payload: CreateCrewPayload) {
   const supabase = await createFleetDb()
+  const activeBranch = await requireFleetCreateBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk menambahkan kru.'
+  )
+  if ('error' in activeBranch) return { error: activeBranch.error }
   const { data, error } = await supabase
     .from('employees')
-    .insert([{ ...payload, org_id: orgId }])
+    .insert([{ ...payload, org_id: orgId, branch_id: activeBranch.branchId }])
     .select()
     .single()
 
@@ -553,6 +741,19 @@ export async function createMedicalRecord(orgId: string, payload: {
     return { error: 'Tanggal next service tidak valid.' }
   }
 
+  const { data: assetRecord, error: assetError } = await supabase
+    .from('fleet_assets')
+    .select('id, status, branch_id')
+    .eq('org_id', orgId)
+    .eq('id', payload.asset_id)
+    .maybeSingle() as { data: AssetBranchRecord; error: DbError | null }
+
+  if (assetError) return { error: assetError.message }
+  if (!assetRecord?.branch_id) return { error: 'Armada tidak ditemukan.' }
+
+  const branchAccess = await ensureFleetBranchAccess(orgId, assetRecord.branch_id, 'Armada tidak ditemukan.')
+  if ('error' in branchAccess) return { error: branchAccess.error }
+
   const { data, error } = await supabase.rpc('create_fleet_medical_record', {
     p_org_id: orgId,
     p_asset_id: payload.asset_id,
@@ -578,20 +779,22 @@ export async function createMedicalRecord(orgId: string, payload: {
     return { error: error.message }
   }
 
-  const { data: asset, error: assetError } = await supabase
+  const { data: asset, error: assetFallbackError } = await supabase
     .from('fleet_assets')
     .select('status')
     .eq('org_id', orgId)
+    .eq('branch_id', branchAccess.branchId)
     .eq('id', payload.asset_id)
     .maybeSingle()
 
-  if (assetError) return { error: assetError.message }
+  if (assetFallbackError) return { error: assetFallbackError.message }
   if (!asset) return { error: 'Armada tidak ditemukan.' }
 
   const { error: assetUpdateError } = await supabase
     .from('fleet_assets')
     .update({ status: 'MAINTENANCE' })
     .eq('org_id', orgId)
+    .eq('branch_id', branchAccess.branchId)
     .eq('id', payload.asset_id)
 
   if (assetUpdateError) return { error: assetUpdateError.message }
@@ -600,6 +803,7 @@ export async function createMedicalRecord(orgId: string, payload: {
     .from('fleet_maintenance_labs')
     .insert({
       org_id: orgId,
+      branch_id: branchAccess.branchId,
       asset_id: payload.asset_id,
       service_date: serviceDate,
       description: payload.description.trim(),
@@ -619,6 +823,7 @@ export async function createMedicalRecord(orgId: string, payload: {
       .from('fleet_assets')
       .update({ status: asset.status })
       .eq('org_id', orgId)
+      .eq('branch_id', branchAccess.branchId)
       .eq('id', payload.asset_id)
 
     return { error: insertError.message }
@@ -655,14 +860,43 @@ export async function checkAssetAvailability(assetId: string, startDate: string,
 
 /** SMART ATTENDANCE (GPS + QR) **/
 
-export async function getTerminals(orgId: string) {
+export async function getTerminals(orgId: string, branchId?: string | null) {
   const supabase = await createFleetDb()
-  const { data, error } = await supabase
+  const branchSelection = await resolveFleetBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) return []
+
+  let query = supabase
     .from('fleet_terminals')
     .select('*')
     .eq('org_id', orgId)
-    .order('name', { ascending: true })
+
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data, error } = await query.order('name', { ascending: true })
   
+  if (error) return []
+  return data
+}
+
+export async function getFleetAttendanceToday(orgId: string, branchId?: string | null) {
+  const supabase = await createFleetDb()
+  const branchSelection = await resolveFleetBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) return []
+
+  const today = new Date().toISOString().split('T')[0]
+  let query = supabase
+    .from('attendance')
+    .select('*, employee:employees(first_name, last_name)')
+    .eq('org_id', orgId)
+    .eq('record_date', today)
+
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
   if (error) return []
   return data
 }
@@ -677,11 +911,25 @@ export async function recordCrewAttendance(orgId: string, payload: {
   const supabase = await createFleetDb()
   const date = new Date().toISOString().split('T')[0]
   const now = new Date().toISOString()
+  const { data: employee, error: employeeError } = await supabase
+    .from('employees')
+    .select('id, branch_id')
+    .eq('org_id', orgId)
+    .eq('id', payload.employee_id)
+    .maybeSingle() as { data: CrewBranchRecord; error: DbError | null }
+
+  if (employeeError) return { error: employeeError.message }
+  if (!employee?.branch_id) return { error: 'Kru tidak ditemukan atau belum terhubung ke unit.' }
+
+  const branchAccess = await ensureFleetBranchAccess(orgId, employee.branch_id, 'Kru tidak ditemukan.')
+  if ('error' in branchAccess) return { error: branchAccess.error }
 
   // Find if already exists for today
   const { data: existing } = await supabase
     .from('attendance')
     .select('*')
+    .eq('org_id', orgId)
+    .eq('branch_id', branchAccess.branchId)
     .eq('employee_id', payload.employee_id)
     .eq('record_date', date)
     .single()
@@ -691,6 +939,7 @@ export async function recordCrewAttendance(orgId: string, payload: {
     
     const { error } = await supabase.from('attendance').insert([{
       org_id: orgId,
+      branch_id: branchAccess.branchId,
       employee_id: payload.employee_id,
       record_date: date,
       check_in: now,
@@ -711,6 +960,7 @@ export async function recordCrewAttendance(orgId: string, payload: {
         notes: payload.notes ? (existing.notes ? existing.notes + ' | ' + payload.notes : payload.notes) : existing.notes
       })
       .eq('id', existing.id)
+      .eq('branch_id', branchAccess.branchId)
     
     if (error) return { error: error.message }
   }

@@ -1,0 +1,129 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createSupabaseMock, success } from './helpers/supabase-mock'
+
+const mocks = vi.hoisted(() => ({
+  createClient: vi.fn(),
+  revalidatePath: vi.fn(),
+  resolveAccessibleBranchSelection: vi.fn(),
+}))
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: mocks.createClient,
+}))
+
+vi.mock('next/cache', () => ({
+  revalidatePath: mocks.revalidatePath,
+}))
+
+vi.mock('@/modules/organization/lib/branch-access.server', () => ({
+  resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
+}))
+
+import {
+  createServiceOrder,
+  getServiceOrders,
+  updateServiceStatus,
+} from '@/modules/services/actions/service.actions'
+
+function buildServiceOrderForm(overrides: Record<string, string> = {}) {
+  const formData = new FormData()
+  formData.set('contact_id', overrides.contact_id || 'contact-1')
+  formData.set('job_number', overrides.job_number || 'JOB-0001')
+  formData.set('description', overrides.description || 'Servis AC utama')
+  formData.set('start_date', overrides.start_date || '2026-04-03')
+  formData.set('notes', overrides.notes || 'Handle dengan prioritas tinggi')
+  formData.set('estimated_cost', overrides.estimated_cost || '1250000')
+  return formData
+}
+
+function getFirstOperationArg(callTable: string, method: string, calls: Array<{ table: string; operations: Array<{ method: string; args: unknown[] }> }>) {
+  const call = calls.find((entry) =>
+    entry.table === callTable && entry.operations.some((operation) => operation.method === method)
+  )
+  return call?.operations.find((operation) => operation.method === method)?.args[0]
+}
+
+describe('Service Order Actions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('filters service orders by resolved branch selection', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        service_orders: [
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
+
+    await getServiceOrders('org-1')
+
+    const branchFilter = supabase.calls[0]?.operations.find(
+      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
+    )
+    expect(branchFilter?.args[1]).toBe('branch-1')
+  })
+
+  it('stamps branch_id when creating a service order', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        service_orders: [
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
+
+    const result = await createServiceOrder('org-1', buildServiceOrderForm())
+    const payload = getFirstOperationArg('service_orders', 'insert', supabase.calls) as Record<string, string>
+
+    expect(result).toEqual({ success: true })
+    expect(payload.branch_id).toBe('branch-1')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/services')
+  })
+
+  it('updates service status only inside the document branch', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        service_orders: [
+          {
+            maybeSingleResult: success({
+              id: 'service-1',
+              branch_id: 'branch-1',
+            }),
+          },
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
+
+    const result = await updateServiceStatus('org-1', 'service-1', 'COMPLETED')
+    const branchFilter = supabase.calls[1]?.operations.find(
+      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
+    )
+
+    expect(result).toEqual({ success: true })
+    expect(branchFilter?.args[1]).toBe('branch-1')
+  })
+})

@@ -4,6 +4,7 @@ import { createSupabaseMock, failure, success } from './helpers/supabase-mock'
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   revalidatePath: vi.fn(),
+  resolveAccessibleBranchSelection: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -12,6 +13,10 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('next/cache', () => ({
   revalidatePath: mocks.revalidatePath,
+}))
+
+vi.mock('@/modules/organization/lib/branch-access.server', () => ({
+  resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
 }))
 
 import {
@@ -54,6 +59,10 @@ function getFirstOperationArg(callTable: string, method: string, calls: Array<{ 
 describe('Fleet Server Actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
   })
 
   it('rejects bookings when date range is invalid', async () => {
@@ -76,6 +85,7 @@ describe('Fleet Server Actions', () => {
             maybeSingleResult: success({
               id: 'asset-1',
               status: 'MAINTENANCE',
+              branch_id: 'branch-1',
             }),
           },
         ],
@@ -96,6 +106,7 @@ describe('Fleet Server Actions', () => {
             maybeSingleResult: success({
               id: 'asset-1',
               status: 'AVAILABLE',
+              branch_id: 'branch-1',
             }),
           },
         ],
@@ -122,6 +133,7 @@ describe('Fleet Server Actions', () => {
             maybeSingleResult: success({
               id: 'asset-1',
               status: 'AVAILABLE',
+              branch_id: 'branch-1',
             }),
           },
         ],
@@ -143,6 +155,7 @@ describe('Fleet Server Actions', () => {
     const insertedPayload = getFirstOperationArg('fleet_bookings', 'insert', supabase.calls) as Record<string, string>
 
     expect(result).toEqual({ success: true, bookingId: 'booking-1' })
+    expect(insertedPayload.branch_id).toBe('branch-1')
     expect(insertedPayload.status).toBe('RESERVED')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/fleet')
   })
@@ -152,7 +165,12 @@ describe('Fleet Server Actions', () => {
       tables: {
         fleet_bookings: [
           {
-            result: success([]),
+            maybeSingleResult: success({
+              id: 'booking-1',
+              branch_id: 'branch-1',
+              asset_id: 'asset-1',
+              status: 'RESERVED',
+            }),
           },
         ],
         fleet_assets: [
@@ -179,6 +197,36 @@ describe('Fleet Server Actions', () => {
             result: success([]),
           },
         ],
+        fleet_assets: [
+          {
+            maybeSingleResult: success({
+              id: 'asset-1',
+              branch_id: 'branch-1',
+            }),
+          },
+        ],
+        fleet_routes: [
+          {
+            maybeSingleResult: success({
+              id: 'route-1',
+              branch_id: 'branch-1',
+            }),
+          },
+        ],
+        employees: [
+          {
+            maybeSingleResult: success({
+              id: 'driver-1',
+              branch_id: 'branch-1',
+            }),
+          },
+          {
+            maybeSingleResult: success({
+              id: 'helper-1',
+              branch_id: 'branch-1',
+            }),
+          },
+        ],
       },
     })
     mocks.createClient.mockResolvedValue(supabase.client)
@@ -187,6 +235,7 @@ describe('Fleet Server Actions', () => {
     const payload = getFirstOperationArg('fleet_schedules', 'insert', supabase.calls) as Record<string, string>
 
     expect(result).toEqual({ success: true })
+    expect(payload.branch_id).toBe('branch-1')
     expect(payload.status).toBe('SCHEDULED')
   })
 
@@ -195,6 +244,17 @@ describe('Fleet Server Actions', () => {
       rpc: {
         create_fleet_medical_record: [
           success('medical-1'),
+        ],
+      },
+      tables: {
+        fleet_assets: [
+          {
+            maybeSingleResult: success({
+              id: 'asset-1',
+              status: 'AVAILABLE',
+              branch_id: 'branch-1',
+            }),
+          },
         ],
       },
     })
@@ -230,6 +290,14 @@ describe('Fleet Server Actions', () => {
             maybeSingleResult: success({
               id: 'asset-1',
               status: 'AVAILABLE',
+              branch_id: 'branch-1',
+            }),
+          },
+          {
+            maybeSingleResult: success({
+              id: 'asset-1',
+              status: 'AVAILABLE',
+              branch_id: 'branch-1',
             }),
           },
           {
@@ -299,6 +367,14 @@ describe('Fleet Server Actions', () => {
           },
           {
             result: success([]),
+          },
+        ],
+        employees: [
+          {
+            maybeSingleResult: success({
+              id: 'employee-1',
+              branch_id: 'branch-1',
+            }),
           },
         ],
       },

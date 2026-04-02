@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-import { getAssets, getBookings, getRoutes, getSchedules, getAllMedicalRecords, getFleetCrew, getTerminals } from '@/modules/fleet/actions/fleet.actions'
+import { getAssets, getBookings, getRoutes, getSchedules, getAllMedicalRecords, getFleetCrew, getTerminals, getFleetAttendanceToday } from '@/modules/fleet/actions/fleet.actions'
 import { FleetClient } from './FleetClient'
 
 export const revalidate = 0
@@ -12,8 +12,7 @@ export default async function FleetPage() {
 
   const supabase = await createClient()
 
-  const today = new Date().toISOString().split('T')[0]
-  const [assets, bookings, routes, schedules, medicalRecords, crew, terminals, { data: attendanceToday }, { data: contacts }] = await Promise.all([
+  const [assets, bookings, routes, schedules, medicalRecords, crew, terminals, attendanceToday, { data: contacts }] = await Promise.all([
     getAssets(orgData.org.id),
     getBookings(orgData.org.id),
     getRoutes(orgData.org.id),
@@ -21,7 +20,7 @@ export default async function FleetPage() {
     getAllMedicalRecords(orgData.org.id),
     getFleetCrew(orgData.org.id),
     getTerminals(orgData.org.id),
-    supabase.from('attendance').select('*, employee:employees(first_name, last_name)').eq('org_id', orgData.org.id).eq('record_date', today),
+    getFleetAttendanceToday(orgData.org.id),
     supabase.from('contacts').select('id, name').eq('org_id', orgData.org.id)
   ])
 
@@ -36,7 +35,7 @@ export default async function FleetPage() {
         medicalRecords={medicalRecords}
         crew={crew}
         terminals={terminals}
-        attendanceToday={attendanceToday || []}
+        attendanceToday={attendanceToday}
         contacts={contacts || []}
       />
     </div>

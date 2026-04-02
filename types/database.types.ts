@@ -98,6 +98,7 @@ export type AuditLog = {
 }
 export type Employee = {
   id: string; org_id: string; user_id: string | null
+  branch_id: string | null
   nik: string; first_name: string; last_name: string | null
   email: string | null; phone: string | null
   date_of_birth: string | null; gender: string | null
@@ -110,44 +111,44 @@ export type Employee = {
   blood_type: string | null; created_at: string; updated_at: string
 }
 export type Attendance = {
-  id: string; org_id: string; employee_id: string
+  id: string; org_id: string; branch_id: string | null; employee_id: string
   record_date: string; check_in: string | null; check_out: string | null
   status: string; notes: string | null
   location_gps: string | null; qr_scanned_payload: string | null; meta: Json
   created_at: string; updated_at: string
 }
 export type FleetAsset = {
-  id: string; org_id: string; plate_number: string; model: string
+  id: string; org_id: string; branch_id: string; plate_number: string; model: string
   brand: string | null; type: string; status: string
   odometer: number; daily_rate: number; notes: string | null
   metadata: Json | null; capacity: number | null
   created_at: string; updated_at: string
 }
 export type FleetBooking = {
-  id: string; org_id: string; asset_id: string; contact_id: string
+  id: string; org_id: string; branch_id: string; asset_id: string; contact_id: string
   start_date: string; end_date: string; status: string
   total_amount: number; deposit: number; payment_status: string | null
   notes: string | null; created_at: string; updated_at: string
 }
 export type FleetRoute = {
-  id: string; org_id: string; name: string
+  id: string; org_id: string; branch_id: string; name: string
   origin: string; destination: string
   distance_km: number | null; base_price: number
   created_at: string; updated_at: string
 }
 export type FleetSchedule = {
-  id: string; org_id: string; route_id: string; asset_id: string
+  id: string; org_id: string; branch_id: string; route_id: string; asset_id: string
   driver_id: string | null; helper_id: string | null
   departure_time: string; arrival_time: string | null
   status: string; created_at: string; updated_at: string
 }
 export type FleetTicket = {
-  id: string; org_id: string; schedule_id: string; passenger_id: string
+  id: string; org_id: string; branch_id: string; schedule_id: string; passenger_id: string
   seat_number: string; price: number; status: string
   notes: string | null; created_at: string; updated_at: string
 }
 export type FleetMaintenanceLab = {
-  id: string; org_id: string; asset_id: string; service_date: string
+  id: string; org_id: string; branch_id: string; asset_id: string; service_date: string
   description: string; cost: number; odometer_at: number | null
   next_service_km: number | null; maintenance_number: string | null
   maintenance_type: string | null; vendor_name: string | null; technician_name: string | null
@@ -156,7 +157,7 @@ export type FleetMaintenanceLab = {
   created_at: string
 }
 export type FleetTerminal = {
-  id: string; org_id: string; name: string
+  id: string; org_id: string; branch_id: string; name: string
   location_name: string | null; gps_coords: string | null
   radius_meters: number | null; qr_code_token: string | null
   created_at: string
