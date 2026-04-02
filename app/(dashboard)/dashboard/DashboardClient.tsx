@@ -114,7 +114,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
   return (
     <motion.div 
       variants={container}
-      initial="hidden"
+      initial={false}
       animate="show"
       className="space-y-12 pb-20"
     >

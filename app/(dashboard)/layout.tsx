@@ -28,6 +28,17 @@ function moduleNameMatches(enabledModuleRaw: string, candidateRaw: string) {
   return saasModuleMatches(enabledModuleRaw, candidateRaw)
 }
 
+function resolveDashboardDependency<T>(
+  label: string,
+  result: PromiseSettledResult<T>,
+  fallback: T
+) {
+  if (result.status === 'fulfilled') return result.value
+
+  console.error(`[DashboardLayout] Failed to load ${label}:`, result.reason)
+  return fallback
+}
+
 export default async function DashboardLayout({
   children,
 }: {
@@ -39,7 +50,7 @@ export default async function DashboardLayout({
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
 
-  const [pendingApprovals, unpostedJournals, pendingPurchaseRequests, resetRequests, cashFlow, branches, isDemo, aiTokens] = await Promise.all([
+  const dependencyResults = await Promise.allSettled([
     getPendingApprovalsCount(orgData.org.id),
     getUnpostedJournalsCount(orgData.org.id),
     getPendingPurchaseRequestsCount(orgData.org.id),
@@ -49,6 +60,14 @@ export default async function DashboardLayout({
     isDemoSession(),
     getAiTokenHeaderSummary(orgData.org.id),
   ])
+  const pendingApprovals = resolveDashboardDependency('pending approvals', dependencyResults[0], 0)
+  const unpostedJournals = resolveDashboardDependency('unposted journals', dependencyResults[1], 0)
+  const pendingPurchaseRequests = resolveDashboardDependency('pending purchase requests', dependencyResults[2], 0)
+  const resetRequests = resolveDashboardDependency('HR reset requests', dependencyResults[3], 0)
+  const cashFlow = resolveDashboardDependency('cash flow summary', dependencyResults[4], null)
+  const branches = resolveDashboardDependency('branches', dependencyResults[5], [])
+  const isDemo = resolveDashboardDependency('demo session state', dependencyResults[6], false)
+  const aiTokens = resolveDashboardDependency('AI token summary', dependencyResults[7], null)
 
   // ─────────────────────────────────────────────────────────────
   // 3. SAAS MODULE & RBAC GUARD (Protect direct URL access)

@@ -120,6 +120,13 @@ export async function getActiveOrg() {
 
   const activeOrgId = memberData.org_id
   const org = memberData.organizations as any
+  if (!org || typeof org !== 'object') {
+    (console as any).error('GetActiveOrg: membership found without organization payload', {
+      userId: user.id,
+      orgId: activeOrgId,
+    })
+    return null
+  }
   const planName = org?.settings?.plan
   // Note: enabled_modules column may not exist in DB; rely on saas_packages + active_addons
   let enabledModules: string[] = []
@@ -134,8 +141,12 @@ export async function getActiveOrg() {
       .maybeSingle()
     
     if (pkgData?.modules) {
-      const pkgModules = Array.isArray(pkgData.modules) ? pkgData.modules : JSON.parse(pkgData.modules || '[]')
-      enabledModules = [...enabledModules, ...pkgModules]
+      try {
+        const pkgModules = Array.isArray(pkgData.modules) ? pkgData.modules : JSON.parse(pkgData.modules || '[]')
+        enabledModules = [...enabledModules, ...pkgModules]
+      } catch (pkgError) {
+        (console as any).error('GetActiveOrg: failed to parse package modules', pkgError)
+      }
     }
   }
 

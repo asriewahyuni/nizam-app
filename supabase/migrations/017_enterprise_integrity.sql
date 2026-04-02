@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS public.stock_movements (
 -- Index untuk audit trail per produk (Kartu Stok)
 CREATE INDEX idx_stock_movements_product ON public.stock_movements(product_id, movement_date);
 
--- 2. ATOMICITY: Fungsi RPC untuk Pembelian (The CTO's Pride)
+-- 2. ATOMICITY: Fungsi RPC untuk Pembelian (The CTOs Pride)
 -- Menghandle Header, Lines, dan Approval dalam satu transaksi DB.
 CREATE OR REPLACE FUNCTION public.process_purchase_atomic(
   p_org_id UUID,

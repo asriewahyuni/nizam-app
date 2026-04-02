@@ -12,7 +12,7 @@ function LoginForm() {
   const initialTab = searchParams.get('tab') === 'karyawan' ? 'karyawan' : 'bisnis'
   const error = searchParams.get('error')
 
-  const [tab, setTab] = useState<'bisnis' | 'karyawan'>(initialTab as any)
+  const [tab, setTab] = useState<'bisnis' | 'karyawan'>(initialTab)
   const [showPass, setShowPass] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
   const [resetMsg, setResetMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null)
@@ -85,7 +85,7 @@ function LoginForm() {
         </div>
       )}
 
-      <AnimatePresence mode="wait">
+      <AnimatePresence initial={false} mode="wait">
         {tab === 'bisnis' ? (
           <motion.div
             key="bisnis"

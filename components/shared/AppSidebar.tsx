@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore, useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import { saasModuleMatches } from '@/lib/saas/module-catalog'
@@ -233,6 +234,47 @@ export function AppSidebar({
     ? [...NAV_GROUPS, SAAS_OPERATOR_GROUP]
     : NAV_GROUPS
 
+  const isNavItemActive = (href: string) => {
+    if (href === '/dashboard') {
+      return pathname === '/dashboard'
+    }
+
+    if (href.includes('?')) {
+      return fullPath === href
+    }
+
+    return pathname.startsWith(href) && (!href.startsWith('/hris') || !tabQuery)
+  }
+
+  const getFilteredItems = (group: NavGroup) => {
+    return group.items.filter((item) => {
+      // Platform admin should always see SaaS operator shortcuts
+      if (showSaasOperatorGroup && group.group === 'SaaS Operator') return true
+
+      // 0. DEMO BYPASS: Tampilkan SEMUA modul di mode Demo/Latihan agar klien bisa eksplorasi fitur penuh
+      if (isDemo) return true
+
+      // 1. SaaS Module Check
+      if (item.module_key) {
+        const entitlementCandidates = [item.module_key, item.label]
+        const matches = enabledModules.some((moduleName) =>
+          entitlementCandidates.some((candidate) => saasModuleMatches(moduleName, candidate))
+        )
+        if (!matches) return false
+      }
+
+      // 2. RBAC Permission Check
+      if (isOwnerOrAdmin) return true
+      if (!item.permission_key) return true
+
+      const reqPerms = item.permission_key.split(',').map((key) => key.trim().toLowerCase())
+      return permissions.some((permission) => {
+        const normalizedPermission = permission.toLowerCase()
+        return reqPerms.some((requiredPermission) => normalizedPermission.includes(requiredPermission))
+      })
+    })
+  }
+
   const toggleCollapse = () => {
     const next = !isCollapsed
     if (typeof window === 'undefined') return
@@ -268,7 +310,13 @@ export function AppSidebar({
       <div className={`h-20 flex items-center px-6 ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
         <>
           <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-md shrink-0 overflow-hidden group-hover:scale-110 transition-transform">
-            <img src="/logo.png" alt="NIZAM Logo" className="w-full h-full object-cover scale-[1.3]" />
+            <Image
+              src="/logo.png"
+              alt="NIZAM Logo"
+              width={48}
+              height={48}
+              className="w-full h-full object-cover scale-[1.3]"
+            />
           </div>
           {!isCollapsed && (
             <div className="flex flex-col justify-center overflow-hidden animate-in fade-in duration-500">
@@ -282,115 +330,134 @@ export function AppSidebar({
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 overflow-y-auto no-scrollbar scroll-smooth">
         {navGroups.map((group) => {
-          // Filter items based on permissions
-          const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
-          const filteredItems = group.items.filter(item => {
-            // Platform admin should always see SaaS operator shortcuts
-            if (showSaasOperatorGroup && group.group === 'SaaS Operator') return true
-
-            // 0. DEMO BYPASS: Tampilkan SEMUA modul di mode Demo/Latihan agar klien bisa eksplorasi fitur penuh
-            if (isDemo) return true
-
-            // 1. SaaS Module Check
-            if (item.module_key) {
-               const entitlementCandidates = [item.module_key, item.label]
-               const matches = enabledModules.some((moduleName) => (
-                 entitlementCandidates.some((candidate) => saasModuleMatches(moduleName, candidate))
-               ))
-               if (!matches) return false
-            }
-
-            // 2. RBAC Permission Check
-            if (isOwnerOrAdmin) return true
-            if (!item.permission_key) return true // Public menus
-            
-            const reqPerms = item.permission_key.split(',').map(k => k.trim().toLowerCase())
-            return permissions.some(p => {
-               const pLower = p.toLowerCase()
-               return reqPerms.some(req => pLower.includes(req))
-            })
-          })
+          const filteredItems = getFilteredItems(group)
 
           if (filteredItems.length === 0) return null
 
+          const hasActiveItem = filteredItems.some((item) => isNavItemActive(item.href))
+          const groupKey = `${group.group}-${fullPath}`
+
           return (
-            <div key={group.group} className="mb-8">
-              <p className={`px-4 mb-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none flex items-center gap-2 ${isCollapsed ? 'justify-center' : ''}`}>
-                {isCollapsed ? '•••' : group.group}
-              </p>
-              <ul className="space-y-1.5">
-                {filteredItems.map((item) => {
-                  const Icon = item.icon
-                  let isActive = false
-                  
-                  if (item.href === '/dashboard') {
-                     isActive = pathname === '/dashboard'
-                  } else if (item.href.includes('?')) {
-                     isActive = fullPath === item.href
-                  } else {
-                     // For exact base matches like /hris without any query tabs
-                     isActive = pathname.startsWith(item.href) && (!item.href.startsWith('/hris') || !tabQuery)
-                  }
+            <div key={group.group} className="mb-6">
+              {isCollapsed ? (
+                <p className="px-4 mb-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none flex items-center justify-center gap-2">
+                  •••
+                </p>
+              ) : (
+                <details key={groupKey} name="app-sidebar-categories" open={hasActiveItem || undefined} className="group/details">
+                  <summary className="mb-2 flex w-full list-none items-center justify-between rounded-2xl px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 transition-all hover:bg-slate-50 hover:text-slate-600 cursor-pointer [&::-webkit-details-marker]:hidden">
+                    <span>{group.group}</span>
+                    <ChevronRight
+                      size={14}
+                      className="text-slate-300 transition-transform duration-200 group-open/details:rotate-90 group-open/details:text-[#003366]"
+                    />
+                  </summary>
+                  <ul className="space-y-1.5">
+                    {filteredItems.map((item) => {
+                      const Icon = item.icon
+                      const isActive = isNavItemActive(item.href)
 
-                  // Define Notification Badges Mapping
-                  let badgeCount = 0
-                if (item.href === '/accounting/audit') badgeCount = pendingApprovals
-                if (item.href === '/accounting/journal') badgeCount = unpostedJournals
-                if (item.href === '/purchasing') badgeCount = pendingPurchaseRequests
-                if (item.href === '/hris') badgeCount = hrisNotifications
+                      // Define Notification Badges Mapping
+                      let badgeCount = 0
+                      if (item.href === '/accounting/audit') badgeCount = pendingApprovals
+                      if (item.href === '/accounting/journal') badgeCount = unpostedJournals
+                      if (item.href === '/purchasing') badgeCount = pendingPurchaseRequests
+                      if (item.href === '/hris') badgeCount = hrisNotifications
 
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        onClick={() => setIsMobileOpen(false)}
-                        title={isCollapsed ? item.label : ''}
-                        className={`flex items-center rounded-2xl text-sm font-bold transition-all duration-200 group/item relative
-                          ${isCollapsed ? 'justify-center p-3' : 'justify-between px-4 py-3'}
-                          ${isActive
-                            ? 'bg-[#003366] text-white shadow-lg shadow-[#003366]/20'
-                            : 'text-slate-500 hover:text-[#003366] hover:bg-[#003366]/5'
-                          }`}
-                      >
-                        <div className="flex items-center gap-3.5 relative">
-                          {/* Icon Container with absolute badge for collapsed mode */}
+                      return (
+                        <li key={item.href}>
+                          <Link
+                            href={item.href}
+                            onClick={() => setIsMobileOpen(false)}
+                            title={isCollapsed ? item.label : ''}
+                            className={`flex items-center rounded-2xl text-sm font-bold transition-all duration-200 group/item relative
+                              ${isCollapsed ? 'justify-center p-3' : 'justify-between px-4 py-3'}
+                              ${isActive
+                                ? 'bg-[#003366] text-white shadow-lg shadow-[#003366]/20'
+                                : 'text-slate-500 hover:text-[#003366] hover:bg-[#003366]/5'
+                              }`}
+                          >
+                            <div className="flex items-center gap-3.5 relative">
+                              <div className="relative">
+                                <Icon
+                                  size={18}
+                                  strokeWidth={isActive ? 2.5 : 2}
+                                  className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover/item:text-emerald-500'}`}
+                                />
+                                {isCollapsed && badgeCount > 0 && (
+                                  <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-[#003366] border border-white flex items-center justify-center text-[7px] font-black text-white shrink-0">
+                                    {badgeCount > 9 ? '9+' : badgeCount}
+                                  </div>
+                                )}
+                              </div>
+
+                              {!isCollapsed && (
+                                <span className="tracking-tight truncate flex-1">{item.label}</span>
+                              )}
+                            </div>
+
+                            {!isCollapsed && (
+                              <div className="flex items-center gap-2">
+                                {badgeCount > 0 && (
+                                  <div className={`px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-widest leading-none flex items-center justify-center animate-in fade-in zoom-in ${isActive ? 'bg-white text-[#003366] shadow-sm' : 'bg-[#003366] text-white shadow-sm shadow-[#003366]/10'}`}>
+                                    {badgeCount}
+                                  </div>
+                                )}
+                                <ChevronRight
+                                  size={14}
+                                  className={`transition-all ${isActive ? 'text-white opacity-50' : 'text-slate-300 opacity-0 -translate-x-1 group-hover/item:opacity-100 group-hover/item:translate-x-0'}`}
+                                />
+                              </div>
+                            )}
+                          </Link>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </details>
+              )}
+              {isCollapsed && (
+                <ul className="space-y-1.5">
+                  {filteredItems.map((item) => {
+                    const Icon = item.icon
+                    const isActive = isNavItemActive(item.href)
+
+                    let badgeCount = 0
+                    if (item.href === '/accounting/audit') badgeCount = pendingApprovals
+                    if (item.href === '/accounting/journal') badgeCount = unpostedJournals
+                    if (item.href === '/purchasing') badgeCount = pendingPurchaseRequests
+                    if (item.href === '/hris') badgeCount = hrisNotifications
+
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          onClick={() => setIsMobileOpen(false)}
+                          title={item.label}
+                          className={`flex items-center justify-center rounded-2xl p-3 text-sm font-bold transition-all duration-200 group/item relative
+                            ${isActive
+                              ? 'bg-[#003366] text-white shadow-lg shadow-[#003366]/20'
+                              : 'text-slate-500 hover:text-[#003366] hover:bg-[#003366]/5'
+                            }`}
+                        >
                           <div className="relative">
                             <Icon
                               size={18}
                               strokeWidth={isActive ? 2.5 : 2}
                               className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover/item:text-emerald-500'}`}
                             />
-                            {isCollapsed && badgeCount > 0 && (
+                            {badgeCount > 0 && (
                               <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-[#003366] border border-white flex items-center justify-center text-[7px] font-black text-white shrink-0">
                                 {badgeCount > 9 ? '9+' : badgeCount}
                               </div>
                             )}
                           </div>
-
-                          {!isCollapsed && (
-                            <span className="tracking-tight truncate flex-1">{item.label}</span>
-                          )}
-                        </div>
-
-                        {/* Notifications / Chevrons for Expanded Mode */}
-                        {!isCollapsed && (
-                          <div className="flex items-center gap-2">
-                            {badgeCount > 0 && (
-                              <div className={`px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-widest leading-none flex items-center justify-center animate-in fade-in zoom-in ${isActive ? 'bg-white text-[#003366] shadow-sm' : 'bg-[#003366] text-white shadow-sm shadow-[#003366]/10'}`}>
-                                {badgeCount}
-                              </div>
-                            )}
-                            <ChevronRight
-                              size={14}
-                              className={`transition-all ${isActive ? 'text-white opacity-50' : 'text-slate-300 opacity-0 -translate-x-1 group-hover/item:opacity-100 group-hover/item:translate-x-0'}`}
-                            />
-                          </div>
-                        )}
-                      </Link>
-                    </li>
-                  )
-                })}
-              </ul>
+                        </Link>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
             </div>
           )
         })}
