@@ -1,29 +1,52 @@
 'use client'
 
-import React, { useState, useRef } from 'react'
+import React, { startTransition, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Camera, Lock, CheckCircle, AlertCircle, Eye, EyeOff, Phone, User, Briefcase, Shield, X } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Camera, Lock, CheckCircle, AlertCircle, Eye, EyeOff, Phone, User, Briefcase, Shield, X, Clock, CalendarDays } from 'lucide-react'
 import { uploadEmployeeAvatar, updateEmployeeProfile, updateEmployeePasswordSelf } from '@/modules/hris/actions/employee.actions'
+import { cancelMyLeaveRequest, clockMyAttendance, submitMyLeaveRequest } from '@/modules/hris/actions/self-service.actions'
+import { formatDate } from '@/lib/utils'
 
 interface Props {
   employee: any
   orgId: string
   userName: string
+  initialAttendanceRecords: any[]
+  initialLeaveRequests: any[]
 }
 
-export default function ProfilSayaClient({ employee, orgId, userName }: Props) {
+export default function ProfilSayaClient({ employee, orgId, userName, initialAttendanceRecords, initialLeaveRequests }: Props) {
+  const router = useRouter()
   const [avatarPreview, setAvatarPreview] = useState<string | null>(employee?.avatar_url || null)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [whatsapp, setWhatsapp] = useState(employee?.whatsapp || '')
+  const [attendanceRecords, setAttendanceRecords] = useState(initialAttendanceRecords || [])
+  const [leaveRequests, setLeaveRequests] = useState(initialLeaveRequests || [])
   const [saving, setSaving] = useState(false)
   const [pwdSaving, setPwdSaving] = useState(false)
+  const [attendanceSaving, setAttendanceSaving] = useState(false)
+  const [leaveSaving, setLeaveSaving] = useState(false)
   const [showOldPwd, setShowOldPwd] = useState(false)
   const [showNewPwd, setShowNewPwd] = useState(false)
   const [showConfirmPwd, setShowConfirmPwd] = useState(false)
   const [newPwd, setNewPwd] = useState('')
   const [confirmPwd, setConfirmPwd] = useState('')
+  const [attendanceNotes, setAttendanceNotes] = useState('')
+  const [leaveType, setLeaveType] = useState('Annual Leave')
+  const [leaveStartDate, setLeaveStartDate] = useState(new Date().toISOString().split('T')[0])
+  const [leaveEndDate, setLeaveEndDate] = useState(new Date().toISOString().split('T')[0])
+  const [leaveReason, setLeaveReason] = useState('')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setAttendanceRecords(initialAttendanceRecords || [])
+  }, [initialAttendanceRecords])
+
+  useEffect(() => {
+    setLeaveRequests(initialLeaveRequests || [])
+  }, [initialLeaveRequests])
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type })
@@ -67,9 +90,74 @@ export default function ProfilSayaClient({ employee, orgId, userName }: Props) {
     else { showToast('Password berhasil diperbarui!', 'success'); setNewPwd(''); setConfirmPwd('') }
   }
 
+  const refreshSelfService = () => {
+    startTransition(() => {
+      router.refresh()
+    })
+  }
+
+  const handleClockAttendance = async (type: 'IN' | 'OUT') => {
+    setAttendanceSaving(true)
+    const res = await clockMyAttendance(orgId, {
+      type,
+      notes: attendanceNotes,
+    })
+    setAttendanceSaving(false)
+
+    if (res.error) {
+      showToast(res.error, 'error')
+      return
+    }
+
+    setAttendanceNotes('')
+    showToast(type === 'IN' ? 'Clock-in berhasil dicatat.' : 'Clock-out berhasil dicatat.', 'success')
+    refreshSelfService()
+  }
+
+  const handleSubmitLeave = async () => {
+    const formData = new FormData()
+    formData.set('leave_type', leaveType)
+    formData.set('start_date', leaveStartDate)
+    formData.set('end_date', leaveEndDate)
+    formData.set('reason', leaveReason)
+
+    setLeaveSaving(true)
+    const res = await submitMyLeaveRequest(orgId, formData)
+    setLeaveSaving(false)
+
+    if (res.error) {
+      showToast(res.error, 'error')
+      return
+    }
+
+    setLeaveReason('')
+    setLeaveType('Annual Leave')
+    setLeaveStartDate(new Date().toISOString().split('T')[0])
+    setLeaveEndDate(new Date().toISOString().split('T')[0])
+    showToast('Pengajuan cuti berhasil dikirim.', 'success')
+    refreshSelfService()
+  }
+
+  const handleCancelLeave = async (leaveId: string) => {
+    setLeaveSaving(true)
+    const res = await cancelMyLeaveRequest(orgId, leaveId)
+    setLeaveSaving(false)
+
+    if (res.error) {
+      showToast(res.error, 'error')
+      return
+    }
+
+    showToast('Pengajuan cuti berhasil dibatalkan.', 'success')
+    refreshSelfService()
+  }
+
   const initials = employee
     ? `${employee.first_name?.[0] || ''}${employee.last_name?.[0] || ''}`.toUpperCase()
     : (userName?.[0] || 'U').toUpperCase()
+
+  const todayAttendanceKey = new Date().toISOString().split('T')[0]
+  const todayAttendance = attendanceRecords.find((record: any) => record.record_date === todayAttendanceKey) || null
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 py-4">
@@ -114,6 +202,7 @@ export default function ProfilSayaClient({ employee, orgId, userName }: Props) {
               </p>
               <p className="text-sm font-bold text-blue-600 uppercase tracking-widest mt-0.5">{employee?.job_title || 'Karyawan'}</p>
               {employee?.nik && <p className="text-[11px] font-black text-slate-300 font-mono tracking-widest mt-1">#{employee.nik}</p>}
+              {employee?.branch?.name && <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-2">{employee.branch.name}</p>}
             </div>
           </div>
 
@@ -166,6 +255,205 @@ export default function ProfilSayaClient({ employee, orgId, userName }: Props) {
             )}
             {saving ? 'Menyimpan...' : 'Simpan Profil'}
           </button>
+        </div>
+      </motion.div>
+
+      {/* === SELF SERVICE ATTENDANCE === */}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
+        <div className="h-2 bg-gradient-to-r from-emerald-400 via-sky-400 to-blue-500" />
+        <div className="p-10 space-y-8">
+          <div className="flex items-center gap-4">
+            <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center">
+              <Clock size={18} />
+            </div>
+            <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Absensi Mandiri</h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+              <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Status Hari Ini</p>
+              <p className="text-sm font-black text-slate-700">{todayAttendance?.status || 'BELUM CLOCK-IN'}</p>
+            </div>
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+              <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Jam Masuk</p>
+              <p className="text-sm font-black text-slate-700">{todayAttendance?.check_in ? new Date(todayAttendance.check_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
+            </div>
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+              <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Jam Keluar</p>
+              <p className="text-sm font-black text-slate-700">{todayAttendance?.check_out ? new Date(todayAttendance.check_out).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Catatan Absensi</label>
+            <textarea
+              value={attendanceNotes}
+              onChange={(e) => setAttendanceNotes(e.target.value)}
+              rows={3}
+              placeholder="Catatan opsional untuk clock-in atau clock-out..."
+              className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 focus:bg-white focus:border-emerald-500 outline-none transition-all resize-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              onClick={() => handleClockAttendance('IN')}
+              disabled={attendanceSaving || Boolean(todayAttendance)}
+              className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-200 active:scale-[0.98]"
+            >
+              {attendanceSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle size={16} />}
+              CLOCK IN
+            </button>
+            <button
+              onClick={() => handleClockAttendance('OUT')}
+              disabled={attendanceSaving || !todayAttendance || Boolean(todayAttendance?.check_out)}
+              className="w-full py-4 rounded-2xl bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-sky-200 active:scale-[0.98]"
+            >
+              {attendanceSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Clock size={16} />}
+              CLOCK OUT
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Riwayat 14 Hari Terakhir</p>
+            {attendanceRecords.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-5 text-sm font-bold text-slate-400">
+                Belum ada riwayat absensi.
+              </div>
+            ) : (
+              attendanceRecords.map((record: any) => (
+                <div key={record.id} className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-black text-slate-800">{formatDate(record.record_date)}</p>
+                    <p className="text-[11px] font-bold text-slate-500">{record.branch?.name || employee?.branch?.name || 'Unit tidak diketahui'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">{record.status}</p>
+                    <p className="text-[11px] font-bold text-slate-500">
+                      {record.check_in ? new Date(record.check_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                      {' · '}
+                      {record.check_out ? new Date(record.check_out).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* === SELF SERVICE LEAVE === */}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
+        <div className="h-2 bg-gradient-to-r from-indigo-400 via-violet-400 to-fuchsia-500" />
+        <div className="p-10 space-y-8">
+          <div className="flex items-center gap-4">
+            <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center">
+              <CalendarDays size={18} />
+            </div>
+            <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Pengajuan Cuti</h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Jenis Cuti</label>
+              <select
+                value={leaveType}
+                onChange={(e) => setLeaveType(e.target.value)}
+                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+              >
+                <option value="Annual Leave">Annual Leave</option>
+                <option value="Sick Leave">Sick Leave</option>
+                <option value="Unpaid Leave">Unpaid Leave</option>
+                <option value="Special Leave">Special Leave</option>
+              </select>
+            </div>
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+              <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Unit Pengajuan</p>
+              <p className="text-sm font-black text-slate-700">{employee?.branch?.name || 'Belum terhubung ke unit'}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tanggal Mulai</label>
+              <input
+                type="date"
+                value={leaveStartDate}
+                onChange={(e) => setLeaveStartDate(e.target.value)}
+                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tanggal Selesai</label>
+              <input
+                type="date"
+                value={leaveEndDate}
+                onChange={(e) => setLeaveEndDate(e.target.value)}
+                className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Alasan</label>
+            <textarea
+              value={leaveReason}
+              onChange={(e) => setLeaveReason(e.target.value)}
+              rows={4}
+              placeholder="Tuliskan alasan cuti Anda..."
+              className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 focus:bg-white focus:border-indigo-500 outline-none transition-all resize-none"
+            />
+          </div>
+
+          <button
+            onClick={handleSubmitLeave}
+            disabled={leaveSaving || !employee}
+            className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-200 active:scale-[0.98]"
+          >
+            {leaveSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CalendarDays size={16} />}
+            KIRIM PENGAJUAN CUTI
+          </button>
+
+          <div className="space-y-3">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Pengajuan Terbaru</p>
+            {leaveRequests.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-5 text-sm font-bold text-slate-400">
+                Belum ada pengajuan cuti.
+              </div>
+            ) : (
+              leaveRequests.map((request: any) => (
+                <div key={request.id} className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-black text-slate-800">{request.leave_type}</p>
+                    <p className="text-[11px] font-bold text-slate-500">{formatDate(request.start_date)} sampai {formatDate(request.end_date)} • {request.days_taken} hari</p>
+                    <p className="text-[11px] font-medium text-slate-500">{request.reason}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-[0.18em] border ${
+                      request.status === 'APPROVED'
+                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                        : request.status === 'REJECTED'
+                          ? 'bg-rose-50 text-rose-600 border-rose-100'
+                          : request.status === 'CANCELLED'
+                            ? 'bg-slate-100 text-slate-500 border-slate-200'
+                            : 'bg-amber-50 text-amber-600 border-amber-100'
+                    }`}>
+                      {request.status}
+                    </span>
+                    {request.status === 'PENDING' && (
+                      <button
+                        onClick={() => handleCancelLeave(request.id)}
+                        disabled={leaveSaving}
+                        className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 disabled:opacity-40"
+                      >
+                        Batalkan
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </motion.div>
 

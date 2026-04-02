@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getMyAttendanceRecords, getMyLeaveRequests } from '@/modules/hris/actions/self-service.actions'
 import ProfilSayaClient from './ProfilSayaClient'
 
 export default async function ProfilSayaPage() {
@@ -15,16 +16,23 @@ export default async function ProfilSayaPage() {
   // Find this user's employee record
   const { data: employee } = await (supabase as any)
     .from('employees')
-    .select('*')
+    .select('*, branch:branches(id, name, code)')
     .eq('org_id', orgData.org.id)
     .eq('user_id', user?.id)
     .maybeSingle()
+
+  const [attendanceRecords, leaveRequests] = await Promise.all([
+    getMyAttendanceRecords(orgData.org.id),
+    getMyLeaveRequests(orgData.org.id),
+  ])
 
   return (
     <ProfilSayaClient
       employee={employee}
       orgId={orgData.org.id}
       userName={orgData.user?.user_metadata?.full_name || orgData.user?.email || ''}
+      initialAttendanceRecords={attendanceRecords}
+      initialLeaveRequests={leaveRequests}
     />
   )
 }
