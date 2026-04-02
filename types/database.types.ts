@@ -55,7 +55,7 @@ export type Organization = {
 }
 export type Warehouse = {
   id: string; org_id: string; code: string; name: string
-  address: string | null; is_active: boolean; created_at: string; updated_at: string
+  branch_id: string | null; address: string | null; is_active: boolean; created_at: string; updated_at: string
 }
 export type InventoryStock = {
   id: string; org_id: string; product_id: string; warehouse_id: string
@@ -63,7 +63,7 @@ export type InventoryStock = {
   created_at: string; updated_at: string
 }
 export type StockMovement = {
-  id: string; org_id: string; product_id: string; movement_date: string
+  id: string; org_id: string; branch_id: string | null; product_id: string; movement_date: string
   quantity: number; unit_price: number; reference_type: string
   reference_id: string; notes: string | null; created_at: string
 }

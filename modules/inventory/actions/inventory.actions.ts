@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { Product } from '@/types/database.types'
+import { getActiveBranch } from '@/modules/organization/actions/org.actions'
 
 export interface ProductWithStock extends Product {
   stock_in: number
@@ -11,17 +12,80 @@ export interface ProductWithStock extends Product {
   stock_available: number
 }
 
-export async function getProducts(orgId: string): Promise<ProductWithStock[]> {
+type WarehouseScopeRecord = {
+  id: string
+  branch_id: string | null
+  is_active: boolean
+}
+
+async function resolveActiveBranchId(orgId: string, branchId?: string | null) {
+  if (branchId !== undefined) {
+    return branchId ?? null
+  }
+
+  const activeBranch = await getActiveBranch(orgId)
+  return activeBranch?.id ?? null
+}
+
+async function getScopedWarehouses(
+  supabase: any,
+  orgId: string,
+  warehouseIds: string[],
+  branchId: string | null
+): Promise<WarehouseScopeRecord[]> {
+  const uniqueIds = [...new Set(warehouseIds.filter(Boolean))]
+  if (uniqueIds.length === 0) return []
+
+  let query = supabase
+    .from('warehouses')
+    .select('id, branch_id, is_active')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .in('id', uniqueIds)
+
+  if (branchId) {
+    query = query.or(`branch_id.eq.${branchId},branch_id.is.null`)
+  }
+
+  const { data, error } = await query
+  if (error) return []
+  return (data as WarehouseScopeRecord[]) || []
+}
+
+export async function getProducts(orgId: string, branchId?: string | null): Promise<ProductWithStock[]> {
   const supabase = await createClient()
+  const effectiveBranchId = await resolveActiveBranchId(orgId, branchId)
 
   const { data: productsData } = await supabase.from('products').select('*').eq('org_id', orgId).order('name', { ascending: true })
-  const { data: movementsData } = await supabase.from('stock_movements').select('product_id, quantity, unit_price').eq('org_id', orgId)
+  let movementsQuery = supabase
+    .from('stock_movements')
+    .select('product_id, quantity, unit_price')
+    .eq('org_id', orgId)
+
+  if (effectiveBranchId) {
+    movementsQuery = (movementsQuery as any).or(`branch_id.eq.${effectiveBranchId},branch_id.is.null`)
+  }
+
+  const { data: movementsData } = await movementsQuery
+
+  let stockQuery = (supabase as any)
+    .from('inventory_stocks')
+    .select('product_id, quantity, warehouses!inner(branch_id)')
+    .eq('org_id', orgId)
+
+  if (effectiveBranchId) {
+    stockQuery = stockQuery.or(`branch_id.eq.${effectiveBranchId},branch_id.is.null`, { foreignTable: 'warehouses' })
+  }
+
+  const { data: stockRows } = await stockQuery
 
   const products = productsData || []
   const movements = movementsData || []
+  const currentStocks = stockRows || []
 
   // Aggregate Movements per Product (Sub-Ledger Logic)
   const aggregation: Record<string, { in: number, out: number, value: number }> = {}
+  const stockByProduct: Record<string, number> = {}
   
   movements.forEach((m: any) => {
     if (!aggregation[m.product_id]) aggregation[m.product_id] = { in: 0, out: 0, value: 0 }
@@ -39,17 +103,23 @@ export async function getProducts(orgId: string): Promise<ProductWithStock[]> {
     aggregation[m.product_id].value += (qty * price)
   })
 
+  currentStocks.forEach((stock: any) => {
+    stockByProduct[stock.product_id] = (stockByProduct[stock.product_id] || 0) + Number(stock.quantity || 0)
+  })
+
   return products.map((p: any) => {
     const stats = aggregation[p.id] || { in: 0, out: 0, value: 0 }
-    const available = stats.in - stats.out
+    const available = effectiveBranchId ? (stockByProduct[p.id] || 0) : (stats.in - stats.out)
+    const stockValue = effectiveBranchId
+      ? Math.max(0, available * Number(p.purchase_price || 0))
+      : Math.max(0, stats.value)
 
     return {
       ...p,
       stock_in: stats.in,
       stock_out: stats.out,
       stock_available: available,
-      // CFO Requirement: Value Must Mirror Sub-Ledger
-      stock_value: Math.max(0, stats.value) 
+      stock_value: stockValue,
     }
   })
 }
@@ -191,6 +261,17 @@ export async function createInventoryAdjustment(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
+  const activeBranchId = await resolveActiveBranchId(orgId)
+  const scopedWarehouses = await getScopedWarehouses(
+    supabase as any,
+    orgId,
+    payload.items.map((item) => item.warehouse_id),
+    activeBranchId
+  )
+
+  if (scopedWarehouses.length !== [...new Set(payload.items.map((item) => item.warehouse_id))].length) {
+    return { error: 'Gudang opname tidak tersedia pada unit aktif.' }
+  }
 
   const { data: adj, error: adjErr } = await insertAdjustmentWithRetry(supabase, {
     org_id: orgId,
@@ -250,6 +331,17 @@ export async function createInventoryTransfer(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
+  const activeBranchId = await resolveActiveBranchId(orgId)
+  const scopedWarehouses = await getScopedWarehouses(
+    supabase as any,
+    orgId,
+    [payload.source_wh_id, payload.target_wh_id],
+    activeBranchId
+  )
+
+  if (scopedWarehouses.length !== 2) {
+    return { error: 'Gudang transfer tidak tersedia pada unit aktif.' }
+  }
 
   // 🔴 RESILIENCY FIX: Use existing 'inventory_adjustments' table (MIGRATION 031 compatible)
   // Modeling Transfer as a 2-line adjustment: -Qty (Source) and +Qty (Target)
@@ -337,8 +429,9 @@ export async function createInventoryWriteOff(orgId: string, payload: any) {
   })
 }
 
-export async function getStockLedger(orgId: string, productId: string) {
+export async function getStockLedger(orgId: string, productId: string, branchId?: string | null) {
   const supabase = await createClient()
+  const effectiveBranchId = await resolveActiveBranchId(orgId, branchId)
   
   const { data: product } = await supabase
     .from('products')
@@ -346,12 +439,17 @@ export async function getStockLedger(orgId: string, productId: string) {
     .eq('id', productId)
     .single()
 
-  const { data: movements, error } = await supabase
+  let movementsQuery = supabase
     .from('stock_movements')
     .select('*')
     .eq('org_id', orgId)
     .eq('product_id', productId)
-    .order('created_at', { ascending: true })
+
+  if (effectiveBranchId) {
+    movementsQuery = (movementsQuery as any).or(`branch_id.eq.${effectiveBranchId},branch_id.is.null`)
+  }
+
+  const { data: movements, error } = await movementsQuery.order('created_at', { ascending: true })
     
   if (error) return { error: error.message }
   
@@ -361,14 +459,21 @@ export async function getStockLedger(orgId: string, productId: string) {
   }
 }
 
-export async function getWarehouseStocks(orgId: string, productId: string) {
+export async function getWarehouseStocks(orgId: string, productId: string, branchId?: string | null) {
   const supabase = await createClient()
+  const effectiveBranchId = await resolveActiveBranchId(orgId, branchId)
 
-  const { data, error } = await supabase
+  let query = (supabase as any)
     .from('inventory_stocks')
-    .select('warehouse_id, quantity, warehouses(name)')
+    .select('warehouse_id, quantity, warehouses!inner(name, branch_id)')
     .eq('org_id', orgId)
     .eq('product_id', productId)
+
+  if (effectiveBranchId) {
+    query = query.or(`branch_id.eq.${effectiveBranchId},branch_id.is.null`, { foreignTable: 'warehouses' })
+  }
+
+  const { data, error } = await query
 
   if (error) return []
   return data.map((s: any) => ({
@@ -391,4 +496,3 @@ export async function getProductByBarcode(orgId: string, barcode: string) {
   if (error) return null
   return data as Product | null
 }
-

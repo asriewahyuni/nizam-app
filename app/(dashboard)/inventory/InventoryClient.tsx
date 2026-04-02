@@ -45,6 +45,39 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
       }
     }
   }, [adjustId, products])
+
+  useEffect(() => {
+    setProducts(initialProducts)
+  }, [initialProducts])
+
+  useEffect(() => {
+    const firstWarehouseId = warehouses[0]?.id || ''
+    const secondWarehouseId = warehouses[1]?.id || firstWarehouseId
+
+    setExpandedId(null)
+    setWhStocks([])
+    setAdjForm((current) => ({
+      ...current,
+      warehouse_id: warehouses.some((warehouse) => warehouse.id === current.warehouse_id)
+        ? current.warehouse_id
+        : firstWarehouseId,
+    }))
+    setWriteOffForm((current) => ({
+      ...current,
+      warehouse_id: warehouses.some((warehouse) => warehouse.id === current.warehouse_id)
+        ? current.warehouse_id
+        : firstWarehouseId,
+    }))
+    setTrfForm((current) => ({
+      ...current,
+      source_wh_id: warehouses.some((warehouse) => warehouse.id === current.source_wh_id)
+        ? current.source_wh_id
+        : firstWarehouseId,
+      target_wh_id: warehouses.some((warehouse) => warehouse.id === current.target_wh_id)
+        ? current.target_wh_id
+        : secondWarehouseId,
+    }))
+  }, [warehouses])
   
   const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false)
   

@@ -96,7 +96,7 @@ export function AuditClient({ logs, orgName, orgId }: { logs: AuditLog[], orgNam
                          alert('Data telah dibersihkan. Memuat ulang sistem...')
                          window.location.reload()
                       } else {
-                         alert('Gagal reset: ' + res.error)
+                         alert('Gagal reset: ' + ('error' in res ? res.error : 'Terjadi kesalahan yang tidak diketahui.'))
                       }
                    }
                 }

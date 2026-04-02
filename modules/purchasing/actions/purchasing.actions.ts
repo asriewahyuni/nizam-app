@@ -253,6 +253,38 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
   const insurance = purchase.insurance_amount || 0
   const totalLandedOverhead = shipping + insurance
   const totalItemsValue = purchase.total_amount || 1
+  let fallbackWarehouse: { id: string; branch_id: string | null } | null = null
+
+  if (!purchase.warehouse_id) {
+    let warehouseQuery = (supabase as any)
+      .from('warehouses')
+      .select('id, branch_id')
+      .eq('org_id', orgId)
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+      .limit(1)
+
+    if (purchase.branch_id) {
+      warehouseQuery = warehouseQuery.or(`branch_id.eq.${purchase.branch_id},branch_id.is.null`)
+    }
+
+    const { data } = await warehouseQuery.maybeSingle()
+    fallbackWarehouse = data || null
+  }
+
+  let movementBranchId = purchase.branch_id || fallbackWarehouse?.branch_id || null
+
+  if (!movementBranchId && purchase.warehouse_id) {
+    const { data: warehouseBranchData } = await (supabase as any)
+      .from('warehouses')
+      .select('branch_id')
+      .eq('id', purchase.warehouse_id)
+      .eq('org_id', orgId)
+      .maybeSingle()
+
+    movementBranchId = warehouseBranchData?.branch_id || null
+  }
+
   const stockMovements: any[] = []
 
   // 3. Process Items for WAC & Stock Card
@@ -275,6 +307,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 
     stockMovements.push({
       org_id: orgId,
+      branch_id: movementBranchId,
       product_id: item.product_id,
       quantity: item.quantity,
       unit_price: landedUnitPrice,
@@ -290,7 +323,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
      if (smErr) (console as any).error("Stock Movement insert failed:", smErr)
      
      // CRITICAL: Sync with physical inventory (inventory_stocks)
-     const whId = purchase.warehouse_id || (await (supabase as any).from('warehouses').select('id').eq('org_id', orgId).limit(1).single().then((r: any) => r.data?.id))
+     const whId = purchase.warehouse_id || fallbackWarehouse?.id
      
      if (whId) {
         for (const m of stockMovements) {
