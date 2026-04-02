@@ -15,11 +15,19 @@ import { BarcodeLabel } from '@/components/shared/BarcodeLabel'
 
 interface InventoryClientProps {
   orgId: string
+  activeBranchId: string | null
+  activeBranchName?: string | null
   initialProducts: ProductWithStock[]
   warehouses: any[]
 }
 
-export default function InventoryClient({ orgId, initialProducts, warehouses = [] }: InventoryClientProps) {
+export default function InventoryClient({
+  orgId,
+  activeBranchId,
+  activeBranchName,
+  initialProducts,
+  warehouses = [],
+}: InventoryClientProps) {
   const [products, setProducts] = useState<ProductWithStock[]>(initialProducts)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isWriteOffModalOpen, setIsWriteOffModalOpen] = useState(false)
@@ -34,6 +42,13 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
   // Real-time stocks per warehouse
   const [whStocks, setWhStocks] = useState<{warehouse_id: string, quantity: number, warehouse_name?: string}[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const hasActiveBranch = Boolean(activeBranchId)
+  const hasWarehouses = warehouses.length > 0
+  const physicalStockGuardMessage = !hasActiveBranch
+    ? 'Pilih unit aktif terlebih dahulu untuk melakukan mutasi stok dan kelola gudang fisik.'
+    : !hasWarehouses
+      ? `Belum ada gudang aktif di unit ${activeBranchName || 'terpilih'}. Tambahkan gudang terlebih dahulu.`
+      : null
   const searchParams = useSearchParams()
   const adjustId = searchParams.get('adjust')
 
@@ -49,6 +64,13 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
   useEffect(() => {
     setProducts(initialProducts)
   }, [initialProducts])
+
+  useEffect(() => {
+    if (!physicalStockGuardMessage) return
+    setIsAdjustmentModalOpen(false)
+    setIsTransferModalOpen(false)
+    setIsWriteOffModalOpen(false)
+  }, [physicalStockGuardMessage])
 
   useEffect(() => {
     const firstWarehouseId = warehouses[0]?.id || ''
@@ -152,7 +174,7 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
     setWriteOffForm({
       ...writeOffForm,
       product_id: product?.id || '',
-      unit_cost: product?.purchase_price || 0,
+      unit_cost: Number((product as any)?.average_cost ?? product?.purchase_price ?? 0),
       quantity: 1
     })
     setIsWriteOffModalOpen(true)
@@ -182,7 +204,7 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
         notes: 'Hasil penghitungan fisik (Stock Opname)'
       }]
     })
-    if (res.error) alert(res.error); else { alert('Berhasil melakukan Stok Opname!'); window.location.reload(); }
+    if ('error' in res && res.error) alert(res.error); else { alert('Berhasil melakukan Stok Opname!'); window.location.reload(); }
     setIsSubmitting(false)
   }
 
@@ -201,7 +223,7 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
         notes: 'Mutasi stok antar gudang'
       }]
     })
-    if (res.error) alert(res.error); else { alert('Berhasil memindahkan stok!'); window.location.reload(); }
+    if ('error' in res && res.error) alert(res.error); else { alert('Berhasil memindahkan stok!'); window.location.reload(); }
     setIsSubmitting(false)
   }
 
@@ -221,7 +243,7 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
         notes: writeOffForm.line_notes
       }]
     })
-    if (res.error) alert(res.error); else { alert('Berhasil melakukan Write-off!'); window.location.reload(); }
+    if ('error' in res && res.error) alert(res.error); else { alert('Berhasil melakukan Write-off!'); window.location.reload(); }
     setIsSubmitting(false)
   }
 
@@ -310,6 +332,8 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
             <SafeButton 
               variant="white"
               icon={<ArrowLeftRight size={16} />}
+              disabled={Boolean(physicalStockGuardMessage)}
+              title={physicalStockGuardMessage || undefined}
               onClick={() => setIsTransferModalOpen(true)}
             >
               Transfer Stok
@@ -317,6 +341,8 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
             <SafeButton 
               variant="white"
               icon={<CheckCircle2 size={16} />}
+              disabled={Boolean(physicalStockGuardMessage)}
+              title={physicalStockGuardMessage || undefined}
               onClick={() => setIsAdjustmentModalOpen(true)}
             >
               Stok Opname
@@ -331,6 +357,12 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
           </div>
         }
       />
+
+      {physicalStockGuardMessage && (
+        <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-800 shadow-sm">
+          {physicalStockGuardMessage}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
@@ -485,8 +517,9 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
                           </Link>
                          <button 
                            onClick={() => handleOpenWriteOff(product)} 
-                           className="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-rose-100" 
-                           title="Write-off (Barang Rusak/Ilang)"
+                           disabled={Boolean(physicalStockGuardMessage)}
+                           className="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-rose-100 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-rose-50 disabled:hover:text-rose-600" 
+                           title={physicalStockGuardMessage || 'Write-off (Barang Rusak/Ilang)'}
                          >
                             <Trash2 size={16} />
                          </button>
@@ -552,7 +585,12 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
                           const p = products.find((x: any) => x.id === id)
                           const stocks = await handleFetchWhStocks(id)
                           const curQty = stocks?.find((s: any) => s.warehouse_id === adjForm.warehouse_id)?.quantity || 0
-                          setAdjForm({...adjForm, product_id: id, current_qty: curQty, unit_cost: p?.purchase_price || 0})
+                          setAdjForm({
+                            ...adjForm,
+                            product_id: id,
+                            current_qty: curQty,
+                            unit_cost: Number((p as any)?.average_cost ?? p?.purchase_price ?? 0),
+                          })
                         }} 
                         className="w-full px-5 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-bold outline-none focus:ring-2 focus:ring-emerald-100 appearance-none"
                       >
@@ -826,7 +864,12 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
               if (product) {
                  const stocks = await handleFetchWhStocks(product.id)
                  const curQty = stocks?.find((s: any) => s.warehouse_id === adjForm.warehouse_id)?.quantity || 0
-                 setAdjForm({ ...adjForm, product_id: product.id, current_qty: curQty, unit_cost: product.purchase_price || 0 })
+                 setAdjForm({
+                   ...adjForm,
+                   product_id: product.id,
+                   current_qty: curQty,
+                   unit_cost: Number((product as any).average_cost ?? product.purchase_price ?? 0),
+                 })
               } else {
                  alert("Produk tidak ditemukan!")
               }

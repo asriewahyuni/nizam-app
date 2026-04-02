@@ -23,6 +23,8 @@ type WarehouseFormState = {
 
 interface WarehouseClientProps {
   orgId: string
+  activeBranchId: string | null
+  activeBranchName?: string | null
   initialWarehouses: any[]
   userRole: string
 }
@@ -57,7 +59,13 @@ function toFormState(warehouse: WarehouseRecord): WarehouseFormState {
   }
 }
 
-export function WarehouseClient({ orgId, initialWarehouses, userRole }: WarehouseClientProps) {
+export function WarehouseClient({
+  orgId,
+  activeBranchId,
+  activeBranchName,
+  initialWarehouses,
+  userRole,
+}: WarehouseClientProps) {
   const router = useRouter()
   const [warehouses, setWarehouses] = useState<WarehouseRecord[]>(() => sortWarehouses((initialWarehouses || []).map(normalizeWarehouse)))
   const [searchQuery, setSearchQuery] = useState('')
@@ -67,12 +75,20 @@ export function WarehouseClient({ orgId, initialWarehouses, userRole }: Warehous
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [formData, setFormData] = useState<WarehouseFormState>(createEmptyForm)
+  const isAdmin = ['owner', 'admin', 'manager'].includes(userRole)
+  const warehouseMutationGuardMessage = !activeBranchId
+    ? 'Mode Semua Unit hanya untuk baca. Pilih unit aktif untuk menambah, mengubah, atau menghapus gudang.'
+    : null
 
   useEffect(() => {
     setWarehouses(sortWarehouses((initialWarehouses || []).map(normalizeWarehouse)))
   }, [initialWarehouses])
 
-  const isAdmin = ['owner', 'admin', 'manager'].includes(userRole)
+  useEffect(() => {
+    if (!warehouseMutationGuardMessage) return
+    setShowModal(false)
+    setEditingWarehouse(null)
+  }, [warehouseMutationGuardMessage])
   const normalizedQuery = searchQuery.trim().toLowerCase()
   const filteredWarehouses = warehouses.filter((warehouse) => {
     if (!normalizedQuery) return true
@@ -94,6 +110,10 @@ export function WarehouseClient({ orgId, initialWarehouses, userRole }: Warehous
   }
 
   const openCreateModal = () => {
+    if (warehouseMutationGuardMessage) {
+      setError(warehouseMutationGuardMessage)
+      return
+    }
     resetFeedback()
     setEditingWarehouse(null)
     setFormData(createEmptyForm())
@@ -101,6 +121,10 @@ export function WarehouseClient({ orgId, initialWarehouses, userRole }: Warehous
   }
 
   const openEditModal = (warehouse: WarehouseRecord) => {
+    if (warehouseMutationGuardMessage) {
+      setError(warehouseMutationGuardMessage)
+      return
+    }
     resetFeedback()
     setEditingWarehouse(warehouse)
     setFormData(toFormState(warehouse))
@@ -179,12 +203,24 @@ export function WarehouseClient({ orgId, initialWarehouses, userRole }: Warehous
         tag="Warehouse Module"
         actions={
           isAdmin ? (
-            <SafeButton variant="emerald" icon={<Plus size={18} />} onClick={openCreateModal}>
+            <SafeButton
+              variant="emerald"
+              icon={<Plus size={18} />}
+              disabled={Boolean(warehouseMutationGuardMessage)}
+              title={warehouseMutationGuardMessage || undefined}
+              onClick={openCreateModal}
+            >
               Gudang Baru
             </SafeButton>
           ) : null
         }
       />
+
+      {warehouseMutationGuardMessage && (
+        <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-800 shadow-sm">
+          {warehouseMutationGuardMessage} {activeBranchName ? `Unit aktif saat ini: ${activeBranchName}.` : ''}
+        </div>
+      )}
 
       {(error || success) && (
         <div className="space-y-3">
@@ -259,16 +295,18 @@ export function WarehouseClient({ orgId, initialWarehouses, userRole }: Warehous
                           <button
                             type="button"
                             onClick={() => openEditModal(warehouse)}
-                            className="w-10 h-10 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-all flex items-center justify-center"
-                            title="Edit gudang"
+                            disabled={Boolean(warehouseMutationGuardMessage)}
+                            className="w-10 h-10 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-500"
+                            title={warehouseMutationGuardMessage || 'Edit gudang'}
                           >
                             <Pencil size={15} />
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDelete(warehouse)}
-                            className="w-10 h-10 rounded-2xl border border-slate-200 bg-white text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 transition-all flex items-center justify-center"
-                            title="Hapus gudang"
+                            disabled={Boolean(warehouseMutationGuardMessage)}
+                            className="w-10 h-10 rounded-2xl border border-slate-200 bg-white text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-400"
+                            title={warehouseMutationGuardMessage || 'Hapus gudang'}
                           >
                             <Trash2 size={15} />
                           </button>

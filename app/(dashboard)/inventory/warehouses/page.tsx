@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 import { WarehouseClient } from './WarehouseClient'
 
@@ -14,11 +14,18 @@ export default async function WarehousesPage() {
     redirect('/dashboard')
   }
 
-  const warehouses = await getWarehouses(orgData.org.id)
+  const activeBranch = await getActiveBranch(orgData.org.id)
+  const warehouses = await getWarehouses(orgData.org.id, activeBranch?.id)
 
   return (
     <div className="p-8">
-      <WarehouseClient orgId={orgData.org.id} initialWarehouses={warehouses} userRole={orgData.role} />
+      <WarehouseClient
+        orgId={orgData.org.id}
+        activeBranchId={activeBranch?.id ?? null}
+        activeBranchName={activeBranch?.name ?? null}
+        initialWarehouses={warehouses}
+        userRole={orgData.role}
+      />
     </div>
   )
 }

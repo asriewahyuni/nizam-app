@@ -18,6 +18,19 @@ type WarehouseScopeRecord = {
   is_active: boolean
 }
 
+type ActiveBranchResult =
+  | { branchId: string }
+  | { error: string }
+
+async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
+  const activeBranch = await getActiveBranch(orgId)
+  if (!activeBranch) {
+    return { error: errorMessage }
+  }
+
+  return { branchId: activeBranch.id }
+}
+
 async function resolveActiveBranchId(orgId: string, branchId?: string | null) {
   if (branchId !== undefined) {
     return branchId ?? null
@@ -110,8 +123,9 @@ export async function getProducts(orgId: string, branchId?: string | null): Prom
   return products.map((p: any) => {
     const stats = aggregation[p.id] || { in: 0, out: 0, value: 0 }
     const available = effectiveBranchId ? (stockByProduct[p.id] || 0) : (stats.in - stats.out)
+    const weightedUnitCost = Number((p as any).average_cost ?? p.purchase_price ?? 0)
     const stockValue = effectiveBranchId
-      ? Math.max(0, available * Number(p.purchase_price || 0))
+      ? Math.max(0, available * weightedUnitCost)
       : Math.max(0, stats.value)
 
     return {
@@ -261,7 +275,12 @@ export async function createInventoryAdjustment(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
-  const activeBranchId = await resolveActiveBranchId(orgId)
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk melakukan stok opname atau write-off.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+  const activeBranchId = activeBranchResult.branchId
   const scopedWarehouses = await getScopedWarehouses(
     supabase as any,
     orgId,
@@ -331,7 +350,12 @@ export async function createInventoryTransfer(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
-  const activeBranchId = await resolveActiveBranchId(orgId)
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk melakukan transfer stok.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+  const activeBranchId = activeBranchResult.branchId
   const scopedWarehouses = await getScopedWarehouses(
     supabase as any,
     orgId,
@@ -357,20 +381,18 @@ export async function createInventoryTransfer(
 
   if (adjErr) return { error: 'Transfer Header Error: ' + adjErr.message }
 
-  const { data: products } = await (supabase as any).from('products').select('id, purchase_price').eq('org_id', orgId)
+  const { data: products } = await (supabase as any)
+    .from('products')
+    .select('id, purchase_price, average_cost')
+    .eq('org_id', orgId)
   
   if (!products) return { error: 'Gagal memvalidasi data produk.' }
-  
-  const productsWithCosts = (products as any[]).map((p: any) => ({
-    id: p.id,
-    cost: Number(p.purchase_price) || 0
-  }))
-  
+
   const itemsToInsert: any[] = []
   
   for (const it of payload.items) {
     const product = products.find((p: any) => p.id === it.product_id)
-    const cost = Number(product?.purchase_price || 1) // Must be > 0 for DB constraint
+    const cost = Number((product as any)?.average_cost ?? product?.purchase_price ?? 1) || 1 // Must be > 0 for DB constraint
 
     // A. Source Line (-Qty)
     itemsToInsert.push({

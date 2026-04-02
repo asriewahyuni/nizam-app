@@ -18,7 +18,7 @@ vi.mock('@/modules/organization/actions/org.actions', () => ({
   getActiveBranch: mocks.getActiveBranch,
 }))
 
-import { createInventoryTransfer } from '@/modules/inventory/actions/inventory.actions'
+import { createInventoryAdjustment, createInventoryTransfer } from '@/modules/inventory/actions/inventory.actions'
 import { createWarehouse, deleteWarehouseBin, getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 
 function createWarehouseListQuery(result: any[] = []) {
@@ -128,6 +128,65 @@ describe('Inventory Branch Context', () => {
         branch_id: 'branch-1',
       }),
     })
+  })
+
+  it('rejects creating a warehouse when no active branch is selected', async () => {
+    const fromMock = vi.fn()
+
+    mocks.getActiveBranch.mockResolvedValue(null)
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: fromMock,
+    })
+
+    const result = await createWarehouse('org-1', {
+      code: 'gd-1',
+      name: 'Gudang Unit A',
+    })
+
+    expect(result).toEqual({
+      error: 'Pilih unit aktif terlebih dahulu untuk mengelola gudang.',
+    })
+    expect(fromMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects stock adjustment when no active branch is selected', async () => {
+    const fromMock = vi.fn()
+
+    mocks.getActiveBranch.mockResolvedValue(null)
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: fromMock,
+    })
+
+    const result = await createInventoryAdjustment('org-1', {
+      adj_date: '2026-04-02',
+      type: 'STOCK_COUNT',
+      notes: 'Opname test',
+      items: [
+        {
+          product_id: 'prod-1',
+          warehouse_id: 'wh-1',
+          actual_quantity: 10,
+          diff_quantity: 2,
+          unit_cost: 1000,
+          notes: 'Test line',
+        },
+      ],
+    })
+
+    expect(result).toEqual({
+      error: 'Pilih unit aktif terlebih dahulu untuk melakukan stok opname atau write-off.',
+    })
+    expect(fromMock).not.toHaveBeenCalled()
   })
 
   it('rejects stock transfer when one warehouse is outside the active branch', async () => {

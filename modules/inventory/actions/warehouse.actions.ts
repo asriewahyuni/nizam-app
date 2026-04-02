@@ -40,6 +40,10 @@ type WarehouseBinAccessRecord = {
   } | null
 }
 
+type ActiveBranchResult =
+  | { branchId: string }
+  | { error: string }
+
 function normalizeWarehousePayload(payload: WarehousePayload): NormalizedWarehousePayload | { error: string } {
   const code = payload.code?.trim().toUpperCase() || ''
   const name = payload.name?.trim() || ''
@@ -73,6 +77,15 @@ async function resolveActiveBranchId(orgId: string, branchId?: string | null) {
 
   const activeBranch = await getActiveBranch(orgId)
   return activeBranch?.id ?? null
+}
+
+async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
+  const activeBranch = await getActiveBranch(orgId)
+  if (!activeBranch) {
+    return { error: errorMessage }
+  }
+
+  return { branchId: activeBranch.id }
 }
 
 function applyWarehouseBranchFilter(query: any, branchId: string | null) {
@@ -165,7 +178,12 @@ export async function getWarehouseBins(orgId: string, warehouseId?: string, bran
 
 export async function createWarehouseBin(orgId: string, payload: { warehouse_id: string; code: string; description?: string }) {
   const supabase = await createClient()
-  const activeBranchId = await resolveActiveBranchId(orgId)
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk mengelola bin gudang.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+  const activeBranchId = activeBranchResult.branchId
   const warehouse = await getAccessibleWarehouse(supabase as any, orgId, payload.warehouse_id, activeBranchId)
 
   if (!warehouse) {
@@ -191,7 +209,12 @@ export async function createWarehouse(orgId: string, payload: WarehousePayload):
 
   const normalized = normalizeWarehousePayload(payload)
   if ('error' in normalized) return normalized
-  const activeBranchId = await resolveActiveBranchId(orgId)
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk mengelola gudang.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+  const activeBranchId = activeBranchResult.branchId
 
   const { data, error } = await (supabase as any)
     .from('warehouses')
@@ -212,7 +235,12 @@ export async function updateWarehouse(orgId: string, id: string, payload: Wareho
 
   const normalized = normalizeWarehousePayload(payload)
   if ('error' in normalized) return normalized
-  const activeBranchId = await resolveActiveBranchId(orgId)
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk mengelola gudang.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+  const activeBranchId = activeBranchResult.branchId
   const targetWarehouse = await getAccessibleWarehouse(supabase as any, orgId, id, activeBranchId)
 
   if (!targetWarehouse) {
@@ -223,7 +251,7 @@ export async function updateWarehouse(orgId: string, id: string, payload: Wareho
     .from('warehouses')
     .update({
       ...normalized,
-      branch_id: activeBranchId ?? targetWarehouse.branch_id,
+      branch_id: activeBranchId,
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
@@ -242,7 +270,12 @@ export async function deleteWarehouse(orgId: string, id: string): Promise<Delete
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) return { error: 'Unauthorized' }
-  const activeBranchId = await resolveActiveBranchId(orgId)
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk mengelola gudang.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+  const activeBranchId = activeBranchResult.branchId
   const targetWarehouse = await getAccessibleWarehouse(supabase as any, orgId, id, activeBranchId)
 
   if (!targetWarehouse) {
@@ -266,7 +299,12 @@ export async function deleteWarehouse(orgId: string, id: string): Promise<Delete
 
 export async function deleteWarehouseBin(orgId: string, id: string) {
   const supabase = await createClient()
-  const activeBranchId = await resolveActiveBranchId(orgId)
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk mengelola bin gudang.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+  const activeBranchId = activeBranchResult.branchId
   const targetBin = await getAccessibleWarehouseBin(supabase as any, orgId, id, activeBranchId)
 
   if (!targetBin) {

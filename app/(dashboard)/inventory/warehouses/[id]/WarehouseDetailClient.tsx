@@ -1,18 +1,27 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { ArrowLeft, Plus, MapPin, Search, Maximize, CheckCircle2, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { createWarehouseBin, deleteWarehouseBin } from '@/modules/inventory/actions/warehouse.actions'
 
 interface WarehouseDetailClientProps {
   orgId: string
+  activeBranchId: string | null
+  activeBranchName?: string | null
   warehouse: any
   initialBins: any[]
   userRole: string
 }
 
-export function WarehouseDetailClient({ orgId, warehouse, initialBins, userRole }: WarehouseDetailClientProps) {
+export function WarehouseDetailClient({
+  orgId,
+  activeBranchId,
+  activeBranchName,
+  warehouse,
+  initialBins,
+  userRole,
+}: WarehouseDetailClientProps) {
   const [bins, setBins] = useState(initialBins)
   const [showModal, setShowModal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -25,14 +34,30 @@ export function WarehouseDetailClient({ orgId, warehouse, initialBins, userRole 
   })
 
   const isAdmin = ['owner', 'admin', 'manager'].includes(userRole)
+  const binMutationGuardMessage = !activeBranchId
+    ? 'Mode Semua Unit hanya untuk baca. Pilih unit aktif untuk mengelola bin gudang.'
+    : null
+
+  useEffect(() => {
+    setBins(initialBins)
+  }, [initialBins])
+
+  useEffect(() => {
+    if (!binMutationGuardMessage) return
+    setShowModal(false)
+  }, [binMutationGuardMessage])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (binMutationGuardMessage) {
+      alert(binMutationGuardMessage)
+      return
+    }
     setSubmitting(true)
     const res = await createWarehouseBin(orgId, { ...formData, warehouse_id: warehouse.id })
-    if (res.error) {
+    if ('error' in res && res.error) {
       alert(res.error)
-    } else {
+    } else if ('data' in res) {
       setBins([...bins, res.data])
       setShowModal(false)
       setFormData({ code: '', description: '', barcode: '' })
@@ -41,9 +66,13 @@ export function WarehouseDetailClient({ orgId, warehouse, initialBins, userRole 
   }
 
   const handleDelete = async (binId: string) => {
+    if (binMutationGuardMessage) {
+      alert(binMutationGuardMessage)
+      return
+    }
     if (!confirm('Yakin ingin menghapus Bin ini? Data terkait stok mungkin terpengaruh.')) return
     const res = await deleteWarehouseBin(orgId, binId)
-    if (!res.error) {
+    if (!('error' in res) || !res.error) {
        setBins(bins.filter(b => b.id !== binId))
     } else {
        alert(res.error)
@@ -88,6 +117,11 @@ export function WarehouseDetailClient({ orgId, warehouse, initialBins, userRole 
 
       {/* Bin Management Section */}
       <div className="space-y-6">
+         {binMutationGuardMessage && (
+            <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-800 shadow-sm">
+              {binMutationGuardMessage} {activeBranchName ? `Unit aktif saat ini: ${activeBranchName}.` : ''}
+            </div>
+         )}
          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="space-y-1">
                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Layout Bins & Lorong</h2>
@@ -109,7 +143,9 @@ export function WarehouseDetailClient({ orgId, warehouse, initialBins, userRole 
                {isAdmin && (
                   <button 
                     onClick={() => setShowModal(true)}
-                    className="shrink-0 flex items-center gap-2 px-4 py-3 bg-slate-900 hover:bg-black text-white font-bold rounded-xl transition-all shadow-lg"
+                    disabled={Boolean(binMutationGuardMessage)}
+                    title={binMutationGuardMessage || 'Tambah bin baru'}
+                    className="shrink-0 flex items-center gap-2 px-4 py-3 bg-slate-900 hover:bg-black text-white font-bold rounded-xl transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-900"
                   >
                     <Plus size={18} /> Bin Baru
                   </button>
@@ -133,7 +169,12 @@ export function WarehouseDetailClient({ orgId, warehouse, initialBins, userRole 
                          {warehouse.code}-{bin.code}
                        </div>
                        {isAdmin && (
-                         <button onClick={() => handleDelete(bin.id)} className="text-slate-300 hover:text-rose-500 transition-colors">
+                         <button
+                           onClick={() => handleDelete(bin.id)}
+                           disabled={Boolean(binMutationGuardMessage)}
+                           title={binMutationGuardMessage || 'Hapus bin'}
+                           className="text-slate-300 hover:text-rose-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-slate-300"
+                         >
                             <Trash2 size={16} />
                          </button>
                        )}
