@@ -54,7 +54,7 @@ export default async function DashboardLayout({
   const activeBranch = await getActiveBranch(orgData.org.id)
 
   const dependencyResults = await Promise.allSettled([
-    getPendingApprovalsCount(orgData.org.id),
+    getPendingApprovalsCount(orgData.org.id, activeBranch?.id),
     getUnpostedJournalsCount(orgData.org.id),
     getPendingPurchaseRequestsCount(orgData.org.id, activeBranch?.id),
     getResetRequestsCount(orgData.org.id),

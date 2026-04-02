@@ -2,14 +2,43 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getActiveBranch } from '@/modules/organization/actions/org.actions'
 
-export async function getSales(orgId: string) {
+type ActiveBranchResult =
+  | { branchId: string }
+  | { error: string }
+
+async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
+  const activeBranch = await getActiveBranch(orgId)
+  if (!activeBranch) {
+    return { error: errorMessage }
+  }
+
+  return { branchId: activeBranch.id }
+}
+
+async function resolveActiveBranchId(orgId: string, branchId?: string | null) {
+  if (branchId !== undefined) {
+    return branchId ?? null
+  }
+
+  const activeBranch = await getActiveBranch(orgId)
+  return activeBranch?.id ?? null
+}
+
+export async function getSales(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const effectiveBranchId = await resolveActiveBranchId(orgId, branchId)
+  let query = supabase
     .from('sales' as any)
-    .select('*, contacts(name), sales_items(*, products(name, sku, unit)), sales_returns(status, grand_total, return_number), sales_payments(amount, discount_amount)' as any)
+    .select('*, branches(name, code), contacts(name), sales_items(*, products(name, sku, unit)), sales_returns(status, grand_total, return_number), sales_payments(amount, discount_amount)' as any)
     .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
+
+  if (effectiveBranchId) {
+    query = query.eq('branch_id', effectiveBranchId)
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) return []
   return data
@@ -19,11 +48,18 @@ export async function createSaleEntry(orgId: string, payload: any) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk membuat sales order.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+  const activeBranchId = activeBranchResult.branchId
 
   const { data: sale, error: saleErr } = await (supabase as any)
     .from('sales')
     .insert({
       org_id: orgId,
+      branch_id: activeBranchId,
       customer_id: payload.customer_id,
       sale_date: payload.sale_date,
       due_date: payload.due_date, // ADDED
@@ -46,6 +82,7 @@ export async function createSaleEntry(orgId: string, payload: any) {
     .from('sales_items')
     .insert(payload.lines.map((l: any) => ({
       org_id: orgId,
+      branch_id: activeBranchId,
       sale_id: sale.id,
       product_id: l.product_id,
       description: l.product_name,
@@ -65,6 +102,7 @@ export async function createSaleEntry(orgId: string, payload: any) {
   const computedTotal = payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0) - (payload.discount_amount || 0) + (payload.tax_amount || 0)
   await (supabase as any).from('approval_requests' as any).insert({
     org_id: orgId,
+    branch_id: activeBranchId,
     requester_id: user.id,
     source_type: 'SALES_ORDER',
     source_id: sale.id,
@@ -78,7 +116,19 @@ export async function createSaleEntry(orgId: string, payload: any) {
 
 export async function deliverSale(orgId: string, saleId: string) {
   const supabase = await createClient()
-  const { data: sale } = await (supabase as any).from('sales' as any).select('status').eq('id', saleId).single()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk mengirim sales order.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+
+  const { data: sale } = await (supabase as any)
+    .from('sales' as any)
+    .select('status')
+    .eq('id', saleId)
+    .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
+    .single()
   if (!sale) return { error: 'Order tidak ditemukan.' }
   if (sale.status === 'FINISHED') return { success: true }
 
@@ -101,6 +151,12 @@ export async function voidSale(orgId: string, saleId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk membatalkan sales order.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+  const activeBranchId = activeBranchResult.branchId
 
   // 1. Check current status — only DRAFT or FINISHED can be voided
   const { data: sale } = await (supabase as any)
@@ -108,6 +164,7 @@ export async function voidSale(orgId: string, saleId: string) {
     .select('status')
     .eq('id', saleId)
     .eq('org_id', orgId)
+    .eq('branch_id', activeBranchId)
     .single()
 
   if (!sale) return { error: 'Order tidak ditemukan.' }
@@ -138,6 +195,7 @@ export async function voidSale(orgId: string, saleId: string) {
 
   // 4. Update sales status
   await (supabase as any).from('sales' as any).update({ status: 'VOIDED' }).eq('id', saleId).eq('org_id', orgId)
+    .eq('branch_id', activeBranchId)
 
   // 5. Cancel any pending approval requests for this order
   await (supabase as any)
@@ -145,6 +203,7 @@ export async function voidSale(orgId: string, saleId: string) {
     .update({ status: 'VOIDED', reason: 'Sales Order Dibatalkan', decided_at: new Date().toISOString() })
     .eq('source_type', 'SALES_ORDER')
     .eq('source_id', saleId)
+    .eq('branch_id', activeBranchId)
     .eq('status', 'PENDING')
 
   revalidatePath('/sales')
@@ -157,7 +216,17 @@ export async function paySale(orgId: string, saleId: string) {
   // ⚠️ Deprecated: gunakan processSalesPayment() untuk mencatat pembayaran dengan jurnal yang benar.
   // Fungsi ini hanya update flag dan TIDAK membuat jurnal penerimaan kas.
   const supabase = await createClient()
-  await (supabase as any).from('sales' as any).update({ payment_status: 'PAID' }).eq('id', saleId).eq('org_id', orgId)
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk menerima pembayaran.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+  await (supabase as any)
+    .from('sales' as any)
+    .update({ payment_status: 'PAID' })
+    .eq('id', saleId)
+    .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
   revalidatePath('/sales')
   return { success: true }
 }
@@ -171,6 +240,21 @@ export async function processSalesReturn(orgId: string, payload: {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk memproses retur penjualan.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+
+  const { data: sale } = await (supabase as any)
+    .from('sales')
+    .select('id')
+    .eq('id', payload.sale_id)
+    .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
+    .maybeSingle()
+
+  if (!sale) return { error: 'Transaksi penjualan tidak tersedia pada unit aktif.' }
 
   const { data, error } = await (supabase as any).rpc('process_sales_return_atomic', {
     p_org_id: orgId, p_sale_id: payload.sale_id, p_return_number: payload.return_number,
@@ -193,6 +277,21 @@ export async function processSalesPayment(orgId: string, payload: {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk memproses pembayaran penjualan.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+
+  const { data: sale } = await (supabase as any)
+    .from('sales')
+    .select('id')
+    .eq('id', payload.sale_id)
+    .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
+    .maybeSingle()
+
+  if (!sale) return { error: 'Transaksi penjualan tidak tersedia pada unit aktif.' }
 
   const { data, error } = await (supabase as any).rpc('process_sales_payment_atomic', {
     p_org_id: orgId, p_sale_id: payload.sale_id, p_account_id: payload.account_id,
@@ -209,14 +308,20 @@ export async function processSalesPayment(orgId: string, payload: {
   return { success: true, paymentId: data.payment_id }
 }
 
-export async function getQuotations(orgId: string) {
+export async function getQuotations(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
-  const { data, error } = await supabase
+  const effectiveBranchId = await resolveActiveBranchId(orgId, branchId)
+  let query = supabase
     .from('sales' as any)
-    .select('*, contacts(name), sales_items(*, products(name, sku, unit))' as any)
+    .select('*, branches(name, code), contacts(name), sales_items(*, products(name, sku, unit))' as any)
     .eq('org_id', orgId)
     .eq('status', 'QUOTATION')
-    .order('created_at', { ascending: false })
+
+  if (effectiveBranchId) {
+    query = query.eq('branch_id', effectiveBranchId)
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) return []
   return data
@@ -226,6 +331,12 @@ export async function createQuotation(orgId: string, payload: any) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk membuat quotation.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+  const activeBranchId = activeBranchResult.branchId
 
   const total = payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)
   const grandTotal = total - (payload.discount_amount || 0) + (payload.tax_amount || 0)
@@ -234,6 +345,7 @@ export async function createQuotation(orgId: string, payload: any) {
     .from('sales')
     .insert({
       org_id: orgId,
+      branch_id: activeBranchId,
       customer_id: payload.customer_id,
       sale_date: payload.sale_date,
       due_date: payload.due_date,
@@ -256,6 +368,7 @@ export async function createQuotation(orgId: string, payload: any) {
     .from('sales_items')
     .insert(payload.lines.map((l: any) => ({
       org_id: orgId,
+      branch_id: activeBranchId,
       sale_id: quote.id,
       product_id: l.product_id,
       description: l.product_name,
@@ -272,11 +385,17 @@ export async function createQuotation(orgId: string, payload: any) {
 
 export async function convertQuotationToOrder(orgId: string, quoteId: string) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk mengonversi quotation.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
   const { error } = await (supabase as any)
     .from('sales')
     .update({ status: 'DRAFT', updated_at: new Date().toISOString() })
     .eq('id', quoteId)
     .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
 
   if (error) return { error: error.message }
   
@@ -287,11 +406,17 @@ export async function convertQuotationToOrder(orgId: string, quoteId: string) {
 
 export async function updateSaleStatus(orgId: string, saleId: string, status: string) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk mengubah status pipeline.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
   const { error } = await (supabase as any)
     .from('sales')
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', saleId)
     .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
 
   if (error) return { error: error.message }
   
@@ -307,6 +432,12 @@ export async function createQuickKanbanCard(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk membuat card pipeline.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+  const activeBranchId = activeBranchResult.branchId
 
   // 1. Create a rapid generic contact
   const { data: contact, error: contactErr } = await (supabase as any)
@@ -328,6 +459,7 @@ export async function createQuickKanbanCard(
     .from('sales')
     .insert({
       org_id: orgId,
+      branch_id: activeBranchId,
       customer_id: contact.id,
       sale_date: new Date().toISOString().split('T')[0],
       total_amount: payload.amount,
@@ -356,12 +488,19 @@ export async function updateSalesCard(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk mengubah card pipeline.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+  const activeBranchId = activeBranchResult.branchId
 
   const { data: sale } = await (supabase as any)
     .from('sales')
     .select('customer_id')
     .eq('id', saleId)
     .eq('org_id', orgId)
+    .eq('branch_id', activeBranchId)
     .single()
 
   if (!sale) return { error: 'Card tidak ditemukan' }
@@ -388,6 +527,7 @@ export async function updateSalesCard(
     })
     .eq('id', saleId)
     .eq('org_id', orgId)
+    .eq('branch_id', activeBranchId)
 
   if (saleErr) return { error: 'Gagal mengedit card: ' + saleErr.message }
 
@@ -399,12 +539,18 @@ export async function deleteSalesCard(orgId: string, saleId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk menghapus card pipeline.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
   const { error } = await (supabase as any)
     .from('sales')
     .delete()
     .eq('id', saleId)
     .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
 
   if (error) return { error: 'Gagal menghapus card: ' + error.message }
   revalidatePath('/sales/pipeline')

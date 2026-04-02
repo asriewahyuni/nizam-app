@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import PipelineClient from './PipelineClient'
 
-import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 export default async function PipelinePage() {
   const supabase = await createClient()
@@ -13,11 +13,17 @@ export default async function PipelinePage() {
   if (!orgData) return null
 
   const orgId = orgData.org.id
+  const activeBranch = await getActiveBranch(orgId)
 
-  const { data: sales } = await supabase.from('sales').select('*, contacts(name, phone, email)')
+  let query = supabase.from('sales').select('*, contacts(name, phone, email)')
     .eq('org_id', orgId)
     .in('status', ['QUOTATION', 'DRAFT', 'ORDERED', 'FINISHED'])
-    .order('created_at', { ascending: false })
+
+  if (activeBranch?.id) {
+    query = query.eq('branch_id', activeBranch.id)
+  }
+
+  const { data: sales } = await query.order('created_at', { ascending: false })
   
   return <PipelineClient orgId={orgId} sales={sales || []} />
 }

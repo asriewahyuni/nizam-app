@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getPendingApprovals } from '@/modules/organization/actions/approval.actions'
 import { ApprovalClient } from './ApprovalClient'
 
@@ -14,7 +14,8 @@ export default async function ApprovalsPage() {
     redirect('/dashboard')
   }
 
-  const approvals = await getPendingApprovals(orgData.org.id)
+  const activeBranch = await getActiveBranch(orgData.org.id)
+  const approvals = await getPendingApprovals(orgData.org.id, activeBranch?.id)
 
   return (
     <div className="p-8">

@@ -2,16 +2,32 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getActiveBranch } from '@/modules/organization/actions/org.actions'
 
-export async function getPendingApprovals(orgId: string) {
+async function resolveApprovalBranchId(orgId: string, branchId?: string | null) {
+  if (branchId !== undefined) {
+    return branchId ?? null
+  }
+
+  const activeBranch = await getActiveBranch(orgId)
+  return activeBranch?.id ?? null
+}
+
+export async function getPendingApprovals(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
+  const effectiveBranchId = await resolveApprovalBranchId(orgId, branchId)
 
-  const { data, error } = await (supabase as any)
+  let query = (supabase as any)
     .from('approval_requests')
     .select('*')
     .eq('org_id', orgId)
     .eq('status', 'PENDING')
-    .order('requested_at', { ascending: false })
+
+  if (effectiveBranchId) {
+    query = query.eq('branch_id', effectiveBranchId)
+  }
+
+  const { data, error } = await query.order('requested_at', { ascending: false })
 
   if (error) {
     (console as any).error('Error fetching approvals:', error)
@@ -21,14 +37,21 @@ export async function getPendingApprovals(orgId: string) {
   return data
 }
 
-export async function getApprovalHistory(orgId: string) {
+export async function getApprovalHistory(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
+  const effectiveBranchId = await resolveApprovalBranchId(orgId, branchId)
 
-  const { data, error } = await (supabase as any)
+  let query = (supabase as any)
     .from('approval_requests')
     .select('*')
     .eq('org_id', orgId)
     .neq('status', 'PENDING')
+
+  if (effectiveBranchId) {
+    query = query.eq('branch_id', effectiveBranchId)
+  }
+
+  const { data, error } = await query
     .order('decided_at', { ascending: false })
     .limit(50)
 
@@ -39,15 +62,24 @@ export async function getApprovalHistory(orgId: string) {
   
   return data
 }
-export async function getApprovalDetail(orgId: string, sourceId: string, sourceType: string) {
+export async function getApprovalDetail(orgId: string, sourceId: string, sourceType: string, branchId?: string | null) {
   const supabase = await createClient()
+  const effectiveBranchId = await resolveApprovalBranchId(orgId, branchId)
 
   let dataRes: any = { data: null, error: null }
   
   if (sourceType === 'PURCHASE_ORDER') {
-    dataRes = await (supabase as any).from('purchases' as any).select('*, purchase_items(*, products(name, unit))').eq('id', sourceId).eq('org_id', orgId).single()
+    let query = (supabase as any).from('purchases' as any).select('*, purchase_items(*, products(name, unit))').eq('id', sourceId).eq('org_id', orgId)
+    if (effectiveBranchId) {
+      query = query.eq('branch_id', effectiveBranchId)
+    }
+    dataRes = await query.single()
   } else if (sourceType === 'SALES_ORDER') {
-    dataRes = await (supabase as any).from('sales' as any).select('*, contacts(name, phone, email), sales_items(*, products(name, sku, unit))').eq('id', sourceId).eq('org_id', orgId).single()
+    let query = (supabase as any).from('sales' as any).select('*, contacts(name, phone, email), sales_items(*, products(name, sku, unit))').eq('id', sourceId).eq('org_id', orgId)
+    if (effectiveBranchId) {
+      query = query.eq('branch_id', effectiveBranchId)
+    }
+    dataRes = await query.single()
   } else if (sourceType === 'REIMBURSEMENT') {
     dataRes = await (supabase as any).from('reimbursements').select('*, items:reimbursement_items(*, account:accounts(code, name))').eq('id', sourceId).eq('org_id', orgId).single()
   }
@@ -62,17 +94,28 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
     .eq('source_type', sourceType)
     .order('requested_at', { ascending: true })
 
-  return { data: dataRes.data, logs: logs || [], error: null }
+  const scopedLogs = effectiveBranchId
+    ? (logs || []).filter((log: any) => log.branch_id === effectiveBranchId)
+    : (logs || [])
+
+  return { data: dataRes.data, logs: scopedLogs, error: null }
 }
 
-export async function getPendingApprovalsCount(orgId: string) {
+export async function getPendingApprovalsCount(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
+  const effectiveBranchId = await resolveApprovalBranchId(orgId, branchId)
 
-  const { count, error } = await (supabase as any)
+  let query = (supabase as any)
     .from('approval_requests')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'PENDING')
+
+  if (effectiveBranchId) {
+    query = query.eq('branch_id', effectiveBranchId)
+  }
+
+  const { count, error } = await query
 
   if (error) {
     (console as any).error('Error fetching approval counts:', error)
@@ -82,22 +125,26 @@ export async function getPendingApprovalsCount(orgId: string) {
   return count || 0
 }
 
-export async function decideApproval(id: string, orgId: string, status: 'APPROVED' | 'REJECTED', notes?: string) {
+export async function decideApproval(id: string, orgId: string, status: 'APPROVED' | 'REJECTED', notes?: string, branchId?: string | null) {
   const supabase = await createClient()
   const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Unauthorized' }
+  const effectiveBranchId = await resolveApprovalBranchId(orgId, branchId)
 
-  // 1. Ambil info request terlebih dahulu untuk mengetahui source_type dan source_id
-  const { data: reqData, error: reqErr } = await (supabase as any)
+  let requestLookup = (supabase as any)
     .from('approval_requests')
-    .select('source_type, source_id')
+    .select('source_type, source_id, branch_id')
     .eq('id', id)
-    .single()
+
+  if (effectiveBranchId) {
+    requestLookup = requestLookup.eq('branch_id', effectiveBranchId)
+  }
+
+  const { data: reqData, error: reqErr } = await requestLookup.single()
 
   if (reqErr || !reqData) return { error: 'Request tidak ditemukan' }
 
-  // 2. Update status di tabel approval
-  const { error } = await (supabase as any)
+  let approvalUpdate = (supabase as any)
     .from('approval_requests')
     .update({ 
       status, 
@@ -107,6 +154,12 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
     })
     .eq('id', id)
     .eq('org_id', orgId)
+
+  if (effectiveBranchId) {
+    approvalUpdate = approvalUpdate.eq('branch_id', effectiveBranchId)
+  }
+
+  const { error } = await approvalUpdate
 
   if (error) return { error: error.message }
 
@@ -118,6 +171,7 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
         .update({ status: newPoStatus })
         .eq('id', reqData.source_id)
         .eq('org_id', orgId)
+        .eq('branch_id', reqData.branch_id)
   }
 
   if (reqData.source_type === 'SALES_ORDER') {
@@ -127,6 +181,7 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
         .update({ status: newSoStatus })
         .eq('id', reqData.source_id)
         .eq('org_id', orgId)
+        .eq('branch_id', reqData.branch_id)
   }
 
   if (reqData.source_type === 'REIMBURSEMENT') {
@@ -141,16 +196,22 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
   return { success: true }
 }
 
-export async function getApprovalForSource(orgId: string, sourceId: string, sourceType: string) {
+export async function getApprovalForSource(orgId: string, sourceId: string, sourceType: string, branchId?: string | null) {
   const supabase = await createClient()
+  const effectiveBranchId = await resolveApprovalBranchId(orgId, branchId)
 
-  const { data, error } = await (supabase as any)
+  let query = (supabase as any)
     .from('approval_requests')
     .select('status, approver_id, decided_at')
     .eq('source_id', sourceId)
     .eq('source_type', sourceType)
     .eq('org_id', orgId)
-    .single()
+
+  if (effectiveBranchId) {
+    query = query.eq('branch_id', effectiveBranchId)
+  }
+
+  const { data, error } = await query.single()
 
   if (error || !data) return null;
   return data;

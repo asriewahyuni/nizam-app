@@ -2,11 +2,16 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getActiveBranch } from '@/modules/organization/actions/org.actions'
 
 export async function processPosTransaction(orgId: string, payload: any) {
   const supabase = await createClient()
   const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  const activeBranch = await getActiveBranch(orgId)
+  if (!activeBranch) {
+    return { error: 'Pilih unit aktif terlebih dahulu untuk memproses transaksi POS.' }
+  }
 
   // 1. Tuntaskan CRM dan Relational Integrity untuk Pelanggan (Cegah Not Null Constraints)
   let finalCustomerId = payload.customer_id
@@ -50,6 +55,7 @@ export async function processPosTransaction(orgId: string, payload: any) {
     .from('sales' as any)
     .insert({
       org_id: orgId,
+      branch_id: activeBranch.id,
       customer_id: finalCustomerId,
       sale_date: new Date().toISOString().split('T')[0],
       due_date: new Date().toISOString().split('T')[0],
@@ -73,6 +79,7 @@ export async function processPosTransaction(orgId: string, payload: any) {
     .from('sales_items' as any)
     .insert(payload.lines.map((l: any) => ({
       org_id: orgId,
+      branch_id: activeBranch.id,
       sale_id: sale.id,
       product_id: l.product_id,
       description: l.product_name,
