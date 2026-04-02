@@ -24,6 +24,7 @@ interface AppHeaderProps {
   activeOrgId: string
   branches: BranchSummary[]
   activeBranchId: string | null
+  allowAllBranchSelection?: boolean
   pendingApprovals?: number
   cashFlow?: any
   aiTokens?: AiTokenHeaderSummary | null
@@ -40,6 +41,7 @@ export function AppHeader({
   activeOrgId,
   branches,
   activeBranchId,
+  allowAllBranchSelection = true,
   pendingApprovals = 0,
   cashFlow,
   aiTokens,
@@ -169,7 +171,7 @@ export function AppHeader({
               <div className="flex flex-col overflow-hidden">
                 <span className="text-[9px] text-[#003366]/60 font-bold uppercase tracking-tighter leading-none mb-0.5">Unit Terpilih</span>
                 <span className="text-xs font-black text-blue-900 leading-none truncate max-w-[150px]">
-                  {activeBranch?.name || 'Semua Unit'}
+                  {activeBranch?.name || (allowAllBranchSelection ? 'Semua Unit' : 'Tidak Ada Unit')}
                 </span>
               </div>
               <ChevronDown size={12} className="text-[#003366]/60 ml-1" />
@@ -177,14 +179,16 @@ export function AppHeader({
 
             <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-2xl p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
               <div className="space-y-1 mt-1">
-                <button
-                  type="button"
-                  disabled={isSwitchingContext}
-                  onClick={() => handleBranchChange(null)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition disabled:cursor-wait disabled:opacity-60 ${activeBranchId === null ? 'bg-[#003366] text-white' : 'hover:bg-slate-50 text-slate-700'}`}
-                >
-                  <span className="text-xs font-bold truncate">Semua Unit</span>
-                </button>
+                {allowAllBranchSelection && (
+                  <button
+                    type="button"
+                    disabled={isSwitchingContext}
+                    onClick={() => handleBranchChange(null)}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition disabled:cursor-wait disabled:opacity-60 ${activeBranchId === null ? 'bg-[#003366] text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                  >
+                    <span className="text-xs font-bold truncate">Semua Unit</span>
+                  </button>
+                )}
                 {branches.map(branch => (
                   <button
                     key={branch.id}
@@ -196,6 +200,11 @@ export function AppHeader({
                     <span className="text-xs font-bold truncate">{branch.name}</span>
                   </button>
                 ))}
+                {branches.length === 0 && (
+                  <div className="px-3 py-2.5 text-xs font-bold text-slate-400">
+                    Belum ada unit yang bisa diakses.
+                  </div>
+                )}
               </div>
             </div>
           </div>

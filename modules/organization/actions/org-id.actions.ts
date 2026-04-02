@@ -1,8 +1,9 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { ACTIVE_ORG_COOKIE } from '@/modules/organization/lib/org-context'
 import { cookies } from 'next/headers'
-import { ACTIVE_BRANCH_COOKIE, ACTIVE_ORG_COOKIE } from '@/modules/organization/lib/org-context'
+import { getCurrentAccessibleBranch } from '@/modules/organization/lib/branch-access.server'
 
 const DEMO_EMAIL = 'demo@nizam.app'
 
@@ -68,33 +69,6 @@ export async function getActiveBranchIdAction(orgId: string): Promise<string | n
   const trimmedOrgId = orgId.trim()
   if (!trimmedOrgId) return null
 
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const cookieStore = await cookies()
-  const activeBranchIdCookie = cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value
-  if (activeBranchIdCookie) {
-    const { data } = await db
-      .from('branches')
-      .select('id')
-      .eq('id', activeBranchIdCookie)
-      .eq('org_id', trimmedOrgId)
-      .eq('is_active', true)
-      .maybeSingle()
-
-    if (data?.id) return data.id
-  }
-
-  const { data } = await db
-    .from('branches')
-    .select('id')
-    .eq('org_id', trimmedOrgId)
-    .eq('is_active', true)
-    .order('name', { ascending: true })
-    .limit(2)
-
-  if (!Array.isArray(data) || data.length !== 1) return null
-  return data[0]?.id ?? null
+  const activeBranch = await getCurrentAccessibleBranch(trimmedOrgId)
+  return activeBranch?.id ?? null
 }

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   revalidatePath: vi.fn(),
-  getActiveBranch: vi.fn(),
+  resolveAccessibleBranchSelection: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -14,8 +14,8 @@ vi.mock('next/cache', () => ({
   revalidatePath: mocks.revalidatePath,
 }))
 
-vi.mock('@/modules/organization/actions/org.actions', () => ({
-  getActiveBranch: mocks.getActiveBranch,
+vi.mock('@/modules/organization/lib/branch-access.server', () => ({
+  resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
 }))
 
 import { decideApproval, getPendingApprovals } from '@/modules/organization/actions/approval.actions'
@@ -41,6 +41,10 @@ describe('Approval Branch Context', () => {
         if (table !== 'approval_requests') throw new Error(`Unexpected table ${table}`)
         return approvalQuery
       }),
+    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
     })
 
     await getPendingApprovals('org-1', 'branch-1')
@@ -91,6 +95,10 @@ describe('Approval Branch Context', () => {
         throw new Error(`Unexpected table ${table}`)
       }),
     })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
 
     const result = await decideApproval('req-1', 'org-1', 'APPROVED', 'OK', 'branch-1')
 
@@ -140,6 +148,10 @@ describe('Approval Branch Context', () => {
         if (table === 'reimbursements') return reimbursementsTable
         throw new Error(`Unexpected table ${table}`)
       }),
+    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
     })
 
     const result = await decideApproval('req-2', 'org-1', 'REJECTED', 'No', 'branch-1')

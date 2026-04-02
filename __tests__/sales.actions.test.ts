@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   revalidatePath: vi.fn(),
   getActiveBranch: vi.fn(),
+  resolveAccessibleBranchSelection: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -18,6 +19,10 @@ vi.mock('@/modules/organization/actions/org.actions', () => ({
   getActiveBranch: mocks.getActiveBranch,
 }))
 
+vi.mock('@/modules/organization/lib/branch-access.server', () => ({
+  resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
+}))
+
 import { processPosTransaction } from '@/modules/sales/actions/pos.actions'
 import { createSaleEntry, getSales } from '@/modules/sales/actions/sales.actions'
 
@@ -29,7 +34,10 @@ describe('Sales Branch Context', () => {
   it('rejects creating sales order when no active branch is selected', async () => {
     const fromMock = vi.fn()
 
-    mocks.getActiveBranch.mockResolvedValue(null)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: [], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: null,
+    })
     mocks.createClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -71,6 +79,10 @@ describe('Sales Branch Context', () => {
       code: 'UA',
       address: null,
       is_active: true,
+    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
     })
     mocks.createClient.mockResolvedValue({
       auth: {
@@ -141,6 +153,10 @@ describe('Sales Branch Context', () => {
         if (table !== 'sales') throw new Error(`Unexpected table ${table}`)
         return salesQuery
       }),
+    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
     })
 
     await getSales('org-1', 'branch-1')

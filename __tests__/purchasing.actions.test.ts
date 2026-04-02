@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   createAdminClient: vi.fn(),
   revalidatePath: vi.fn(),
   getActiveBranch: vi.fn(),
+  resolveAccessibleBranchSelection: vi.fn(),
+  getBranchAccessScope: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -18,6 +20,11 @@ vi.mock('next/cache', () => ({
 
 vi.mock('@/modules/organization/actions/org.actions', () => ({
   getActiveBranch: mocks.getActiveBranch,
+}))
+
+vi.mock('@/modules/organization/lib/branch-access.server', () => ({
+  resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
+  getBranchAccessScope: mocks.getBranchAccessScope,
 }))
 
 import { createPurchaseRequests } from '@/modules/factory/actions/factory.actions'
@@ -39,17 +46,13 @@ describe('Purchasing Branch Context', () => {
   })
 
   it('rejects purchase creation when branch does not belong to active org', async () => {
-    const branchQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: null,
-        error: null,
-      }),
-    }
     const productsQuery = createNoopMutationBuilder()
     const rpcMock = vi.fn()
 
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: [], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      error: 'Anda tidak memiliki akses ke unit tersebut.',
+    })
     mocks.createClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -57,7 +60,6 @@ describe('Purchasing Branch Context', () => {
         }),
       },
       from: vi.fn((table: string) => {
-        if (table === 'branches') return branchQuery
         if (table === 'products') return productsQuery
         throw new Error(`Unexpected table ${table}`)
       }),
@@ -84,20 +86,16 @@ describe('Purchasing Branch Context', () => {
   })
 
   it('passes branch_id into purchase RPC when branch is valid', async () => {
-    const branchQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { id: 'branch-1' },
-        error: null,
-      }),
-    }
     const productsQuery = createNoopMutationBuilder()
     const rpcMock = vi.fn().mockResolvedValue({
       data: { success: true, purchase_id: 'po-1' },
       error: null,
     })
 
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
     mocks.createClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -105,7 +103,6 @@ describe('Purchasing Branch Context', () => {
         }),
       },
       from: vi.fn((table: string) => {
-        if (table === 'branches') return branchQuery
         if (table === 'products') return productsQuery
         throw new Error(`Unexpected table ${table}`)
       }),
@@ -154,6 +151,10 @@ describe('Purchasing Branch Context', () => {
         if (table === 'purchase_requests') return purchaseRequestQuery
         throw new Error(`Unexpected table ${table}`)
       }),
+    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
     })
 
     await getPurchaseRequests('org-1', 'branch-1')
@@ -251,6 +252,13 @@ describe('Purchasing Branch Context', () => {
         if (table === 'warehouses') return warehouseFallbackQuery
         throw new Error(`Unexpected table ${table}`)
       }),
+    })
+    mocks.getBranchAccessScope.mockResolvedValue({
+      accessibleBranches: [{ id: 'branch-1' }],
+      accessibleBranchIds: ['branch-1'],
+      canAccessAllBranches: false,
+      membershipId: 'member-1',
+      role: 'staff',
     })
 
     const result = await receivePurchase('org-1', 'po-1')

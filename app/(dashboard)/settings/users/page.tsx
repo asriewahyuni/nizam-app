@@ -1,4 +1,4 @@
-import { getActiveOrg, getInvitations } from '@/modules/organization/actions/org.actions'
+import { getActiveOrg, getBranches, getInvitations, getOrgMembers } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
 import UsersClient from './UsersClient'
 import { createClient } from '@/lib/supabase/server'
@@ -8,16 +8,9 @@ export default async function UsersPage() {
   if (!orgData || orgData.role !== 'owner') return redirect('/dashboard')
 
   const supabase = await createClient()
-  const [{ data: members }, { data: roles }, invitations] = await Promise.all([
-    supabase
-      .from('org_members')
-      .select(`
-        *,
-        user:user_id (
-          email
-        )
-      `)
-      .eq('org_id', orgData.org.id),
+  const [members, branches, { data: roles }, invitations] = await Promise.all([
+    getOrgMembers(orgData.org.id),
+    getBranches(orgData.org.id),
     supabase
       .from('roles')
       .select('*')
@@ -30,6 +23,7 @@ export default async function UsersPage() {
     <UsersClient
       orgId={orgData.org.id}
       initialMembers={members || []}
+      branches={branches || []}
       roles={roles || []}
       initialInvitations={invitations || []}
     />

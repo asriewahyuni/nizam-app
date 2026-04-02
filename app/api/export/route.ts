@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getBranchAccessScope } from '@/modules/organization/lib/branch-access.server'
 import {
   exportProfitLossXLSX,
   exportBalanceSheetXLSX,
@@ -36,18 +37,17 @@ export async function GET(request: NextRequest) {
 
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  if (branchId) {
-    const { data: branch } = await db
-      .from('branches')
-      .select('id')
-      .eq('id', branchId)
-      .eq('org_id', orgId)
-      .eq('is_active', true)
-      .maybeSingle()
+  const branchAccessScope = await getBranchAccessScope(orgId)
+  if (!branchAccessScope.role) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
-    if (!branch) {
-      return NextResponse.json({ error: 'Branch tidak valid untuk organisasi ini' }, { status: 400 })
+  if (branchId) {
+    if (!branchAccessScope.accessibleBranchIds.includes(branchId)) {
+      return NextResponse.json({ error: 'Anda tidak memiliki akses ke unit tersebut' }, { status: 403 })
     }
+  } else if (!branchAccessScope.canAccessAllBranches) {
+    return NextResponse.json({ error: 'Pilih unit aktif terlebih dahulu untuk export laporan' }, { status: 400 })
   }
 
   // Get org name for header

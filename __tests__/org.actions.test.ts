@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   redirect: vi.fn(),
   seedDemoData: vi.fn(),
   applyVoucher: vi.fn(),
+  getCurrentAccessibleBranch: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -33,6 +34,12 @@ vi.mock('@/modules/organization/actions/billing.actions', () => ({
   applyVoucher: mocks.applyVoucher,
 }))
 
+vi.mock('@/modules/organization/lib/branch-access.server', () => ({
+  getBranchAccessScope: vi.fn(),
+  getCurrentAccessibleBranch: mocks.getCurrentAccessibleBranch,
+  canAccessAllBranchesForOrg: vi.fn(),
+}))
+
 import { createOrganization, getActiveBranch } from '@/modules/organization/actions/org.actions'
 import { getActiveBranchIdAction } from '@/modules/organization/actions/org-id.actions'
 
@@ -54,20 +61,6 @@ function createCookieStore(initial: Record<string, string> = {}) {
   }
 }
 
-function createSingleBranchListBuilder(branches: any[]) {
-  const builder = {
-    select: vi.fn(() => builder),
-    eq: vi.fn(() => builder),
-    order: vi.fn(() => builder),
-    limit: vi.fn().mockResolvedValue({
-      data: branches,
-      error: null,
-    }),
-  }
-
-  return builder
-}
-
 describe('Organization Branch Bootstrap', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -75,27 +68,13 @@ describe('Organization Branch Bootstrap', () => {
   })
 
   it('falls back to the sole active branch when no branch cookie is set', async () => {
-    const branchListBuilder = createSingleBranchListBuilder([
-      {
-        id: 'branch-1',
-        org_id: 'org-1',
-        name: 'Unit Utama',
-        code: 'MAIN',
-        address: null,
-        is_active: true,
-      },
-    ])
-
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1' } },
-        }),
-      },
-      from: vi.fn((table: string) => {
-        if (table !== 'branches') throw new Error(`Unexpected table ${table}`)
-        return branchListBuilder
-      }),
+    mocks.getCurrentAccessibleBranch.mockResolvedValue({
+      id: 'branch-1',
+      org_id: 'org-1',
+      name: 'Unit Utama',
+      code: 'MAIN',
+      address: null,
+      is_active: true,
     })
 
     const result = await getActiveBranch('org-1')
@@ -108,25 +87,16 @@ describe('Organization Branch Bootstrap', () => {
       address: null,
       is_active: true,
     })
-    expect(branchListBuilder.eq).toHaveBeenCalledWith('org_id', 'org-1')
-    expect(branchListBuilder.eq).toHaveBeenCalledWith('is_active', true)
   })
 
   it('returns the sole active branch id when no branch cookie is set', async () => {
-    const branchListBuilder = createSingleBranchListBuilder([
-      { id: 'branch-1' },
-    ])
-
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1' } },
-        }),
-      },
-      from: vi.fn((table: string) => {
-        if (table !== 'branches') throw new Error(`Unexpected table ${table}`)
-        return branchListBuilder
-      }),
+    mocks.getCurrentAccessibleBranch.mockResolvedValue({
+      id: 'branch-1',
+      org_id: 'org-1',
+      name: 'Unit Utama',
+      code: 'MAIN',
+      address: null,
+      is_active: true,
     })
 
     const result = await getActiveBranchIdAction('org-1')

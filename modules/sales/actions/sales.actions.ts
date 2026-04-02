@@ -2,33 +2,35 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { getActiveBranch } from '@/modules/organization/actions/org.actions'
+import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
 type ActiveBranchResult =
   | { branchId: string }
   | { error: string }
 
 async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
-  const activeBranch = await getActiveBranch(orgId)
-  if (!activeBranch) {
+  const branchSelection = await resolveAccessibleBranchSelection(orgId)
+  if ('error' in branchSelection || !branchSelection.branchId) {
     return { error: errorMessage }
   }
 
-  return { branchId: activeBranch.id }
+  return { branchId: branchSelection.branchId }
 }
 
 async function resolveActiveBranchId(orgId: string, branchId?: string | null) {
-  if (branchId !== undefined) {
-    return branchId ?? null
+  const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) {
+    return branchSelection
   }
 
-  const activeBranch = await getActiveBranch(orgId)
-  return activeBranch?.id ?? null
+  return { branchId: branchSelection.branchId }
 }
 
 export async function getSales(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
-  const effectiveBranchId = await resolveActiveBranchId(orgId, branchId)
+  const branchSelection = await resolveActiveBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
+  const effectiveBranchId = branchSelection.branchId
   let query = supabase
     .from('sales' as any)
     .select('*, branches(name, code), contacts(name), sales_items(*, products(name, sku, unit)), sales_returns(status, grand_total, return_number), sales_payments(amount, discount_amount)' as any)
@@ -310,7 +312,9 @@ export async function processSalesPayment(orgId: string, payload: {
 
 export async function getQuotations(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
-  const effectiveBranchId = await resolveActiveBranchId(orgId, branchId)
+  const branchSelection = await resolveActiveBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
+  const effectiveBranchId = branchSelection.branchId
   let query = supabase
     .from('sales' as any)
     .select('*, branches(name, code), contacts(name), sales_items(*, products(name, sku, unit))' as any)

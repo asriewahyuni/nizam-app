@@ -11,8 +11,12 @@ import {
   ACTIVE_BRANCH_COOKIE,
   ACTIVE_ORG_COOKIE,
   type AccessibleOrganization,
-  type BranchSummary,
 } from '@/modules/organization/lib/org-context'
+import {
+  canAccessAllBranchesForOrg,
+  getBranchAccessScope,
+  getCurrentAccessibleBranch,
+} from '@/modules/organization/lib/branch-access.server'
 import { applyVoucher } from './billing.actions'
 
 const DEMO_EMAIL = 'demo@nizam.app'
@@ -80,22 +84,6 @@ async function resolveActiveMembership(
   }
 
   return memberData
-}
-
-async function getSingleActiveBranch(db: any, orgId: string): Promise<BranchSummary | null> {
-  const { data, error } = await db
-    .from('branches')
-    .select('id, org_id, name, code, address, is_active')
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .order('name', { ascending: true })
-    .limit(2)
-
-  if (error || !Array.isArray(data) || data.length !== 1) {
-    return null
-  }
-
-  return (data[0] as BranchSummary) ?? null
 }
 
 export async function createOrganization(formData: FormData) {
@@ -331,7 +319,16 @@ export async function setActiveOrg(orgId: string) {
 
   cookieStore.delete('nizam_demo_org_id')
   cookieStore.set(ACTIVE_ORG_COOKIE, trimmedOrgId, getActiveContextCookieOptions())
-  cookieStore.delete(ACTIVE_BRANCH_COOKIE)
+  const branchAccessScope = await getBranchAccessScope(trimmedOrgId)
+  if (!branchAccessScope.canAccessAllBranches && branchAccessScope.accessibleBranches.length > 0) {
+    cookieStore.set(
+      ACTIVE_BRANCH_COOKIE,
+      branchAccessScope.accessibleBranches[0].id,
+      getActiveContextCookieOptions()
+    )
+  } else {
+    cookieStore.delete(ACTIVE_BRANCH_COOKIE)
+  }
 
   revalidatePath('/', 'layout')
   return { success: true, orgId: trimmedOrgId }
@@ -373,7 +370,22 @@ export async function uploadLogo(orgId: string, formData: FormData) {
 export async function getOrgMembers(orgId: string) {
   const supabase = await createClient()
   const db = supabase as any
-  const { data } = await db.from('org_members').select('*, organizations(name)').eq('org_id', orgId).eq('is_active', true)
+  const { data } = await db
+    .from('org_members')
+    .select(`
+      *,
+      organizations(name),
+      user:user_id (
+        email
+      ),
+      unit_assignments:org_member_units(
+        branch_id,
+        branch:branches(id, name, code)
+      )
+    `)
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .order('joined_at', { ascending: true })
   return data || []
 }
 
@@ -390,45 +402,16 @@ export async function destroyOrganization(orgId: string) {
 }
 
 export async function getBranches(orgId: string) {
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data } = await db
-    .from('branches')
-    .select('*')
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .order('name', { ascending: true })
-  return data || []
+  const scope = await getBranchAccessScope(orgId)
+  return scope.accessibleBranches
 }
 
-export async function getActiveBranch(orgId: string): Promise<BranchSummary | null> {
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const cookieStore = await cookies()
-  const activeBranchIdCookie = cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value
-  if (activeBranchIdCookie) {
-    const { data } = await db
-      .from('branches')
-      .select('id, org_id, name, code, address, is_active')
-      .eq('id', activeBranchIdCookie)
-      .eq('org_id', orgId)
-      .eq('is_active', true)
-      .maybeSingle()
-
-    if (data) {
-      return data as BranchSummary
-    }
-  }
-
-  return getSingleActiveBranch(db, orgId)
+export async function getActiveBranch(orgId: string) {
+  return getCurrentAccessibleBranch(orgId)
 }
 
 export async function setActiveBranch(orgId: string, branchId: string | null) {
   const supabase = await createClient()
-  const db = supabase as any
   const cookieStore = await cookies()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
@@ -436,35 +419,24 @@ export async function setActiveBranch(orgId: string, branchId: string | null) {
   const trimmedOrgId = orgId.trim()
   if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
 
-  const { data: membership } = await db
-    .from('org_members')
-    .select('org_id')
-    .eq('user_id', user.id)
-    .eq('org_id', trimmedOrgId)
-    .eq('is_active', true)
-    .maybeSingle()
+  const branchAccessScope = await getBranchAccessScope(trimmedOrgId)
 
-  if (!membership) {
+  if (!branchAccessScope.role) {
     return { error: 'Anda tidak memiliki akses ke organisasi ini.' }
   }
 
   if (!branchId) {
+    if (!branchAccessScope.canAccessAllBranches) {
+      return { error: 'Anda harus memilih unit yang termasuk dalam akses Anda.' }
+    }
     cookieStore.delete(ACTIVE_BRANCH_COOKIE)
     revalidatePath('/', 'layout')
     return { success: true, branchId: null }
   }
 
   const trimmedBranchId = branchId.trim()
-  const { data: branch, error } = await db
-    .from('branches')
-    .select('id')
-    .eq('id', trimmedBranchId)
-    .eq('org_id', trimmedOrgId)
-    .eq('is_active', true)
-    .maybeSingle()
-
-  if (error || !branch) {
-    return { error: 'Unit tidak ditemukan pada organisasi aktif.' }
+  if (!branchAccessScope.accessibleBranchIds.includes(trimmedBranchId)) {
+    return { error: 'Anda tidak memiliki akses ke unit tersebut.' }
   }
 
   cookieStore.set(ACTIVE_BRANCH_COOKIE, trimmedBranchId, getActiveContextCookieOptions())
@@ -472,12 +444,127 @@ export async function setActiveBranch(orgId: string, branchId: string | null) {
   return { success: true, branchId: trimmedBranchId }
 }
 
+export async function canSelectAllBranches(orgId: string) {
+  return canAccessAllBranchesForOrg(orgId)
+}
+
 export async function createBranch(orgId: string, formData: FormData) {
   const supabase = await createClient()
   const db = supabase as any
   await db.from('branches').insert({ org_id: orgId, name: formData.get('name'), code: formData.get('code'), address: formData.get('address'), is_active: true })
   revalidatePath('/settings/branches')
+  revalidatePath('/settings/users')
   return { success: true }
+}
+
+export async function updateMemberUnitAccess(orgId: string, memberId: string, branchIds: string[]) {
+  const supabase = await createClient()
+  const db = supabase as any
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Tidak terautentikasi.' }
+
+  const trimmedOrgId = orgId.trim()
+  const trimmedMemberId = memberId.trim()
+  if (!trimmedOrgId || !trimmedMemberId) {
+    return { error: 'Data anggota tidak valid.' }
+  }
+
+  const { data: actorMembership } = await db
+    .from('org_members')
+    .select('role')
+    .eq('org_id', trimmedOrgId)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!actorMembership || !['owner', 'admin'].includes(String(actorMembership.role || ''))) {
+    return { error: 'Hanya owner atau admin yang dapat mengatur akses unit.' }
+  }
+
+  const { data: targetMembership } = await db
+    .from('org_members')
+    .select('id, role')
+    .eq('id', trimmedMemberId)
+    .eq('org_id', trimmedOrgId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!targetMembership) {
+    return { error: 'Anggota organisasi tidak ditemukan.' }
+  }
+
+  if (['owner', 'admin'].includes(String(targetMembership.role || ''))) {
+    return { error: 'Owner dan admin selalu memiliki akses ke semua unit.' }
+  }
+
+  const normalizedBranchIds = Array.from(
+    new Set(
+      branchIds
+        .map((branchId) => String(branchId || '').trim())
+        .filter(Boolean)
+    )
+  )
+
+  if (normalizedBranchIds.length === 0) {
+    return { error: 'Minimal satu unit harus dipilih untuk anggota non-owner/admin.' }
+  }
+
+  let validBranches: Array<{ id: string; name: string; code: string }> = []
+  if (normalizedBranchIds.length > 0) {
+    const { data: branchRows, error: branchError } = await db
+      .from('branches')
+      .select('id, name, code')
+      .eq('org_id', trimmedOrgId)
+      .eq('is_active', true)
+      .in('id', normalizedBranchIds)
+
+    if (branchError) {
+      return { error: 'Gagal memverifikasi unit yang dipilih.' }
+    }
+
+    validBranches = Array.isArray(branchRows) ? branchRows : []
+    if (validBranches.length !== normalizedBranchIds.length) {
+      return { error: 'Satu atau lebih unit yang dipilih tidak valid.' }
+    }
+  }
+
+  const { error: deleteError } = await db
+    .from('org_member_units')
+    .delete()
+    .eq('org_id', trimmedOrgId)
+    .eq('org_member_id', trimmedMemberId)
+
+  if (deleteError) {
+    return { error: 'Gagal menghapus akses unit sebelumnya.' }
+  }
+
+  if (normalizedBranchIds.length > 0) {
+    const { error: insertError } = await db
+      .from('org_member_units')
+      .insert(
+        normalizedBranchIds.map((branchId) => ({
+          org_member_id: trimmedMemberId,
+          org_id: trimmedOrgId,
+          branch_id: branchId,
+          assigned_by: user.id,
+        }))
+      )
+
+    if (insertError) {
+      return { error: 'Gagal menyimpan akses unit anggota.' }
+    }
+  }
+
+  revalidatePath('/settings/users')
+  revalidatePath('/', 'layout')
+  return {
+    success: true,
+    branchIds: normalizedBranchIds,
+    branches: validBranches,
+  }
 }
 
 // INVITATION TOKENS

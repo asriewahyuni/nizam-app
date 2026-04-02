@@ -2,20 +2,18 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { getActiveBranch } from '@/modules/organization/actions/org.actions'
+import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
 async function resolveApprovalBranchId(orgId: string, branchId?: string | null) {
-  if (branchId !== undefined) {
-    return branchId ?? null
-  }
-
-  const activeBranch = await getActiveBranch(orgId)
-  return activeBranch?.id ?? null
+  const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
+  return branchSelection
 }
 
 export async function getPendingApprovals(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
-  const effectiveBranchId = await resolveApprovalBranchId(orgId, branchId)
+  const branchSelection = await resolveApprovalBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
+  const effectiveBranchId = branchSelection.branchId
 
   let query = (supabase as any)
     .from('approval_requests')
@@ -39,7 +37,9 @@ export async function getPendingApprovals(orgId: string, branchId?: string | nul
 
 export async function getApprovalHistory(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
-  const effectiveBranchId = await resolveApprovalBranchId(orgId, branchId)
+  const branchSelection = await resolveApprovalBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
+  const effectiveBranchId = branchSelection.branchId
 
   let query = (supabase as any)
     .from('approval_requests')
@@ -64,7 +64,9 @@ export async function getApprovalHistory(orgId: string, branchId?: string | null
 }
 export async function getApprovalDetail(orgId: string, sourceId: string, sourceType: string, branchId?: string | null) {
   const supabase = await createClient()
-  const effectiveBranchId = await resolveApprovalBranchId(orgId, branchId)
+  const branchSelection = await resolveApprovalBranchId(orgId, branchId)
+  if ('error' in branchSelection) return { data: null, error: branchSelection.error }
+  const effectiveBranchId = branchSelection.branchId
 
   let dataRes: any = { data: null, error: null }
   
@@ -112,7 +114,9 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
 
 export async function getPendingApprovalsCount(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
-  const effectiveBranchId = await resolveApprovalBranchId(orgId, branchId)
+  const branchSelection = await resolveApprovalBranchId(orgId, branchId)
+  if ('error' in branchSelection) return 0
+  const effectiveBranchId = branchSelection.branchId
 
   let query = (supabase as any)
     .from('approval_requests')
@@ -138,7 +142,9 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
   const supabase = await createClient()
   const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Unauthorized' }
-  const effectiveBranchId = await resolveApprovalBranchId(orgId, branchId)
+  const branchSelection = await resolveApprovalBranchId(orgId, branchId)
+  if ('error' in branchSelection) return { error: branchSelection.error }
+  const effectiveBranchId = branchSelection.branchId
 
   let requestLookup = (supabase as any)
     .from('approval_requests')
@@ -217,7 +223,9 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
 
 export async function getApprovalForSource(orgId: string, sourceId: string, sourceType: string, branchId?: string | null) {
   const supabase = await createClient()
-  const effectiveBranchId = await resolveApprovalBranchId(orgId, branchId)
+  const branchSelection = await resolveApprovalBranchId(orgId, branchId)
+  if ('error' in branchSelection) return null
+  const effectiveBranchId = branchSelection.branchId
 
   let query = (supabase as any)
     .from('approval_requests')

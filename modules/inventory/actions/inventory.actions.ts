@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { Product } from '@/types/database.types'
-import { getActiveBranch } from '@/modules/organization/actions/org.actions'
+import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
 export interface ProductWithStock extends Product {
   stock_in: number
@@ -23,21 +23,21 @@ type ActiveBranchResult =
   | { error: string }
 
 async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
-  const activeBranch = await getActiveBranch(orgId)
-  if (!activeBranch) {
+  const branchSelection = await resolveAccessibleBranchSelection(orgId)
+  if ('error' in branchSelection || !branchSelection.branchId) {
     return { error: errorMessage }
   }
 
-  return { branchId: activeBranch.id }
+  return { branchId: branchSelection.branchId }
 }
 
 async function resolveActiveBranchId(orgId: string, branchId?: string | null) {
-  if (branchId !== undefined) {
-    return branchId ?? null
+  const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) {
+    return branchSelection
   }
 
-  const activeBranch = await getActiveBranch(orgId)
-  return activeBranch?.id ?? null
+  return { branchId: branchSelection.branchId }
 }
 
 async function getScopedWarehouses(
@@ -67,7 +67,9 @@ async function getScopedWarehouses(
 
 export async function getProducts(orgId: string, branchId?: string | null): Promise<ProductWithStock[]> {
   const supabase = await createClient()
-  const effectiveBranchId = await resolveActiveBranchId(orgId, branchId)
+  const branchSelection = await resolveActiveBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
+  const effectiveBranchId = branchSelection.branchId
 
   const { data: productsData } = await supabase.from('products').select('*').eq('org_id', orgId).order('name', { ascending: true })
   let movementsQuery = supabase
@@ -453,7 +455,9 @@ export async function createInventoryWriteOff(orgId: string, payload: any) {
 
 export async function getStockLedger(orgId: string, productId: string, branchId?: string | null) {
   const supabase = await createClient()
-  const effectiveBranchId = await resolveActiveBranchId(orgId, branchId)
+  const branchSelection = await resolveActiveBranchId(orgId, branchId)
+  if ('error' in branchSelection) return { error: branchSelection.error }
+  const effectiveBranchId = branchSelection.branchId
   
   const { data: product } = await supabase
     .from('products')
@@ -483,7 +487,9 @@ export async function getStockLedger(orgId: string, productId: string, branchId?
 
 export async function getWarehouseStocks(orgId: string, productId: string, branchId?: string | null) {
   const supabase = await createClient()
-  const effectiveBranchId = await resolveActiveBranchId(orgId, branchId)
+  const branchSelection = await resolveActiveBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
+  const effectiveBranchId = branchSelection.branchId
 
   let query = (supabase as any)
     .from('inventory_stocks')

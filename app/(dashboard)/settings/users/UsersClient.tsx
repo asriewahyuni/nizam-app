@@ -1,12 +1,13 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { Plus, Shield, Trash2, Edit2, ShieldAlert, Link as LinkIcon, Copy } from 'lucide-react'
+import { Plus, Shield, Trash2, Edit2, ShieldAlert, Link as LinkIcon, Copy, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type UsersClientProps = {
   orgId: string
   initialMembers: any[]
+  branches: Array<{ id: string; name: string; code: string }>
   roles?: any[]
   initialInvitations?: any[]
 }
@@ -16,6 +17,7 @@ const ALLOWED_MEMBER_ROLES = ['owner', 'admin', 'hr', 'manager', 'staff', 'viewe
 export default function UsersClient({
   orgId,
   initialMembers,
+  branches,
   roles = [],
   initialInvitations = [],
 }: UsersClientProps) {
@@ -27,6 +29,7 @@ export default function UsersClient({
   const [inviteDuration, setInviteDuration] = useState('7')
   const [latestInviteUrl, setLatestInviteUrl] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
+  const [memberUnitsModal, setMemberUnitsModal] = useState<{ memberId: string; email: string; branchIds: string[] } | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -134,10 +137,71 @@ export default function UsersClient({
       setMembers((current: any[]) => current.map((member: any) => (
         member.id === memberId ? { ...member, role: normalizedRole } : member
       )))
+      window.location.reload()
     } else {
       alert(error.message)
     }
 
+    setLoading(false)
+  }
+
+  const getAssignedBranchIds = (member: any) => {
+    const assignments = Array.isArray(member.unit_assignments) ? member.unit_assignments : []
+    return assignments
+      .map((assignment: any) => String(assignment.branch_id || '').trim())
+      .filter(Boolean)
+  }
+
+  const openUnitAccessModal = (member: any) => {
+    setMemberUnitsModal({
+      memberId: member.id,
+      email: member.user?.email || member.user_id,
+      branchIds: getAssignedBranchIds(member),
+    })
+  }
+
+  const toggleMemberUnit = (branchId: string) => {
+    setMemberUnitsModal((current) => {
+      if (!current) return current
+      const exists = current.branchIds.includes(branchId)
+      return {
+        ...current,
+        branchIds: exists
+          ? current.branchIds.filter((id) => id !== branchId)
+          : [...current.branchIds, branchId],
+      }
+    })
+  }
+
+  const handleSaveMemberUnits = async () => {
+    if (!memberUnitsModal) return
+    setLoading(true)
+
+    const { updateMemberUnitAccess } = await import('@/modules/organization/actions/org.actions')
+    const res = await updateMemberUnitAccess(orgId, memberUnitsModal.memberId, memberUnitsModal.branchIds)
+
+    if ((res as any).error) {
+      alert((res as any).error)
+      setLoading(false)
+      return
+    }
+
+    const branchMap = new Map(branches.map((branch) => [branch.id, branch]))
+    setMembers((current: any[]) =>
+      current.map((member: any) =>
+        member.id === memberUnitsModal.memberId
+          ? {
+              ...member,
+              unit_assignments: memberUnitsModal.branchIds.map((branchId: string) => ({
+                branch_id: branchId,
+                branch: branchMap.get(branchId) || null,
+              })),
+            }
+          : member
+      )
+    )
+
+    setMemberUnitsModal(null)
     setLoading(false)
   }
 
@@ -246,6 +310,7 @@ export default function UsersClient({
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">User ID & Info</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Peran (Role)</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Akses Unit</th>
                   <th className="px-6 py-4 text-right text-xs font-bold text-slate-400 uppercase tracking-widest">Aksi</th>
                 </tr>
               </thead>
@@ -278,8 +343,38 @@ export default function UsersClient({
                         {member.role}
                       </span>
                     </td>
+                    <td className="px-6 py-4">
+                      {['owner', 'admin'].includes(member.role) ? (
+                        <span className="text-xs font-bold text-emerald-600">Semua Unit</span>
+                      ) : getAssignedBranchIds(member).length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {getAssignedBranchIds(member).map((branchId: string) => {
+                            const branch = branches.find((item) => item.id === branchId)
+                            return (
+                              <span
+                                key={branchId}
+                                className="px-2.5 py-1 rounded-full bg-slate-100 text-[10px] font-bold uppercase tracking-widest text-slate-600"
+                              >
+                                {branch?.code || branch?.name || 'Unit'}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <span className="text-xs font-medium text-rose-500">Belum ada akses unit</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {!['owner', 'admin'].includes(member.role) && (
+                          <button
+                            onClick={() => openUnitAccessModal(member)}
+                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                            title="Atur Akses Unit"
+                          >
+                            <Shield size={16} />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleUpdateRole(member.id, member.role)}
                           className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
@@ -300,7 +395,7 @@ export default function UsersClient({
                 ))}
                 {members.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="px-6 py-10 text-center text-slate-400 font-medium">Belum ada pengguna di organisasi ini.</td>
+                    <td colSpan={4} className="px-6 py-10 text-center text-slate-400 font-medium">Belum ada pengguna di organisasi ini.</td>
                   </tr>
                 )}
               </tbody>
@@ -355,6 +450,79 @@ export default function UsersClient({
           </div>
         </div>
       </div>
+
+      {memberUnitsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+            onClick={() => setMemberUnitsModal(null)}
+          />
+          <div className="relative w-full max-w-xl rounded-[32px] border border-slate-100 bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">Atur Akses Unit</h3>
+                <p className="text-sm text-slate-500">{memberUnitsModal.email}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMemberUnitsModal(null)}
+                className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {branches.map((branch) => {
+                const checked = memberUnitsModal.branchIds.includes(branch.id)
+                return (
+                  <label
+                    key={branch.id}
+                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition ${
+                      checked ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleMemberUnit(branch.id)}
+                      className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-slate-900">{branch.name}</div>
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{branch.code}</div>
+                    </div>
+                  </label>
+                )
+              })}
+            </div>
+
+            {branches.length === 0 && (
+              <div className="mt-6 rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-400">
+                Belum ada unit aktif yang bisa ditugaskan.
+              </div>
+            )}
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setMemberUnitsModal(null)}
+                className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleSaveMemberUnits}
+                className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-100 disabled:opacity-50"
+              >
+                Simpan Akses Unit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

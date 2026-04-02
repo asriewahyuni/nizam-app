@@ -7,6 +7,7 @@ import { getUnpostedJournalsCount } from '@/modules/accounting/actions/journal.a
 import { getPendingPurchaseRequestsCount } from '@/modules/purchasing/actions/purchasing.actions'
 import { getResetRequestsCount } from '@/modules/organization/actions/hris.actions'
 import { getCashFlow } from '@/modules/accounting/actions/reports.actions'
+import { canAccessAllBranchesForOrg } from '@/modules/organization/lib/branch-access.server'
 import { isDemoSession } from '@/modules/demo/actions/demo.actions'
 import { getAiTokenHeaderSummary } from '@/modules/ai/lib/ai-token.server'
 import { saasModuleMatches } from '@/lib/saas/module-catalog'
@@ -51,7 +52,10 @@ export default async function DashboardLayout({
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
   const adminImpersonation = await getAdminImpersonationState()
-  const activeBranch = await getActiveBranch(orgData.org.id)
+  const [activeBranch, allowAllBranchSelection] = await Promise.all([
+    getActiveBranch(orgData.org.id),
+    canAccessAllBranchesForOrg(orgData.org.id),
+  ])
 
   const dependencyResults = await Promise.allSettled([
     getPendingApprovalsCount(orgData.org.id, activeBranch?.id),
@@ -180,6 +184,7 @@ export default async function DashboardLayout({
           activeOrgId={orgData.org.id}
           branches={branches || []}
           activeBranchId={activeBranch?.id || null}
+          allowAllBranchSelection={allowAllBranchSelection}
           pendingApprovals={pendingApprovals}
           cashFlow={cashFlow}
           aiTokens={aiTokens}

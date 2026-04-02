@@ -1,0 +1,223 @@
+import { cookies } from 'next/headers'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { ACTIVE_BRANCH_COOKIE, type BranchSummary } from './org-context'
+
+const FULL_BRANCH_ACCESS_ROLES = new Set(['owner', 'admin'])
+
+export type BranchAccessScope = {
+  membershipId: string | null
+  role: string | null
+  accessibleBranches: BranchSummary[]
+  accessibleBranchIds: string[]
+  canAccessAllBranches: boolean
+}
+
+export type ResolvedBranchSelection =
+  | {
+      scope: BranchAccessScope
+      branchId: string | null
+      error?: undefined
+    }
+  | {
+      scope: BranchAccessScope
+      branchId?: undefined
+      error: string
+    }
+
+function emptyScope(): BranchAccessScope {
+  return {
+    membershipId: null,
+    role: null,
+    accessibleBranches: [],
+    accessibleBranchIds: [],
+    canAccessAllBranches: false,
+  }
+}
+
+function normalizeBranchRows(rows: any[]): BranchSummary[] {
+  return rows.map((branch) => ({
+    id: String(branch.id),
+    org_id: String(branch.org_id),
+    name: String(branch.name),
+    code: String(branch.code),
+    address: branch.address ? String(branch.address) : null,
+    is_active: Boolean(branch.is_active),
+  }))
+}
+
+function pickDefaultBranch(scope: BranchAccessScope): BranchSummary | null {
+  if (scope.accessibleBranches.length === 1) {
+    return scope.accessibleBranches[0] ?? null
+  }
+
+  if (!scope.canAccessAllBranches) {
+    return scope.accessibleBranches[0] ?? null
+  }
+
+  return null
+}
+
+function pickBranchFromCookie(scope: BranchAccessScope, branchIdFromCookie?: string | null) {
+  const trimmedBranchId = String(branchIdFromCookie || '').trim()
+  if (!trimmedBranchId) return null
+  if (!scope.accessibleBranchIds.includes(trimmedBranchId)) return null
+  return scope.accessibleBranches.find((branch) => branch.id === trimmedBranchId) ?? null
+}
+
+export async function getBranchAccessScope(orgId: string): Promise<BranchAccessScope> {
+  const trimmedOrgId = orgId.trim()
+  if (!trimmedOrgId) return emptyScope()
+
+  const supabase = await createClient()
+  const db = supabase as any
+  const adminClient = await createAdminClient()
+  const admin = adminClient as any
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return emptyScope()
+
+  const { data: membership } = await db
+    .from('org_members')
+    .select('id, role')
+    .eq('org_id', trimmedOrgId)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!membership?.id) return emptyScope()
+
+  const { data: allBranches, error: branchesError } = await admin
+    .from('branches')
+    .select('id, org_id, name, code, address, is_active')
+    .eq('org_id', trimmedOrgId)
+    .eq('is_active', true)
+    .order('name', { ascending: true })
+
+  if (branchesError || !Array.isArray(allBranches) || allBranches.length === 0) {
+    return {
+      membershipId: String(membership.id),
+      role: String(membership.role || 'staff'),
+      accessibleBranches: [],
+      accessibleBranchIds: [],
+      canAccessAllBranches: false,
+    }
+  }
+
+  const normalizedBranches = normalizeBranchRows(allBranches)
+  const role = String(membership.role || 'staff')
+
+  if (FULL_BRANCH_ACCESS_ROLES.has(role)) {
+    return {
+      membershipId: String(membership.id),
+      role,
+      accessibleBranches: normalizedBranches,
+      accessibleBranchIds: normalizedBranches.map((branch) => branch.id),
+      canAccessAllBranches: true,
+    }
+  }
+
+  const { data: assignments, error: assignmentsError } = await admin
+    .from('org_member_units')
+    .select('branch_id')
+    .eq('org_id', trimmedOrgId)
+    .eq('org_member_id', membership.id)
+
+  if (assignmentsError || !Array.isArray(assignments)) {
+    return {
+      membershipId: String(membership.id),
+      role,
+      accessibleBranches: [],
+      accessibleBranchIds: [],
+      canAccessAllBranches: false,
+    }
+  }
+
+  const assignedBranchIds = new Set(
+    assignments
+      .map((assignment) => String(assignment.branch_id || '').trim())
+      .filter(Boolean)
+  )
+  const accessibleBranches = normalizedBranches.filter((branch) => assignedBranchIds.has(branch.id))
+
+  return {
+    membershipId: String(membership.id),
+    role,
+    accessibleBranches,
+    accessibleBranchIds: accessibleBranches.map((branch) => branch.id),
+    canAccessAllBranches:
+      accessibleBranches.length > 0 && accessibleBranches.length === normalizedBranches.length,
+  }
+}
+
+export async function getCurrentAccessibleBranch(orgId: string): Promise<BranchSummary | null> {
+  const scope = await getBranchAccessScope(orgId)
+  if (scope.accessibleBranches.length === 0) return null
+
+  const cookieStore = await cookies()
+  const activeBranch = pickBranchFromCookie(scope, cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value)
+  if (activeBranch) return activeBranch
+
+  return pickDefaultBranch(scope)
+}
+
+export async function canAccessAllBranchesForOrg(orgId: string): Promise<boolean> {
+  const scope = await getBranchAccessScope(orgId)
+  return scope.canAccessAllBranches
+}
+
+export async function isAccessibleBranch(orgId: string, branchId: string): Promise<boolean> {
+  const trimmedBranchId = branchId.trim()
+  if (!trimmedBranchId) return false
+
+  const scope = await getBranchAccessScope(orgId)
+  return scope.accessibleBranchIds.includes(trimmedBranchId)
+}
+
+export async function resolveAccessibleBranchSelection(
+  orgId: string,
+  branchId?: string | null
+): Promise<ResolvedBranchSelection> {
+  const scope = await getBranchAccessScope(orgId)
+
+  if (!scope.role) {
+    return { scope, error: 'Akses organisasi tidak ditemukan.' }
+  }
+
+  if (scope.accessibleBranches.length === 0) {
+    return { scope, error: 'Anda belum memiliki akses ke unit mana pun pada organisasi ini.' }
+  }
+
+  if (branchId !== undefined) {
+    if (branchId === null) {
+      if (!scope.canAccessAllBranches) {
+        return { scope, error: 'Anda tidak memiliki akses ke semua unit pada organisasi ini.' }
+      }
+      return { scope, branchId: null }
+    }
+
+    const trimmedBranchId = branchId.trim()
+    if (!trimmedBranchId) {
+      return { scope, error: 'Unit tidak valid.' }
+    }
+
+    if (!scope.accessibleBranchIds.includes(trimmedBranchId)) {
+      return { scope, error: 'Anda tidak memiliki akses ke unit tersebut.' }
+    }
+
+    return { scope, branchId: trimmedBranchId }
+  }
+
+  const cookieStore = await cookies()
+  const activeBranch = pickBranchFromCookie(scope, cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value)
+  if (activeBranch) {
+    return { scope, branchId: activeBranch.id }
+  }
+
+  if (scope.canAccessAllBranches) {
+    return { scope, branchId: null }
+  }
+
+  return { scope, branchId: scope.accessibleBranches[0]?.id ?? null }
+}

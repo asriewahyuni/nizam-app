@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   revalidatePath: vi.fn(),
-  getActiveBranch: vi.fn(),
+  resolveAccessibleBranchSelection: vi.fn(),
   createJournalEntry: vi.fn(),
 }))
 
@@ -15,8 +15,8 @@ vi.mock('next/cache', () => ({
   revalidatePath: mocks.revalidatePath,
 }))
 
-vi.mock('@/modules/organization/actions/org.actions', () => ({
-  getActiveBranch: mocks.getActiveBranch,
+vi.mock('@/modules/organization/lib/branch-access.server', () => ({
+  resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
 }))
 
 vi.mock('@/modules/accounting/actions/journal.actions', () => ({
@@ -47,6 +47,10 @@ describe('Reimbursement Branch Context', () => {
         return reimburseQuery
       }),
     })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
 
     await getReimbursements('org-1', 'branch-1')
 
@@ -57,7 +61,10 @@ describe('Reimbursement Branch Context', () => {
   it('rejects reimbursement submission when no active branch is selected', async () => {
     const fromMock = vi.fn()
 
-    mocks.getActiveBranch.mockResolvedValue(null)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: [], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: null,
+    })
     mocks.createClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -102,13 +109,9 @@ describe('Reimbursement Branch Context', () => {
     const itemsInsert = vi.fn().mockResolvedValue({ error: null })
     const approvalInsert = vi.fn().mockResolvedValue({ error: null })
 
-    mocks.getActiveBranch.mockResolvedValue({
-      id: 'branch-1',
-      org_id: 'org-1',
-      name: 'Unit A',
-      code: 'UA',
-      address: null,
-      is_active: true,
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
     })
     mocks.createClient.mockResolvedValue({
       auth: {
@@ -200,13 +203,9 @@ describe('Reimbursement Branch Context', () => {
       update: vi.fn(() => reimbursementUpdate),
     }
 
-    mocks.getActiveBranch.mockResolvedValue({
-      id: 'branch-1',
-      org_id: 'org-1',
-      name: 'Unit A',
-      code: 'UA',
-      address: null,
-      is_active: true,
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
     })
     mocks.createJournalEntry.mockResolvedValue({
       success: true,

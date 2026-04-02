@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { getActiveBranch } from '@/modules/organization/actions/org.actions'
+import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
 type WarehousePayload = {
   code: string
@@ -71,21 +71,21 @@ function revalidateWarehousePages(warehouseId?: string) {
 }
 
 async function resolveActiveBranchId(orgId: string, branchId?: string | null) {
-  if (branchId !== undefined) {
-    return branchId ?? null
+  const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) {
+    return branchSelection
   }
 
-  const activeBranch = await getActiveBranch(orgId)
-  return activeBranch?.id ?? null
+  return { branchId: branchSelection.branchId }
 }
 
 async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
-  const activeBranch = await getActiveBranch(orgId)
-  if (!activeBranch) {
+  const branchSelection = await resolveAccessibleBranchSelection(orgId)
+  if ('error' in branchSelection || !branchSelection.branchId) {
     return { error: errorMessage }
   }
 
-  return { branchId: activeBranch.id }
+  return { branchId: branchSelection.branchId }
 }
 
 function applyWarehouseBranchFilter(query: any, branchId: string | null) {
@@ -139,7 +139,9 @@ export async function getWarehouses(orgId: string, branchId?: string | null) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) return []
-  const effectiveBranchId = await resolveActiveBranchId(orgId, branchId)
+  const branchSelection = await resolveActiveBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
+  const effectiveBranchId = branchSelection.branchId
 
   let query = (supabase as any)
     .from('warehouses')
@@ -157,7 +159,9 @@ export async function getWarehouses(orgId: string, branchId?: string | null) {
 
 export async function getWarehouseBins(orgId: string, warehouseId?: string, branchId?: string | null) {
   const supabase = await createClient()
-  const effectiveBranchId = await resolveActiveBranchId(orgId, branchId)
+  const branchSelection = await resolveActiveBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
+  const effectiveBranchId = branchSelection.branchId
   let query = supabase
     .from('warehouse_bins')
     .select('*, warehouses!inner(name, code, branch_id)')

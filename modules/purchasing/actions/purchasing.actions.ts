@@ -3,6 +3,44 @@
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
+import { getBranchAccessScope, resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+
+type BranchSelectionResult =
+  | { branchId: string | null; error?: undefined }
+  | { branchId?: undefined; error: string }
+
+async function resolvePurchasingBranchId(orgId: string, branchId?: string | null): Promise<BranchSelectionResult> {
+  const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) {
+    return { error: branchSelection.error || 'Unit tidak valid.' }
+  }
+
+  return { branchId: branchSelection.branchId }
+}
+
+async function ensurePurchaseDocumentAccess(orgId: string, branchId: string | null | undefined) {
+  const scope = await getBranchAccessScope(orgId)
+  if (!scope.role) {
+    return { error: 'Akses organisasi tidak ditemukan.' as const }
+  }
+
+  if (scope.accessibleBranches.length === 0) {
+    return { error: 'Anda belum memiliki akses ke unit mana pun pada organisasi ini.' as const }
+  }
+
+  if (!branchId) {
+    if (!scope.canAccessAllBranches) {
+      return { error: 'Pilih unit aktif terlebih dahulu untuk mengakses pembelian ini.' as const }
+    }
+    return { success: true as const }
+  }
+
+  if (!scope.accessibleBranchIds.includes(String(branchId))) {
+    return { error: 'Pembelian ini tidak tersedia pada unit akses Anda.' as const }
+  }
+
+  return { success: true as const }
+}
 
 export async function getPurchases(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
@@ -21,6 +59,8 @@ export async function getPurchases(orgId: string, branchId?: string | null) {
   }
 
   if (!canReadPurchasing) return []
+  const branchSelection = await resolvePurchasingBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
 
   // Read with admin client after explicit permission check so server-rendered
   // purchasing data is not dropped by mismatched line-item RLS policies.
@@ -46,8 +86,8 @@ export async function getPurchases(orgId: string, branchId?: string | null) {
     ` as any)
     .eq('org_id', orgId)
 
-  if (branchId) {
-    query = query.eq('branch_id', branchId)
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
   }
 
   const { data, error } = await query
@@ -74,8 +114,8 @@ export async function getPurchases(orgId: string, branchId?: string | null) {
       ` as any)
       .eq('org_id', orgId)
 
-    if (branchId) {
-      fallbackQuery = fallbackQuery.eq('branch_id', branchId)
+    if (branchSelection.branchId) {
+      fallbackQuery = fallbackQuery.eq('branch_id', branchSelection.branchId)
     }
 
     const { data: fallback, error: fallbackErr } = await fallbackQuery
@@ -126,19 +166,15 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
     return { error: 'Vendor dan baris produk wajib diisi.' }
   }
 
-  if (payload.branch_id) {
-    const { data: branch, error: branchError } = await (supabase as any)
-      .from('branches')
-      .select('id')
-      .eq('id', payload.branch_id)
-      .eq('org_id', orgId)
-      .eq('is_active', true)
-      .maybeSingle()
-
-    if (branchError || !branch) {
-      return { error: 'Unit aktif tidak valid untuk organisasi ini.' }
-    }
+  const branchSelection = await resolvePurchasingBranchId(orgId, payload.branch_id)
+  if ('error' in branchSelection) {
+    return { error: 'Unit aktif tidak valid untuk organisasi ini.' }
   }
+
+  if (!branchSelection.branchId) {
+    return { error: 'Pilih unit aktif terlebih dahulu untuk membuat purchase order.' }
+  }
+  const purchaseBranchId = branchSelection.branchId
 
   // 1. Calculate Subtotals to perform Value-Based Allocation for Landed Costs
   const totalOverhead = (payload.shipping_amount || 0) + (payload.insurance_amount || 0)
@@ -216,7 +252,7 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
       p_shariah_mode: payload.shariah_mode || 'CASH',
       p_lines: processedLines,
       p_user_id: user.id,
-      p_branch_id: payload.branch_id || null,
+      p_branch_id: purchaseBranchId,
   })
 
   if (rpcError || !rpcRes?.success) {
@@ -239,6 +275,8 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     .single()
 
   if (!purchase) return { error: 'PO tidak ditemukan.' }
+  const purchaseAccess = await ensurePurchaseDocumentAccess(orgId, purchase.branch_id)
+  if ('error' in purchaseAccess) return { error: purchaseAccess.error }
   if (purchase.status === 'RECEIVED') return { success: true }
 
   const shipping = purchase.shipping_amount || 0
@@ -462,6 +500,16 @@ export async function voidPurchase(orgId: string, purchaseId: string) {
 
   const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
+  const { data: purchase } = await (supabase as any)
+    .from('purchases')
+    .select('branch_id')
+    .eq('id', purchaseId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (!purchase) return { error: 'PO tidak ditemukan.' }
+  const purchaseAccess = await ensurePurchaseDocumentAccess(orgId, purchase.branch_id)
+  if ('error' in purchaseAccess) return { error: purchaseAccess.error }
 
   // Gunakan RPC agar berjalan di level DB dengan security definer (admin) 
   // Melewati pembatasan RLS agar Ledger & Sub-Ledger sinkron
@@ -494,6 +542,16 @@ export async function createPurchasePayment(orgId: string, payload: {
   const supabase = await createClient()
   const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  const { data: purchase } = await (supabase as any)
+    .from('purchases')
+    .select('branch_id')
+    .eq('id', payload.purchase_id)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (!purchase) return { error: 'PO tidak ditemukan.' }
+  const purchaseAccess = await ensurePurchaseDocumentAccess(orgId, purchase.branch_id)
+  if ('error' in purchaseAccess) return { error: purchaseAccess.error }
 
   const { data, error } = await (supabase as any).rpc('process_purchase_payment_atomic', {
     p_org_id: orgId,
@@ -524,6 +582,16 @@ export async function createPurchaseReturn(orgId: string, payload: {
   const supabase = await createClient()
   const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  const { data: purchase } = await (supabase as any)
+    .from('purchases')
+    .select('branch_id')
+    .eq('id', payload.purchase_id)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (!purchase) return { error: 'PO tidak ditemukan.' }
+  const purchaseAccess = await ensurePurchaseDocumentAccess(orgId, purchase.branch_id)
+  if ('error' in purchaseAccess) return { error: purchaseAccess.error }
 
   const { data, error } = await (supabase as any).rpc('process_purchase_return_atomic', {
     p_org_id: orgId,
@@ -546,6 +614,8 @@ export async function createPurchaseReturn(orgId: string, payload: {
 
 export async function getPurchaseRequests(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
+  const branchSelection = await resolvePurchasingBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
   
   let query = (supabase as any)
     .from('purchase_requests')
@@ -556,8 +626,8 @@ export async function getPurchaseRequests(orgId: string, branchId?: string | nul
     `)
     .eq('org_id', orgId)
 
-  if (branchId) {
-    query = query.eq('branch_id', branchId)
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
   }
 
   const { data, error } = await query.order('created_at', { ascending: false })
@@ -572,8 +642,8 @@ export async function getPurchaseRequests(orgId: string, branchId?: string | nul
       `)
       .eq('org_id', orgId)
 
-    if (branchId) {
-      fallbackQuery = fallbackQuery.eq('branch_id', branchId)
+    if (branchSelection.branchId) {
+      fallbackQuery = fallbackQuery.eq('branch_id', branchSelection.branchId)
     }
 
     const { data: fallback, error: fallbackError } = await fallbackQuery.order('created_at', { ascending: false })
@@ -585,14 +655,16 @@ export async function getPurchaseRequests(orgId: string, branchId?: string | nul
 
 export async function updatePurchaseRequestStatus(orgId: string, requestId: string, status: string, branchId?: string | null) {
   const supabase = await createClient()
+  const branchSelection = await resolvePurchasingBranchId(orgId, branchId)
+  if ('error' in branchSelection) return { error: branchSelection.error }
   let query = (supabase as any)
     .from('purchase_requests')
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', requestId)
     .eq('org_id', orgId)
 
-  if (branchId) {
-    query = query.eq('branch_id', branchId)
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
   }
 
   const { error } = await query
@@ -605,14 +677,16 @@ export async function updatePurchaseRequestStatus(orgId: string, requestId: stri
 
 export async function getPendingPurchaseRequestsCount(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
+  const branchSelection = await resolvePurchasingBranchId(orgId, branchId)
+  if ('error' in branchSelection) return 0
   let query = (supabase as any)
     .from('purchase_requests')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'PENDING')
 
-  if (branchId) {
-    query = query.eq('branch_id', branchId)
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
   }
 
   const { count, error } = await query

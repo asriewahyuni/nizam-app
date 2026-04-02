@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   revalidatePath: vi.fn(),
-  getActiveBranch: vi.fn(),
+  resolveAccessibleBranchSelection: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -14,8 +14,8 @@ vi.mock('next/cache', () => ({
   revalidatePath: mocks.revalidatePath,
 }))
 
-vi.mock('@/modules/organization/actions/org.actions', () => ({
-  getActiveBranch: mocks.getActiveBranch,
+vi.mock('@/modules/organization/lib/branch-access.server', () => ({
+  resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
 }))
 
 import { createInventoryAdjustment, createInventoryTransfer } from '@/modules/inventory/actions/inventory.actions'
@@ -43,13 +43,9 @@ describe('Inventory Branch Context', () => {
   it('filters warehouses strictly by active branch', async () => {
     const warehouseQuery = createWarehouseListQuery([{ id: 'wh-1', name: 'Gudang A' }])
 
-    mocks.getActiveBranch.mockResolvedValue({
-      id: 'branch-1',
-      org_id: 'org-1',
-      name: 'Unit A',
-      code: 'UA',
-      address: null,
-      is_active: true,
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
     })
     mocks.createClient.mockResolvedValue({
       auth: {
@@ -87,13 +83,9 @@ describe('Inventory Branch Context', () => {
       })),
     }))
 
-    mocks.getActiveBranch.mockResolvedValue({
-      id: 'branch-1',
-      org_id: 'org-1',
-      name: 'Unit A',
-      code: 'UA',
-      address: null,
-      is_active: true,
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
     })
     mocks.createClient.mockResolvedValue({
       auth: {
@@ -134,7 +126,10 @@ describe('Inventory Branch Context', () => {
   it('rejects creating a warehouse when no active branch is selected', async () => {
     const fromMock = vi.fn()
 
-    mocks.getActiveBranch.mockResolvedValue(null)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: [], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: null,
+    })
     mocks.createClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -158,7 +153,10 @@ describe('Inventory Branch Context', () => {
   it('rejects stock adjustment when no active branch is selected', async () => {
     const fromMock = vi.fn()
 
-    mocks.getActiveBranch.mockResolvedValue(null)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: [], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: null,
+    })
     mocks.createClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -201,13 +199,9 @@ describe('Inventory Branch Context', () => {
       }),
     }
 
-    mocks.getActiveBranch.mockResolvedValue({
-      id: 'branch-1',
-      org_id: 'org-1',
-      name: 'Unit A',
-      code: 'UA',
-      address: null,
-      is_active: true,
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
     })
     mocks.createClient.mockResolvedValue({
       auth: {
@@ -256,13 +250,9 @@ describe('Inventory Branch Context', () => {
     const deleteMock = vi.fn(() => deleteBuilder)
     let warehouseBinsCalls = 0
 
-    mocks.getActiveBranch.mockResolvedValue({
-      id: 'branch-1',
-      org_id: 'org-1',
-      name: 'Unit A',
-      code: 'UA',
-      address: null,
-      is_active: true,
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
     })
     mocks.createClient.mockResolvedValue({
       from: vi.fn((table: string) => {
