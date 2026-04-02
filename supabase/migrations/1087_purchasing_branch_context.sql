@@ -23,6 +23,10 @@ DROP FUNCTION IF EXISTS public.process_purchase_atomic(
   UUID, UUID, TIMESTAMPTZ, DATE, NUMERIC, NUMERIC, NUMERIC, NUMERIC, TEXT, JSONB, UUID, UUID, TEXT
 );
 
+DROP FUNCTION IF EXISTS public.process_purchase_atomic(
+  UUID, UUID, TIMESTAMPTZ, DATE, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, TEXT, JSONB, UUID
+);
+
 CREATE OR REPLACE FUNCTION public.process_purchase_atomic(
   p_org_id       UUID,
   p_vendor_id    UUID,
