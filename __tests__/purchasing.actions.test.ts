@@ -21,7 +21,7 @@ vi.mock('@/modules/organization/actions/org.actions', () => ({
 }))
 
 import { createPurchaseRequests } from '@/modules/factory/actions/factory.actions'
-import { createPurchaseEntry, getPurchaseRequests } from '@/modules/purchasing/actions/purchasing.actions'
+import { createPurchaseEntry, getPurchaseRequests, receivePurchase } from '@/modules/purchasing/actions/purchasing.actions'
 
 function createNoopMutationBuilder() {
   const builder = {
@@ -206,5 +206,59 @@ describe('Purchasing Branch Context', () => {
       }),
     ])
     expect(result).toEqual({ success: true, count: 1 })
+  })
+
+  it('rejects receiving a branch PO when no active warehouse is available', async () => {
+    const purchaseSelectBuilder = {
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({
+        data: {
+          id: 'po-1',
+          org_id: 'org-1',
+          status: 'DRAFT',
+          branch_id: 'branch-1',
+          warehouse_id: null,
+          purchase_items: [],
+          total_amount: 1000,
+          shipping_amount: 0,
+          insurance_amount: 0,
+        },
+        error: null,
+      }),
+    }
+    const purchaseUpdateEq = vi.fn()
+    const purchasesTable = {
+      select: vi.fn(() => purchaseSelectBuilder),
+      update: vi.fn(() => ({
+        eq: purchaseUpdateEq,
+      })),
+    }
+    const warehouseFallbackQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      or: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: null,
+        error: null,
+      }),
+    }
+
+    mocks.createClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'purchases') return purchasesTable
+        if (table === 'warehouses') return warehouseFallbackQuery
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const result = await receivePurchase('org-1', 'po-1')
+
+    expect(result).toEqual({
+      error: 'Tidak ada gudang aktif untuk unit PO ini. Buat atau pilih gudang unit terlebih dahulu.',
+    })
+    expect(purchasesTable.update).not.toHaveBeenCalled()
+    expect(purchaseUpdateEq).not.toHaveBeenCalled()
   })
 })

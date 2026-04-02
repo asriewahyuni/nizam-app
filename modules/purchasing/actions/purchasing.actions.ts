@@ -241,21 +241,33 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
   if (!purchase) return { error: 'PO tidak ditemukan.' }
   if (purchase.status === 'RECEIVED') return { success: true }
 
-  // 2. TRANSACTION START: Update Status PO (Audit Lock)
-  const { error: statusErr } = await (supabase as any)
-    .from('purchases' as any)
-    .update({ status: 'RECEIVED' })
-    .eq('id', purchaseId)
-
-  if (statusErr) return { error: 'Gagal memperbarui status PO: ' + statusErr.message }
-
   const shipping = purchase.shipping_amount || 0
   const insurance = purchase.insurance_amount || 0
   const totalLandedOverhead = shipping + insurance
   const totalItemsValue = purchase.total_amount || 1
-  let fallbackWarehouse: { id: string; branch_id: string | null } | null = null
+  let receiptWarehouse: { id: string; branch_id: string | null } | null = null
 
-  if (!purchase.warehouse_id) {
+  if (purchase.warehouse_id) {
+    const { data: explicitWarehouse, error: warehouseError } = await (supabase as any)
+      .from('warehouses')
+      .select('id, branch_id')
+      .eq('id', purchase.warehouse_id)
+      .eq('org_id', orgId)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (warehouseError || !explicitWarehouse) {
+      return { error: 'Gudang penerimaan untuk PO ini tidak ditemukan atau tidak aktif.' }
+    }
+
+    if (purchase.branch_id && explicitWarehouse.branch_id && explicitWarehouse.branch_id !== purchase.branch_id) {
+      return { error: 'Gudang penerimaan tidak berada pada unit yang sama dengan PO.' }
+    }
+
+    receiptWarehouse = explicitWarehouse
+  }
+
+  if (!receiptWarehouse) {
     let warehouseQuery = (supabase as any)
       .from('warehouses')
       .select('id, branch_id')
@@ -269,21 +281,18 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     }
 
     const { data } = await warehouseQuery.maybeSingle()
-    fallbackWarehouse = data || null
+    receiptWarehouse = data || null
   }
 
-  let movementBranchId = purchase.branch_id || fallbackWarehouse?.branch_id || null
-
-  if (!movementBranchId && purchase.warehouse_id) {
-    const { data: warehouseBranchData } = await (supabase as any)
-      .from('warehouses')
-      .select('branch_id')
-      .eq('id', purchase.warehouse_id)
-      .eq('org_id', orgId)
-      .maybeSingle()
-
-    movementBranchId = warehouseBranchData?.branch_id || null
+  if (!receiptWarehouse) {
+    return {
+      error: purchase.branch_id
+        ? 'Tidak ada gudang aktif untuk unit PO ini. Buat atau pilih gudang unit terlebih dahulu.'
+        : 'Tidak ada gudang aktif untuk menerima pembelian ini.',
+    }
   }
+
+  const movementBranchId = purchase.branch_id || receiptWarehouse.branch_id || null
 
   const stockMovements: any[] = []
 
@@ -320,31 +329,24 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
   // 4. Persistence: Stock Movements (Sub-Ledger) & WMS Sync (Physical Stock)
   if (stockMovements.length > 0) {
      const { error: smErr } = await (supabase as any).from('stock_movements').insert(stockMovements)
-     if (smErr) (console as any).error("Stock Movement insert failed:", smErr)
+     if (smErr) {
+       return { error: 'Gagal mencatat kartu stok pembelian: ' + smErr.message }
+     }
      
      // CRITICAL: Sync with physical inventory (inventory_stocks)
-     const whId = purchase.warehouse_id || fallbackWarehouse?.id
-     
-     if (whId) {
-        for (const m of stockMovements) {
-           await (supabase as any).from('inventory_stocks').upsert({
-              org_id: orgId,
-              product_id: m.product_id,
-              warehouse_id: whId,
-              quantity: m.quantity // This will be ADDED if using a trigger or function? No, the upsert below handles Conflict.
-           }, { onConflict: 'product_id,warehouse_id,batch_number' }) // Since batch is null by default.
-           
-           // Wait! A standard upsert will OVERWRITE. We need to increment.
-           // Since we are in a server action, it's safer to use an RPC or do a Get-then-Set.
-           // However, most entries for 'inventory_stocks' in this DB use the increment logic.
-           
-           await (supabase as any).rpc('adjust_inventory_stock', {
-              p_org_id: orgId,
-              p_product_id: m.product_id,
-              p_warehouse_id: whId,
-              p_diff: m.quantity
-           }).then((r: any) => { if (r.error) (console as any).error("WMS sync error", r.error) })
-        }
+     const whId = receiptWarehouse.id
+
+     for (const m of stockMovements) {
+       const { error: inventorySyncError } = await (supabase as any).rpc('adjust_inventory_stock', {
+          p_org_id: orgId,
+          p_product_id: m.product_id,
+          p_warehouse_id: whId,
+          p_diff: m.quantity
+       })
+
+       if (inventorySyncError) {
+         return { error: 'Gagal sinkron stok fisik gudang: ' + inventorySyncError.message }
+       }
      }
   }
 
@@ -442,6 +444,13 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
        });
     }
   }
+
+  const { error: statusErr } = await (supabase as any)
+    .from('purchases' as any)
+    .update({ status: 'RECEIVED' })
+    .eq('id', purchaseId)
+
+  if (statusErr) return { error: 'Gagal memperbarui status PO: ' + statusErr.message }
 
   revalidatePath('/purchasing')
   revalidatePath('/inventory')

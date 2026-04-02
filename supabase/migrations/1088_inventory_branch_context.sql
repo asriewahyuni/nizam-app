@@ -308,6 +308,7 @@ BEGIN
         VALUES (v_je_id, v_fg_asset_account_id, v_total_rm_cost, 0, 'Produk Jadi: ' || v_wo.wo_number);
 
         UPDATE public.products SET
+            average_cost = v_fg_unit_cost,
             purchase_price = v_fg_unit_cost,
             selling_price = CASE
                 WHEN COALESCE(selling_price, 0) = 0 THEN ROUND(v_fg_unit_cost / 0.7 / 100) * 100
@@ -459,6 +460,7 @@ BEGIN
         VALUES (v_je_id, v_fg_asset_account_id, v_grand_total_cost, 0, 'Produk Jadi: ' || v_wo.wo_number);
 
         UPDATE public.products SET
+            average_cost = v_fg_unit_cost,
             purchase_price = v_fg_unit_cost,
             selling_price = CASE
                 WHEN COALESCE(selling_price, 0) = 0 THEN ROUND(v_fg_unit_cost / 0.7 / 100) * 100

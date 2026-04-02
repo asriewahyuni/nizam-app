@@ -19,7 +19,7 @@ vi.mock('@/modules/organization/actions/org.actions', () => ({
 }))
 
 import { createInventoryTransfer } from '@/modules/inventory/actions/inventory.actions'
-import { createWarehouse, getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
+import { createWarehouse, deleteWarehouseBin, getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 
 function createWarehouseListQuery(result: any[] = []) {
   const builder = {
@@ -178,5 +178,46 @@ describe('Inventory Branch Context', () => {
     expect(result).toEqual({
       error: 'Gudang transfer tidak tersedia pada unit aktif.',
     })
+  })
+
+  it('rejects deleting warehouse bin outside the active branch', async () => {
+    const binLookupQuery = {
+      select: vi.fn(() => binLookupQuery),
+      eq: vi.fn(() => binLookupQuery),
+      or: vi.fn(() => binLookupQuery),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: null,
+        error: null,
+      }),
+    }
+    const deleteBuilder = {
+      eq: vi.fn(() => deleteBuilder),
+    }
+    const deleteMock = vi.fn(() => deleteBuilder)
+    let warehouseBinsCalls = 0
+
+    mocks.getActiveBranch.mockResolvedValue({
+      id: 'branch-1',
+      org_id: 'org-1',
+      name: 'Unit A',
+      code: 'UA',
+      address: null,
+      is_active: true,
+    })
+    mocks.createClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table !== 'warehouse_bins') throw new Error(`Unexpected table ${table}`)
+        warehouseBinsCalls += 1
+        if (warehouseBinsCalls === 1) return binLookupQuery
+        return { delete: deleteMock }
+      }),
+    })
+
+    const result = await deleteWarehouseBin('org-1', 'bin-9')
+
+    expect(result).toEqual({
+      error: 'Bin tidak tersedia pada unit aktif.',
+    })
+    expect(deleteMock).not.toHaveBeenCalled()
   })
 })

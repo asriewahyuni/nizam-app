@@ -32,6 +32,14 @@ type WarehouseAccessRecord = {
   is_active: boolean
 }
 
+type WarehouseBinAccessRecord = {
+  id: string
+  warehouse_id: string
+  warehouses: {
+    branch_id: string | null
+  } | null
+}
+
 function normalizeWarehousePayload(payload: WarehousePayload): NormalizedWarehousePayload | { error: string } {
   const code = payload.code?.trim().toUpperCase() || ''
   const name = payload.name?.trim() || ''
@@ -90,6 +98,27 @@ async function getAccessibleWarehouse(
   const { data, error } = await query.maybeSingle()
   if (error) return null
   return (data as WarehouseAccessRecord | null) ?? null
+}
+
+async function getAccessibleWarehouseBin(
+  supabase: any,
+  orgId: string,
+  binId: string,
+  branchId: string | null
+): Promise<WarehouseBinAccessRecord | null> {
+  let query = (supabase as any)
+    .from('warehouse_bins')
+    .select('id, warehouse_id, warehouses!inner(branch_id)')
+    .eq('id', binId)
+    .eq('org_id', orgId)
+
+  if (branchId) {
+    query = query.or(`branch_id.eq.${branchId},branch_id.is.null`, { foreignTable: 'warehouses' })
+  }
+
+  const { data, error } = await query.maybeSingle()
+  if (error) return null
+  return (data as WarehouseBinAccessRecord | null) ?? null
 }
 
 export async function getWarehouses(orgId: string, branchId?: string | null) {
@@ -237,6 +266,13 @@ export async function deleteWarehouse(orgId: string, id: string): Promise<Delete
 
 export async function deleteWarehouseBin(orgId: string, id: string) {
   const supabase = await createClient()
+  const activeBranchId = await resolveActiveBranchId(orgId)
+  const targetBin = await getAccessibleWarehouseBin(supabase as any, orgId, id, activeBranchId)
+
+  if (!targetBin) {
+    return { error: 'Bin tidak tersedia pada unit aktif.' }
+  }
+
   const { error } = await (supabase as any)
     .from('warehouse_bins')
     .delete()
@@ -244,6 +280,6 @@ export async function deleteWarehouseBin(orgId: string, id: string) {
     .eq('org_id', orgId)
 
   if (error) return { error: error.message }
-  revalidateWarehousePages()
+  revalidateWarehousePages(targetBin.warehouse_id)
   return { success: true }
 }
