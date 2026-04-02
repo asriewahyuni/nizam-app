@@ -2,6 +2,43 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+
+type BranchSelectionResult =
+  | { branchId: string | null }
+  | { error: string }
+
+async function resolvePayrollBranchSelection(orgId: string, branchId?: string | null): Promise<BranchSelectionResult> {
+  const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) {
+    return { error: branchSelection.error || 'Akses unit tidak valid.' }
+  }
+
+  return { branchId: branchSelection.branchId }
+}
+
+async function requirePayrollRunBranch(orgId: string, errorMessage: string): Promise<{ branchId: string } | { error: string }> {
+  const branchSelection = await resolvePayrollBranchSelection(orgId)
+  if ('error' in branchSelection || !branchSelection.branchId) {
+    return { error: errorMessage }
+  }
+
+  return { branchId: branchSelection.branchId as string }
+}
+
+async function ensurePayrollBranchAccess(orgId: string, branchId: string | null, notFoundMessage: string) {
+  const trimmedBranchId = String(branchId || '').trim()
+  if (!trimmedBranchId) {
+    return { error: notFoundMessage }
+  }
+
+  const branchSelection = await resolvePayrollBranchSelection(orgId, trimmedBranchId)
+  if ('error' in branchSelection) {
+    return { error: branchSelection.error }
+  }
+
+  return { branchId: trimmedBranchId }
+}
 
 export async function getPayrollComponents(orgId: string) {
   const supabase = await createClient()
@@ -48,13 +85,22 @@ export async function deletePayrollComponent(componentId: string) {
   revalidatePath('/hris')
   return { success: true }
 }
-export async function getPayrollRuns(orgId: string) {
+export async function getPayrollRuns(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
-  const { data, error } = await (supabase as any)
+  const branchSelection = await resolvePayrollBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) return []
+
+  let query = (supabase as any)
     .from('payroll_runs')
-    .select('*')
+    .select('*, branch:branches(id, name, code)')
     .eq('org_id', orgId)
     .order('period_start', { ascending: false })
+
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data, error } = await query
 
   if (error) return []
   return data
@@ -62,6 +108,11 @@ export async function getPayrollRuns(orgId: string) {
 
 export async function generatePayrollRun(orgId: string, formData: FormData) {
   const supabase = await createClient()
+  const activeBranch = await requirePayrollRunBranch(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk membuat payroll run.'
+  )
+  if ('error' in activeBranch) return { error: activeBranch.error }
   
   const periodStart = formData.get('period_start') as string
   const periodEnd = formData.get('period_end') as string
@@ -72,6 +123,7 @@ export async function generatePayrollRun(orgId: string, formData: FormData) {
     .from('payroll_runs')
     .insert({
       org_id: orgId,
+      branch_id: activeBranch.branchId,
       period_start: periodStart,
       period_end: periodEnd,
       payment_date: paymentDate,
@@ -96,18 +148,37 @@ export async function generatePayrollRun(orgId: string, formData: FormData) {
 
 export async function payPayrollRun(runId: string, orgId: string, accountId: string) {
   const supabase = await createClient()
+  const db = supabase as any
   
-  const { data: { user } } = await (supabase as any).auth.getUser()
+  const { data: { user } } = await db.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
+  const { data: run, error: runError } = await db
+    .from('payroll_runs')
+    .select('id, branch_id')
+    .eq('id', runId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (runError) return { error: runError.message }
+
+  const accessibleRun = await ensurePayrollBranchAccess(
+    orgId,
+    run?.branch_id ?? null,
+    'Payroll run tidak ditemukan.'
+  )
+  if ('error' in accessibleRun) return { error: accessibleRun.error }
+
   // 1. Update the run with selected bank account before processing
-  await (supabase as any)
+  await db
     .from('payroll_runs')
     .update({ disbursement_account_id: accountId })
-    .eq('id', runId);
+    .eq('id', runId)
+    .eq('org_id', orgId)
+    .eq('branch_id', accessibleRun.branchId)
 
   // 2. Execute SQL payment/journalizing function
-  const { error } = await (supabase as any).rpc('process_payroll_payment', {
+  const { error } = await db.rpc('process_payroll_payment', {
     p_run_id: runId,
     p_bank_account_id: accountId, // This is now a fallback in the SQL function
     p_created_by: user.id
@@ -122,7 +193,18 @@ export async function payPayrollRun(runId: string, orgId: string, accountId: str
 
 export async function fixEmptyPayrollJournals(orgId: string) {
   const supabase = await createClient()
-  const { data: runs } = await (supabase as any).from('payroll_runs').select('*').eq('org_id', orgId).eq('status', 'PAID')
+  const activeBranch = await requirePayrollRunBranch(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk menjalankan perbaikan jurnal payroll.'
+  )
+  if ('error' in activeBranch) return { error: activeBranch.error }
+
+  const { data: runs } = await (supabase as any)
+    .from('payroll_runs')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('branch_id', activeBranch.branchId)
+    .eq('status', 'PAID')
 
   if (!runs) return { success: true, count: 0 }
 
@@ -164,6 +246,7 @@ export async function fixEmptyPayrollJournals(orgId: string) {
 
        const { data: newEntry } = await (supabase as any).from('journal_entries').insert({
          org_id: orgId,
+         branch_id: run.branch_id,
          entry_date: run.payment_date,
          description: `[RE-SYNC] Pembayaran Gaji Periode ${run.period_start} s/d ${run.period_end}`,
          reference_id: run.id,
@@ -229,35 +312,91 @@ export async function fixEmptyPayrollJournals(orgId: string) {
   return { success: true, count: fixedCount }
 }
 
-export async function getPayrollRunDetails(runId: string) {
+export async function getPayrollRunDetails(orgId: string, runId: string) {
   const supabase = await createClient()
+  const db = supabase as any
+  const { data: run, error: runError } = await db
+    .from('payroll_runs')
+    .select('id, branch_id')
+    .eq('id', runId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (runError || !run) return []
+
+  const accessibleRun = await ensurePayrollBranchAccess(
+    orgId,
+    run.branch_id ?? null,
+    'Payroll run tidak ditemukan.'
+  )
+  if ('error' in accessibleRun) return []
   
-  const { data: slips, error } = await (supabase as any)
+  const { data: slips, error } = await db
     .from('payslips')
     .select(`
       *,
-      employee:employee_id(nik, first_name, last_name, job_title),
+      branch:branches(id, name, code),
+      employee:employee_id(nik, first_name, last_name, job_title, branch_id),
       lines:payslip_lines(*)
     `)
     .eq('run_id', runId)
+    .eq('branch_id', accessibleRun.branchId)
 
   if (error) return []
   return slips
 }
 
-export async function deletePayrollRun(runId: string) {
+export async function deletePayrollRun(runId: string, orgId: string) {
   const supabase = await createClient()
-  const { error } = await (supabase as any).from('payroll_runs').delete().eq('id', runId)
+  const db = supabase as any
+  const { data: run, error: runError } = await db
+    .from('payroll_runs')
+    .select('id, branch_id')
+    .eq('id', runId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (runError) return { error: runError.message }
+
+  const accessibleRun = await ensurePayrollBranchAccess(
+    orgId,
+    run?.branch_id ?? null,
+    'Payroll run tidak ditemukan.'
+  )
+  if ('error' in accessibleRun) return { error: accessibleRun.error }
+
+  const { error } = await db
+    .from('payroll_runs')
+    .delete()
+    .eq('id', runId)
+    .eq('org_id', orgId)
+    .eq('branch_id', accessibleRun.branchId)
   if (error) return { error: error.message }
   revalidatePath('/hris')
   return { success: true }
 }
 
-export async function voidPayrollRun(runId: string) {
+export async function voidPayrollRun(runId: string, orgId: string) {
   const supabase = await createClient()
-  const { error } = await (supabase as any).rpc('void_payroll_run', { p_run_id: runId })
+  const db = supabase as any
+  const { data: run, error: runError } = await db
+    .from('payroll_runs')
+    .select('id, branch_id')
+    .eq('id', runId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (runError) return { error: runError.message }
+
+  const accessibleRun = await ensurePayrollBranchAccess(
+    orgId,
+    run?.branch_id ?? null,
+    'Payroll run tidak ditemukan.'
+  )
+  if ('error' in accessibleRun) return { error: accessibleRun.error }
+
+  const { error } = await db.rpc('void_payroll_run', { p_run_id: runId })
   if (error) return { error: error.message }
   revalidatePath('/hris')
   return { success: true }
 }
-

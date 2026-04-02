@@ -21,7 +21,7 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
     getEmployees(orgData.org.id, activeBranch?.id),
     getPayrollComponents(orgData.org.id),
     getAccountBalances(orgData.org.id),
-    getPayrollRuns(orgData.org.id),
+    getPayrollRuns(orgData.org.id, activeBranch?.id),
     getInvitations(orgData.org.id),
     canSelectAllBranches(orgData.org.id),
   ])

@@ -402,7 +402,7 @@ export default function HrisClient({
     if (!confirm(msg)) return
 
     setLoading(true)
-    const res = isPaid ? await voidPayrollRun(id) : await deletePayrollRun(id)
+    const res = isPaid ? await voidPayrollRun(id, orgId) : await deletePayrollRun(id, orgId)
     if (res.error) showToast(res.error, 'error')
     else {
       setPayrollRuns(payrollRuns.filter((r: any) => r.id !== id))
@@ -415,6 +415,11 @@ export default function HrisClient({
     : allowAllBranchSelection
       ? 'Mode semua unit aktif'
       : 'Unit aktif belum dipilih'
+  const payrollScopeLabel = activeBranchName
+    ? `Payroll run untuk unit ${activeBranchName}`
+    : allowAllBranchSelection
+      ? 'Mode semua unit aktif'
+      : 'Unit aktif belum dipilih'
 
   const hrisSubtitle =
     activeTab === 'ATTENDANCE'
@@ -422,7 +427,7 @@ export default function HrisClient({
       : activeTab === 'PAYROLL'
         ? 'Atur template gaji, tunjangan, dan potongan karyawan. Payroll saat ini tetap lintas organisasi.'
         : activeTab === 'RUNS'
-          ? 'Lakukan generate slip gaji otomatis dan pencatatan kas jurnal lintas organisasi.'
+          ? `Lakukan generate slip gaji otomatis dan pencatatan kas jurnal dengan scope ${payrollScopeLabel.toLowerCase()}.`
           : `Manajemen sumber daya manusia dengan scope ${employeeScopeLabel.toLowerCase()}.`
 
   return (
@@ -806,10 +811,11 @@ export default function HrisClient({
                       size="sm"
                       icon={<Check size={16} />}
                       isLoading={loading}
+                      disabled={!activeBranchId}
                     >
                       FIX JOURNALS
                     </SafeButton>
-                    <SafeButton onClick={() => setIsRunModalOpen(true)} variant="primary" size="sm" icon={<Plus size={16} />}>
+                    <SafeButton onClick={() => setIsRunModalOpen(true)} variant="primary" size="sm" icon={<Plus size={16} />} disabled={!activeBranchId}>
                       GENERATE RUN
                     </SafeButton>
                   </div>
@@ -817,6 +823,18 @@ export default function HrisClient({
               />
 
               <div className="overflow-x-auto min-h-[400px]">
+                <div className="mb-6 flex flex-wrap items-center gap-3 rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-4">
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Scope</div>
+                  <div className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${activeBranchName ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {payrollScopeLabel}
+                  </div>
+                  {!activeBranchId && (
+                    <div className="text-[11px] font-bold text-slate-500">
+                      Pilih satu unit dari header jika ingin membuat atau memperbaiki payroll run.
+                    </div>
+                  )}
+                </div>
+
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/50 border-b border-slate-100">
@@ -836,6 +854,11 @@ export default function HrisClient({
                           <div className="text-[10px] text-slate-400 font-bold font-mono mt-1 tracking-wider italic flex items-center gap-2">
                             <Clock size={10} /> {run.period_start} - {run.period_end}
                           </div>
+                          {run.branch?.name && (
+                            <div className="mt-2 inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-blue-600 border border-blue-100">
+                              {run.branch.name}
+                            </div>
+                          )}
                         </td>
                         <td className="px-8 py-6 text-right">
                           <span className="text-xs font-bold text-slate-500 font-mono">{formatRupiah(run.total_gross)}</span>
@@ -856,7 +879,7 @@ export default function HrisClient({
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={async () => {
-                                const res = await getPayrollRunDetails(run.id)
+                                const res = await getPayrollRunDetails(orgId, run.id)
                                 setViewingRun(run)
                                 setViewingRunData(res)
                               }}
@@ -896,7 +919,7 @@ export default function HrisClient({
                       description="Start your first payroll calculation for this organization."
                       icon={CalendarDays}
                       action={
-                        <SafeButton onClick={() => setIsRunModalOpen(true)} variant="primary" size="sm" icon={<Plus size={16} />}>
+                        <SafeButton onClick={() => setIsRunModalOpen(true)} variant="primary" size="sm" icon={<Plus size={16} />} disabled={!activeBranchId}>
                           Create First Run
                         </SafeButton>
                       }
@@ -1251,7 +1274,11 @@ export default function HrisClient({
                   <input name="payment_date" type="date" required className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 focus:bg-white focus:border-blue-500 transition-all outline-none" />
                 </div>
                 <div className="p-6 bg-blue-50/50 rounded-[32px] border border-blue-100/50">
-                  <p className="text-[11px] text-blue-600 font-bold leading-relaxed text-center italic">The engine will calculate basic salary and all active components for registered employees.</p>
+                  <p className="text-[11px] text-blue-600 font-bold leading-relaxed text-center italic">
+                    {activeBranchName
+                      ? `Payroll hanya akan dibuat untuk karyawan di unit ${activeBranchName}.`
+                      : 'Pilih unit aktif terlebih dahulu untuk membuat payroll run.'}
+                  </p>
                 </div>
                 <SafeButton
                   type="submit"
@@ -1260,6 +1287,7 @@ export default function HrisClient({
                   isLoading={loading}
                   icon={<CalendarDays size={20} />}
                   className="w-full rounded-[24px]"
+                  disabled={!activeBranchId}
                 >
                   GENERATE PAYROLL RUN
                 </SafeButton>
@@ -1588,6 +1616,9 @@ export default function HrisClient({
                   <div>
                     <h3 className="text-xl font-black text-slate-800 tracking-tight">Detail Payroll: {new Date(viewingRun.period_start).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</h3>
                     <p className="text-sm text-slate-500 font-medium">Periode {viewingRun.period_start} s/d {viewingRun.period_end}</p>
+                    {viewingRun.branch?.name && (
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600 mt-1">{viewingRun.branch.name}</p>
+                    )}
                   </div>
                 </div>
                 <button onClick={() => setViewingRun(null)} className="p-2 bg-white text-slate-400 rounded-xl hover:text-slate-600 border border-slate-100 shadow-sm transition">
