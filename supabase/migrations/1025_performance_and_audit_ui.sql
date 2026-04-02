@@ -9,7 +9,7 @@
 -- Journal Entries & Lines
 CREATE INDEX IF NOT EXISTS idx_journal_entries_org_date ON public.journal_entries(org_id, entry_date DESC);
 CREATE INDEX IF NOT EXISTS idx_journal_entries_org_status ON public.journal_entries(org_id, status);
-CREATE INDEX IF NOT EXISTS idx_journal_lines_account_org ON public.journal_lines(account_id, org_id);
+CREATE INDEX IF NOT EXISTS idx_journal_lines_account_entry ON public.journal_lines(account_id, entry_id);
 
 -- Inventory Stocks
 CREATE INDEX IF NOT EXISTS idx_inventory_stocks_org_warehouse ON public.inventory_stocks(org_id, warehouse_id);
@@ -19,7 +19,7 @@ CREATE INDEX IF NOT EXISTS idx_sales_org_date ON public.sales(org_id, sale_date 
 CREATE INDEX IF NOT EXISTS idx_purchases_org_date ON public.purchases(org_id, purchase_date DESC);
 
 -- Payroll
-CREATE INDEX IF NOT EXISTS idx_payslips_org_period ON public.payslips(org_id, period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_payslips_employee_created ON public.payslips(employee_id, created_at DESC);
 
 
 -- 2. AUDIT LOG ENHANCEMENT

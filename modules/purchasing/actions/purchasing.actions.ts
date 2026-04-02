@@ -1,13 +1,32 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
 
 export async function getPurchases(orgId: string) {
   const supabase = await createClient()
+  const { data: { user } } = await (supabase as any).auth.getUser()
 
-  const { data, error } = await (supabase as any)
+  if (!user) return []
+
+  const { data: canReadPurchasing, error: permissionError } = await (supabase as any).rpc('nizam_has_permission', {
+    p_permission: 'purchasing:read',
+    p_org_id: orgId,
+  })
+
+  if (permissionError) {
+    ;(console as any).error('DEBUG: getPurchases permission check error:', permissionError)
+    return []
+  }
+
+  if (!canReadPurchasing) return []
+
+  // Read with admin client after explicit permission check so server-rendered
+  // purchasing data is not dropped by mismatched line-item RLS policies.
+  const adminClient = await createAdminClient()
+
+  const { data, error } = await (adminClient as any)
     .from('purchases' as any)
     .select(`
       *,
@@ -30,7 +49,7 @@ export async function getPurchases(orgId: string) {
   if (error) {
     (console as any).error("DEBUG: getPurchases error:", error)
     // If it's a field error, try pulling without the new tables
-    const { data: fallback, error: fallbackErr } = await (supabase as any)
+    const { data: fallback, error: fallbackErr } = await (adminClient as any)
       .from('purchases' as any)
       .select(`
         *,

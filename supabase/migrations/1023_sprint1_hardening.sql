@@ -127,22 +127,26 @@ WHERE je.status = 'POSTED'
 ALTER TABLE public.intercompany_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.intercompany_transactions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "members_view_intercompany_accounts" ON public.intercompany_accounts;
 CREATE POLICY "members_view_intercompany_accounts" ON public.intercompany_accounts
   FOR SELECT USING (org_id IN (
     SELECT org_id FROM org_members WHERE user_id = auth.uid() AND is_active = TRUE
   ));
 
+DROP POLICY IF EXISTS "admins_manage_intercompany_accounts" ON public.intercompany_accounts;
 CREATE POLICY "admins_manage_intercompany_accounts" ON public.intercompany_accounts
   FOR ALL USING (org_id IN (
     SELECT org_id FROM org_members WHERE user_id = auth.uid() 
     AND role IN ('owner', 'admin') AND is_active = TRUE
   ));
 
+DROP POLICY IF EXISTS "members_view_intercompany_tx" ON public.intercompany_transactions;
 CREATE POLICY "members_view_intercompany_tx" ON public.intercompany_transactions
   FOR SELECT USING (org_id IN (
     SELECT org_id FROM org_members WHERE user_id = auth.uid() AND is_active = TRUE
   ));
 
+DROP POLICY IF EXISTS "admins_manage_intercompany_tx" ON public.intercompany_transactions;
 CREATE POLICY "admins_manage_intercompany_tx" ON public.intercompany_transactions
   FOR ALL USING (org_id IN (
     SELECT org_id FROM org_members WHERE user_id = auth.uid() 

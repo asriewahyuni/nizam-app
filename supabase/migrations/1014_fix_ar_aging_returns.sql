@@ -4,7 +4,9 @@
 -- sehingga invoice yang sudah di-retur masih tampil sebagai piutang.
 -- ==========================================
 
-CREATE OR REPLACE VIEW v_ar_aging_report AS
+DROP VIEW IF EXISTS v_ar_aging_report;
+
+CREATE VIEW v_ar_aging_report AS
 WITH paid_agg AS (
     -- Total yang sudah dibayar per invoice
     SELECT sale_id, COALESCE(SUM(amount), 0) as total_paid 
