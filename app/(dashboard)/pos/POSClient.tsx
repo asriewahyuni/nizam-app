@@ -13,9 +13,20 @@ const PROMOS = [
    { code: 'HARBOLSALE', type: 'PERCENT', value: 15, status: 'EXPIRED' }
 ]
 
-export default function POSClient({ orgId, org, products, customers, accounts, currentUser }: any) {
+export default function POSClient({
+   orgId,
+   org,
+   products,
+   customers,
+   accounts,
+   currentUser,
+   activeBranchId,
+   activeBranchName,
+}: any) {
     const orgSettings = org?.settings || {}
     const logoUrl = org?.logo_url || ''
+   const branchGuardMessage = 'Pilih satu unit aktif terlebih dahulu untuk memakai POS.'
+   const isStockTrackedProduct = (item: any) => (item?.type || 'INVENTORY') === 'INVENTORY'
    const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
    const [loading, setLoading] = useState(false)
    const [successData, setSuccessData] = useState<any>(null)
@@ -109,14 +120,39 @@ export default function POSClient({ orgId, org, products, customers, accounts, c
                   handleApplyPromo(scannedCode)
                } else {
                   // Mode Katalog -> Tangkap tembakan Scanner sebagai SKU Produk (Tambah ke keranjang)
-                  const product = products.find((p: any) => 
+                  const product = products.find((p: any) =>
                      p.sku && p.sku.toLowerCase() === scannedCode.toLowerCase()
                   )
                   if (product) {
+                     if (!activeBranchId) {
+                        alert(branchGuardMessage)
+                        return
+                     }
+
                      setCart((prev: any[]) => {
+                        const stockTracked = isStockTrackedProduct(product)
                         const existing = prev.find((item: any) => item.id === product.id)
-                        if (existing) return prev.map((item: any) => item.id === product.id ? { ...item, qty: item.qty + 1 } : item)
-                        return [...prev, { id: product.id, name: product.name, price: product.selling_price, qty: 1, sku: product.sku, unit: product.unit || 'Pcs' }]
+                        if (existing) {
+                           if (stockTracked && existing.qty + 1 > (product.stock || 0)) {
+                              alert(`Peringatan: Stok '${product.name}' tidak mencukupi (Tersedia: ${product.stock || 0}).`)
+                              return prev
+                           }
+                           return prev.map((item: any) => item.id === product.id ? { ...item, qty: item.qty + 1 } : item)
+                        }
+                        if (stockTracked && (product.stock || 0) <= 0) {
+                           alert(`Gagal: Stok '${product.name}' sedang kosong. Transaksi tidak dapat dilanjutkan untuk produk ini.`)
+                           return prev
+                        }
+                        return [...prev, {
+                           id: product.id,
+                           name: product.name,
+                           price: product.selling_price,
+                           qty: 1,
+                           sku: product.sku,
+                           unit: product.unit || 'Pcs',
+                           stock: product.stock,
+                           type: product.type || 'INVENTORY',
+                        }]
                      })
                   } else {
                      console.warn('Barcode Produk tidak dikenali:', scannedCode)
@@ -147,11 +183,14 @@ export default function POSClient({ orgId, org, products, customers, accounts, c
          window.removeEventListener('keydown', handleKeyDown)
          if (barcodeTimer.current) clearTimeout(barcodeTimer.current)
       }
-   }, [products, showPayment, successData, selectedCustomer, showAddCustomer, newCustomerName, newCustomerPhone, promoCode])
+   }, [products, showPayment, successData, selectedCustomer, showAddCustomer, newCustomerName, newCustomerPhone, promoCode, activeBranchId, branchGuardMessage])
 
    const filteredProducts = useMemo(() => {
       if (!searchTerm) return products
-      return products.filter((p: any) => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
+      return products.filter((p: any) =>
+         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+         (p.sku || '').toLowerCase().includes(searchTerm.toLowerCase())
+      )
    }, [products, searchTerm])
 
    const cartSubtotal = Math.round(cart.reduce((sum: number, item: any) => sum + (item.price * item.qty), 0))
@@ -168,7 +207,13 @@ export default function POSClient({ orgId, org, products, customers, accounts, c
    const changeDue = Math.round(Number(amountTendered.replace(/\D/g, ''))) - grandTotal
 
    const addToCart = (product: any) => {
-      if ((product.stock || 0) <= 0) {
+      if (!activeBranchId) {
+         alert(branchGuardMessage)
+         return
+      }
+
+      const stockTracked = isStockTrackedProduct(product)
+      if (stockTracked && (product.stock || 0) <= 0) {
          alert(`Gagal: Stok '${product.name}' sedang kosong. Transaksi tidak dapat dilanjutkan untuk produk ini.`)
          return
       }
@@ -176,13 +221,22 @@ export default function POSClient({ orgId, org, products, customers, accounts, c
       setCart((prev: any[]) => {
          const existing = prev.find((item: any) => item.id === product.id)
          if (existing) {
-            if (existing.qty + 1 > (product.stock || 0)) {
+            if (stockTracked && existing.qty + 1 > (product.stock || 0)) {
                alert(`Peringatan: Stok '${product.name}' tidak mencukupi (Tersedia: ${product.stock}).`)
                return prev
             }
             return prev.map((item: any) => item.id === product.id ? { ...item, qty: item.qty + 1 } : item)
          }
-         return [...prev, { id: product.id, name: product.name, price: product.selling_price, qty: 1, sku: product.sku, stock: product.stock, unit: product.unit || 'Pcs' }]
+         return [...prev, {
+            id: product.id,
+            name: product.name,
+            price: product.selling_price,
+            qty: 1,
+            sku: product.sku,
+            stock: product.stock,
+            unit: product.unit || 'Pcs',
+            type: product.type || 'INVENTORY',
+         }]
       })
    }
 
@@ -190,7 +244,7 @@ export default function POSClient({ orgId, org, products, customers, accounts, c
       setCart((prev: any[]) => prev.map((item: any) => {
          if (item.id === id) {
             const newQty = Math.max(1, item.qty + delta)
-            if (delta > 0 && newQty > (item.stock || 0)) {
+            if (delta > 0 && isStockTrackedProduct(item) && newQty > (item.stock || 0)) {
                alert(`Stok tidak mencukupi!`)
                return item
             }
@@ -203,6 +257,10 @@ export default function POSClient({ orgId, org, products, customers, accounts, c
    const removeLine = (id: string) => setCart((prev: any[]) => prev.filter((item: any) => item.id !== id))
 
    const handlePay = async () => {
+      if (!activeBranchId) {
+         alert(branchGuardMessage)
+         return
+      }
       if (!selectedAccount) { alert('Pilih laci kas/rekening penerima lebih dulu.'); return }
       if (paymentMethod === 'CASH' && Number(amountTendered.replace(/\D/g, '')) < grandTotal) {
          alert('Nominal uang tunai kurang dari total tagihan.')
@@ -302,7 +360,7 @@ export default function POSClient({ orgId, org, products, customers, accounts, c
                 <div>
                    <h1 className="text-sm md:text-lg font-black tracking-tight leading-none">{orgSettings.brand_name || 'Nizam POS'}</h1>
                   <div className="text-[8px] md:text-[10px] font-bold text-white/70 uppercase tracking-widest flex items-center gap-1 mt-0.5">
-                     <MapPin size={8} className="md:w-[10px]" /> Cabang Utama
+                     <MapPin size={8} className="md:w-[10px]" /> {activeBranchName || 'Pilih Unit Aktif'}
                   </div>
                </div>
             </div>
@@ -338,24 +396,44 @@ export default function POSClient({ orgId, org, products, customers, accounts, c
 
                {/* Product Grid Layout */}
                <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/50 pb-32 md:pb-6">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 auto-rows-max overflow-visible">
-                     {filteredProducts.map((p: any) => (
-                        <button
-                           key={p.id}
-                           onClick={() => addToCart(p)}
-                           className="bg-white p-3 md:p-4 rounded-3xl border border-slate-200 shadow-sm hover:border-blue-500 hover:shadow-xl hover:-translate-y-1 transition-all text-left group flex flex-col min-h-[140px] md:h-44 relative z-0"
-                        >
-                           <div className="text-[8px] md:text-[10px] font-black text-blue-500 bg-blue-50 w-fit px-2 py-1 rounded-md mb-2">{p.sku}</div>
-                           <h3 className="font-bold text-xs md:text-sm text-slate-800 leading-tight flex-1 line-clamp-3">{p.name}</h3>
-                           <div className="text-sm md:text-lg font-black text-[#003366] mt-2 group-hover:scale-105 origin-left transition-transform">
-                              {formatRupiah(p.selling_price)}
+                  {!activeBranchId ? (
+                     <div className="h-full min-h-[320px] flex items-center justify-center">
+                        <div className="max-w-md w-full bg-white border border-slate-200 rounded-[32px] shadow-sm p-8 text-center">
+                           <div className="w-14 h-14 mx-auto rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+                              <MapPin size={26} />
                            </div>
-                           <div className={`mt-2 text-[9px] font-bold px-2 py-0.5 rounded-md w-fit ${p.stock <= 5 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-400'}`}>
-                              Stok: {p.stock || 0} {p.unit || 'Pcs'}
-                           </div>
-                        </button>
-                     ))}
-                  </div>
+                           <h3 className="text-lg font-black text-slate-800 mb-2">Pilih Unit Aktif</h3>
+                           <p className="text-sm font-medium text-slate-500 leading-relaxed">
+                              POS hanya bisa dipakai di satu unit aktif. Pilih unit dari header terlebih dahulu agar stok dan jurnal tidak tercampur.
+                           </p>
+                        </div>
+                     </div>
+                  ) : (
+                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 auto-rows-max overflow-visible">
+                        {filteredProducts.map((p: any) => (
+                           <button
+                              key={p.id}
+                              onClick={() => addToCart(p)}
+                              className="bg-white p-3 md:p-4 rounded-3xl border border-slate-200 shadow-sm hover:border-blue-500 hover:shadow-xl hover:-translate-y-1 transition-all text-left group flex flex-col min-h-[140px] md:h-44 relative z-0"
+                           >
+                              <div className="text-[8px] md:text-[10px] font-black text-blue-500 bg-blue-50 w-fit px-2 py-1 rounded-md mb-2">{p.sku || 'NO-SKU'}</div>
+                              <h3 className="font-bold text-xs md:text-sm text-slate-800 leading-tight flex-1 line-clamp-3">{p.name}</h3>
+                              <div className="text-sm md:text-lg font-black text-[#003366] mt-2 group-hover:scale-105 origin-left transition-transform">
+                                 {formatRupiah(p.selling_price)}
+                              </div>
+                              {isStockTrackedProduct(p) ? (
+                                 <div className={`mt-2 text-[9px] font-bold px-2 py-0.5 rounded-md w-fit ${p.stock <= 5 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-400'}`}>
+                                    Stok: {p.stock || 0} {p.unit || 'Pcs'}
+                                 </div>
+                              ) : (
+                                 <div className="mt-2 text-[9px] font-bold px-2 py-0.5 rounded-md w-fit bg-emerald-50 text-emerald-600">
+                                    {p.type === 'SERVICE' ? 'Jasa' : 'Non Stok'}
+                                 </div>
+                              )}
+                           </button>
+                        ))}
+                     </div>
+                  )}
                </div>
             </div>
 
@@ -514,7 +592,7 @@ export default function POSClient({ orgId, org, products, customers, accounts, c
                         </div>
 
                         <button
-                           disabled={cart.length === 0}
+                           disabled={!activeBranchId || cart.length === 0}
                            onClick={() => setShowPayment(true)}
                            className="w-full h-14 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl md:rounded-2xl font-black text-xs md:text-base tracking-widest uppercase transition-colors flex items-center justify-center gap-3 shadow-lg"
                         >
@@ -708,7 +786,7 @@ export default function POSClient({ orgId, org, products, customers, accounts, c
                               </div>
 
                               <div className="pt-6 mt-auto">
-                                 <button disabled={loading} onClick={handlePay} className="w-full h-16 md:h-[72px] bg-[#003366] hover:bg-[#002244] text-white flex flex-col items-center justify-center gap-1 rounded-2xl md:rounded-[20px] shadow-xl transition-all font-black text-[11px] md:text-xs tracking-widest disabled:opacity-50">
+                                 <button disabled={loading || !activeBranchId} onClick={handlePay} className="w-full h-16 md:h-[72px] bg-[#003366] hover:bg-[#002244] text-white flex flex-col items-center justify-center gap-1 rounded-2xl md:rounded-[20px] shadow-xl transition-all font-black text-[11px] md:text-xs tracking-widest disabled:opacity-50">
                                     {loading ? (
                                        <span className="animate-spin border-2 border-white/20 border-t-white rounded-full w-5 h-5 mb-0.5" />
                                     ) : (
@@ -740,7 +818,8 @@ export default function POSClient({ orgId, org, products, customers, accounts, c
                      {logoUrl && (
                         <img src={logoUrl} alt="Logo" className="w-12 h-12 object-contain mb-1" />
                      )}
-                     <h2 className="font-bold text-sm uppercase">{orgSettings.brand_name || 'NIZAM CABANG UTAMA'}</h2>
+                     <h2 className="font-bold text-sm uppercase">{orgSettings.brand_name || 'NIZAM POS'}</h2>
+                     <p className="text-[8px] uppercase font-bold">{activeBranchName || 'Unit Belum Dipilih'}</p>
                      <p className="text-[8px]">{orgSettings.company_address || 'Pusat Penjualan Retil'}</p>
                   </div>
                   <div className="border-b border-dashed border-black mb-2" />

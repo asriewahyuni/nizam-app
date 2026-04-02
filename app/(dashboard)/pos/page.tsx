@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import POSClient from './POSClient'
-import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getProducts } from '@/modules/inventory/actions/inventory.actions'
 
 export default async function POSPage() {
   const supabase = await createClient()
@@ -12,17 +13,14 @@ export default async function POSPage() {
   if (!orgData) return null
 
   const orgId = orgData.org.id
-
-  // Fetch active products with total stock
-  const { data: products } = await supabase.from('products').select('*, inventory_stocks(quantity)')
-    .eq('is_active', true)
-    .eq('org_id', orgId)
-
-  // Sub-process: manually aggregate quantity if needed or use the first record if POS uses single WH
-  const productsWithStock = (products as any[])?.map(p => ({
-     ...p,
-     stock: p.inventory_stocks?.reduce((acc: number, s: any) => acc + s.quantity, 0) || 0
-  })) || []
+  const activeBranch = await getActiveBranch(orgId)
+  const products = activeBranch ? await getProducts(orgId, activeBranch.id) : []
+  const productsWithStock = (products || [])
+    .filter((product: any) => product.is_active)
+    .map((product: any) => ({
+      ...product,
+      stock: Number(product.stock_available || 0),
+    }))
 
   // Fetch customers
   const { data: customers } = await supabase.from('contacts').select('id, name, phone')
@@ -32,5 +30,16 @@ export default async function POSPage() {
   const { data: accounts } = await supabase.from('accounts').select('id, name, code')
     .eq('org_id', orgId).eq('is_active', true)
     
-  return <POSClient orgId={orgId} org={orgData.org} products={productsWithStock} customers={customers || []} accounts={accounts || []} currentUser={user} />
+  return (
+    <POSClient
+      orgId={orgId}
+      org={orgData.org}
+      products={productsWithStock}
+      customers={customers || []}
+      accounts={accounts || []}
+      currentUser={user}
+      activeBranchId={activeBranch?.id || null}
+      activeBranchName={activeBranch?.name || null}
+    />
+  )
 }

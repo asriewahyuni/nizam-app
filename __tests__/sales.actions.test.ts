@@ -165,6 +165,34 @@ describe('Sales Branch Context', () => {
     expect(salesQuery.eq).toHaveBeenCalledWith('branch_id', 'branch-1')
   })
 
+  it('rejects POS transaction when no active branch is selected', async () => {
+    const fromMock = vi.fn()
+    const rpcMock = vi.fn()
+
+    mocks.getActiveBranch.mockResolvedValue(null)
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: fromMock,
+      rpc: rpcMock,
+    })
+
+    const result = await processPosTransaction('org-1', {
+      lines: [{ product_id: 'prod-1', product_name: 'Produk A', quantity: 1, unit_price: 1000 }],
+      account_id: 'cash-1',
+      notes: 'POS',
+    })
+
+    expect(result).toEqual({
+      error: 'Pilih unit aktif terlebih dahulu untuk memproses transaksi POS.',
+    })
+    expect(fromMock).not.toHaveBeenCalled()
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
   it('stamps active branch on POS sales transaction', async () => {
     const walkInQuery = {
       select: vi.fn(() => walkInQuery),
