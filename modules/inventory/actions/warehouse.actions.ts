@@ -90,7 +90,7 @@ async function requireActiveBranchId(orgId: string, errorMessage: string): Promi
 
 function applyWarehouseBranchFilter(query: any, branchId: string | null) {
   if (!branchId) return query
-  return query.or(`branch_id.eq.${branchId},branch_id.is.null`)
+  return query.eq('branch_id', branchId)
 }
 
 async function getAccessibleWarehouse(
@@ -126,7 +126,7 @@ async function getAccessibleWarehouseBin(
     .eq('org_id', orgId)
 
   if (branchId) {
-    query = query.or(`branch_id.eq.${branchId},branch_id.is.null`, { foreignTable: 'warehouses' })
+    query = query.or(`branch_id.eq.${branchId}`, { foreignTable: 'warehouses' })
   }
 
   const { data, error } = await query.maybeSingle()
@@ -168,7 +168,7 @@ export async function getWarehouseBins(orgId: string, warehouseId?: string, bran
   }
 
   if (effectiveBranchId) {
-    query = (query as any).or(`branch_id.eq.${effectiveBranchId},branch_id.is.null`, { foreignTable: 'warehouses' })
+    query = (query as any).or(`branch_id.eq.${effectiveBranchId}`, { foreignTable: 'warehouses' })
   }
 
   const { data, error } = await query.order('warehouse_id', { ascending: true })

@@ -40,7 +40,7 @@ describe('Inventory Branch Context', () => {
     vi.clearAllMocks()
   })
 
-  it('filters warehouses by active branch with legacy-null fallback', async () => {
+  it('filters warehouses strictly by active branch', async () => {
     const warehouseQuery = createWarehouseListQuery([{ id: 'wh-1', name: 'Gudang A' }])
 
     mocks.getActiveBranch.mockResolvedValue({
@@ -65,7 +65,8 @@ describe('Inventory Branch Context', () => {
 
     const result = await getWarehouses('org-1')
 
-    expect(warehouseQuery.or).toHaveBeenCalledWith('branch_id.eq.branch-1,branch_id.is.null')
+    expect(warehouseQuery.eq).toHaveBeenCalledWith('branch_id', 'branch-1')
+    expect(warehouseQuery.or).not.toHaveBeenCalled()
     expect(result).toEqual([{ id: 'wh-1', name: 'Gudang A' }])
   })
 

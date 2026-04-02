@@ -258,6 +258,8 @@ describe('Purchasing Branch Context', () => {
     expect(result).toEqual({
       error: 'Tidak ada gudang aktif untuk unit PO ini. Buat atau pilih gudang unit terlebih dahulu.',
     })
+    expect(warehouseFallbackQuery.eq).toHaveBeenCalledWith('branch_id', 'branch-1')
+    expect(warehouseFallbackQuery.or).not.toHaveBeenCalled()
     expect(purchasesTable.update).not.toHaveBeenCalled()
     expect(purchaseUpdateEq).not.toHaveBeenCalled()
   })

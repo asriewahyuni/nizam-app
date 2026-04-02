@@ -57,7 +57,7 @@ async function getScopedWarehouses(
     .in('id', uniqueIds)
 
   if (branchId) {
-    query = query.or(`branch_id.eq.${branchId},branch_id.is.null`)
+    query = query.eq('branch_id', branchId)
   }
 
   const { data, error } = await query
@@ -76,7 +76,7 @@ export async function getProducts(orgId: string, branchId?: string | null): Prom
     .eq('org_id', orgId)
 
   if (effectiveBranchId) {
-    movementsQuery = (movementsQuery as any).or(`branch_id.eq.${effectiveBranchId},branch_id.is.null`)
+    movementsQuery = movementsQuery.eq('branch_id', effectiveBranchId)
   }
 
   const { data: movementsData } = await movementsQuery
@@ -87,7 +87,7 @@ export async function getProducts(orgId: string, branchId?: string | null): Prom
     .eq('org_id', orgId)
 
   if (effectiveBranchId) {
-    stockQuery = stockQuery.or(`branch_id.eq.${effectiveBranchId},branch_id.is.null`, { foreignTable: 'warehouses' })
+    stockQuery = stockQuery.or(`branch_id.eq.${effectiveBranchId}`, { foreignTable: 'warehouses' })
   }
 
   const { data: stockRows } = await stockQuery
@@ -468,7 +468,7 @@ export async function getStockLedger(orgId: string, productId: string, branchId?
     .eq('product_id', productId)
 
   if (effectiveBranchId) {
-    movementsQuery = (movementsQuery as any).or(`branch_id.eq.${effectiveBranchId},branch_id.is.null`)
+    movementsQuery = movementsQuery.eq('branch_id', effectiveBranchId)
   }
 
   const { data: movements, error } = await movementsQuery.order('created_at', { ascending: true })
@@ -492,7 +492,7 @@ export async function getWarehouseStocks(orgId: string, productId: string, branc
     .eq('product_id', productId)
 
   if (effectiveBranchId) {
-    query = query.or(`branch_id.eq.${effectiveBranchId},branch_id.is.null`, { foreignTable: 'warehouses' })
+    query = query.or(`branch_id.eq.${effectiveBranchId}`, { foreignTable: 'warehouses' })
   }
 
   const { data, error } = await query

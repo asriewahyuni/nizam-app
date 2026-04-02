@@ -277,7 +277,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
       .limit(1)
 
     if (purchase.branch_id) {
-      warehouseQuery = warehouseQuery.or(`branch_id.eq.${purchase.branch_id},branch_id.is.null`)
+      warehouseQuery = warehouseQuery.eq('branch_id', purchase.branch_id)
     }
 
     const { data } = await warehouseQuery.maybeSingle()
