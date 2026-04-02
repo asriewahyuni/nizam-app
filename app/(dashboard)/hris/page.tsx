@@ -2,6 +2,8 @@ import { canSelectAllBranches, getActiveBranch, getActiveOrg, getInvitations } f
 import { redirect } from 'next/navigation'
 import { getEmployees } from '@/modules/hris/actions/employee.actions'
 import { getPayrollComponents, getPayrollRuns } from '@/modules/hris/actions/payroll.actions'
+import { getAttendanceRecords } from '@/modules/hris/actions/attendance.actions'
+import { getLeaveRequests } from '@/modules/hris/actions/leave.actions'
 import { getAccountBalances } from '@/modules/accounting/actions/coa.actions'
 import { createClient } from '@/lib/supabase/server'
 import HrisClient from './HrisClient'
@@ -17,11 +19,13 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
   const supabase = await createClient()
   const { data: roles } = await supabase.from('roles').select('*').eq('org_id', orgData.org.id).order('name')
 
-  const [employees, payrollComponents, accounts, payrollRuns, invitations, allowAllBranchSelection] = await Promise.all([
+  const [employees, payrollComponents, accounts, payrollRuns, attendanceRecords, leaveRequests, invitations, allowAllBranchSelection] = await Promise.all([
     getEmployees(orgData.org.id, activeBranch?.id),
     getPayrollComponents(orgData.org.id),
     getAccountBalances(orgData.org.id),
     getPayrollRuns(orgData.org.id, activeBranch?.id),
+    getAttendanceRecords(orgData.org.id, activeBranch?.id),
+    getLeaveRequests(orgData.org.id, activeBranch?.id),
     getInvitations(orgData.org.id),
     canSelectAllBranches(orgData.org.id),
   ])
@@ -34,6 +38,8 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
     initialEmployees={employees} 
     initialPayrollComponents={payrollComponents}
     initialPayrollRuns={payrollRuns}
+    initialAttendanceRecords={attendanceRecords}
+    initialLeaveRequests={leaveRequests}
     accounts={accounts}
     settings={orgData.org.settings}
     roles={roles || []}

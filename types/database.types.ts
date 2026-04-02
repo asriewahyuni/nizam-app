@@ -124,6 +124,12 @@ export type ExpenseClaim = {
   approved_by: string | null; journal_entry_id: string | null
   created_at: string; updated_at: string
 }
+export type LeaveRequest = {
+  id: string; org_id: string; branch_id: string; employee_id: string
+  leave_type: string; start_date: string; end_date: string; days_taken: number
+  reason: string; status: string; approved_by: string | null; approved_at: string | null
+  created_at: string; updated_at: string
+}
 export type FleetAsset = {
   id: string; org_id: string; branch_id: string; plate_number: string; model: string
   brand: string | null; type: string; status: string
@@ -261,6 +267,12 @@ export interface Database {
         Row: ExpenseClaim
         Insert: Omit<ExpenseClaim, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
         Update: Partial<ExpenseClaim>
+        Relationships: []
+      }
+      leave_requests: {
+        Row: LeaveRequest
+        Insert: Omit<LeaveRequest, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<LeaveRequest>
         Relationships: []
       }
       fleet_assets: {

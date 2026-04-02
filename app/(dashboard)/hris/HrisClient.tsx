@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { startTransition, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { requestPasswordReset, resetEmployeePassword } from '@/modules/auth/actions/auth.actions'
 import { uploadEmployeeAvatar } from '@/modules/hris/actions/employee.actions'
 import {
@@ -38,6 +39,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
 import { createEmployee, updateEmployee } from '@/modules/hris/actions/employee.actions'
 import { createPayrollComponent, deletePayrollComponent, generatePayrollRun, payPayrollRun, fixEmptyPayrollJournals, getPayrollRunDetails, deletePayrollRun, voidPayrollRun } from '@/modules/hris/actions/payroll.actions'
+import { upsertAttendanceRecord } from '@/modules/hris/actions/attendance.actions'
+import { approveLeaveRequest, createLeaveRequest, rejectLeaveRequest } from '@/modules/hris/actions/leave.actions'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import {
@@ -59,6 +62,8 @@ export default function HrisClient({
   initialEmployees,
   initialPayrollComponents = [],
   initialPayrollRuns = [],
+  initialAttendanceRecords = [],
+  initialLeaveRequests = [],
   accounts = [],
   settings = {},
   roles = [],
@@ -72,20 +77,27 @@ export default function HrisClient({
   initialEmployees: any[],
   initialPayrollComponents?: any[],
   initialPayrollRuns?: any[],
+  initialAttendanceRecords?: any[],
+  initialLeaveRequests?: any[],
   accounts?: any[],
   settings?: any,
   roles?: any[],
   initialInvitations?: any[],
   defaultTab?: string
 }) {
+  const router = useRouter()
   const supabase = createClient()
   const [employees, setEmployees] = useState(initialEmployees)
   const [payrollComponents, setPayrollComponents] = useState(initialPayrollComponents)
   const [payrollRuns, setPayrollRuns] = useState(initialPayrollRuns || [])
+  const [attendanceRecords, setAttendanceRecords] = useState(initialAttendanceRecords || [])
+  const [leaveRequests, setLeaveRequests] = useState(initialLeaveRequests || [])
   const [invitations, setInvitations] = useState(initialInvitations || [])
   const [rolesList, setRolesList] = useState(roles || []) 
   const [activeTab, setActiveTab] = useState<'EMPLOYEES' | 'POSITIONS' | 'PAYROLL' | 'ATTENDANCE' | 'RUNS' | 'ACTIVATION'>(defaultTab as any || 'EMPLOYEES')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false)
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false)
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
   const [isPositionModalOpen, setIsPositionModalOpen] = useState(false)
   const [editingPosition, setEditingPosition] = useState<any>(null)
@@ -112,6 +124,14 @@ export default function HrisClient({
   useEffect(() => {
     setPayrollRuns(initialPayrollRuns || [])
   }, [initialPayrollRuns])
+
+  useEffect(() => {
+    setAttendanceRecords(initialAttendanceRecords || [])
+  }, [initialAttendanceRecords])
+
+  useEffect(() => {
+    setLeaveRequests(initialLeaveRequests || [])
+  }, [initialLeaveRequests])
 
   useEffect(() => {
     setInvitations(initialInvitations || [])
@@ -410,8 +430,65 @@ export default function HrisClient({
     setLoading(false)
   }
 
+  const refreshHrisPage = () => {
+    startTransition(() => {
+      router.refresh()
+    })
+  }
+
+  const handleSaveAttendance = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+    const res = await upsertAttendanceRecord(orgId, new FormData(e.currentTarget))
+    if (res.error) {
+      showToast(res.error, 'error')
+    } else {
+      setIsAttendanceModalOpen(false)
+      showToast('Absensi berhasil disimpan.', 'success')
+      refreshHrisPage()
+    }
+    setLoading(false)
+  }
+
+  const handleCreateLeave = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+    const res = await createLeaveRequest(orgId, new FormData(e.currentTarget))
+    if (res.error) {
+      showToast(res.error, 'error')
+    } else {
+      setIsLeaveModalOpen(false)
+      showToast('Pengajuan cuti berhasil dibuat.', 'success')
+      refreshHrisPage()
+    }
+    setLoading(false)
+  }
+
+  const handleProcessLeave = async (leaveId: string, action: 'approve' | 'reject') => {
+    setLoading(true)
+    const res = action === 'approve'
+      ? await approveLeaveRequest(leaveId)
+      : await rejectLeaveRequest(leaveId)
+
+    if (res.error) {
+      showToast(res.error, 'error')
+    } else {
+      showToast(
+        action === 'approve' ? 'Pengajuan cuti disetujui.' : 'Pengajuan cuti ditolak.',
+        'success'
+      )
+      refreshHrisPage()
+    }
+    setLoading(false)
+  }
+
   const employeeScopeLabel = activeBranchName
     ? `Unit aktif: ${activeBranchName}`
+    : allowAllBranchSelection
+      ? 'Mode semua unit aktif'
+      : 'Unit aktif belum dipilih'
+  const attendanceScopeLabel = activeBranchName
+    ? `Absensi & cuti untuk unit ${activeBranchName}`
     : allowAllBranchSelection
       ? 'Mode semua unit aktif'
       : 'Unit aktif belum dipilih'
@@ -423,12 +500,21 @@ export default function HrisClient({
 
   const hrisSubtitle =
     activeTab === 'ATTENDANCE'
-      ? 'Mesin absensi dan cuti masih dalam rollout bertahap per unit.'
+      ? `Kontrol absensi harian dan pengajuan cuti dengan scope ${attendanceScopeLabel.toLowerCase()}.`
       : activeTab === 'PAYROLL'
-        ? 'Atur template gaji, tunjangan, dan potongan karyawan. Payroll saat ini tetap lintas organisasi.'
+        ? 'Atur template gaji, tunjangan, dan potongan karyawan. Komponen gaji tetap org-wide, tetapi payroll run sudah terscope per unit.'
         : activeTab === 'RUNS'
           ? `Lakukan generate slip gaji otomatis dan pencatatan kas jurnal dengan scope ${payrollScopeLabel.toLowerCase()}.`
           : `Manajemen sumber daya manusia dengan scope ${employeeScopeLabel.toLowerCase()}.`
+
+  const todayAttendanceKey = new Date().toISOString().split('T')[0]
+  const attendanceToday = attendanceRecords.filter((record: any) => record.record_date === todayAttendanceKey)
+  const attendancePresentCount = attendanceToday.filter((record: any) => ['PRESENT', 'LATE', 'HALFDAY'].includes(String(record.status || '').toUpperCase())).length
+  const attendanceCheckedOutCount = attendanceToday.filter((record: any) => Boolean(record.check_out)).length
+  const attendanceLateCount = attendanceToday.filter((record: any) => String(record.status || '').toUpperCase() === 'LATE').length
+  const pendingLeaveCount = leaveRequests.filter((request: any) => String(request.status || '').toUpperCase() === 'PENDING').length
+  const defaultDateInput = new Date().toISOString().split('T')[0]
+  const defaultDateTimeInput = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 
   return (
     <div className="space-y-10 pb-20">
@@ -520,6 +606,39 @@ export default function HrisClient({
             sub="Past 30 Days"
             icon={CheckCircle}
             color="amber"
+          />
+        </div>
+      )}
+
+      {activeTab === 'ATTENDANCE' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard
+            label="Hadir Hari Ini"
+            value={attendancePresentCount.toString()}
+            sub="Termasuk telat & halfday"
+            icon={CheckCircle}
+            color="emerald"
+          />
+          <StatCard
+            label="Sudah Check-Out"
+            value={attendanceCheckedOutCount.toString()}
+            sub="Dari catatan hari ini"
+            icon={Clock}
+            color="blue"
+          />
+          <StatCard
+            label="Telat Hari Ini"
+            value={attendanceLateCount.toString()}
+            sub="Perlu review supervisor"
+            icon={AlertTriangle}
+            color="amber"
+          />
+          <StatCard
+            label="Cuti Menunggu"
+            value={pendingLeaveCount.toString()}
+            sub="Pending approval"
+            icon={CalendarDays}
+            color="indigo"
           />
         </div>
       )}
@@ -694,14 +813,208 @@ export default function HrisClient({
         )}
 
         {activeTab === 'ATTENDANCE' && (
-          <motion.div key="attendance-tab" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="py-20 text-center">
-            <div className="w-32 h-32 bg-slate-50 text-slate-200 rounded-[48px] flex items-center justify-center mx-auto mb-10 shadow-inner border border-slate-100">
-              <ClipboardList size={64} strokeWidth={1} />
-            </div>
-            <h3 className="text-3xl font-black text-slate-900 tracking-tighter mb-4">Enterprise Attendance Engine</h3>
-            <p className="text-slate-400 max-w-md mx-auto font-medium text-sm leading-relaxed">
-              Automated biometric sync, leave management, and shift scheduling are currently in the final testing phase of Nizam ERP 2.1.
-            </p>
+          <motion.div key="attendance-tab" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-8">
+            <SectionCard>
+              <SectionHeader
+                title="Attendance Register"
+                subtitle="Kelola absensi manual per hari berdasarkan karyawan yang termasuk ke unit yang bisa Anda akses."
+                icon={Clock}
+                actions={
+                  <SafeButton
+                    onClick={() => setIsAttendanceModalOpen(true)}
+                    variant="primary"
+                    size="sm"
+                    icon={<Plus size={16} />}
+                    disabled={employees.length === 0}
+                  >
+                    CATAT ABSENSI
+                  </SafeButton>
+                }
+              />
+
+              <div className="p-2">
+                <div className="mb-6 flex flex-wrap items-center gap-3 rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-4">
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Scope</div>
+                  <div className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${activeBranchName ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {attendanceScopeLabel}
+                  </div>
+                  <div className="text-[11px] font-bold text-slate-500">
+                    {allowAllBranchSelection && !activeBranchId
+                      ? 'Anda sedang melihat semua unit yang bisa diakses. Pilih karyawan untuk merekam absensi pada unitnya.'
+                      : 'Catatan terbaru menampilkan 14 hari terakhir pada scope unit aktif.'}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {attendanceRecords.map((record: any) => (
+                    <div key={record.id} className="rounded-[28px] border border-slate-100 bg-slate-50/60 px-6 py-5 shadow-sm">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="text-sm font-black text-slate-900">
+                              {record.employee?.first_name} {record.employee?.last_name}
+                            </h4>
+                            <span className="rounded-full bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 border border-slate-100">
+                              {record.employee?.nik || 'Tanpa NIK'}
+                            </span>
+                            {record.branch?.name && (
+                              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-blue-600 border border-blue-100">
+                                {record.branch.name}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] font-bold text-slate-500">
+                            {record.employee?.job_title || 'Posisi belum diatur'} • {formatDate(record.record_date)}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3 md:justify-end">
+                            <StatusBadge label={String(record.status || 'UNKNOWN').replace('_', ' ')} variant={
+                              String(record.status || '').toUpperCase() === 'PRESENT'
+                                ? 'success'
+                                : String(record.status || '').toUpperCase() === 'LATE'
+                                  ? 'warning'
+                                  : String(record.status || '').toUpperCase() === 'ABSENT'
+                                  ? 'error'
+                                  : 'info'
+                            } />
+                          <div className="rounded-2xl bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 border border-slate-100">
+                            IN {record.check_in ? new Date(record.check_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                          </div>
+                          <div className="rounded-2xl bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 border border-slate-100">
+                            OUT {record.check_out ? new Date(record.check_out).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                          </div>
+                        </div>
+                      </div>
+                      {record.notes && (
+                        <div className="mt-4 rounded-2xl bg-white px-4 py-3 text-xs font-medium text-slate-500 border border-slate-100">
+                          {record.notes}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {attendanceRecords.length === 0 && (
+                    <EmptyState
+                      title="Belum ada catatan absensi"
+                      description="Mulai isi absensi harian per unit agar HRIS punya log kehadiran yang konsisten."
+                      icon={ClipboardList}
+                      action={
+                        <SafeButton
+                          onClick={() => setIsAttendanceModalOpen(true)}
+                          variant="primary"
+                          size="sm"
+                          icon={<Plus size={16} />}
+                          disabled={employees.length === 0}
+                        >
+                          Catat Absensi Pertama
+                        </SafeButton>
+                      }
+                    />
+                  )}
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard>
+              <SectionHeader
+                title="Leave Requests"
+                subtitle="Kelola pengajuan cuti karyawan per unit dan proses approval langsung dari HRIS."
+                icon={CalendarDays}
+                actions={
+                  <SafeButton
+                    onClick={() => setIsLeaveModalOpen(true)}
+                    variant="indigo"
+                    size="sm"
+                    icon={<Plus size={16} />}
+                    disabled={employees.length === 0}
+                  >
+                    AJUKAN CUTI
+                  </SafeButton>
+                }
+              />
+
+              <div className="p-2">
+                <div className="space-y-4">
+                  {leaveRequests.map((request: any) => (
+                    <div key={request.id} className="rounded-[28px] border border-slate-100 bg-slate-50/60 px-6 py-5 shadow-sm">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="text-sm font-black text-slate-900">
+                              {request.employee?.first_name} {request.employee?.last_name}
+                            </h4>
+                            <StatusBadge
+                              label={String(request.status || 'PENDING').replace('_', ' ')}
+                              variant={
+                                String(request.status || '').toUpperCase() === 'APPROVED'
+                                  ? 'success'
+                                  : String(request.status || '').toUpperCase() === 'REJECTED'
+                                    ? 'error'
+                                    : 'warning'
+                              }
+                            />
+                            {request.branch?.name && (
+                              <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-indigo-600 border border-indigo-100">
+                                {request.branch.name}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] font-bold text-slate-500">
+                            {request.leave_type} • {formatDate(request.start_date)} sampai {formatDate(request.end_date)} • {request.days_taken} hari
+                          </div>
+                          <div className="rounded-2xl bg-white px-4 py-3 text-xs font-medium text-slate-500 border border-slate-100">
+                            {request.reason}
+                          </div>
+                        </div>
+
+                        {String(request.status || '').toUpperCase() === 'PENDING' && (
+                          <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+                            <SafeButton
+                              onClick={() => handleProcessLeave(request.id, 'approve')}
+                              variant="emerald"
+                              size="sm"
+                              icon={<Check size={14} />}
+                              isLoading={loading}
+                            >
+                              APPROVE
+                            </SafeButton>
+                            <SafeButton
+                              onClick={() => handleProcessLeave(request.id, 'reject')}
+                              variant="danger"
+                              size="sm"
+                              icon={<X size={14} />}
+                              isLoading={loading}
+                            >
+                              REJECT
+                            </SafeButton>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {leaveRequests.length === 0 && (
+                    <EmptyState
+                      title="Belum ada pengajuan cuti"
+                      description="Gunakan form pengajuan untuk mulai mencatat leave request per unit."
+                      icon={CalendarDays}
+                      action={
+                        <SafeButton
+                          onClick={() => setIsLeaveModalOpen(true)}
+                          variant="indigo"
+                          size="sm"
+                          icon={<Plus size={16} />}
+                          disabled={employees.length === 0}
+                        >
+                          Buat Pengajuan Cuti
+                        </SafeButton>
+                      }
+                    />
+                  )}
+                </div>
+              </div>
+            </SectionCard>
           </motion.div>
         )}
 
@@ -1228,6 +1541,185 @@ export default function HrisClient({
                   CREATE COMPONENT
                 </SafeButton>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isAttendanceModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAttendanceModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
+              <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-blue-100">
+                    <Clock size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase italic">Attendance Register</h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Catat kehadiran berdasarkan unit karyawan</p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setIsAttendanceModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveAttendance} className="p-10 space-y-8">
+                <div className="rounded-[28px] border px-6 py-5 border-blue-100 bg-blue-50/60">
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Konteks Unit</div>
+                  <div className="text-sm font-black text-slate-800">
+                    {activeBranchName
+                      ? `Anda sedang bekerja di unit ${activeBranchName}.`
+                      : allowAllBranchSelection
+                        ? 'Mode semua unit aktif. Unit akan mengikuti branch karyawan yang dipilih.'
+                        : 'Unit aktif belum dipilih.'}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Karyawan</label>
+                  <select name="employee_id" required className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all">
+                    <option value="">-- PILIH KARYAWAN --</option>
+                    {employees.map((emp: any) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.first_name} {emp.last_name} {emp.branch?.name ? `• ${emp.branch.name}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tanggal</label>
+                    <input name="record_date" type="date" required defaultValue={defaultDateInput} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Status</label>
+                    <select name="status" defaultValue="PRESENT" className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all">
+                      <option value="PRESENT">PRESENT</option>
+                      <option value="LATE">LATE</option>
+                      <option value="HALFDAY">HALFDAY</option>
+                      <option value="SICK">SICK</option>
+                      <option value="LEAVE">LEAVE</option>
+                      <option value="ABSENT">ABSENT</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Jam Masuk</label>
+                    <input name="check_in" type="datetime-local" defaultValue={defaultDateTimeInput} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Jam Keluar</label>
+                    <input name="check_out" type="datetime-local" className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Catatan</label>
+                  <textarea name="notes" rows={4} placeholder="Catatan keterlambatan, izin, atau keterangan lain..." className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition-all resize-none" />
+                </div>
+
+                <div className="flex items-center justify-end gap-4">
+                  <button type="button" onClick={() => setIsAttendanceModalOpen(false)} className="px-8 py-3 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-widest">CANCEL</button>
+                  <SafeButton
+                    type="submit"
+                    variant="primary"
+                    size="lg"
+                    icon={<Check size={18} />}
+                    isLoading={loading}
+                  >
+                    SIMPAN ABSENSI
+                  </SafeButton>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isLeaveModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsLeaveModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white">
+              <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-100">
+                    <CalendarDays size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase italic">Leave Request</h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Ajukan cuti sesuai unit karyawan</p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setIsLeaveModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateLeave} className="p-10 space-y-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Karyawan</label>
+                  <select name="employee_id" required className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all">
+                    <option value="">-- PILIH KARYAWAN --</option>
+                    {employees.map((emp: any) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.first_name} {emp.last_name} {emp.branch?.name ? `• ${emp.branch.name}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Jenis Cuti</label>
+                    <select name="leave_type" required defaultValue="Annual Leave" className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all">
+                      <option value="Annual Leave">Annual Leave</option>
+                      <option value="Sick Leave">Sick Leave</option>
+                      <option value="Unpaid Leave">Unpaid Leave</option>
+                      <option value="Special Leave">Special Leave</option>
+                    </select>
+                  </div>
+                  <div className="rounded-[28px] border px-6 py-5 border-indigo-100 bg-indigo-50/60">
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Scope</div>
+                    <div className="text-sm font-black text-slate-800">{attendanceScopeLabel}</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tanggal Mulai</label>
+                    <input name="start_date" type="date" required defaultValue={defaultDateInput} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Tanggal Selesai</label>
+                    <input name="end_date" type="date" required defaultValue={defaultDateInput} className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Alasan</label>
+                  <textarea name="reason" rows={4} required placeholder="Tuliskan alasan cuti..." className="w-full px-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-indigo-500 transition-all resize-none" />
+                </div>
+
+                <div className="flex items-center justify-end gap-4">
+                  <button type="button" onClick={() => setIsLeaveModalOpen(false)} className="px-8 py-3 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-widest">CANCEL</button>
+                  <SafeButton
+                    type="submit"
+                    variant="indigo"
+                    size="lg"
+                    icon={<Check size={18} />}
+                    isLoading={loading}
+                  >
+                    KIRIM PENGAJUAN
+                  </SafeButton>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}
