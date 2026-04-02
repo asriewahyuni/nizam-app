@@ -13,17 +13,35 @@ import { updateSession } from '@/lib/supabase/middleware'
 
 const ORIGINAL_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const ORIGINAL_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const ORIGINAL_TARGET = process.env.NEXT_PUBLIC_SUPABASE_TARGET
+const ORIGINAL_LOCAL_URL = process.env.NEXT_PUBLIC_SUPABASE_LOCAL_URL
+const ORIGINAL_LOCAL_KEY = process.env.NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name]
+    return
+  }
+
+  process.env[name] = value
+}
 
 describe('Supabase Middleware', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    delete process.env.NEXT_PUBLIC_SUPABASE_TARGET
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-key'
+    delete process.env.NEXT_PUBLIC_SUPABASE_LOCAL_URL
+    delete process.env.NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY
   })
 
   afterEach(() => {
-    process.env.NEXT_PUBLIC_SUPABASE_URL = ORIGINAL_URL
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = ORIGINAL_KEY
+    restoreEnv('NEXT_PUBLIC_SUPABASE_TARGET', ORIGINAL_TARGET)
+    restoreEnv('NEXT_PUBLIC_SUPABASE_URL', ORIGINAL_URL)
+    restoreEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', ORIGINAL_KEY)
+    restoreEnv('NEXT_PUBLIC_SUPABASE_LOCAL_URL', ORIGINAL_LOCAL_URL)
+    restoreEnv('NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY', ORIGINAL_LOCAL_KEY)
   })
 
   it('redirects unauthenticated users away from protected routes', async () => {
@@ -113,5 +131,27 @@ describe('Supabase Middleware', () => {
     expect(mocks.createServerClient).not.toHaveBeenCalled()
     expect(response.status).toBe(200)
     expect(response.headers.get('location')).toBeNull()
+  })
+
+  it('uses local supabase credentials when target is local', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_TARGET = 'local'
+    process.env.NEXT_PUBLIC_SUPABASE_LOCAL_URL = 'http://127.0.0.1:54321'
+    process.env.NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY = 'local-anon-key'
+
+    mocks.createServerClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: null },
+        }),
+      },
+    })
+
+    await updateSession(new NextRequest('http://localhost:3000/fleet'))
+
+    expect(mocks.createServerClient).toHaveBeenCalledWith(
+      'http://127.0.0.1:54321',
+      'local-anon-key',
+      expect.any(Object)
+    )
   })
 })

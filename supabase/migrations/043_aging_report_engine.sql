@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS public.purchase_payments (
 
 -- RLS for purchase_payments
 ALTER TABLE public.purchase_payments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "members_can_view_purchase_payments" ON public.purchase_payments;
 CREATE POLICY "members_can_view_purchase_payments" ON public.purchase_payments FOR SELECT 
 USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND is_active = TRUE));
 

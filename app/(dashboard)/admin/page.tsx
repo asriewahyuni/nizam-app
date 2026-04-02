@@ -1,6 +1,10 @@
 'use client'
 
+<<<<<<< HEAD
 import React, { useEffect, useState, useTransition } from 'react'
+=======
+import React, { useState, useEffect, useTransition } from 'react'
+>>>>>>> 3eb2b7b19c3a9ca817ab3a23724a342cad879760
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ShieldCheck, 
@@ -35,6 +39,7 @@ import { createClient } from '@/lib/supabase/client'
 import { signInAsTenantOwner } from '@/modules/auth/actions/auth.actions'
 import { Organization } from '@/types/database.types'
 import Link from 'next/link'
+import { signInAsTenantOwner } from '@/modules/auth/actions/auth.actions'
 import {
   calculateAiHppPerGeneration,
   calculateAiRecommendedSellPer1kTokens,
@@ -136,8 +141,13 @@ export default function SaaSAdminPage() {
   const [confirmState, setConfirmState] = useState<{ open: boolean, title: string, message: string, action: () => Promise<void> }>({
     open: false, title: '', message: '', action: async () => {}
   })
+<<<<<<< HEAD
   const [loginAsOrgId, setLoginAsOrgId] = useState<string | null>(null)
   const [isLoginAsPending, startLoginAsTransition] = useTransition()
+=======
+  const [loginAsPending, startLoginAsTransition] = useTransition()
+  const [loginAsOrgId, setLoginAsOrgId] = useState<string | null>(null)
+>>>>>>> 3eb2b7b19c3a9ca817ab3a23724a342cad879760
 
   // State local untuk helper set date di modal org
   const [modalExpireDate, setModalExpireDate] = useState('')
@@ -584,6 +594,27 @@ export default function SaaSAdminPage() {
      return matchesSearch && matchesType && matchesPkg
   })
 
+  const handleLoginAsTenant = (org: Organization) => {
+    const ownerEmail = String((org as any).owner_email || '').trim()
+    const confirmText = ownerEmail
+      ? `Sesi admin saat ini akan diganti dengan sesi tenant ${org.name} (${ownerEmail}). Lanjutkan login as owner?`
+      : `Sesi admin saat ini akan diganti dengan sesi tenant ${org.name}. Lanjutkan login as owner?`
+
+    if (!window.confirm(confirmText)) {
+      return
+    }
+
+    setLoginAsOrgId(org.id)
+    startLoginAsTransition(async () => {
+      const result = await signInAsTenantOwner(org.id)
+
+      if (result?.error) {
+        alert(result.error)
+        setLoginAsOrgId(null)
+      }
+    })
+  }
+
   return (
     <div className="p-8 pb-32 max-w-[1600px] mx-auto space-y-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -947,11 +978,24 @@ export default function SaaSAdminPage() {
                             <div className="flex justify-end gap-2">
                               <button
                                 onClick={() => handleLoginAsTenant(org)}
+<<<<<<< HEAD
                                 disabled={isLoginAsPending}
                                 title="Login sebagai tenant"
                                 className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 {isLoginAsPending && loginAsOrgId === org.id ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
+=======
+                                disabled={loginAsPending}
+                                title="Login sebagai owner tenant ini"
+                                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-black uppercase tracking-wide text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60"
+                              >
+                                {loginAsPending && loginAsOrgId === org.id ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  <LogIn size={14} />
+                                )}
+                                <span>Login As</span>
+>>>>>>> 3eb2b7b19c3a9ca817ab3a23724a342cad879760
                               </button>
                               <button onClick={() => setOrgModal({ open: true, editData: org })} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
                                  <Edit3 size={18} />

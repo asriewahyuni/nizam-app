@@ -89,7 +89,7 @@ export async function getActiveOrg() {
   const isDemoUser = user.email === DEMO_EMAIL || user.user_metadata?.is_demo
   const cookieStore = await cookies()
   const demoOrgId = cookieStore.get('nizam_demo_org_id')?.value
-  const activeOrgCookie = cookieStore.get(ACTIVE_ORG_COOKIE)?.value
+  const activeOrgIdCookie = cookieStore.get(ACTIVE_ORG_COOKIE)?.value
 
   let memberData = null
 
@@ -104,12 +104,12 @@ export async function getActiveOrg() {
     memberData = data
   }
 
-  if (!memberData && activeOrgCookie) {
+  if (!memberData && activeOrgIdCookie) {
     const { data } = await db
       .from('org_members')
-      .select('org_id, role, role_id, organizations(*), roles(permissions)')
+      .select('*, organizations(*), roles(permissions)')
       .eq('user_id', user.id)
-      .eq('org_id', activeOrgCookie)
+      .eq('org_id', activeOrgIdCookie)
       .eq('is_active', true)
       .maybeSingle()
     memberData = data

@@ -21,7 +21,7 @@ export async function getActiveOrgIdAction(): Promise<string | null> {
   const isDemoUser = user.email === DEMO_EMAIL || user.user_metadata?.is_demo
   const cookieStore = await cookies()
   const demoOrgId = cookieStore.get('nizam_demo_org_id')?.value
-  const activeOrgCookie = cookieStore.get(ACTIVE_ORG_COOKIE)?.value
+  const activeOrgIdCookie = cookieStore.get(ACTIVE_ORG_COOKIE)?.value
 
   if (isDemoUser && demoOrgId) {
     // Verify this demo org still exists and belongs to this user
@@ -35,15 +35,14 @@ export async function getActiveOrgIdAction(): Promise<string | null> {
     if (data) return data.org_id
   }
 
-  if (activeOrgCookie) {
+  if (activeOrgIdCookie) {
     const { data } = await db
       .from('org_members')
       .select('org_id')
       .eq('user_id', user.id)
-      .eq('org_id', activeOrgCookie)
+      .eq('org_id', activeOrgIdCookie)
       .eq('is_active', true)
       .maybeSingle()
-
     if (data) return data.org_id
   }
 

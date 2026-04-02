@@ -204,13 +204,13 @@ export function AppSidebar({
   isDemo = false,
   planName = 'Trial'
 }: AppSidebarProps) {
+  const [isSigningOut, startSignOutTransition] = useTransition()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const tabQuery = searchParams?.get('tab')
   const fullPath = pathname + (tabQuery ? `?tab=${tabQuery}` : '')
 
   const [isMobileOpen, setIsMobileOpen] = useState(false)
-  const [isSignOutPending, startSignOutTransition] = useTransition()
 
   useEffect(() => {
     const handleMobileToggle = () => setIsMobileOpen((prev) => !prev)
@@ -234,6 +234,17 @@ export function AppSidebar({
   const navGroups = showSaasOperatorGroup
     ? [...NAV_GROUPS, SAAS_OPERATOR_GROUP]
     : NAV_GROUPS
+
+  const handleClientSignOut = () => {
+    startSignOutTransition(async () => {
+      if (isDemo) {
+        await signOutDemo()
+        return
+      }
+
+      await signOut()
+    })
+  }
 
   const isNavItemActive = (href: string) => {
     if (href === '/dashboard') {
@@ -282,17 +293,6 @@ export function AppSidebar({
 
     window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next.toString())
     window.dispatchEvent(new Event(SIDEBAR_STATE_EVENT))
-  }
-
-  const handleSignOut = () => {
-    startSignOutTransition(async () => {
-      if (isDemo) {
-        await signOutDemo()
-        return
-      }
-
-      await signOut()
-    })
   }
 
   return (
@@ -501,14 +501,14 @@ export function AppSidebar({
             >
               <Settings size={18} strokeWidth={1.5} />
             </Link>
-            <button
+            <button 
               type="button"
-              onClick={handleSignOut}
-              disabled={isSignOutPending}
-              title={isDemo ? 'Keluar & Reset Demo' : 'Keluar'}
-              className={`p-2.5 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed ${isDemo ? 'text-orange-500 hover:text-orange-600 hover:bg-orange-50' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
+              onClick={handleClientSignOut}
+              disabled={isSigningOut}
+              title={isDemo ? "Keluar & Reset Demo" : "Keluar"}
+              className={`p-2.5 rounded-xl transition-all disabled:cursor-wait disabled:opacity-60 ${isDemo ? 'text-orange-500 hover:text-orange-600 hover:bg-orange-50' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
             >
-              <LogOut size={18} strokeWidth={2} />
+              <LogOut size={18} strokeWidth={2} className={isSigningOut ? 'animate-pulse' : ''} />
             </button>
           </div>
         </div>

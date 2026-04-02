@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { getSupabasePublicConfig } from '@/lib/supabase/config'
 import type { Database } from '@/types/database.types'
 
 const AUTH_PAGE_PREFIXES = ['/login', '/register']
@@ -73,10 +74,15 @@ export async function updateSession(request: NextRequest) {
     },
   })
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (isBypassedPath(pathname)) {
+    return supabaseResponse
+  }
 
-  if (!url || !key || isBypassedPath(pathname)) {
+  let publicConfig: ReturnType<typeof getSupabasePublicConfig> | null = null
+
+  try {
+    publicConfig = getSupabasePublicConfig()
+  } catch {
     return supabaseResponse
   }
 
@@ -89,8 +95,8 @@ export async function updateSession(request: NextRequest) {
   }
 
   const supabase = createServerClient<Database>(
-    url,
-    key,
+    publicConfig.url,
+    publicConfig.anonKey,
     {
       cookies: {
         getAll() {

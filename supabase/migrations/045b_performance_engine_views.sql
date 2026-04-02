@@ -46,7 +46,7 @@ SELECT
 FROM accounts a
 LEFT JOIN budgets b ON b.account_id = a.id
 LEFT JOIN actual_monthly am ON am.account_id = a.id AND am.period = b.period
-WHERE (a.type IN ('REVENUE', 'EXPENSE', 'COGS'))
+WHERE (a.type::text IN ('REVENUE', 'EXPENSE', 'COGS'))
 AND (b.budget_amount != 0 OR am.actual_amount != 0);
 
 -- 3. Fix potential gen_random_uuid issue in all new tables

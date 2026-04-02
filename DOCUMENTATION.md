@@ -804,13 +804,19 @@ Environment variable yang benar-benar dipakai di kode:
 
 | Variable | Status | Kegunaan |
 |---|---|---|
+| `NEXT_PUBLIC_SUPABASE_TARGET` | opsional | selector target Supabase. `local` = pakai kredensial lokal, selain itu default ke online |
 | `NEXT_PUBLIC_SUPABASE_URL` | wajib | URL project Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | wajib | anon key frontend/server SSR |
 | `SUPABASE_SERVICE_ROLE_KEY` | opsional tetapi dibutuhkan untuk fitur tertentu | admin client: employee provisioning, reset password, dsb |
+| `NEXT_PUBLIC_SUPABASE_LOCAL_URL` | opsional | URL Supabase CLI lokal saat `NEXT_PUBLIC_SUPABASE_TARGET=local` |
+| `NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY` | opsional | anon key lokal saat `NEXT_PUBLIC_SUPABASE_TARGET=local` |
+| `SUPABASE_LOCAL_SERVICE_ROLE_KEY` | opsional | service role key lokal saat `NEXT_PUBLIC_SUPABASE_TARGET=local` |
 | `GOOGLE_AI_STUDIO_KEY` | opsional | OCR receipt |
 | `RESEND_API_KEY` | opsional | pengiriman email invoice/promo |
 | `NEXT_PUBLIC_SITE_URL` | opsional | redirect URL reset password |
 | `VERCEL_URL` | opsional | fallback origin saat deploy Vercel |
+
+Pemilihan target dibaca terpusat dari `lib/supabase/config.ts`. Selama `NEXT_PUBLIC_SUPABASE_TARGET !== 'local'`, seluruh client/browser/server tetap mengarah ke Supabase online walaupun stack Supabase local sedang hidup.
 
 ## 10. Setup dan Operasional
 
@@ -833,9 +839,29 @@ npm run test:watch
 npm run test:coverage
 npm run test:erp
 npm run test:erp:coverage
+npm run supabase:start
+npm run supabase:stop
+npm run supabase:status
+npm run supabase:db:reset
+npm run supabase:migrate-local-data
 ```
 
-### 10.3 Catatan build
+### 10.3 Mode koneksi Supabase untuk development lokal
+
+- App lokal -> Supabase online:
+  Isi env remote, kosongkan `NEXT_PUBLIC_SUPABASE_TARGET`, lalu restart `npm run dev`.
+- App lokal -> Supabase local:
+  Jalankan `npm run supabase:start`, isi env local dari `npm run supabase:status`, set `NEXT_PUBLIC_SUPABASE_TARGET=local`, lalu restart `npm run dev`.
+- Clone data online -> local:
+  Pertahankan env remote dan local sekaligus, lalu jalankan `npm run supabase:migrate-local-data`.
+
+Catatan:
+
+- Script clone data membutuhkan `SUPABASE_SERVICE_ROLE_KEY` remote dan `SUPABASE_LOCAL_SERVICE_ROLE_KEY` local.
+- Password user hasil clone ke local di-reset menjadi `LocalTest123!`.
+- Pergantian target tidak hot-reload; process Next.js harus di-restart.
+
+### 10.4 Catatan build
 
 `next.config.mjs` saat ini mengaktifkan:
 
