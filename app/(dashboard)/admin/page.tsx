@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState, useTransition } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ShieldCheck, 
@@ -27,10 +27,12 @@ import {
   Database,
   Zap,
   ExternalLink,
-  Coins
+  Coins,
+  LogIn
 } from 'lucide-react'
 import { PageHeader, SectionCard, SectionHeader, SafeButton, StatusBadge, ConfirmDialog } from '@/components/ui/NizamUI'
 import { createClient } from '@/lib/supabase/client'
+import { signInAsTenantOwner } from '@/modules/auth/actions/auth.actions'
 import { Organization } from '@/types/database.types'
 import Link from 'next/link'
 import {
@@ -134,6 +136,8 @@ export default function SaaSAdminPage() {
   const [confirmState, setConfirmState] = useState<{ open: boolean, title: string, message: string, action: () => Promise<void> }>({
     open: false, title: '', message: '', action: async () => {}
   })
+  const [loginAsOrgId, setLoginAsOrgId] = useState<string | null>(null)
+  const [isLoginAsPending, startLoginAsTransition] = useTransition()
 
   // State local untuk helper set date di modal org
   const [modalExpireDate, setModalExpireDate] = useState('')
@@ -558,6 +562,21 @@ export default function SaaSAdminPage() {
      })
   }
 
+  const handleLoginAsTenant = (org: Organization) => {
+    if (!window.confirm(`Masuk sebagai tenant "${org.name}"? Sesi admin saat ini akan disimpan sementara.`)) {
+      return
+    }
+
+    setLoginAsOrgId(org.id)
+    startLoginAsTransition(async () => {
+      const result = await signInAsTenantOwner(org.id)
+      if (result?.error) {
+        alert(result.error)
+        setLoginAsOrgId(null)
+      }
+    })
+  }
+
   const filteredOrgs = orgs.filter(o => {
      const matchesSearch = o.name.toLowerCase().includes(searchTxt.toLowerCase()) || (o as any).owner_email?.toLowerCase().includes(searchTxt.toLowerCase())
      const matchesType = typeFilter === 'all' ? true : (typeFilter === 'demo' ? (o as any).is_demo : !(o as any).is_demo)
@@ -926,6 +945,14 @@ export default function SaaSAdminPage() {
                           </td>
                           <td className="py-4 px-6 text-right">
                             <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => handleLoginAsTenant(org)}
+                                disabled={isLoginAsPending}
+                                title="Login sebagai tenant"
+                                className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {isLoginAsPending && loginAsOrgId === org.id ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
+                              </button>
                               <button onClick={() => setOrgModal({ open: true, editData: org })} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
                                  <Edit3 size={18} />
                               </button>

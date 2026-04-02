@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -9,7 +10,6 @@ import {
   CreditCard,
   Download,
   Printer,
-  ShieldCheck,
 } from 'lucide-react'
 import type { OperatorDocumentSnapshot } from '@/modules/saas/actions/operator-sales.actions'
 
@@ -413,8 +413,20 @@ export default function SaasDocumentView({
           <header className="bg-slate-950 px-6 py-8 text-white md:px-10">
             <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
               <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-100">
-                  <ShieldCheck size={12} /> NIZAM ERP
+                <div className="inline-flex items-center gap-3">
+                  <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl bg-white/95 shadow-lg shadow-black/20 ring-1 ring-white/10">
+                    <Image
+                      src="/logo.png"
+                      alt=""
+                      width={40}
+                      height={40}
+                      className="h-full w-full object-cover scale-[1.22]"
+                    />
+                  </span>
+                  <span className="flex flex-col leading-none">
+                    <span className="text-lg font-black uppercase tracking-tight text-white">NIZAM</span>
+                    <span className="mt-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-300">Cloud ERP</span>
+                  </span>
                 </div>
                 <div>
                   <p className="text-sm font-bold uppercase tracking-[0.35em] text-slate-300">Dokumen Komersial</p>

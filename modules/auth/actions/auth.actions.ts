@@ -1,8 +1,50 @@
 'use server'
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+
+const ACTIVE_ORG_COOKIE = 'nizam_active_org_id'
+const ADMIN_IMPERSONATION_COOKIE = 'nizam_admin_impersonation'
+const ADMIN_IMPERSONATION_MAX_AGE = 60 * 60 * 4
+
+type AdminImpersonationPayload = {
+  accessToken: string
+  refreshToken: string
+  email: string
+  activeOrgId: string | null
+}
+
+function encodeAdminImpersonation(payload: AdminImpersonationPayload) {
+  return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
+}
+
+function decodeAdminImpersonation(raw?: string | null): AdminImpersonationPayload | null {
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as Partial<AdminImpersonationPayload>
+
+    if (
+      typeof parsed.accessToken !== 'string' ||
+      typeof parsed.refreshToken !== 'string' ||
+      typeof parsed.email !== 'string'
+    ) {
+      return null
+    }
+
+    return {
+      accessToken: parsed.accessToken,
+      refreshToken: parsed.refreshToken,
+      email: parsed.email,
+      activeOrgId: typeof parsed.activeOrgId === 'string' ? parsed.activeOrgId : null,
+    }
+  } catch {
+    return null
+  }
+}
 
 // ─────────────────────────────────────────────────────────────
 // signUp — Create a new Business Owner account
@@ -260,6 +302,9 @@ export async function signInWithNik(formData: FormData) {
 // REST REMAINING (signOut, verifyEmployeeNikByToken, etc.)
 export async function signOut() {
   const supabase = await createClient()
+  const cookieStore = await cookies()
+  cookieStore.delete(ACTIVE_ORG_COOKIE)
+  cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
   await supabase.auth.signOut()
   revalidatePath('/', 'layout')
   redirect('/login')
@@ -270,6 +315,177 @@ export async function getSession() {
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) return null
   return user
+}
+
+export async function getAdminImpersonationState() {
+  const cookieStore = await cookies()
+  const payload = decodeAdminImpersonation(cookieStore.get(ADMIN_IMPERSONATION_COOKIE)?.value)
+
+  if (!payload) return null
+
+  return {
+    email: payload.email,
+    activeOrgId: payload.activeOrgId,
+  }
+}
+
+export async function signInAsTenantOwner(orgId: string) {
+  const supabase = await createClient()
+  const adminClient = await createAdminClient()
+  const cookieStore = await cookies()
+  const trimmedOrgId = orgId.trim()
+
+  if (!trimmedOrgId) {
+    return { error: 'Tenant tidak valid.' }
+  }
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+  const adminSession = sessionData.session
+  const adminUser = adminSession?.user
+  const adminEmail = adminUser?.email?.toLowerCase().trim() || ''
+
+  if (sessionError || !adminSession?.access_token || !adminSession.refresh_token || !adminUser) {
+    return { error: 'Sesi admin tidak ditemukan. Silakan login ulang.' }
+  }
+
+  if (!isPlatformAdminEmail(adminEmail)) {
+    return { error: 'Akses ditolak. Hanya platform admin yang bisa login sebagai tenant.' }
+  }
+
+  const { data: org, error: orgError } = await (adminClient as any)
+    .from('organizations')
+    .select('id, name, owner_email')
+    .eq('id', trimmedOrgId)
+    .maybeSingle()
+
+  if (orgError) {
+    return { error: `Gagal memuat tenant: ${orgError.message}` }
+  }
+
+  if (!org) {
+    return { error: 'Tenant tidak ditemukan.' }
+  }
+
+  const { data: ownerMembership, error: ownerMembershipError } = await (adminClient as any)
+    .from('org_members')
+    .select('user_id')
+    .eq('org_id', trimmedOrgId)
+    .eq('role', 'owner')
+    .eq('is_active', true)
+    .order('joined_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (ownerMembershipError) {
+    return { error: `Gagal memuat owner tenant: ${ownerMembershipError.message}` }
+  }
+
+  let tenantEmail = (org.owner_email || '').trim().toLowerCase()
+
+  if (ownerMembership?.user_id) {
+    const { data: ownerUserData, error: ownerUserError } = await adminClient.auth.admin.getUserById(ownerMembership.user_id)
+    if (ownerUserError) {
+      return { error: `Gagal membaca akun owner tenant: ${ownerUserError.message}` }
+    }
+    if (ownerUserData.user?.email) {
+      tenantEmail = ownerUserData.user.email.trim().toLowerCase()
+    }
+  }
+
+  if (!tenantEmail) {
+    return { error: 'Tenant belum memiliki akun owner yang dapat dipakai untuk Login As.' }
+  }
+
+  cookieStore.set(
+    ADMIN_IMPERSONATION_COOKIE,
+    encodeAdminImpersonation({
+      accessToken: adminSession.access_token,
+      refreshToken: adminSession.refresh_token,
+      email: adminEmail,
+      activeOrgId: cookieStore.get(ACTIVE_ORG_COOKIE)?.value || null,
+    }),
+    {
+      maxAge: ADMIN_IMPERSONATION_MAX_AGE,
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    }
+  )
+
+  const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+    type: 'magiclink',
+    email: tenantEmail,
+  })
+
+  if (linkError) {
+    cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
+    return { error: `Gagal membuat magic link tenant: ${linkError.message}` }
+  }
+
+  const tokenHash = linkData.properties?.hashed_token
+  if (!tokenHash) {
+    cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
+    return { error: 'Magic link tenant tidak memiliki token yang bisa diverifikasi.' }
+  }
+
+  const { error: verifyError } = await supabase.auth.verifyOtp({
+    type: 'magiclink',
+    token_hash: tokenHash,
+  })
+
+  if (verifyError) {
+    cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
+    return { error: `Gagal mengganti sesi ke tenant: ${verifyError.message}` }
+  }
+
+  cookieStore.delete('nizam_demo_org_id')
+  cookieStore.set(ACTIVE_ORG_COOKIE, org.id, {
+    maxAge: ADMIN_IMPERSONATION_MAX_AGE,
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  })
+
+  revalidatePath('/', 'layout')
+  redirect('/dashboard')
+}
+
+export async function restorePlatformAdminSession() {
+  const supabase = await createClient()
+  const cookieStore = await cookies()
+  const payload = decodeAdminImpersonation(cookieStore.get(ADMIN_IMPERSONATION_COOKIE)?.value)
+
+  if (!payload) {
+    return { error: 'Sesi admin cadangan tidak ditemukan atau sudah kadaluarsa.' }
+  }
+
+  const { error } = await supabase.auth.setSession({
+    access_token: payload.accessToken,
+    refresh_token: payload.refreshToken,
+  })
+
+  if (error) {
+    return { error: `Gagal memulihkan sesi admin: ${error.message}` }
+  }
+
+  cookieStore.delete('nizam_demo_org_id')
+  if (payload.activeOrgId) {
+    cookieStore.set(ACTIVE_ORG_COOKIE, payload.activeOrgId, {
+      maxAge: ADMIN_IMPERSONATION_MAX_AGE,
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    })
+  } else {
+    cookieStore.delete(ACTIVE_ORG_COOKIE)
+  }
+  cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
+
+  revalidatePath('/', 'layout')
+  redirect('/admin')
 }
 
 export async function verifyEmployeeNikByToken(token: string, nik: string) {

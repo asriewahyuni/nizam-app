@@ -1,6 +1,6 @@
 'use client'
 
-import { useSyncExternalStore, useState, useEffect } from 'react'
+import { useEffect, useState, useSyncExternalStore, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useSearchParams } from 'next/navigation'
@@ -210,6 +210,7 @@ export function AppSidebar({
   const fullPath = pathname + (tabQuery ? `?tab=${tabQuery}` : '')
 
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const [isSignOutPending, startSignOutTransition] = useTransition()
 
   useEffect(() => {
     const handleMobileToggle = () => setIsMobileOpen((prev) => !prev)
@@ -281,6 +282,17 @@ export function AppSidebar({
 
     window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next.toString())
     window.dispatchEvent(new Event(SIDEBAR_STATE_EVENT))
+  }
+
+  const handleSignOut = () => {
+    startSignOutTransition(async () => {
+      if (isDemo) {
+        await signOutDemo()
+        return
+      }
+
+      await signOut()
+    })
   }
 
   return (
@@ -489,15 +501,15 @@ export function AppSidebar({
             >
               <Settings size={18} strokeWidth={1.5} />
             </Link>
-            <form action={isDemo ? signOutDemo : signOut}>
-              <button 
-                type="submit" 
-                title={isDemo ? "Keluar & Reset Demo" : "Keluar"}
-                className={`p-2.5 rounded-xl transition-all ${isDemo ? 'text-orange-500 hover:text-orange-600 hover:bg-orange-50' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
-              >
-                <LogOut size={18} strokeWidth={2} />
-              </button>
-            </form>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={isSignOutPending}
+              title={isDemo ? 'Keluar & Reset Demo' : 'Keluar'}
+              className={`p-2.5 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed ${isDemo ? 'text-orange-500 hover:text-orange-600 hover:bg-orange-50' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
+            >
+              <LogOut size={18} strokeWidth={2} />
+            </button>
           </div>
         </div>
       {isCollapsed && (

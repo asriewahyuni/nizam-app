@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import { getSession } from '@/modules/auth/actions/auth.actions'
+import { getAdminImpersonationState, getSession } from '@/modules/auth/actions/auth.actions'
 import { getActiveOrg, getBranches } from '@/modules/organization/actions/org.actions'
 import { getPendingApprovalsCount } from '@/modules/organization/actions/approval.actions'
 import { getUnpostedJournalsCount } from '@/modules/accounting/actions/journal.actions'
@@ -12,6 +12,7 @@ import { getAiTokenHeaderSummary } from '@/modules/ai/lib/ai-token.server'
 import { saasModuleMatches } from '@/lib/saas/module-catalog'
 import { AppSidebar } from '@/components/shared/AppSidebar'
 import { AppHeader } from '@/components/shared/AppHeader'
+import { AdminImpersonationBanner } from '@/components/shared/AdminImpersonationBanner'
 import { DemoBanner } from '@/components/shared/DemoBanner'
 import { StartupWizard } from '@/components/shared/StartupWizard'
 import { FloatingPlanBadge } from '@/components/shared/FloatingPlanBadge'
@@ -49,6 +50,7 @@ export default async function DashboardLayout({
 
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
+  const adminImpersonation = await getAdminImpersonationState()
 
   const dependencyResults = await Promise.allSettled([
     getPendingApprovalsCount(orgData.org.id),
@@ -157,6 +159,12 @@ export default async function DashboardLayout({
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden print:overflow-visible">
+        {adminImpersonation && (
+          <AdminImpersonationBanner
+            adminEmail={adminImpersonation.email}
+            orgName={orgData.org.name}
+          />
+        )}
         {isDemo && <DemoBanner />}
         <AppHeader
           user={{
