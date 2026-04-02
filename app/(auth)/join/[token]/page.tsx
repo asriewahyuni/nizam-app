@@ -57,7 +57,7 @@ export default function JoinByTokenPage({
         }
 
         if (res?.success) {
-          router.push(res.redirectTo || '/dashboard')
+          router.push(('redirectTo' in res && res.redirectTo) ? res.redirectTo : '/dashboard')
           return
         }
 

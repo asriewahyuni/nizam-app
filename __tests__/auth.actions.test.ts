@@ -27,7 +27,9 @@ vi.mock('next/navigation', () => ({
 
 import {
   getSession,
+  requestPasswordReset,
   restorePlatformAdminSession,
+  signInWithNik,
   signInAsTenantOwner,
   signOut,
   signUp,
@@ -117,6 +119,7 @@ describe('Auth Actions', () => {
     const signOutMock = vi.fn().mockResolvedValue({})
     const cookieStore = createCookieStore({
       nizam_active_org_id: 'org-1',
+      nizam_active_branch_id: 'branch-1',
       nizam_admin_impersonation: 'backup-token',
     })
 
@@ -130,10 +133,130 @@ describe('Auth Actions', () => {
     await signOut()
 
     expect(cookieStore.delete).toHaveBeenCalledWith('nizam_active_org_id')
+    expect(cookieStore.delete).toHaveBeenCalledWith('nizam_active_branch_id')
     expect(cookieStore.delete).toHaveBeenCalledWith('nizam_admin_impersonation')
     expect(signOutMock).toHaveBeenCalledOnce()
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/', 'layout')
     expect(mocks.redirect).toHaveBeenCalledWith('/login')
+  })
+
+  it('signs in employee by NIK using a shared auth user and keeps active org preference', async () => {
+    const cookieStore = createCookieStore({
+      nizam_active_org_id: 'org-b',
+      nizam_active_branch_id: 'branch-old',
+    })
+    const signInWithPasswordMock = vi.fn().mockResolvedValue({ error: null })
+
+    mocks.cookies.mockResolvedValue(cookieStore)
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        signInWithPassword: signInWithPasswordMock,
+      },
+    })
+
+    const employeesQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({
+        data: [
+          { id: 'emp-a', org_id: 'org-a', user_id: 'user-shared', created_at: '2025-01-01T00:00:00Z' },
+          { id: 'emp-b', org_id: 'org-b', user_id: 'user-shared', created_at: '2025-02-01T00:00:00Z' },
+        ],
+        error: null,
+      }),
+    }
+
+    const getUserByIdMock = vi.fn().mockResolvedValue({
+      data: {
+        user: {
+          id: 'user-shared',
+          email: 'shared.staff@example.com',
+        },
+      },
+      error: null,
+    })
+
+    mocks.createAdminClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'employees') return employeesQuery
+        throw new Error(`Unexpected table ${table}`)
+      }),
+      auth: {
+        admin: {
+          getUserById: getUserByIdMock,
+        },
+      },
+    })
+
+    const formData = new FormData()
+    formData.set('nik', 'K-0001')
+    formData.set('password', 'secret123')
+    formData.set('redirectTo', '/purchasing')
+
+    await signInWithNik(formData)
+
+    expect(getUserByIdMock).toHaveBeenCalledWith('user-shared')
+    expect(signInWithPasswordMock).toHaveBeenCalledWith({
+      email: 'shared.staff@example.com',
+      password: 'secret123',
+    })
+    expect(cookieStore.set).toHaveBeenCalledWith(
+      'nizam_active_org_id',
+      'org-b',
+      expect.objectContaining({
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+      })
+    )
+    expect(cookieStore.delete).toHaveBeenCalledWith('nizam_demo_org_id')
+    expect(cookieStore.delete).toHaveBeenCalledWith('nizam_active_branch_id')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/', 'layout')
+    expect(mocks.redirect).toHaveBeenCalledWith('/purchasing')
+  })
+
+  it('marks every employee row tied to the same auth user when requesting password reset', async () => {
+    const listQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({
+        data: [
+          { id: 'emp-a', first_name: 'Rina', user_id: 'user-shared' },
+          { id: 'emp-b', first_name: 'Rina', user_id: 'user-shared' },
+        ],
+        error: null,
+      }),
+    }
+
+    const updateQuery = {
+      update: vi.fn().mockReturnThis(),
+      in: vi.fn().mockResolvedValue({
+        data: null,
+        error: null,
+      }),
+    }
+
+    mocks.createAdminClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table !== 'employees') throw new Error(`Unexpected table ${table}`)
+        return {
+          ...listQuery,
+          update: updateQuery.update,
+          in: updateQuery.in,
+        }
+      }),
+    })
+
+    const result = await requestPasswordReset('K-0001')
+
+    expect(updateQuery.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reset_requested: true,
+      })
+    )
+    expect(updateQuery.in).toHaveBeenCalledWith('id', ['emp-a', 'emp-b'])
+    expect(result).toEqual({ success: true, name: 'Rina' })
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/hris')
   })
 
   it('rejects sign in as tenant when current user is not a platform admin', async () => {
@@ -166,6 +289,7 @@ describe('Auth Actions', () => {
   it('backs up admin session, switches to tenant session, and redirects to dashboard', async () => {
     const cookieStore = createCookieStore({
       nizam_active_org_id: 'admin-org-1',
+      nizam_active_branch_id: 'admin-branch-1',
     })
     const verifyOtpMock = vi.fn().mockResolvedValue({ error: null })
 
@@ -281,6 +405,7 @@ describe('Auth Actions', () => {
       })
     )
     expect(cookieStore.delete).toHaveBeenCalledWith('nizam_demo_org_id')
+    expect(cookieStore.delete).toHaveBeenCalledWith('nizam_active_branch_id')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/', 'layout')
     expect(mocks.redirect).toHaveBeenCalledWith('/dashboard')
   })
@@ -296,6 +421,7 @@ describe('Auth Actions', () => {
     const cookieStore = createCookieStore({
       nizam_admin_impersonation: payload,
       nizam_active_org_id: 'tenant-org-1',
+      nizam_active_branch_id: 'tenant-branch-1',
     })
 
     mocks.cookies.mockResolvedValue(cookieStore)
@@ -314,6 +440,7 @@ describe('Auth Actions', () => {
       refresh_token: 'admin-refresh',
     })
     expect(cookieStore.delete).toHaveBeenCalledWith('nizam_demo_org_id')
+    expect(cookieStore.delete).toHaveBeenCalledWith('nizam_active_branch_id')
     expect(cookieStore.set).toHaveBeenCalledWith(
       'nizam_active_org_id',
       'admin-org-1',

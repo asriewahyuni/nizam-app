@@ -5,10 +5,11 @@ import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { ACTIVE_BRANCH_COOKIE, ACTIVE_ORG_COOKIE } from '@/modules/organization/lib/org-context'
 
-const ACTIVE_ORG_COOKIE = 'nizam_active_org_id'
 const ADMIN_IMPERSONATION_COOKIE = 'nizam_admin_impersonation'
 const ADMIN_IMPERSONATION_MAX_AGE = 60 * 60 * 4
+const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 
 type AdminImpersonationPayload = {
   accessToken: string
@@ -44,6 +45,221 @@ function decodeAdminImpersonation(raw?: string | null): AdminImpersonationPayloa
   } catch {
     return null
   }
+}
+
+function getActiveContextCookieOptions() {
+  return {
+    maxAge: ACTIVE_CONTEXT_COOKIE_MAX_AGE,
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure: process.env.NODE_ENV === 'production',
+  }
+}
+
+function setActiveOrganizationCookie(cookieStore: Awaited<ReturnType<typeof cookies>>, orgId: string) {
+  cookieStore.delete('nizam_demo_org_id')
+  cookieStore.set(ACTIVE_ORG_COOKIE, orgId, getActiveContextCookieOptions())
+  cookieStore.delete(ACTIVE_BRANCH_COOKIE)
+}
+
+function buildInternalStaffEmail(orgId: string, nik: string) {
+  const orgPrefix = orgId.replace(/-/g, '').toLowerCase().slice(0, 8)
+  const nikSlug = nik.toLowerCase().replace(/[^a-z0-9]/g, '-')
+  return `${nikSlug}@${orgPrefix}.staff.nizam`
+}
+
+function normalizeEmail(value: unknown) {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toLowerCase()
+  return normalized || null
+}
+
+type StaffLoginCandidate = {
+  userId: string
+  orgIds: string[]
+  preferredOrgId: string
+  authEmailFallback: string | null
+}
+
+async function resolveRoleIdForEmployee(adminClient: Awaited<ReturnType<typeof createAdminClient>>, inviteRoleId: string | null | undefined, emp: any) {
+  if (inviteRoleId) return inviteRoleId
+
+  const { data: allRoles } = await (adminClient as any)
+    .from('roles')
+    .select('id, name')
+    .eq('org_id', emp.org_id)
+
+  const matchingRole = allRoles?.find((role: any) =>
+    role.name.toLowerCase().trim() === emp.job_title?.toLowerCase().trim()
+  )
+
+  return matchingRole?.id || null
+}
+
+async function linkEmployeeToUser(
+  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
+  emp: any,
+  userId: string,
+  roleId: string | null,
+) {
+  const { error: updateErr } = await (adminClient as any)
+    .from('employees')
+    .update({
+      user_id: userId,
+      employment_status: emp.employment_status || 'PROBATION',
+      registration_status: 'REGISTERED',
+    })
+    .eq('id', emp.id)
+
+  if (updateErr) {
+    return { error: 'Gagal menautkan user ke data karyawan.' }
+  }
+
+  const { error: memberErr } = await (adminClient as any)
+    .from('org_members')
+    .upsert({
+      org_id: emp.org_id,
+      user_id: userId,
+      role: 'staff',
+      role_id: roleId,
+      is_active: true,
+    }, { onConflict: 'org_id,user_id' })
+
+  if (memberErr) {
+    return { error: 'Gagal mendaftarkan keanggotaan organisasi.' }
+  }
+
+  return { success: true as const }
+}
+
+async function trackInvitationUsage(adminClient: Awaited<ReturnType<typeof createAdminClient>>, invite: any) {
+  const nextUseCount = Number(invite.use_count || 0) + 1
+  const maxUses = Number(invite.max_uses || 0)
+  const shouldDeactivate = maxUses > 0 && nextUseCount >= maxUses
+
+  await (adminClient as any)
+    .from('org_invitations')
+    .update({
+      use_count: nextUseCount,
+      ...(shouldDeactivate ? { is_active: false } : {}),
+    })
+    .eq('id', invite.id)
+}
+
+async function getAuthEmailByUserId(
+  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
+  userId: string,
+  fallbackEmail?: string | null,
+) {
+  const { data, error } = await adminClient.auth.admin.getUserById(userId)
+  if (error) return fallbackEmail || null
+  return data.user?.email?.trim().toLowerCase() || fallbackEmail || null
+}
+
+function buildStaffLoginCandidates(employees: any[], nik: string, activeOrgId: string | null) {
+  const candidates = new Map<string, StaffLoginCandidate>()
+
+  for (const employee of employees) {
+    if (!employee?.user_id || !employee?.org_id) continue
+
+    const existing = candidates.get(employee.user_id)
+    if (existing) {
+      if (!existing.orgIds.includes(employee.org_id)) {
+        existing.orgIds.push(employee.org_id)
+      }
+
+      if (activeOrgId && existing.orgIds.includes(activeOrgId)) {
+        existing.preferredOrgId = activeOrgId
+      }
+
+      if (!existing.authEmailFallback) {
+        existing.authEmailFallback = buildInternalStaffEmail(employee.org_id, nik)
+      }
+
+      continue
+    }
+
+    candidates.set(employee.user_id, {
+      userId: employee.user_id,
+      orgIds: [employee.org_id],
+      preferredOrgId: activeOrgId === employee.org_id ? activeOrgId : employee.org_id,
+      authEmailFallback: buildInternalStaffEmail(employee.org_id, nik),
+    })
+  }
+
+  return Array.from(candidates.values()).sort((left, right) => {
+    const leftPreferred = activeOrgId ? left.orgIds.includes(activeOrgId) : false
+    const rightPreferred = activeOrgId ? right.orgIds.includes(activeOrgId) : false
+
+    if (leftPreferred === rightPreferred) return 0
+    return leftPreferred ? -1 : 1
+  })
+}
+
+async function resolveExistingStaffIdentity(
+  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
+  publicClient: Awaited<ReturnType<typeof createClient>>,
+  emp: any,
+  nik: string,
+  password: string,
+) {
+  const { data: { user: currentUser } } = await publicClient.auth.getUser()
+  const normalizedEmail = normalizeEmail(emp.email)
+
+  if (currentUser?.id && currentUser.user_metadata?.login_type === 'employee') {
+    const currentNik = typeof currentUser.user_metadata?.nik === 'string'
+      ? currentUser.user_metadata.nik.trim().toUpperCase()
+      : null
+
+    if (currentNik === nik) {
+      return { userId: currentUser.id, authEmail: currentUser.email?.trim().toLowerCase() || null }
+    }
+
+    if (normalizedEmail) {
+      const { data: linkedSelf } = await (adminClient as any)
+        .from('employees')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .ilike('email', normalizedEmail)
+        .limit(1)
+        .maybeSingle()
+
+      if (linkedSelf) {
+        return { userId: currentUser.id, authEmail: currentUser.email?.trim().toLowerCase() || null }
+      }
+    }
+  }
+
+  if (!normalizedEmail) return null
+
+  const { data: existingEmployee } = await (adminClient as any)
+    .from('employees')
+    .select('user_id')
+    .neq('id', emp.id)
+    .ilike('email', normalizedEmail)
+    .not('user_id', 'is', null)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (!existingEmployee?.user_id) return null
+
+  const authEmail = await getAuthEmailByUserId(adminClient, existingEmployee.user_id)
+  if (!authEmail) {
+    return { error: 'Akun karyawan terdeteksi di organisasi lain, tetapi email login tidak ditemukan. Hubungi admin.' }
+  }
+
+  const { error: loginError } = await publicClient.auth.signInWithPassword({
+    email: authEmail,
+    password,
+  })
+
+  if (loginError) {
+    return { error: 'Akun Anda sudah terhubung ke organisasi lain. Login dulu memakai akun yang sudah aktif, lalu buka kembali link undangan ini.' }
+  }
+
+  return { userId: existingEmployee.user_id, authEmail }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -110,6 +326,7 @@ export async function signIn(formData: FormData) {
 export async function registerEmployeeAccount(formData: FormData) {
   const adminClient = await createAdminClient()
   const publicClient = await createClient()
+  const cookieStore = await cookies()
 
   const nik = (formData.get('nik') as string)?.trim().toUpperCase()
   const password = (formData.get('password') as string)
@@ -150,87 +367,53 @@ export async function registerEmployeeAccount(formData: FormData) {
   if (!emp) return { error: 'NIK tidak valid atau tidak ditemukan di organisasi ini.' }
   if (emp.user_id) return { error: 'NIK ini sudah memiliki akun aktif. Silakan Login.' }
 
-  // 3. Generate Internal Email
-  const orgPrefix = (emp.org_id as string).replace(/-/g, '').toLowerCase().slice(0, 8)
-  const nikSlug = nik.toLowerCase().replace(/[^a-z0-9]/g, '-')
-  const internalEmail = `${nikSlug}@${orgPrefix}.staff.nizam`
+  // 3. Map role
+  const roleId = await resolveRoleIdForEmployee(adminClient, invite?.role_id, emp)
 
-  // 4. Create Auth User via ADMIN to bypass SMTP/Confirmation hurdles for internal staff
+  // 4. Reuse an already-linked staff identity when possible.
+  const existingIdentity = await resolveExistingStaffIdentity(adminClient, publicClient, emp, nik, password)
+  if (existingIdentity && 'error' in existingIdentity) {
+    return { error: existingIdentity.error }
+  }
+
+  if (existingIdentity?.userId) {
+    const linkResult = await linkEmployeeToUser(adminClient, emp, existingIdentity.userId, roleId)
+    if ('error' in linkResult) return linkResult
+
+    await trackInvitationUsage(adminClient, invite)
+    setActiveOrganizationCookie(cookieStore, emp.org_id)
+
+    revalidatePath('/', 'layout')
+    return { success: true, redirectTo: '/dashboard' }
+  }
+
+  // 5. Generate internal email and create new auth user for fresh staff registration.
+  const internalEmail = buildInternalStaffEmail(emp.org_id, nik)
   const { data: authData, error: authErr } = await adminClient.auth.admin.createUser({
     email: internalEmail,
     password,
-    email_confirm: true, // AUTO-CONFIRM for staff
-    user_metadata: { 
+    email_confirm: true,
+    user_metadata: {
       full_name: `${emp.first_name} ${emp.last_name}`,
       nik,
-      login_type: 'employee'
-    }
+      login_type: 'employee',
+      employee_email: normalizeEmail(emp.email),
+    },
   })
 
   if (authErr) {
-     return { error: authErr.message || 'Gagal membuat akun autentikasi.' }
+    return { error: authErr.message || 'Gagal membuat akun autentikasi.' }
   }
 
   const userId = authData.user?.id
   if (!userId) return { error: 'Gagal membuat user ID.' }
 
-  // 5. Update Employee Record
-  const { error: updateErr } = await (adminClient as any)
-    .from('employees')
-    .update({ 
-      user_id: userId,
-      employment_status: emp.employment_status || 'PROBATION',
-      registration_status: 'REGISTERED',
-    })
-    .eq('id', emp.id)
+  const linkResult = await linkEmployeeToUser(adminClient, emp, userId, roleId)
+  if ('error' in linkResult) return linkResult
 
-  if (updateErr) return { error: 'Gagal menautkan user ke data karyawan.' }
-
-  // 6. Map Role
-  let roleId = invite?.role_id
-  if (!roleId) {
-     const { data: allRoles } = await (adminClient as any)
-       .from('roles')
-       .select('id, name')
-       .eq('org_id', emp.org_id)
-  
-     const matchingRole = allRoles?.find((r: any) => 
-       r.name.toLowerCase().trim() === emp.job_title?.toLowerCase().trim()
-     )
-     roleId = matchingRole?.id || null
-  }
-
-  // 7. Insert Organization Membership
-  const { error: memberErr } = await (adminClient as any)
-    .from('org_members')
-    .upsert({
-      org_id: emp.org_id,
-      user_id: userId,
-      role: 'staff',
-      role_id: roleId,
-      is_active: true
-    }, { onConflict: 'org_id,user_id' })
-
-  if (memberErr) return { error: 'Gagal mendaftarkan keanggotaan organisasi.' }
-
-  // 8. Track Usage
-  if (invite) {
-     const nextUseCount = Number(invite.use_count || 0) + 1
-     const maxUses = Number(invite.max_uses || 0)
-     const shouldDeactivate = maxUses > 0 && nextUseCount >= maxUses
-     await (adminClient as any)
-       .from('org_invitations')
-       .update({
-         use_count: nextUseCount,
-         ...(shouldDeactivate ? { is_active: false } : {})
-       })
-       .eq('id', invite.id)
-  }
+  await trackInvitationUsage(adminClient, invite)
 
   // 9. Now Log in the user on the client side
-  // Since we used admin.createUser, they are NOT logged in yet.
-  // We'll perform a silent login or redirect to login.
-  // BUT for better UX, we'll login them now.
   const { error: loginErr } = await publicClient.auth.signInWithPassword({ 
     email: internalEmail, 
     password 
@@ -240,6 +423,7 @@ export async function registerEmployeeAccount(formData: FormData) {
      return { error: 'Akun berhasil dibuat, tapi login otomatis gagal. Silakan login manual pakai NIK & password baru.' }
   }
 
+  setActiveOrganizationCookie(cookieStore, emp.org_id)
   revalidatePath('/', 'layout')
   return { success: true, redirectTo: '/dashboard' }
 }
@@ -250,53 +434,56 @@ export async function registerEmployeeAccount(formData: FormData) {
 export async function signInWithNik(formData: FormData) {
   const adminClient = await createAdminClient()
   const publicClient = await createClient()
+  const cookieStore = await cookies()
 
   let nik = (formData.get('nik') as string)?.trim()
   const password = (formData.get('password') as string)
   const redirectTo = (formData.get('redirectTo') as string)
 
   if (!nik || !password) {
-     redirect(`/login?error=${encodeURIComponent('NIK dan Password wajib diisi.')}&tab=karyawan`)
+     return redirect(`/login?error=${encodeURIComponent('NIK dan Password wajib diisi.')}&tab=karyawan`)
   }
 
   nik = nik.toUpperCase()
+  const activeOrgIdPreference = cookieStore.get(ACTIVE_ORG_COOKIE)?.value?.trim() || null
 
-  const { data: emp, error: empErr } = await (adminClient as any)
+  const { data: employees, error: empErr } = await (adminClient as any)
     .from('employees')
-    .select('org_id, user_id')
+    .select('id, org_id, user_id, created_at')
     .eq('nik', nik)
-    .limit(1)
-    .maybeSingle()
+    .order('created_at', { ascending: true })
 
-  if (empErr && empErr.code === 'PGRST116') {
-     redirect(`/login?error=${encodeURIComponent('Terdeteksi duplikasi NIK di database. Harap hubungi Admin.')}&tab=karyawan`)
-  }
   if (empErr) {
-     redirect(`/login?error=${encodeURIComponent(`Database Error: ${empErr.message}`)}&tab=karyawan`)
-  }
-  if (!emp) {
-    redirect(`/login?error=${encodeURIComponent('NIK tidak ditemukan.')}&tab=karyawan`)
+     return redirect(`/login?error=${encodeURIComponent(`Database Error: ${empErr.message}`)}&tab=karyawan`)
   }
 
-  if (!emp.user_id) {
-    redirect(`/login?error=${encodeURIComponent('Akun belum diaktivasi. Silakan pendaftaran terlebih dahulu.')}&tab=karyawan`)
+  const matchingEmployees = Array.isArray(employees) ? employees : []
+  if (matchingEmployees.length === 0) {
+    return redirect(`/login?error=${encodeURIComponent('NIK tidak ditemukan.')}&tab=karyawan`)
   }
 
-  const orgPrefix = (emp.org_id as string).replace(/-/g, '').toLowerCase().slice(0, 8)
-  const nikSlug = nik.toLowerCase().replace(/[^a-z0-9]/g, '-')
-  const internalEmail = `${nikSlug}@${orgPrefix}.staff.nizam`
-
-  const { error } = await publicClient.auth.signInWithPassword({ 
-     email: internalEmail, 
-     password 
-  })
-
-  if (error) {
-    redirect(`/login?error=${encodeURIComponent('NIK atau password salah.')}&tab=karyawan`)
+  const loginCandidates = buildStaffLoginCandidates(matchingEmployees, nik, activeOrgIdPreference)
+  if (loginCandidates.length === 0) {
+    return redirect(`/login?error=${encodeURIComponent('Akun belum diaktivasi. Silakan pendaftaran terlebih dahulu.')}&tab=karyawan`)
   }
 
-  revalidatePath('/', 'layout')
-  redirect(redirectTo || '/dashboard')
+  for (const candidate of loginCandidates) {
+    const authEmail = await getAuthEmailByUserId(adminClient, candidate.userId, candidate.authEmailFallback)
+    if (!authEmail) continue
+
+    const { error } = await publicClient.auth.signInWithPassword({
+      email: authEmail,
+      password,
+    })
+
+    if (!error) {
+      setActiveOrganizationCookie(cookieStore, candidate.preferredOrgId)
+      revalidatePath('/', 'layout')
+      return redirect(redirectTo || '/dashboard')
+    }
+  }
+
+  return redirect(`/login?error=${encodeURIComponent('NIK atau password salah.')}&tab=karyawan`)
 }
 
 // REST REMAINING (signOut, verifyEmployeeNikByToken, etc.)
@@ -304,6 +491,7 @@ export async function signOut() {
   const supabase = await createClient()
   const cookieStore = await cookies()
   cookieStore.delete(ACTIVE_ORG_COOKIE)
+  cookieStore.delete(ACTIVE_BRANCH_COOKIE)
   cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
   await supabase.auth.signOut()
   revalidatePath('/', 'layout')
@@ -447,6 +635,7 @@ export async function signInAsTenantOwner(orgId: string) {
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
   })
+  cookieStore.delete(ACTIVE_BRANCH_COOKIE)
 
   revalidatePath('/', 'layout')
   redirect('/dashboard')
@@ -482,6 +671,7 @@ export async function restorePlatformAdminSession() {
   } else {
     cookieStore.delete(ACTIVE_ORG_COOKIE)
   }
+  cookieStore.delete(ACTIVE_BRANCH_COOKIE)
   cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
 
   revalidatePath('/', 'layout')
@@ -558,28 +748,64 @@ export async function verifyEmployeeNikByToken(token: string, nik: string) {
 export async function requestPasswordReset(nik: string) {
   const adminClient = await createAdminClient()
   const formattedNik = nik.trim().toUpperCase()
-  
-  const { data: emp, error } = await (adminClient as any)
+
+  const { data: employees, error } = await (adminClient as any)
     .from('employees')
-    .update({ 
+    .select('id, first_name, user_id')
+    .eq('nik', formattedNik)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+     return { error: `Database Error: ${error.message}` }
+  }
+
+  const matchingEmployees = Array.isArray(employees) ? employees : []
+  if (matchingEmployees.length === 0) {
+    return { error: 'Gagal mengajukan reset. Pastikan NIK terdaftar atau periksa huruf/angkanya.' }
+  }
+
+  const linkedUserIds = Array.from(
+    new Set(
+      matchingEmployees
+        .map((employee: any) => employee.user_id)
+        .filter((value: unknown): value is string => typeof value === 'string' && value.length > 0)
+    )
+  )
+
+  if (linkedUserIds.length > 1) {
+    return { error: 'NIK ini terhubung ke lebih dari satu akun. Hubungi admin organisasi Anda untuk reset password.' }
+  }
+
+  if (linkedUserIds.length === 0 && matchingEmployees.length > 1) {
+    return { error: 'NIK ini terdaftar di lebih dari satu organisasi tetapi belum terhubung ke satu akun. Hubungi admin untuk aktivasi atau reset password.' }
+  }
+
+  const targetEmployees = linkedUserIds.length === 1
+    ? matchingEmployees.filter((employee: any) => employee.user_id === linkedUserIds[0])
+    : matchingEmployees.slice(0, 1)
+
+  const employeeIds = targetEmployees
+    .map((employee: any) => employee.id)
+    .filter((value: unknown): value is string => typeof value === 'string' && value.length > 0)
+
+  if (employeeIds.length === 0) {
+    return { error: 'Gagal mengajukan reset password. Hubungi admin organisasi Anda.' }
+  }
+
+  const { error: updateError } = await (adminClient as any)
+    .from('employees')
+    .update({
       reset_requested: true,
       reset_requested_at: new Date().toISOString()
     })
-    .eq('nik', formattedNik)
-    .select('id, first_name')
-    .limit(1)
-    .maybeSingle()
+    .in('id', employeeIds)
 
-  if (error && error.code !== 'PGRST116') {
-     return { error: `Database Error: ${error.message}` }
+  if (updateError) {
+     return { error: `Database Error: ${updateError.message}` }
   }
-  if (!emp && error?.code === 'PGRST116') {
-     return { error: 'Terdeteksi Duplikat NIK di Database. Hubungi Administrator System.' }
-  }
-  if (!emp) return { error: 'Gagal mengajukan reset. Pastikan NIK terdaftar atau periksa huruf/angkanya.' }
-  
+
   revalidatePath('/hris')
-  return { success: true, name: emp.first_name }
+  return { success: true, name: targetEmployees[0]?.first_name || 'Karyawan' }
 }
 
 export async function resetEmployeePassword(employeeId: string, newPassword: string) {

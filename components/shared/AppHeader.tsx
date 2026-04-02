@@ -2,36 +2,82 @@
 
 import { getInitials } from '@/lib/utils'
 import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles } from 'lucide-react'
-import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import type { Organization } from '@/types/database.types'
 import type { AiTokenHeaderSummary } from '@/modules/ai/lib/ai-token'
+import type {
+  AccessibleOrganization,
+  BranchSummary,
+} from '@/modules/organization/lib/org-context'
+import {
+  setActiveBranch,
+  setActiveOrg,
+} from '@/modules/organization/actions/org.actions'
 
 interface AppHeaderProps {
   user: { fullName?: string; email: string }
   jobTitle?: string
   org: Organization
-  branches: any[]
+  organizations: AccessibleOrganization[]
+  activeOrgId: string
+  branches: BranchSummary[]
+  activeBranchId: string | null
   pendingApprovals?: number
   cashFlow?: any
   aiTokens?: AiTokenHeaderSummary | null
 }
 
-export function AppHeader({ user, jobTitle, org, branches, pendingApprovals = 0, cashFlow, aiTokens }: AppHeaderProps) {
-  const searchParams = useSearchParams()
+const ACTIVE_ORG_CHANGE_EVENT = 'nizam_active_org_change'
+const ACTIVE_BRANCH_CHANGE_EVENT = 'nizam_active_branch_change'
+
+export function AppHeader({
+  user,
+  jobTitle,
+  org,
+  organizations,
+  activeOrgId,
+  branches,
+  activeBranchId,
+  pendingApprovals = 0,
+  cashFlow,
+  aiTokens,
+}: AppHeaderProps) {
   const router = useRouter()
-  const pathname = usePathname()
+  const [isSwitchingContext, startContextTransition] = useTransition()
   const [isTokenPopupOpen, setIsTokenPopupOpen] = useState(false)
   const tokenPopupRef = useRef<HTMLDivElement | null>(null)
 
-  const activeBranchId = searchParams?.get('branchId') || branches[0]?.id || null
-  const activeBranch = branches.find(b => b.id === activeBranchId) || branches[0]
+  const activeBranch = branches.find((branch) => branch.id === activeBranchId) || null
 
-  const handleBranchChange = (branchId: string) => {
-    const params = new URLSearchParams(searchParams?.toString() || '')
-    params.set('branchId', branchId)
-    router.push(`${pathname}?${params.toString()}`)
+  const handleOrgChange = (orgId: string) => {
+    if (orgId === activeOrgId) return
+
+    startContextTransition(async () => {
+      const result = await setActiveOrg(orgId)
+      if ((result as any)?.error) {
+        alert((result as any).error)
+        return
+      }
+
+      window.dispatchEvent(new CustomEvent(ACTIVE_ORG_CHANGE_EVENT, { detail: { orgId } }))
+      window.dispatchEvent(new CustomEvent(ACTIVE_BRANCH_CHANGE_EVENT, { detail: { orgId, branchId: null } }))
+      router.refresh()
+    })
+  }
+
+  const handleBranchChange = (branchId: string | null) => {
+    startContextTransition(async () => {
+      const result = await setActiveBranch(activeOrgId, branchId)
+      if ((result as any)?.error) {
+        alert((result as any).error)
+        return
+      }
+
+      window.dispatchEvent(new CustomEvent(ACTIVE_BRANCH_CHANGE_EVENT, { detail: { orgId: activeOrgId, branchId } }))
+      router.refresh()
+    })
   }
 
   const initials = getInitials(user.fullName || user.email)
@@ -71,29 +117,59 @@ export function AppHeader({ user, jobTitle, org, branches, pendingApprovals = 0,
         </button>
 
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl shadow-sm">
-            <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[#003366] shrink-0 shadow-sm">
-              <Building2 size={14} />
+          <div className="relative group">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl shadow-sm cursor-default">
+              <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[#003366] shrink-0 shadow-sm">
+                <Building2 size={14} />
+              </div>
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter leading-none mb-0.5">Organisasi Aktif</span>
+                <span className="text-xs font-black text-slate-900 leading-none truncate max-w-[140px]">{org.name}</span>
+              </div>
+              {organizations.length > 1 && <ChevronDown size={12} className="text-slate-400 ml-1" />}
             </div>
-            <div className="flex flex-col">
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter leading-none mb-0.5">Organisasi</span>
-              <span className="text-xs font-black text-slate-900 leading-none truncate max-w-[120px]">{org.name}</span>
-            </div>
+
+            {organizations.length > 1 && (
+              <div className="absolute top-full left-0 mt-2 w-72 bg-white border border-slate-100 rounded-2xl shadow-2xl p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                <div className="space-y-1 mt-1">
+                  {organizations.map((membership) => (
+                    <button
+                      key={membership.orgId}
+                      type="button"
+                      disabled={isSwitchingContext}
+                      onClick={() => handleOrgChange(membership.orgId)}
+                      className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-left transition disabled:cursor-wait disabled:opacity-60 ${
+                        activeOrgId === membership.orgId ? 'bg-slate-900 text-white' : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="text-xs font-black truncate">{membership.org.name}</div>
+                        <div className={`text-[9px] font-black uppercase tracking-[0.18em] ${activeOrgId === membership.orgId ? 'text-slate-300' : 'text-slate-400'}`}>
+                          {membership.role}
+                        </div>
+                      </div>
+                      {activeOrgId === membership.orgId && (
+                        <span className="text-[9px] font-black uppercase tracking-[0.18em]">Aktif</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="h-6 w-px bg-slate-100 hidden sm:block" />
 
           {/* Branch Switcher */}
           <div className="relative group">
-            <div 
-              onClick={() => handleBranchChange(branches[0]?.id)} 
-              className="flex items-center gap-2 px-3 py-1.5 bg-[#003366]/5/50 border border-[#003366]/10 rounded-xl hover:bg-[#003366]/5 transition-all cursor-pointer shadow-sm"
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 bg-[#003366]/5/50 border border-[#003366]/10 rounded-xl hover:bg-[#003366]/5 transition-all cursor-default shadow-sm"
             >
               <MapPin size={14} className="text-[#003366] shrink-0" />
               <div className="flex flex-col overflow-hidden">
                 <span className="text-[9px] text-[#003366]/60 font-bold uppercase tracking-tighter leading-none mb-0.5">Unit Terpilih</span>
                 <span className="text-xs font-black text-blue-900 leading-none truncate max-w-[150px]">
-                  {activeBranch?.name || 'Pilih Unit'}
+                  {activeBranch?.name || 'Semua Unit'}
                 </span>
               </div>
               <ChevronDown size={12} className="text-[#003366]/60 ml-1" />
@@ -101,11 +177,21 @@ export function AppHeader({ user, jobTitle, org, branches, pendingApprovals = 0,
 
             <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-2xl p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
               <div className="space-y-1 mt-1">
+                <button
+                  type="button"
+                  disabled={isSwitchingContext}
+                  onClick={() => handleBranchChange(null)}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition disabled:cursor-wait disabled:opacity-60 ${activeBranchId === null ? 'bg-[#003366] text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                >
+                  <span className="text-xs font-bold truncate">Semua Unit</span>
+                </button>
                 {branches.map(branch => (
-                  <button 
-                    key={branch.id} 
+                  <button
+                    key={branch.id}
+                    type="button"
+                    disabled={isSwitchingContext}
                     onClick={() => handleBranchChange(branch.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl ${activeBranchId === branch.id ? 'bg-[#003366] text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition disabled:cursor-wait disabled:opacity-60 ${activeBranchId === branch.id ? 'bg-[#003366] text-white' : 'hover:bg-slate-50 text-slate-700'}`}
                   >
                     <span className="text-xs font-bold truncate">{branch.name}</span>
                   </button>

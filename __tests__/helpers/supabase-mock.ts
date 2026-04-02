@@ -6,8 +6,8 @@ type QueryOutcome<T> = {
 }
 
 type QueryScript<T> = {
-  result?: QueryOutcome<T[]>
-  singleResult?: QueryOutcome<T>
+  result?: QueryOutcome<T[] | null>
+  singleResult?: QueryOutcome<T | null>
   maybeSingleResult?: QueryOutcome<T | null>
 }
 
@@ -123,7 +123,7 @@ export function createSupabaseMock(config: MockConfig = {}) {
         operations.push({ method: 'maybeSingle', args: [] })
         return Promise.resolve(script.maybeSingleResult || success(null))
       },
-      then(onFulfilled?: (value: QueryOutcome<unknown[]>) => unknown, onRejected?: (reason: unknown) => unknown) {
+      then(onFulfilled?: (value: QueryOutcome<unknown[] | null>) => unknown, onRejected?: (reason: unknown) => unknown) {
         return Promise.resolve(script.result || success([])).then(onFulfilled, onRejected)
       }
     }

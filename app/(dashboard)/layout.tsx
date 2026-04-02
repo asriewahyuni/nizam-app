@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getAdminImpersonationState, getSession } from '@/modules/auth/actions/auth.actions'
-import { getActiveOrg, getBranches } from '@/modules/organization/actions/org.actions'
+import { getActiveBranch, getActiveOrg, getBranches, getMyOrganizations } from '@/modules/organization/actions/org.actions'
 import { getPendingApprovalsCount } from '@/modules/organization/actions/approval.actions'
 import { getUnpostedJournalsCount } from '@/modules/accounting/actions/journal.actions'
 import { getPendingPurchaseRequestsCount } from '@/modules/purchasing/actions/purchasing.actions'
@@ -59,6 +59,8 @@ export default async function DashboardLayout({
     getResetRequestsCount(orgData.org.id),
     getCashFlow(orgData.org.id),
     getBranches(orgData.org.id),
+    getMyOrganizations(),
+    getActiveBranch(orgData.org.id),
     isDemoSession(),
     getAiTokenHeaderSummary(orgData.org.id),
   ])
@@ -68,8 +70,10 @@ export default async function DashboardLayout({
   const resetRequests = resolveDashboardDependency('HR reset requests', dependencyResults[3], 0)
   const cashFlow = resolveDashboardDependency('cash flow summary', dependencyResults[4], null)
   const branches = resolveDashboardDependency('branches', dependencyResults[5], [])
-  const isDemo = resolveDashboardDependency('demo session state', dependencyResults[6], false)
-  const aiTokens = resolveDashboardDependency('AI token summary', dependencyResults[7], null)
+  const organizations = resolveDashboardDependency('accessible organizations', dependencyResults[6], [])
+  const activeBranch = resolveDashboardDependency('active branch', dependencyResults[7], null)
+  const isDemo = resolveDashboardDependency('demo session state', dependencyResults[8], false)
+  const aiTokens = resolveDashboardDependency('AI token summary', dependencyResults[9], null)
 
   // ─────────────────────────────────────────────────────────────
   // 3. SAAS MODULE & RBAC GUARD (Protect direct URL access)
@@ -173,7 +177,10 @@ export default async function DashboardLayout({
           }}
           jobTitle={orgData.jobTitle}
           org={orgData.org}
+          organizations={organizations}
+          activeOrgId={orgData.org.id}
           branches={branches || []}
+          activeBranchId={activeBranch?.id || null}
           pendingApprovals={pendingApprovals}
           cashFlow={cashFlow}
           aiTokens={aiTokens}

@@ -2,9 +2,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
+import { ACTIVE_BRANCH_COOKIE, ACTIVE_ORG_COOKIE } from '@/modules/organization/lib/org-context'
 
 const DEMO_EMAIL = 'demo@nizam.app'
-const ACTIVE_ORG_COOKIE = 'nizam_active_org_id'
 
 /**
  * Server action: returns the active org_id for the current user.
@@ -54,7 +54,36 @@ export async function getActiveOrgIdAction(): Promise<string | null> {
     .eq('is_active', true)
     .order('joined_at', { ascending: true })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   return data?.org_id ?? null
+}
+
+/**
+ * Server action: returns the verified active branch_id for the provided org.
+ * Returns null when "Semua Unit" is selected or when the cookie no longer matches
+ * an active branch in the current organization.
+ */
+export async function getActiveBranchIdAction(orgId: string): Promise<string | null> {
+  const trimmedOrgId = orgId.trim()
+  if (!trimmedOrgId) return null
+
+  const supabase = await createClient()
+  const db = supabase as any
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const cookieStore = await cookies()
+  const activeBranchIdCookie = cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value
+  if (!activeBranchIdCookie) return null
+
+  const { data } = await db
+    .from('branches')
+    .select('id')
+    .eq('id', activeBranchIdCookie)
+    .eq('org_id', trimmedOrgId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  return data?.id ?? null
 }
