@@ -86,7 +86,21 @@ async function resolveActiveMembership(
   return memberData
 }
 
-export async function createOrganization(formData: FormData) {
+type CreateOrganizationSuccess = {
+  success: true
+  orgId: string
+  branchId: string
+}
+
+type CreateOrganizationFailure = {
+  error: string
+}
+
+type CreateOrganizationActionResult = CreateOrganizationSuccess | CreateOrganizationFailure
+
+async function createOrganizationRecord(
+  formData: FormData
+): Promise<CreateOrganizationActionResult> {
   const supabase = await createClient()
   const db = supabase as any
   const cookieStore = await cookies()
@@ -174,8 +188,28 @@ export async function createOrganization(formData: FormData) {
   cookieStore.set(ACTIVE_ORG_COOKIE, orgId, getActiveContextCookieOptions())
   cookieStore.set(ACTIVE_BRANCH_COOKIE, defaultBranchId, getActiveContextCookieOptions())
 
+  return {
+    success: true,
+    orgId,
+    branchId: defaultBranchId,
+  }
+}
+
+export async function createOrganization(formData: FormData) {
+  const result = await createOrganizationRecord(formData)
+  if ('error' in result) return result
+
   revalidatePath('/dashboard')
   return redirect('/dashboard')
+}
+
+export async function createOrganizationQuick(formData: FormData) {
+  const result = await createOrganizationRecord(formData)
+  if ('error' in result) return result
+
+  revalidatePath('/', 'layout')
+  revalidatePath('/dashboard')
+  return result
 }
 
 export async function getActiveOrg() {

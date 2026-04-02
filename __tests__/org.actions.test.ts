@@ -40,7 +40,7 @@ vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   canAccessAllBranchesForOrg: vi.fn(),
 }))
 
-import { createBranch, createOrganization, getActiveBranch } from '@/modules/organization/actions/org.actions'
+import { createBranch, createOrganization, createOrganizationQuick, getActiveBranch } from '@/modules/organization/actions/org.actions'
 import { getActiveBranchIdAction } from '@/modules/organization/actions/org-id.actions'
 
 function createCookieStore(initial: Record<string, string> = {}) {
@@ -168,6 +168,64 @@ describe('Organization Branch Bootstrap', () => {
       })
     )
     expect(mocks.redirect).toHaveBeenCalledWith('/dashboard')
+
+    randomUuidMock.mockRestore()
+  })
+
+  it('creates a new organization without redirect for quick switching from header', async () => {
+    const cookieStore = createCookieStore()
+    mocks.cookies.mockResolvedValue(cookieStore)
+
+    const orgInsert = vi.fn().mockResolvedValue({ error: null })
+    const memberInsert = vi.fn().mockResolvedValue({ error: null })
+    const branchInsert = vi.fn().mockResolvedValue({ error: null })
+
+    const randomUuidMock = vi.spyOn(globalThis.crypto, 'randomUUID')
+    randomUuidMock
+      .mockReturnValueOnce('org-2')
+      .mockReturnValueOnce('branch-2')
+
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1', email: 'owner@example.com' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'organizations') return { insert: orgInsert, delete: vi.fn(() => ({ eq: vi.fn() })) }
+        if (table === 'org_members') return { insert: memberInsert }
+        if (table === 'branches') return { insert: branchInsert }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const formData = new FormData()
+    formData.set('name', 'PT Header Baru')
+
+    const result = await createOrganizationQuick(formData)
+
+    expect(result).toEqual({
+      success: true,
+      orgId: 'org-2',
+      branchId: 'branch-2',
+    })
+    expect(cookieStore.set).toHaveBeenCalledWith(
+      'nizam_active_org_id',
+      'org-2',
+      expect.objectContaining({
+        path: '/',
+        httpOnly: true,
+      })
+    )
+    expect(cookieStore.set).toHaveBeenCalledWith(
+      'nizam_active_branch_id',
+      'branch-2',
+      expect.objectContaining({
+        path: '/',
+        httpOnly: true,
+      })
+    )
+    expect(mocks.redirect).not.toHaveBeenCalled()
 
     randomUuidMock.mockRestore()
   })

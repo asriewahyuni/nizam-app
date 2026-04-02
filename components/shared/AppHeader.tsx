@@ -13,6 +13,7 @@ import type {
 } from '@/modules/organization/lib/org-context'
 import {
   createBranch,
+  createOrganizationQuick,
   setActiveBranch,
   setActiveOrg,
 } from '@/modules/organization/actions/org.actions'
@@ -51,12 +52,17 @@ export function AppHeader({
 }: AppHeaderProps) {
   const router = useRouter()
   const [isSwitchingContext, startContextTransition] = useTransition()
+  const [isCreatingOrg, startCreateOrgTransition] = useTransition()
   const [isCreatingBranch, startCreateBranchTransition] = useTransition()
   const [isTokenPopupOpen, setIsTokenPopupOpen] = useState(false)
+  const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false)
+  const [isQuickCreateOrgOpen, setIsQuickCreateOrgOpen] = useState(false)
+  const [orgFeedback, setOrgFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false)
   const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false)
   const [branchFeedback, setBranchFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const tokenPopupRef = useRef<HTMLDivElement | null>(null)
+  const orgMenuRef = useRef<HTMLDivElement | null>(null)
   const branchMenuRef = useRef<HTMLDivElement | null>(null)
 
   const activeBranch = branches.find((branch) => branch.id === activeBranchId) || null
@@ -71,8 +77,44 @@ export function AppHeader({
         return
       }
 
+      setOrgFeedback(null)
+      setIsQuickCreateOrgOpen(false)
+      setIsOrgMenuOpen(false)
       window.dispatchEvent(new CustomEvent(ACTIVE_ORG_CHANGE_EVENT, { detail: { orgId } }))
       window.dispatchEvent(new CustomEvent(ACTIVE_BRANCH_CHANGE_EVENT, { detail: { orgId, branchId: null } }))
+      router.refresh()
+    })
+  }
+
+  const handleCreateOrganization = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const form = event.currentTarget
+    const formData = new FormData(form)
+    setOrgFeedback(null)
+
+    startCreateOrgTransition(async () => {
+      const result = await createOrganizationQuick(formData)
+      if ((result as any)?.error) {
+        setOrgFeedback({ type: 'error', message: (result as any).error })
+        return
+      }
+
+      const createdOrgId = (result as any)?.orgId || null
+      const createdBranchId = (result as any)?.branchId || null
+      if (createdOrgId) {
+        window.dispatchEvent(new CustomEvent(ACTIVE_ORG_CHANGE_EVENT, { detail: { orgId: createdOrgId } }))
+        window.dispatchEvent(
+          new CustomEvent(ACTIVE_BRANCH_CHANGE_EVENT, {
+            detail: { orgId: createdOrgId, branchId: createdBranchId },
+          })
+        )
+      }
+
+      setOrgFeedback({ type: 'success', message: 'Organisasi baru dibuat dan langsung dijadikan konteks aktif.' })
+      setIsQuickCreateOrgOpen(false)
+      setIsOrgMenuOpen(false)
+      form.reset()
       router.refresh()
     })
   }
@@ -151,6 +193,22 @@ export function AppHeader({
   }, [isTokenPopupOpen])
 
   useEffect(() => {
+    if (!isOrgMenuOpen) return
+
+    const onClickOutside = (event: MouseEvent) => {
+      const targetNode = event.target as Node
+      if (!orgMenuRef.current?.contains(targetNode)) {
+        setIsOrgMenuOpen(false)
+        setIsQuickCreateOrgOpen(false)
+        setOrgFeedback(null)
+      }
+    }
+
+    window.addEventListener('mousedown', onClickOutside)
+    return () => window.removeEventListener('mousedown', onClickOutside)
+  }, [isOrgMenuOpen])
+
+  useEffect(() => {
     if (!isBranchMenuOpen) return
 
     const onClickOutside = (event: MouseEvent) => {
@@ -174,6 +232,7 @@ export function AppHeader({
         ? 'Mode agregat read-only'
         : 'Tidak ada unit aktif'
       : 'Transaksi butuh unit aktif'
+  const activeOrganization = organizations.find((membership) => membership.orgId === activeOrgId) || null
 
   return (
     <header className="h-16 flex items-center justify-between px-4 md:px-8 border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-30 print:hidden">
@@ -186,28 +245,47 @@ export function AppHeader({
         </button>
 
         <div className="flex items-center gap-4">
-          <div className="relative group">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl shadow-sm cursor-default">
+          <div ref={orgMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setOrgFeedback(null)
+                setIsQuickCreateOrgOpen(false)
+                setIsOrgMenuOpen((prev) => !prev)
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl shadow-sm hover:bg-slate-100/70 transition-all"
+            >
               <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[#003366] shrink-0 shadow-sm">
                 <Building2 size={14} />
               </div>
               <div className="flex flex-col overflow-hidden">
                 <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter leading-none mb-0.5">Organisasi Aktif</span>
                 <span className="text-xs font-black text-slate-900 leading-none truncate max-w-[140px]">{org.name}</span>
+                <span className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 mt-1 leading-none">
+                  {activeOrganization?.role || 'member'}
+                </span>
               </div>
-              {organizations.length > 1 && <ChevronDown size={12} className="text-slate-400 ml-1" />}
-            </div>
+              <ChevronDown size={12} className={`text-slate-400 ml-1 transition-transform ${isOrgMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-            {organizations.length > 1 && (
-              <div className="absolute top-full left-0 mt-2 w-72 bg-white border border-slate-100 rounded-2xl shadow-2xl p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                <div className="space-y-1 mt-1">
+            {isOrgMenuOpen && (
+              <div className="absolute top-full left-0 mt-2 w-[340px] bg-white border border-slate-100 rounded-3xl shadow-2xl p-3 z-50">
+                <div className="px-2 pt-1 pb-3 border-b border-slate-100">
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Konteks Organisasi</div>
+                  <div className="mt-1 text-sm font-black text-slate-900">{org.name}</div>
+                  <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">
+                    Pilih organisasi aktif sebelum memilih unit kerja. Setiap organisasi punya konteks unit, data, dan paketnya sendiri.
+                  </p>
+                </div>
+
+                <div className="space-y-1 mt-3">
                   {organizations.map((membership) => (
                     <button
                       key={membership.orgId}
                       type="button"
-                      disabled={isSwitchingContext}
+                      disabled={isSwitchingContext || isCreatingOrg}
                       onClick={() => handleOrgChange(membership.orgId)}
-                      className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-left transition disabled:cursor-wait disabled:opacity-60 ${
+                      className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl text-left transition disabled:cursor-wait disabled:opacity-60 ${
                         activeOrgId === membership.orgId ? 'bg-slate-900 text-white' : 'hover:bg-slate-50 text-slate-700'
                       }`}
                     >
@@ -218,10 +296,53 @@ export function AppHeader({
                         </div>
                       </div>
                       {activeOrgId === membership.orgId && (
-                        <span className="text-[9px] font-black uppercase tracking-[0.18em]">Aktif</span>
+                        <CheckCircle2 size={14} />
                       )}
                     </button>
                   ))}
+                </div>
+
+                {orgFeedback && (
+                  <div className={`mt-3 flex items-start gap-2 rounded-2xl border px-3 py-2.5 text-[11px] font-bold ${
+                    orgFeedback.type === 'success'
+                      ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                      : 'border-rose-100 bg-rose-50 text-rose-700'
+                  }`}>
+                    {orgFeedback.type === 'success' ? <CheckCircle2 size={14} className="shrink-0 mt-0.5" /> : <AlertCircle size={14} className="shrink-0 mt-0.5" />}
+                    <span>{orgFeedback.message}</span>
+                  </div>
+                )}
+
+                <div className="mt-3 border-t border-slate-100 pt-3 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOrgFeedback(null)
+                      setIsQuickCreateOrgOpen((prev) => !prev)
+                    }}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50 transition-all"
+                  >
+                    <Plus size={14} />
+                    Tambah Org
+                  </button>
+
+                  {isQuickCreateOrgOpen && (
+                    <form onSubmit={handleCreateOrganization} className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <input
+                        name="name"
+                        required
+                        placeholder="Nama organisasi"
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-slate-900"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isCreatingOrg || isSwitchingContext}
+                        className="w-full rounded-2xl bg-slate-900 px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.16em] text-white hover:bg-[#003366] transition-all disabled:cursor-wait disabled:opacity-60"
+                      >
+                        {isCreatingOrg ? 'Membuat Org...' : 'Buat Dan Aktifkan'}
+                      </button>
+                    </form>
+                  )}
                 </div>
               </div>
             )}
