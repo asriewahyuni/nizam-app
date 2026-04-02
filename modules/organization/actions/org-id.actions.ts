@@ -75,15 +75,26 @@ export async function getActiveBranchIdAction(orgId: string): Promise<string | n
 
   const cookieStore = await cookies()
   const activeBranchIdCookie = cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value
-  if (!activeBranchIdCookie) return null
+  if (activeBranchIdCookie) {
+    const { data } = await db
+      .from('branches')
+      .select('id')
+      .eq('id', activeBranchIdCookie)
+      .eq('org_id', trimmedOrgId)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (data?.id) return data.id
+  }
 
   const { data } = await db
     .from('branches')
     .select('id')
-    .eq('id', activeBranchIdCookie)
     .eq('org_id', trimmedOrgId)
     .eq('is_active', true)
-    .maybeSingle()
+    .order('name', { ascending: true })
+    .limit(2)
 
-  return data?.id ?? null
+  if (!Array.isArray(data) || data.length !== 1) return null
+  return data[0]?.id ?? null
 }

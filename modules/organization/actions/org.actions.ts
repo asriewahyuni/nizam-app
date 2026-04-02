@@ -17,6 +17,8 @@ import { applyVoucher } from './billing.actions'
 
 const DEMO_EMAIL = 'demo@nizam.app'
 const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
+const DEFAULT_BRANCH_NAME = 'Unit Utama'
+const DEFAULT_BRANCH_CODE = 'MAIN'
 
 function getActiveContextCookieOptions() {
   return {
@@ -80,6 +82,22 @@ async function resolveActiveMembership(
   return memberData
 }
 
+async function getSingleActiveBranch(db: any, orgId: string): Promise<BranchSummary | null> {
+  const { data, error } = await db
+    .from('branches')
+    .select('id, org_id, name, code, address, is_active')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .order('name', { ascending: true })
+    .limit(2)
+
+  if (error || !Array.isArray(data) || data.length !== 1) {
+    return null
+  }
+
+  return (data[0] as BranchSummary) ?? null
+}
+
 export async function createOrganization(formData: FormData) {
   const supabase = await createClient()
   const db = supabase as any
@@ -91,6 +109,7 @@ export async function createOrganization(formData: FormData) {
   if (!name) return { error: 'Nama organisasi wajib diisi' }
   const slug = generateSlug(name)
   const orgId = crypto.randomUUID()
+  const defaultBranchId = crypto.randomUUID()
 
   // POPULATE OWNER EMAIL FROM SESSION
   const ownerEmail = user.email
@@ -125,7 +144,26 @@ export async function createOrganization(formData: FormData) {
     .from('org_members')
     .insert({ org_id: orgId, user_id: user.id, role: 'owner' })
 
-  if (memberError) return { error: 'Gagal menambahkan anggota.' }
+  if (memberError) {
+    await db.from('organizations').delete().eq('id', orgId)
+    return { error: 'Gagal menambahkan anggota.' }
+  }
+
+  const { error: branchError } = await db
+    .from('branches')
+    .insert({
+      id: defaultBranchId,
+      org_id: orgId,
+      name: DEFAULT_BRANCH_NAME,
+      code: DEFAULT_BRANCH_CODE,
+      address: null,
+      is_active: true,
+    })
+
+  if (branchError) {
+    await db.from('organizations').delete().eq('id', orgId)
+    return { error: 'Gagal menyiapkan unit default organisasi.' }
+  }
 
   // IF DEMO, SEED DATA
   if (isDemo) {
@@ -146,7 +184,7 @@ export async function createOrganization(formData: FormData) {
   }
 
   cookieStore.set(ACTIVE_ORG_COOKIE, orgId, getActiveContextCookieOptions())
-  cookieStore.delete(ACTIVE_BRANCH_COOKIE)
+  cookieStore.set(ACTIVE_BRANCH_COOKIE, defaultBranchId, getActiveContextCookieOptions())
 
   revalidatePath('/dashboard')
   return redirect('/dashboard')
@@ -371,17 +409,21 @@ export async function getActiveBranch(orgId: string): Promise<BranchSummary | nu
 
   const cookieStore = await cookies()
   const activeBranchIdCookie = cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value
-  if (!activeBranchIdCookie) return null
+  if (activeBranchIdCookie) {
+    const { data } = await db
+      .from('branches')
+      .select('id, org_id, name, code, address, is_active')
+      .eq('id', activeBranchIdCookie)
+      .eq('org_id', orgId)
+      .eq('is_active', true)
+      .maybeSingle()
 
-  const { data } = await db
-    .from('branches')
-    .select('id, org_id, name, code, address, is_active')
-    .eq('id', activeBranchIdCookie)
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .maybeSingle()
+    if (data) {
+      return data as BranchSummary
+    }
+  }
 
-  return (data as BranchSummary | null) ?? null
+  return getSingleActiveBranch(db, orgId)
 }
 
 export async function setActiveBranch(orgId: string, branchId: string | null) {
