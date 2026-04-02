@@ -34,8 +34,6 @@ CREATE OR REPLACE FUNCTION public.process_purchase_atomic(
   p_lines JSONB,
   p_user_id UUID
 ) RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
 AS $$
 DECLARE
     v_purchase_id UUID;
@@ -77,24 +75,4 @@ EXCEPTION WHEN OTHERS THEN
     -- Postgres secara otomatis ROLLBACK semua aksi di atas jika ada error
     RETURN jsonb_build_object('success', FALSE, 'error', SQLERRM);
 END;
-$$;
-
--- 3. UX GUARDRAIL: Mencegah penghapusan transaksi yang sudah ada jurnalnya (Ghost Protection)
-CREATE OR REPLACE FUNCTION public.check_transaction_protection()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- Jika ada jurnal dengan reference_id ini yang sudah POSTED, blokir delete.
-    IF EXISTS (SELECT 1 FROM public.journal_entries WHERE reference_id = OLD.id AND status = 'POSTED') THEN
-        RAISE EXCEPTION 'TRANSAKSI TERKUNCI: Transaksi ini sudah memiliki jurnal yang sah. Batalkan jurnal terlebih dahulu.';
-    END IF;
-    RETURN OLD;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_protect_purchase_delete
-    BEFORE DELETE ON public.purchases
-    FOR EACH ROW EXECUTE FUNCTION check_transaction_protection();
-
-CREATE TRIGGER trg_protect_sales_delete
-    BEFORE DELETE ON public.sales
-    FOR EACH ROW EXECUTE FUNCTION check_transaction_protection();
+$$ LANGUAGE plpgsql SECURITY DEFINER;

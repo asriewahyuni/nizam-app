@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { getSupabaseAdminConfig, getSupabasePublicConfig } from '@/lib/supabase/config'
 import type { Database } from '@/types/database.types'
 
 /**
@@ -10,16 +11,11 @@ import type { Database } from '@/types/database.types'
  */
 export async function createClient() {
   const cookieStore = await cookies()
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY')
-  }
+  const { url, anonKey } = getSupabasePublicConfig()
 
   return createServerClient<Database>(
     url,
-    key,
+    anonKey,
     {
       db: { schema: 'public' },
       cookies: {
@@ -39,17 +35,13 @@ export async function createClient() {
     }
   )
 }
-export async function createAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!url || !key) {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
-  }
+export async function createAdminClient() {
+  const { url, serviceRoleKey } = getSupabaseAdminConfig()
 
   return createServerClient<Database>(
     url,
-    key,
+    serviceRoleKey,
     {
       db: { schema: 'public' },
       cookies: {

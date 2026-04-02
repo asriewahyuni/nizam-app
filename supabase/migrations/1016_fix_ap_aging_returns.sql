@@ -5,7 +5,9 @@
 -- sehingga invoice yang sudah di-retur/diskon masih tampil sebagai hutang.
 -- ==========================================
 
-CREATE OR REPLACE VIEW v_ap_aging_report AS
+DROP VIEW IF EXISTS v_ap_aging_report;
+
+CREATE VIEW v_ap_aging_report AS
 WITH paid_agg AS (
     -- Total yang sudah dibayar + diskon per invoice
     SELECT purchase_id, COALESCE(SUM(amount + discount_amount), 0) as total_paid 

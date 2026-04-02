@@ -1,7 +1,9 @@
 'use server'
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 // ─────────────────────────────────────────────────────────────
@@ -260,9 +262,107 @@ export async function signInWithNik(formData: FormData) {
 // REST REMAINING (signOut, verifyEmployeeNikByToken, etc.)
 export async function signOut() {
   const supabase = await createClient()
+  const cookieStore = await cookies()
+  cookieStore.delete('nizam_active_org_id')
   await supabase.auth.signOut()
   revalidatePath('/', 'layout')
   redirect('/login')
+}
+
+export async function signInAsTenantOwner(orgId: string) {
+  const supabase = await createClient()
+  const adminClient = await createAdminClient()
+
+  const { data: { user: currentUser }, error: currentUserError } = await supabase.auth.getUser()
+
+  if (currentUserError || !currentUser || !isPlatformAdminEmail(currentUser.email)) {
+    return { error: 'Akses ditolak. Fitur ini hanya untuk platform admin.' }
+  }
+
+  const normalizedOrgId = orgId?.trim()
+  if (!normalizedOrgId) {
+    return { error: 'Tenant tidak valid.' }
+  }
+
+  const { data: org, error: orgError } = await (adminClient as any)
+    .from('organizations')
+    .select('id, name, owner_email')
+    .eq('id', normalizedOrgId)
+    .maybeSingle()
+
+  if (orgError) {
+    return { error: `Gagal membaca data tenant: ${orgError.message}` }
+  }
+
+  if (!org) {
+    return { error: 'Tenant tidak ditemukan.' }
+  }
+
+  const { data: ownerMember, error: ownerMemberError } = await (adminClient as any)
+    .from('org_members')
+    .select('user_id')
+    .eq('org_id', normalizedOrgId)
+    .eq('role', 'owner')
+    .eq('is_active', true)
+    .order('joined_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (ownerMemberError) {
+    return { error: `Gagal membaca owner tenant: ${ownerMemberError.message}` }
+  }
+
+  let targetEmail = ''
+
+  if (ownerMember?.user_id) {
+    const { data: ownerAuthUser, error: ownerAuthError } = await adminClient.auth.admin.getUserById(ownerMember.user_id)
+    if (ownerAuthError) {
+      return { error: `Gagal membaca akun owner tenant: ${ownerAuthError.message}` }
+    }
+
+    targetEmail = ownerAuthUser.user?.email?.trim().toLowerCase() || ''
+  }
+
+  if (!targetEmail) {
+    targetEmail = typeof org.owner_email === 'string' ? org.owner_email.trim().toLowerCase() : ''
+  }
+
+  if (!targetEmail) {
+    return { error: `Tenant ${org.name} belum punya akun owner yang bisa dipakai login.` }
+  }
+
+  const { data: generatedLink, error: generateLinkError } = await adminClient.auth.admin.generateLink({
+    type: 'magiclink',
+    email: targetEmail,
+  })
+
+  if (generateLinkError) {
+    return { error: `Gagal membuat sesi login tenant: ${generateLinkError.message}` }
+  }
+
+  const tokenHash = generatedLink.properties?.hashed_token
+  if (!tokenHash) {
+    return { error: 'Supabase tidak mengembalikan token login tenant.' }
+  }
+
+  const { error: verifyOtpError } = await supabase.auth.verifyOtp({
+    type: 'magiclink',
+    token_hash: tokenHash,
+  })
+
+  if (verifyOtpError) {
+    return { error: `Gagal mengaktifkan sesi tenant: ${verifyOtpError.message}` }
+  }
+
+  const cookieStore = await cookies()
+  cookieStore.set('nizam_active_org_id', org.id, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+  })
+
+  revalidatePath('/', 'layout')
+  redirect('/dashboard')
 }
 
 export async function getSession() {
