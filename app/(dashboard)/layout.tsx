@@ -51,16 +51,16 @@ export default async function DashboardLayout({
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
   const adminImpersonation = await getAdminImpersonationState()
+  const activeBranch = await getActiveBranch(orgData.org.id)
 
   const dependencyResults = await Promise.allSettled([
     getPendingApprovalsCount(orgData.org.id),
     getUnpostedJournalsCount(orgData.org.id),
-    getPendingPurchaseRequestsCount(orgData.org.id),
+    getPendingPurchaseRequestsCount(orgData.org.id, activeBranch?.id),
     getResetRequestsCount(orgData.org.id),
     getCashFlow(orgData.org.id),
     getBranches(orgData.org.id),
     getMyOrganizations(),
-    getActiveBranch(orgData.org.id),
     isDemoSession(),
     getAiTokenHeaderSummary(orgData.org.id),
   ])
@@ -71,9 +71,8 @@ export default async function DashboardLayout({
   const cashFlow = resolveDashboardDependency('cash flow summary', dependencyResults[4], null)
   const branches = resolveDashboardDependency('branches', dependencyResults[5], [])
   const organizations = resolveDashboardDependency('accessible organizations', dependencyResults[6], [])
-  const activeBranch = resolveDashboardDependency('active branch', dependencyResults[7], null)
-  const isDemo = resolveDashboardDependency('demo session state', dependencyResults[8], false)
-  const aiTokens = resolveDashboardDependency('AI token summary', dependencyResults[9], null)
+  const isDemo = resolveDashboardDependency('demo session state', dependencyResults[7], false)
+  const aiTokens = resolveDashboardDependency('AI token summary', dependencyResults[8], null)
 
   // ─────────────────────────────────────────────────────────────
   // 3. SAAS MODULE & RBAC GUARD (Protect direct URL access)

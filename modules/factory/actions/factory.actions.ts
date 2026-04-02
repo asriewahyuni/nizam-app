@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getActiveBranch } from '@/modules/organization/actions/org.actions'
 
 export async function getBoms(orgId: string) {
   const supabase = await createClient()
@@ -291,9 +292,11 @@ export async function createPurchaseRequests(orgId: string, requests: any[]) {
   const { data: { user } } = await (supabase as any).auth.getUser()
 
   if (!user) return { error: 'Unauthorized' }
+  const activeBranch = await getActiveBranch(orgId)
 
   const payload = requests.map((req: any) => ({
     org_id: orgId,
+    branch_id: activeBranch?.id || null,
     requester_id: user.id,
     product_id: req.productId,
     product_name: req.productName,

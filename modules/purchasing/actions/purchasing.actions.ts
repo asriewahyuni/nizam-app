@@ -4,7 +4,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
 
-export async function getPurchases(orgId: string) {
+export async function getPurchases(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
   const { data: { user } } = await (supabase as any).auth.getUser()
 
@@ -26,10 +26,11 @@ export async function getPurchases(orgId: string) {
   // purchasing data is not dropped by mismatched line-item RLS policies.
   const adminClient = await createAdminClient()
 
-  const { data, error } = await (adminClient as any)
+  let query = (adminClient as any)
     .from('purchases' as any)
     .select(`
       *,
+      branches (name, code),
       contacts (name),
       purchase_items (
         id,
@@ -44,13 +45,19 @@ export async function getPurchases(orgId: string) {
       purchase_returns (total_amount)
     ` as any)
     .eq('org_id', orgId)
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId)
+  }
+
+  const { data, error } = await query
     .order('purchase_date', { ascending: false })
     .order('created_at', { ascending: false })
 
   if (error) {
     (console as any).error("DEBUG: getPurchases error:", error)
     // If it's a field error, try pulling without the new tables
-    const { data: fallback, error: fallbackErr } = await (adminClient as any)
+    let fallbackQuery = (adminClient as any)
       .from('purchases' as any)
       .select(`
         *,
@@ -66,6 +73,12 @@ export async function getPurchases(orgId: string) {
         )
       ` as any)
       .eq('org_id', orgId)
+
+    if (branchId) {
+      fallbackQuery = fallbackQuery.eq('branch_id', branchId)
+    }
+
+    const { data: fallback, error: fallbackErr } = await fallbackQuery
       .order('purchase_date', { ascending: false })
       .order('created_at', { ascending: false })
       
@@ -89,6 +102,7 @@ export interface PurchaseLineData {
 
 export interface CreatePurchaseData {
   vendor_id: string
+  branch_id?: string | null
   purchase_date: string
   due_date?: string
   notes?: string
@@ -110,6 +124,20 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
 
   if (!payload.vendor_id || payload.lines.length === 0) {
     return { error: 'Vendor dan baris produk wajib diisi.' }
+  }
+
+  if (payload.branch_id) {
+    const { data: branch, error: branchError } = await (supabase as any)
+      .from('branches')
+      .select('id')
+      .eq('id', payload.branch_id)
+      .eq('org_id', orgId)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (branchError || !branch) {
+      return { error: 'Unit aktif tidak valid untuk organisasi ini.' }
+    }
   }
 
   // 1. Calculate Subtotals to perform Value-Based Allocation for Landed Costs
@@ -187,7 +215,8 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
       p_notes: notesWithTerm,
       p_shariah_mode: payload.shariah_mode || 'CASH',
       p_lines: processedLines,
-      p_user_id: user.id
+      p_user_id: user.id,
+      p_branch_id: payload.branch_id || null,
   })
 
   if (rpcError || !rpcRes?.success) {
@@ -357,6 +386,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 
     const journalResult = await createJournalEntry({
       org_id: orgId,
+      branch_id: purchase.branch_id || undefined,
       entry_date: new Date().toISOString().split('T')[0],
       description: 'Penerimaan Pembelian & Stok ' + (purchase.purchase_number || ''),
       reference_type: 'PURCHASE',
@@ -472,33 +502,58 @@ export async function createPurchaseReturn(orgId: string, payload: {
   return { success: true }
 }
 
-export async function getPurchaseRequests(orgId: string) {
+export async function getPurchaseRequests(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
   
-  // Try without joins first if it fails with {} error
-  const { data, error } = await (supabase as any)
+  let query = (supabase as any)
     .from('purchase_requests')
     .select(`
       *,
+      branch:branches(name, code),
       product:products(name, sku, unit)
     `)
     .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId)
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) {
     (console as any).error('DEBUG: getPurchaseRequests fail:', error.message, error.code, error.details)
-    return []
+    let fallbackQuery = (supabase as any)
+      .from('purchase_requests')
+      .select(`
+        *,
+        product:products(name, sku, unit)
+      `)
+      .eq('org_id', orgId)
+
+    if (branchId) {
+      fallbackQuery = fallbackQuery.eq('branch_id', branchId)
+    }
+
+    const { data: fallback, error: fallbackError } = await fallbackQuery.order('created_at', { ascending: false })
+    if (fallbackError) return []
+    return fallback
   }
   return data
 }
 
-export async function updatePurchaseRequestStatus(orgId: string, requestId: string, status: string) {
+export async function updatePurchaseRequestStatus(orgId: string, requestId: string, status: string, branchId?: string | null) {
   const supabase = await createClient()
-  const { error } = await (supabase as any)
+  let query = (supabase as any)
     .from('purchase_requests')
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', requestId)
     .eq('org_id', orgId)
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId)
+  }
+
+  const { error } = await query
 
   if (error) return { error: error.message }
   revalidatePath('/purchasing')
@@ -506,13 +561,19 @@ export async function updatePurchaseRequestStatus(orgId: string, requestId: stri
   return { success: true }
 }
 
-export async function getPendingPurchaseRequestsCount(orgId: string) {
+export async function getPendingPurchaseRequestsCount(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
-  const { count, error } = await (supabase as any)
+  let query = (supabase as any)
     .from('purchase_requests')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'PENDING')
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId)
+  }
+
+  const { count, error } = await query
 
   if (error) return 0
   return count || 0
