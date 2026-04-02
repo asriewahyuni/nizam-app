@@ -403,6 +403,12 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
     setLoadingDetail(false)
   }
 
+  const handlePrintDetail = () => {
+    window.requestAnimationFrame(() => {
+      window.setTimeout(() => window.print(), 75)
+    })
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount)
   }
@@ -1244,9 +1250,9 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
         
          {/* MODAL DETAIL DOKUMEN PO INCLUDE QR */}
          {showDetailModal && selectedDetailPurchase && (
-           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowDetailModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:static print:block print:p-0">
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowDetailModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden no-print" />
+             <motion.div id="po-print-area" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col print:shadow-none print:max-h-none print:h-auto print:max-w-none print:w-full print:mx-auto print:rounded-none print:text-[11px] print:leading-relaxed">
                 
                 {/* Print Styles for PO */}
                 <style>{`
@@ -1282,7 +1288,7 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
                      <p className="text-xs text-slate-500 font-medium">Preview & Cetak Dokumen PO Resmi</p>
                    </div>
                    <div className="flex gap-3">
-                      <button onClick={() => window.print()} className="px-5 py-2.5 bg-white text-slate-600 font-bold text-sm border border-slate-200 rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm">
+                      <button onClick={handlePrintDetail} className="px-5 py-2.5 bg-white text-slate-600 font-bold text-sm border border-slate-200 rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm">
                         <Printer size={16}/> Cetak PDF
                       </button>
                       <button onClick={() => setShowDetailModal(false)} className="w-10 h-10 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-all flex items-center justify-center shadow-sm">
@@ -1291,7 +1297,7 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
                    </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-10 relative bg-white print:p-0 print:text-[11px] print:leading-relaxed" id="po-print-area">
+                <div className="flex-1 overflow-y-auto p-10 relative bg-white print:overflow-visible print:p-0">
                    {/* Watermark/Status Background */}
                    {selectedDetailPurchase.status === 'VOIDED' && (
                      <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-0 opacity-10">
