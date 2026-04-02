@@ -327,7 +327,8 @@ export default function InventoryClient({ orgId, initialProducts, warehouses = [
           value={`${stats.activeWarehouses} Gudang`} 
           icon={HistoryIcon}
           color="blue"
-          sub="Warehouse aktif terdaftar"
+          sub="Warehouse aktif terdaftar, klik untuk kelola"
+          href="/inventory/warehouses"
         />
       </div>
 

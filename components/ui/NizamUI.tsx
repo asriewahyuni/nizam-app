@@ -6,6 +6,7 @@
 'use client'
 
 import React, { useState, useCallback } from 'react'
+import Link, { type LinkProps } from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, CheckCircle2, AlertTriangle, X } from 'lucide-react'
 
@@ -174,9 +175,10 @@ interface StatCardProps {
   alert?: boolean
   trend?: { value: string; positive: boolean }
   onClick?: () => void
+  href?: LinkProps['href']
 }
 
-export function StatCard({ label, value, sub, color = 'slate', icon: Icon, alert, trend, onClick }: StatCardProps) {
+export function StatCard({ label, value, sub, color = 'slate', icon: Icon, alert, trend, onClick, href }: StatCardProps) {
   const styles = {
     emerald: 'bg-emerald-50/50 border-emerald-100 hover:border-emerald-300 text-emerald-900 shadow-emerald-100/10',
     rose: 'bg-rose-50/50 border-rose-100 hover:border-rose-300 text-rose-900 shadow-rose-100/10',
@@ -198,11 +200,11 @@ export function StatCard({ label, value, sub, color = 'slate', icon: Icon, alert
   }
 
   const isOrange = color === 'orange'
-
-  return (
+  const isInteractive = Boolean(onClick || href)
+  const card = (
     <div 
       onClick={onClick}
-      className={`p-8 rounded-[40px] border shadow-[0_15px_30px_-5px_rgba(0,0,0,0.02)] transition-all duration-500 relative overflow-hidden flex flex-col justify-between h-full min-h-[180px] ${styles[color]} ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-xl group/card' : 'group'}`}
+      className={`p-8 rounded-[40px] border shadow-[0_15px_30px_-5px_rgba(0,0,0,0.02)] transition-all duration-500 relative overflow-hidden flex flex-col justify-between h-full min-h-[180px] ${styles[color]} ${isInteractive ? 'cursor-pointer hover:-translate-y-1 hover:shadow-xl group/card' : 'group'}`}
     >
       <div className="flex items-start justify-between mb-4 relative z-10">
         <div className="space-y-1">
@@ -232,6 +234,16 @@ export function StatCard({ label, value, sub, color = 'slate', icon: Icon, alert
       {alert && <div className="absolute top-4 right-4"><AlertTriangle size={16} className="text-amber-500 animate-pulse" /></div>}
     </div>
   )
+
+  if (href) {
+    return (
+      <Link href={href} className="block h-full">
+        {card}
+      </Link>
+    )
+  }
+
+  return card
 }
 
 // ============================================================

@@ -4,7 +4,15 @@ import { getDashboardAnalytics } from '@/modules/accounting/actions/analytics.ac
 import ContactClient from './ContactClient'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 
-export default async function ContactsPage() {
+type ContactsSearchParams = Promise<{
+  type?: string | string[] | undefined
+}>
+
+export default async function ContactsPage({
+  searchParams,
+}: {
+  searchParams?: ContactsSearchParams
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -14,6 +22,9 @@ export default async function ContactsPage() {
   if (!orgData) return null
 
   const orgId = orgData.org.id
+  const resolvedSearchParams = searchParams ? await searchParams : {}
+  const rawType = Array.isArray(resolvedSearchParams.type) ? resolvedSearchParams.type[0] : resolvedSearchParams.type
+  const initialTypeFilter = rawType === 'CUSTOMER' || rawType === 'SUPPLIER' ? rawType : 'ALL'
 
   const [contacts, analytics] = await Promise.all([
     getContacts(orgId),
@@ -25,6 +36,7 @@ export default async function ContactsPage() {
       orgId={orgId} 
       contacts={contacts} 
       customerPareto={analytics.customerPareto} 
+      initialTypeFilter={initialTypeFilter}
     />
   )
 }

@@ -479,7 +479,8 @@ export default function PurchasingClient({ orgId, orgName, org, purchases, vendo
           value={`${stats.vendorCount} Vendor`} 
           icon={Truck}
           color="blue"
-          sub="Vendor terdaftar di database"
+          sub="Vendor terdaftar di database, klik untuk kelola"
+          href="/contacts?type=SUPPLIER"
         />
       </div>
 
