@@ -15,6 +15,7 @@ import { useSearchParams } from 'next/navigation'
 import { createBillingInvoice, submitPaymentProof, applyVoucher } from '@/modules/organization/actions/billing.actions'
 import { normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
 import { OPERATOR_ADDON_OPTIONS } from '@/lib/saas/operator-pricing'
+import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
 
 const db = createClient() as any
 
@@ -69,6 +70,7 @@ function BillingContent() {
   const searchParams = useSearchParams()
   const pkgId = searchParams.get('pkg')
   const section = searchParams.get('section')
+  const { orgId: activeOrgId, loading: activeOrgLoading } = useActiveOrgId()
   
   const [activeOrg, setActiveOrg] = useState<any>(null)
   const [invoices, setInvoices] = useState<any[]>([])
@@ -156,6 +158,9 @@ function BillingContent() {
 
   useEffect(() => {
     async function loadData() {
+      if (activeOrgLoading) return
+
+      setLoading(true)
       const { data: tokenPackages } = await db
         .from('ai_token_topup_packages')
         .select('*')
@@ -165,59 +170,54 @@ function BillingContent() {
 
       setAiTokenPackages(tokenPackages || [])
 
-      const { data: { user } } = await db.auth.getUser()
-      if (user) {
-        const { data: member } = await db.from('org_members')
-          .select('org_id, organizations(*)')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .maybeSingle()
-        
-        if (member?.organizations) {
-          const org = member.organizations
-          setActiveOrg(org)
-
-          const { data: walletData } = await db
-            .from('ai_token_wallets')
-            .select('balance_tokens')
-            .eq('org_id', org.id)
-            .maybeSingle()
-
-          setAiTokenBalance(Number(walletData?.balance_tokens || 0))
-          
-          // --- CALCULATE MONTHLY COST ---
-          const { data: pkgs } = await db.from('saas_packages').select('*')
-          const planPkg = pkgs?.find((p: any) => p.name === org.settings?.plan)
-          let total = planPkg?.price || 0
-          
-          // Sum Addons
-          const activeAddons = Array.isArray(org.active_addons) ? org.active_addons : []
-          activeAddons.forEach((a: any) => {
-            const addonName = normalizeSaasEntitlementName(String(a?.name || ''))
-            const addonPrice = AVAILABLE_ADDONS.find((ma) => ma.name === addonName)?.price || 0
-            total += addonPrice
-          })
-          setTotalMonthly(total)
-          
-          if (pkgId) {
-             const pkg = pkgs?.find((p: any) => p.id === pkgId)
-             if (pkg) {
-               handleBuyItem(org.id, { id: pkg.id, name: pkg.name, price: pkg.price, type: 'PACKAGE' })
-             }
-          }
-
-          const { data: invs } = await db.from('saas_invoices')
-            .select('*')
-            .eq('org_id', org.id)
-            .order('created_at', { ascending: false })
-          
-          setInvoices(invs || [])
-        }
+      if (!activeOrgId) {
+        setActiveOrg(null)
+        setInvoices([])
+        setAiTokenBalance(0)
+        setTotalMonthly(0)
+        setLoading(false)
+        return
       }
+
+      const [{ data: org }, { data: pkgs }, { data: walletData }, { data: invs }] = await Promise.all([
+        db.from('organizations').select('*').eq('id', activeOrgId).maybeSingle(),
+        db.from('saas_packages').select('*'),
+        db.from('ai_token_wallets').select('balance_tokens').eq('org_id', activeOrgId).maybeSingle(),
+        db.from('saas_invoices').select('*').eq('org_id', activeOrgId).order('created_at', { ascending: false }),
+      ])
+
+      if (org) {
+        setActiveOrg(org)
+        setAiTokenBalance(Number(walletData?.balance_tokens || 0))
+
+        const planPkg = pkgs?.find((p: any) => p.name === org.settings?.plan)
+        let total = planPkg?.price || 0
+
+        const activeAddons = Array.isArray(org.active_addons) ? org.active_addons : []
+        activeAddons.forEach((a: any) => {
+          const addonName = normalizeSaasEntitlementName(String(a?.name || ''))
+          const addonPrice = AVAILABLE_ADDONS.find((ma) => ma.name === addonName)?.price || 0
+          total += addonPrice
+        })
+        setTotalMonthly(total)
+
+        if (pkgId) {
+          const pkg = pkgs?.find((p: any) => p.id === pkgId)
+          if (pkg) {
+            handleBuyItem(org.id, { id: pkg.id, name: pkg.name, price: pkg.price, type: 'PACKAGE' })
+          }
+        }
+      } else {
+        setActiveOrg(null)
+        setAiTokenBalance(0)
+        setTotalMonthly(0)
+      }
+
+      setInvoices(invs || [])
       setLoading(false)
     }
     loadData()
-  }, [pkgId])
+  }, [pkgId, activeOrgId, activeOrgLoading])
 
   const openCheckout = (inv: any) => {
     setCheckoutInvoice(inv)

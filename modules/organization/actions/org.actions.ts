@@ -7,14 +7,83 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { seedDemoData, type DemoBusinessType } from '@/modules/demo/actions/demo.actions'
+import {
+  ACTIVE_BRANCH_COOKIE,
+  ACTIVE_ORG_COOKIE,
+  type AccessibleOrganization,
+  type BranchSummary,
+} from '@/modules/organization/lib/org-context'
 import { applyVoucher } from './billing.actions'
 
 const DEMO_EMAIL = 'demo@nizam.app'
-const ACTIVE_ORG_COOKIE = 'nizam_active_org_id'
+const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
+
+function getActiveContextCookieOptions() {
+  return {
+    maxAge: ACTIVE_CONTEXT_COOKIE_MAX_AGE,
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure: process.env.NODE_ENV === 'production',
+  }
+}
+
+async function resolveActiveMembership(
+  db: any,
+  user: { id: string; email?: string | null; user_metadata?: Record<string, any> | null },
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
+) {
+  const isDemoUser = user.email === DEMO_EMAIL || user.user_metadata?.is_demo
+  const demoOrgId = cookieStore.get('nizam_demo_org_id')?.value
+  const activeOrgIdCookie = cookieStore.get(ACTIVE_ORG_COOKIE)?.value
+
+  let memberData: any = null
+
+  if (isDemoUser && demoOrgId) {
+    const { data } = await db
+      .from('org_members')
+      .select('org_id, role, role_id, joined_at, organizations(*), roles(permissions)')
+      .eq('user_id', user.id)
+      .eq('org_id', demoOrgId)
+      .eq('is_active', true)
+      .maybeSingle()
+    memberData = data
+  }
+
+  if (!memberData && activeOrgIdCookie) {
+    const { data } = await db
+      .from('org_members')
+      .select('org_id, role, role_id, joined_at, organizations(*), roles(permissions)')
+      .eq('user_id', user.id)
+      .eq('org_id', activeOrgIdCookie)
+      .eq('is_active', true)
+      .maybeSingle()
+    memberData = data
+  }
+
+  if (!memberData) {
+    const { data, error } = await db
+      .from('org_members')
+      .select('org_id, role, role_id, joined_at, organizations(*), roles(permissions)')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('joined_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      ;(console as any).error('resolveActiveMembership Error:', error)
+    }
+    memberData = data
+  }
+
+  return memberData
+}
 
 export async function createOrganization(formData: FormData) {
   const supabase = await createClient()
   const db = supabase as any
+  const cookieStore = await cookies()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi' }
 
@@ -76,6 +145,9 @@ export async function createOrganization(formData: FormData) {
      }
   }
 
+  cookieStore.set(ACTIVE_ORG_COOKIE, orgId, getActiveContextCookieOptions())
+  cookieStore.delete(ACTIVE_BRANCH_COOKIE)
+
   revalidatePath('/dashboard')
   return redirect('/dashboard')
 }
@@ -86,48 +158,8 @@ export async function getActiveOrg() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const isDemoUser = user.email === DEMO_EMAIL || user.user_metadata?.is_demo
   const cookieStore = await cookies()
-  const demoOrgId = cookieStore.get('nizam_demo_org_id')?.value
-  const activeOrgIdCookie = cookieStore.get(ACTIVE_ORG_COOKIE)?.value
-
-  let memberData = null
-
-  if (isDemoUser && demoOrgId) {
-    const { data } = await db
-      .from('org_members')
-      .select('org_id, role, role_id, organizations(*), roles(permissions)')
-      .eq('user_id', user.id)
-      .eq('org_id', demoOrgId)
-      .eq('is_active', true)
-      .maybeSingle()
-    memberData = data
-  }
-
-  if (!memberData && activeOrgIdCookie) {
-    const { data } = await db
-      .from('org_members')
-      .select('*, organizations(*), roles(permissions)')
-      .eq('user_id', user.id)
-      .eq('org_id', activeOrgIdCookie)
-      .eq('is_active', true)
-      .maybeSingle()
-    memberData = data
-  }
-
-  if (!memberData) {
-    const { data, error } = await db
-      .from('org_members')
-      .select('*, organizations(*), roles(permissions)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('joined_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-    
-    if (error) (console as any).error('GetActiveOrg Error:', error)
-    memberData = data
-  }
+  const memberData = await resolveActiveMembership(db, user, cookieStore)
 
   if (!memberData) return null
 
@@ -191,6 +223,82 @@ export async function getActiveOrg() {
   }
 }
 
+export async function getMyOrganizations(): Promise<AccessibleOrganization[]> {
+  const supabase = await createClient()
+  const db = supabase as any
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { data, error } = await db
+    .from('org_members')
+    .select('org_id, role, role_id, joined_at, organizations(id, name, slug, logo_url, settings, is_active)')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .order('joined_at', { ascending: true })
+
+  if (error || !Array.isArray(data)) {
+    if (error) {
+      ;(console as any).error('getMyOrganizations Error:', error)
+    }
+    return []
+  }
+
+  return data
+    .map((membership: any) => {
+      const org = membership.organizations
+      if (!org || typeof org !== 'object') return null
+
+      return {
+        orgId: membership.org_id,
+        role: membership.role || 'staff',
+        roleId: membership.role_id || null,
+        joinedAt: membership.joined_at || new Date(0).toISOString(),
+        org: {
+          id: org.id,
+          name: org.name,
+          slug: org.slug,
+          logo_url: org.logo_url ?? null,
+          settings: org.settings ?? {},
+          is_active: Boolean(org.is_active),
+        },
+      } satisfies AccessibleOrganization
+    })
+    .filter((membership): membership is AccessibleOrganization => Boolean(membership))
+}
+
+export async function setActiveOrg(orgId: string) {
+  const supabase = await createClient()
+  const db = supabase as any
+  const cookieStore = await cookies()
+  const trimmedOrgId = orgId.trim()
+
+  if (!trimmedOrgId) {
+    return { error: 'Organisasi tidak valid.' }
+  }
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Tidak terautentikasi.' }
+
+  const { data: membership, error } = await db
+    .from('org_members')
+    .select('org_id')
+    .eq('user_id', user.id)
+    .eq('org_id', trimmedOrgId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (error || !membership) {
+    return { error: 'Anda tidak memiliki akses ke organisasi tersebut.' }
+  }
+
+  cookieStore.delete('nizam_demo_org_id')
+  cookieStore.set(ACTIVE_ORG_COOKIE, trimmedOrgId, getActiveContextCookieOptions())
+  cookieStore.delete(ACTIVE_BRANCH_COOKIE)
+
+  revalidatePath('/', 'layout')
+  return { success: true, orgId: trimmedOrgId }
+}
+
 export async function updateOrgSettings(orgId: string, updates: any) {
   const supabase = await createClient()
   const db = supabase as any
@@ -246,8 +354,80 @@ export async function destroyOrganization(orgId: string) {
 export async function getBranches(orgId: string) {
   const supabase = await createClient()
   const db = supabase as any
-  const { data } = await db.from('branches').select('*').eq('org_id', orgId).eq('is_active', true)
+  const { data } = await db
+    .from('branches')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .order('name', { ascending: true })
   return data || []
+}
+
+export async function getActiveBranch(orgId: string): Promise<BranchSummary | null> {
+  const supabase = await createClient()
+  const db = supabase as any
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const cookieStore = await cookies()
+  const activeBranchIdCookie = cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value
+  if (!activeBranchIdCookie) return null
+
+  const { data } = await db
+    .from('branches')
+    .select('id, org_id, name, code, address, is_active')
+    .eq('id', activeBranchIdCookie)
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  return (data as BranchSummary | null) ?? null
+}
+
+export async function setActiveBranch(orgId: string, branchId: string | null) {
+  const supabase = await createClient()
+  const db = supabase as any
+  const cookieStore = await cookies()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Tidak terautentikasi.' }
+
+  const trimmedOrgId = orgId.trim()
+  if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
+
+  const { data: membership } = await db
+    .from('org_members')
+    .select('org_id')
+    .eq('user_id', user.id)
+    .eq('org_id', trimmedOrgId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!membership) {
+    return { error: 'Anda tidak memiliki akses ke organisasi ini.' }
+  }
+
+  if (!branchId) {
+    cookieStore.delete(ACTIVE_BRANCH_COOKIE)
+    revalidatePath('/', 'layout')
+    return { success: true, branchId: null }
+  }
+
+  const trimmedBranchId = branchId.trim()
+  const { data: branch, error } = await db
+    .from('branches')
+    .select('id')
+    .eq('id', trimmedBranchId)
+    .eq('org_id', trimmedOrgId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (error || !branch) {
+    return { error: 'Unit tidak ditemukan pada organisasi aktif.' }
+  }
+
+  cookieStore.set(ACTIVE_BRANCH_COOKIE, trimmedBranchId, getActiveContextCookieOptions())
+  revalidatePath('/', 'layout')
+  return { success: true, branchId: trimmedBranchId }
 }
 
 export async function createBranch(orgId: string, formData: FormData) {

@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { CheckCircle2, Zap, Crown, Shield, Package, ArrowRight, Loader2, Building2, Store, Users, Warehouse } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
 
 const db = createClient() as any
 
@@ -25,12 +26,16 @@ const PLAN_GRADIENT: Record<string, string> = {
 }
 
 export default function PricingPage() {
+  const { orgId: activeOrgId, loading: activeOrgLoading } = useActiveOrgId()
   const [packages, setPackages] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [currentPlan, setCurrentPlan] = useState<string>('')
 
   useEffect(() => {
     const load = async () => {
+      if (activeOrgLoading) return
+
+      setLoading(true)
       // Fetch packages
       const { data: pkgs } = await db.from('saas_packages').select('*').eq('is_active', true).order('price', { ascending: true })
       if (pkgs) {
@@ -41,18 +46,16 @@ export default function PricingPage() {
       }
 
       // Fetch current org plan
-      const { data: { user } } = await db.auth.getUser()
-      if (user) {
-        const { data: member } = await db.from('org_members').select('org_id').eq('user_id', user.id).eq('is_active', true).maybeSingle()
-        if (member?.org_id) {
-          const { data: org } = await db.from('organizations').select('settings').eq('id', member.org_id).maybeSingle()
-          setCurrentPlan(org?.settings?.plan || '')
-        }
+      if (activeOrgId) {
+        const { data: org } = await db.from('organizations').select('settings').eq('id', activeOrgId).maybeSingle()
+        setCurrentPlan(org?.settings?.plan || '')
+      } else {
+        setCurrentPlan('')
       }
       setLoading(false)
     }
     load()
-  }, [])
+  }, [activeOrgId, activeOrgLoading])
 
   if (loading) return (
     <div className="flex items-center justify-center h-96">

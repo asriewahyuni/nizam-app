@@ -2,6 +2,7 @@ import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getAccountBalances } from '@/modules/accounting/actions/coa.actions'
 import { formatRupiah } from '@/lib/utils'
 import { redirect } from 'next/navigation'
+import { getActiveBranch } from '@/modules/organization/actions/org.actions'
 import { 
   Wallet, 
   TrendingUp, 
@@ -17,10 +18,11 @@ export const revalidate = 3600 // CACHE FOR 1 HOUR TO TEST LOOP
 export default async function DashboardPage() {
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
+  const activeBranch = await getActiveBranch(orgData.org.id)
 
   const [balances, analytics] = await Promise.all([
     getAccountBalances(orgData.org.id),
-    getDashboardAnalytics(orgData.org.id)
+    getDashboardAnalytics(orgData.org.id, activeBranch?.id)
   ])
 
   // Aggregate key metrics
