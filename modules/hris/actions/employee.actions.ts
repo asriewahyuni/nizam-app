@@ -3,14 +3,61 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
-export async function getEmployees(orgId: string) {
+type BranchSelectionResult =
+  | { branchId: string | null }
+  | { error: string }
+
+async function resolveEmployeeBranchSelection(orgId: string, branchId?: string | null): Promise<BranchSelectionResult> {
+  const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) {
+    return { error: branchSelection.error || 'Akses unit tidak valid.' }
+  }
+
+  return { branchId: branchSelection.branchId }
+}
+
+async function requireEmployeeCreateBranchId(orgId: string): Promise<{ branchId: string } | { error: string }> {
+  const branchSelection = await resolveEmployeeBranchSelection(orgId)
+  if ('error' in branchSelection || !branchSelection.branchId) {
+    return { error: 'Pilih unit aktif terlebih dahulu untuk menambahkan karyawan.' }
+  }
+
+  return { branchId: branchSelection.branchId as string }
+}
+
+async function ensureEmployeeBranchAccess(orgId: string, branchId: string | null, notFoundMessage: string) {
+  const trimmedBranchId = String(branchId || '').trim()
+  if (!trimmedBranchId) {
+    return { error: notFoundMessage }
+  }
+
+  const branchSelection = await resolveEmployeeBranchSelection(orgId, trimmedBranchId)
+  if ('error' in branchSelection) {
+    return { error: branchSelection.error }
+  }
+
+  return { branchId: trimmedBranchId }
+}
+
+export async function getEmployees(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
-  const { data, error } = await (supabase as any)
+  const db = supabase as any
+  const branchSelection = await resolveEmployeeBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) return []
+
+  let query = db
     .from('employees')
-    .select('*')
+    .select('*, branch:branches(id, name, code)')
     .eq('org_id', orgId)
     .order('first_name')
+
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data, error } = await query
 
   if (error) return []
   return data
@@ -18,6 +65,9 @@ export async function getEmployees(orgId: string) {
 
 export async function createEmployee(orgId: string, formData: FormData) {
   const supabase = await createClient()
+  const db = supabase as any
+  const activeBranch = await requireEmployeeCreateBranchId(orgId)
+  if ('error' in activeBranch) return { error: activeBranch.error }
 
   // Extract basics
   const nik = formData.get('nik') as string
@@ -28,8 +78,9 @@ export async function createEmployee(orgId: string, formData: FormData) {
   const basicSalary = Number(formData.get('basic_salary') || 0)
   const joinDate = formData.get('join_date') as string || new Date().toISOString().split('T')[0]
 
-  const { error } = await (supabase as any).from('employees').insert({
+  const { error } = await db.from('employees').insert({
     org_id: orgId,
+    branch_id: activeBranch.branchId,
     nik,
     first_name: firstName,
     last_name: lastName,
@@ -37,13 +88,15 @@ export async function createEmployee(orgId: string, formData: FormData) {
     employment_status: status,
     basic_salary: basicSalary,
     join_date: joinDate,
-    department: formData.get('department'),
-    email: formData.get('email'),
+    department: formData.get('department') || null,
+    department_id: formData.get('department_id') || null,
+    email: formData.get('email') || null,
+    gender: formData.get('gender') || null,
     whatsapp: formData.get('whatsapp') || null,
     avatar_url: formData.get('avatar_url') || null,
-    bank_name: formData.get('bank_name'),
-    bank_account_number: formData.get('bank_account_number'),
-    tax_status: formData.get('tax_status')
+    bank_name: formData.get('bank_name') || null,
+    bank_account_number: formData.get('bank_account_number') || null,
+    tax_status: formData.get('tax_status') || null
   })
 
   if (error) return { error: error.message }
@@ -53,6 +106,23 @@ export async function createEmployee(orgId: string, formData: FormData) {
 
 export async function updateEmployee(id: string, orgId: string, formData: FormData) {
   const supabase = await createClient()
+  const db = supabase as any
+
+  const { data: existingEmployee, error: existingEmployeeError } = await db
+    .from('employees')
+    .select('id, branch_id')
+    .eq('id', id)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (existingEmployeeError) return { error: existingEmployeeError.message }
+
+  const accessibleEmployee = await ensureEmployeeBranchAccess(
+    orgId,
+    existingEmployee?.branch_id ?? null,
+    'Data karyawan tidak ditemukan.'
+  )
+  if ('error' in accessibleEmployee) return { error: accessibleEmployee.error }
 
   const nik = formData.get('nik') as string
   const firstName = formData.get('first_name') as string
@@ -62,7 +132,7 @@ export async function updateEmployee(id: string, orgId: string, formData: FormDa
   const basicSalary = Number(formData.get('basic_salary') || 0)
   const joinDate = formData.get('join_date') as string
 
-  const { error } = await (supabase as any)
+  const { error } = await db
     .from('employees')
     .update({
       nik,
@@ -72,17 +142,20 @@ export async function updateEmployee(id: string, orgId: string, formData: FormDa
       employment_status: status,
       basic_salary: basicSalary,
       join_date: joinDate,
-      department: formData.get('department'),
-      email: formData.get('email'),
+      department: formData.get('department') || null,
+      department_id: formData.get('department_id') || null,
+      email: formData.get('email') || null,
+      gender: formData.get('gender') || null,
       whatsapp: formData.get('whatsapp') || null,
       avatar_url: formData.get('avatar_url') || null,
-      bank_name: formData.get('bank_name'),
-      bank_account_number: formData.get('bank_account_number'),
-      tax_status: formData.get('tax_status'),
+      bank_name: formData.get('bank_name') || null,
+      bank_account_number: formData.get('bank_account_number') || null,
+      tax_status: formData.get('tax_status') || null,
       updated_at: new Date().toISOString()
     })
     .eq('id', id)
     .eq('org_id', orgId)
+    .eq('branch_id', accessibleEmployee.branchId)
 
   if (error) return { error: error.message }
   revalidatePath('/hris')
@@ -125,4 +198,3 @@ export async function updateEmployeeProfile(empId: string, payload: { avatar_url
   revalidatePath('/profil-saya')
   return { success: true }
 }
-

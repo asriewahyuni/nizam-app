@@ -117,6 +117,13 @@ export type Attendance = {
   location_gps: string | null; qr_scanned_payload: string | null; meta: Json
   created_at: string; updated_at: string
 }
+export type ExpenseClaim = {
+  id: string; org_id: string; branch_id: string; employee_id: string
+  claim_date: string; category: string; amount: number
+  description: string; receipt_url: string | null; status: string
+  approved_by: string | null; journal_entry_id: string | null
+  created_at: string; updated_at: string
+}
 export type FleetAsset = {
   id: string; org_id: string; branch_id: string; plate_number: string; model: string
   brand: string | null; type: string; status: string
@@ -248,6 +255,12 @@ export interface Database {
         Row: Attendance
         Insert: Omit<Attendance, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
         Update: Partial<Attendance>
+        Relationships: []
+      }
+      expense_claims: {
+        Row: ExpenseClaim
+        Insert: Omit<ExpenseClaim, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<ExpenseClaim>
         Relationships: []
       }
       fleet_assets: {

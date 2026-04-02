@@ -53,6 +53,9 @@ import {
 
 export default function HrisClient({
   orgId,
+  activeBranchId = null,
+  activeBranchName = null,
+  allowAllBranchSelection = true,
   initialEmployees,
   initialPayrollComponents = [],
   initialPayrollRuns = [],
@@ -63,6 +66,9 @@ export default function HrisClient({
   defaultTab
 }: {
   orgId: string,
+  activeBranchId?: string | null,
+  activeBranchName?: string | null,
+  allowAllBranchSelection?: boolean,
   initialEmployees: any[],
   initialPayrollComponents?: any[],
   initialPayrollRuns?: any[],
@@ -211,6 +217,11 @@ export default function HrisClient({
   }
 
   const handleOpenNew = () => {
+    if (!activeBranchId) {
+      showToast('Pilih unit aktif terlebih dahulu untuk menambahkan karyawan baru.', 'info')
+      return
+    }
+
     setEditingEmp(null)
     setBasicSalary(0)
     setSelectedRole('')
@@ -399,6 +410,21 @@ export default function HrisClient({
     setLoading(false)
   }
 
+  const employeeScopeLabel = activeBranchName
+    ? `Unit aktif: ${activeBranchName}`
+    : allowAllBranchSelection
+      ? 'Mode semua unit aktif'
+      : 'Unit aktif belum dipilih'
+
+  const hrisSubtitle =
+    activeTab === 'ATTENDANCE'
+      ? 'Mesin absensi dan cuti masih dalam rollout bertahap per unit.'
+      : activeTab === 'PAYROLL'
+        ? 'Atur template gaji, tunjangan, dan potongan karyawan. Payroll saat ini tetap lintas organisasi.'
+        : activeTab === 'RUNS'
+          ? 'Lakukan generate slip gaji otomatis dan pencatatan kas jurnal lintas organisasi.'
+          : `Manajemen sumber daya manusia dengan scope ${employeeScopeLabel.toLowerCase()}.`
+
   return (
     <div className="space-y-10 pb-20">
       <PageHeader
@@ -409,10 +435,7 @@ export default function HrisClient({
           'HRIS Dashboard'
         }
         subtitle={
-          activeTab === 'ATTENDANCE' ? 'Manajemen daftar kehadiran, jadwal, dan cuti karyawan.' :
-          activeTab === 'PAYROLL' ? 'Atur template gaji, tunjangan, dan potongan karyawan.' :
-          activeTab === 'RUNS' ? 'Lakukan generate slip gaji otomatis dan pencatatan kas jurnal.' :
-          'Manajemen sumber daya manusia, karyawan, dan hierarki akses organisasi.'
+          hrisSubtitle
         }
         icon={
           activeTab === 'ATTENDANCE' ? <Clock /> :
@@ -504,13 +527,25 @@ export default function HrisClient({
                 title="Active Personnel"
                 icon={Users}
                 actions={
-                  <SafeButton onClick={handleOpenNew} variant="primary" size="sm" icon={<Plus size={16} />}>
+                  <SafeButton onClick={handleOpenNew} variant="primary" size="sm" icon={<Plus size={16} />} disabled={!activeBranchId}>
                     ADD NEW EMPLOYEE
                   </SafeButton>
                 }
               />
 
               <div className="p-2">
+                <div className="mb-6 flex flex-wrap items-center gap-3 rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-4">
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Scope</div>
+                  <div className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${activeBranchName ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {employeeScopeLabel}
+                  </div>
+                  {!activeBranchId && (
+                    <div className="text-[11px] font-bold text-slate-500">
+                      Pilih satu unit dari header jika ingin mendaftarkan karyawan baru.
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {employees.map((emp: any) => (
                     <motion.div
@@ -529,14 +564,19 @@ export default function HrisClient({
                               </div>
                             )}
                           </div>
-                          <div className="space-y-0.5">
-                            <h4 className="font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight">{emp.first_name} {emp.last_name}</h4>
-                            <div className="flex items-center gap-2">
-                              <StatusBadge label={emp.employment_status.replace('_', ' ')} variant={emp.employment_status === 'FULL_TIME' ? 'success' : 'warning'} />
-                              <span className="text-[10px] font-black font-mono text-slate-400 tracking-wider">#{emp.nik}</span>
+                            <div className="space-y-0.5">
+                              <h4 className="font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight">{emp.first_name} {emp.last_name}</h4>
+                              <div className="flex items-center gap-2">
+                                <StatusBadge label={emp.employment_status.replace('_', ' ')} variant={emp.employment_status === 'FULL_TIME' ? 'success' : 'warning'} />
+                                <span className="text-[10px] font-black font-mono text-slate-400 tracking-wider">#{emp.nik}</span>
+                                {emp.branch?.name && (
+                                  <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-[0.18em] border border-blue-100">
+                                    {emp.branch.name}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
                         <div className="flex flex-col gap-2 items-end">
                           <button
                             onClick={(e: any) => { e.stopPropagation(); handleOpenEdit(emp); }}
@@ -1368,6 +1408,18 @@ export default function HrisClient({
 
               <div className="p-10 overflow-y-auto no-scrollbar flex-1">
                 <form id="emp-form" onSubmit={handleCreateEmp} className="space-y-12">
+                  <div className={`rounded-[28px] border px-6 py-5 ${editingEmp ? 'border-blue-100 bg-blue-50/60' : activeBranchId ? 'border-emerald-100 bg-emerald-50/60' : 'border-amber-100 bg-amber-50/60'}`}>
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+                      Konteks Unit
+                    </div>
+                    <div className="text-sm font-black text-slate-800">
+                      {editingEmp?.branch?.name
+                        ? `Profil ini terdaftar di unit ${editingEmp.branch.name}.`
+                        : activeBranchName
+                          ? `Karyawan baru akan didaftarkan ke unit ${activeBranchName}.`
+                          : 'Pilih unit aktif dari header sebelum menambahkan karyawan baru.'}
+                    </div>
+                  </div>
 
                   <div className="space-y-6">
                     <div className="flex items-center gap-3">
