@@ -2,6 +2,26 @@
 -- MIGRATION 020: Update process_purchase_atomic to support due_date
 -- ============================================================
 
+-- Legacy note:
+-- stock_movements used to be introduced by an out-of-order migration (017).
+-- Keep the bootstrap here so fresh databases still have the table before
+-- later inventory/accounting migrations depend on it.
+CREATE TABLE IF NOT EXISTS public.stock_movements (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id              UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  product_id          UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+  movement_date       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  quantity            DECIMAL(15,2) NOT NULL,
+  unit_price          DECIMAL(15,2) NOT NULL,
+  reference_type      TEXT NOT NULL,
+  reference_id        UUID NOT NULL,
+  notes               TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_stock_movements_product
+  ON public.stock_movements(product_id, movement_date);
+
 CREATE OR REPLACE FUNCTION public.process_purchase_atomic(
   p_org_id UUID,
   p_vendor_id UUID,
