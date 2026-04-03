@@ -42,6 +42,88 @@ async function ensurePurchaseDocumentAccess(orgId: string, branchId: string | nu
   return { success: true as const }
 }
 
+type InventorySyncParams = {
+  orgId: string
+  productId: string
+  warehouseId: string
+  diff: number
+}
+
+function isAdjustInventoryStockSchemaCacheMiss(error: { code?: string | null; message?: string | null } | null | undefined) {
+  if (!error) return false
+
+  const message = String(error.message || '')
+  return error.code === 'PGRST202' || (message.includes('adjust_inventory_stock') && message.includes('schema cache'))
+}
+
+async function fallbackInventoryStockSync({ orgId, productId, warehouseId, diff }: InventorySyncParams) {
+  const adminClient = await createAdminClient()
+  const { data: stockRows, error: lookupError } = await (adminClient as any)
+    .from('inventory_stocks')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('product_id', productId)
+    .eq('warehouse_id', warehouseId)
+    .is('batch_number', null)
+    .order('created_at', { ascending: true })
+
+  if (lookupError) {
+    return { error: 'Gagal sinkron stok fisik gudang: ' + lookupError.message }
+  }
+
+  const existingStock = ((stockRows as any[]) || []).find((row: any) => row?.bin_id == null) || stockRows?.[0]
+
+  if (existingStock?.id) {
+    const { error: updateError } = await (adminClient as any)
+      .from('inventory_stocks')
+      .update({ quantity: Number(existingStock.quantity || 0) + diff })
+      .eq('id', existingStock.id)
+
+    if (updateError) {
+      return { error: 'Gagal sinkron stok fisik gudang: ' + updateError.message }
+    }
+
+    return { success: true as const }
+  }
+
+  const { error: insertError } = await (adminClient as any)
+    .from('inventory_stocks')
+    .insert({
+      org_id: orgId,
+      product_id: productId,
+      warehouse_id: warehouseId,
+      quantity: diff,
+      batch_number: null,
+    })
+
+  if (insertError) {
+    return { error: 'Gagal sinkron stok fisik gudang: ' + insertError.message }
+  }
+
+  return { success: true as const }
+}
+
+async function syncInventoryStock(supabase: any, params: InventorySyncParams) {
+  const { error: inventorySyncError } = await (supabase as any).rpc('adjust_inventory_stock', {
+    p_org_id: params.orgId,
+    p_product_id: params.productId,
+    p_warehouse_id: params.warehouseId,
+    p_diff: params.diff,
+    p_batch_number: null,
+    p_bin_id: null,
+  })
+
+  if (!inventorySyncError) {
+    return { success: true as const }
+  }
+
+  if (!isAdjustInventoryStockSchemaCacheMiss(inventorySyncError)) {
+    return { error: 'Gagal sinkron stok fisik gudang: ' + inventorySyncError.message }
+  }
+
+  return fallbackInventoryStockSync(params)
+}
+
 export async function getPurchases(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
   const { data: { user } } = await (supabase as any).auth.getUser()
@@ -375,15 +457,15 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
      const whId = receiptWarehouse.id
 
      for (const m of stockMovements) {
-       const { error: inventorySyncError } = await (supabase as any).rpc('adjust_inventory_stock', {
-          p_org_id: orgId,
-          p_product_id: m.product_id,
-          p_warehouse_id: whId,
-          p_diff: m.quantity
+       const inventorySyncResult = await syncInventoryStock(supabase, {
+         orgId,
+         productId: m.product_id,
+         warehouseId: whId,
+         diff: m.quantity,
        })
 
-       if (inventorySyncError) {
-         return { error: 'Gagal sinkron stok fisik gudang: ' + inventorySyncError.message }
+       if ('error' in inventorySyncResult) {
+         return inventorySyncResult
        }
      }
   }
