@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 
-export async function getBSCMetrics(orgId: string) {
+export async function getBSCMetrics(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
   const db = supabase as any
   const now = new Date()
@@ -13,13 +13,19 @@ export async function getBSCMetrics(orgId: string) {
 
   // ===== PERSPECTIVE 1: FINANCIAL =====
   // Anchor by org via journal_entries, then get P&L lines
-  const { data: thisMonthEntries } = await db
+  let thisMonthEntriesQuery = db
     .from('journal_entries')
     .select('id')
     .eq('org_id', orgId)
     .eq('status', 'POSTED')
     .gte('entry_date', monthStart)
     .lte('entry_date', monthEnd)
+
+  if (branchId) {
+    thisMonthEntriesQuery = thisMonthEntriesQuery.eq('branch_id', branchId)
+  }
+
+  const { data: thisMonthEntries } = await thisMonthEntriesQuery
 
   const thisIds = (thisMonthEntries || []).map((e: any) => e.id)
 
@@ -38,13 +44,19 @@ export async function getBSCMetrics(orgId: string) {
   }
 
   // Last month for comparison
-  const { data: lastMonthEntries } = await db
+  let lastMonthEntriesQuery = db
     .from('journal_entries')
     .select('id')
     .eq('org_id', orgId)
     .eq('status', 'POSTED')
     .gte('entry_date', lastMonthStart)
     .lte('entry_date', lastMonthEnd)
+
+  if (branchId) {
+    lastMonthEntriesQuery = lastMonthEntriesQuery.eq('branch_id', branchId)
+  }
+
+  const { data: lastMonthEntries } = await lastMonthEntriesQuery
 
   const lastIds = (lastMonthEntries || []).map((e: any) => e.id)
   let lastRevenue = 0
@@ -65,11 +77,17 @@ export async function getBSCMetrics(orgId: string) {
   const revenueGrowth = lastRevenue > 0 ? ((currentRevenue - lastRevenue) / lastRevenue) * 100 : 0
 
   // ===== PERSPECTIVE 2: CUSTOMER (Sales) =====
-  const { data: salesData } = await db
+  let salesQuery = db
     .from('sales')
     .select('id, grand_total, status, customer_id')
     .eq('org_id', orgId)
     .gte('created_at', monthStart)
+
+  if (branchId) {
+    salesQuery = salesQuery.eq('branch_id', branchId)
+  }
+
+  const { data: salesData } = await salesQuery
 
   const mtdSales = (salesData || []).reduce((s: any, x: any) => s + Number(x.grand_total), 0)
   const totalOrders = (salesData || []).length
@@ -77,43 +95,79 @@ export async function getBSCMetrics(orgId: string) {
 
   // ===== PERSPECTIVE 3: INTERNAL PROCESS (Operational efficiency) =====
   // Pending approvals / drafts (bottleneck indicator)
-  const { count: pendingPurchases } = await db
+  let pendingPurchasesQuery = db
     .from('purchases')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'DRAFT')
 
-  const { count: pendingSales } = await db
+  if (branchId) {
+    pendingPurchasesQuery = pendingPurchasesQuery.eq('branch_id', branchId)
+  }
+
+  const { count: pendingPurchases } = await pendingPurchasesQuery
+
+  let pendingSalesQuery = db
     .from('sales')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'DRAFT')
 
-  const { count: totalAssets } = await db
+  if (branchId) {
+    pendingSalesQuery = pendingSalesQuery.eq('branch_id', branchId)
+  }
+
+  const { count: pendingSales } = await pendingSalesQuery
+
+  let totalAssetsQuery = db
     .from('fixed_assets')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'ACTIVE')
 
-  const { count: overdueAssets } = await db
+  if (branchId) {
+    totalAssetsQuery = totalAssetsQuery.eq('branch_id', branchId)
+  }
+
+  const { count: totalAssets } = await totalAssetsQuery
+
+  let overdueAssetsQuery = db
     .from('fixed_assets')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'ACTIVE')
     .or(`last_depreciation_date.is.null,last_depreciation_date.lt.${lastMonthEnd}`)
 
+  if (branchId) {
+    overdueAssetsQuery = overdueAssetsQuery.eq('branch_id', branchId)
+  }
+
+  const { count: overdueAssets } = await overdueAssetsQuery
+
   // ===== PERSPECTIVE 4: LEARNING & GROWTH =====
-  const { count: employees } = await db
+  let employeesQuery = db
     .from('employees')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'ACTIVE')
 
-  const { count: payrollRuns } = await db
+  if (branchId) {
+    employeesQuery = employeesQuery.eq('branch_id', branchId)
+  }
+
+  const { count: employees } = await employeesQuery
+
+  let payrollRunsQuery = db
     .from('payroll_runs')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'PAID')
+
+  if (branchId) {
+    payrollRunsQuery = payrollRunsQuery.eq('branch_id', branchId)
+  }
+
+  const { count: payrollRuns } = await payrollRunsQuery
 
   return {
     financial: {

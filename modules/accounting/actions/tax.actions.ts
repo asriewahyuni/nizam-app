@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 
-export async function getTaxSummary(orgId: string, startDate?: string, endDate?: string) {
+export async function getTaxSummary(orgId: string, startDate?: string, endDate?: string, branchId?: string | null) {
   const supabase = await createClient()
   const db = supabase as any
 
@@ -35,13 +35,19 @@ export async function getTaxSummary(orgId: string, startDate?: string, endDate?:
   const taxAccountIds = taxAccounts.map((a: any) => a.id)
 
   // ── STEP 2: Get relevant journal entry IDs in date range ─────────────────
-  const { data: entries, error: entErr } = await db
+  let entriesQuery = db
     .from('journal_entries')
     .select('id')
     .eq('org_id', orgId)
     .eq('status', 'POSTED')
     .gte('entry_date', sDate)
     .lte('entry_date', eDate)
+
+  if (branchId) {
+    entriesQuery = entriesQuery.eq('branch_id', branchId)
+  }
+
+  const { data: entries, error: entErr } = await entriesQuery
 
   if (entErr || !entries || entries.length === 0) {
     return {

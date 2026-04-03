@@ -175,6 +175,21 @@ export type FleetTerminal = {
   radius_meters: number | null; qr_code_token: string | null
   created_at: string
 }
+export type FixedAsset = {
+  id: string; org_id: string; branch_id: string; code: string
+  name: string; description: string | null; category: string | null
+  purchase_date: string; purchase_price: number; salvage_value: number
+  useful_life_months: number; asset_account_id: string | null
+  accum_dep_account_id: string | null; dep_expense_account_id: string | null
+  depreciation_method: string; status: string
+  accumulated_depreciation: number; current_book_value: number
+  last_depreciation_date: string | null; created_at: string; updated_at: string
+}
+export type AssetDepreciationLog = {
+  id: string; asset_id: string; org_id: string; branch_id: string
+  period_date: string; amount: number; journal_entry_id: string | null
+  created_at: string
+}
 export type ProductionBom = {
   id: string; org_id: string; branch_id: string | null; product_id: string
   code: string; description: string | null; is_active: boolean
@@ -280,6 +295,18 @@ export interface Database {
         Row: Attendance
         Insert: Omit<Attendance, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
         Update: Partial<Attendance>
+        Relationships: []
+      }
+      fixed_assets: {
+        Row: FixedAsset
+        Insert: Omit<FixedAsset, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<FixedAsset>
+        Relationships: []
+      }
+      asset_depreciation_logs: {
+        Row: AssetDepreciationLog
+        Insert: Omit<AssetDepreciationLog, 'id' | 'created_at'> & { id?: string; created_at?: string }
+        Update: Partial<AssetDepreciationLog>
         Relationships: []
       }
       production_boms: {

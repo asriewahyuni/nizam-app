@@ -2,16 +2,100 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
 import { createJournalEntry } from './journal.actions'
 
-export async function getFixedAssets(orgId: string) {
-  const supabase = await createClient()
+type ActiveBranchResult =
+  | { branchId: string }
+  | { error: string }
 
-  const { data, error } = await ((supabase as any).from('fixed_assets') as any)
-    .select('*')
+type FixedAssetAccessRecord = {
+  id: string
+  org_id: string
+  branch_id: string | null
+  accumulated_depreciation: number | null
+  current_book_value: number | null
+  purchase_price: number | null
+  salvage_value: number | null
+  useful_life_months: number | null
+  last_depreciation_date: string | null
+  purchase_date: string
+  name: string
+  code: string
+  status: string
+  asset_account_id: string | null
+  accum_dep_account_id: string | null
+  dep_expense_account_id: string | null
+}
+
+async function resolveAssetsBranchId(orgId: string, branchId?: string | null) {
+  const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) {
+    return branchSelection
+  }
+
+  return { branchId: branchSelection.branchId }
+}
+
+async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
+  const branchSelection = await resolveAccessibleBranchSelection(orgId)
+  if ('error' in branchSelection || !branchSelection.branchId) {
+    return { error: errorMessage }
+  }
+
+  return { branchId: branchSelection.branchId }
+}
+
+async function getAccessibleAsset(
+  supabase: any,
+  orgId: string,
+  assetId: string,
+  branchId: string
+): Promise<FixedAssetAccessRecord | null> {
+  const { data, error } = await (supabase as any)
+    .from('fixed_assets')
+    .select(`
+      id,
+      org_id,
+      branch_id,
+      accumulated_depreciation,
+      current_book_value,
+      purchase_price,
+      salvage_value,
+      useful_life_months,
+      last_depreciation_date,
+      purchase_date,
+      name,
+      code,
+      status,
+      asset_account_id,
+      accum_dep_account_id,
+      dep_expense_account_id
+    `)
+    .eq('id', assetId)
     .eq('org_id', orgId)
-    .order('purchase_date', { ascending: false })
+    .eq('branch_id', branchId)
+    .maybeSingle()
+
+  if (error) return null
+  return (data as FixedAssetAccessRecord | null) ?? null
+}
+
+export async function getFixedAssets(orgId: string, branchId?: string | null) {
+  const supabase = await createClient()
+  const branchSelection = await resolveAssetsBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
+
+  let query = ((supabase as any).from('fixed_assets') as any)
+    .select('*, branch:branches(id, name, code)')
+    .eq('org_id', orgId)
+
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data, error } = await query.order('purchase_date', { ascending: false })
 
   if (error) {
     (console as any).error('Error fetching fixed assets:', error)
@@ -23,6 +107,11 @@ export async function getFixedAssets(orgId: string) {
 
 export async function createFixedAsset(orgId: string, assetData: any) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk mendaftarkan aset tetap.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
   // 1. Persiapan Data (Split Payment Support)
   const { 
@@ -43,13 +132,14 @@ export async function createFixedAsset(orgId: string, assetData: any) {
     .insert({
        ...finalAssetData,
        org_id: orgId,
+       branch_id: activeBranchResult.branchId,
        acquisition_method,
        source_account_id: (acquisition_method !== 'SPLIT' && source_account_id) ? source_account_id : null,
        asset_account_id: finalAssetData.asset_account_id || null,
        accum_dep_account_id: finalAssetData.accum_dep_account_id || null,
        dep_expense_account_id: finalAssetData.dep_expense_account_id || null
     })
-    .select()
+    .select('*, branch:branches(id, name, code)')
     .single()
 
   if (assetError) {
@@ -108,6 +198,7 @@ export async function createFixedAsset(orgId: string, assetData: any) {
   if (journalLines.length > 1) {
     const resJournal = await createJournalEntry({
       org_id: orgId,
+      branch_id: activeBranchResult.branchId,
       entry_date: asset.purchase_date,
       description: description,
       reference_type: 'ADJUSTMENT',
@@ -129,11 +220,18 @@ export async function createFixedAsset(orgId: string, assetData: any) {
 // ─────────────────────────────────────────────────────────────
 // previewOrganizationDepreciation — Idiot-Proof Preview (UX MASTER)
 // ─────────────────────────────────────────────────────────────
-export async function previewOrganizationDepreciation(orgId: string) {
+export async function previewOrganizationDepreciation(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk melihat preview penyusutan aset.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+
   const { data: assets, error: fetchError } = await ((supabase as any).from('fixed_assets') as any)
     .select('*')
     .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
     .eq('status', 'ACTIVE')
 
   if (fetchError || !assets) return { error: 'Gagal mengambil data aset.' }
@@ -179,13 +277,19 @@ export async function previewOrganizationDepreciation(orgId: string) {
 // ─────────────────────────────────────────────────────────────
 // runOrganizationDepreciation — Main Execution Engine
 // ─────────────────────────────────────────────────────────────
-export async function runOrganizationDepreciation(orgId: string) {
+export async function runOrganizationDepreciation(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk menjalankan penyusutan aset.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
   // 1. Ambil semua aset aktif yang bisa disusutkan
   const { data: assets, error: assetError } = await ((supabase as any).from('fixed_assets') as any)
     .select('*')
     .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
     .eq('status', 'ACTIVE')
     .neq('depreciation_method', 'NON_DEPRECIABLE')
 
@@ -236,6 +340,7 @@ export async function runOrganizationDepreciation(orgId: string) {
       // POSTING JURNAL OTOMATIS
       const journalRes = await createJournalEntry({
         org_id: orgId,
+        branch_id: activeBranchResult.branchId,
         entry_date: nextRunDate.toISOString().split('T')[0],
         description: description,
         reference_type: 'DEPRECIATION',
@@ -269,6 +374,7 @@ export async function runOrganizationDepreciation(orgId: string) {
             last_depreciation_date: nextRunDate.toISOString().split('T')[0]
           })
           .eq('id', asset.id)
+          .eq('branch_id', activeBranchResult.branchId)
 
         if (updateError) (console as any).error('Error updating asset state:', updateError)
 
@@ -276,6 +382,7 @@ export async function runOrganizationDepreciation(orgId: string) {
         await ((supabase as any).from('asset_depreciation_logs') as any).insert({
           asset_id: asset.id,
           org_id: orgId,
+          branch_id: activeBranchResult.branchId,
           period_date: nextRunDate.toISOString().split('T')[0],
           amount: monthlyAmount,
           journal_entry_id: (journalRes as any).entryId
@@ -305,6 +412,16 @@ export async function runOrganizationDepreciation(orgId: string) {
 
 export async function updateFixedAsset(assetId: string, orgId: string, assetData: any) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk memperbarui aset tetap.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+
+  const accessibleAsset = await getAccessibleAsset(supabase as any, orgId, assetId, activeBranchResult.branchId)
+  if (!accessibleAsset) {
+    return { error: 'Aset tetap tidak ditemukan pada unit aktif.' }
+  }
 
   const { 
     source_account_id, 
@@ -324,7 +441,7 @@ export async function updateFixedAsset(assetId: string, orgId: string, assetData
   // GUARDRAIL: Jika sudah ada penyusutan, melarang edit data finansial
   const { count: logCount } = await ((supabase as any).from('asset_depreciation_logs') as any)
     .select('*', { count: 'exact', head: true })
-    .eq('asset_id', assetId)
+    .eq('asset_id', accessibleAsset.id)
 
   if (logCount && logCount > 0) {
      const hasFinancialEdit = 
@@ -348,9 +465,10 @@ export async function updateFixedAsset(assetId: string, orgId: string, assetData
 
   const { data, error } = await ((supabase as any).from('fixed_assets') as any)
     .update(sanitizedData)
-    .eq('id', assetId)
+    .eq('id', accessibleAsset.id)
     .eq('org_id', orgId)
-    .select()
+    .eq('branch_id', activeBranchResult.branchId)
+    .select('*, branch:branches(id, name, code)')
     .single()
 
   if (error) {
@@ -364,11 +482,17 @@ export async function updateFixedAsset(assetId: string, orgId: string, assetData
 
 export async function deleteFixedAsset(assetId: string, orgId: string) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk menghapus aset tetap.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
   const { error } = await ((supabase as any).from('fixed_assets') as any)
     .delete()
     .eq('id', assetId)
     .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
 
   if (error) {
     (console as any).error('Error deleting fixed asset:', error)
@@ -387,10 +511,25 @@ export async function disposeFixedAsset(orgId: string, payload: {
   notes?: string
 }) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk melepas aset tetap.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+
+  const accessibleAsset = await getAccessibleAsset(
+    supabase as any,
+    orgId,
+    payload.assetId,
+    activeBranchResult.branchId
+  )
+  if (!accessibleAsset) {
+    return { error: 'Aset tetap tidak ditemukan pada unit aktif.' }
+  }
 
   const { data, error } = await (supabase as any).rpc('process_asset_disposal', {
     p_org_id: orgId,
-    p_asset_id: payload.assetId,
+    p_asset_id: accessibleAsset.id,
     p_sale_price: payload.salePrice,
     p_sale_date: payload.saleDate,
     p_cash_account_id: payload.cashAccountId,

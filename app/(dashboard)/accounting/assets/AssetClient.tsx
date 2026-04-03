@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { startTransition, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Landmark, Building2, CarFront, Monitor, Plus, Calculator, History, Trash2, Calendar, FileText, X, Printer, QrCode, Pencil, DollarSign, AlertTriangle } from 'lucide-react'
 import Barcode from 'react-barcode'
 import { QRCodeCanvas } from 'qrcode.react'
@@ -10,6 +11,8 @@ import { formatDate } from '@/lib/utils'
 interface AssetClientProps {
   orgId: string
   orgName: string
+  activeBranchId?: string | null
+  activeBranchName?: string | null
   initialAssets: any[]
   coa: any[]
 }
@@ -70,7 +73,15 @@ function SearchableSelect({ label, options, value, onChange, placeholder, requir
   )
 }
 
-export function AssetClient({ orgId, orgName, initialAssets, coa }: AssetClientProps) {
+export function AssetClient({
+  orgId,
+  orgName,
+  activeBranchId = null,
+  activeBranchName = null,
+  initialAssets,
+  coa,
+}: AssetClientProps) {
+  const router = useRouter()
   const [assets, setAssets] = useState(initialAssets)
   const [showModal, setShowModal] = useState(false)
   const [showLabelModal, setShowLabelModal] = useState(false)
@@ -92,6 +103,13 @@ export function AssetClient({ orgId, orgName, initialAssets, coa }: AssetClientP
   })
   const [disposeLoading, setDisposeLoading] = useState(false)
   const [disposeResult, setDisposeResult] = useState<any>(null)
+  const branchGuardMessage = 'Pilih satu unit aktif terlebih dahulu untuk mengelola aset tetap.'
+
+  const refreshAssetsPage = () => {
+    startTransition(() => {
+      router.refresh()
+    })
+  }
 
   const [formData, setFormData] = useState({
     code: '',
@@ -139,6 +157,10 @@ export function AssetClient({ orgId, orgName, initialAssets, coa }: AssetClientP
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!activeBranchId) {
+      alert(branchGuardMessage)
+      return
+    }
     setLoading(true)
 
     if (!formData.asset_account_id || !formData.accum_dep_account_id || !formData.dep_expense_account_id) {
@@ -213,6 +235,10 @@ export function AssetClient({ orgId, orgName, initialAssets, coa }: AssetClientP
   }
 
   const handleEdit = (asset: any) => {
+    if (!activeBranchId) {
+      alert(branchGuardMessage)
+      return
+    }
     setFormData({
       code: asset.code,
       name: asset.name,
@@ -239,6 +265,10 @@ export function AssetClient({ orgId, orgName, initialAssets, coa }: AssetClientP
   }
 
   const handleDelete = async (asset: any) => {
+     if (!activeBranchId) {
+       alert(branchGuardMessage)
+       return
+     }
      if (!confirm(`Hapus aset "${asset.name}"? Data ini tidak bisa dikembalikan.`)) return
      const res = await deleteFixedAsset(asset.id, orgId)
      if (res.error) alert(res.error)
@@ -267,8 +297,12 @@ export function AssetClient({ orgId, orgName, initialAssets, coa }: AssetClientP
   }
 
   const handlePreview = async () => {
+    if (!activeBranchId) {
+      alert(branchGuardMessage)
+      return
+    }
     setDepProcessing(true)
-    const res = await previewOrganizationDepreciation(orgId)
+    const res = await previewOrganizationDepreciation(orgId, activeBranchId)
     setDepProcessing(false)
     if (res.projections) {
       setProjections(res.projections)
@@ -279,6 +313,10 @@ export function AssetClient({ orgId, orgName, initialAssets, coa }: AssetClientP
   }
 
   const handleOpenDisposal = (asset: any) => {
+    if (!activeBranchId) {
+      alert(branchGuardMessage)
+      return
+    }
     setSelectedAssetForDisposal(asset)
     setDisposeResult(null)
     setDisposalForm({
@@ -291,6 +329,10 @@ export function AssetClient({ orgId, orgName, initialAssets, coa }: AssetClientP
   }
 
   const handleDispose = async () => {
+    if (!activeBranchId) {
+      alert(branchGuardMessage)
+      return
+    }
     if (!disposalForm.cashAccountId) return alert('Pilih Akun Penerimaan Kas/Bank terlebih dahulu!')
     if (!confirm(`Konfirmasi Jual/Lepas Aset "${selectedAssetForDisposal?.name}"?\nTindakan ini tidak bisa dibatalkan, status aset akan berubah ke SOLD.`)) return
 
@@ -321,48 +363,66 @@ export function AssetClient({ orgId, orgName, initialAssets, coa }: AssetClientP
             <Landmark className="text-blue-600" size={40} />
             Manajemen Aset Tetap
           </h1>
-          <p className="text-slate-500 font-medium text-lg mt-2">Inventory Aset, Kapitalisasi, dan Kalkulasi Penyusutan Berjalan.</p>
+          <p className="text-slate-500 font-medium text-lg mt-2">
+            Inventory Aset, Kapitalisasi, dan Kalkulasi Penyusutan Berjalan.
+            {activeBranchName ? ` Scope aktif: ${activeBranchName}.` : ' Mode semua unit hanya baca.'}
+          </p>
         </div>
         
         <div className="flex items-center gap-3">
           <button 
-            disabled={depProcessing}
+            disabled={!activeBranchId || depProcessing}
             onClick={handlePreview}
-            className="flex items-center gap-2 px-6 py-4 bg-white border-2 border-slate-100 hover:border-blue-200 hover:bg-blue-50 text-blue-600 font-black rounded-3xl transition-all shadow-sm active:scale-95 disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-4 bg-white border-2 border-slate-100 hover:border-blue-200 hover:bg-blue-50 text-blue-600 font-black rounded-3xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <History size={20} />
             Preview Jurnal
           </button>
 
           <button 
-            disabled={depProcessing}
+            disabled={!activeBranchId || depProcessing}
             onClick={async () => {
               if (!confirm("Jalankan Posting Jurnal Penyusutan Otomatis sekarang?")) return
               setDepProcessing(true)
-              const res = await runOrganizationDepreciation(orgId)
+              const res = await runOrganizationDepreciation(orgId, activeBranchId)
               setDepProcessing(false)
               if (res.success) {
                 alert(`Penyusutan Selesai! ${res.processed} Jurnal Otomatis telah diterbitkan.`)
-                window.location.reload()
+                refreshAssetsPage()
               } else {
                 alert("Gagal: " + res.error)
               }
             }}
-            className="flex items-center gap-2 px-6 py-4 bg-white border-2 border-slate-100 hover:border-emerald-200 hover:bg-emerald-50 text-emerald-600 font-black rounded-3xl transition-all shadow-sm active:scale-95 disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-4 bg-white border-2 border-slate-100 hover:border-emerald-200 hover:bg-emerald-50 text-emerald-600 font-black rounded-3xl transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Calculator size={20} className={depProcessing ? 'animate-spin' : ''} />
             {depProcessing ? 'Sedang Memproses...' : 'Jalankan Penyusutan'}
           </button>
 
           <button 
+            disabled={!activeBranchId}
             onClick={() => { setEditingAssetId(null); setShowModal(true); }}
-            className="flex items-center gap-2 px-8 py-4 bg-blue-600 hover:bg-indigo-700 text-white font-black rounded-3xl transition-all shadow-xl shadow-blue-200 active:scale-95"
+            className="flex items-center gap-2 px-8 py-4 bg-blue-600 hover:bg-indigo-700 text-white font-black rounded-3xl transition-all shadow-xl shadow-blue-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={24} />
             Registrasi Aset Baru
           </button>
         </div>
       </div>
+
+      {!activeBranchId && (
+        <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-6 py-5 flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-white text-amber-500 border border-amber-100 flex items-center justify-center shrink-0">
+            <AlertTriangle size={22} />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-black text-amber-900 uppercase tracking-widest">Pilih Unit Aktif</h3>
+            <p className="text-sm font-medium text-amber-800/80">
+              Anda sedang melihat aset lintas unit. Pilih satu unit dari header untuk mendaftarkan aset, menjalankan penyusutan, mengubah data, atau melepas aset.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -448,6 +508,11 @@ export function AssetClient({ orgId, orgName, initialAssets, coa }: AssetClientP
                                 <div className="max-w-[200px]">
                                    <p className="font-black text-slate-900 truncate">{asset.name}</p>
                                    <p className="text-xs font-mono font-bold text-slate-400 uppercase tracking-tighter mt-1">{asset.code}</p>
+                                   {asset.branch?.name && (
+                                     <span className="mt-2 inline-flex px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-[0.18em] border border-blue-100">
+                                       {asset.branch.name}
+                                     </span>
+                                   )}
                                 </div>
                              </div>
                           </td>
@@ -475,9 +540,9 @@ export function AssetClient({ orgId, orgName, initialAssets, coa }: AssetClientP
                                  <button onClick={() => { setSelectedAsset(asset); setShowLabelModal(true); }} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm" title="Label Aset"> <QrCode size={18} /> </button>
                                  {asset.status === 'ACTIVE' ? (
                                    <>
-                                     <button onClick={() => handleEdit(asset)} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all shadow-sm" title="Edit Aset"> <Pencil size={18} /> </button>
-                                     <button onClick={() => handleOpenDisposal(asset)} className="p-3 bg-white border border-emerald-200 text-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all shadow-sm" title="Jual / Lepas Aset"> <DollarSign size={18} /> </button>
-                                     <button onClick={() => handleDelete(asset)} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm" title="Hapus Aset"> <Trash2 size={18} /> </button>
+                                     <button disabled={!activeBranchId} onClick={() => handleEdit(asset)} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title="Edit Aset"> <Pencil size={18} /> </button>
+                                     <button disabled={!activeBranchId} onClick={() => handleOpenDisposal(asset)} className="p-3 bg-white border border-emerald-200 text-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title="Jual / Lepas Aset"> <DollarSign size={18} /> </button>
+                                     <button disabled={!activeBranchId} onClick={() => handleDelete(asset)} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" title="Hapus Aset"> <Trash2 size={18} /> </button>
                                    </>
                                  ) : (
                                    <span className="px-3 py-1 text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-400 rounded-full">SOLD</span>
@@ -740,11 +805,11 @@ export function AssetClient({ orgId, orgName, initialAssets, coa }: AssetClientP
                       if (!confirm("Konfirmasi posting jurnal di atas?")) return
                       setShowPreview(false)
                       setDepProcessing(true)
-                      const res = await runOrganizationDepreciation(orgId)
+                      const res = await runOrganizationDepreciation(orgId, activeBranchId)
                       setDepProcessing(false)
                       if (res.success) {
                         alert(`Sukses! ${res.processed} Jurnal telah diposting.`)
-                        window.location.reload()
+                        refreshAssetsPage()
                       } else {
                         alert("Gagal: " + res.error)
                       }
