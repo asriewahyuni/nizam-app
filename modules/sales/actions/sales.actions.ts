@@ -8,6 +8,10 @@ type ActiveBranchResult =
   | { branchId: string }
   | { error: string }
 
+type DeliveryWarehouseResult =
+  | { warehouseId: string }
+  | { error: string }
+
 async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
   const branchSelection = await resolveAccessibleBranchSelection(orgId)
   if ('error' in branchSelection || !branchSelection.branchId) {
@@ -26,6 +30,45 @@ async function resolveActiveBranchId(orgId: string, branchId?: string | null) {
   return { branchId: branchSelection.branchId }
 }
 
+async function resolveDeliveryWarehouseId(
+  supabase: any,
+  orgId: string,
+  branchId: string,
+  explicitWarehouseId?: string | null
+): Promise<DeliveryWarehouseResult> {
+  let query = (supabase as any)
+    .from('warehouses')
+    .select('id, name, branch_id')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .eq('branch_id', branchId)
+
+  if (explicitWarehouseId) {
+    const { data, error } = await query.eq('id', explicitWarehouseId).maybeSingle()
+    if (error || !data) {
+      return { error: 'Gudang pengiriman tidak tersedia pada unit aktif.' }
+    }
+
+    return { warehouseId: data.id }
+  }
+
+  const { data, error } = await query.order('name', { ascending: true }).limit(2)
+  if (error) {
+    return { error: 'Gagal memuat gudang pengiriman.' }
+  }
+
+  const warehouses = (data as Array<{ id: string }>) || []
+  if (warehouses.length === 0) {
+    return { error: 'Belum ada gudang aktif di unit ini. Tambahkan gudang terlebih dahulu.' }
+  }
+
+  if (warehouses.length > 1) {
+    return { error: 'Pilih gudang pengiriman terlebih dahulu karena unit ini memiliki lebih dari satu gudang aktif.' }
+  }
+
+  return { warehouseId: warehouses[0].id }
+}
+
 export async function getSales(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
   const branchSelection = await resolveActiveBranchId(orgId, branchId)
@@ -33,7 +76,7 @@ export async function getSales(orgId: string, branchId?: string | null) {
   const effectiveBranchId = branchSelection.branchId
   let query = supabase
     .from('sales' as any)
-    .select('*, branches(name, code), contacts(name), sales_items(*, products(name, sku, unit)), sales_returns(status, grand_total, return_number), sales_payments(amount, discount_amount)' as any)
+    .select('*, branches(name, code), contacts(name), sales_items(*, products(name, sku, unit, type)), sales_returns(status, grand_total, return_number), sales_payments(amount, discount_amount)' as any)
     .eq('org_id', orgId)
 
   if (effectiveBranchId) {
@@ -116,7 +159,7 @@ export async function createSaleEntry(orgId: string, payload: any) {
   return { success: true, saleId: sale.id }
 }
 
-export async function deliverSale(orgId: string, saleId: string) {
+export async function deliverSale(orgId: string, saleId: string, warehouseId?: string | null) {
   const supabase = await createClient()
   const activeBranchResult = await requireActiveBranchId(
     orgId,
@@ -126,7 +169,7 @@ export async function deliverSale(orgId: string, saleId: string) {
 
   const { data: sale } = await (supabase as any)
     .from('sales' as any)
-    .select('status')
+    .select('status, warehouse_id')
     .eq('id', saleId)
     .eq('org_id', orgId)
     .eq('branch_id', activeBranchResult.branchId)
@@ -134,9 +177,26 @@ export async function deliverSale(orgId: string, saleId: string) {
   if (!sale) return { error: 'Order tidak ditemukan.' }
   if (sale.status === 'FINISHED') return { success: true }
 
+  let resolvedWarehouseId: string | null = null
+  if (warehouseId || sale.warehouse_id) {
+    const resolvedWarehouse = await resolveDeliveryWarehouseId(
+      supabase as any,
+      orgId,
+      activeBranchResult.branchId,
+      warehouseId || sale.warehouse_id || null
+    )
+
+    if ('error' in resolvedWarehouse) {
+      return { error: resolvedWarehouse.error }
+    }
+
+    resolvedWarehouseId = resolvedWarehouse.warehouseId
+  }
+
   const { error } = await (supabase as any).rpc('process_sales_delivery_atomic', {
     p_org_id: orgId,
-    p_sale_id: saleId
+    p_sale_id: saleId,
+    p_warehouse_id: resolvedWarehouseId,
   })
 
   if (error) {
@@ -317,7 +377,7 @@ export async function getQuotations(orgId: string, branchId?: string | null) {
   const effectiveBranchId = branchSelection.branchId
   let query = supabase
     .from('sales' as any)
-    .select('*, branches(name, code), contacts(name), sales_items(*, products(name, sku, unit))' as any)
+    .select('*, branches(name, code), contacts(name), sales_items(*, products(name, sku, unit, type))' as any)
     .eq('org_id', orgId)
     .eq('status', 'QUOTATION')
 

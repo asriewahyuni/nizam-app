@@ -15,7 +15,17 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { formatRupiah } from '@/lib/utils'
 
-export default function SalesClient({ orgId, orgName, sales, customers, products, coa, orgSettings = {} }: any) {
+export default function SalesClient({
+  orgId,
+  orgName,
+  sales,
+  customers,
+  products,
+  warehouses = [],
+  coa,
+  orgSettings = {},
+  activeBranchName,
+}: any) {
   const [showModal, setShowModal] = useState(false)
   const [showCustomerModal, setShowCustomerModal] = useState(false)
    const [loading, setLoading] = useState(false)
@@ -77,6 +87,9 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
   const [discountAmount, setDiscountAmount] = useState<number>(0)
   const [collectionAccountId, setCollectionAccountId] = useState('')
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false)
+  const [selectedSaleForDelivery, setSelectedSaleForDelivery] = useState<any>(null)
+  const [deliveryWarehouseId, setDeliveryWarehouseId] = useState('')
 
   // Sales Form State
   const [customerId, setCustomerId] = useState('')
@@ -261,16 +274,51 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
     setLoading(false)
   }
 
-  const handleDeliverPO = async (id: string) => {
-    if (!confirm('Tandai barang sudah dikirim (Sales -> FINISHED & COGS Dibukukan)?')) return
+  const executeDelivery = async (saleId: string, warehouseId?: string | null) => {
     setLoading(true)
-    const res = await deliverSale(orgId, id)
+    const res = await deliverSale(orgId, saleId, warehouseId || null)
     if (res?.error) setError(res.error)
     else {
       setSuccess('Penjualan berhasil diselesaikan (FINISHED)! Jurnal COGS telah dibukukan otomatis.')
+      setShowDeliveryModal(false)
+      setSelectedSaleForDelivery(null)
+      setDeliveryWarehouseId('')
       setTimeout(() => setSuccess(null), 4000)
     }
     setLoading(false)
+  }
+
+  const handleDeliverPO = async (sale: any) => {
+    const requiresInventorySync = (sale.sales_items || []).some((item: any) => (item?.products?.type || 'INVENTORY') === 'INVENTORY')
+
+    if (!requiresInventorySync) {
+      if (!confirm('Tandai pesanan jasa/non-stok ini sebagai selesai?')) return
+      await executeDelivery(sale.id, null)
+      return
+    }
+
+    const selectedWarehouse = warehouses.find((warehouse: any) => warehouse.id === sale.warehouse_id)
+
+    if (selectedWarehouse) {
+      if (!confirm(`Tandai barang sudah dikirim dari gudang "${selectedWarehouse.name}"?`)) return
+      await executeDelivery(sale.id, selectedWarehouse.id)
+      return
+    }
+
+    if (warehouses.length === 0) {
+      setError(`Belum ada gudang aktif di unit ${activeBranchName || 'terpilih'}. Tambahkan gudang terlebih dahulu.`)
+      return
+    }
+
+    if (warehouses.length === 1) {
+      if (!confirm(`Tandai barang sudah dikirim dari gudang "${warehouses[0].name}"?`)) return
+      await executeDelivery(sale.id, warehouses[0].id)
+      return
+    }
+
+    setSelectedSaleForDelivery(sale)
+    setDeliveryWarehouseId('')
+    setShowDeliveryModal(true)
   }
 
   const handleVoidPO = async (id: string) => {
@@ -528,7 +576,7 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
                     <td className="px-8 py-6">
                        <div className="flex flex-wrap items-center justify-end gap-2">
                          {s.status === 'ORDERED' && (
-                           <button onClick={() => handleDeliverPO(s.id)} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm border border-emerald-100 group/btn" title="Kirim Barang">
+                           <button onClick={() => handleDeliverPO(s)} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm border border-emerald-100 group/btn" title="Kirim Barang">
                              <CheckSquare size={16}/>
                            </button>
                          )}
@@ -865,6 +913,46 @@ export default function SalesClient({ orgId, orgName, sales, customers, products
                     <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-2xl shadow-lg shadow-blue-100">{loading ? 'Menyimpan...' : 'Simpan Customer'}</button>
                   </div>
                 </form>
+             </motion.div>
+          </div>
+        )}
+
+        {showDeliveryModal && selectedSaleForDelivery && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !loading && setShowDeliveryModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl p-8">
+                <h3 className="text-xl font-bold mb-2">Pilih Gudang Pengiriman</h3>
+                <p className="text-sm text-slate-500 font-medium mb-6">
+                  Stok fisik untuk <span className="font-bold text-slate-800">{selectedSaleForDelivery.sale_number}</span> akan dikurangi dari gudang ini.
+                </p>
+
+                <div className="space-y-2 mb-8">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Gudang Aktif di {activeBranchName || 'Unit Terpilih'}</label>
+                  <select
+                    value={deliveryWarehouseId}
+                    onChange={(e) => setDeliveryWarehouseId(e.target.value)}
+                    className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-black text-slate-900 shadow-sm focus:border-emerald-500 transition-all"
+                  >
+                    <option value="">Pilih gudang pengiriman...</option>
+                    {warehouses.map((warehouse: any) => (
+                      <option key={warehouse.id} value={warehouse.id}>
+                        {warehouse.name} ({warehouse.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-slate-100">
+                  <button type="button" onClick={() => setShowDeliveryModal(false)} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-2xl transition">Batal</button>
+                  <button
+                    type="button"
+                    disabled={loading || !deliveryWarehouseId}
+                    onClick={() => executeDelivery(selectedSaleForDelivery.id, deliveryWarehouseId)}
+                    className="flex-1 py-4 px-8 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 rounded-2xl shadow-lg transition"
+                  >
+                    {loading ? 'Memproses...' : 'Kirim Barang'}
+                  </button>
+                </div>
              </motion.div>
           </div>
         )}

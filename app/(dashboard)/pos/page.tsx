@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import POSClient from './POSClient'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getProducts } from '@/modules/inventory/actions/inventory.actions'
+import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 
 export default async function POSPage() {
   const supabase = await createClient()
@@ -15,6 +16,7 @@ export default async function POSPage() {
   const orgId = orgData.org.id
   const activeBranch = await getActiveBranch(orgId)
   const products = activeBranch ? await getProducts(orgId, activeBranch.id) : []
+  const warehouses = activeBranch ? await getWarehouses(orgId, activeBranch.id) : []
   const productsWithStock = (products || [])
     .filter((product: any) => product.is_active)
     .map((product: any) => ({
@@ -37,6 +39,7 @@ export default async function POSPage() {
       products={productsWithStock}
       customers={customers || []}
       accounts={accounts || []}
+      warehouses={warehouses || []}
       currentUser={user}
       activeBranchId={activeBranch?.id || null}
       activeBranchName={activeBranch?.name || null}

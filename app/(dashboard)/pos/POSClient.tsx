@@ -19,6 +19,7 @@ export default function POSClient({
    products,
    customers,
    accounts,
+   warehouses = [],
    currentUser,
    activeBranchId,
    activeBranchName,
@@ -52,6 +53,7 @@ export default function POSClient({
       if (typeof scannedCode !== 'string') setPromoCode('')
    }
    const [cart, setCart] = useState<any[]>([])
+   const requiresWarehouseSelection = cart.some((item: any) => isStockTrackedProduct(item))
    const [searchTerm, setSearchTerm] = useState('')
    const [selectedCustomer, setSelectedCustomer] = useState<string>('')
    const [showAddCustomer, setShowAddCustomer] = useState(false)
@@ -60,9 +62,28 @@ export default function POSClient({
    const [showPayment, setShowPayment] = useState(false)
    const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'TRANSFER' | 'QRIS'>('CASH')
    const [selectedAccount, setSelectedAccount] = useState<string>('')
+   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('')
    const [amountTendered, setAmountTendered] = useState<string>('')
    const [discountAmount, setDiscountAmount] = useState<string>('')
    const [taxPercent, setTaxPercent] = useState<number>(0)
+
+   useEffect(() => {
+      if (!activeBranchId) {
+         setSelectedWarehouseId('')
+         return
+      }
+
+      if (warehouses.some((warehouse: any) => warehouse.id === selectedWarehouseId)) {
+         return
+      }
+
+      if (warehouses.length === 1) {
+         setSelectedWarehouseId(warehouses[0].id)
+         return
+      }
+
+      setSelectedWarehouseId('')
+   }, [activeBranchId, warehouses, selectedWarehouseId])
 
    // ─────────────────────────────────────────────────────────────
    // AUTO-ROUTER: REKENING KASIR DI-SET OTOMATIS BERDASARKAN METODE BAYAR
@@ -261,6 +282,10 @@ export default function POSClient({
          alert(branchGuardMessage)
          return
       }
+      if (requiresWarehouseSelection && !selectedWarehouseId) {
+         alert('Pilih gudang pengeluaran terlebih dahulu.')
+         return
+      }
       if (!selectedAccount) { alert('Pilih laci kas/rekening penerima lebih dulu.'); return }
       if (paymentMethod === 'CASH' && Number(amountTendered.replace(/\D/g, '')) < grandTotal) {
          alert('Nominal uang tunai kurang dari total tagihan.')
@@ -273,6 +298,7 @@ export default function POSClient({
          new_customer_name: showAddCustomer ? newCustomerName : null,
          new_customer_phone: showAddCustomer ? newCustomerPhone : null,
          account_id: selectedAccount,
+         warehouse_id: requiresWarehouseSelection ? selectedWarehouseId : null,
          lines: cart.map((c: any) => ({ product_id: c.id, product_name: c.name, quantity: c.qty, unit_price: c.price })),
          discount_amount: parsedDiscount,
          tax_amount: taxNominal,
@@ -727,6 +753,27 @@ export default function POSClient({
                               </div>
 
                               <div className="space-y-6 flex-1">
+                                 {requiresWarehouseSelection && (
+                                 <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Gudang Pengeluaran</label>
+                                    <select
+                                       value={selectedWarehouseId}
+                                       onChange={e => setSelectedWarehouseId(e.target.value)}
+                                       className="w-full h-12 md:h-14 px-4 bg-white border border-slate-200 rounded-xl font-bold text-xs md:text-sm text-slate-700 outline-none shadow-sm"
+                                    >
+                                       <option value="">Pilih gudang pengeluaran...</option>
+                                       {warehouses.map((warehouse: any) => (
+                                          <option key={warehouse.id} value={warehouse.id}>
+                                             {warehouse.name} ({warehouse.code})
+                                          </option>
+                                       ))}
+                                    </select>
+                                    <p className="text-[10px] text-slate-500 font-medium px-1">
+                                       Stok fisik akan dikurangi dari gudang ini saat transaksi POS selesai.
+                                    </p>
+                                 </div>
+                                 )}
+
                                  <div className="space-y-1.5 opacity-80 pointer-events-none mb-6">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-emerald-700 ml-1 flex items-center gap-1.5">
                                        <CheckCircle2 size={12} /> Auto-Routed ke Rekening POS
@@ -786,7 +833,7 @@ export default function POSClient({
                               </div>
 
                               <div className="pt-6 mt-auto">
-                                 <button disabled={loading || !activeBranchId} onClick={handlePay} className="w-full h-16 md:h-[72px] bg-[#003366] hover:bg-[#002244] text-white flex flex-col items-center justify-center gap-1 rounded-2xl md:rounded-[20px] shadow-xl transition-all font-black text-[11px] md:text-xs tracking-widest disabled:opacity-50">
+                                 <button disabled={loading || !activeBranchId || (requiresWarehouseSelection && !selectedWarehouseId)} onClick={handlePay} className="w-full h-16 md:h-[72px] bg-[#003366] hover:bg-[#002244] text-white flex flex-col items-center justify-center gap-1 rounded-2xl md:rounded-[20px] shadow-xl transition-all font-black text-[11px] md:text-xs tracking-widest disabled:opacity-50">
                                     {loading ? (
                                        <span className="animate-spin border-2 border-white/20 border-t-white rounded-full w-5 h-5 mb-0.5" />
                                     ) : (

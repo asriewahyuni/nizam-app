@@ -4,6 +4,45 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getActiveBranch } from '@/modules/organization/actions/org.actions'
 
+async function resolvePosWarehouseId(
+  supabase: any,
+  orgId: string,
+  branchId: string,
+  explicitWarehouseId?: string | null
+) {
+  let query = (supabase as any)
+    .from('warehouses')
+    .select('id, name')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .eq('branch_id', branchId)
+
+  if (explicitWarehouseId) {
+    const { data, error } = await query.eq('id', explicitWarehouseId).maybeSingle()
+    if (error || !data) {
+      return { error: 'Gudang POS tidak tersedia pada unit aktif.' }
+    }
+
+    return { warehouseId: data.id }
+  }
+
+  const { data, error } = await query.order('name', { ascending: true }).limit(2)
+  if (error) {
+    return { error: 'Gagal memuat gudang POS.' }
+  }
+
+  const warehouses = (data as Array<{ id: string }>) || []
+  if (warehouses.length === 0) {
+    return { error: 'Belum ada gudang aktif di unit ini. Tambahkan gudang terlebih dahulu sebelum memakai POS.' }
+  }
+
+  if (warehouses.length > 1) {
+    return { error: 'Pilih gudang POS terlebih dahulu karena unit ini memiliki lebih dari satu gudang aktif.' }
+  }
+
+  return { warehouseId: warehouses[0].id }
+}
+
 export async function processPosTransaction(orgId: string, payload: any) {
   const supabase = await createClient()
   const { data: { user } } = await (supabase as any).auth.getUser()
@@ -11,6 +50,38 @@ export async function processPosTransaction(orgId: string, payload: any) {
   const activeBranch = await getActiveBranch(orgId)
   if (!activeBranch) {
     return { error: 'Pilih unit aktif terlebih dahulu untuk memproses transaksi POS.' }
+  }
+
+  const productIds = [...new Set((payload.lines || []).map((line: any) => line.product_id).filter(Boolean))]
+  let requiresWarehouse = false
+
+  if (productIds.length > 0) {
+    const { data: productRows, error: productError } = await (supabase as any)
+      .from('products')
+      .select('id, type')
+      .eq('org_id', orgId)
+      .in('id', productIds)
+
+    if (productError) {
+      return { error: 'Gagal memvalidasi produk POS: ' + productError.message }
+    }
+
+    requiresWarehouse = (productRows || []).some((product: any) => (product?.type || 'INVENTORY') === 'INVENTORY')
+  }
+  let resolvedWarehouseId: string | null = null
+
+  if (requiresWarehouse) {
+    const resolvedWarehouse = await resolvePosWarehouseId(
+      supabase as any,
+      orgId,
+      activeBranch.id,
+      payload.warehouse_id || null
+    )
+    if ('error' in resolvedWarehouse) {
+      return { error: resolvedWarehouse.error }
+    }
+
+    resolvedWarehouseId = resolvedWarehouse.warehouseId
   }
 
   // 1. Tuntaskan CRM dan Relational Integrity untuk Pelanggan (Cegah Not Null Constraints)
@@ -56,6 +127,7 @@ export async function processPosTransaction(orgId: string, payload: any) {
     .insert({
       org_id: orgId,
       branch_id: activeBranch.id,
+      warehouse_id: resolvedWarehouseId,
       customer_id: finalCustomerId,
       sale_date: new Date().toISOString().split('T')[0],
       due_date: new Date().toISOString().split('T')[0],
@@ -97,7 +169,8 @@ export async function processPosTransaction(orgId: string, payload: any) {
   // Auto-deliver (reduce stock)
   const { error: deliverErr } = await (supabase as any).rpc('process_sales_delivery_atomic', {
     p_org_id: orgId,
-    p_sale_id: sale.id
+    p_sale_id: sale.id,
+    p_warehouse_id: resolvedWarehouseId,
   })
 
   // Auto-pay (create journal entry)

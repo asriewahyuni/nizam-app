@@ -24,7 +24,7 @@ vi.mock('@/modules/organization/lib/branch-access.server', () => ({
 }))
 
 import { processPosTransaction } from '@/modules/sales/actions/pos.actions'
-import { createSaleEntry, getSales } from '@/modules/sales/actions/sales.actions'
+import { createSaleEntry, deliverSale, getSales } from '@/modules/sales/actions/sales.actions'
 
 describe('Sales Branch Context', () => {
   beforeEach(() => {
@@ -194,6 +194,22 @@ describe('Sales Branch Context', () => {
   })
 
   it('stamps active branch on POS sales transaction', async () => {
+    const productsQuery = {
+      select: vi.fn(() => productsQuery),
+      eq: vi.fn(() => productsQuery),
+      in: vi.fn(() => Promise.resolve({
+        data: [{ id: 'prod-1', type: 'INVENTORY' }],
+        error: null,
+      })),
+    }
+    const warehouseQuery = {
+      select: vi.fn(() => warehouseQuery),
+      eq: vi.fn(() => warehouseQuery),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { id: 'wh-1', name: 'Gudang Utama' },
+        error: null,
+      }),
+    }
     const walkInQuery = {
       select: vi.fn(() => walkInQuery),
       eq: vi.fn(() => walkInQuery),
@@ -230,6 +246,8 @@ describe('Sales Branch Context', () => {
       },
       from: vi.fn((table: string) => {
         if (table === 'contacts') return walkInQuery
+        if (table === 'products') return productsQuery
+        if (table === 'warehouses') return warehouseQuery
         if (table === 'sales') return { insert: salesInsert }
         if (table === 'sales_items') return { insert: salesItemsInsert }
         throw new Error(`Unexpected table ${table}`)
@@ -238,6 +256,7 @@ describe('Sales Branch Context', () => {
     })
 
     const result = await processPosTransaction('org-1', {
+      warehouse_id: 'wh-1',
       lines: [{ product_id: 'prod-1', product_name: 'Produk A', quantity: 1, unit_price: 1000 }],
       account_id: 'cash-1',
       notes: 'POS',
@@ -248,6 +267,7 @@ describe('Sales Branch Context', () => {
       expect.objectContaining({
         org_id: 'org-1',
         branch_id: 'branch-1',
+        warehouse_id: 'wh-1',
       })
     )
     expect(salesItemsInsert).toHaveBeenCalledWith([
@@ -256,5 +276,51 @@ describe('Sales Branch Context', () => {
         branch_id: 'branch-1',
       }),
     ])
+    expect(rpcMock).toHaveBeenCalledWith('process_sales_delivery_atomic', {
+      p_org_id: 'org-1',
+      p_sale_id: 'sale-1',
+      p_warehouse_id: 'wh-1',
+    })
+  })
+
+  it('delivers sales order using selected warehouse for physical stock sync', async () => {
+    const saleQuery = {
+      select: vi.fn(() => saleQuery),
+      eq: vi.fn(() => saleQuery),
+      single: vi.fn().mockResolvedValue({
+        data: { status: 'ORDERED', warehouse_id: null },
+      }),
+    }
+    const warehouseQuery = {
+      select: vi.fn(() => warehouseQuery),
+      eq: vi.fn(() => warehouseQuery),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { id: 'wh-1', name: 'Gudang Utama', branch_id: 'branch-1' },
+        error: null,
+      }),
+    }
+    const rpcMock = vi.fn().mockResolvedValue({ error: null })
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'sales') return saleQuery
+        if (table === 'warehouses') return warehouseQuery
+        throw new Error(`Unexpected table ${table}`)
+      }),
+      rpc: rpcMock,
+    })
+
+    const result = await deliverSale('org-1', 'sale-1', 'wh-1')
+
+    expect(result).toEqual({ success: true })
+    expect(rpcMock).toHaveBeenCalledWith('process_sales_delivery_atomic', {
+      p_org_id: 'org-1',
+      p_sale_id: 'sale-1',
+      p_warehouse_id: 'wh-1',
+    })
   })
 })
