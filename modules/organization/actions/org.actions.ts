@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
 import { generateSlug } from '@/lib/utils'
 import { revalidatePath } from 'next/cache'
@@ -103,6 +103,7 @@ async function createOrganizationRecord(
 ): Promise<CreateOrganizationActionResult> {
   const supabase = await createClient()
   const db = supabase as any
+  const admin = (await createAdminClient()) as any
   const cookieStore = await cookies()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi' }
@@ -142,16 +143,16 @@ async function createOrganizationRecord(
     return { error: 'Gagal membuat organisasi.' }
   }
 
-  const { error: memberError } = await db
+  const { error: memberError } = await admin
     .from('org_members')
     .insert({ org_id: orgId, user_id: user.id, role: 'owner' })
 
   if (memberError) {
-    await db.from('organizations').delete().eq('id', orgId)
+    await admin.from('organizations').delete().eq('id', orgId)
     return { error: 'Gagal menambahkan anggota.' }
   }
 
-  const { error: branchError } = await db
+  const { error: branchError } = await admin
     .from('branches')
     .insert({
       id: defaultBranchId,
@@ -163,7 +164,7 @@ async function createOrganizationRecord(
     })
 
   if (branchError) {
-    await db.from('organizations').delete().eq('id', orgId)
+    await admin.from('organizations').delete().eq('id', orgId)
     return { error: 'Gagal menyiapkan unit default organisasi.' }
   }
 
@@ -404,6 +405,24 @@ export async function uploadLogo(orgId: string, formData: FormData) {
 export async function getOrgMembers(orgId: string) {
   const supabase = await createClient()
   const db = supabase as any
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return []
+
+  const { data: actorMembership } = await db
+    .from('org_members')
+    .select('role')
+    .eq('org_id', orgId)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!actorMembership || !['owner', 'admin'].includes(String(actorMembership.role || ''))) {
+    return []
+  }
+
   const { data } = await db
     .from('org_members')
     .select(`

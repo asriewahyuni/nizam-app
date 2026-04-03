@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export default async function UsersPage() {
   const orgData = await getActiveOrg()
-  if (!orgData || orgData.role !== 'owner') return redirect('/dashboard')
+  if (!orgData || !['owner', 'admin'].includes(orgData.role)) return redirect('/dashboard')
 
   const supabase = await createClient()
   const [members, branches, { data: roles }, invitations] = await Promise.all([

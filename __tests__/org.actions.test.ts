@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
+  createAdminClient: vi.fn(),
   cookies: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn(),
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: mocks.createClient,
+  createAdminClient: mocks.createAdminClient,
 }))
 
 vi.mock('next/headers', () => ({
@@ -124,10 +126,16 @@ describe('Organization Branch Bootstrap', () => {
         }),
       },
       from: vi.fn((table: string) => {
-        if (table === 'organizations') return { insert: orgInsert, delete: vi.fn(() => ({ eq: vi.fn() })) }
+        if (table === 'organizations') return { insert: orgInsert }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+    mocks.createAdminClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
         if (table === 'org_members') return { insert: memberInsert }
         if (table === 'branches') return { insert: branchInsert }
-        throw new Error(`Unexpected table ${table}`)
+        if (table === 'organizations') return { delete: vi.fn(() => ({ eq: vi.fn() })) }
+        throw new Error(`Unexpected admin table ${table}`)
       }),
     })
 
@@ -192,10 +200,16 @@ describe('Organization Branch Bootstrap', () => {
         }),
       },
       from: vi.fn((table: string) => {
-        if (table === 'organizations') return { insert: orgInsert, delete: vi.fn(() => ({ eq: vi.fn() })) }
+        if (table === 'organizations') return { insert: orgInsert }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+    mocks.createAdminClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
         if (table === 'org_members') return { insert: memberInsert }
         if (table === 'branches') return { insert: branchInsert }
-        throw new Error(`Unexpected table ${table}`)
+        if (table === 'organizations') return { delete: vi.fn(() => ({ eq: vi.fn() })) }
+        throw new Error(`Unexpected admin table ${table}`)
       }),
     })
 
@@ -329,5 +343,38 @@ describe('Organization Branch Bootstrap', () => {
         httpOnly: true,
       })
     )
+  })
+
+  it('rejects managers from creating a new branch from the app layer', async () => {
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1', email: 'manager@example.com' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'org_members') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { role: 'manager' },
+              error: null,
+            }),
+          }
+        }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const formData = new FormData()
+    formData.set('name', 'Cabang Surabaya')
+    formData.set('code', 'SBY')
+
+    const result = await createBranch('org-1', formData)
+
+    expect(result).toEqual({
+      error: 'Hanya owner atau admin yang dapat menambahkan unit.',
+    })
   })
 })

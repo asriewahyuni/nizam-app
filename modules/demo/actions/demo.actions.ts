@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -25,6 +25,7 @@ export type DemoBusinessType = 'COMPUTER' | 'CATERING' | 'RESTAURANT' | 'SUPPLIE
 
 export async function startDemoSession(businessName?: string, demoType: DemoBusinessType = 'COMPUTER') {
   const supabase = await createClient()
+  const adminClient = await createAdminClient()
 
   // 1. Sign up or sign in the demo user
   const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
@@ -115,7 +116,7 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
   }
 
   // 4. Make demo user the owner (Include is_active explicitly to be safe)
-  const { error: memberErr } = await authedClient.from('org_members').insert({
+  const { error: memberErr } = await (adminClient as any).from('org_members').insert({
     org_id: orgId,
     user_id: userId,
     role: 'owner',
