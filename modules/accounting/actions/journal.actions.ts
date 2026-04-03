@@ -45,13 +45,19 @@ async function resolveJournalBranchId(input: CreateJournalEntryInput) {
   return { branchId: branchSelection.branchId }
 }
 
-export async function getUnpostedJournalsCount(orgId: string): Promise<number> {
+export async function getUnpostedJournalsCount(orgId: string, branchId?: string | null): Promise<number> {
   const supabase = await createClient()
-  const { count, error } = await (supabase as any)
+  let query = (supabase as any)
     .from('journal_entries')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
     .eq('status', 'DRAFT')
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId)
+  }
+
+  const { count, error } = await query
 
   if (error) {
     (console as any).error('Error fetching unposted journals count:', error)

@@ -187,7 +187,16 @@ export async function getCashFlow(orgId: string, branchId?: BranchFilter) {
   const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0]
 
   // Get all accounts linked to bank/cash module to treat them as cash accounts
-  const { data: linkedAccounts } = await (supabase as any).from('bank_accounts').select('account_id, accounts(code)')
+  let linkedAccountsQuery = (supabase as any)
+    .from('bank_accounts')
+    .select('account_id, accounts(code)')
+    .eq('org_id', orgId)
+
+  if (branchId) {
+    linkedAccountsQuery = linkedAccountsQuery.eq('branch_id', branchId)
+  }
+
+  const { data: linkedAccounts } = await linkedAccountsQuery
   const cashAccountCodes = (linkedAccounts || [])
     .map((la: any) => la.accounts?.code)
     .filter(Boolean)
@@ -278,4 +287,3 @@ export async function getCashFlow(orgId: string, branchId?: BranchFilter) {
     changePercent
   }
 }
-

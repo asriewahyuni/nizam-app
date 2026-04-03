@@ -15,5 +15,14 @@ export default async function JournalPage() {
     getChartOfAccounts(orgData.org.id)
   ])
 
-  return <JournalClient orgId={orgData.org.id} initialEntries={entries} accounts={accounts} userRole={orgData.role} />
+  return (
+    <JournalClient
+      orgId={orgData.org.id}
+      initialEntries={entries}
+      accounts={accounts}
+      userRole={orgData.role}
+      activeBranchId={activeBranch?.id ?? null}
+      activeBranchName={activeBranch?.name ?? null}
+    />
+  )
 }

@@ -441,6 +441,7 @@ export async function payZakat(orgId: string, accountId: string, amount: number)
     entry_date: getIslamicToday(),
     description: 'Pembayaran Zakat Tijarah Haul',
     reference_type: 'MANUAL',
+    allow_org_scope: true,
     auto_post: true,
     lines: [
       { account_id: zakatAcc.id, debit: amount, credit: 0, memo: 'Pembayaran Zakat' },

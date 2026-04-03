@@ -128,17 +128,26 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
   }
 
   // 5. Seed sample data for demo using authed client (so RLS doesn't block inserts)
-  await seedDemoData(authedClient, orgId, demoType)
+  const demoBranchId = await seedDemoData(authedClient, orgId, demoType)
 
   // 6. Set Demo Org ID in Cookie for session-specific tracking
   const cookieStore = await cookies()
   cookieStore.delete('nizam_active_org_id') // Reset shared org cache for fresh demo
+  cookieStore.delete('nizam_active_branch_id')
   cookieStore.set('nizam_demo_org_id', orgId, { 
     maxAge: 60 * 60 * 6, // 6 hours
     path: '/',
     httpOnly: true,
     sameSite: 'lax'
   })
+  if (demoBranchId) {
+    cookieStore.set('nizam_active_branch_id', demoBranchId, {
+      maxAge: 60 * 60 * 6,
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+    })
+  }
 
   revalidatePath('/', 'layout')
   redirect('/dashboard')
@@ -187,6 +196,7 @@ export async function signOutDemo() {
   // Clear ALL demo + active org cookies
   cookieStore.delete('nizam_demo_org_id')
   cookieStore.delete('nizam_active_org_id')
+  cookieStore.delete('nizam_active_branch_id')
 
   await supabase.auth.signOut()
   revalidatePath('/', 'layout')
@@ -206,9 +216,39 @@ export async function isDemoSession(): Promise<boolean> {
 // ═══════════════════════════════════════════════════════════
 // SEED DEMO DATA — Products, Warehouses, Contacts, etc.
 // ═══════════════════════════════════════════════════════════
+async function ensureDemoBranch(supabase: any, orgId: string) {
+  const { data: existingBranch } = await supabase
+    .from('branches')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (existingBranch?.id) return existingBranch.id as string
+
+  const { data: branch } = await supabase
+    .from('branches')
+    .insert({
+      id: crypto.randomUUID(),
+      org_id: orgId,
+      name: 'Unit Utama',
+      code: 'MAIN',
+      is_active: true,
+    })
+    .select('id')
+    .single()
+
+  return branch?.id ? String(branch.id) : null
+}
+
 export async function seedDemoData(supabase: any, orgId: string, demoType: DemoBusinessType) {
+  const branchId = await ensureDemoBranch(supabase, orgId)
+  if (!branchId) return null
+
   // 🔴 AUTHENTIC BLANK DEMO: No products, no warehouses, no contacts.
-  if (demoType === 'BLANK') return 
+  if (demoType === 'BLANK') return branchId
 
   // --- WAREHOUSES & CONTACTS & PRODUCTS BY TYPE ---
   let warehousesData: any[] = []
@@ -217,8 +257,8 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
 
   if (demoType === 'COMPUTER') {
     warehousesData = [
-      { id: crypto.randomUUID(), org_id: orgId, name: 'Gudang Utama', code: 'GU-01', address: 'Jl. Industri No.1' },
-      { id: crypto.randomUUID(), org_id: orgId, name: 'Gudang Produksi', code: 'GP-01', address: 'Jl. Pabrik No.5' },
+      { id: crypto.randomUUID(), org_id: orgId, branch_id: branchId, name: 'Gudang Utama', code: 'GU-01', address: 'Jl. Industri No.1' },
+      { id: crypto.randomUUID(), org_id: orgId, branch_id: branchId, name: 'Gudang Produksi', code: 'GP-01', address: 'Jl. Pabrik No.5' },
     ]
     contactsData = [
       { org_id: orgId, name: 'PT Supplier Jaya', type: 'SUPPLIER', phone: '021-1234567', email: 'order@supplierjaya.com' },
@@ -237,8 +277,8 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
     ]
   } else if (demoType === 'CATERING') {
     warehousesData = [
-      { id: crypto.randomUUID(), org_id: orgId, name: 'Dapur Utama', code: 'WH-K-01', address: 'Pusat Produksi' },
-      { id: crypto.randomUUID(), org_id: orgId, name: 'Gudang Bahan Baku', code: 'WH-K-02', address: 'Area Pendingin' },
+      { id: crypto.randomUUID(), org_id: orgId, branch_id: branchId, name: 'Dapur Utama', code: 'WH-K-01', address: 'Pusat Produksi' },
+      { id: crypto.randomUUID(), org_id: orgId, branch_id: branchId, name: 'Gudang Bahan Baku', code: 'WH-K-02', address: 'Area Pendingin' },
     ]
     contactsData = [
       { org_id: orgId, name: 'Supplier Beras Makmur', type: 'SUPPLIER', phone: '0811223344', email: 'v-beras@example.com' },
@@ -254,8 +294,8 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
     ]
   } else if (demoType === 'RESTAURANT') {
     warehousesData = [
-      { id: crypto.randomUUID(), org_id: orgId, name: 'Area Bar', code: 'WH-R-01', address: 'Front Counter' },
-      { id: crypto.randomUUID(), org_id: orgId, name: 'Kitchen Supply', code: 'WH-R-02', address: 'Back Area' },
+      { id: crypto.randomUUID(), org_id: orgId, branch_id: branchId, name: 'Area Bar', code: 'WH-R-01', address: 'Front Counter' },
+      { id: crypto.randomUUID(), org_id: orgId, branch_id: branchId, name: 'Kitchen Supply', code: 'WH-R-02', address: 'Back Area' },
     ]
     contactsData = [
       { org_id: orgId, name: 'Pasar Induk Kramat Jati', type: 'SUPPLIER' },
@@ -271,8 +311,8 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
     ]
   } else if (demoType === 'SUPPLIER_MBG') {
     warehousesData = [
-      { id: crypto.randomUUID(), org_id: orgId, name: 'Distribution Center 1', code: 'WH-M-01', address: 'Hub Utama MBG' },
-      { id: crypto.randomUUID(), org_id: orgId, name: 'Cold Storage A', code: 'WH-M-02', address: 'Area Susu & Buah' },
+      { id: crypto.randomUUID(), org_id: orgId, branch_id: branchId, name: 'Distribution Center 1', code: 'WH-M-01', address: 'Hub Utama MBG' },
+      { id: crypto.randomUUID(), org_id: orgId, branch_id: branchId, name: 'Cold Storage A', code: 'WH-M-02', address: 'Area Susu & Buah' },
     ]
     contactsData = [
       { org_id: orgId, name: 'Gabungan Kelompok Tani', type: 'SUPPLIER' },
@@ -342,6 +382,7 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
 
     const { data: entry, error: entErr } = await supabase.from('journal_entries').insert({
       org_id: orgId,
+      branch_id: branchId,
       entry_date: new Date().toISOString().split('T')[0],
       description: 'Saldo Awal Persediaan (Demo Seed)',
       status: 'DRAFT', // MUST START AS DRAFT TO ALLOW LINE INSERTION
@@ -367,7 +408,8 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
         unit_price: finalProducts.find((p: any) => p.id === s.product_id)?.purchase_price || 0,
         reference_type: 'INITIAL',
         reference_id: entry.id,
-        notes: 'Saldo awal demo (' + demoType + ')'
+        notes: 'Saldo awal demo (' + demoType + ')',
+        branch_id: branchId,
       }))
 
       await supabase.from('stock_movements').insert(movements)
@@ -382,6 +424,7 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
 
     const { data: cashEntry, error: cashEntErr } = await supabase.from('journal_entries').insert({
       org_id: orgId,
+      branch_id: branchId,
       entry_date: new Date().toISOString().split('T')[0],
       description: 'Setoran Modal Awal (Cash & Bank Injection)',
       status: 'DRAFT', // MUST START AS DRAFT
@@ -399,5 +442,6 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
       await supabase.from('journal_entries').update({ status: 'POSTED' }).eq('id', cashEntry.id)
     }
   }
-}
 
+  return branchId
+}

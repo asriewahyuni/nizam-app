@@ -216,7 +216,13 @@ export async function fixEmptyPayrollJournals(orgId: string) {
      accExpense = altAcc
   }
   
-  const { data: firstBank } = await (supabase as any).from('bank_accounts').select('account_id').eq('org_id', orgId).limit(1).maybeSingle()
+  const { data: firstBank } = await (supabase as any)
+    .from('bank_accounts')
+    .select('account_id')
+    .eq('org_id', orgId)
+    .eq('branch_id', activeBranch.branchId)
+    .limit(1)
+    .maybeSingle()
 
   if (!accExpense || !firstBank) {
       console.warn('Fallback Account for Payroll not found (Code 6001 or "Beban Gaji") or Bank Account missing.');

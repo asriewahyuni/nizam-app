@@ -28,13 +28,13 @@ export type AccountBalance = {
   total_debit: number; total_credit: number
 }
 export type BankAccount = {
-  id: string; org_id: string; account_id: string; account_name: string
-  bank_name: string; account_number: string; currency: string
+  id: string; org_id: string; branch_id: string; account_id: string; account_name: string
+  bank_name: string; account_number: string | null; currency: string
   current_balance: number; is_active: boolean
   created_at: string; updated_at: string
 }
 export type BankTransaction = {
-  id: string; org_id: string; bank_account_id: string
+  id: string; org_id: string; branch_id: string; bank_account_id: string
   transaction_date: string; description: string
   amount: number; type: string; reference_id: string | null
   journal_entry_id: string | null; balance_after: number
@@ -74,7 +74,7 @@ export type InventoryAdjustment = {
   created_at: string; updated_at: string
 }
 export type JournalEntry = {
-  id: string; org_id: string; entry_number: string; entry_date: string
+  id: string; org_id: string; branch_id: string | null; entry_number: string; entry_date: string
   description: string; reference_type: string; reference_id: string | null
   status: string; is_auto: boolean; notes: string | null
   created_by: string | null; posted_at: string | null

@@ -13,9 +13,18 @@ interface JournalClientProps {
   initialEntries: any[]
   accounts: any[]
   userRole: string
+  activeBranchId: string | null
+  activeBranchName: string | null
 }
 
-export default function JournalClient({ orgId, initialEntries, accounts, userRole }: JournalClientProps) {
+export default function JournalClient({
+  orgId,
+  initialEntries,
+  accounts,
+  userRole,
+  activeBranchId,
+  activeBranchName,
+}: JournalClientProps) {
   const [entries, setEntries] = useState<any[]>(initialEntries)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -31,6 +40,7 @@ export default function JournalClient({ orgId, initialEntries, accounts, userRol
     { id: 1, account_id: '', debit: 0, credit: 0, memo: '' },
     { id: 2, account_id: '', debit: 0, credit: 0, memo: '' }
   ])
+  const canCreateManualJournal = Boolean(activeBranchId)
 
   const totalDebit = lines.reduce((sum: number, line: any) => sum + (line.debit || 0), 0)
   const totalCredit = lines.reduce((sum: number, line: any) => sum + (line.credit || 0), 0)
@@ -201,6 +211,7 @@ export default function JournalClient({ orgId, initialEntries, accounts, userRol
             <SafeButton 
               variant="primary"
               icon={<Plus size={18} />}
+              disabled={!canCreateManualJournal}
               onClick={() => setIsModalOpen(true)}
             >
               Jurnal Manual
@@ -208,6 +219,16 @@ export default function JournalClient({ orgId, initialEntries, accounts, userRol
           </>
         }
       />
+
+      {!canCreateManualJournal ? (
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-900 shadow-sm">
+          Pilih unit aktif terlebih dahulu untuk membuat jurnal manual. Buku besar saat ini masih menampilkan data level organisasi.
+        </div>
+      ) : (
+        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-semibold text-emerald-900 shadow-sm">
+          Jurnal manual baru akan dicatat ke unit aktif: <span className="font-black">{activeBranchName}</span>.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 

@@ -201,11 +201,11 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
     setIsSubmitting(true)
     const result = await payReimbursement(selectedReimbursement.id, orgId, selectedBankId)
     setIsSubmitting(false)
-    if (result.success) {
+    if (!('error' in result)) {
         setIsPayModalOpen(false)
         setSelectedReimbursement(null)
     } else {
-        alert((result as any).error)
+        alert(result.error)
     }
   }
 

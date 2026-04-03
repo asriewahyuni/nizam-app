@@ -14,7 +14,7 @@ export default async function ReimbursePage() {
   
   const [reimbursements, bankAccounts, allAccounts] = await Promise.all([
     getReimbursements(orgId, activeBranch?.id),
-    getBankAccounts(orgId),
+    getBankAccounts(orgId, activeBranch?.id),
     getChartOfAccounts(orgId)
   ])
 

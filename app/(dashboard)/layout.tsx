@@ -59,7 +59,7 @@ export default async function DashboardLayout({
 
   const dependencyResults = await Promise.allSettled([
     getPendingApprovalsCount(orgData.org.id, activeBranch?.id),
-    getUnpostedJournalsCount(orgData.org.id),
+    getUnpostedJournalsCount(orgData.org.id, activeBranch?.id),
     getPendingPurchaseRequestsCount(orgData.org.id, activeBranch?.id),
     getResetRequestsCount(orgData.org.id),
     getCashFlow(orgData.org.id, activeBranch?.id),

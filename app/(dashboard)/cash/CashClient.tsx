@@ -48,6 +48,8 @@ import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButt
 interface CashClientProps {
   orgId: string
   orgName: string
+  activeBranchId: string | null
+  activeBranchName: string | null
   bankAccounts: (BankAccount & {
     account: Account;
     balances?: { balance: number }
@@ -68,7 +70,17 @@ const item = {
   show: { opacity: 1, y: 0 }
 }
 
-export function CashClient({ orgId, orgName, bankAccounts, categoryAccounts, bankGlAccounts, recentTransactions, userRole }: CashClientProps) {
+export function CashClient({
+  orgId,
+  orgName,
+  activeBranchId,
+  activeBranchName,
+  bankAccounts,
+  categoryAccounts,
+  bankGlAccounts,
+  recentTransactions,
+  userRole,
+}: CashClientProps) {
   const router = useRouter()
   const [showTransactionModal, setShowTransactionModal] = useState(false)
   const [showAccountModal, setShowAccountModal] = useState(false)
@@ -86,6 +98,7 @@ export function CashClient({ orgId, orgName, bankAccounts, categoryAccounts, ban
   const [filterAccountId, setFilterAccountId] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const isOwner = userRole === 'owner'
+  const canWriteCash = Boolean(activeBranchId)
 
   useEffect(() => {
     const pay = searchParams.get('pay')
@@ -152,7 +165,7 @@ export function CashClient({ orgId, orgName, bankAccounts, categoryAccounts, ban
     try {
       const text = await file.text()
       const res = await processBankCSV(orgId, selectedBankId, text)
-      if (res?.error) setError(res.error)
+      if ('error' in res) setError(res.error || 'Gagal memproses mutasi bank.')
       else {
         setSuccess(`${res.count} mutasi berhasil diunggah.`)
         setTimeout(() => setSuccess(null), 3000)
@@ -194,7 +207,9 @@ export function CashClient({ orgId, orgName, bankAccounts, categoryAccounts, ban
       <PageHeader
         icon={<Wallet />}
         title="Kas & Bank"
-        subtitle="Manajemen likuiditas dan mutasi rekening secara real-time."
+        subtitle={activeBranchName
+          ? `Mutasi kas dan bank untuk unit aktif ${activeBranchName}.`
+          : 'Mode semua unit aktif. Pilih unit spesifik untuk membuat rekening atau transaksi baru.'}
         tag="Cash Module"
         actions={
           <>
@@ -215,6 +230,7 @@ export function CashClient({ orgId, orgName, bankAccounts, categoryAccounts, ban
             <SafeButton 
               variant="white"
               icon={<Building2 size={16} />}
+              disabled={!canWriteCash}
               onClick={() => setShowAccountModal(true)}
             >
               Rekening
@@ -222,6 +238,7 @@ export function CashClient({ orgId, orgName, bankAccounts, categoryAccounts, ban
             <SafeButton 
               variant="primary"
               icon={<Plus size={18} />}
+              disabled={!canWriteCash}
               onClick={() => { 
                 setTxType('OUT'); 
                 setTxAmount(0);
@@ -234,6 +251,12 @@ export function CashClient({ orgId, orgName, bankAccounts, categoryAccounts, ban
           </>
         }
       />
+
+      {!canWriteCash ? (
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-900 shadow-sm">
+          Pilih unit aktif terlebih dahulu untuk menambah rekening, mencatat transaksi, atau unggah mutasi bank.
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
@@ -533,7 +556,7 @@ export function CashClient({ orgId, orgName, bankAccounts, categoryAccounts, ban
                           </div>
                        </div>
                     </div>
-                    <SafeButton type="submit" variant="primary" size="lg" className="w-full shadow-lg" isLoading={loading} disabled={!selectedBankId}>
+                    <SafeButton type="submit" variant="primary" size="lg" className="w-full shadow-lg" isLoading={loading} disabled={!selectedBankId || !canWriteCash}>
                       MULAI PROSES MUTASI
                     </SafeButton>
                   </form>

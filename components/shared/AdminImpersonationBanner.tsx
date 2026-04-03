@@ -10,6 +10,11 @@ export function AdminImpersonationBanner({
   adminEmail,
   orgName,
 }: AdminImpersonationBannerProps) {
+  async function restoreAction() {
+    'use server'
+    await restorePlatformAdminSession()
+  }
+
   return (
     <div className="bg-emerald-950 px-4 py-2 flex items-center justify-between gap-4 print:hidden border-b border-emerald-200/10 relative z-20">
       <div className="flex items-center gap-4 min-w-0">
@@ -24,7 +29,7 @@ export function AdminImpersonationBanner({
         </p>
       </div>
 
-      <form action={restorePlatformAdminSession}>
+      <form action={restoreAction}>
         <button
           type="submit"
           className="flex items-center gap-2 px-4 py-1.5 bg-white/5 hover:bg-white/10 text-emerald-100 text-[10px] font-black uppercase tracking-[0.2em] rounded-lg transition-all border border-white/10 hover:border-emerald-300/40 active:scale-95 whitespace-nowrap"

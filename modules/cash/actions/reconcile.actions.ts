@@ -2,6 +2,30 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+
+async function getAccessibleBankAccountBranch(orgId: string, bankAccountId: string) {
+  const supabase = await createClient()
+  const { data: bankAccount, error } = await (supabase as any)
+    .from('bank_accounts')
+    .select('id, branch_id')
+    .eq('id', bankAccountId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (error || !bankAccount?.id) {
+    return { error: 'Rekening kas/bank tidak ditemukan.' }
+  }
+
+  if (!bankAccount.branch_id) {
+    return { error: 'Rekening kas/bank belum memiliki konteks unit.' }
+  }
+
+  const branchSelection = await resolveAccessibleBranchSelection(orgId, bankAccount.branch_id)
+  if ('error' in branchSelection) return { error: branchSelection.error }
+
+  return { branchId: bankAccount.branch_id as string }
+}
 
 /**
  * processBankCSV
@@ -10,6 +34,8 @@ import { revalidatePath } from 'next/cache'
  */
 export async function processBankCSV(orgId: string, bankAccountId: string, csvContent: string) {
   const supabase = await createClient()
+  const bankAccountBranch = await getAccessibleBankAccountBranch(orgId, bankAccountId)
+  if ('error' in bankAccountBranch) return { error: bankAccountBranch.error }
 
   // Simple CSV parser (assuming comma-separated, skip header)
   const lines = csvContent.split('\n').filter((line: any) => line.trim() !== '')
@@ -30,6 +56,7 @@ export async function processBankCSV(orgId: string, bankAccountId: string, csvCo
 
     mutations.push({
       org_id: orgId,
+      branch_id: bankAccountBranch.branchId,
       bank_account_id: bankAccountId,
       mutation_date: new Date(dateStr).toISOString().split('T')[0],
       description,
@@ -52,11 +79,16 @@ export async function processBankCSV(orgId: string, bankAccountId: string, csvCo
 /**
  * getUnmatchedMutations
  */
-export async function getUnmatchedMutations(orgId: string, bankAccountId?: string) {
+export async function getUnmatchedMutations(orgId: string, bankAccountId?: string, branchId?: string | null) {
   const supabase = await createClient()
 
   let query = (supabase as any).from('bank_mutations').select('*').eq('org_id', orgId).eq('is_matched', false)
   if (bankAccountId) query = query.eq('bank_account_id', bankAccountId)
+  if (branchId) {
+    const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
+    if ('error' in branchSelection || !branchSelection.branchId) return []
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
 
   const { data, error } = await query.order('mutation_date', { ascending: false })
   if (error) return []

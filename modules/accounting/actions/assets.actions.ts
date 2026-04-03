@@ -362,7 +362,7 @@ export async function runOrganizationDepreciation(orgId: string, branchId?: stri
         ]
       })
 
-      if (journalRes.success) {
+      if (!('error' in journalRes)) {
         // Update data Aset (State Internal)
         const updatedAccum = Number(asset.accumulated_depreciation) + monthlyAmount
         const updatedBook = Number(asset.purchase_price) - updatedAccum

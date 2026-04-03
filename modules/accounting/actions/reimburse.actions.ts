@@ -232,6 +232,8 @@ export async function payReimbursement(id: string, orgId: string, bankAccountId:
     .from('bank_accounts')
     .select('account_id')
     .eq('id', bankAccountId)
+    .eq('org_id', orgId)
+    .eq('branch_id', activeBranchId)
     .single()
 
   if (bErr || !bank) return { error: 'Akun Bank tidak ditemukan.' }
