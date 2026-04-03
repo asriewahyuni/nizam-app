@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
   const asOfDate = searchParams.get('asOfDate') || endDate
   const goldPerGram = parseFloat(searchParams.get('goldPerGram') || '1300000')
   const silverPerGram = parseFloat(searchParams.get('silverPerGram') || '15000')
+  const isOrgScopedExport = type === 'zakat'
 
   if (!orgId) return NextResponse.json({ error: 'orgId diperlukan' }, { status: 400 })
 
@@ -42,11 +43,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  if (branchId) {
+  if (!isOrgScopedExport && branchId) {
     if (!branchAccessScope.accessibleBranchIds.includes(branchId)) {
       return NextResponse.json({ error: 'Anda tidak memiliki akses ke unit tersebut' }, { status: 403 })
     }
-  } else if (!branchAccessScope.canAccessAllBranches) {
+  } else if (!isOrgScopedExport && !branchAccessScope.canAccessAllBranches) {
     return NextResponse.json({ error: 'Pilih unit aktif terlebih dahulu untuk export laporan' }, { status: 400 })
   }
 

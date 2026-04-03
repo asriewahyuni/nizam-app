@@ -356,6 +356,12 @@ export async function exportZakatReportXLSX(
 
   addNizamHeader(sheet, 'LAPORAN ZAKAT TIJARAH', `Digenerate: ${new Date().toLocaleDateString('id-ID')}`, orgName)
 
+  const scopeRow = sheet.addRow(['CAKUPAN LAPORAN', data.scopeLabel || 'Level Organisasi', 'Zakat Tijarah dihitung untuk seluruh organisasi, bukan per unit.'])
+  styleSectionHeader(scopeRow)
+  sheet.mergeCells(`C${scopeRow.number}:C${scopeRow.number}`)
+
+  sheet.addRow([])
+
   // Fiqh parameters
   const fiqhHeader = sheet.addRow(['PARAMETER FIQH', 'NILAI', 'KETERANGAN'])
   styleHeaderRow(fiqhHeader, 'FF2D6A4F')

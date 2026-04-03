@@ -260,6 +260,8 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
     .eq('is_active', true)
 
   return {
+    scopeLevel: 'ORG',
+    scopeLabel: 'Level Organisasi',
     isShariahEnabled: (shariahCount || 0) > 0,
     zakatAssets,
     totalAssets,

@@ -17,9 +17,10 @@ import { startZakatHaul, checkAndCancelHaul, payZakat, syncActiveHaulPrices } fr
 interface ZakatClientProps {
   summary: any
   orgId: string
+  activeBranchName?: string | null
 }
 
-export default function ZakatClient({ summary, orgId }: ZakatClientProps) {
+export default function ZakatClient({ summary, orgId, activeBranchName = null }: ZakatClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -169,6 +170,18 @@ export default function ZakatClient({ summary, orgId }: ZakatClientProps) {
             Kalkulator Zakat Maal Perusahaan — Nishab: <strong>20 Dinar (85gr Emas)</strong> atau <strong>200 Dirham (595gr Perak)</strong>.
             Harga dikunci pada awal haul.
           </p>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white text-[10px] font-black uppercase tracking-widest text-slate-700">
+            <Building2 size={12} />
+            {summary.scopeLabel || 'Level Organisasi'}
+          </div>
+          <div className="max-w-3xl rounded-3xl border border-blue-100 bg-blue-50/80 px-5 py-4 text-sm text-blue-900">
+            <p className="font-black uppercase tracking-widest text-[10px] text-blue-700 mb-1">Boundary Modul</p>
+            <p className="font-medium leading-relaxed">
+              Zakat Tijarah dihitung untuk seluruh organisasi, bukan per unit. {activeBranchName
+                ? `Unit aktif saat ini adalah ${activeBranchName}, tetapi haul, nishab, dan pembayaran zakat tetap memakai agregat organisasi.`
+                : 'Pemilihan unit aktif tidak mengubah hasil perhitungan modul ini.'}
+            </p>
+          </div>
         </div>
 
         {/* Price Control */}

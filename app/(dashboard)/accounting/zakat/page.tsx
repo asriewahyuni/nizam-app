@@ -1,4 +1,4 @@
-import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getZakatSummary, evaluateZakatDaily } from '@/modules/accounting/actions/zakat.actions'
 import { redirect } from 'next/navigation'
 import ZakatClient from './ZakatClient'
@@ -8,6 +8,7 @@ export default async function ZakatPage({ searchParams }: { searchParams: Promis
   if (!activeOrg) redirect('/onboarding')
 
   const orgId = activeOrg.org.id
+  const activeBranch = await getActiveBranch(orgId)
   const sParams = await searchParams
   
   // Default gold price Rp 1,500,000 / gram, silver Rp 15,000 / gram
@@ -21,7 +22,11 @@ export default async function ZakatPage({ searchParams }: { searchParams: Promis
 
   return (
     <main className="p-8">
-      <ZakatClient summary={summary} orgId={orgId} />
+      <ZakatClient
+        summary={summary}
+        orgId={orgId}
+        activeBranchName={activeBranch?.name ?? null}
+      />
     </main>
   )
 }
