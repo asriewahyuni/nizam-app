@@ -919,7 +919,7 @@ export default function HrisClient({
             <SectionCard>
               <SectionHeader
                 title="Leave Requests"
-                subtitle="Kelola pengajuan cuti karyawan per unit dan proses approval langsung dari HRIS."
+                subtitle="Kelola pengajuan cuti karyawan per unit. Approval sekarang sinkron ke HRIS dan Approval Center."
                 icon={CalendarDays}
                 actions={
                   <SafeButton

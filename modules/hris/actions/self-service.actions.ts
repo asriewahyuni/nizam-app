@@ -12,6 +12,8 @@ type SelfEmployee = {
   nik: string
 }
 
+const LEAVE_APPROVAL_SOURCE = 'LEAVE_REQUEST'
+
 function normalizeDateOnly(value: string) {
   const trimmedValue = value.trim()
   if (!trimmedValue) return null
@@ -196,6 +198,11 @@ export async function submitMyLeaveRequest(orgId: string, formData: FormData) {
 
   const supabase = await createClient()
   const db = supabase as any
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Unauthorized' }
 
   const leaveType = String(formData.get('leave_type') || '').trim()
   const startDate = normalizeDateOnly(String(formData.get('start_date') || ''))
@@ -209,7 +216,7 @@ export async function submitMyLeaveRequest(orgId: string, formData: FormData) {
   }
   if (!reason) return { error: 'Alasan cuti wajib diisi.' }
 
-  const { error } = await db
+  const { data: leaveRequest, error } = await db
     .from('leave_requests')
     .insert({
       org_id: orgId,
@@ -222,11 +229,38 @@ export async function submitMyLeaveRequest(orgId: string, formData: FormData) {
       reason,
       status: 'PENDING',
     })
+    .select('id')
+    .single()
 
   if (error) return { error: error.message }
 
+  const { error: approvalError } = await db
+    .from('approval_requests')
+    .insert({
+      org_id: orgId,
+      branch_id: selfEmployee.employee.branch_id,
+      requester_id: user.id,
+      source_type: LEAVE_APPROVAL_SOURCE,
+      source_id: leaveRequest.id,
+      status: 'PENDING',
+      reason: `Leave Request: ${leaveType} (${startDate} s/d ${endDate})`,
+      requested_at: new Date().toISOString(),
+    })
+
+  if (approvalError) {
+    await db
+      .from('leave_requests')
+      .delete()
+      .eq('id', leaveRequest.id)
+      .eq('org_id', orgId)
+      .eq('employee_id', selfEmployee.employee.id)
+
+    return { error: approvalError.message }
+  }
+
   revalidatePath('/profil-saya')
   revalidatePath('/hris')
+  revalidatePath('/accounting/approvals')
   return { success: true }
 }
 
@@ -275,6 +309,11 @@ export async function cancelMyLeaveRequest(orgId: string, leaveId: string) {
 
   const supabase = await createClient()
   const db = supabase as any
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Unauthorized' }
   const { data: leaveRequest, error: leaveRequestError } = await db
     .from('leave_requests')
     .select('id, status')
@@ -293,6 +332,8 @@ export async function cancelMyLeaveRequest(orgId: string, leaveId: string) {
     .from('leave_requests')
     .update({
       status: 'CANCELLED',
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq('id', leaveId)
@@ -301,8 +342,25 @@ export async function cancelMyLeaveRequest(orgId: string, leaveId: string) {
 
   if (error) return { error: error.message }
 
+  const { error: approvalError } = await db
+    .from('approval_requests')
+    .update({
+      status: 'CANCELLED',
+      approver_id: user.id,
+      notes: 'Pengajuan cuti dibatalkan oleh pemohon.',
+      decided_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('org_id', orgId)
+    .eq('branch_id', selfEmployee.employee.branch_id)
+    .eq('source_type', LEAVE_APPROVAL_SOURCE)
+    .eq('source_id', leaveId)
+
+  if (approvalError) return { error: approvalError.message }
+
   revalidatePath('/profil-saya')
   revalidatePath('/hris')
+  revalidatePath('/accounting/approvals')
   return { success: true }
 }
 

@@ -229,6 +229,13 @@ describe('Employee Self Service Actions', () => {
         ],
         leave_requests: [
           {
+            singleResult: success({
+              id: 'leave-1',
+            }),
+          },
+        ],
+        approval_requests: [
+          {
             result: success([]),
           },
         ],
@@ -241,11 +248,17 @@ describe('Employee Self Service Actions', () => {
     const insertPayload = supabase.calls[1]?.operations.find(
       (operation) => operation.method === 'insert'
     )?.args[0] as Record<string, string | number>
+    const approvalPayload = supabase.calls[2]?.operations.find(
+      (operation) => operation.method === 'insert'
+    )?.args[0] as Record<string, string>
 
     expect(result).toEqual({ success: true })
     expect(insertPayload.employee_id).toBe('emp-2')
     expect(insertPayload.branch_id).toBe('branch-3')
     expect(insertPayload.days_taken).toBe(3)
+    expect(approvalPayload.source_type).toBe('LEAVE_REQUEST')
+    expect(approvalPayload.source_id).toBe('leave-1')
+    expect(approvalPayload.requester_id).toBe('user-1')
   })
 
   it('loads only the current employee expense claims', async () => {
@@ -385,6 +398,11 @@ describe('Employee Self Service Actions', () => {
             result: success([]),
           },
         ],
+        approval_requests: [
+          {
+            result: success([]),
+          },
+        ],
       },
     })
 
@@ -392,12 +410,18 @@ describe('Employee Self Service Actions', () => {
 
     const result = await cancelMyLeaveRequest('org-1', 'leave-1')
     const updateCall = supabase.calls[2]
+    const approvalUpdateCall = supabase.calls[3]
     const employeeFilter = updateCall?.operations.find(
       (operation) => operation.method === 'eq' && operation.args[0] === 'employee_id'
+    )
+    const approvalBranchFilter = approvalUpdateCall?.operations.find(
+      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
     )
 
     expect(result).toEqual({ success: true })
     expect(updateCall?.operations.some((operation) => operation.method === 'update')).toBe(true)
     expect(employeeFilter?.args[1]).toBe('emp-2')
+    expect(approvalUpdateCall?.operations.some((operation) => operation.method === 'update')).toBe(true)
+    expect(approvalBranchFilter?.args[1]).toBe('branch-3')
   })
 })

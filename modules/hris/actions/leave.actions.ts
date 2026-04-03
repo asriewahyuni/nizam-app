@@ -9,6 +9,7 @@ type BranchSelectionResult =
   | { error: string }
 
 const LEAVE_STATUSES = new Set(['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'])
+const LEAVE_APPROVAL_SOURCE = 'LEAVE_REQUEST'
 
 async function resolveLeaveBranchSelection(orgId: string, branchId?: string | null): Promise<BranchSelectionResult> {
   const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
@@ -58,6 +59,57 @@ function calculateDaysTaken(startDate: string, endDate: string) {
   return Math.floor((end.getTime() - start.getTime()) / 86400000) + 1
 }
 
+async function createLeaveApprovalRequest(db: any, input: {
+  orgId: string
+  branchId: string
+  leaveId: string
+  requesterId: string
+  reason: string
+}) {
+  const { error } = await db
+    .from('approval_requests')
+    .insert({
+      org_id: input.orgId,
+      branch_id: input.branchId,
+      requester_id: input.requesterId,
+      source_type: LEAVE_APPROVAL_SOURCE,
+      source_id: input.leaveId,
+      status: 'PENDING',
+      reason: input.reason,
+      requested_at: new Date().toISOString(),
+    })
+
+  return error
+}
+
+async function syncLeaveApprovalStatus(db: any, input: {
+  orgId: string
+  branchId: string
+  leaveId: string
+  status: 'APPROVED' | 'REJECTED' | 'CANCELLED'
+  approverId: string
+  notes?: string | null
+}) {
+  const updatePayload: Record<string, string | null> = {
+    status: input.status,
+    approver_id: input.approverId,
+    decided_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+
+  if (input.notes !== undefined) {
+    updatePayload.notes = input.notes
+  }
+
+  return db
+    .from('approval_requests')
+    .update(updatePayload)
+    .eq('org_id', input.orgId)
+    .eq('source_type', LEAVE_APPROVAL_SOURCE)
+    .eq('source_id', input.leaveId)
+    .eq('branch_id', input.branchId)
+}
+
 export async function getLeaveRequests(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
   const db = supabase as any
@@ -87,6 +139,11 @@ export async function getLeaveRequests(orgId: string, branchId?: string | null) 
 export async function createLeaveRequest(orgId: string, formData: FormData) {
   const supabase = await createClient()
   const db = supabase as any
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Unauthorized' }
 
   const employeeId = String(formData.get('employee_id') || '').trim()
   const leaveType = String(formData.get('leave_type') || '').trim()
@@ -118,7 +175,7 @@ export async function createLeaveRequest(orgId: string, formData: FormData) {
   )
   if ('error' in accessibleEmployee) return { error: accessibleEmployee.error }
 
-  const { error } = await db
+  const { data: leaveRequest, error } = await db
     .from('leave_requests')
     .insert({
       org_id: orgId,
@@ -131,10 +188,32 @@ export async function createLeaveRequest(orgId: string, formData: FormData) {
       reason,
       status: 'PENDING',
     })
+    .select('id')
+    .single()
 
   if (error) return { error: error.message }
 
+  const approvalError = await createLeaveApprovalRequest(db, {
+    orgId,
+    branchId: accessibleEmployee.branchId,
+    leaveId: leaveRequest.id,
+    requesterId: user.id,
+    reason: `Leave Request: ${leaveType} (${startDate} s/d ${endDate})`,
+  })
+
+  if (approvalError) {
+    await db
+      .from('leave_requests')
+      .delete()
+      .eq('id', leaveRequest.id)
+      .eq('org_id', orgId)
+      .eq('branch_id', accessibleEmployee.branchId)
+
+    return { error: approvalError.message }
+  }
+
   revalidatePath('/hris')
+  revalidatePath('/accounting/approvals')
   return { success: true }
 }
 
@@ -184,7 +263,18 @@ async function updateLeaveStatus(leaveId: string, nextStatus: 'APPROVED' | 'REJE
 
   if (error) return { error: error.message }
 
+  const { error: approvalError } = await syncLeaveApprovalStatus(db, {
+    orgId: leaveRequest.org_id,
+    branchId: accessibleLeave.branchId,
+    leaveId,
+    status: nextStatus,
+    approverId: user.id,
+  })
+
+  if (approvalError) return { error: approvalError.message }
+
   revalidatePath('/hris')
+  revalidatePath('/accounting/approvals')
   return { success: true }
 }
 

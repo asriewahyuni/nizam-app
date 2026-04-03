@@ -93,6 +93,21 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
       query = query.eq('branch_id', effectiveBranchId)
     }
     dataRes = await query.single()
+  } else if (sourceType === 'LEAVE_REQUEST') {
+    let query = (supabase as any)
+      .from('leave_requests')
+      .select(`
+        *,
+        branch:branches(id, name, code),
+        employee:employee_id(id, first_name, last_name, nik, job_title, branch_id)
+      `)
+      .eq('id', sourceId)
+      .eq('org_id', orgId)
+
+    if (effectiveBranchId) {
+      query = query.eq('branch_id', effectiveBranchId)
+    }
+    dataRes = await query.single()
   }
 
   if ((dataRes as any).error) return { data: null, error: (dataRes as any).error.message }
@@ -101,6 +116,7 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
   const { data: logs } = await (supabase as any)
     .from('approval_requests')
     .select('*')
+    .eq('org_id', orgId)
     .eq('source_id', sourceId)
     .eq('source_type', sourceType)
     .order('requested_at', { ascending: true })
@@ -209,6 +225,23 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
       let query = (supabase as any)
         .from('reimbursements')
         .update({ status: status }) // APPROVED or REJECTED
+        .eq('id', reqData.source_id)
+        .eq('org_id', orgId)
+      if (reqData.branch_id) {
+        query = query.eq('branch_id', reqData.branch_id)
+      }
+      await query
+  }
+
+  if (reqData.source_type === 'LEAVE_REQUEST') {
+      let query = (supabase as any)
+        .from('leave_requests')
+        .update({
+          status,
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', reqData.source_id)
         .eq('org_id', orgId)
       if (reqData.branch_id) {

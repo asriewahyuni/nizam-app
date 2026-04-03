@@ -80,13 +80,27 @@ describe('Leave Actions', () => {
         ],
         leave_requests: [
           {
+            singleResult: success({
+              id: 'leave-new',
+            }),
+          },
+        ],
+        approval_requests: [
+          {
             result: success([]),
           },
         ],
       },
     })
 
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.createClient.mockResolvedValue({
+      ...supabase.client,
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'requester-1' } },
+        }),
+      },
+    })
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-4'] },
       branchId: 'branch-4',
@@ -94,10 +108,14 @@ describe('Leave Actions', () => {
 
     const result = await createLeaveRequest('org-1', buildLeaveForm())
     const insertPayload = supabase.calls[1]?.operations.find((operation) => operation.method === 'insert')?.args[0] as Record<string, string | number>
+    const approvalPayload = supabase.calls[2]?.operations.find((operation) => operation.method === 'insert')?.args[0] as Record<string, string>
 
     expect(result).toEqual({ success: true })
     expect(insertPayload.branch_id).toBe('branch-4')
     expect(insertPayload.days_taken).toBe(3)
+    expect(approvalPayload.source_type).toBe('LEAVE_REQUEST')
+    expect(approvalPayload.source_id).toBe('leave-new')
+    expect(approvalPayload.requester_id).toBe('requester-1')
   })
 
   it('validates branch access before approving a leave request', async () => {
@@ -112,6 +130,11 @@ describe('Leave Actions', () => {
               status: 'PENDING',
             }),
           },
+          {
+            result: success([]),
+          },
+        ],
+        approval_requests: [
           {
             result: success([]),
           },
@@ -134,13 +157,19 @@ describe('Leave Actions', () => {
 
     const result = await approveLeaveRequest('leave-1')
     const updateCall = supabase.calls[1]
+    const approvalUpdateCall = supabase.calls[2]
     const branchFilter = updateCall?.operations.find(
+      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
+    )
+    const approvalBranchFilter = approvalUpdateCall?.operations.find(
       (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
     )
 
     expect(result).toEqual({ success: true })
     expect(updateCall?.operations.some((operation) => operation.method === 'update')).toBe(true)
     expect(branchFilter?.args[1]).toBe('branch-2')
+    expect(approvalUpdateCall?.operations.some((operation) => operation.method === 'update')).toBe(true)
+    expect(approvalBranchFilter?.args[1]).toBe('branch-2')
   })
 
   it('rejects leave requests only inside the accessible branch', async () => {
@@ -155,6 +184,11 @@ describe('Leave Actions', () => {
               status: 'PENDING',
             }),
           },
+          {
+            result: success([]),
+          },
+        ],
+        approval_requests: [
           {
             result: success([]),
           },
@@ -177,11 +211,16 @@ describe('Leave Actions', () => {
 
     const result = await rejectLeaveRequest('leave-2')
     const updateCall = supabase.calls[1]
+    const approvalUpdateCall = supabase.calls[2]
     const branchFilter = updateCall?.operations.find(
+      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
+    )
+    const approvalBranchFilter = approvalUpdateCall?.operations.find(
       (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
     )
 
     expect(result).toEqual({ success: true })
     expect(branchFilter?.args[1]).toBe('branch-5')
+    expect(approvalBranchFilter?.args[1]).toBe('branch-5')
   })
 })

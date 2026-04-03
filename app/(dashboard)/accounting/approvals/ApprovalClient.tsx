@@ -12,6 +12,27 @@ interface ApprovalClientProps {
   initialApprovals: any[]
 }
 
+function getSourceTypeTone(sourceType: string) {
+  if (sourceType === 'SALES_ORDER') {
+    return {
+      icon: 'bg-emerald-50 text-emerald-600',
+      badge: 'bg-emerald-50 text-emerald-700',
+    }
+  }
+
+  if (sourceType === 'LEAVE_REQUEST') {
+    return {
+      icon: 'bg-indigo-50 text-indigo-600',
+      badge: 'bg-indigo-50 text-indigo-700',
+    }
+  }
+
+  return {
+    icon: 'bg-[#003366]/5 text-[#003366]',
+    badge: 'bg-[#003366]/5 text-[#003366]',
+  }
+}
+
 export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps) {
   const [approvals, setApprovals] = useState(initialApprovals)
   const [history, setHistory] = useState<any[]>([])
@@ -127,17 +148,19 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
             </div>
           </div>
         ) : (
-          approvals.map((req) => (
+          approvals.map((req) => {
+            const sourceTone = getSourceTypeTone(req.source_type)
+            return (
             <div key={req.id} className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-6 overflow-hidden relative group">
               <div className="absolute top-0 left-0 w-2 h-full bg-[#003366] opacity-0 group-hover:opacity-100 transition-all" />
 
               <div className="flex items-center gap-6">
-                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${req.source_type === 'SALES_ORDER' ? 'bg-emerald-50 text-emerald-600' : 'bg-[#003366]/5 text-[#003366]'}`}>
+                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${sourceTone.icon}`}>
                     <FileText size={24} />
                  </div>
                  <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                       <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg ${req.source_type === 'SALES_ORDER' ? 'bg-emerald-50 text-emerald-700' : 'bg-[#003366]/5 text-[#003366]'}`}>{req.source_type}</span>
+                       <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg ${sourceTone.badge}`}>{req.source_type}</span>
                        <span className="text-slate-400 text-xs font-mono">• {formatDate(req.requested_at)}</span>
                     </div>
                     <h3 className="text-lg font-bold text-slate-900">{req.reason || 'Permintaan Persetujuan Operasional'}</h3>
@@ -160,7 +183,8 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                  </button>
               </div>
             </div>
-          ))
+            )
+          })
         )}
         </div>
         ) : (
@@ -339,6 +363,41 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                             </div>
                           ))}
                         </div>
+                      </div>
+                    </>
+                  )}
+                  {selectedReq.source_type === 'LEAVE_REQUEST' && (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-indigo-50 p-4 rounded-2xl">
+                          <p className="text-xs text-indigo-600 uppercase font-black mb-1">Karyawan</p>
+                          <p className="text-base font-black text-slate-900">
+                            {detailData.employee?.first_name} {detailData.employee?.last_name}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {detailData.employee?.job_title || 'Staff'} • {detailData.employee?.nik || 'N/A'}
+                          </p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Unit</p>
+                          <p className="text-base font-black text-slate-900">{detailData.branch?.name || 'Tanpa Unit'}</p>
+                          {detailData.branch?.code && <p className="text-xs text-slate-500 mt-0.5">{detailData.branch.code}</p>}
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Jenis & Durasi</p>
+                          <p className="text-base font-black text-slate-900">{detailData.leave_type}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{detailData.days_taken} hari</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Periode Cuti</p>
+                          <p className="text-sm font-black text-slate-900">{formatDate(detailData.start_date)}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">s/d {formatDate(detailData.end_date)}</p>
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                        <p className="text-[10px] text-amber-600 uppercase font-black mb-1">Alasan Pengajuan</p>
+                        <p className="text-sm text-slate-700">{detailData.reason}</p>
                       </div>
                     </>
                   )}

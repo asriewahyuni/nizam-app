@@ -161,4 +161,58 @@ describe('Approval Branch Context', () => {
     expect(approvalUpdateEq).toHaveBeenCalledWith('branch_id', 'branch-1')
     expect(reimburseUpdateEq).toHaveBeenCalledWith('branch_id', 'branch-1')
   })
+
+  it('scopes leave approval side effects to the active branch', async () => {
+    const requestLookup = {
+      select: vi.fn(() => requestLookup),
+      eq: vi.fn(() => requestLookup),
+      single: vi.fn().mockResolvedValue({
+        data: {
+          source_type: 'LEAVE_REQUEST',
+          source_id: 'leave-1',
+          branch_id: 'branch-1',
+        },
+        error: null,
+      }),
+    }
+    const approvalUpdateEq = vi.fn(() => approvalUpdate)
+    const approvalUpdate = {
+      eq: approvalUpdateEq,
+    }
+    const approvalTable = {
+      select: vi.fn(() => requestLookup),
+      update: vi.fn(() => approvalUpdate),
+    }
+    const leaveUpdateEq = vi.fn(() => leaveUpdate)
+    const leaveUpdate = {
+      eq: leaveUpdateEq,
+    }
+    const leaveRequestsTable = {
+      update: vi.fn(() => leaveUpdate),
+    }
+
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'approver-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'approval_requests') return approvalTable
+        if (table === 'leave_requests') return leaveRequestsTable
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'manager' },
+      branchId: 'branch-1',
+    })
+
+    const result = await decideApproval('req-3', 'org-1', 'APPROVED', 'Approved', 'branch-1')
+
+    expect(result).toEqual({ success: true })
+    expect(requestLookup.eq).toHaveBeenCalledWith('branch_id', 'branch-1')
+    expect(approvalUpdateEq).toHaveBeenCalledWith('branch_id', 'branch-1')
+    expect(leaveUpdateEq).toHaveBeenCalledWith('branch_id', 'branch-1')
+  })
 })
