@@ -166,13 +166,15 @@ describe('Purchasing Branch Context', () => {
   it('stamps active branch on manufacturing purchase requests', async () => {
     const insertMock = vi.fn().mockResolvedValue({ error: null })
 
-    mocks.getActiveBranch.mockResolvedValue({
-      id: 'branch-1',
-      org_id: 'org-1',
-      name: 'Unit A',
-      code: 'UA',
-      address: null,
-      is_active: true,
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: {
+        accessibleBranches: [],
+        accessibleBranchIds: ['branch-1'],
+        canAccessAllBranches: false,
+        membershipId: 'member-1',
+        role: 'staff',
+      },
+      branchId: 'branch-1',
     })
     mocks.createClient.mockResolvedValue({
       auth: {

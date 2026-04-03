@@ -175,6 +175,25 @@ export type FleetTerminal = {
   radius_meters: number | null; qr_code_token: string | null
   created_at: string
 }
+export type ProductionBom = {
+  id: string; org_id: string; branch_id: string | null; product_id: string
+  code: string; description: string | null; is_active: boolean
+  created_at: string; updated_at: string
+}
+export type ProductionBomItem = {
+  id: string; bom_id: string; product_id: string
+  quantity: number; unit: string | null; created_at: string
+}
+export type ProductionWorkOrder = {
+  id: string; org_id: string; branch_id: string | null; bom_id: string
+  wo_number: string; quantity_planned: number; quantity_actual: number
+  status: string; released_at: string | null; completed_at: string | null
+  notes: string | null; created_at: string; updated_at: string
+}
+export type ProductionWorkOrderCost = {
+  id: string; wo_id: string; description: string; amount: number
+  cost_type: string; created_at: string
+}
 
 export interface Database {
   public: {
@@ -261,6 +280,30 @@ export interface Database {
         Row: Attendance
         Insert: Omit<Attendance, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
         Update: Partial<Attendance>
+        Relationships: []
+      }
+      production_boms: {
+        Row: ProductionBom
+        Insert: Omit<ProductionBom, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<ProductionBom>
+        Relationships: []
+      }
+      production_bom_items: {
+        Row: ProductionBomItem
+        Insert: Omit<ProductionBomItem, 'id' | 'created_at'> & { id?: string; created_at?: string }
+        Update: Partial<ProductionBomItem>
+        Relationships: []
+      }
+      production_work_orders: {
+        Row: ProductionWorkOrder
+        Insert: Omit<ProductionWorkOrder, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<ProductionWorkOrder>
+        Relationships: []
+      }
+      production_wo_costs: {
+        Row: ProductionWorkOrderCost
+        Insert: Omit<ProductionWorkOrderCost, 'id' | 'created_at'> & { id?: string; created_at?: string }
+        Update: Partial<ProductionWorkOrderCost>
         Relationships: []
       }
       expense_claims: {

@@ -2,15 +2,121 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { getActiveBranch } from '@/modules/organization/actions/org.actions'
+import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
-export async function getBoms(orgId: string) {
+type ActiveBranchResult =
+  | { branchId: string }
+  | { error: string }
+
+type FactoryBomAccessRecord = {
+  id: string
+  org_id: string
+  branch_id: string | null
+}
+
+type FactoryWorkOrderAccessRecord = {
+  id: string
+  org_id: string
+  branch_id: string | null
+  bom_id: string
+  status: string
+}
+
+type FactoryWarehouseAccessRecord = {
+  id: string
+  org_id: string
+  branch_id: string | null
+  is_active: boolean
+}
+
+async function resolveFactoryBranchId(orgId: string, branchId?: string | null) {
+  const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) {
+    return branchSelection
+  }
+
+  return { branchId: branchSelection.branchId }
+}
+
+async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
+  const branchSelection = await resolveAccessibleBranchSelection(orgId)
+  if ('error' in branchSelection || !branchSelection.branchId) {
+    return { error: errorMessage }
+  }
+
+  return { branchId: branchSelection.branchId }
+}
+
+function applyBomBranchFilter(query: any, branchId: string | null) {
+  if (!branchId) return query
+  return query.or(`branch_id.is.null,branch_id.eq.${branchId}`)
+}
+
+async function getAccessibleBom(
+  supabase: any,
+  orgId: string,
+  bomId: string,
+  branchId: string
+): Promise<FactoryBomAccessRecord | null> {
+  const { data, error } = await supabase
+    .from('production_boms')
+    .select('id, org_id, branch_id')
+    .eq('id', bomId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (error || !data) return null
+  if (data.branch_id && data.branch_id !== branchId) return null
+  return data as FactoryBomAccessRecord
+}
+
+async function getAccessibleWorkOrder(
+  supabase: any,
+  orgId: string,
+  woId: string,
+  branchId: string
+): Promise<FactoryWorkOrderAccessRecord | null> {
+  const { data, error } = await supabase
+    .from('production_work_orders')
+    .select('id, org_id, branch_id, bom_id, status')
+    .eq('id', woId)
+    .eq('org_id', orgId)
+    .eq('branch_id', branchId)
+    .maybeSingle()
+
+  if (error) return null
+  return (data as FactoryWorkOrderAccessRecord | null) ?? null
+}
+
+async function getAccessibleWarehouse(
+  supabase: any,
+  orgId: string,
+  warehouseId: string,
+  branchId: string
+): Promise<FactoryWarehouseAccessRecord | null> {
+  const { data, error } = await supabase
+    .from('warehouses')
+    .select('id, org_id, branch_id, is_active')
+    .eq('id', warehouseId)
+    .eq('org_id', orgId)
+    .eq('branch_id', branchId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (error) return null
+  return (data as FactoryWarehouseAccessRecord | null) ?? null
+}
+
+export async function getBoms(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
+  const branchSelection = await resolveFactoryBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
 
-  const { data, error } = await (supabase as any)
+  let query = (supabase as any)
     .from('production_boms')
     .select(`
       *,
+      branch:branches(id, name, code),
       product:products(id, name, sku, average_cost, purchase_price, unit),
       items:production_bom_items(
         id,
@@ -20,7 +126,10 @@ export async function getBoms(orgId: string) {
       )
     `)
     .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
+
+  query = applyBomBranchFilter(query, branchSelection.branchId)
+
+  const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) {
     (console as any).error('Error fetching BoM:', error)
@@ -51,6 +160,11 @@ export async function getBomItems(bomId: string) {
 
 export async function createBom(orgId: string, payload: { productId: string; code: string; description: string; items: Array<{ productId: string; quantity: number; unit?: string }> }) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk membuat resep produksi.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
   // Start Transaction (via manual check or RPC)
   // For simplicity using sequential inserts (but in real production we use RPC)
@@ -58,6 +172,7 @@ export async function createBom(orgId: string, payload: { productId: string; cod
     .from('production_boms')
     .insert({
       org_id: orgId,
+      branch_id: activeBranchResult.branchId,
       product_id: payload.productId,
       code: payload.code,
       description: payload.description
@@ -86,6 +201,16 @@ export async function createBom(orgId: string, payload: { productId: string; cod
 
 export async function updateBom(orgId: string, bomId: string, payload: { productId: string; code: string; description: string; items: Array<{ productId: string; quantity: number; unit?: string }> }) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk memperbarui resep produksi.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+
+  const accessibleBom = await getAccessibleBom(supabase as any, orgId, bomId, activeBranchResult.branchId)
+  if (!accessibleBom) {
+    return { error: 'Resep produksi tidak ditemukan pada unit aktif.' }
+  }
 
   // 1. Update BoM Header
   const { error: bomError } = await (supabase as any)
@@ -96,7 +221,7 @@ export async function updateBom(orgId: string, bomId: string, payload: { product
       description: payload.description,
       updated_at: new Date().toISOString()
     })
-    .eq('id', bomId)
+    .eq('id', accessibleBom.id)
     .eq('org_id', orgId)
 
   if (bomError) return { error: bomError.message }
@@ -105,12 +230,12 @@ export async function updateBom(orgId: string, bomId: string, payload: { product
   const { error: deleteError } = await (supabase as any)
     .from('production_bom_items')
     .delete()
-    .eq('bom_id', bomId)
+    .eq('bom_id', accessibleBom.id)
 
   if (deleteError) return { error: deleteError.message }
 
   const bomItems = payload.items.map((item: any) => ({
-    bom_id: bomId,
+    bom_id: accessibleBom.id,
     product_id: item.productId,
     quantity: item.quantity,
     unit: item.unit
@@ -127,15 +252,19 @@ export async function updateBom(orgId: string, bomId: string, payload: { product
 }
 
 
-export async function getWorkOrders(orgId: string) {
+export async function getWorkOrders(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
+  const branchSelection = await resolveFactoryBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
 
-  const { data, error } = await (supabase as any)
+  let query = (supabase as any)
     .from('production_work_orders')
     .select(`
       *,
+      branch:branches(id, name, code),
       bom:production_boms(
-        id, code,
+        id, code, branch_id,
+        branch:branches(id, name, code),
         product:products(id, name, sku),
         items:production_bom_items(
           product_id,
@@ -145,7 +274,12 @@ export async function getWorkOrders(orgId: string) {
       )
     `)
     .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
+
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) {
     (console as any).error('Error fetching Work Orders:', error)
@@ -157,17 +291,28 @@ export async function getWorkOrders(orgId: string) {
 
 export async function createWorkOrder(orgId: string, formData: FormData) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk membuat SPK.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
   const bom_id = formData.get('bom_id') as string
   const wo_number = formData.get('wo_number') as string
   const quantity_planned = Number(formData.get('quantity_planned'))
   const notes = formData.get('notes') as string
 
+  const accessibleBom = await getAccessibleBom(supabase as any, orgId, bom_id, activeBranchResult.branchId)
+  if (!accessibleBom) {
+    return { error: 'Resep produksi tidak tersedia untuk unit aktif.' }
+  }
+
   const { error } = await (supabase as any)
     .from('production_work_orders')
     .insert({
       org_id: orgId,
-      bom_id,
+      branch_id: activeBranchResult.branchId,
+      bom_id: accessibleBom.id,
       wo_number,
       quantity_planned,
       status: 'DRAFT',
@@ -194,9 +339,20 @@ export async function getWorkOrderCosts(woId: string) {
 
 export async function addWorkOrderCost(orgId: string, woId: string, payload: { description: string; amount: number; cost_type: string }) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk mencatat biaya produksi.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+
+  const accessibleWorkOrder = await getAccessibleWorkOrder(supabase as any, orgId, woId, activeBranchResult.branchId)
+  if (!accessibleWorkOrder) {
+    return { error: 'SPK tidak ditemukan pada unit aktif.' }
+  }
+
   const { error } = await (supabase as any)
     .from('production_wo_costs')
-    .insert([{ ...payload, wo_id: woId }])
+    .insert([{ ...payload, wo_id: accessibleWorkOrder.id }])
 
   if (error) return { error: error.message }
   revalidatePath('/factory')
@@ -205,11 +361,25 @@ export async function addWorkOrderCost(orgId: string, woId: string, payload: { d
 
 export async function getFGBins(orgId: string, warehouseId: string) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk memilih gudang hasil produksi.'
+  )
+  if ('error' in activeBranchResult) return []
+
+  const accessibleWarehouse = await getAccessibleWarehouse(
+    supabase as any,
+    orgId,
+    warehouseId,
+    activeBranchResult.branchId
+  )
+  if (!accessibleWarehouse) return []
+
   const { data, error } = await (supabase as any)
     .from('warehouse_bins')
     .select('id, code')
     .eq('org_id', orgId)
-    .eq('warehouse_id', warehouseId)
+    .eq('warehouse_id', accessibleWarehouse.id)
   
   if (error) return []
   return data
@@ -217,8 +387,51 @@ export async function getFGBins(orgId: string, warehouseId: string) {
 
 export async function updateWorkOrderStatus(orgId: string, woId: string, status: string, options?: { warehouseId?: string; binId?: string }) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk memproses SPK.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+
+  const accessibleWorkOrder = await getAccessibleWorkOrder(
+    supabase as any,
+    orgId,
+    woId,
+    activeBranchResult.branchId
+  )
+  if (!accessibleWorkOrder) {
+    return { error: 'SPK tidak ditemukan pada unit aktif.' }
+  }
 
   if (status === 'COMPLETED') {
+    if (!options?.warehouseId) {
+      return { error: 'Pilih gudang hasil produksi terlebih dahulu.' }
+    }
+
+    const accessibleWarehouse = await getAccessibleWarehouse(
+      supabase as any,
+      orgId,
+      options.warehouseId,
+      activeBranchResult.branchId
+    )
+    if (!accessibleWarehouse) {
+      return { error: 'Gudang hasil produksi tidak berada pada unit aktif.' }
+    }
+
+    if (options?.binId) {
+      const { data: binData, error: binError } = await (supabase as any)
+        .from('warehouse_bins')
+        .select('id, warehouse_id')
+        .eq('id', options.binId)
+        .eq('org_id', orgId)
+        .eq('warehouse_id', accessibleWarehouse.id)
+        .maybeSingle()
+
+      if (binError || !binData?.id) {
+        return { error: 'Rak hasil produksi tidak valid untuk gudang terpilih.' }
+      }
+    }
+
     const { data: userData } = await (supabase as any).auth.getUser()
     
     // Use V2 (with overhead support)
@@ -233,8 +446,9 @@ export async function updateWorkOrderStatus(orgId: string, woId: string, status:
       // Fallback to V1 if RPC V2 is not found/active
       console.warn('RPC V2 not found, falling back to V1')
       const { data: v1Data, error: v1Err } = await (supabase as any).rpc('process_work_order_completion', {
-        p_wo_id: woId,
-        p_user_id: userData.user?.id
+        p_wo_id: accessibleWorkOrder.id,
+        p_user_id: userData.user?.id,
+        p_warehouse_id: accessibleWarehouse.id,
       })
       if (v1Err) return { error: v1Err.message }
       if (!v1Data?.success) return { error: v1Data?.error || 'Failed to complete Work Order' }
@@ -252,8 +466,9 @@ export async function updateWorkOrderStatus(orgId: string, woId: string, status:
   const { error } = await (supabase as any)
     .from('production_work_orders')
     .update(payload)
-    .eq('id', woId)
+    .eq('id', accessibleWorkOrder.id)
     .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
 
   if (error) return { error: error.message }
 
@@ -263,10 +478,21 @@ export async function updateWorkOrderStatus(orgId: string, woId: string, status:
 
 export async function deleteBom(orgId: string, bomId: string) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk menghapus resep produksi.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+
+  const accessibleBom = await getAccessibleBom(supabase as any, orgId, bomId, activeBranchResult.branchId)
+  if (!accessibleBom) {
+    return { error: 'Resep produksi tidak ditemukan pada unit aktif.' }
+  }
+
   const { error } = await (supabase as any)
     .from('production_boms')
     .delete()
-    .eq('id', bomId)
+    .eq('id', accessibleBom.id)
     .eq('org_id', orgId)
 
   if (error) return { error: error.message }
@@ -276,11 +502,18 @@ export async function deleteBom(orgId: string, bomId: string) {
 
 export async function deleteWorkOrder(orgId: string, woId: string) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk menghapus SPK.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+
   const { error } = await (supabase as any)
     .from('production_work_orders')
     .delete()
     .eq('id', woId)
     .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
 
   if (error) return { error: error.message }
   revalidatePath('/factory')
@@ -292,11 +525,15 @@ export async function createPurchaseRequests(orgId: string, requests: any[]) {
   const { data: { user } } = await (supabase as any).auth.getUser()
 
   if (!user) return { error: 'Unauthorized' }
-  const activeBranch = await getActiveBranch(orgId)
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk membuat permintaan pembelian produksi.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
   const payload = requests.map((req: any) => ({
     org_id: orgId,
-    branch_id: activeBranch?.id || null,
+    branch_id: activeBranchResult.branchId,
     requester_id: user.id,
     product_id: req.productId,
     product_name: req.productName,

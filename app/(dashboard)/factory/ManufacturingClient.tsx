@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { startTransition, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Plus, 
@@ -28,6 +29,8 @@ import { createBom, updateBom, deleteBom, createWorkOrder, updateWorkOrderStatus
 
 interface ManufacturingClientProps {
   orgId: string
+  activeBranchId?: string | null
+  activeBranchName?: string | null
   boms: any[]
   workOrders: any[]
   products: any[]
@@ -44,7 +47,16 @@ const item = {
   show: { opacity: 1, y: 0 }
 }
 
-export function ManufacturingClient({ orgId, boms, workOrders, products, warehouses }: ManufacturingClientProps) {
+export function ManufacturingClient({
+  orgId,
+  activeBranchId = null,
+  activeBranchName = null,
+  boms,
+  workOrders,
+  products,
+  warehouses,
+}: ManufacturingClientProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<'BOM' | 'SPK'>('SPK')
   const [showBomModal, setShowBomModal] = useState(false)
   const [showSpkModal, setShowSpkModal] = useState(false)
@@ -65,10 +77,25 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
   const [shortItems, setShortItems] = useState<any[]>([])
   const [pendingWo, setPendingWo] = useState<any>(null)
   const [showQuotationPrompt, setShowQuotationPrompt] = useState(false)
+  const branchGuardMessage = 'Pilih satu unit aktif terlebih dahulu untuk memakai modul manufaktur.'
+
+  const refreshFactoryPage = () => {
+    startTransition(() => {
+      router.refresh()
+    })
+  }
 
   // Load bins when warehouse is selected
   const handleWhChange = async (whId: string) => {
+    if (!activeBranchId) {
+      alert(branchGuardMessage)
+      return
+    }
     setSelectedWarehouse(whId)
+    if (!whId) {
+      setAvailableBins([])
+      return
+    }
     const bins = await getFGBins(orgId, whId)
     setAvailableBins(bins)
   }
@@ -76,6 +103,10 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
   // Create/Update BoM
   const handleCreateBom = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (!activeBranchId) {
+      alert(branchGuardMessage)
+      return
+    }
     setLoading(true)
     const formData = new FormData(e.currentTarget)
     const payload = {
@@ -94,7 +125,7 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
       setShowBomModal(false)
       setEditingBom(null)
       setBomItems([])
-      window.location.reload()
+      refreshFactoryPage()
     }
     setLoading(false)
   }
@@ -102,12 +133,16 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
   // Create SPK
   const handleCreateSpk = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (!activeBranchId) {
+      alert(branchGuardMessage)
+      return
+    }
     setLoading(true)
     const res = await createWorkOrder(orgId, new FormData(e.currentTarget))
     if (res.error) alert(res.error)
     else {
       setShowSpkModal(false)
-      window.location.reload()
+      refreshFactoryPage()
     }
     setLoading(false)
   }
@@ -115,6 +150,10 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
   // Finish SPK with Costs
   const handleFinishSpk = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (!activeBranchId) {
+      alert(branchGuardMessage)
+      return
+    }
     setLoading(true)
     
     const formData = new FormData(e.currentTarget)
@@ -134,12 +173,16 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
     if (res.error) alert(res.error)
     else {
       setShowFinishModal(false)
-      window.location.reload()
+      refreshFactoryPage()
     }
     setLoading(false)
   }
 
   const handleRelease = async (wo: any) => {
+    if (!activeBranchId) {
+      alert(branchGuardMessage)
+      return
+    }
     setLoading(true)
     const items = wo.bom?.items || []
     const qtyPlanned = wo.quantity_planned
@@ -173,14 +216,22 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
   }
 
   const proceedWithRelease = async (woId: string) => {
+    if (!activeBranchId) {
+      alert(branchGuardMessage)
+      return
+    }
     setLoading(true)
     const res = await updateWorkOrderStatus(orgId, woId, 'RELEASED')
     if (res.error) alert(res.error)
-    else window.location.reload()
+    else refreshFactoryPage()
     setLoading(false)
   }
 
   const handleRequestToPurchasing = async () => {
+    if (!activeBranchId) {
+      alert(branchGuardMessage)
+      return
+    }
     setLoading(true)
     const requests = shortItems.map(item => ({
       productId: item.productId,
@@ -209,7 +260,10 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
             <Factory size={28} className="text-blue-600" />
             Nizam Manufacturing
           </h1>
-          <p className="text-sm text-slate-500 font-medium">Pengelolaan Bill of Materials (BoM) dan Work Order (SPK) dengan Accurate Costing.</p>
+          <p className="text-sm text-slate-500 font-medium">
+            Pengelolaan Bill of Materials (BoM) dan Work Order (SPK) dengan Accurate Costing.
+            {activeBranchName ? ` Scope aktif: ${activeBranchName}.` : ' Mode semua unit hanya baca.'}
+          </p>
         </div>
 
         <div className="flex bg-slate-100/50 p-1 rounded-2xl border border-slate-100">
@@ -231,7 +285,8 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
           {activeTab === 'BOM' ? (
             <button
               onClick={() => setShowBomModal(true)}
-              className="flex items-center gap-2 px-6 py-3 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all"
+              disabled={!activeBranchId}
+              className="flex items-center gap-2 px-6 py-3 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus size={18} />
               Setup BoM Baru
@@ -239,7 +294,8 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
           ) : (
             <button
               onClick={() => setShowSpkModal(true)}
-              className="flex items-center gap-2 px-6 py-3 text-sm font-bold text-white bg-emerald-500 rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all"
+              disabled={!activeBranchId}
+              className="flex items-center gap-2 px-6 py-3 text-sm font-bold text-white bg-emerald-500 rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Zap size={18} />
               Terbitkan SPK
@@ -247,6 +303,20 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
           )}
         </div>
       </motion.div>
+
+      {!activeBranchId && (
+        <motion.div variants={item} className="rounded-[28px] border border-amber-200 bg-amber-50 px-6 py-5 flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-white text-amber-500 border border-amber-100 flex items-center justify-center shrink-0">
+            <AlertTriangle size={22} />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-black text-amber-900 uppercase tracking-widest">Pilih Unit Aktif</h3>
+            <p className="text-sm font-medium text-amber-800/80">
+              Anda sedang melihat data lintas unit. Pilih satu unit dari header untuk membuat BoM, menerbitkan SPK, mencatat biaya produksi, atau menyelesaikan produksi.
+            </p>
+          </div>
+        </motion.div>
+      )}
 
       <AnimatePresence mode="wait">
         {activeTab === 'SPK' ? (
@@ -292,6 +362,16 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
                              <td className="px-8 py-5">
                                 <p className="text-sm font-black text-slate-900">{wo.wo_number}</p>
                                 <p className="text-xs text-slate-500">{wo.bom?.product?.name}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-[0.18em] border border-blue-100">
+                                    {wo.branch?.name || 'Semua Unit'}
+                                  </span>
+                                  {wo.bom?.branch?.name && (
+                                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-black uppercase tracking-[0.18em] border border-slate-200">
+                                      BOM {wo.bom.branch.name}
+                                    </span>
+                                  )}
+                                </div>
                              </td>
                              <td className="px-6 py-5 text-right font-black text-slate-900">{wo.quantity_planned} Unit</td>
                              <td className="px-6 py-5">
@@ -307,9 +387,9 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
                              <td className="px-8 py-5 text-right flex justify-end gap-2">
                                  {wo.status === 'DRAFT' && (
                                    <button 
-                                     disabled={loading}
+                                     disabled={!activeBranchId || loading}
                                      onClick={() => handleRelease(wo)} 
-                                     className="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase rounded-lg disabled:opacity-50"
+                                     className="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                    >
                                      {loading ? 'Processing...' : 'Mulai Produksi'}
                                    </button>
@@ -317,25 +397,27 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
                                 {wo.status === 'RELEASED' && (
                                   <>
                                     <button 
+                                      disabled={!activeBranchId}
                                       onClick={() => {
                                         setSelectedWo(wo)
                                         setShowFinishModal(true)
                                       }} 
-                                      className="px-4 py-2 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-lg shadow-lg shadow-emerald-100"
+                                      className="px-4 py-2 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-lg shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                       Selesaikan
                                     </button>
                                   </>
                                 )}
                                 <button
+                                  disabled={!activeBranchId}
                                   onClick={async () => {
                                     if (confirm('Yakin ingin menghapus SPK ini?')) {
                                       const res = await deleteWorkOrder(orgId, wo.id)
                                       if (res.error) alert(res.error)
-                                      else window.location.reload()
+                                      else refreshFactoryPage()
                                     }
                                   }}
-                                  className="p-2 text-rose-300 hover:text-rose-600 transition-colors"
+                                  className="p-2 text-rose-300 hover:text-rose-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                   title="Hapus SPK"
                                 >
                                   <Trash2 size={16} />
@@ -381,6 +463,11 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
                               <span className="text-sm font-black text-rose-600">{formatRupiah(estimatedHppPerUnit)}</span>
                            </div>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-[0.18em] border border-indigo-100">
+                            {bom.branch?.name || 'Shared / Semua Unit'}
+                          </span>
+                        </div>
                         <h3 className="text-xl font-bold text-slate-900">{bom.product?.name}</h3>
                         <p className="text-xs text-slate-400 font-medium leading-relaxed">{bom.description || 'Tidak ada deskripsi resep.'}</p>
                      </div>
@@ -403,6 +490,7 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
 
                      <div className="pt-4 flex items-center justify-between">
                         <button 
+                          disabled={!activeBranchId}
                           onClick={() => {
                             setEditingBom(bom)
                             setBomItems(bom.items?.map((bi: any) => ({
@@ -412,22 +500,23 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
                             })) || [])
                             setShowBomModal(true)
                           }}
-                          className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2 hover:gap-3 transition-all"
+                          className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2 hover:gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                            Edit Resep <ChevronRight size={14} />
                         </button>
 
                         <button 
+                          disabled={!activeBranchId}
                           onClick={async () => {
                             if (confirm('Yakin ingin menghapus resep (BoM) ini?')) {
                               setLoading(true)
                               const res = await deleteBom(orgId, bom.id)
                               if (res.error) alert(res.error)
-                              else window.location.reload()
+                              else refreshFactoryPage()
                               setLoading(false)
                             }
                           }}
-                          className="flex items-center gap-2 px-3 py-1 text-[10px] font-black text-rose-400 hover:text-rose-600 transition-all uppercase tracking-widest"
+                          className="flex items-center gap-2 px-3 py-1 text-[10px] font-black text-rose-400 hover:text-rose-600 transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Trash2 size={12} /> Hapus
                         </button>
@@ -684,7 +773,7 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
                           <span className="font-bold text-slate-700">{formatRupiah(rawMaterialCost)}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-100">
-                          <span className="font-bold text-slate-800">Total HPP Produksi (Semua Unit):</span>
+                          <span className="font-bold text-slate-800">Total HPP Produksi:</span>
                           <span className="font-black text-rose-600">{formatRupiah(grandTotalHPP)}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm">
@@ -853,7 +942,7 @@ export function ManufacturingClient({ orgId, boms, workOrders, products, warehou
                   Nanti Saja
                 </button>
                 <button
-                  onClick={() => window.location.href = '/sales/quotations'}
+                  onClick={() => router.push('/sales/quotations')}
                   className="flex-1 py-5 bg-blue-600 text-white font-black rounded-3xl hover:bg-blue-500 shadow-xl shadow-blue-100 transition text-[11px] uppercase tracking-widest"
                 >
                   Ya, Alihkan
