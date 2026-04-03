@@ -83,6 +83,10 @@ export function createSupabaseMock(config: MockConfig = {}) {
         operations.push({ method: 'update', args: [values] })
         return builder
       },
+      upsert(values: unknown, options?: unknown) {
+        operations.push({ method: 'upsert', args: [values, options] })
+        return builder
+      },
       delete() {
         operations.push({ method: 'delete', args: [] })
         return builder

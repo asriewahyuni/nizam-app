@@ -2,36 +2,84 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
-export async function getBudgets(orgId: string, period: string) {
+type BranchFilterResult =
+  | { branchId: string | null }
+  | { error: string }
+
+async function resolveBudgetBranchId(orgId: string, branchId?: string | null): Promise<BranchFilterResult> {
+  const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
+  if ('error' in branchSelection) {
+    return branchSelection
+  }
+
+  return { branchId: branchSelection.branchId }
+}
+
+async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<BranchFilterResult> {
+  const branchSelection = await resolveAccessibleBranchSelection(orgId)
+  if ('error' in branchSelection || !branchSelection.branchId) {
+    return { error: errorMessage }
+  }
+
+  return { branchId: branchSelection.branchId }
+}
+
+export async function getBudgets(orgId: string, period: string, branchId?: string | null) {
   const supabase = await createClient()
-  const { data, error } = await (supabase as any)
+  const branchSelection = await resolveBudgetBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
+
+  let query = (supabase as any)
     .from('budgets')
-    .select('*, accounts(code, name, type)')
+    .select('*, accounts(code, name, type), branch:branches(id, name, code)')
     .eq('org_id', orgId)
     .eq('period', period)
+
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data, error } = await query
+
   if (error) return []
   return data
 }
 
 export async function saveBudget(orgId: string, accountId: string, period: string, amount: number) {
   const supabase = await createClient()
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih satu unit aktif terlebih dahulu untuk menyimpan budget.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+
   const { error } = await (supabase as any)
     .from('budgets')
     .upsert({
       org_id: orgId,
+      branch_id: activeBranchResult.branchId,
       account_id: accountId,
       period,
       budget_amount: amount,
       updated_at: new Date().toISOString()
-    }, { onConflict: 'org_id, account_id, period' })
-  if (error) throw error
+    }, { onConflict: 'org_id,branch_id,account_id,period' })
+  if (error) return { error: error.message || 'Gagal menyimpan budget.' }
+
   revalidatePath('/accounting/budgets')
-  return { success: true }
+  return { success: true, branchId: activeBranchResult.branchId }
 }
 
-export async function getBudgetVsActual(orgId: string, startDate: string, endDate: string) {
+export async function getBudgetVsActual(
+  orgId: string,
+  startDate: string,
+  endDate: string,
+  branchId?: string | null
+) {
   const supabase = await createClient()
+  const branchSelection = await resolveBudgetBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
 
   // 1. Get ALL relevant accounts
   const { data: accounts } = await (supabase as any)
@@ -43,12 +91,18 @@ export async function getBudgetVsActual(orgId: string, startDate: string, endDat
   if (!accounts || accounts.length === 0) return []
 
   // 2. Get budgets
-  const { data: budgets } = await (supabase as any)
+  let budgetsQuery = (supabase as any)
     .from('budgets')
     .select('*')
     .eq('org_id', orgId)
     .gte('period', startDate)
     .lte('period', endDate)
+
+  if (branchSelection.branchId) {
+    budgetsQuery = budgetsQuery.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data: budgets } = await budgetsQuery
 
   const budgetByAccount: Record<string, number> = {}
   for (const b of budgets || []) {
@@ -56,13 +110,19 @@ export async function getBudgetVsActual(orgId: string, startDate: string, endDat
   }
 
   // 3. Get actuals
-  const { data: entries } = await (supabase as any)
+  let entriesQuery = (supabase as any)
     .from('journal_entries')
     .select('id')
     .eq('org_id', orgId)
     .eq('status', 'POSTED')
     .gte('entry_date', startDate)
     .lte('entry_date', endDate)
+
+  if (branchSelection.branchId) {
+    entriesQuery = entriesQuery.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data: entries } = await entriesQuery
 
   const entryIds = (entries || []).map((e: any) => e.id)
   const actualByAccount: Record<string, number> = {}

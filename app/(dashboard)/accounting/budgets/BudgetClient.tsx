@@ -28,17 +28,32 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 interface BudgetClientProps {
   orgId: string
+  activeBranchId?: string | null
+  activeBranchName?: string | null
+  allowAllBranchSelection?: boolean
   initialBudgets: any[]
   reportData: any[]
   accounts: any[]
   currentPeriod: string
 }
 
-export function BudgetClient({ orgId, initialBudgets, reportData, accounts, currentPeriod }: BudgetClientProps) {
+export function BudgetClient({
+  orgId,
+  activeBranchId = null,
+  activeBranchName = null,
+  allowAllBranchSelection = false,
+  initialBudgets,
+  reportData,
+  accounts,
+  currentPeriod,
+}: BudgetClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [activeTab, setActiveTab] = useState<'EDIT' | 'ANALYSIS'>('ANALYSIS')
+  const canEditBudget = Boolean(activeBranchId)
+  const scopeLabel = activeBranchName || (allowAllBranchSelection ? 'Semua Unit' : 'Unit belum dipilih')
+  const branchGuardMessage = 'Pilih satu unit aktif terlebih dahulu untuk mengelola budget.'
   
   // Local state for editing amounts
   const [editMap, setEditMap] = useState<Record<string, number>>(
@@ -46,8 +61,17 @@ export function BudgetClient({ orgId, initialBudgets, reportData, accounts, curr
   )
 
   const handleSave = async (accountId: string, amount: number) => {
+    if (!canEditBudget) {
+      window.alert(branchGuardMessage)
+      return
+    }
+
     startTransition(async () => {
-       await saveBudget(orgId, accountId, currentPeriod, amount)
+       const result = await saveBudget(orgId, accountId, currentPeriod, amount)
+       if ((result as any)?.error) {
+         window.alert((result as any).error)
+         return
+       }
        router.refresh()
     })
   }
@@ -75,6 +99,14 @@ export function BudgetClient({ orgId, initialBudgets, reportData, accounts, curr
           </div>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight tracking-tighter">Budgeting & Analysis</h1>
           <p className="text-slate-500 font-medium">Kendalikan pengeluaran operasional dengan pagu anggaran yang terukur.</p>
+          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-[10px] font-black uppercase tracking-widest ${
+            activeBranchName
+              ? 'bg-blue-50 text-blue-700 border-blue-100'
+              : 'bg-amber-50 text-amber-700 border-amber-100'
+          }`}>
+            <Package size={12} />
+            {scopeLabel}
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -86,8 +118,21 @@ export function BudgetClient({ orgId, initialBudgets, reportData, accounts, curr
               Realisasi Anggaran
             </button>
             <button 
-              onClick={() => setActiveTab('EDIT')}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'EDIT' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-500 hover:text-slate-800'}`}
+              onClick={() => {
+                if (!canEditBudget) {
+                  window.alert(branchGuardMessage)
+                  return
+                }
+                setActiveTab('EDIT')
+              }}
+              disabled={!canEditBudget}
+              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${
+                activeTab === 'EDIT'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+                  : canEditBudget
+                    ? 'text-slate-500 hover:text-slate-800'
+                    : 'text-slate-300 cursor-not-allowed'
+              }`}
             >
               Alokasi Budget
             </button>
@@ -104,6 +149,18 @@ export function BudgetClient({ orgId, initialBudgets, reportData, accounts, curr
           </div>
         </div>
       </div>
+
+      {!canEditBudget && (
+        <div className="rounded-[32px] border border-amber-200 bg-amber-50 px-6 py-5 flex items-start gap-4">
+          <AlertCircle className="text-amber-600 mt-0.5" size={18} />
+          <div className="space-y-1">
+            <p className="text-sm font-black text-amber-900 uppercase tracking-widest">Mode Read-Only</p>
+            <p className="text-sm font-medium text-amber-800">
+              Pilih satu unit aktif terlebih dahulu untuk menyusun atau mengubah budget. Dalam mode ini data masih tampil sebagai ringkasan {scopeLabel.toLowerCase()}.
+            </p>
+          </div>
+        </div>
+      )}
 
       <AnimatePresence mode="wait">
         {activeTab === 'ANALYSIS' ? (
@@ -183,44 +240,56 @@ export function BudgetClient({ orgId, initialBudgets, reportData, accounts, curr
             key="edit"
             className="bg-white rounded-[50px] border border-slate-100 shadow-sm overflow-hidden"
           >
-             <div className="p-10 border-b border-slate-50 flex justify-between items-center">
-                <h3 className="text-2xl font-black text-slate-900 flex items-center gap-4">
-                   <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
+             {!canEditBudget ? (
+               <div className="p-16 text-center space-y-4">
+                 <AlertCircle size={28} className="mx-auto text-amber-500" />
+                 <h3 className="text-xl font-black text-slate-900 tracking-tight">Pilih Unit Aktif</h3>
+                 <p className="text-sm font-medium text-slate-500 max-w-xl mx-auto">
+                   Budget sekarang disimpan per unit. Pilih satu unit aktif dari header sebelum melakukan alokasi budget bulanan.
+                 </p>
+               </div>
+             ) : (
+              <>
+                <div className="p-10 border-b border-slate-50 flex justify-between items-center">
+                  <h3 className="text-2xl font-black text-slate-900 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
                       <Plus size={24} />
-                   </div>
-                   Input Alokasi Bulanan
-                </h3>
-                <div className="flex items-center gap-3 text-xs font-black text-slate-400 bg-slate-50 px-5 py-2 rounded-2xl">
-                   <Filter size={14} /> Only Income & Expense Recommended
+                    </div>
+                    Input Alokasi Bulanan
+                  </h3>
+                  <div className="flex items-center gap-3 text-xs font-black text-slate-400 bg-slate-50 px-5 py-2 rounded-2xl">
+                    <Filter size={14} /> Only Income & Expense Recommended
+                  </div>
                 </div>
-             </div>
 
-             <div className="p-10">
-                <div className="grid grid-cols-1 gap-4">
-                   {accounts.filter(a => ['REVENUE', 'EXPENSE', 'COGS'].includes(a.type) || a.code.startsWith('4') || a.code.startsWith('5') || a.code.startsWith('6')).map((a) => (
+                <div className="p-10">
+                  <div className="grid grid-cols-1 gap-4">
+                    {accounts.filter(a => ['REVENUE', 'EXPENSE', 'COGS'].includes(a.type) || a.code.startsWith('4') || a.code.startsWith('5') || a.code.startsWith('6')).map((a) => (
                       <div key={a.id} className="flex flex-col md:flex-row md:items-center gap-6 p-6 hover:bg-slate-50 rounded-[32px] transition-all group">
-                         <div className="w-64">
-                            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">{a.code}</p>
-                            <p className="font-black text-slate-800 uppercase italic group-hover:text-blue-600 transition-colors truncate">{a.name}</p>
-                         </div>
-                         <div className="flex-1">
-                            <div className="relative group/input">
-                               <input 
-                                 type="number"
-                                 placeholder="IDR 0,00"
-                                 defaultValue={editMap[a.id]}
-                                 onBlur={(e) => handleSave(a.id, Number(e.target.value))}
-                                 className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 text-sm font-black outline-none transition-all placeholder:text-slate-300"
-                               />
-                               <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2 opacity-0 group-focus-within/input:opacity-100 transition-opacity">
-                                  <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest italic tracking-tighter">Auto-saving...</span>
-                               </div>
+                        <div className="w-64">
+                          <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">{a.code}</p>
+                          <p className="font-black text-slate-800 uppercase italic group-hover:text-blue-600 transition-colors truncate">{a.name}</p>
+                        </div>
+                        <div className="flex-1">
+                          <div className="relative group/input">
+                            <input
+                              type="number"
+                              placeholder="IDR 0,00"
+                              defaultValue={editMap[a.id]}
+                              onBlur={(e) => handleSave(a.id, Number(e.target.value))}
+                              className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 text-sm font-black outline-none transition-all placeholder:text-slate-300"
+                            />
+                            <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2 opacity-0 group-focus-within/input:opacity-100 transition-opacity">
+                              <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest italic tracking-tighter">Auto-saving...</span>
                             </div>
-                         </div>
+                          </div>
+                        </div>
                       </div>
-                   ))}
+                    ))}
+                  </div>
                 </div>
-             </div>
+              </>
+             )}
           </motion.div>
         )}
       </AnimatePresence>

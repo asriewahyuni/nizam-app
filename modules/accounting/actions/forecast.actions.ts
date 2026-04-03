@@ -1,33 +1,97 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { getAccountBalances } from './coa.actions'
 
-export async function getCashFlowForecast(orgId: string, days: number = 90) {
+type BranchFilter = string | null | undefined
+
+async function getCashAccountCodes(db: any, orgId: string) {
+  const { data: linkedAccounts } = await db
+    .from('bank_accounts')
+    .select('account_id, accounts(code)')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+
+  const codes = Array.from(
+    new Set(
+      (linkedAccounts || [])
+        .map((account: any) => account.accounts?.code)
+        .filter(Boolean)
+    )
+  )
+
+  return codes.length > 0 ? codes : ['1101', '1102', '1103', '1104', '1105']
+}
+
+async function getPostedEntryIds(db: any, orgId: string, branchId?: BranchFilter) {
+  let query = db
+    .from('journal_entries')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('status', 'POSTED')
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId)
+  }
+
+  const { data, error } = await query
+  if (error || !Array.isArray(data)) return []
+
+  return data.map((entry: any) => entry.id)
+}
+
+async function getCurrentCashBalance(db: any, orgId: string, branchId?: BranchFilter) {
+  const [cashAccountCodes, entryIds] = await Promise.all([
+    getCashAccountCodes(db, orgId),
+    getPostedEntryIds(db, orgId, branchId),
+  ])
+
+  if (entryIds.length === 0) return 0
+
+  const { data: lines, error } = await db
+    .from('journal_lines')
+    .select('debit, credit, accounts!inner(code)')
+    .in('entry_id', entryIds)
+    .in('accounts.code', cashAccountCodes) as any
+
+  if (error || !Array.isArray(lines)) return 0
+
+  return lines.reduce((sum: number, line: any) => sum + Number(line.debit || 0) - Number(line.credit || 0), 0)
+}
+
+export async function getCashFlowForecast(orgId: string, days: number = 90, branchId?: BranchFilter) {
   const supabase = await createClient()
   const db = supabase as any
 
-  // 1. Current Total Cash (Balances for 1101-1105)
-  const balances = await getAccountBalances(orgId)
-  const currentCash = balances
-    .filter((b: any) => b.code >= '1101' && b.code <= '1105')
-    .reduce((sum: any, b: any) => sum + (b.balance || 0), 0)
+  // 1. Current Total Cash
+  const currentCash = await getCurrentCashBalance(db, orgId, branchId)
 
   // 2. Projected Inflow (Sales)
-  const { data: sales, error: sErr } = await db
+  let salesQuery = db
     .from('sales')
     .select('grand_total, due_date, sale_number')
     .eq('org_id', orgId)
     .in('payment_status', ['UNPAID', 'PARTIAL'])
     .neq('status', 'VOIDED')
 
+  if (branchId) {
+    salesQuery = salesQuery.eq('branch_id', branchId)
+  }
+
+  const { data: sales } = await salesQuery
+
   // 3. Projected Outflow (Purchases)
-  const { data: purchases, error: pErr } = await db
+  let purchasesQuery = db
     .from('purchases')
     .select('grand_total, due_date, purchase_number')
     .eq('org_id', orgId)
     .in('payment_status', ['UNPAID', 'PARTIAL'])
     .neq('status', 'VOIDED')
+
+  if (branchId) {
+    purchasesQuery = purchasesQuery.eq('branch_id', branchId)
+  }
+
+  const { data: purchases } = await purchasesQuery
     
   // 5. Generate Time Series
   const forecast = []

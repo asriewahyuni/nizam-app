@@ -36,12 +36,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 interface ForecastClientProps {
   forecast: any
   orgId: string
+  activeBranchName?: string | null
 }
 
-export default function ForecastClient({ forecast, orgId }: ForecastClientProps) {
+export default function ForecastClient({ forecast, orgId, activeBranchName = null }: ForecastClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const days = parseInt(searchParams.get('days') || '30')
+  const scopeLabel = activeBranchName || 'Semua Unit'
 
   const changeDays = (d: number) => {
     const params = new URLSearchParams(searchParams)
@@ -71,6 +73,14 @@ export default function ForecastClient({ forecast, orgId }: ForecastClientProps)
                 Estimasi ketersediaan dana berdasarkan jatuh tempo Piutang (AR) dan Hutang (AP) 
                 selama {days} hari ke depan.
             </p>
+            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-[10px] font-black uppercase tracking-widest ${
+              activeBranchName
+                ? 'bg-blue-50 text-blue-700 border-blue-100'
+                : 'bg-slate-100 text-slate-600 border-slate-200'
+            }`}>
+              <LayoutGrid size={12} />
+              {scopeLabel}
+            </div>
         </div>
 
         <div className="flex bg-slate-100 p-1.5 rounded-3xl w-fit">
