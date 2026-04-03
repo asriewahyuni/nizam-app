@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import type { JournalReferenceType } from '@/types/database.types'
 
 export interface JournalLineInput {
@@ -21,6 +22,27 @@ export interface CreateJournalEntryInput {
   notes?: string
   lines: JournalLineInput[]
   auto_post?: boolean // if true, immediately post after creation
+  allow_org_scope?: boolean
+}
+
+async function resolveJournalBranchId(input: CreateJournalEntryInput) {
+  if (input.branch_id) {
+    const branchSelection = await resolveAccessibleBranchSelection(input.org_id, input.branch_id)
+    if ('error' in branchSelection) return { error: branchSelection.error }
+    return { branchId: branchSelection.branchId }
+  }
+
+  if (input.allow_org_scope) {
+    return { branchId: null as string | null }
+  }
+
+  const branchSelection = await resolveAccessibleBranchSelection(input.org_id)
+  if ('error' in branchSelection) return { error: branchSelection.error }
+  if (!branchSelection.branchId) {
+    return { error: 'Pilih unit aktif terlebih dahulu untuk membuat jurnal manual.' }
+  }
+
+  return { branchId: branchSelection.branchId }
 }
 
 export async function getUnpostedJournalsCount(orgId: string): Promise<number> {
@@ -60,12 +82,15 @@ export async function createJournalEntry(input: CreateJournalEntryInput) {
     return { error: `Jurnal tidak balance: debit ${totalDebit} ≠ credit ${totalCredit}` }
   }
 
+  const resolvedBranch = await resolveJournalBranchId(input)
+  if ('error' in resolvedBranch) return resolvedBranch
+
   // Insert header
   const { data: entry, error: entryError } = await (supabase as any)
     .from('journal_entries')
     .insert({
       org_id: input.org_id,
-      branch_id: input.branch_id || null, // Linked to branch
+      branch_id: resolvedBranch.branchId, // Linked to branch
       entry_date: input.entry_date,
       description: input.description,
       reference_type: input.reference_type || 'MANUAL',

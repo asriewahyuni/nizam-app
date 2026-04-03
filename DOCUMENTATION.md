@@ -1,946 +1,940 @@
-# NIZAM ERP Documentation
+# NIZAM ERP — Comprehensive Codebase Documentation
 
-Dokumen ini disusun dari audit langsung terhadap kode pada **29 Maret 2026**. Seluruh isi di bawah mengacu ke kondisi repo saat ini, bukan ke README lama.
+> **Last updated:** 3 April 2026 — generated from direct repository audit.
 
-## 1. Ringkasan Eksekutif
+---
 
-NIZAM ERP adalah aplikasi ERP multi-tenant berbasis Next.js App Router dan Supabase. Sistem ini memadukan modul akuntansi, kas & bank, inventory, purchasing, sales, POS, HRIS, payroll, fixed assets, budgeting, tax, zakat, approval, audit, manufacturing, fleet, service order, billing SaaS, pricing, admin SaaS, mode demo, serta landing khusus voucher ABS.
+## 1. Executive Summary
 
-Snapshot saat audit:
+NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **Supabase (PostgreSQL)**. It consolidates accounting, cash & bank, inventory/WMS, purchasing, sales, POS, CRM, HRIS & payroll, fixed assets, budgeting, tax, zakat (Islamic finance), approval workflows, audit trails, manufacturing, fleet management, service orders, SaaS billing, AI token economy, and a sales page builder — all within a single monorepo.
 
-- `55` route page file
-- `40` client page/component utama
-- `41` server action file
-- `127` migration SQL
-- `6` test file
-- `1` route handler (`app/api/export/route.ts`)
-- `1` request proxy (`proxy.ts`)
+### Codebase Snapshot
 
-## 2. Stack Aktual
-
-| Lapisan | Implementasi aktual |
+| Metric | Value |
 |---|---|
-| Framework | Next.js `16.2.1` |
-| UI runtime | React `19.2.4` |
-| Router | App Router |
-| Rendering mix | Server Components + Client Components + Server Actions |
-| Request interception | `proxy.ts` |
-| Database | Supabase / PostgreSQL |
-| Auth | Supabase Auth |
-| Security | RLS PostgreSQL + org isolation + role/module gating |
-| Styling | Tailwind CSS `4.2.2`, custom `NizamUI`, Framer Motion |
+| Page routes (`page.tsx`) | **61** |
+| Client components (`*Client.tsx`) | **42** |
+| Server action files | **52** |
+| Migration SQL files | **153** (latest: `1104`) |
+| Test files | **30** |
+| API route handlers | **2** (`/api/export`, `/api/sales-pages/lead`) |
+| Proxy (middleware) | `proxy.ts` |
+
+---
+
+## 2. Technology Stack
+
+| Layer | Implementation |
+|---|---|
+| Framework | Next.js **16.2.1** (App Router) |
+| UI Runtime | React **19.2.4** |
+| Rendering | Server Components + Client Components + Server Actions |
+| Request Interception | `proxy.ts` (Next.js 16 Proxy convention) |
+| Database | Supabase / PostgreSQL with RLS |
+| Auth | Supabase Auth (email/password, NIK/password for staff) |
+| Security | RLS + org isolation + role/module gating + branch-level ACL |
+| Styling | Tailwind CSS **4.2.2** + custom design tokens + Framer Motion |
+| UI Components | Custom `NizamUI` component library + Radix UI primitives |
 | Charts | Recharts |
-| XLSX export | ExcelJS |
+| XLSX Export | ExcelJS |
 | OCR / AI | Google Gemini via `@google/generative-ai` |
 | Email | Resend |
-| QR / Scan | `html5-qrcode`, `qrcode.react` |
-| Test runner | Vitest `4.1.1` |
-
-## 3. Struktur Repo
-
-### 3.1 Folder utama
-
-- `app/`: seluruh route App Router.
-- `modules/`: domain business logic dan server actions.
-- `components/`: shared UI dan shared layout components.
-- `lib/`: utilitas, Supabase client/server, hooks, email sender.
-- `supabase/migrations/`: evolusi skema database.
-- `types/database.types.ts`: tipe database Supabase.
-- `__tests__/`: unit test dan mock helper.
-- `public/`: manifest PWA dan aset publik.
-
-### 3.2 Entry points penting
-
-- `app/layout.tsx`: root layout, metadata, viewport, manifest.
-- `app/(auth)/layout.tsx`: layout halaman login/register.
-- `app/(dashboard)/layout.tsx`: layout utama dashboard, guard session/org/module/RBAC.
-- `proxy.ts`: refresh session Supabase dan proteksi route.
-- `app/api/export/route.ts`: endpoint export XLSX.
-- `next.config.mjs`: build `standalone`, namun TypeScript build errors di-ignore.
-
-### 3.3 Shared UI penting
-
-- `components/ui/NizamUI.tsx`: `SafeButton`, `PageHeader`, `StatCard`, `EmptyState`, `SectionCard`, `SectionHeader`, `StatusBadge`, `ConfirmDialog`.
-- `components/shared/AppSidebar.tsx`: navigasi modul berdasarkan role, permission, enabled modules, dan mode demo.
-- `components/shared/AppHeader.tsx`: header organisasi, branch switcher, pending approvals.
-- `components/shared/StartupWizard.tsx`: wizard startup.
-- `components/shared/MobileBottomNav.tsx`: navigasi mobile.
-- `components/shared/BarcodeScanner.tsx` dan `BarcodeLabel.tsx`: barcode scan/print.
-
-## 4. Arsitektur Aplikasi
-
-### 4.1 Routing model
-
-NIZAM menggunakan App Router. Route dibagi menjadi:
-
-- `(auth)`: login, register, join invitation, forgot/update password.
-- `(dashboard)`: seluruh area aplikasi setelah user punya org aktif.
-- route publik khusus: `/`, `/demo`, `/abs`, `/onboarding`.
-- route handler: `/api/export`.
-
-### 4.2 Root flow
-
-- `/` memeriksa session lewat `getSession()`.
-- Jika belum login, user diarahkan ke `/login`.
-- Jika sudah login tetapi belum punya organisasi aktif, root menampilkan onboarding.
-- Jika organisasi aktif tersedia, user diarahkan ke `/dashboard`.
-
-### 4.3 Dashboard layout guard
-
-`app/(dashboard)/layout.tsx` melakukan:
-
-- validasi session
-- validasi organisasi aktif
-- fetch notifikasi lintas modul
-- module guard berbasis `enabledModules`
-- permission guard untuk non-owner/non-admin
-- render sidebar, header, demo banner, startup wizard, mobile nav, dan floating plan badge
-
-Layout ini juga membaca header `x-pathname` yang di-set di `lib/supabase/middleware.ts`.
-
-### 4.4 Proxy
-
-Repo ini sudah mengikuti istilah **Proxy** milik Next.js 16.
-
-`proxy.ts`:
-
-- memanggil `updateSession(request)`
-- menyegarkan cookie session Supabase
-- redirect user login ke dashboard bila sudah auth
-- redirect user anonymous dari route privat ke login
-
-Route yang dianggap privat mencakup hampir seluruh area bisnis: `/dashboard`, `/billing`, `/cash`, `/contacts`, `/factory`, `/fleet`, `/hris`, `/pos`, `/pricing`, `/profil-saya`, `/reports`, `/services`, `/settings`, `/accounting`, `/inventory`, `/sales`, `/purchasing`, dan `/admin`.
-
-### 4.5 Route handler
-
-`app/api/export/route.ts` menerima `GET` dan menghasilkan file XLSX untuk:
-
-- `type=pl`
-- `type=bs`
-- `type=gl`
-- `type=zakat`
-
-Guard yang dipakai:
-
-- user harus login
-- `orgId` harus diberikan
-- user harus tercatat sebagai anggota aktif di `org_members`
-
-## 5. Auth, Tenant, Org, dan Akses
-
-### 5.1 Model tenant
-
-Isolasi tenant bertumpu pada:
-
-- `organizations`
-- `org_members`
-- `roles`
-- hampir semua tabel bisnis memiliki `org_id`
-- policy RLS membaca `auth.uid()` dan keanggotaan org
-
-### 5.2 Alur auth yang tersedia
-
-#### Owner / business account
-
-- `signUp(formData)`: daftar owner berbasis email/password.
-- `signIn(formData)`: login email/password.
-- `signOut()`: logout dan redirect ke `/login`.
-
-#### Employee account
-
-- `verifyEmployeeNikByToken(token, nik)`: verifikasi invitation token + NIK.
-- `registerEmployeeAccount(formData)`: membuat auth user internal staff.
-- `signInWithNik(formData)`: login staff via NIK + password.
-- `requestPasswordReset(nik)`: menandai permintaan reset dari sisi HRIS.
-- `resetEmployeePassword(employeeId, newPassword)`: reset password karyawan via admin client.
-- `sendPasswordResetEmail(formData)`: reset password via email Supabase.
-
-### 5.3 Organisasi aktif
-
-`getActiveOrg()` melakukan:
-
-- baca session user
-- dukungan mode demo via cookie `nizam_demo_org_id`
-- ambil membership aktif paling awal
-- resolve plan aktif dan enabled modules dari `saas_packages`
-- gabungkan `active_addons`
-- ambil `job_title` dari tabel `employees`
-
-Hook client `useActiveOrgId()` memanggil `getActiveOrgIdAction()` agar resolusi org aktif konsisten dengan server.
-
-### 5.4 Onboarding
-
-`createOrganization(formData)`:
-
-- membuat `organizations`
-- membuat `org_members` dengan role `owner`
-- mengisi `settings.plan`
-- dapat men-trigger mode demo (`plan=demo`)
-- dapat auto-apply voucher ABS (`plan=abs`)
-
-### 5.5 RBAC dan module gating
-
-Kontrol akses terjadi di dua level:
-
-- level database: RLS dan role/membership
-- level aplikasi: guard modul dan permission di dashboard layout + sidebar
-
-Sumber data utamanya:
-
-- `roles.permissions`
-- `organizations.enabled_modules`
-- `saas_packages.modules`
-- `organizations.active_addons`
-
-### 5.6 Admin SaaS
-
-`app/(dashboard)/admin/layout.tsx` memakai allowlist email `SUPER_ADMIN_EMAILS`. Hanya email tertentu yang bisa masuk ke `/admin`.
-
-## 6. Peta Route
-
-### 6.1 Route publik dan auth
-
-| Route | Fungsi |
-|---|---|
-| `/` | Root redirect/login/onboarding/dashboard gate |
-| `/onboarding` | Pembuatan organisasi baru |
-| `/demo` | Mulai sesi demo |
-| `/abs` | Landing voucher ABS2024 |
-| `/sp/[orgSlug]/[pageSlug]` | Sales page publik per organisasi |
-| `/login` | Login owner/staff |
-| `/register` | Registrasi owner |
-| `/forgot-password` | Kirim reset password email |
-| `/update-password` | Set password baru |
-| `/join/[token]` | Aktivasi akun karyawan lewat token |
-
-### 6.2 Route dashboard inti
-
-| Route | Fungsi |
-|---|---|
-| `/dashboard` | KPI overview, OCF, runway, pareto analytics |
-| `/profil-saya` | Profil karyawan aktif |
-| `/billing` | Billing organisasi aktif |
-| `/billing/invoice/[id]` | Halaman print invoice billing |
-| `/pricing` | Daftar paket SaaS |
-| `/admin` | Admin panel SaaS |
-
-### 6.3 Route finance & accounting
-
-| Route | Fungsi |
-|---|---|
-| `/cash` | Bank accounts, bank transactions, kas/bank overview |
-| `/accounting/journal` | Buku besar dan jurnal manual |
-| `/accounting/aging` | AR/AP aging |
-| `/accounting/approvals` | Approval center |
-| `/accounting/assets` | Fixed assets |
-| `/accounting/audit` | Audit integritas data |
-| `/accounting/budgets` | Budgeting dan budget vs actual |
-| `/accounting/closing` | Fiscal period closing/opening |
-| `/accounting/forecast` | Cash flow forecast |
-| `/accounting/reimburse` | Reimbursement |
-| `/accounting/tax` | Ringkasan pajak |
-| `/accounting/zakat` | Zakat tijarah dan haul |
-| `/settings/accounts` | Chart of Accounts |
-| `/settings/accounts/new` | Tambah akun |
-| `/settings/accounts/[id]` | Edit akun |
-
-### 6.4 Route operasional
-
-| Route | Fungsi |
-|---|---|
-| `/inventory` | Master produk, opname, transfer, write-off, barcode |
-| `/inventory/warehouses` | Master gudang |
-| `/inventory/warehouses/[id]` | Detail bin gudang |
-| `/inventory/ledger/[id]` | Stock ledger produk |
-| `/purchasing` | PO, penerimaan, pembayaran, retur, purchase requests |
-| `/factory` | BoM, work order, completion |
-| `/fleet` | Fleet assets, bookings, routes, schedules, tickets, attendance, maintenance |
-| `/services` | Service/job orders |
-
-### 6.5 Route sales & CRM
-
-| Route | Fungsi |
-|---|---|
-| `/contacts` | Customer/supplier CRM |
-| `/pos` | POS transaksi tunai |
-| `/sales` | Sales order, delivery, payment, return |
-| `/sales/quotations` | Quotation |
-| `/sales/pipeline` | Sales pipeline |
-| `/sales/commission` | Komisi penjualan |
-| `/sales/promos` | Promo UI |
-| `/sales/pages` | Sales Page Studio, generator halaman, publish, leads |
-
-### 6.6 Route HRIS & settings
-
-| Route | Fungsi |
-|---|---|
-| `/hris` | Karyawan, payroll components, payroll runs, activation |
-| `/settings/business` | Profil bisnis, format dokumen, logo, slug, dan danger zone reset data |
-| `/settings/roles` | Struktur jabatan dan permissions |
-| `/settings/users` | Membership organisasi |
-| `/settings/branches` | Cabang/divisi |
-| `/settings/audit` | Audit trail admin/user |
-| `/audit` | Redirect ke `/settings/audit` |
-
-### 6.7 Route reports
-
-| Route | Fungsi |
-|---|---|
-| `/reports` | P&L, balance sheet, cash flow |
-| `/reports/bsc` | Balanced scorecard |
-| `/reports/pareto` | Pareto report |
-
-## 7. Modul Bisnis
-
-### 7.1 Organization & SaaS Core
-
-File utama:
-
-- `modules/organization/actions/org.actions.ts`
-- `modules/organization/actions/org-id.actions.ts`
-- `modules/organization/actions/billing.actions.ts`
-- `modules/organization/actions/approval.actions.ts`
-- `modules/organization/actions/audit.actions.ts`
-- `modules/organization/actions/hris.actions.ts`
-
-Kemampuan:
-
-- create/update organization
-- active org resolution
-- branch management
-- invitation token management
-- owner-only reset transaksi dan reset seluruh data operasional
-- billing invoice creation
-- payment proof upload confirmation
-- voucher activation
-- approval queue dan approval history
-- audit log admin-level
-
-Tabel yang banyak disentuh:
-
-- `organizations`
-- `org_members`
-- `branches`
-- `org_invitations`
-- `saas_packages`
-- `saas_invoices`
-- `saas_vouchers`
-- `approval_requests`
-- `audit_logs`
-
-### 7.2 Accounting
-
-File action:
-
-- `coa.actions.ts`
-- `journal.actions.ts`
-- `reports.actions.ts`
-- `export.actions.ts`
-- `analytics.actions.ts`
-- `aging.actions.ts`
-- `tax.actions.ts`
-- `zakat.actions.ts`
-- `assets.actions.ts`
-- `budget.actions.ts`
-- `closing.actions.ts`
-- `forecast.actions.ts`
-- `audit.actions.ts`
-- `bsc.actions.ts`
-- `shariah.actions.ts`
-- `price.actions.ts`
-- `reimburse.actions.ts`
-
-Kemampuan penting:
-
-- manual journal + auto-post
-- posting/void journal dan two-way sync ke sub-ledger tertentu
-- balance sheet, P&L, cash flow, general ledger
-- XLSX export
-- dashboard analytics dan pareto
-- AR/AP aging
-- tax ledger summary untuk akun `1401`, `2201`, `2202`, `2203`
-- zakat haul dengan nishab emas/perak dan timeline aset
-- fixed assets, capitalization, depreciation preview/run, disposal
-- budgeting dan budget vs actual
-- fiscal period open/close
-- cash flow forecast
-- audit integrity checks
-- reimbursement + receipt upload + approval
-- shariah account activation/injection
-
-Tabel/RPC penting:
-
-- `journal_entries`, `journal_lines`, `account_balances`
-- `accounts`, `fixed_assets`, `asset_depreciation_logs`
-- `budgets`, `fiscal_periods`
-- `reimbursements`, `reimbursement_items`
-- `zakat_haul`, `zakat_asset_timeline`, `zakat_haul_events`
-- RPC seperti `seed_default_coa`, `process_asset_disposal`
-
-### 7.3 Cash & Bank
-
-File action:
-
-- `modules/cash/actions/bank.actions.ts`
-- `modules/cash/actions/reconcile.actions.ts`
-
-Kemampuan:
-
-- CRUD rekening bank
-- input transaksi kas/bank
-- fetch transaksi terbaru
-- hapus transaksi sambil void linked journal
-- upload/parse CSV mutasi bank
-- daftar mutasi belum match
-
-Tabel:
-
-- `bank_accounts`
-- `bank_transactions`
-- `bank_mutations`
-- `journal_entries`
-
-### 7.4 Inventory & WMS
-
-File action:
-
-- `modules/inventory/actions/inventory.actions.ts`
-- `modules/inventory/actions/warehouse.actions.ts`
-
-Kemampuan:
-
-- master produk
-- perhitungan stock in/out/value dari `stock_movements`
-- stock adjustment
-- write-off
-- transfer antar gudang
-- warehouse dan warehouse bins
-- barcode lookup
-- stock ledger per produk
-
-Catatan implementasi:
-
-- transfer stok dimodelkan sebagai adjustment dua baris
-- adjustment dibuat via helper collision-safe untuk nomor adjustment
-- beberapa operasi tergantung RPC `process_inventory_adjustment`
-
-Tabel/RPC:
-
-- `products`
-- `stock_movements`
-- `inventory_adjustments`
-- `inventory_adjustment_items`
-- `inventory_stocks`
-- `warehouses`
-- `warehouse_bins`
-- RPC `process_inventory_adjustment`
-
-### 7.5 Purchasing
-
-File action:
-
-- `modules/purchasing/actions/purchasing.actions.ts`
-
-Kemampuan:
-
-- create PO dengan alokasi landed cost
-- auto-create/update produk dari baris PO
-- receive purchase dan sync stock + GL
-- void purchase via RPC atomik
-- purchase payment
-- purchase return
-- purchase requests untuk manufaktur/pembelian internal
-
-Tabel/RPC penting:
-
-- `purchases`, `purchase_items`, `purchase_payments`, `purchase_returns`
-- `purchase_requests`
-- `stock_movements`, `inventory_stocks`
-- RPC `process_purchase_atomic`
-- RPC `void_purchase_atomic`
-- RPC `process_purchase_payment_atomic`
-- RPC `process_purchase_return_atomic`
-- RPC `adjust_inventory_stock`
-
-### 7.6 Sales, Quotation, POS
-
-File action:
-
-- `modules/sales/actions/sales.actions.ts`
-- `modules/sales/actions/pos.actions.ts`
-- `modules/sales/actions/sales-page.actions.ts`
-- `modules/sales/lib/sales-page.ts`
-- `modules/sales/lib/sales-page.server.ts`
-
-Kemampuan:
-
-- create sales order
-- approval request untuk sales order baru
-- delivery via RPC atomik
-- void sale dan revert stock/journal terkait
-- sales payment
-- sales return
-- quotation create/convert
-- POS cash sale dengan walk-in customer fallback
-- generator sales page per organisasi
-- publish route publik `/sp/[orgSlug]/[pageSlug]`
-- Meta Pixel ID per halaman
-- lead capture publik via `/api/sales-pages/lead`
-
-Tabel/RPC penting:
-
-- `sales`, `sales_items`, `sales_payments`, `sales_returns`
-- `sales_pages`
-- `sales_page_leads`
-- `approval_requests`
-- `contacts`
-- RPC `process_sales_delivery_atomic`
-- RPC `process_sales_payment_atomic`
-- RPC `process_sales_return_atomic`
-
-### 7.7 Contacts / CRM
-
-File action:
-
-- `modules/contacts/actions/contact.actions.ts`
-
-Kemampuan:
-
-- daftar contact by type
-- tambah customer/supplier
-- digunakan lintas purchasing, sales, POS, services, fleet ticketing
-
-### 7.8 HRIS & Payroll
-
-File action:
-
-- `modules/hris/actions/employee.actions.ts`
-- `modules/hris/actions/expense.actions.ts`
-- `modules/hris/actions/payroll.actions.ts`
-- `modules/auth/actions/auth.actions.ts` juga terlibat untuk aktivasi dan reset password
-
-Kemampuan:
-
-- CRUD karyawan
-- upload avatar karyawan
-- self profile update
-- payroll component management
-- payroll runs
-- generate payslip via RPC
-- pay payroll via RPC
-- fix empty payroll journals
-- expense claims
-- reset password permintaan HR
-- invitation-based employee activation
-
-Tabel/RPC penting:
-
-- `employees`
-- `payroll_components`
-- `payroll_runs`
-- `payslips`
-- `payslip_lines`
-- `attendance`
-- `leave_requests`
-- `expense_claims`
-- RPC `generate_payslips_for_run`
-- RPC `process_payroll_payment`
-- RPC `void_payroll_run`
-- RPC `process_expense_claim`
-
-UI tab utama di `HrisClient.tsx`:
-
-- `EMPLOYEES`
-- `POSITIONS`
-- `PAYROLL`
-- `ATTENDANCE`
-- `RUNS`
-- `ACTIVATION`
-
-### 7.9 Manufacturing
-
-File action:
-
-- `modules/factory/actions/factory.actions.ts`
-
-Kemampuan:
-
-- BoM header dan item
-- work order
-- work order extra costs
-- finish goods bins
-- work order completion via RPC v2 dengan fallback v1
-- create purchase requests dari kebutuhan produksi
-
-Tabel/RPC:
-
-- `production_boms`
-- `production_bom_items`
-- `production_work_orders`
-- `production_wo_costs`
-- `purchase_requests`
-- RPC `process_work_order_completion_v2`
-- RPC `process_work_order_completion`
-
-### 7.10 Fleet & Rental / PO Bus
-
-File action:
-
-- `modules/fleet/actions/fleet.actions.ts`
-
-Kemampuan:
-
-- asset fleet
-- booking rental dengan overlap guard
-- sync status asset terhadap booking aktif
-- route management
-- schedule management
-- ticketing
-- maintenance/medical record kendaraan
-- crew management
-- attendance crew via GPS + QR
-- terminal management
-
-Sub-area UI di `FleetClient.tsx`:
-
-- `UNITS`
-- `BOOKINGS`
-- `PO_BUS`
-- `LABS`
-
-Sub-tab PO bus:
-
-- `ROUTES`
-- `SCHEDULES`
-- `TICKETING`
-- `CREW`
-- `ATTENDANCE`
-
-Tabel/RPC:
-
-- `fleet_assets`
-- `fleet_bookings`
-- `fleet_routes`
-- `fleet_schedules`
-- `fleet_tickets`
-- `fleet_maintenance_labs`
-- `fleet_terminals`
-- `attendance`
-- RPC `create_fleet_medical_record`
-
-### 7.11 Service Orders
-
-File action:
-
-- `modules/services/actions/service.actions.ts`
-
-Kemampuan:
-
-- daftar service orders
-- create service order
-- update status service order
-
-Tabel:
-
-- `service_orders`
-
-### 7.12 Demo & ABS
-
-File action:
-
-- `modules/demo/actions/demo.actions.ts`
-
-Kemampuan:
-
-- login/boot demo account `demo@nizam.app`
-- hapus org demo lama dan buat org demo baru
-- seed data berdasarkan tipe bisnis
-- set cookie `nizam_demo_org_id`
-- cleanup demo org saat logout
-
-Tipe demo:
-
-- `COMPUTER`
-- `CATERING`
-- `RESTAURANT`
-- `SUPPLIER_MBG`
-- `BLANK`
-
-Landing `/abs` memeriksa voucher `ABS2024` dan mengarahkan registrasi plan ABS.
-
-### 7.13 AI & Email
-
-File:
-
-- `modules/ai/actions/vision.actions.ts`
-- `lib/email/sender.ts`
-
-Kemampuan AI:
-
-- OCR receipt/invoice memakai Gemini
-- normalisasi format Rupiah Indonesia
-- fallback error manual input jika AI gagal
-
-Kemampuan email:
-
-- kirim invoice email
-- kirim promo broadcast
-
-## 8. Database & Migrasi
-
-### 8.1 Gambaran umum
-
-Repo menyimpan:
-
-- `129` migration SQL di `supabase/migrations/`
-- `master_init.sql` sebagai bootstrap SQL lama/fondasi
-
-### 8.2 Entitas inti
-
-Entitas inti yang paling sering muncul:
-
-- organisasi dan membership: `organizations`, `org_members`, `roles`, `branches`
-- akuntansi: `accounts`, `journal_entries`, `journal_lines`, `account_balances`
-- cash/bank: `bank_accounts`, `bank_transactions`, `bank_mutations`
-- inventory: `products`, `stock_movements`, `inventory_stocks`, `inventory_adjustments`, `inventory_adjustment_items`, `warehouses`, `warehouse_bins`
-- sales: `sales`, `sales_items`, `sales_payments`, `sales_returns`
-- sales page: `sales_pages`, `sales_page_leads`
-- purchasing: `purchases`, `purchase_items`, `purchase_payments`, `purchase_returns`, `purchase_requests`
-- HRIS: `employees`, `payroll_components`, `payroll_runs`, `payslips`, `payslip_lines`, `attendance`, `leave_requests`, `expense_claims`
-- approval/audit: `approval_requests`, `audit_logs`
-- assets: `fixed_assets`, `asset_depreciation_logs`
-- manufacturing: `production_boms`, `production_bom_items`, `production_work_orders`, `production_wo_costs`
-- fleet: `fleet_assets`, `fleet_bookings`, `fleet_routes`, `fleet_schedules`, `fleet_tickets`, `fleet_maintenance_labs`, `fleet_terminals`
-- services: `service_orders`
-- SaaS: `saas_packages`, `saas_invoices`, `saas_vouchers`, `saas_config`
-- zakat: `zakat_haul`, `zakat_haul_events`, `zakat_asset_timeline`
-
-### 8.3 Migration timeline ringkas
-
-#### Foundation ERP
-
-- `001_organizations.sql`: organizations, org_members, helper RLS.
-- `002_rbac.sql`: roles, permission engine.
-- `003_chart_of_accounts.sql`: CoA dasar.
-- `004_journal_entries.sql`: journal core.
-- `005` sampai `048`: cash/bank, sales/purchasing, inventory, assets, payroll, budgeting, aging, audit, performance helper, RLS hardening.
-
-#### Manufacturing / Fleet / Services / Multi-branch
-
-- `1000_manufacturing_foundation.sql`
-- `1001_manufacturing_completion_engine.sql`
-- `1002_fleet_rental_foundation.sql`
-- `1003_service_order_foundation.sql`
-- `1004_multi_branch_infrastructure.sql`
-
-#### Shariah / Zakat / Barcode / Production request
-
-- `1006_shariah_coa_addon.sql`
-- `1007_shariah_modes.sql`
-- `1008_update_rpc_shariah.sql`
-- `1009_zakat_haul.sql`
-- `1010_zakat_intra_day_history.sql`
-- `1015_zakat_asset_timeline.sql`
-- `1028_barcode_foundation.sql`
-- `1036_production_purchasing_request.sql`
-
-#### Fleet, org governance, storage, SaaS expansion
-
-- `1040_fleet_medical_record.sql`
-- `1045_fleet_crew_refactor.sql`
-- `1046_fleet_smart_attendance.sql`
-- `1052_storage_setup.sql`
-- `1054_org_slug_registration.sql`
-- `1056_org_module_activation.sql`
-- `1064_add_org_hierarchy.sql`
-- `1065_add_saas_package_limits.sql`
-- `1066_create_service_orders.sql`
-- `1067_saas_billing_system.sql`
-- `1069_billing_activation_engine.sql`
-- `1070_saas_global_config.sql`
-- `1072_billing_proof_storage.sql`
-- `1073_org_invitation_tokens.sql`
-- `1077_add_saas_vouchers.sql`
-- `1078_employee_profile_fields.sql`
-- `1079_fleet_hardening.sql`
-- `1080_reset_org_data_v2.sql`
-- `1081_sales_page_module.sql`
-
-### 8.4 Stored procedures / RPC / triggers yang penting
-
-Beberapa procedure/fungsi yang menjadi tulang punggung:
-
-- `seed_default_coa`
-- `process_purchase_atomic`
-- `void_purchase_atomic`
-- `process_purchase_payment_atomic`
-- `process_purchase_return_atomic`
-- `process_sales_delivery_atomic`
-- `process_sales_payment_atomic`
-- `process_sales_return_atomic`
-- `process_inventory_adjustment`
-- `adjust_inventory_stock`
-- `update_product_average_cost`
-- `generate_payslips_for_run`
-- `process_payroll_payment`
-- `void_payroll_run`
-- `process_expense_claim`
-- `process_work_order_completion_v2`
-- `process_work_order_completion`
-- `create_fleet_medical_record`
-- `process_asset_disposal`
-- `reset_org_data`
-
-### 8.5 Storage buckets yang dipakai
-
-- `brand_assets`: logo organisasi
-- `receipts`: bukti reimbursement
-- `avatars`: avatar karyawan
-- `billing-proofs`: bukti bayar billing SaaS
-
-## 9. Environment Variables Aktual
-
-Environment variable yang benar-benar dipakai di kode:
-
-| Variable | Status | Kegunaan |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_TARGET` | opsional | selector target Supabase. `local` = pakai kredensial lokal, selain itu default ke online |
-| `NEXT_PUBLIC_SUPABASE_URL` | wajib | URL project Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | wajib | anon key frontend/server SSR |
-| `SUPABASE_SERVICE_ROLE_KEY` | opsional tetapi dibutuhkan untuk fitur tertentu | admin client: employee provisioning, reset password, dsb |
-| `NEXT_PUBLIC_SUPABASE_LOCAL_URL` | opsional | URL Supabase CLI lokal saat `NEXT_PUBLIC_SUPABASE_TARGET=local` |
-| `NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY` | opsional | anon key lokal saat `NEXT_PUBLIC_SUPABASE_TARGET=local` |
-| `SUPABASE_LOCAL_SERVICE_ROLE_KEY` | opsional | service role key lokal saat `NEXT_PUBLIC_SUPABASE_TARGET=local` |
-| `GOOGLE_AI_STUDIO_KEY` | opsional | OCR receipt |
-| `RESEND_API_KEY` | opsional | pengiriman email invoice/promo |
-| `NEXT_PUBLIC_SITE_URL` | opsional | redirect URL reset password |
-| `VERCEL_URL` | opsional | fallback origin saat deploy Vercel |
-
-Pemilihan target dibaca terpusat dari `lib/supabase/config.ts`. Selama `NEXT_PUBLIC_SUPABASE_TARGET !== 'local'`, seluruh client/browser/server tetap mengarah ke Supabase online walaupun stack Supabase local sedang hidup.
-
-## 10. Setup dan Operasional
-
-### 10.1 Prasyarat
-
-- Node.js `>=20.0.0`
-- project Supabase
-- migrasi SQL
-- env vars diisi
-
-### 10.2 Script yang tersedia
-
-```bash
-npm run dev
-npm run build
-npm run start
-npm run lint
-npm run test
-npm run test:watch
-npm run test:coverage
-npm run test:erp
-npm run test:erp:coverage
-npm run supabase:start
-npm run supabase:stop
-npm run supabase:status
-npm run supabase:db:reset
-npm run supabase:migrate-local-data
+| QR / Barcode | `html5-qrcode`, `qrcode.react`, `react-barcode` |
+| Testing | Vitest **4.1.1** + `@vitest/coverage-v8` |
+| Node.js | **≥ 20.0.0** (enforced in `package.json` engines) |
+| TypeScript | **5.5.4** (strict mode) |
+| Build Output | `standalone` |
+
+---
+
+## 3. Repository Structure
+
+### 3.1 Top-Level Directories
+
+```
+nizam-app/
+├── app/                 # Next.js App Router (all routes)
+│   ├── (auth)/          # Login, register, password reset, join invitation
+│   ├── (dashboard)/     # Main dashboard + all business modules
+│   ├── abs/             # ABS voucher landing page
+│   ├── api/             # API route handlers
+│   ├── demo/            # Demo mode entry
+│   ├── onboarding/      # New organization setup
+│   └── sp/              # Public sales pages
+├── components/
+│   ├── shared/          # Layout components (sidebar, header, wizard, etc.)
+│   └── ui/              # Reusable UI primitives (NizamUI, CurrencyInput, etc.)
+├── lib/
+│   ├── email/           # Email sender (Resend)
+│   ├── hooks/           # Client hooks (useActiveOrgId)
+│   ├── saas/            # SaaS module catalog, pricing, platform admin
+│   ├── supabase/        # Supabase clients (server, client, middleware, config)
+│   └── utils.ts         # cn(), formatRupiah(), formatDate(), generateSlug(), etc.
+├── modules/             # Domain business logic (server actions + lib)
+│   ├── accounting/      # 17 action files
+│   ├── ai/              # Vision OCR + AI token wallet
+│   ├── auth/            # Authentication actions
+│   ├── cash/            # Bank + reconciliation
+│   ├── contacts/        # CRM contacts
+│   ├── demo/            # Demo seeding
+│   ├── factory/         # Manufacturing
+│   ├── fleet/           # Fleet management
+│   ├── hris/            # HR + payroll + attendance + leave + expense + self-service
+│   ├── inventory/       # Products + warehousing
+│   ├── organization/    # Org CRUD, billing, approval, audit, branch access
+│   ├── purchasing/      # Purchase orders
+│   ├── saas/            # SaaS operator sales actions
+│   ├── sales/           # Sales orders, POS, sales pages
+│   ├── services/        # Service/job orders
+│   └── settings/        # Settings audit
+├── types/
+│   └── database.types.ts # Auto-generated Supabase types
+├── __tests__/           # Vitest test suites (30 files)
+├── supabase/
+│   └── migrations/      # 153 SQL migration files
+├── scripts/             # Data migration scripts
+└── public/              # PWA manifest, logo, static assets
 ```
 
-### 10.3 Mode koneksi Supabase untuk development lokal
+### 3.2 Key Entry Points
 
-- App lokal -> Supabase online:
-  Isi env remote, kosongkan `NEXT_PUBLIC_SUPABASE_TARGET`, lalu restart `npm run dev`.
-- App lokal -> Supabase local:
-  Jalankan `npm run supabase:start`, isi env local dari `npm run supabase:status`, set `NEXT_PUBLIC_SUPABASE_TARGET=local`, lalu restart `npm run dev`.
-- Clone data online -> local:
-  Pertahankan env remote dan local sekaligus, lalu jalankan `npm run supabase:migrate-local-data`.
+| File | Purpose |
+|---|---|
+| `app/layout.tsx` | Root layout — metadata, viewport, manifest, global CSS |
+| `app/(auth)/layout.tsx` | Auth pages layout (login/register/join) |
+| `app/(dashboard)/layout.tsx` | **Main app guard** — session, org, module, RBAC validation |
+| `proxy.ts` | Next.js 16 Proxy — session refresh, route protection |
+| `lib/supabase/middleware.ts` | Session update, auth/protected page redirect logic |
+| `lib/supabase/config.ts` | Centralized Supabase connection config (remote/local switch) |
+| `lib/supabase/server.ts` | Server-side Supabase client (`createClient`, `createAdminClient`) |
+| `lib/supabase/client.ts` | Browser-side Supabase client |
+| `next.config.mjs` | Build config: `standalone` output, TypeScript errors ignored |
 
-Catatan:
+---
 
-- Script clone data membutuhkan `SUPABASE_SERVICE_ROLE_KEY` remote dan `SUPABASE_LOCAL_SERVICE_ROLE_KEY` local.
-- Password user hasil clone ke local di-reset menjadi `LocalTest123!`.
-- Pergantian target tidak hot-reload; process Next.js harus di-restart.
+## 4. Architecture
 
-### 10.4 Catatan build
+### 4.1 Routing Model
 
-`next.config.mjs` saat ini mengaktifkan:
+NIZAM uses the **App Router** with route groups:
 
-```js
-typescript: {
-  ignoreBuildErrors: true,
+- **`(auth)`** — login, register, join invitation, forgot/update password
+- **`(dashboard)`** — all authenticated business modules (20 subdirectories)
+- **Public routes** — `/`, `/demo`, `/abs`, `/onboarding`, `/sp/[orgSlug]/[pageSlug]`
+- **API routes** — `/api/export`, `/api/sales-pages/lead`
+
+### 4.2 Root Flow
+
+```
+/ → getSession()
+├── Not logged in → /login
+├── Logged in, no org → Onboarding UI
+└── Logged in, has org → /dashboard
+```
+
+### 4.3 Dashboard Layout Guard
+
+`app/(dashboard)/layout.tsx` performs:
+
+1. **Session validation** — redirect to `/login` if no session
+2. **Active org resolution** — redirect to `/` if no active org
+3. **Cross-module notification fetch** — pending approvals, etc.
+4. **Module guard** — checks `enabledModules` from SaaS package against route path
+5. **RBAC permission guard** — checks `roles.permissions` for non-owner/non-admin
+6. **Branch-level access** — filters data by user's assigned branches
+
+Route-to-module mapping uses `RouteModuleEntry` with aliases and permission keys for tolerant matching.
+
+### 4.4 Proxy & Middleware
+
+**`proxy.ts`** — Next.js 16 Proxy that calls `updateSession(request)`.
+
+Matcher excludes:
+- `api`, `_next/static`, `_next/image`, `_next/webpack-hmr`
+- Metadata files (`favicon.ico`, `robots.txt`, `sitemap.xml`, `manifest.json`)
+- Files with extensions
+- Prefetch requests
+
+**`lib/supabase/middleware.ts`** — the actual session logic:
+- Short-circuits for bypassed paths (internal/metadata)
+- Short-circuits for public routes (no auth lookup needed)
+- Redirects authenticated users from login → dashboard (with `redirectTo` support)
+- Redirects unauthenticated users from protected routes → login (preserving `pathname + search`)
+- Validates `redirectTo` to prevent open redirects
+
+### 4.5 Server Actions Pattern
+
+All business logic lives in `modules/*/actions/*.actions.ts`:
+
+```typescript
+'use server'
+
+import { createClient } from '@/lib/supabase/server'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+
+export async function doSomething(formData: FormData) {
+  const supabase = await createClient()
+  const org = await getActiveOrg()
+  if (!org) return { error: 'No active organization' }
+  
+  // Business logic with org.orgId for tenant isolation
+  const { data, error } = await supabase
+    .from('some_table')
+    .select('*')
+    .eq('org_id', org.orgId)
+  
+  return { data, error: error?.message }
 }
 ```
 
-Artinya build produksi tidak akan gagal walaupun masih ada error TypeScript.
+### 4.6 Client Component Pattern
 
-Status verifikasi terakhir:
+Pages follow a **thin server page + fat client component** pattern:
 
-- `npm run build` berhasil pada audit lanjutan 29 Maret 2026.
-- Next.js tetap menampilkan `Skipping validation of types` karena flag di atas masih aktif.
-- Penyebab flag belum dicabut adalah backlog error TypeScript lintas modul, bukan error baru pada perbaikan dokumentasi/audit ini.
+```
+app/(dashboard)/sales/page.tsx          ← Server Component (minimal, passes props)
+app/(dashboard)/sales/SalesClient.tsx   ← Client Component ('use client', all UI)
+```
 
-## 11. Testing & Quality
+Client components import server actions and call them via `startTransition` or form actions.
 
-### 11.1 Vitest
+### 4.7 Supabase Client Usage
 
-`vitest.config.ts`:
+| Context | Import | Function |
+|---|---|---|
+| Server Components, Server Actions | `lib/supabase/server.ts` | `createClient()` |
+| Admin operations (password reset, etc.) | `lib/supabase/server.ts` | `createAdminClient()` |
+| Client Components | `lib/supabase/client.ts` | `createClient()` |
+| Middleware | `lib/supabase/middleware.ts` | `createServerClient()` inline |
 
-- environment: `node`
-- coverage provider: `v8`
-- reporter: `text`, `html`
+**Config switching:** `lib/supabase/config.ts` reads `NEXT_PUBLIC_SUPABASE_TARGET`:
+- `'local'` → use `NEXT_PUBLIC_SUPABASE_LOCAL_URL` + local keys
+- anything else → use `NEXT_PUBLIC_SUPABASE_URL` + remote keys
 
-### 11.2 Test suites yang ada
+---
 
-- `__tests__/accounting.test.ts`
-- `__tests__/auth.actions.test.ts`
-- `__tests__/fleet.actions.test.ts`
-- `__tests__/middleware.test.ts`
-- `__tests__/proxy.test.ts`
-- `__tests__/helpers/supabase-mock.ts`
+## 5. Auth, Tenancy & Access Control
 
-### 11.3 Fokus coverage saat ini
+### 5.1 Multi-Tenant Model
 
-- validasi balance journal
-- zakat nishab calculation
-- payroll calculation engine
-- auth actions
-- Supabase middleware/proxy behavior
-- fleet booking, maintenance, attendance
+- Every business table has `org_id` for tenant isolation
+- PostgreSQL RLS policies read `auth.uid()` and check org membership
+- Key tables: `organizations`, `org_members`, `roles`, `branches`
 
-## 12. Update Dibanding Dokumentasi Lama
+### 5.2 Authentication Flows
 
-Berikut perubahan paling penting yang perlu diketahui:
+| Flow | Function | Users |
+|---|---|---|
+| Owner signup | `signUp(formData)` | Business owners |
+| Owner login | `signIn(formData)` | Email/password |
+| Staff login | `signInWithNik(formData)` | NIK/password |
+| Staff invitation | `verifyEmployeeNikByToken(token, nik)` | Join link → `/join/[token]` |
+| Staff registration | `registerEmployeeAccount(formData)` | After invitation verification |
+| Password reset (owner) | `sendPasswordResetEmail(formData)` | Via Supabase email |
+| Password reset (staff) | `requestPasswordReset(nik)` → `resetEmployeePassword(...)` | HR-initiated |
 
-- README lama menyebut **Next.js 15**, padahal repo sekarang memakai **Next.js 16.2.1**.
-- README lama menyebut **Node.js 18+**, padahal `package.json` sekarang meminta **Node.js 20+**.
-- Istilah proteksi request sekarang sebaiknya disebut **Proxy** (`proxy.ts`), mengikuti Next.js 16.
-- Rentang migrasi tidak lagi berhenti di `1023`; repo saat ini memiliki `129` file migrasi dan titik paling baru mencapai seri `1081`.
-- Fitur SaaS/billing sekarang jauh lebih matang: invoice SaaS, package duration, package limits, vouchers, proof storage, config global, billing activation.
-- Fitur demo dan voucher ABS sekarang nyata di repo, termasuk auto-seed demo data dan landing `/abs`.
-- Fleet saat ini bukan sekadar foundation; sudah ada booking guard, route/schedule/ticketing, crew attendance, maintenance RPC, dan hardening RLS.
-- Employee profile sudah bertambah avatar, WhatsApp, dan dukungan reset password yang lebih jelas.
-- Setelah audit, halaman `/settings/users` tidak lagi memakai invite mock. Sekarang ia membuat link aktivasi nyata berbasis `org_invitations`.
-- Setelah audit, fallback API key di `lib/email/sender.ts` sudah dihapus dan email sender sekarang wajib memakai `RESEND_API_KEY`.
-- Setelah audit, typo redirect stock ledger dari `/onboard` ke `/onboarding` sudah diperbaiki.
-- Setelah audit lanjutan, halaman `/settings/business` sekarang memiliki danger zone reset dengan dua mode: `Reset Transaksi` dan `Reset Semua Data Operasional`.
-- Audit lanjutan juga menambahkan migrasi `1080_reset_org_data_v2.sql` untuk memperkuat fungsi reset organisasi dan memperbaiki trigger closed period saat delete journal.
-- Audit pengembangan terbaru menambahkan modul Sales Page lengkap dengan studio dashboard, route publik `/sp/[orgSlug]/[pageSlug]`, lead capture endpoint, dan migrasi `1081_sales_page_module.sql`.
+### 5.3 Active Organization Resolution
 
-## 13. Temuan Audit Teknis
+`getActiveOrg()` does:
+1. Read session user
+2. Support demo mode via `nizam_demo_org_id` cookie
+3. Get earliest active membership
+4. Resolve plan + enabled modules from `saas_packages`
+5. Merge `active_addons`
+6. Fetch `job_title` from `employees` table
+7. Return org context with `orgId`, `role`, `enabledModules`, `permissions`, etc.
 
-Temuan ini saya catat agar dokumentasi juga berfungsi sebagai audit kondisi aktual repo:
+### 5.4 RBAC & Module Gating
 
-- `next.config.mjs` masih mengabaikan TypeScript build errors. Ini mempercepat build, tetapi meningkatkan risiko deploy dengan type issue.
-- `lib/email/sender.ts` kini sudah env-only, tetapi semua environment deployment tetap harus memastikan `RESEND_API_KEY` tersedia sebelum fitur email dipakai.
-- `app/(dashboard)/settings/users/UsersClient.tsx` kini memakai invitation token yang nyata, tetapi sebagian area settings/admin lain masih mengandalkan client-side Supabase writes.
-- `app/(dashboard)/inventory/ledger/[id]/page.tsx` sudah redirect ke `/onboarding`; temuan ini ditutup pada audit lanjutan.
-- Reset data organisasi sekarang sudah punya guardrail owner-only dan konfirmasi berlapis, tetapi migrasi SQL baru tetap perlu dijalankan di environment Supabase agar fungsi reset v2 tersedia di database.
-- Modul Sales Page sudah bisa dipakai end-to-end di kode, tetapi migrasi `1081_sales_page_module.sql` tetap harus dijalankan di Supabase agar tabel `sales_pages` dan `sales_page_leads` tersedia.
-- Sebagian area admin/settings menggunakan client-side Supabase writes secara langsung, bukan server actions khusus.
+Two-level access control:
 
-## 14. Inventaris File Aksi
+1. **Database level:** RLS policies + role/membership checks
+2. **Application level:** Dashboard layout guard + sidebar visibility
 
-Daftar action file per domain:
+Permission sources:
+- `roles.permissions` — granular per-domain permissions
+- `organizations.enabled_modules` — which modules are activated
+- `saas_packages.modules` — which modules the plan includes
+- `organizations.active_addons` — additional purchased modules
+
+### 5.5 Branch-Level Access
+
+Recent branch context additions (migrations `1087`–`1104`):
+- `org_members.allowed_branch_ids` — which branches a user can access
+- `modules/organization/lib/branch-access.server.ts` — server-side branch filter
+- Most business tables now have `branch_id` for branch-scoped operations
+- Purchasing, inventory, sales, services, fleet, HRIS, payroll, factory, fixed assets, budgets, and journal entries are all branch-aware
+
+### 5.6 Platform Admin
+
+Platform admin access is controlled by email allowlist in `lib/saas/platform-admin.ts`:
+```typescript
+export const PLATFORM_ADMIN_EMAILS = ['bob@executive.id']
+```
+Guards both `/admin` and `/saas/*` routes.
+
+---
+
+## 6. Route Map
+
+### 6.1 Public & Auth Routes
+
+| Route | Purpose |
+|---|---|
+| `/` | Root gate — login/onboarding/dashboard redirect |
+| `/onboarding` | New organization creation |
+| `/demo` | Start demo session |
+| `/abs` | ABS voucher landing |
+| `/sp/[orgSlug]/[pageSlug]` | Public sales page |
+| `/login` | Owner/staff login |
+| `/register` | Owner registration |
+| `/forgot-password` | Password reset email |
+| `/update-password` | Set new password |
+| `/join/[token]` | Employee invitation activation |
+
+### 6.2 Dashboard Core
+
+| Route | Purpose |
+|---|---|
+| `/dashboard` | KPI overview, OCF, runway, pareto analytics |
+| `/profil-saya` | Employee self-service profile |
+| `/billing` | Organization billing + AI token topup |
+| `/billing/invoice/[id]` | Invoice print view |
+| `/pricing` | SaaS package listing |
+| `/admin` | SaaS admin panel |
+
+### 6.3 Finance & Accounting
+
+| Route | Purpose |
+|---|---|
+| `/cash` | Bank accounts & transactions |
+| `/accounting/journal` | General ledger & manual journals |
+| `/accounting/aging` | AR/AP aging |
+| `/accounting/approvals` | Approval center |
+| `/accounting/assets` | Fixed assets & depreciation |
+| `/accounting/audit` | Data integrity audit |
+| `/accounting/budgets` | Budgeting & budget vs actual |
+| `/accounting/closing` | Fiscal period closing/opening |
+| `/accounting/forecast` | Cash flow forecast |
+| `/accounting/reimburse` | Reimbursement management |
+| `/accounting/tax` | Tax summary |
+| `/accounting/zakat` | Zakat tijarah & haul |
+| `/settings/accounts` | Chart of Accounts |
+| `/settings/accounts/new` | Add account |
+| `/settings/accounts/[id]` | Edit account |
+
+### 6.4 Operations
+
+| Route | Purpose |
+|---|---|
+| `/inventory` | Products, opname, transfers, write-off, barcode |
+| `/inventory/warehouses` | Warehouse master |
+| `/inventory/warehouses/[id]` | Warehouse bin detail |
+| `/inventory/ledger/[id]` | Stock ledger per product |
+| `/purchasing` | POs, receiving, payment, returns, purchase requests |
+| `/factory` | BoM, work orders, completion |
+| `/fleet` | Fleet assets, bookings, routes, schedules, ticketing, crew, attendance, maintenance |
+| `/services` | Service/job orders |
+
+### 6.5 Sales & CRM
+
+| Route | Purpose |
+|---|---|
+| `/contacts` | Customer/supplier CRM |
+| `/pos` | POS cash sales |
+| `/sales` | Sales orders, delivery, payment, returns |
+| `/sales/quotations` | Quotation management |
+| `/sales/pipeline` | Sales pipeline (Kanban + realtime) |
+| `/sales/commission` | Sales commission |
+| `/sales/promos` | Promotions UI |
+| `/sales/pages` | Sales Page Studio (landing page builder) |
+
+### 6.6 HRIS & Settings
+
+| Route | Purpose |
+|---|---|
+| `/hris` | Employees, payroll, attendance, leave, expense, activation |
+| `/settings/business` | Business profile, document format, logo, danger zone |
+| `/settings/roles` | Role hierarchy & permissions |
+| `/settings/users` | Organization membership |
+| `/settings/branches` | Branch/division management |
+| `/settings/audit` | Admin audit trail |
+| `/audit` | Redirect → `/settings/audit` |
+
+### 6.7 Reports
+
+| Route | Purpose |
+|---|---|
+| `/reports` | P&L, balance sheet, cash flow |
+| `/reports/bsc` | Balanced scorecard |
+| `/reports/pareto` | Pareto analysis |
+
+### 6.8 SaaS Operator
+
+| Route | Purpose |
+|---|---|
+| `/saas` | Redirect → `/saas/penjualan` |
+| `/saas/penawaran` | SaaS quotation management |
+| `/saas/penjualan` | SaaS sales management |
+| `/saas/dokumen/[id]` | SaaS quotation/invoice document view |
+
+---
+
+## 7. Business Modules Detail
+
+### 7.1 Organization & SaaS Core
+
+**Actions:** `modules/organization/actions/` (6 files) + `modules/organization/lib/` (2 files)
+
+- Organization create/update, active org resolution
+- Branch management with access control
+- Invitation token management (real, not mocked)
+- Owner-only data reset (transactions or full operational reset)
+- Billing invoices, payment proof upload, voucher activation
+- Approval queue and history
+- Admin-level audit logs
+
+**Key tables:** `organizations`, `org_members`, `branches`, `org_invitations`, `roles`, `saas_packages`, `saas_invoices`, `saas_vouchers`, `approval_requests`, `audit_logs`
+
+### 7.2 Accounting
+
+**Actions:** `modules/accounting/actions/` (17 files)
+
+- Manual journal + auto-post, posting/void with sub-ledger sync
+- Balance sheet, P&L, cash flow, general ledger
+- XLSX export
+- Dashboard analytics + pareto
+- AR/AP aging reports
+- Tax ledger summary
+- Zakat haul with gold/silver nishab and asset timeline
+- Fixed assets: capitalization, depreciation preview/run, disposal
+- Budgeting + budget vs actual
+- Fiscal period open/close
+- Cash flow forecast
+- Data integrity audit checks
+- Reimbursement with receipt upload + approval
+- Shariah account activation/injection
+- Price management
+- BSC metrics
+
+### 7.3 Cash & Bank
+
+**Actions:** `modules/cash/actions/` (2 files)
+
+- CRUD bank accounts
+- Cash/bank transactions with linked journal entries
+- CSV bank statement upload & parse
+- Unmatched mutation listing
+- Delete transaction with automatic journal void
+
+### 7.4 Inventory & WMS
+
+**Actions:** `modules/inventory/actions/` (2 files)
+
+- Product master with categories and barcode
+- Stock calculation from `stock_movements`
+- Stock adjustments, write-offs, inter-warehouse transfers
+- Warehouse and warehouse bin management
+- Stock ledger per product
+- Branch-aware inventory (since migration `1088`)
+
+### 7.5 Purchasing
+
+**Actions:** `modules/purchasing/actions/` (1 file)
+
+- PO creation with landed cost allocation
+- Auto-create/update products from PO lines
+- Receive purchase with stock + GL sync (atomic RPC)
+- Void purchase via atomic RPC
+- Purchase payments and returns
+- Purchase requests (internal/manufacturing)
+- Branch-aware purchasing (since migration `1087`)
+
+### 7.6 Sales, Quotation & POS
+
+**Actions:** `modules/sales/actions/` (3 files) + `modules/sales/lib/` (2 files)
+
+- Sales orders with approval workflow
+- Delivery via atomic RPC, void with stock/journal revert
+- Sales payments and returns
+- Quotation create/convert
+- POS cash sales with walk-in customer fallback
+- Sales Page Studio: generate landing pages with template + AI, publish to `/sp/[orgSlug]/[pageSlug]`
+- Sales pipeline Kanban with Supabase Realtime WebSocket
+- Commission and promo management
+- Lead capture (public API) → auto-create contact + pipeline card
+- Branch-aware sales (since migration `1091`)
+
+### 7.7 Contacts / CRM
+
+**Actions:** `modules/contacts/actions/` (1 file)
+
+- Contact list by type (customer/supplier)
+- Create customer/supplier
+- Used across purchasing, sales, POS, services, fleet
+
+### 7.8 HRIS & Payroll
+
+**Actions:** `modules/hris/actions/` (6 files)
+
+- Employee CRUD, avatar upload, self-service profile update
+- Payroll component management, payroll runs
+- Payslip generation + payment via RPC
+- Attendance tracking (GPS + QR for fleet crew)
+- Leave request management with approval
+- Expense claims with approval
+- Self-service portal for employees
+- Invitation-based employee activation
+- Branch-aware HR (since migrations `1095`–`1098`)
+
+### 7.9 Manufacturing
+
+**Actions:** `modules/factory/actions/` (1 file)
+
+- Bill of Materials (BoM) headers and items
+- Work orders with extra costs and finish goods bins
+- Work order completion via RPC v2 (with v1 fallback)
+- Purchase request creation from production needs
+- Branch-aware factory (since migration `1101`)
+
+### 7.10 Fleet & Rental / PO Bus
+
+**Actions:** `modules/fleet/actions/` (1 file)
+
+- Fleet asset management
+- Booking rental with overlap guard + asset status sync
+- Route, schedule, ticketing management
+- Maintenance/medical records (via RPC)
+- Crew management and terminal management
+- Crew attendance via GPS + QR
+- Branch-aware fleet (since migration `1094`)
+
+### 7.11 Service Orders
+
+**Actions:** `modules/services/actions/` (1 file)
+
+- Service order CRUD and status updates
+- Branch-aware services (since migration `1094`)
+
+### 7.12 Demo & ABS
+
+**Actions:** `modules/demo/actions/` (1 file)
+
+- Demo account login/boot (`demo@nizam.app`)
+- Demo org cleanup and creation with type-based seeding
+- Demo types: `COMPUTER`, `CATERING`, `RESTAURANT`, `SUPPLIER_MBG`, `BLANK`
+- Cookie-based demo org tracking (`nizam_demo_org_id`)
+- ABS voucher landing with `ABS2024` code
+
+### 7.13 AI & Email
+
+**Files:** `modules/ai/actions/vision.actions.ts`, `modules/ai/lib/ai-token.server.ts`, `modules/ai/lib/ai-token.ts`, `lib/email/sender.ts`
+
+**AI capabilities:**
+- OCR receipt/invoice via Gemini
+- Token wallet system (debit/credit per AI operation)
+- Token balance check before AI generation
+- Sales Page AI enrichment via `gemini-2.5-flash`
+
+**Email capabilities:**
+- Invoice email sending
+- Promo broadcast
+- Requires `RESEND_API_KEY` (no fallback)
+
+### 7.14 SaaS Operator
+
+**Actions:** `modules/saas/actions/` (1 file)
+
+- Cross-tenant snapshot (org/package/invoice data)
+- SaaS quotation creation with full pricing breakdown (add-ons, tokens, entity/branch pricing, discount, tax)
+- Quotation → sale conversion
+- Sale payment + plan activation
+- Invoice document detail with fallback for schema versions
+- Editable anchor/actual pricing per add-on
+
+---
+
+## 8. Shared UI Components
+
+### 8.1 NizamUI (`components/ui/NizamUI.tsx`)
+
+Core reusable components:
+- `SafeButton` — button with loading/pending state
+- `PageHeader` — consistent page header with breadcrumbs
+- `StatCard` — KPI metric card
+- `EmptyState` — empty data placeholder
+- `SectionCard` / `SectionHeader` — content sections
+- `StatusBadge` — status indicator
+- `ConfirmDialog` — confirmation modal
+
+### 8.2 Other UI Components
+
+- `CurrencyInput` — formatted Rupiah input
+- `SearchableSelect` — searchable dropdown
+- `BarcodeScanner` / `BarcodeLabel` — barcode scan/print
+
+### 8.3 Shared Layout Components
+
+- `AppSidebar` — module navigation (role/permission/module aware, collapsible categories, platform admin group)
+- `AppHeader` — org info, branch switcher, pending approvals, AI token badge
+- `StartupWizard` — first-time onboarding wizard
+- `MobileBottomNav` — mobile navigation
+- `DemoBanner` — demo mode indicator
+- `FloatingPlanBadge` — plan indicator
+- `AdminImpersonationBanner` — admin impersonation indicator
+
+---
+
+## 9. Database & Migrations
+
+### 9.1 Overview
+
+- **153 migration files** in `supabase/migrations/`
+- `master_init.sql` — legacy bootstrap SQL (foundation reference)
+- Latest migration: `1104_journal_single_branch_backfill.sql`
+
+### 9.2 Core Entities
+
+| Domain | Tables |
+|---|---|
+| Organization | `organizations`, `org_members`, `roles`, `branches`, `org_invitations` |
+| Accounting | `accounts`, `journal_entries`, `journal_lines`, `account_balances` |
+| Cash/Bank | `bank_accounts`, `bank_transactions`, `bank_mutations` |
+| Inventory | `products`, `stock_movements`, `inventory_stocks`, `inventory_adjustments`, `inventory_adjustment_items`, `warehouses`, `warehouse_bins` |
+| Sales | `sales`, `sales_items`, `sales_payments`, `sales_returns` |
+| Sales Page | `sales_pages`, `sales_page_leads` |
+| Purchasing | `purchases`, `purchase_items`, `purchase_payments`, `purchase_returns`, `purchase_requests` |
+| HRIS | `employees`, `payroll_components`, `payroll_runs`, `payslips`, `payslip_lines`, `attendance`, `leave_requests`, `expense_claims` |
+| Approval/Audit | `approval_requests`, `audit_logs` |
+| Assets | `fixed_assets`, `asset_depreciation_logs` |
+| Manufacturing | `production_boms`, `production_bom_items`, `production_work_orders`, `production_wo_costs` |
+| Fleet | `fleet_assets`, `fleet_bookings`, `fleet_routes`, `fleet_schedules`, `fleet_tickets`, `fleet_maintenance_labs`, `fleet_terminals` |
+| Services | `service_orders` |
+| SaaS | `saas_packages`, `saas_invoices`, `saas_vouchers`, `saas_config` |
+| Zakat | `zakat_haul`, `zakat_haul_events`, `zakat_asset_timeline` |
+| AI Tokens | `ai_token_wallets`, `ai_token_usage_logs`, `ai_token_topup_packages`, `ai_token_topup_orders` |
+
+### 9.3 Key Stored Procedures / RPC
+
+| Procedure | Purpose |
+|---|---|
+| `seed_default_coa` | Seed default chart of accounts for new org |
+| `process_purchase_atomic` | Atomic purchase receiving (stock + journal) |
+| `void_purchase_atomic` | Atomic purchase void |
+| `process_purchase_payment_atomic` | Purchase payment processing |
+| `process_purchase_return_atomic` | Purchase return processing |
+| `process_sales_delivery_atomic` | Sales delivery (stock + journal) |
+| `process_sales_payment_atomic` | Sales payment processing |
+| `process_sales_return_atomic` | Sales return processing |
+| `process_inventory_adjustment` | Inventory adjustment processing |
+| `adjust_inventory_stock` | Direct stock adjustment |
+| `update_product_average_cost` | Average cost recalculation |
+| `generate_payslips_for_run` | Payslip generation |
+| `process_payroll_payment` | Payroll disbursement |
+| `void_payroll_run` | Payroll void |
+| `process_expense_claim` | Expense claim processing |
+| `process_work_order_completion_v2` | Manufacturing WO completion |
+| `create_fleet_medical_record` | Fleet maintenance record |
+| `process_asset_disposal` | Fixed asset disposal |
+| `reset_org_data` | Organization data reset (v2) |
+
+### 9.4 Migration Timeline
+
+| Range | Focus |
+|---|---|
+| `001`–`048` | Foundation ERP: org, RBAC, CoA, journals, cash/bank, sales/purchasing, inventory, assets, payroll, budgeting, aging, audit, RLS |
+| `01_create_saas_packages` | SaaS package system |
+| `999` | Final sales returns fix |
+| `1000`–`1003` | Manufacturing, fleet, service orders |
+| `1004` | Multi-branch infrastructure |
+| `1005`–`1036` | Finance expansion, shariah, zakat, barcode, fleet extensions |
+| `1040`–`1055` | Fleet medical/crew, storage, employee auth, org slug |
+| `1056`–`1080` | Module activation, demo, SaaS billing, vouchers, fleet hardening, reset v2 |
+| `1081` | Sales page module |
+| `1082` | AI token economy + sales template |
+| `1083`–`1084` | SaaS invoice column fixes, discount/tax |
+| `1085`–`1086` | Module catalog sync, permission names fix |
+| `1087`–`1104` | **Branch context expansion** (purchasing, inventory, sales, reimbursement, services, fleet, HRIS, expenses, payroll, leave, attendance, factory, fixed assets, budgets, journals) |
+
+### 9.5 Storage Buckets
+
+| Bucket | Purpose |
+|---|---|
+| `brand_assets` | Organization logos |
+| `receipts` | Reimbursement proof |
+| `avatars` | Employee avatars |
+| `billing-proofs` | SaaS billing payment proof |
+
+---
+
+## 10. Environment Variables
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase anon key |
+| `NEXT_PUBLIC_SUPABASE_TARGET` | Optional | `local` = use local Supabase CLI |
+| `SUPABASE_SERVICE_ROLE_KEY` | For admin ops | Employee provisioning, reset password |
+| `NEXT_PUBLIC_SUPABASE_LOCAL_URL` | When local | Local Supabase URL |
+| `NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY` | When local | Local anon key |
+| `SUPABASE_LOCAL_SERVICE_ROLE_KEY` | When local | Local service role |
+| `GOOGLE_AI_STUDIO_KEY` | For AI features | OCR, AI content generation |
+| `RESEND_API_KEY` | For email | Invoice, promo email |
+| `NEXT_PUBLIC_SITE_URL` | Optional | Password reset redirect URL |
+| `VERCEL_URL` | Auto (Vercel) | Vercel deployment origin |
+
+Connection switching is handled by `lib/supabase/config.ts`. **Changing `NEXT_PUBLIC_SUPABASE_TARGET` requires a restart** — it doesn't hot-reload.
+
+---
+
+## 11. Development Setup & Workflows
+
+### 11.1 Prerequisites
+
+- Node.js ≥ 20.0.0
+- Supabase project (or local Supabase CLI + Docker)
+- Environment variables configured
+
+### 11.2 Available Scripts
+
+```bash
+# Development
+npm run dev               # Start Next.js dev server
+npm run build             # Production build
+npm run start             # Start production server
+npm run lint              # ESLint
+
+# Testing
+npm run test              # Run all tests
+npm run test:watch        # Watch mode
+npm run test:coverage     # With coverage report
+npm run test:erp          # Core ERP tests only
+npm run test:erp:coverage # Core ERP tests with coverage
+
+# Supabase
+npm run supabase:start           # Start local Supabase
+npm run supabase:stop            # Stop local Supabase
+npm run supabase:status          # Show local Supabase status
+npm run supabase:db:reset        # Reset local database
+npm run supabase:migrate-local-data  # Clone online data to local
+```
+
+### 11.3 Supabase Connection Modes
+
+| Mode | Setup |
+|---|---|
+| **App → Remote Supabase** | Fill remote env vars, leave `NEXT_PUBLIC_SUPABASE_TARGET` empty |
+| **App → Local Supabase** | Run `supabase:start`, fill local env vars, set `TARGET=local` |
+| **Clone Remote → Local** | Keep both env sets, run `supabase:migrate-local-data` |
+
+> ⚠️ After cloning, user passwords are reset to `LocalTest123!`
+> ⚠️ Always restart `npm run dev` after changing `NEXT_PUBLIC_SUPABASE_TARGET`
+
+### 11.4 Build Notes
+
+`next.config.mjs` currently ignores TypeScript build errors:
+```js
+typescript: { ignoreBuildErrors: true }
+```
+This means production builds will succeed even with type errors. This flag exists due to a backlog of cross-module TypeScript errors.
+
+---
+
+## 12. Testing
+
+### 12.1 Configuration
+
+**Vitest** (`vitest.config.ts`):
+- Environment: `node`
+- Coverage: `v8` provider, `text` + `html` reporters
+- Path alias: `@/` → project root
+
+### 12.2 Test Suites (30 files)
+
+| File | Coverage Area |
+|---|---|
+| `accounting.test.ts` | Journal balance, zakat nishab, payroll calc |
+| `auth.actions.test.ts` | Auth flows |
+| `fleet.actions.test.ts` | Fleet booking, maintenance, attendance |
+| `middleware.test.ts` | Middleware redirect logic |
+| `proxy.test.ts` | Proxy behavior |
+| `aging.actions.test.ts` | AR/AP aging |
+| `approval.actions.test.ts` | Approval workflows |
+| `assets.actions.test.ts` | Fixed assets |
+| `attendance.actions.test.ts` | Attendance tracking |
+| `branch-access.server.test.ts` | Branch ACL |
+| `bsc.actions.test.ts` | Balanced scorecard |
+| `budget.actions.test.ts` | Budgeting |
+| `employee.actions.test.ts` | Employee CRUD |
+| `expense.actions.test.ts` | Expense claims |
+| `export.route.test.ts` | XLSX export |
+| `factory.actions.test.ts` | Manufacturing |
+| `forecast.actions.test.ts` | Cash flow forecast |
+| `inventory.actions.test.ts` | Inventory operations |
+| `leave.actions.test.ts` | Leave management |
+| `org.actions.test.ts` | Organization operations |
+| `payroll.actions.test.ts` | Payroll processing |
+| `purchasing.actions.test.ts` | Purchase operations |
+| `reimburse.actions.test.ts` | Reimbursement |
+| `reports.actions.test.ts` | Financial reports |
+| `sales.actions.test.ts` | Sales operations |
+| `self-service.actions.test.ts` | Employee self-service |
+| `service.actions.test.ts` | Service orders |
+| `supabase.config.test.ts` | Supabase config |
+| `tax.actions.test.ts` | Tax calculations |
+| `zakat.actions.test.ts` | Zakat calculations |
+
+### 12.3 Test Helpers
+
+- `__tests__/helpers/supabase-mock.ts` — Supabase client mocking utilities
+
+---
+
+## 13. Design System
+
+### 13.1 Color Palette
+
+```css
+/* Primary: Deep Tech Blue */
+--color-primary-500: #003366;
+--color-primary-600: #002d5a;
+--color-primary-700: #00264d;
+
+/* Neutrals */
+--color-bg: #f8f9fa;
+--color-surface: #ffffff;
+--color-border: #e9ecef;
+--color-grey-accent: #4a4a4a;
+```
+
+### 13.2 Typography
+
+Font stack: `Inter → Outfit → system-ui → sans-serif`
+
+### 13.3 Spacing & Radius
+
+- Border radius: `8px` (sm), `12px` (md), `16px` (lg), `32px` (xl)
+- Shadows: Ultra-subtle (`--shadow-sm` through `--shadow-xl`)
+
+### 13.4 Animations
+
+- `fadeIn` — 200ms ease, translateY(6px → 0)
+- `slideIn` — 200ms ease, translateX(-8px → 0)
+- `pulseSlow` — 2s ease-in-out, opacity cycle
+
+### 13.5 Tailwind v4 Integration
+
+The project uses **Tailwind CSS 4.2.2** with `@tailwindcss/postcss`. Custom colors are defined in both `globals.css` `@theme` blocks and `tailwind.config.ts`.
+
+---
+
+## 14. Conventions for AI Assistants
+
+### 14.1 Critical Rules
+
+1. **Read Next.js 16 docs first.** This project uses Next.js 16, which has breaking changes. Check `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+
+2. **Always use `'use server'` for server actions.** All business logic goes in `modules/*/actions/*.actions.ts`.
+
+3. **Always check org context.** Every server action must call `getActiveOrg()` and verify `org.orgId` before database operations.
+
+4. **Always filter by `org_id`.** Every query must include `.eq('org_id', org.orgId)` for tenant isolation.
+
+5. **Check branch access.** For branch-aware operations, use `modules/organization/lib/branch-access.server.ts` to filter by user's allowed branches.
+
+6. **Use the correct Supabase client:**
+   - Server actions/components: `import { createClient } from '@/lib/supabase/server'`
+   - Client components: `import { createClient } from '@/lib/supabase/client'`
+   - Admin operations: `import { createAdminClient } from '@/lib/supabase/server'`
+
+7. **Follow the thin page + fat client pattern.** Server `page.tsx` files should be minimal. Put interactive UI in `*Client.tsx` with `'use client'`.
+
+8. **Use NizamUI components** for consistent UI: `SafeButton`, `PageHeader`, `StatCard`, `EmptyState`, `SectionCard`, `StatusBadge`, `ConfirmDialog`.
+
+9. **Use `lib/utils.ts` helpers** for formatting: `cn()`, `formatRupiah()`, `formatDate()`, `generateSlug()`, `getInitials()`.
+
+10. **TypeScript errors don't block build** (due to `ignoreBuildErrors: true`), but always write type-safe code.
+
+### 14.2 File Naming Conventions
+
+| Type | Convention | Example |
+|---|---|---|
+| Server actions | `*.actions.ts` | `sales.actions.ts` |
+| Server library | `*.server.ts` | `branch-access.server.ts` |
+| Client component | `*Client.tsx` | `SalesClient.tsx` |
+| Page route | `page.tsx` | `app/(dashboard)/sales/page.tsx` |
+| Layout | `layout.tsx` | `app/(dashboard)/layout.tsx` |
+| Types | `*.types.ts` | `database.types.ts` |
+| Tests | `*.test.ts` | `sales.actions.test.ts` |
+| Migrations | `NNNN_description.sql` | `1104_journal_single_branch_backfill.sql` |
+
+### 14.3 Module Structure
+
+Each domain module in `modules/` follows:
+```
+modules/[domain]/
+├── actions/
+│   └── [domain].actions.ts   # Server actions ('use server')
+└── lib/
+    ├── [domain].ts            # Shared types & utilities
+    └── [domain].server.ts     # Server-only library code
+```
+
+### 14.4 Adding a New Route
+
+1. Create `app/(dashboard)/[route]/page.tsx` (server component)
+2. Create `app/(dashboard)/[route]/[Route]Client.tsx` (client component)
+3. Add route to `PROTECTED_PAGE_PREFIXES` in `lib/supabase/middleware.ts`
+4. Add route-to-module mapping in `app/(dashboard)/layout.tsx`
+5. Add menu entry in `components/shared/AppSidebar.tsx`
+6. Create server actions in `modules/[domain]/actions/`
+
+### 14.5 Adding a New Migration
+
+- File naming: `NNNN_description.sql` (next number after `1104`)
+- Always make migrations **idempotent** (use `IF NOT EXISTS`, `DO $$ ... $$`)
+- Include `NOTIFY pgrst, 'reload schema'` if adding/removing columns
+- Add appropriate RLS policies for new tables
+
+### 14.6 Error Handling Pattern
+
+Server actions return `{ data?, error? }`:
+```typescript
+export async function doThing() {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase.from('table').select()
+    if (error) return { error: error.message }
+    return { data }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+```
+
+### 14.7 SaaS Module Catalog
+
+When adding new modules to the SaaS system, update:
+1. `lib/saas/module-catalog.ts` — canonical names and aliases
+2. `lib/saas/operator-pricing.ts` — pricing configuration
+3. Dashboard layout guard — route-to-module mapping
+4. Sidebar — menu visibility rules
+
+### 14.8 Known Technical Debt
+
+- `next.config.mjs` ignores TypeScript build errors
+- Some admin/settings areas use client-side Supabase writes instead of server actions
+- ESLint has a backlog of warnings across modules
+- Some `<img>` tags should be `next/image`
+
+---
+
+## 15. Complete File Inventories
+
+### 15.1 Server Action Files (52)
+
+<details>
+<summary>Click to expand</summary>
 
 - `modules/accounting/actions/aging.actions.ts`
 - `modules/accounting/actions/analytics.actions.ts`
@@ -967,9 +961,12 @@ Daftar action file per domain:
 - `modules/demo/actions/demo.actions.ts`
 - `modules/factory/actions/factory.actions.ts`
 - `modules/fleet/actions/fleet.actions.ts`
+- `modules/hris/actions/attendance.actions.ts`
 - `modules/hris/actions/employee.actions.ts`
 - `modules/hris/actions/expense.actions.ts`
+- `modules/hris/actions/leave.actions.ts`
 - `modules/hris/actions/payroll.actions.ts`
+- `modules/hris/actions/self-service.actions.ts`
 - `modules/inventory/actions/inventory.actions.ts`
 - `modules/inventory/actions/warehouse.actions.ts`
 - `modules/organization/actions/approval.actions.ts`
@@ -979,31 +976,50 @@ Daftar action file per domain:
 - `modules/organization/actions/org-id.actions.ts`
 - `modules/organization/actions/org.actions.ts`
 - `modules/purchasing/actions/purchasing.actions.ts`
+- `modules/saas/actions/operator-sales.actions.ts`
 - `modules/sales/actions/pos.actions.ts`
 - `modules/sales/actions/sales-page.actions.ts`
 - `modules/sales/actions/sales.actions.ts`
 - `modules/services/actions/service.actions.ts`
 - `modules/settings/actions/audit.actions.ts`
 
-## 15. Inventaris Route File
+**Server library files:**
+- `modules/ai/lib/ai-token.server.ts`
+- `modules/ai/lib/ai-token.ts`
+- `modules/organization/lib/branch-access.server.ts`
+- `modules/organization/lib/org-context.ts`
+- `modules/sales/lib/sales-page.server.ts`
+- `modules/sales/lib/sales-page.ts`
 
-Daftar `page.tsx` yang ada saat audit:
+</details>
 
+### 15.2 Page Routes (61)
+
+<details>
+<summary>Click to expand</summary>
+
+**Root & Public:**
 - `app/page.tsx`
 - `app/onboarding/page.tsx`
 - `app/demo/page.tsx`
 - `app/abs/page.tsx`
-- `app/(auth)/forgot-password/page.tsx`
-- `app/(auth)/join/[token]/page.tsx`
+- `app/sp/[orgSlug]/[pageSlug]/page.tsx`
+
+**Auth (5):**
 - `app/(auth)/login/page.tsx`
 - `app/(auth)/register/page.tsx`
+- `app/(auth)/forgot-password/page.tsx`
 - `app/(auth)/update-password/page.tsx`
+- `app/(auth)/join/[token]/page.tsx`
+
+**Dashboard (51):**
 - `app/(dashboard)/dashboard/page.tsx`
 - `app/(dashboard)/profil-saya/page.tsx`
 - `app/(dashboard)/billing/page.tsx`
 - `app/(dashboard)/billing/invoice/[id]/page.tsx`
 - `app/(dashboard)/pricing/page.tsx`
 - `app/(dashboard)/admin/page.tsx`
+- `app/(dashboard)/audit/page.tsx`
 - `app/(dashboard)/cash/page.tsx`
 - `app/(dashboard)/contacts/page.tsx`
 - `app/(dashboard)/inventory/page.tsx`
@@ -1044,449 +1060,86 @@ Daftar `page.tsx` yang ada saat audit:
 - `app/(dashboard)/settings/business/page.tsx`
 - `app/(dashboard)/settings/roles/page.tsx`
 - `app/(dashboard)/settings/users/page.tsx`
-- `app/(dashboard)/audit/page.tsx`
-- `app/sp/[orgSlug]/[pageSlug]/page.tsx`
-
-## 16. Aktivitas Lanjutan (30 Maret 2026)
-
-Update ini dilakukan setelah implementasi awal modul Sales Page selesai, dengan fokus ke hardening dan kontrol paket SaaS.
-
-### 16.1 SaaS package editor: modul Sales Page
-
-- Form **Edit/Buat Paket SaaS** di `app/(dashboard)/admin/page.tsx` sekarang memiliki opsi modul baru: `Sales Page` pada grup `Marketing & Sales`.
-- Tujuan: owner SaaS bisa memasukkan fitur Sales Page hanya ke paket tertentu.
-
-### 16.2 Guard akses modul Sales Page
-
-- `app/(dashboard)/layout.tsx` diperbarui agar path `/sales/pages` memakai guard modul khusus `Sales Page` (tidak lagi otomatis ikut modul `Sales` biasa).
-- Permission check untuk path ini tetap memakai domain permission `sales`, sehingga role internal sales tetap konsisten.
-- `components/shared/AppSidebar.tsx` diperbarui: menu `Sales Page` kini memakai `module_key: 'Sales Page'` agar visibilitas menu mengikuti paket yang benar.
-
-### 16.3 Hardening publik Sales Page
-
-- Sanitasi URL CTA ditambahkan melalui helper `normalizeSalesPageCtaUrl(...)` di:
-  - `modules/sales/lib/sales-page.ts`
-  - dipakai juga saat insert/update di `modules/sales/lib/sales-page.server.ts`
-- Tujuan sanitasi: menolak skema URL berbahaya dan hanya mengizinkan anchor (`#...`), path relatif (`/...`), atau URL `http/https`.
-
-### 16.4 Form lead toggle dan status response API
-
-- `app/sp/[orgSlug]/[pageSlug]/SalesPagePublicView.tsx` kini menghormati `formSettings.enabled`.
-  - Jika nonaktif, form lead tidak dirender dan diganti panel info.
-- `app/api/sales-pages/lead/route.ts` kini mengembalikan `404` untuk kasus page tidak ditemukan / belum dipublikasikan (sebelumnya selalu `500`).
-
-### 16.5 Verifikasi pasca perubahan
-
-- `npm run test` lulus (`5` test file, `42` test).
-- `npm run build` lulus, termasuk route:
-  - `/sales/pages`
-  - `/sp/[orgSlug]/[pageSlug]`
-  - `/api/sales-pages/lead`
-- `npm run lint` masih gagal karena backlog lint lintas modul lama (bukan khusus perubahan Sales Page ini).
-
-### 16.6 Hotfix 404 output Sales Page
-
-- Studio Sales Page (`app/(dashboard)/sales/pages/page.tsx`) tidak lagi memakai fallback slug statis `'nizam'`.
-  - Fallback baru menggunakan `orgId` saat `organizations.slug` kosong.
-- Resolver publik (`modules/sales/lib/sales-page.server.ts`) diperbarui:
-  - menerima parameter org dari **slug atau UUID org**,
-  - melakukan normalisasi `pageSlug` sebelum query,
-  - memastikan nilai `org.slug` selalu terisi (fallback ke `org.id`) agar form lead publik tetap bisa mengirimkan identifier yang valid.
-- Tujuan hotfix: menghilangkan kasus route publik valid yang sebelumnya tetap berakhir `404` karena mismatch slug organisasi.
-
-### 16.7 Tombol aktivasi publish cepat
-
-- `app/(dashboard)/sales/pages/SalesPageStudioClient.tsx` sekarang memiliki tombol `Aktivasi` per kartu halaman di Library.
-- Panel `Ringkasan Aktif` juga menampilkan tombol `Aktivasi Publish` saat status halaman masih `DRAFT`.
-- Tombol ini langsung mengubah status ke `PUBLISHED` tanpa wajib membuka modal edit, untuk mempercepat go-live URL publik.
-
-### 16.8 Hybrid generator: template + AI prompt
-
-- Studio generator (`app/(dashboard)/sales/pages/SalesPageStudioClient.tsx`) kini mendukung:
-  - `Template Layout` picker (Lead Capture, Webinar Funnel, Product Launch, Consulting Offer),
-  - kolom `Prompt AI / Brief Campaign`,
-  - input `Hero Image URL` dan `Hero Image Alt` saat membuat draft.
-- Model data generator diperluas di `modules/sales/lib/sales-page.ts`:
-  - type template ID,
-  - katalog template,
-  - default CTA/offer per template.
-- Server generator (`modules/sales/lib/sales-page.server.ts`) kini mencoba enrich copy via Gemini (`gemini-2.5-flash`) ketika:
-  - `aiPrompt` diisi, dan
-  - `GOOGLE_AI_STUDIO_KEY` tersedia.
-- Jika AI gagal / key tidak tersedia, sistem fallback otomatis ke output template default sehingga alur create tetap aman.
-
-### 16.9 Visual template frame + color guide
-
-- Template picker di modal generator tidak lagi hanya dropdown teks.
-- `app/(dashboard)/sales/pages/SalesPageStudioClient.tsx` sekarang menampilkan:
-  - kartu visual mini (frame/wireframe) untuk tiap template layout,
-  - indicator template terpilih,
-  - panel `Color Guide` untuk template aktif (palet warna referensi).
-- Tujuan UX:
-  - user bisa melihat gambaran struktur halaman sebelum generate,
-  - user punya referensi warna awal saat menyusun hero image dan copy.
-
-### 16.10 Variasi output layout per template (bukan hanya warna)
-
-- Public renderer `app/sp/[orgSlug]/[pageSlug]/SalesPagePublicView.tsx` dirombak agar setiap template menghasilkan struktur layout berbeda:
-  - `LEAD_CAPTURE`: hero + proof strip + form-first.
-  - `WEBINAR`: hero event + agenda/proof ringkas + register emphasis.
-  - `PRODUCT_LAUNCH`: launch card layout + feature/value stack emphasis.
-  - `CONSULTING`: authority dark-hero + problem-solution framing.
-- Tujuan: menjawab issue “layout sama semua” pada output Sales Page.
-
-### 16.11 Persist template id ke database Sales Page
-
-- Menambahkan field `template_id` pada tabel `sales_pages` melalui migrasi baru:
-  - `supabase/migrations/1082_ai_token_economy_and_sales_template.sql`
-- Domain model diperbarui:
-  - `modules/sales/lib/sales-page.ts`
-  - `modules/sales/lib/sales-page.server.ts`
-  - `app/(dashboard)/sales/pages/SalesPageStudioClient.tsx`
-- Template terpilih saat generate sekarang tersimpan dan dipakai kembali saat render publik/edit/update.
-
-### 16.12 AI token economy: wallet, usage log, topup package, topup order
-
-- Migrasi `1082_ai_token_economy_and_sales_template.sql` menambahkan:
-  - `ai_token_wallets` (saldo token per tenant/org),
-  - `ai_token_usage_logs` (ledger debit/credit token),
-  - `ai_token_topup_packages` (katalog paket topup token),
-  - `ai_token_topup_orders` (relasi invoice -> paket topup token),
-  - helper policy function `is_platform_admin()` + policy RLS terkait.
-- Default config token juga ditambahkan ke `saas_config`:
-  - `ai_token_policy`
-  - `ai_token_inventory`
-
-### 16.13 Integrasi token AI ke generator + header + billing
-
-- Generator Sales Page AI kini menghitung konsumsi token dan melakukan debit wallet:
-  - `modules/sales/lib/sales-page.server.ts`
-  - `modules/ai/lib/ai-token.server.ts`
-- Jika token tidak cukup untuk generate AI, sistem menolak generate AI dan menampilkan pesan topup.
-- Header dashboard sekarang menampilkan badge saldo token AI + popup ringkas:
-  - `components/shared/AppHeader.tsx`
-  - `app/(dashboard)/layout.tsx`
-- Halaman billing menambahkan section topup token AI:
-  - `app/(dashboard)/billing/page.tsx`
-  - user bisa beli paket token, checkout invoice, dan saldo token bertambah setelah pembayaran diproses.
-
-### 16.14 Admin tab AI Tokens (stok, HPP, rekomendasi harga, paket topup)
-
-- Admin SaaS mendapatkan tab baru `AI Tokens` di:
-  - `app/(dashboard)/admin/page.tsx`
-- Tab ini memuat:
-  - konfigurasi biaya token (input/output), average token usage, overhead, margin,
-  - stok global token + agregat saldo tenant + total penggunaan,
-  - kalkulasi otomatis HPP per generate dan rekomendasi harga jual (per generate / per 1K token),
-  - CRUD paket topup token AI (aktif/nonaktif, harga, token, cost/HPP paket).
-- Approval invoice di admin kini mendeteksi invoice topup token dan mengkredit saldo wallet tenant otomatis.
-
-### 16.15 Integrasi Kanban, Custom Domain DNS, dan Realtime Notifications
-
-- **Sales Pipeline Kanban Enhancements**:
-  - `PipelineClient.tsx` ditambah fitur *Fullscreen Mode* untuk keleluasaan pengelolaan prospek dan drag-and-drop.
-  - Form Quick Add Card dimasukkan agar sales rep bisa manual entri tanpa membuat SPK baru.
-  - Setiap Kanban Card dilengkapi aksi cepat 1-klik Follow-Up (WhatsApp & Email).
-  - Implementasi *Supabase Realtime WebSocket* untuk mendengar `INSERT` record `sales`. Kanban langsung memunculkan Toast hijau "Lead Masuk!" dan me-refresh view tanpa perlu di-reload secara manual.
-- **Custom Domain (DNS) pada Sales Page**:
-  - `SalesPageStudioClient.tsx` dipindahkan UI "Domain Khusus (DNS)" ke panel "Ringkasan Aktif". User bisa dengan mudah mengisi domain custom (contoh: `promo.domain.com`) tanpa harus membuka Editor berukuran besar.
-  - Diberikan panduan pengarahan A Record/CNAME ke IP NIZAM Server.
-- **Automasi CRM Landing Page -> Pipeline**:
-  - `createPublicSalesPageLead` diubah perilakunya. Saat lead publik (kunjungan ke `/sp`) melakukan submit landing page, sistem akan *Otomatis Membuat Contact* dan *Membuat Sales Card (Kanban) berstatus NEW*, lalu menyinkronkannya dengan `created_by` milik kreator Sales Page.
-- **Perbaikan Environment Rendering**:
-  - `next.config.mjs` diubah untuk *Next 16 Turbopack compatibility* dengan memastikan tidak ada konfigurasi `webpack watchOptions` yang berbenturan dengan Turbopack caching. Endless re-rendering loops berhasil dikurangi signifikan pada arsitektur bawaan Next.js 16.
-
-### 16.16 Hardening auth redirect, proxy matcher, dan stabilisasi akses halaman terakhir
-
-Update ini dilakukan untuk menutup isu operasional: setelah input/navigasi user, aplikasi kadang terasa compile/render berulang, perlu refresh manual, dan setelah refresh kembali ke `/dashboard` alih-alih ke halaman terakhir.
-
-- **Perubahan utama di `lib/supabase/middleware.ts`**:
-  - Menambahkan pemisahan path yang jelas:
-    - `AUTH_PAGE_PREFIXES` (login/register),
-    - `PROTECTED_PAGE_PREFIXES` (dashboard + modul privat),
-    - path bypass internal (`/_next`, `/api`, metadata file).
-  - Menambahkan short-circuit agar middleware **tidak melakukan auth lookup berat** untuk route publik/internal yang tidak perlu.
-  - Menambahkan sanitasi `redirectTo` via `normalizeRedirectTarget(...)` untuk mencegah open redirect path berbahaya.
-  - Redirect dari route privat ke login sekarang menyimpan path lengkap berikut query (`pathname + search`), sehingga konteks tab/filter tetap pulih setelah login.
-  - Jika user sudah login tetapi mengakses `/login`/`/register`, middleware sekarang memprioritaskan:
-    1. `redirectTo` dari query (jika valid),
-    2. fallback referer internal yang valid,
-    3. fallback akhir `/dashboard`.
-
-- **Perubahan `proxy.ts` matcher**:
-  - Menambahkan pengecualian route yang tidak perlu diproses proxy:
-    - `api`,
-    - `_next/static`,
-    - `_next/image`,
-    - `_next/webpack-hmr`,
-    - metadata (`favicon.ico`, `robots.txt`, `sitemap.xml`, `manifest.json`),
-    - path file berekstensi.
-  - Menambahkan rule `missing` header prefetch (`next-router-prefetch`, `purpose=prefetch`) agar request prefetch tidak memicu jalur auth/proxy utama.
-
-### 16.17 Sinkronisasi ACL dashboard layout + verifikasi test
-
-- **Perubahan `app/(dashboard)/layout.tsx`**:
-  - Guard modul/RBAC diperluas agar lebih selaras dengan route aktual dan nomenklatur modul pada sidebar/paket SaaS.
-  - Menambahkan `RouteModuleEntry` dengan:
-    - `aliases` modul (contoh: Finance/Accounting, Inventory/Warehouse, Marketing/Sales),
-    - `permissionKeys` jamak per route family.
-  - Menambahkan helper `moduleNameMatches(...)` untuk matching modul yang lebih toleran terhadap variasi label plan/add-on.
-  - Menambahkan coverage path yang sebelumnya rawan mismatch guard:
-    - `/inventory/warehouses`,
-    - `/cash`,
-    - `/contacts`,
-    - serta penguatan mapping untuk family `/accounting`, `/reports`, `/hris`, `/services`.
-  - Dampak: menurunkan false redirect ke `/dashboard` pada akses halaman yang sebenarnya valid menurut paket/role.
-
-- **Perubahan test (`__tests__/middleware.test.ts`)**:
-  - Menambah skenario:
-    - `redirectTo` mempertahankan query params untuk route privat,
-    - user terautentikasi pada `/login` dengan `redirectTo` diarahkan ke halaman target (bukan selalu dashboard),
-    - request internal `/_next/webpack-hmr` dibypass tanpa auth lookup.
-
-- **Verifikasi pasca perubahan**:
-  - `npm run test -- __tests__/middleware.test.ts __tests__/proxy.test.ts` lulus (`2` file test, `7` test case).
-  - `npx eslint lib/supabase/middleware.ts proxy.ts app/(dashboard)/layout.tsx __tests__/middleware.test.ts` lulus.
-
-### 16.18 Modul Penawaran & Penjualan Khusus Pengelola SaaS (tanpa buka Admin page)
-
-Update ini menambahkan modul operasional SaaS owner yang berdiri sendiri, sehingga tim pengelola platform bisa mengelola pipeline komersial tanpa harus masuk ke halaman `/admin`.
-
-- **Route baru khusus operator SaaS**:
-  - `/saas` (redirect ke `/saas/penjualan`)
-  - `/saas/penawaran`
-  - `/saas/penjualan`
-- Implementasi file:
-  - `app/(dashboard)/saas/layout.tsx`
-  - `app/(dashboard)/saas/page.tsx`
-  - `app/(dashboard)/saas/penawaran/page.tsx`
-  - `app/(dashboard)/saas/penjualan/page.tsx`
-  - `app/(dashboard)/saas/SaasOperatorClient.tsx`
-
-- **Hak akses platform admin dipusatkan**:
-  - util baru `lib/saas/platform-admin.ts` (`isPlatformAdminEmail`)
-  - `app/(dashboard)/admin/layout.tsx` dipindahkan menggunakan util ini agar konsisten dengan modul operator SaaS baru.
-
-- **Server Actions baru untuk operator SaaS**:
-  - `modules/saas/actions/operator-sales.actions.ts`
-  - Fitur:
-    - ambil snapshot data tenant/paket/invoice lintas tenant (`getOperatorSaasSnapshot`)
-    - buat penawaran SaaS (`createOperatorQuotation`)
-    - konversi penawaran menjadi penjualan (`convertQuotationToSale`)
-    - tandai penjualan paid + aktivasi plan tenant (`markOperatorSalePaid`)
-
-- **Akses cepat tanpa membuka halaman admin**:
-  - `components/shared/AppSidebar.tsx` sekarang menampilkan grup menu `SaaS Operator` (Penawaran SaaS + Penjualan SaaS) hanya untuk email platform admin.
-  - Guard tambahan: grup `SaaS Operator` dibypass dari filter `enabledModules`/`permission` tenant biasa agar selalu terlihat untuk platform admin.
-
-- **Hardening proteksi route**:
-  - `lib/supabase/middleware.ts` menambah prefix privat `/saas` agar flow redirect login konsisten untuk modul baru.
-
-- **Verifikasi**:
-  - lint file baru/terkait lulus (tanpa error; ada warning lama `<img>` di sidebar yang tidak terkait modul baru).
-
-### 16.19 Perbaikan Hydration mismatch pada Sidebar (`/saas/*`)
-
-Perbaikan dilakukan untuk kasus `Hydration failed` di `components/shared/AppSidebar.tsx` saat membuka modul `/saas/penawaran` atau `/saas/penjualan`.
-
-- **Akar masalah yang ditangani**:
-  - state sidebar (`isCollapsed`) sebelumnya membaca `localStorage` saat inisialisasi render client, sehingga berpotensi tidak sinkron dengan HTML server.
-  - grup menu `SaaS Operator` dirender kondisional langsung saat render awal, sehingga berisiko berbeda antara snapshot server dan render client awal.
-
-- **Perubahan implementasi** (`components/shared/AppSidebar.tsx`):
-  - menambahkan sinkronisasi snapshot SSR/CSR menggunakan `useSyncExternalStore`:
-    - hydration flag (`subscribeHydration`) dengan server snapshot `false` dan client snapshot `true`,
-    - sidebar collapsed store (`subscribeSidebarCollapsed`) berbasis `localStorage` key `nizam_sidebar_collapsed`.
-  - visibilitas grup `SaaS Operator` di-sidebar kini bergantung pada `showSaasOperatorGroup = isHydrated && isPlatformAdmin`, agar struktur HTML awal server/client tetap konsisten.
-  - toggle collapsed sidebar kini menulis ke `localStorage` + broadcast event internal (`nizam_sidebar_state_change`) sehingga state tetap sinkron tanpa memicu pola `setState` sinkron di effect.
-  - grup `SaaS Operator` diekstrak ke konstanta `SAAS_OPERATOR_GROUP` agar struktur menu stabil dan eksplisit.
-
-### 16.20 Hotfix error `item_description` pada SaaS Operator Penawaran
-
-Perbaikan untuk error runtime:
-`Gagal membuat penawaran: Could not find the 'item_description' column of 'saas_invoices' in the schema cache`
-
-- **Akar masalah**:
-  - beberapa environment masih menggunakan skema `saas_invoices` lama (tanpa `item_name` / `item_description`) atau PostgREST schema cache belum refresh.
-
-- **Perubahan aplikasi** (`modules/saas/actions/operator-sales.actions.ts`):
-  - menambahkan fallback query snapshot invoice:
-    - default mencoba select dengan `item_name` + `item_description`,
-    - jika terdeteksi missing column, otomatis fallback ke select legacy (tanpa kolom item).
-  - menambahkan fallback insert saat membuat penawaran:
-    - prioritas insert dengan `item_name` + `item_description`,
-    - fallback ke `item_name` saja jika `item_description` belum ada,
-    - fallback terakhir ke payload legacy jika `item_name` juga belum ada.
-  - dampak: modul `/saas/penawaran` dan `/saas/penjualan` tetap berjalan pada skema lama maupun baru.
-
-- **Perubahan migrasi database**:
-  - menambahkan file `supabase/migrations/1083_fix_saas_invoice_item_columns_and_schema_cache.sql`:
-    - memastikan kolom `item_name` dan `item_description` ada (idempotent),
-    - mengirim `NOTIFY pgrst, 'reload schema'` untuk refresh cache schema PostgREST.
-
-### 16.21 Download Dokumen Penawaran & Invoice untuk SaaS Operator
-
-Fitur baru agar tim pengelola SaaS dapat mengunduh dokumen penawaran maupun invoice langsung dari modul `/saas`.
-
-- **Halaman dokumen baru**:
-  - route: `/saas/dokumen/[id]`
-  - file:
-    - `app/(dashboard)/saas/dokumen/[id]/page.tsx`
-    - `app/(dashboard)/saas/dokumen/[id]/SaasDocumentView.tsx`
-  - mendukung dua jenis dokumen dari tabel yang sama:
-    - `QTN-SAAS-*` => label dokumen **PENAWARAN**
-    - selain itu => label dokumen **INVOICE**
-  - tersedia aksi:
-    - `Print / Download PDF` (via print dialog browser),
-    - `Download HTML` (arsip file langsung).
-
-- **Integrasi tombol download di daftar operator**:
-  - `app/(dashboard)/saas/SaasOperatorClient.tsx`
-  - pada tab Penawaran dan Penjualan, tiap baris sekarang memiliki tombol `Download` menuju `/saas/dokumen/{invoiceId}`.
-
-- **Server action baru untuk detail dokumen**:
-  - `modules/saas/actions/operator-sales.actions.ts`
-  - menambahkan `getOperatorInvoiceDocument(invoiceId)`:
-    - guard platform admin tetap aktif,
-    - fetch detail invoice + org + package + konfigurasi `saas_config`,
-    - fallback otomatis jika environment belum punya kolom `item_name/item_description`.
-
-### 16.22 Opsi Modul, Add-on, dan Token AI di Halaman Surat Penawaran
-
-Update ini menambahkan pilihan komersial langsung di halaman surat penawaran (`/saas/dokumen/[id]`) agar tim SaaS bisa menyiapkan penawaran yang lebih fleksibel.
-
-- **Perubahan server action dokumen**:
-  - `modules/saas/actions/operator-sales.actions.ts`
-  - `getOperatorInvoiceDocument(...)` sekarang mengembalikan tambahan data:
-    - `packageModules`: daftar modul dari paket SaaS terkait invoice,
-    - `packageAddons`: daftar add-on bawaan paket (jika ada),
-    - `aiTokenPackages`: daftar paket topup AI token aktif (`ai_token_topup_packages`).
-  - detail relasi paket invoice diperluas menjadi `name, price, billing, modules, addons`.
-  - parsing array modul/add-on dibuat robust untuk format JSON array maupun string.
-
-- **Perubahan UI surat penawaran**:
-  - `app/(dashboard)/saas/dokumen/[id]/SaasDocumentView.tsx`
-  - khusus dokumen tipe `QTN-SAAS-*` kini tampil section:
-    - **Modul Paket** (badge modul yang termasuk dalam paket),
-    - **Pilihan Add-on** (checkbox dengan harga),
-    - **Pilihan Token AI** (radio dari paket topup aktif).
-  - ringkasan total otomatis menghitung:
-    - subtotal invoice dasar,
-    - total add-on terpilih,
-    - paket token AI terpilih,
-    - grand total estimasi penawaran.
-
-### 16.23 Penambahan Entitas Bisnis & Cabang Berharga di Surat Penawaran
-
-Menanggapi kebutuhan pricing expansion, surat penawaran sekarang punya kalkulasi khusus untuk:
-- **Entitas Bisnis Tambahan**
-- **Cabang Tambahan**
-
-- **Implementasi UI**:
-  - file: `app/(dashboard)/saas/dokumen/[id]/SaasDocumentView.tsx`
-  - pada dokumen tipe `QTN-SAAS-*`, ditambahkan panel baru:
-    - `Entitas Bisnis Tambahan` (stepper +/-),
-    - `Cabang Tambahan` (stepper +/-).
-  - harga satuan yang digunakan:
-    - Entitas Bisnis: `Rp 249.000` / entitas / bulan
-    - Cabang: `Rp 149.000` / cabang / bulan
-
-- **Perhitungan total**:
-  - menambahkan state quantity untuk kedua item (minimum `0`),
-  - total kalkulasi penawaran kini mencakup:
-    - subtotal invoice dasar,
-    - add-on terpilih,
-    - token AI terpilih,
-    - total entitas tambahan,
-    - total cabang tambahan.
-  - breakdown baru ditampilkan di summary total (kanan bawah dokumen) agar transparan sebelum print/download.
-
-### 16.24 Opsi Lengkap Langsung di Halaman `/saas/penawaran` + Kolom Pajak & Diskon
-
-Menindaklanjuti kebutuhan operasional, opsi yang sebelumnya hanya terlihat di surat dokumen sekarang dipindahkan juga ke form utama `/saas/penawaran`.
-
-- **Perubahan form penawaran operator**:
-  - file: `app/(dashboard)/saas/SaasOperatorClient.tsx`
-  - form `Buat Penawaran SaaS Baru` kini memuat langsung:
-    - pilihan **modul** (checkbox berdasarkan paket terpilih),
-    - pilihan **add-on** berharga,
-    - pilihan **paket token AI**,
-    - input jumlah **entitas bisnis tambahan**,
-    - input jumlah **cabang tambahan**,
-    - input **diskon (%)**,
-    - input **pajak (%)**.
-  - ditambahkan panel **estimasi total real-time** (subtotal, diskon, pajak, grand total) sebelum submit.
-
-- **Perubahan server action kalkulasi penawaran**:
-  - file: `modules/saas/actions/operator-sales.actions.ts`
-  - `createOperatorQuotation(...)` sekarang menerima field baru dari form:
-    - `selected_modules[]`,
-    - `selected_addons[]`,
-    - `ai_token_package_id`,
-    - `extra_entity_qty`,
-    - `extra_branch_qty`,
-    - `discount_percent`,
-    - `tax_percent`.
-  - total invoice dihitung otomatis dari kombinasi paket dasar + add-on + token AI + entitas/cabang + diskon/pajak.
-  - detail komposisi harga ditulis ke `item_description` agar dapat diaudit saat buka dokumen.
-
-- **Kolom pajak & diskon pada data penawaran/penjualan**:
-  - `SaasOperatorClient` tabel list kini menampilkan kolom:
-    - `Diskon` (amount + %)
-    - `Pajak` (amount + %)
-  - server action snapshot/doc menambahkan fallback select untuk environment yang belum memiliki kolom pricing baru.
-
-- **Migrasi database baru**:
-  - file: `supabase/migrations/1084_add_discount_and_tax_columns_to_saas_invoices.sql`
-  - menambah kolom idempotent pada `saas_invoices`:
-    - `discount_percent`,
-    - `discount_amount`,
-    - `tax_percent`,
-    - `tax_amount`.
-  - melakukan `NOTIFY pgrst, 'reload schema'` untuk refresh schema cache.
-
-- **Konstanta pricing dipusatkan**:
-  - file baru: `lib/saas/operator-pricing.ts`
-  - berisi daftar add-on operator SaaS serta harga satuan:
-    - entitas bisnis tambahan,
-    - cabang tambahan.
-
-### 16.25 Sales Page dijadikan Add-on resmi
-
-Permintaan update: `Sales Page` dimasukkan sebagai add-on (bukan hanya fitur paket).
-
-- **Konstanta add-on operator SaaS**:
-  - file: `lib/saas/operator-pricing.ts`
-  - menambahkan item baru:
-    - `id`: `addon_sales_page`
-    - `name`: `Sales Page`
-    - `price`: `Rp 199.000 / bulan`
-    - deskripsi: builder landing page + lead capture.
-  - dampak: otomatis muncul pada opsi add-on di form `/saas/penawaran` dan surat penawaran `/saas/dokumen/[id]`.
-
-- **Sinkronisasi halaman billing tenant**:
-  - file: `app/(dashboard)/billing/page.tsx`
-  - menambahkan kartu add-on `Sales Page` ke `AVAILABLE_ADDONS` agar tenant dapat membeli add-on ini dari halaman billing.
-
-### 16.26 Editable Harga Coret/Jual Add-on di Form `/saas/penawaran`
-
-Menindaklanjuti request agar harga bisa diedit ulang, form penawaran operator sekarang mendukung override harga langsung sebelum submit.
-
-- **Perubahan UI form penawaran** (`app/(dashboard)/saas/SaasOperatorClient.tsx`):
-  - tiap add-on sekarang memiliki input:
-    - `Harga coret` (anchor/before),
-    - `Harga jual` (effective/sesudah coret).
-  - harga satuan `Entitas Tambahan` dan `Cabang Tambahan` juga bisa diedit.
-  - nilai override dikirim sebagai hidden payload:
-    - `addon_price_overrides_json`,
-    - `addon_anchor_overrides_json`,
-    - `extra_entity_unit_price`,
-    - `extra_branch_unit_price`.
-
-- **Perubahan kalkulasi server** (`modules/saas/actions/operator-sales.actions.ts`):
-  - `createOperatorQuotation(...)` membaca override JSON harga add-on + override harga satuan entitas/cabang.
-  - total penawaran menggunakan harga override tersebut.
-  - detail `item_description` menyimpan breakdown termasuk format harga coret -> harga jual per add-on.
-
-- **Pusat konfigurasi pricing**:
-  - `lib/saas/operator-pricing.ts` kini menambahkan `anchorPrice` per add-on (default rekomendasi harga coret).
+- `app/(dashboard)/saas/page.tsx`
+- `app/(dashboard)/saas/penawaran/page.tsx`
+- `app/(dashboard)/saas/penjualan/page.tsx`
+- `app/(dashboard)/saas/dokumen/[id]/page.tsx`
+
+</details>
+
+### 15.3 Client Components (42)
+
+<details>
+<summary>Click to expand</summary>
+
+- `AgingClient.tsx`, `ApprovalClient.tsx`, `AssetClient.tsx`, `AuditClient.tsx` (accounting + settings)
+- `BudgetClient.tsx`, `ClosingClient.tsx`, `ForecastClient.tsx`, `JournalClient.tsx`
+- `ReimbursementClient.tsx`, `TaxClient.tsx`, `ZakatClient.tsx`
+- `AuditTrailClient.tsx` (standalone audit)
+- `CashClient.tsx`, `ContactClient.tsx`, `DashboardClient.tsx`
+- `ManufacturingClient.tsx`, `FleetClient.tsx`, `HrisClient.tsx`
+- `InventoryClient.tsx`, `StockLedgerClient.tsx`, `WarehouseDetailClient.tsx`, `WarehouseClient.tsx`
+- `POSClient.tsx`, `ProfilSayaClient.tsx`, `PurchasingClient.tsx`
+- `BSCClient.tsx`, `ParetoClient.tsx`, `ReportsClient.tsx`
+- `SaasOperatorClient.tsx`, `SaasDocumentView.tsx`
+- `CommissionClient.tsx`, `SalesPageStudioClient.tsx`, `PipelineClient.tsx`
+- `PromoClient.tsx`, `QuotationClient.tsx`, `SalesClient.tsx`
+- `ServiceOrderClient.tsx`
+- `BranchManagementClient.tsx`, `BusinessClient.tsx`, `UsersClient.tsx`
+- `AbsClient.tsx`, `DemoClient.tsx`
+
+</details>
+
+---
+
+## 16. Changelog (Recent Updates)
+
+### Branch Context Expansion (April 2026)
+
+Major initiative to add branch-level scoping across all business modules:
+
+- **1087–1089:** Purchasing + Inventory branch context with backfill
+- **1090:** Default branch bootstrap for existing orgs
+- **1091:** Sales, approval, and delivery branch context
+- **1092:** Reimbursement branch context
+- **1093:** Org member branch ACL (`allowed_branch_ids`)
+- **1094:** Services and fleet branch context
+- **1095–1098:** HRIS, expense, payroll, leave, attendance branch context
+- **1099–1100:** Legacy scope fix and leave approval backfill
+- **1101:** Factory/manufacturing branch context
+- **1102:** Fixed assets branch context
+- **1103:** Budget branch context
+- **1104:** Journal single-branch backfill
+
+### SaaS Operator Module (March 2026)
+
+- Dedicated routes `/saas/*` for platform operators
+- Quotation + sales pipeline without needing `/admin`
+- Document view with pricing breakdown (add-ons, tokens, entity/branch, discount/tax)
+- Editable anchor/actual pricing per add-on
+
+### AI Token Economy (March 2026)
+
+- Token wallet per tenant, usage logging
+- Token topup packages and orders
+- AI balance badge in header
+- Token debit on Sales Page AI generation
+
+### Sales Page Builder (March 2026)
+
+- Template-based landing page generator
+- AI enrichment via Gemini
+- Public rendering at `/sp/[orgSlug]/[pageSlug]`
+- Lead capture → CRM pipeline integration
+- Supabase Realtime for live lead notifications
+
+### Self-Service HRIS Expansion (Late March–April 2026)
+
+- Employee self-service portal
+- Attendance, leave management
+- Expense claims
+- Branch-aware HRIS operations
+
+---
+
+*This document is auto-maintained. When the codebase changes significantly, re-run the analysis to keep it current.*
