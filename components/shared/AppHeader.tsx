@@ -1,12 +1,13 @@
 'use client'
 
 import { getInitials } from '@/lib/utils'
-import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle } from 'lucide-react'
+import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from 'react'
 import Link from 'next/link'
 import type { Organization } from '@/types/database.types'
 import type { AiTokenHeaderSummary } from '@/modules/ai/lib/ai-token'
+import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import type {
   AccessibleOrganization,
   BranchSummary,
@@ -206,6 +207,7 @@ export function AppHeader({
 
   const initials = getInitials(user.fullName || user.email)
   const hasRequests = pendingApprovals > 0
+  const isPlatformAdmin = isPlatformAdminEmail(user.email)
 
   const tokenSummary = useMemo(() => ({
     balance: aiTokens?.balanceTokens || 0,
@@ -566,6 +568,16 @@ export function AppHeader({
       </div>
 
       <div className="flex items-center gap-6">
+        {isPlatformAdmin && (
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-amber-700 transition-all hover:border-amber-300 hover:bg-amber-100"
+          >
+            <ShieldAlert size={14} />
+            <span className="hidden sm:inline">SaaS Admin</span>
+          </Link>
+        )}
+
         <div ref={tokenPopupRef} className="relative">
           <button
             type="button"
