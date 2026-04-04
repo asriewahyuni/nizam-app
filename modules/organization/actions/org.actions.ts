@@ -13,13 +13,16 @@ import {
   type AccessibleOrganization,
 } from '@/modules/organization/lib/org-context'
 import {
+  persistMembershipActiveContext,
+  resolveActiveMembership,
+} from '@/modules/organization/lib/active-context.server'
+import {
   canAccessAllBranchesForOrg,
   getBranchAccessScope,
   getCurrentAccessibleBranch,
 } from '@/modules/organization/lib/branch-access.server'
 import { applyVoucher } from './billing.actions'
 
-const DEMO_EMAIL = 'demo@nizam.app'
 const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 const DEFAULT_BRANCH_NAME = 'Unit Utama'
 const DEFAULT_BRANCH_CODE = 'MAIN'
@@ -34,56 +37,18 @@ function getActiveContextCookieOptions() {
   }
 }
 
-async function resolveActiveMembership(
-  db: any,
-  user: { id: string; email?: string | null; user_metadata?: Record<string, any> | null },
-  cookieStore: Awaited<ReturnType<typeof cookies>>,
+function resolvePersistedBranchIdForOrgSwitch(
+  branchAccessScope: Awaited<ReturnType<typeof getBranchAccessScope>>
 ) {
-  const isDemoUser = user.email === DEMO_EMAIL || user.user_metadata?.is_demo
-  const demoOrgId = cookieStore.get('nizam_demo_org_id')?.value
-  const activeOrgIdCookie = cookieStore.get(ACTIVE_ORG_COOKIE)?.value
-
-  let memberData: any = null
-
-  if (isDemoUser && demoOrgId) {
-    const { data } = await db
-      .from('org_members')
-      .select('org_id, role, role_id, joined_at, organizations(*), roles(permissions)')
-      .eq('user_id', user.id)
-      .eq('org_id', demoOrgId)
-      .eq('is_active', true)
-      .maybeSingle()
-    memberData = data
+  if (branchAccessScope.accessibleBranches.length === 1) {
+    return branchAccessScope.accessibleBranches[0]?.id ?? null
   }
 
-  if (!memberData && activeOrgIdCookie) {
-    const { data } = await db
-      .from('org_members')
-      .select('org_id, role, role_id, joined_at, organizations(*), roles(permissions)')
-      .eq('user_id', user.id)
-      .eq('org_id', activeOrgIdCookie)
-      .eq('is_active', true)
-      .maybeSingle()
-    memberData = data
+  if (!branchAccessScope.canAccessAllBranches) {
+    return branchAccessScope.accessibleBranches[0]?.id ?? null
   }
 
-  if (!memberData) {
-    const { data, error } = await db
-      .from('org_members')
-      .select('org_id, role, role_id, joined_at, organizations(*), roles(permissions)')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('joined_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-
-    if (error) {
-      ;(console as any).error('resolveActiveMembership Error:', error)
-    }
-    memberData = data
-  }
-
-  return memberData
+  return null
 }
 
 type CreateOrganizationSuccess = {
@@ -168,6 +133,12 @@ async function createOrganizationRecord(
     return { error: 'Gagal menyiapkan unit default organisasi.' }
   }
 
+  await persistMembershipActiveContext(admin, {
+    userId: user.id,
+    orgId,
+    branchId: defaultBranchId,
+  })
+
   // IF DEMO, SEED DATA
   if (isDemo) {
     try {
@@ -220,7 +191,12 @@ export async function getActiveOrg() {
   if (!user) return null
 
   const cookieStore = await cookies()
-  const memberData = await resolveActiveMembership(db, user, cookieStore)
+  const memberData = await resolveActiveMembership(
+    db,
+    user,
+    cookieStore,
+    'org_id, role, role_id, joined_at, last_active_at, last_active_branch_id, organizations(*), roles(permissions)'
+  )
 
   if (!memberData) return null
 
@@ -329,6 +305,7 @@ export async function getMyOrganizations(): Promise<AccessibleOrganization[]> {
 
 export async function setActiveOrg(orgId: string) {
   const supabase = await createClient()
+  const admin = (await createAdminClient()) as any
   const db = supabase as any
   const cookieStore = await cookies()
   const trimmedOrgId = orgId.trim()
@@ -355,18 +332,26 @@ export async function setActiveOrg(orgId: string) {
   cookieStore.delete('nizam_demo_org_id')
   cookieStore.set(ACTIVE_ORG_COOKIE, trimmedOrgId, getActiveContextCookieOptions())
   const branchAccessScope = await getBranchAccessScope(trimmedOrgId)
-  if (!branchAccessScope.canAccessAllBranches && branchAccessScope.accessibleBranches.length > 0) {
+  const persistedBranchId = resolvePersistedBranchIdForOrgSwitch(branchAccessScope)
+
+  if (persistedBranchId) {
     cookieStore.set(
       ACTIVE_BRANCH_COOKIE,
-      branchAccessScope.accessibleBranches[0].id,
+      persistedBranchId,
       getActiveContextCookieOptions()
     )
   } else {
     cookieStore.delete(ACTIVE_BRANCH_COOKIE)
   }
 
+  await persistMembershipActiveContext(admin, {
+    userId: user.id,
+    orgId: trimmedOrgId,
+    branchId: persistedBranchId,
+  })
+
   revalidatePath('/', 'layout')
-  return { success: true, orgId: trimmedOrgId }
+  return { success: true, orgId: trimmedOrgId, branchId: persistedBranchId }
 }
 
 export async function updateOrgSettings(orgId: string, updates: any) {
@@ -465,6 +450,7 @@ export async function getActiveBranch(orgId: string) {
 
 export async function setActiveBranch(orgId: string, branchId: string | null) {
   const supabase = await createClient()
+  const admin = (await createAdminClient()) as any
   const cookieStore = await cookies()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
@@ -483,6 +469,11 @@ export async function setActiveBranch(orgId: string, branchId: string | null) {
       return { error: 'Anda harus memilih unit yang termasuk dalam akses Anda.' }
     }
     cookieStore.delete(ACTIVE_BRANCH_COOKIE)
+    await persistMembershipActiveContext(admin, {
+      userId: user.id,
+      orgId: trimmedOrgId,
+      branchId: null,
+    })
     revalidatePath('/', 'layout')
     return { success: true, branchId: null }
   }
@@ -493,6 +484,11 @@ export async function setActiveBranch(orgId: string, branchId: string | null) {
   }
 
   cookieStore.set(ACTIVE_BRANCH_COOKIE, trimmedBranchId, getActiveContextCookieOptions())
+  await persistMembershipActiveContext(admin, {
+    userId: user.id,
+    orgId: trimmedOrgId,
+    branchId: trimmedBranchId,
+  })
   revalidatePath('/', 'layout')
   return { success: true, branchId: trimmedBranchId }
 }
@@ -503,6 +499,7 @@ export async function canSelectAllBranches(orgId: string) {
 
 export async function createBranch(orgId: string, formData: FormData) {
   const supabase = await createClient()
+  const admin = (await createAdminClient()) as any
   const db = supabase as any
   const cookieStore = await cookies()
   const {
@@ -572,6 +569,11 @@ export async function createBranch(orgId: string, formData: FormData) {
   }
 
   cookieStore.set(ACTIVE_BRANCH_COOKIE, insertedBranch.id, getActiveContextCookieOptions())
+  await persistMembershipActiveContext(admin, {
+    userId: user.id,
+    orgId: trimmedOrgId,
+    branchId: insertedBranch.id,
+  })
   revalidatePath('/', 'layout')
   revalidatePath('/settings/branches')
   revalidatePath('/settings/users')

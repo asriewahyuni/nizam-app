@@ -1,11 +1,9 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { ACTIVE_ORG_COOKIE } from '@/modules/organization/lib/org-context'
 import { cookies } from 'next/headers'
 import { getCurrentAccessibleBranch } from '@/modules/organization/lib/branch-access.server'
-
-const DEMO_EMAIL = 'demo@nizam.app'
+import { resolveActiveMembership } from '@/modules/organization/lib/active-context.server'
 
 /**
  * Server action: returns the active org_id for the current user.
@@ -18,46 +16,9 @@ export async function getActiveOrgIdAction(): Promise<string | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  // Demo user: prioritize the org from session cookie (same as getActiveOrg)
-  const isDemoUser = user.email === DEMO_EMAIL || user.user_metadata?.is_demo
   const cookieStore = await cookies()
-  const demoOrgId = cookieStore.get('nizam_demo_org_id')?.value
-  const activeOrgIdCookie = cookieStore.get(ACTIVE_ORG_COOKIE)?.value
-
-  if (isDemoUser && demoOrgId) {
-    // Verify this demo org still exists and belongs to this user
-    const { data } = await db
-      .from('org_members')
-      .select('org_id')
-      .eq('user_id', user.id)
-      .eq('org_id', demoOrgId)
-      .eq('is_active', true)
-      .maybeSingle()
-    if (data) return data.org_id
-  }
-
-  if (activeOrgIdCookie) {
-    const { data } = await db
-      .from('org_members')
-      .select('org_id')
-      .eq('user_id', user.id)
-      .eq('org_id', activeOrgIdCookie)
-      .eq('is_active', true)
-      .maybeSingle()
-    if (data) return data.org_id
-  }
-
-  // Regular lookup: oldest joined active org (consistent with getActiveOrg)
-  const { data } = await db
-    .from('org_members')
-    .select('org_id')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .order('joined_at', { ascending: true })
-    .limit(1)
-    .maybeSingle()
-
-  return data?.org_id ?? null
+  const membership = await resolveActiveMembership(db, user, cookieStore, 'org_id')
+  return membership?.org_id ? String(membership.org_id) : null
 }
 
 /**

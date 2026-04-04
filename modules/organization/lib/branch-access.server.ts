@@ -12,6 +12,8 @@ export type BranchAccessScope = {
   accessibleBranches: BranchSummary[]
   accessibleBranchIds: string[]
   canAccessAllBranches: boolean
+  hasPersistedSelection: boolean
+  storedBranchId: string | null
 }
 
 export type ResolvedBranchSelection =
@@ -33,6 +35,8 @@ function emptyScope(): BranchAccessScope {
     accessibleBranches: [],
     accessibleBranchIds: [],
     canAccessAllBranches: false,
+    hasPersistedSelection: false,
+    storedBranchId: null,
   }
 }
 
@@ -64,6 +68,20 @@ function pickBranchFromCookie(scope: BranchAccessScope, branchIdFromCookie?: str
   if (!trimmedBranchId) return null
   if (!scope.accessibleBranchIds.includes(trimmedBranchId)) return null
   return scope.accessibleBranches.find((branch) => branch.id === trimmedBranchId) ?? null
+}
+
+function pickPersistedBranch(scope: BranchAccessScope): BranchSummary | null | undefined {
+  if (!scope.hasPersistedSelection) return undefined
+
+  if (scope.storedBranchId) {
+    return pickBranchFromCookie(scope, scope.storedBranchId) ?? undefined
+  }
+
+  if (scope.canAccessAllBranches && scope.accessibleBranches.length > 1) {
+    return null
+  }
+
+  return undefined
 }
 
 async function fetchActiveBranches(admin: any, orgId: string): Promise<BranchSummary[] | null> {
@@ -147,7 +165,7 @@ export async function getBranchAccessScope(orgId: string): Promise<BranchAccessS
 
   const { data: membership } = await db
     .from('org_members')
-    .select('id, role')
+    .select('id, role, last_active_at, last_active_branch_id')
     .eq('org_id', trimmedOrgId)
     .eq('user_id', user.id)
     .eq('is_active', true)
@@ -170,6 +188,8 @@ export async function getBranchAccessScope(orgId: string): Promise<BranchAccessS
       accessibleBranches: [],
       accessibleBranchIds: [],
       canAccessAllBranches: false,
+      hasPersistedSelection: Boolean(membership.last_active_at),
+      storedBranchId: membership.last_active_branch_id ? String(membership.last_active_branch_id) : null,
     }
   }
 
@@ -180,6 +200,8 @@ export async function getBranchAccessScope(orgId: string): Promise<BranchAccessS
       accessibleBranches: normalizedBranches,
       accessibleBranchIds: normalizedBranches.map((branch) => branch.id),
       canAccessAllBranches: true,
+      hasPersistedSelection: Boolean(membership.last_active_at),
+      storedBranchId: membership.last_active_branch_id ? String(membership.last_active_branch_id) : null,
     }
   }
 
@@ -213,6 +235,8 @@ export async function getBranchAccessScope(orgId: string): Promise<BranchAccessS
     accessibleBranchIds: accessibleBranches.map((branch) => branch.id),
     canAccessAllBranches:
       accessibleBranches.length > 0 && accessibleBranches.length === normalizedBranches.length,
+    hasPersistedSelection: Boolean(membership.last_active_at),
+    storedBranchId: membership.last_active_branch_id ? String(membership.last_active_branch_id) : null,
   }
 }
 
@@ -223,6 +247,9 @@ export async function getCurrentAccessibleBranch(orgId: string): Promise<BranchS
   const cookieStore = await cookies()
   const activeBranch = pickBranchFromCookie(scope, cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value)
   if (activeBranch) return activeBranch
+
+  const persistedBranch = pickPersistedBranch(scope)
+  if (persistedBranch !== undefined) return persistedBranch
 
   return pickDefaultBranch(scope)
 }
@@ -278,6 +305,14 @@ export async function resolveAccessibleBranchSelection(
   const activeBranch = pickBranchFromCookie(scope, cookieStore.get(ACTIVE_BRANCH_COOKIE)?.value)
   if (activeBranch) {
     return { scope, branchId: activeBranch.id }
+  }
+
+  const persistedBranch = pickPersistedBranch(scope)
+  if (persistedBranch === null) {
+    return { scope, branchId: null }
+  }
+  if (persistedBranch) {
+    return { scope, branchId: persistedBranch.id }
   }
 
   const defaultBranch = pickDefaultBranch(scope)

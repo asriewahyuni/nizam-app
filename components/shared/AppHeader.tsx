@@ -1,7 +1,7 @@
 'use client'
 
 import { getInitials } from '@/lib/utils'
-import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from 'react'
 import Link from 'next/link'
@@ -29,9 +29,23 @@ interface AppHeaderProps {
   allowAllBranchSelection?: boolean
   canManageBranches?: boolean
   pendingApprovals?: number
-  cashFlow?: any
+  cashFlow?: unknown
   aiTokens?: AiTokenHeaderSummary | null
 }
+
+type PendingContextSwitch =
+  | {
+      kind: 'org'
+      orgId: string
+      branchId?: string | null
+      label: string
+    }
+  | {
+      kind: 'branch'
+      orgId: string
+      branchId: string | null
+      label: string
+    }
 
 const ACTIVE_ORG_CHANGE_EVENT = 'nizam_active_org_change'
 const ACTIVE_BRANCH_CHANGE_EVENT = 'nizam_active_branch_change'
@@ -47,13 +61,12 @@ export function AppHeader({
   allowAllBranchSelection = true,
   canManageBranches = false,
   pendingApprovals = 0,
-  cashFlow,
   aiTokens,
 }: AppHeaderProps) {
   const router = useRouter()
-  const [isSwitchingContext, startContextTransition] = useTransition()
   const [isCreatingOrg, startCreateOrgTransition] = useTransition()
   const [isCreatingBranch, startCreateBranchTransition] = useTransition()
+  const [pendingContextSwitch, setPendingContextSwitch] = useState<PendingContextSwitch | null>(null)
   const [isTokenPopupOpen, setIsTokenPopupOpen] = useState(false)
   const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false)
   const [isQuickCreateOrgOpen, setIsQuickCreateOrgOpen] = useState(false)
@@ -66,24 +79,38 @@ export function AppHeader({
   const branchMenuRef = useRef<HTMLDivElement | null>(null)
 
   const activeBranch = branches.find((branch) => branch.id === activeBranchId) || null
+  const isSwitchingContext = pendingContextSwitch !== null
 
-  const handleOrgChange = (orgId: string) => {
+  const handleOrgChange = async (orgId: string) => {
     if (orgId === activeOrgId) return
 
-    startContextTransition(async () => {
-      const result = await setActiveOrg(orgId)
-      if ((result as any)?.error) {
-        alert((result as any).error)
-        return
-      }
-
-      setOrgFeedback(null)
-      setIsQuickCreateOrgOpen(false)
-      setIsOrgMenuOpen(false)
-      window.dispatchEvent(new CustomEvent(ACTIVE_ORG_CHANGE_EVENT, { detail: { orgId } }))
-      window.dispatchEvent(new CustomEvent(ACTIVE_BRANCH_CHANGE_EVENT, { detail: { orgId, branchId: null } }))
-      router.refresh()
+    const targetOrg = organizations.find((membership) => membership.orgId === orgId)
+    setPendingContextSwitch({
+      kind: 'org',
+      orgId,
+      label: targetOrg?.org.name || 'organisasi terpilih',
     })
+
+    const result: Awaited<ReturnType<typeof setActiveOrg>> = await setActiveOrg(orgId)
+    if ('error' in result) {
+      setPendingContextSwitch(null)
+      alert(result.error)
+      return
+    }
+
+    setPendingContextSwitch({
+      kind: 'org',
+      orgId,
+      branchId: result.branchId,
+      label: targetOrg?.org.name || 'organisasi terpilih',
+    })
+    setOrgFeedback(null)
+    setIsQuickCreateOrgOpen(false)
+    setIsOrgMenuOpen(false)
+    window.dispatchEvent(new CustomEvent(ACTIVE_ORG_CHANGE_EVENT, { detail: { orgId } }))
+    window.dispatchEvent(new CustomEvent(ACTIVE_BRANCH_CHANGE_EVENT, { detail: { orgId, branchId: result.branchId } }))
+    router.refresh()
+    setPendingContextSwitch(null)
   }
 
   const handleCreateOrganization = (event: FormEvent<HTMLFormElement>) => {
@@ -94,14 +121,14 @@ export function AppHeader({
     setOrgFeedback(null)
 
     startCreateOrgTransition(async () => {
-      const result = await createOrganizationQuick(formData)
-      if ((result as any)?.error) {
-        setOrgFeedback({ type: 'error', message: (result as any).error })
+      const result: Awaited<ReturnType<typeof createOrganizationQuick>> = await createOrganizationQuick(formData)
+      if ('error' in result) {
+        setOrgFeedback({ type: 'error', message: result.error })
         return
       }
 
-      const createdOrgId = (result as any)?.orgId || null
-      const createdBranchId = (result as any)?.branchId || null
+      const createdOrgId = result.orgId || null
+      const createdBranchId = result.branchId || null
       if (createdOrgId) {
         window.dispatchEvent(new CustomEvent(ACTIVE_ORG_CHANGE_EVENT, { detail: { orgId: createdOrgId } }))
         window.dispatchEvent(
@@ -119,20 +146,31 @@ export function AppHeader({
     })
   }
 
-  const handleBranchChange = (branchId: string | null) => {
-    startContextTransition(async () => {
-      const result = await setActiveBranch(activeOrgId, branchId)
-      if ((result as any)?.error) {
-        alert((result as any).error)
-        return
-      }
+  const handleBranchChange = async (branchId: string | null) => {
+    const targetBranchLabel = branchId
+      ? branches.find((branch) => branch.id === branchId)?.name || 'unit terpilih'
+      : 'Semua Unit'
 
-      setBranchFeedback(null)
-      setIsQuickCreateOpen(false)
-      setIsBranchMenuOpen(false)
-      window.dispatchEvent(new CustomEvent(ACTIVE_BRANCH_CHANGE_EVENT, { detail: { orgId: activeOrgId, branchId } }))
-      router.refresh()
+    setPendingContextSwitch({
+      kind: 'branch',
+      orgId: activeOrgId,
+      branchId,
+      label: targetBranchLabel,
     })
+
+    const result: Awaited<ReturnType<typeof setActiveBranch>> = await setActiveBranch(activeOrgId, branchId)
+    if ('error' in result) {
+      setPendingContextSwitch(null)
+      alert(result.error)
+      return
+    }
+
+    setBranchFeedback(null)
+    setIsQuickCreateOpen(false)
+    setIsBranchMenuOpen(false)
+    window.dispatchEvent(new CustomEvent(ACTIVE_BRANCH_CHANGE_EVENT, { detail: { orgId: activeOrgId, branchId } }))
+    router.refresh()
+    setPendingContextSwitch(null)
   }
 
   const handleCreateBranch = (event: FormEvent<HTMLFormElement>) => {
@@ -143,13 +181,13 @@ export function AppHeader({
     setBranchFeedback(null)
 
     startCreateBranchTransition(async () => {
-      const result = await createBranch(activeOrgId, formData)
-      if ((result as any)?.error) {
-        setBranchFeedback({ type: 'error', message: (result as any).error })
+      const result: Awaited<ReturnType<typeof createBranch>> = await createBranch(activeOrgId, formData)
+      if ('error' in result) {
+        setBranchFeedback({ type: 'error', message: result.error })
         return
       }
 
-      const createdBranchId = (result as any)?.branchId || null
+      const createdBranchId = result.branchId || null
       if (createdBranchId) {
         window.dispatchEvent(
           new CustomEvent(ACTIVE_BRANCH_CHANGE_EVENT, {
@@ -233,6 +271,11 @@ export function AppHeader({
         : 'Tidak ada unit aktif'
       : 'Transaksi butuh unit aktif'
   const activeOrganization = organizations.find((membership) => membership.orgId === activeOrgId) || null
+  const contextSwitchLabel = pendingContextSwitch
+    ? pendingContextSwitch.kind === 'org'
+      ? `Membuka ${pendingContextSwitch.label}...`
+      : `Mengganti unit ke ${pendingContextSwitch.label}...`
+    : null
 
   return (
     <header className="h-16 flex items-center justify-between px-4 md:px-8 border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-30 print:hidden">
@@ -245,18 +288,26 @@ export function AppHeader({
         </button>
 
         <div className="flex items-center gap-4">
+          {contextSwitchLabel && (
+            <div className="hidden lg:flex items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">
+              <LoaderCircle size={12} className="animate-spin" />
+              <span>{contextSwitchLabel}</span>
+            </div>
+          )}
+
           <div ref={orgMenuRef} className="relative">
             <button
               type="button"
+              disabled={isSwitchingContext}
               onClick={() => {
                 setOrgFeedback(null)
                 setIsQuickCreateOrgOpen(false)
                 setIsOrgMenuOpen((prev) => !prev)
               }}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl shadow-sm hover:bg-slate-100/70 transition-all"
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl shadow-sm hover:bg-slate-100/70 transition-all disabled:cursor-wait disabled:opacity-70"
             >
               <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[#003366] shrink-0 shadow-sm">
-                <Building2 size={14} />
+                {pendingContextSwitch?.kind === 'org' ? <LoaderCircle size={14} className="animate-spin" /> : <Building2 size={14} />}
               </div>
               <div className="flex flex-col overflow-hidden">
                 <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter leading-none mb-0.5">Organisasi Aktif</span>
@@ -279,27 +330,29 @@ export function AppHeader({
                 </div>
 
                 <div className="space-y-1 mt-3">
-                  {organizations.map((membership) => (
-                    <button
-                      key={membership.orgId}
-                      type="button"
-                      disabled={isSwitchingContext || isCreatingOrg}
-                      onClick={() => handleOrgChange(membership.orgId)}
-                      className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl text-left transition disabled:cursor-wait disabled:opacity-60 ${
-                        activeOrgId === membership.orgId ? 'bg-slate-900 text-white' : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <div className="text-xs font-black truncate">{membership.org.name}</div>
-                        <div className={`text-[9px] font-black uppercase tracking-[0.18em] ${activeOrgId === membership.orgId ? 'text-slate-300' : 'text-slate-400'}`}>
-                          {membership.role}
+                  {organizations.map((membership) => {
+                    const isPendingTarget = pendingContextSwitch?.kind === 'org' && pendingContextSwitch.orgId === membership.orgId
+
+                    return (
+                      <button
+                        key={membership.orgId}
+                        type="button"
+                        disabled={isSwitchingContext || isCreatingOrg}
+                        onClick={() => handleOrgChange(membership.orgId)}
+                        className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl text-left transition disabled:cursor-wait disabled:opacity-60 ${
+                          activeOrgId === membership.orgId ? 'bg-slate-900 text-white' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="text-xs font-black truncate">{membership.org.name}</div>
+                          <div className={`text-[9px] font-black uppercase tracking-[0.18em] ${activeOrgId === membership.orgId ? 'text-slate-300' : 'text-slate-400'}`}>
+                            {membership.role}
+                          </div>
                         </div>
-                      </div>
-                      {activeOrgId === membership.orgId && (
-                        <CheckCircle2 size={14} />
-                      )}
-                    </button>
-                  ))}
+                        {isPendingTarget ? <LoaderCircle size={14} className="animate-spin" /> : activeOrgId === membership.orgId ? <CheckCircle2 size={14} /> : null}
+                      </button>
+                    )
+                  })}
                 </div>
 
                 {orgFeedback && (
@@ -354,14 +407,17 @@ export function AppHeader({
           <div ref={branchMenuRef} className="relative">
             <button
               type="button"
+              disabled={isSwitchingContext}
               onClick={() => {
                 setBranchFeedback(null)
                 setIsQuickCreateOpen(false)
                 setIsBranchMenuOpen((prev) => !prev)
               }}
-              className="flex items-center gap-2 px-3 py-1.5 bg-[#003366]/5/50 border border-[#003366]/10 rounded-xl hover:bg-[#003366]/5 transition-all shadow-sm"
+              className="flex items-center gap-2 px-3 py-1.5 bg-[#003366]/5/50 border border-[#003366]/10 rounded-xl hover:bg-[#003366]/5 transition-all shadow-sm disabled:cursor-wait disabled:opacity-70"
             >
-              <MapPin size={14} className="text-[#003366] shrink-0" />
+              {pendingContextSwitch?.kind === 'branch'
+                ? <LoaderCircle size={14} className="text-[#003366] shrink-0 animate-spin" />
+                : <MapPin size={14} className="text-[#003366] shrink-0" />}
               <div className="flex flex-col overflow-hidden">
                 <span className="text-[9px] text-[#003366]/60 font-bold uppercase tracking-tighter leading-none mb-0.5">Unit Terpilih</span>
                 <span className="text-xs font-black text-blue-900 leading-none truncate max-w-[150px]">
@@ -397,33 +453,41 @@ export function AppHeader({
                     disabled={isSwitchingContext || isCreatingBranch}
                     onClick={() => handleBranchChange(null)}
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl transition disabled:cursor-wait disabled:opacity-60 ${activeBranchId === null ? 'bg-[#003366] text-white' : 'hover:bg-slate-50 text-slate-700'}`}
-                  >
-                    <div className="text-left">
-                      <div className="text-xs font-bold truncate">Semua Unit</div>
-                      <div className={`text-[9px] font-black uppercase tracking-[0.16em] ${activeBranchId === null ? 'text-white/70' : 'text-slate-400'}`}>
-                        Read-only agregat
+                    >
+                      <div className="text-left">
+                        <div className="text-xs font-bold truncate">Semua Unit</div>
+                        <div className={`text-[9px] font-black uppercase tracking-[0.16em] ${activeBranchId === null ? 'text-white/70' : 'text-slate-400'}`}>
+                          Read-only agregat
+                        </div>
                       </div>
-                    </div>
-                    {activeBranchId === null && <CheckCircle2 size={14} />}
+                    {pendingContextSwitch?.kind === 'branch' && pendingContextSwitch.branchId === null
+                      ? <LoaderCircle size={14} className="animate-spin" />
+                      : activeBranchId === null
+                        ? <CheckCircle2 size={14} />
+                        : null}
                   </button>
                 )}
-                {branches.map(branch => (
-                  <button
-                    key={branch.id}
-                    type="button"
-                    disabled={isSwitchingContext || isCreatingBranch}
-                    onClick={() => handleBranchChange(branch.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl transition disabled:cursor-wait disabled:opacity-60 ${activeBranchId === branch.id ? 'bg-[#003366] text-white' : 'hover:bg-slate-50 text-slate-700'}`}
-                  >
-                    <div className="text-left min-w-0">
-                      <div className="text-xs font-bold truncate">{branch.name}</div>
-                      <div className={`text-[9px] font-black uppercase tracking-[0.16em] ${activeBranchId === branch.id ? 'text-white/70' : 'text-slate-400'}`}>
-                        {branch.code}
+                {branches.map((branch) => {
+                  const isPendingTarget = pendingContextSwitch?.kind === 'branch' && pendingContextSwitch.branchId === branch.id
+
+                  return (
+                    <button
+                      key={branch.id}
+                      type="button"
+                      disabled={isSwitchingContext || isCreatingBranch}
+                      onClick={() => handleBranchChange(branch.id)}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl transition disabled:cursor-wait disabled:opacity-60 ${activeBranchId === branch.id ? 'bg-[#003366] text-white' : 'hover:bg-slate-50 text-slate-700'}`}
+                    >
+                      <div className="text-left min-w-0">
+                        <div className="text-xs font-bold truncate">{branch.name}</div>
+                        <div className={`text-[9px] font-black uppercase tracking-[0.16em] ${activeBranchId === branch.id ? 'text-white/70' : 'text-slate-400'}`}>
+                          {branch.code}
+                        </div>
                       </div>
-                    </div>
-                    {activeBranchId === branch.id && <CheckCircle2 size={14} />}
-                  </button>
-                ))}
+                      {isPendingTarget ? <LoaderCircle size={14} className="animate-spin" /> : activeBranchId === branch.id ? <CheckCircle2 size={14} /> : null}
+                    </button>
+                  )
+                })}
                 {branches.length === 0 && (
                   <div className="px-3 py-4 rounded-2xl bg-amber-50 border border-amber-100 text-xs font-bold text-amber-700">
                     Belum ada unit yang bisa diakses.

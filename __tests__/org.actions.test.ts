@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createSupabaseMock, success } from './helpers/supabase-mock'
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
@@ -8,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   redirect: vi.fn(),
   seedDemoData: vi.fn(),
   applyVoucher: vi.fn(),
+  getBranchAccessScope: vi.fn(),
   getCurrentAccessibleBranch: vi.fn(),
 }))
 
@@ -37,13 +39,20 @@ vi.mock('@/modules/organization/actions/billing.actions', () => ({
 }))
 
 vi.mock('@/modules/organization/lib/branch-access.server', () => ({
-  getBranchAccessScope: vi.fn(),
+  getBranchAccessScope: mocks.getBranchAccessScope,
   getCurrentAccessibleBranch: mocks.getCurrentAccessibleBranch,
   canAccessAllBranchesForOrg: vi.fn(),
 }))
 
-import { createBranch, createOrganization, createOrganizationQuick, getActiveBranch } from '@/modules/organization/actions/org.actions'
-import { getActiveBranchIdAction } from '@/modules/organization/actions/org-id.actions'
+import {
+  createBranch,
+  createOrganization,
+  createOrganizationQuick,
+  getActiveBranch,
+  setActiveBranch,
+  setActiveOrg,
+} from '@/modules/organization/actions/org.actions'
+import { getActiveBranchIdAction, getActiveOrgIdAction } from '@/modules/organization/actions/org-id.actions'
 
 function createCookieStore(initial: Record<string, string> = {}) {
   const values = new Map(Object.entries(initial))
@@ -113,6 +122,10 @@ describe('Organization Branch Bootstrap', () => {
     const orgInsert = vi.fn().mockResolvedValue({ error: null })
     const memberInsert = vi.fn().mockResolvedValue({ error: null })
     const branchInsert = vi.fn().mockResolvedValue({ error: null })
+    const memberUpdateBuilder = {
+      update: vi.fn(() => memberUpdateBuilder),
+      eq: vi.fn(() => memberUpdateBuilder),
+    }
 
     const randomUuidMock = vi.spyOn(globalThis.crypto, 'randomUUID')
     randomUuidMock
@@ -132,7 +145,13 @@ describe('Organization Branch Bootstrap', () => {
     })
     mocks.createAdminClient.mockResolvedValue({
       from: vi.fn((table: string) => {
-        if (table === 'org_members') return { insert: memberInsert }
+        if (table === 'org_members') {
+          return {
+            insert: memberInsert,
+            update: memberUpdateBuilder.update,
+            eq: memberUpdateBuilder.eq,
+          }
+        }
         if (table === 'branches') return { insert: branchInsert }
         if (table === 'organizations') return { delete: vi.fn(() => ({ eq: vi.fn() })) }
         throw new Error(`Unexpected admin table ${table}`)
@@ -187,6 +206,10 @@ describe('Organization Branch Bootstrap', () => {
     const orgInsert = vi.fn().mockResolvedValue({ error: null })
     const memberInsert = vi.fn().mockResolvedValue({ error: null })
     const branchInsert = vi.fn().mockResolvedValue({ error: null })
+    const memberUpdateBuilder = {
+      update: vi.fn(() => memberUpdateBuilder),
+      eq: vi.fn(() => memberUpdateBuilder),
+    }
 
     const randomUuidMock = vi.spyOn(globalThis.crypto, 'randomUUID')
     randomUuidMock
@@ -206,7 +229,13 @@ describe('Organization Branch Bootstrap', () => {
     })
     mocks.createAdminClient.mockResolvedValue({
       from: vi.fn((table: string) => {
-        if (table === 'org_members') return { insert: memberInsert }
+        if (table === 'org_members') {
+          return {
+            insert: memberInsert,
+            update: memberUpdateBuilder.update,
+            eq: memberUpdateBuilder.eq,
+          }
+        }
         if (table === 'branches') return { insert: branchInsert }
         if (table === 'organizations') return { delete: vi.fn(() => ({ eq: vi.fn() })) }
         throw new Error(`Unexpected admin table ${table}`)
@@ -294,6 +323,10 @@ describe('Organization Branch Bootstrap', () => {
     }
 
     let branchReadCount = 0
+    const memberUpdateBuilder = {
+      update: vi.fn(() => memberUpdateBuilder),
+      eq: vi.fn(() => memberUpdateBuilder),
+    }
 
     mocks.createClient.mockResolvedValue({
       auth: {
@@ -310,6 +343,17 @@ describe('Organization Branch Bootstrap', () => {
           return branchInsertBuilder
         }
         throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+    mocks.createAdminClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'org_members') {
+          return {
+            update: memberUpdateBuilder.update,
+            eq: memberUpdateBuilder.eq,
+          }
+        }
+        throw new Error(`Unexpected admin table ${table}`)
       }),
     })
 
@@ -342,6 +386,198 @@ describe('Organization Branch Bootstrap', () => {
         path: '/',
         httpOnly: true,
       })
+    )
+    expect(memberUpdateBuilder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        last_active_branch_id: 'branch-2',
+      })
+    )
+  })
+
+  it('persists the active org and resolved branch when switching organization', async () => {
+    const cookieStore = createCookieStore()
+    mocks.cookies.mockResolvedValue(cookieStore)
+    mocks.getBranchAccessScope.mockResolvedValue({
+      membershipId: 'member-2',
+      role: 'owner',
+      accessibleBranches: [
+        { id: 'branch-2', org_id: 'org-2', name: 'Unit Bandung', code: 'BDG', address: null, is_active: true },
+      ],
+      accessibleBranchIds: ['branch-2'],
+      canAccessAllBranches: true,
+      hasPersistedSelection: false,
+      storedBranchId: null,
+    })
+
+    const membershipQuery = {
+      select: vi.fn(() => membershipQuery),
+      eq: vi.fn(() => membershipQuery),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { org_id: 'org-2' },
+        error: null,
+      }),
+    }
+    const memberUpdateBuilder = {
+      update: vi.fn(() => memberUpdateBuilder),
+      eq: vi.fn(() => memberUpdateBuilder),
+    }
+
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1', email: 'owner@example.com' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'org_members') return membershipQuery
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+    mocks.createAdminClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'org_members') {
+          return {
+            update: memberUpdateBuilder.update,
+            eq: memberUpdateBuilder.eq,
+          }
+        }
+        throw new Error(`Unexpected admin table ${table}`)
+      }),
+    })
+
+    const result = await setActiveOrg('org-2')
+
+    expect(result).toEqual({
+      success: true,
+      orgId: 'org-2',
+      branchId: 'branch-2',
+    })
+    expect(cookieStore.set).toHaveBeenCalledWith(
+      'nizam_active_org_id',
+      'org-2',
+      expect.objectContaining({
+        path: '/',
+        httpOnly: true,
+      })
+    )
+    expect(cookieStore.set).toHaveBeenCalledWith(
+      'nizam_active_branch_id',
+      'branch-2',
+      expect.objectContaining({
+        path: '/',
+        httpOnly: true,
+      })
+    )
+    expect(memberUpdateBuilder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        last_active_branch_id: 'branch-2',
+      })
+    )
+  })
+
+  it('persists the active branch when switching unit context', async () => {
+    const cookieStore = createCookieStore()
+    mocks.cookies.mockResolvedValue(cookieStore)
+    mocks.getBranchAccessScope.mockResolvedValue({
+      membershipId: 'member-1',
+      role: 'owner',
+      accessibleBranches: [
+        { id: 'branch-1', org_id: 'org-1', name: 'Unit A', code: 'UA', address: null, is_active: true },
+        { id: 'branch-2', org_id: 'org-1', name: 'Unit B', code: 'UB', address: null, is_active: true },
+      ],
+      accessibleBranchIds: ['branch-1', 'branch-2'],
+      canAccessAllBranches: true,
+      hasPersistedSelection: false,
+      storedBranchId: null,
+    })
+
+    const memberUpdateBuilder = {
+      update: vi.fn(() => memberUpdateBuilder),
+      eq: vi.fn(() => memberUpdateBuilder),
+    }
+
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1', email: 'owner@example.com' } },
+        }),
+      },
+    })
+    mocks.createAdminClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'org_members') {
+          return {
+            update: memberUpdateBuilder.update,
+            eq: memberUpdateBuilder.eq,
+          }
+        }
+        throw new Error(`Unexpected admin table ${table}`)
+      }),
+    })
+
+    const result = await setActiveBranch('org-1', 'branch-2')
+
+    expect(result).toEqual({
+      success: true,
+      branchId: 'branch-2',
+    })
+    expect(cookieStore.set).toHaveBeenCalledWith(
+      'nizam_active_branch_id',
+      'branch-2',
+      expect.objectContaining({
+        path: '/',
+        httpOnly: true,
+      })
+    )
+    expect(memberUpdateBuilder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        last_active_branch_id: 'branch-2',
+      })
+    )
+  })
+
+  it('returns the persisted active org when login starts without an active-org cookie', async () => {
+    const cookieStore = createCookieStore()
+    mocks.cookies.mockResolvedValue(cookieStore)
+
+    const supabase = createSupabaseMock({
+      tables: {
+        org_members: [
+          {
+            maybeSingleResult: success({
+              org_id: 'org-2',
+              last_active_at: '2026-04-04T10:00:00.000Z',
+              joined_at: '2026-01-01T00:00:00.000Z',
+            }),
+          },
+          {
+            maybeSingleResult: success({
+              org_id: 'org-2',
+            }),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue({
+      ...supabase.client,
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1', email: 'owner@example.com' } },
+        }),
+      },
+    })
+
+    const result = await getActiveOrgIdAction()
+
+    expect(result).toBe('org-2')
+    expect(supabase.calls[0]?.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: 'order',
+          args: ['last_active_at', expect.objectContaining({ ascending: false })],
+        }),
+      ])
     )
   })
 

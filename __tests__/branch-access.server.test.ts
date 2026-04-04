@@ -158,6 +158,58 @@ describe('Branch Access Server Helper', () => {
     )
   })
 
+  it('reuses the persisted branch preference when the user last opened a specific unit', async () => {
+    const createScopedClient = () => {
+      const supabase = createSupabaseMock({
+        tables: {
+          org_members: [
+            {
+              maybeSingleResult: success({
+                id: 'member-1',
+                role: 'owner',
+                last_active_at: '2026-04-04T10:00:00.000Z',
+                last_active_branch_id: 'branch-2',
+              }),
+            },
+          ],
+          branches: [
+            {
+              result: success([
+                { id: 'branch-1', org_id: 'org-1', name: 'Unit A', code: 'UA', address: null, is_active: true },
+                { id: 'branch-2', org_id: 'org-1', name: 'Unit B', code: 'UB', address: null, is_active: true },
+              ]),
+            },
+          ],
+        },
+      })
+
+      return {
+        authed: {
+          ...supabase.client,
+          auth: {
+            getUser: vi.fn().mockResolvedValue({
+              data: { user: { id: 'owner-1' } },
+            }),
+          },
+        },
+        admin: supabase.client,
+      }
+    }
+
+    mocks.createClient.mockImplementation(async () => createScopedClient().authed)
+    mocks.createAdminClient.mockImplementation(async () => createScopedClient().admin)
+
+    const currentBranch = await getCurrentAccessibleBranch('org-1')
+    const selection = await resolveAccessibleBranchSelection('org-1')
+
+    expect(currentBranch?.id).toBe('branch-2')
+    expect(selection).toEqual(
+      expect.objectContaining({
+        branchId: 'branch-2',
+      })
+    )
+  })
+
   it('defaults owner/admin writes to the sole accessible branch when only one branch exists', async () => {
     const createScopedClient = () => {
       const supabase = createSupabaseMock({

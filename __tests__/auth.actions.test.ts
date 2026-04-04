@@ -215,6 +215,87 @@ describe('Auth Actions', () => {
     expect(mocks.redirect).toHaveBeenCalledWith('/purchasing')
   })
 
+  it('restores the persisted active org for NIK login when browser cookies are empty', async () => {
+    const cookieStore = createCookieStore()
+    const signInWithPasswordMock = vi.fn().mockResolvedValue({ error: null })
+
+    mocks.cookies.mockResolvedValue(cookieStore)
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        signInWithPassword: signInWithPasswordMock,
+      },
+    })
+
+    const employeesQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({
+        data: [
+          { id: 'emp-a', org_id: 'org-a', user_id: 'user-shared', created_at: '2025-01-01T00:00:00Z' },
+          { id: 'emp-b', org_id: 'org-b', user_id: 'user-shared', created_at: '2025-02-01T00:00:00Z' },
+        ],
+        error: null,
+      }),
+    }
+
+    const preferredOrgQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: {
+          org_id: 'org-b',
+          last_active_at: '2026-04-04T10:00:00.000Z',
+          joined_at: '2025-02-01T00:00:00Z',
+        },
+        error: null,
+      }),
+    }
+
+    const getUserByIdMock = vi.fn().mockResolvedValue({
+      data: {
+        user: {
+          id: 'user-shared',
+          email: 'shared.staff@example.com',
+        },
+      },
+      error: null,
+    })
+
+    mocks.createAdminClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'employees') return employeesQuery
+        if (table === 'org_members') return preferredOrgQuery
+        throw new Error(`Unexpected table ${table}`)
+      }),
+      auth: {
+        admin: {
+          getUserById: getUserByIdMock,
+        },
+      },
+    })
+
+    const formData = new FormData()
+    formData.set('nik', 'K-0001')
+    formData.set('password', 'secret123')
+
+    await signInWithNik(formData)
+
+    expect(preferredOrgQuery.in).toHaveBeenCalledWith('org_id', ['org-a', 'org-b'])
+    expect(cookieStore.set).toHaveBeenCalledWith(
+      'nizam_active_org_id',
+      'org-b',
+      expect.objectContaining({
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+      })
+    )
+    expect(mocks.redirect).toHaveBeenCalledWith('/dashboard')
+  })
+
   it('marks every employee row tied to the same auth user when requesting password reset', async () => {
     const listQuery = {
       select: vi.fn().mockReturnThis(),

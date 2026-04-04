@@ -6,6 +6,10 @@ import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { ACTIVE_BRANCH_COOKIE, ACTIVE_ORG_COOKIE } from '@/modules/organization/lib/org-context'
+import {
+  getStoredActiveOrgIdForUser,
+  persistMembershipActiveContext,
+} from '@/modules/organization/lib/active-context.server'
 
 const ADMIN_IMPERSONATION_COOKIE = 'nizam_admin_impersonation'
 const ADMIN_IMPERSONATION_MAX_AGE = 60 * 60 * 4
@@ -197,6 +201,16 @@ function buildStaffLoginCandidates(employees: any[], nik: string, activeOrgId: s
   })
 }
 
+async function resolvePreferredOrgIdForStaffLogin(
+  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
+  userId: string,
+  orgIds: string[],
+  fallbackOrgId: string,
+) {
+  const storedOrgId = await getStoredActiveOrgIdForUser(adminClient as any, userId, orgIds)
+  return storedOrgId || fallbackOrgId
+}
+
 async function resolveExistingStaffIdentity(
   adminClient: Awaited<ReturnType<typeof createAdminClient>>,
   publicClient: Awaited<ReturnType<typeof createClient>>,
@@ -381,6 +395,11 @@ export async function registerEmployeeAccount(formData: FormData) {
     if ('error' in linkResult) return linkResult
 
     await trackInvitationUsage(adminClient, invite)
+    await persistMembershipActiveContext(adminClient as any, {
+      userId: existingIdentity.userId,
+      orgId: emp.org_id,
+      branchId: emp.branch_id ? String(emp.branch_id) : null,
+    })
     setActiveOrganizationCookie(cookieStore, emp.org_id)
 
     revalidatePath('/', 'layout')
@@ -423,6 +442,11 @@ export async function registerEmployeeAccount(formData: FormData) {
      return { error: 'Akun berhasil dibuat, tapi login otomatis gagal. Silakan login manual pakai NIK & password baru.' }
   }
 
+  await persistMembershipActiveContext(adminClient as any, {
+    userId,
+    orgId: emp.org_id,
+    branchId: emp.branch_id ? String(emp.branch_id) : null,
+  })
   setActiveOrganizationCookie(cookieStore, emp.org_id)
   revalidatePath('/', 'layout')
   return { success: true, redirectTo: '/dashboard' }
@@ -477,7 +501,16 @@ export async function signInWithNik(formData: FormData) {
     })
 
     if (!error) {
-      setActiveOrganizationCookie(cookieStore, candidate.preferredOrgId)
+      const preferredOrgId = activeOrgIdPreference && candidate.orgIds.includes(activeOrgIdPreference)
+        ? activeOrgIdPreference
+        : await resolvePreferredOrgIdForStaffLogin(
+            adminClient,
+            candidate.userId,
+            candidate.orgIds,
+            candidate.preferredOrgId
+          )
+
+      setActiveOrganizationCookie(cookieStore, preferredOrgId)
       revalidatePath('/', 'layout')
       return redirect(redirectTo || '/dashboard')
     }
