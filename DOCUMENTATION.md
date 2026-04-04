@@ -1,6 +1,6 @@
 # NIZAM ERP — Comprehensive Codebase Documentation
 
-> **Last updated:** 3 April 2026 — generated from direct repository audit.
+> **Last updated:** 4 April 2026 — generated from direct repository audit.
 
 ---
 
@@ -12,10 +12,10 @@ NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **
 
 | Metric | Value |
 |---|---|
-| Page routes (`page.tsx`) | **61** |
-| Client components (`*Client.tsx`) | **42** |
-| Server action files | **52** |
-| Migration SQL files | **153** (latest: `1104`) |
+| Page routes (`page.tsx`) | **64** |
+| Client components (`*Client.tsx`) | **45** |
+| Server action files | **53** |
+| Migration SQL files | **155** (latest: `1115`) |
 | Test files | **30** |
 | API route handlers | **2** (`/api/export`, `/api/sales-pages/lead`) |
 | Proxy (middleware) | `proxy.ts` |
@@ -359,6 +359,8 @@ Guards both `/admin` and `/saas/*` routes.
 | `/settings/users` | Organization membership |
 | `/settings/branches` | Branch/division management |
 | `/settings/audit` | Admin audit trail |
+| `/settings/ticketing` | User bug ticketing (menu, waktu kejadian, upload screenshot) |
+| `/settings/ticketing/doc-update` | Feed progres perbaikan bug yang dipublikasikan |
 | `/audit` | Redirect → `/settings/audit` |
 
 ### 6.7 Reports
@@ -376,6 +378,7 @@ Guards both `/admin` and `/saas/*` routes.
 | `/saas` | Redirect → `/saas/penjualan` |
 | `/saas/penawaran` | SaaS quotation management |
 | `/saas/penjualan` | SaaS sales management |
+| `/saas/ticketing` | SaaS operator ticket progress management |
 | `/saas/dokumen/[id]` | SaaS quotation/invoice document view |
 
 ---
@@ -543,7 +546,7 @@ Guards both `/admin` and `/saas/*` routes.
 
 ### 7.14 SaaS Operator
 
-**Actions:** `modules/saas/actions/` (1 file)
+**Actions:** `modules/saas/actions/` (2 files)
 
 - Cross-tenant snapshot (org/package/invoice data)
 - SaaS quotation creation with full pricing breakdown (add-ons, tokens, entity/branch pricing, discount, tax)
@@ -551,6 +554,7 @@ Guards both `/admin` and `/saas/*` routes.
 - Sale payment + plan activation
 - Invoice document detail with fallback for schema versions
 - Editable anchor/actual pricing per add-on
+- Support ticketing lifecycle (create ticket, operator progress update, doc update feed)
 
 ---
 
@@ -589,9 +593,9 @@ Core reusable components:
 
 ### 9.1 Overview
 
-- **153 migration files** in `supabase/migrations/`
+- **155 migration files** in `supabase/migrations/`
 - `master_init.sql` — legacy bootstrap SQL (foundation reference)
-- Latest migration: `1104_journal_single_branch_backfill.sql`
+- Latest migration: `1115_support_ticket_updates_doc_update.sql`
 
 ### 9.2 Core Entities
 
@@ -655,13 +659,14 @@ Core reusable components:
 | `1083`–`1084` | SaaS invoice column fixes, discount/tax |
 | `1085`–`1086` | Module catalog sync, permission names fix |
 | `1087`–`1104` | **Branch context expansion** (purchasing, inventory, sales, reimbursement, services, fleet, HRIS, expenses, payroll, leave, attendance, factory, fixed assets, budgets, journals) |
+| `1114`–`1115` | Support ticketing + public doc update progress feed |
 
 ### 9.5 Storage Buckets
 
 | Bucket | Purpose |
 |---|---|
 | `brand_assets` | Organization logos |
-| `receipts` | Reimbursement proof |
+| `receipts` | Reimbursement proof + support ticket screenshots |
 | `avatars` | Employee avatars |
 | `billing-proofs` | SaaS billing payment proof |
 
@@ -866,7 +871,7 @@ The project uses **Tailwind CSS 4.2.2** with `@tailwindcss/postcss`. Custom colo
 | Layout | `layout.tsx` | `app/(dashboard)/layout.tsx` |
 | Types | `*.types.ts` | `database.types.ts` |
 | Tests | `*.test.ts` | `sales.actions.test.ts` |
-| Migrations | `NNNN_description.sql` | `1104_journal_single_branch_backfill.sql` |
+| Migrations | `NNNN_description.sql` | `1115_support_ticket_updates_doc_update.sql` |
 
 ### 14.3 Module Structure
 
@@ -891,7 +896,7 @@ modules/[domain]/
 
 ### 14.5 Adding a New Migration
 
-- File naming: `NNNN_description.sql` (next number after `1104`)
+- File naming: `NNNN_description.sql` (next number after `1115`)
 - Always make migrations **idempotent** (use `IF NOT EXISTS`, `DO $$ ... $$`)
 - Include `NOTIFY pgrst, 'reload schema'` if adding/removing columns
 - Add appropriate RLS policies for new tables
@@ -931,7 +936,7 @@ When adding new modules to the SaaS system, update:
 
 ## 15. Complete File Inventories
 
-### 15.1 Server Action Files (52)
+### 15.1 Server Action Files (53)
 
 <details>
 <summary>Click to expand</summary>
@@ -977,6 +982,7 @@ When adding new modules to the SaaS system, update:
 - `modules/organization/actions/org.actions.ts`
 - `modules/purchasing/actions/purchasing.actions.ts`
 - `modules/saas/actions/operator-sales.actions.ts`
+- `modules/saas/actions/ticketing.actions.ts`
 - `modules/sales/actions/pos.actions.ts`
 - `modules/sales/actions/sales-page.actions.ts`
 - `modules/sales/actions/sales.actions.ts`
@@ -993,7 +999,7 @@ When adding new modules to the SaaS system, update:
 
 </details>
 
-### 15.2 Page Routes (61)
+### 15.2 Page Routes (64)
 
 <details>
 <summary>Click to expand</summary>
@@ -1012,7 +1018,7 @@ When adding new modules to the SaaS system, update:
 - `app/(auth)/update-password/page.tsx`
 - `app/(auth)/join/[token]/page.tsx`
 
-**Dashboard (51):**
+**Dashboard (54):**
 - `app/(dashboard)/dashboard/page.tsx`
 - `app/(dashboard)/profil-saya/page.tsx`
 - `app/(dashboard)/billing/page.tsx`
@@ -1060,14 +1066,17 @@ When adding new modules to the SaaS system, update:
 - `app/(dashboard)/settings/business/page.tsx`
 - `app/(dashboard)/settings/roles/page.tsx`
 - `app/(dashboard)/settings/users/page.tsx`
+- `app/(dashboard)/settings/ticketing/page.tsx`
+- `app/(dashboard)/settings/ticketing/doc-update/page.tsx`
 - `app/(dashboard)/saas/page.tsx`
 - `app/(dashboard)/saas/penawaran/page.tsx`
 - `app/(dashboard)/saas/penjualan/page.tsx`
+- `app/(dashboard)/saas/ticketing/page.tsx`
 - `app/(dashboard)/saas/dokumen/[id]/page.tsx`
 
 </details>
 
-### 15.3 Client Components (42)
+### 15.3 Client Components (45)
 
 <details>
 <summary>Click to expand</summary>
@@ -1086,6 +1095,8 @@ When adding new modules to the SaaS system, update:
 - `PromoClient.tsx`, `QuotationClient.tsx`, `SalesClient.tsx`
 - `ServiceOrderClient.tsx`
 - `BranchManagementClient.tsx`, `BusinessClient.tsx`, `UsersClient.tsx`
+- `TicketingClient.tsx`, `TicketingDocUpdateClient.tsx`
+- `SaasTicketingClient.tsx`
 - `AbsClient.tsx`, `DemoClient.tsx`
 
 </details>
@@ -1093,6 +1104,18 @@ When adding new modules to the SaaS system, update:
 ---
 
 ## 16. Changelog (Recent Updates)
+
+### Config Navigation: Ticketing Menu (April 2026)
+
+- Added new sidebar item `Ticketing` under the `Config` group.
+- Added route `/settings/ticketing` with active bug-report form.
+- Added fields to capture bug context: `menu/lokasi ditemukan`, `kapan ditemukan`, dan `pada saat apa bug terjadi`.
+- Added screenshot upload support from the ticket form (stored in Supabase Storage).
+- Added route `/settings/ticketing/doc-update` for user-facing progress feed.
+- Added route `/saas/ticketing` for operator progress management and publication control.
+- Added migration `1114_support_ticketing.sql` for `support_tickets` table + RLS.
+- Added migration `1115_support_ticket_updates_doc_update.sql` for progress timeline + public doc update.
+- Fixed runtime error in `/saas/ticketing` form submit by preserving HTML form reference before async transition.
 
 ### Branch Context Expansion (April 2026)
 

@@ -38,6 +38,7 @@ import {
   Store,
   Clock,
   Megaphone,
+  LifeBuoy,
   type LucideIcon
 } from 'lucide-react'
 import { signOut } from '@/modules/auth/actions/auth.actions'
@@ -126,6 +127,8 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Audit Trail', href: '/settings/audit', icon: ShieldCheck, permission_key: 'audit_trail', module_key: 'Audit' },
       { label: 'Cabang & Divisi', href: '/settings/branches', icon: MapPin, permission_key: 'branch', module_key: 'Consolidation' },
       { label: 'Pengaturan Bisnis', href: '/settings/business', icon: Settings, permission_key: 'business', module_key: 'Config' },
+      { label: 'Ticketing', href: '/settings/ticketing', icon: LifeBuoy, permission_key: 'business', module_key: 'Config' },
+      { label: 'Doc Update Ticketing', href: '/settings/ticketing/doc-update', icon: FileText, permission_key: 'business', module_key: 'Config' },
     ]
   }
 ]
@@ -135,6 +138,7 @@ const SAAS_OPERATOR_GROUP: NavGroup = {
   items: [
     { label: 'Penawaran SaaS', href: '/saas/penawaran', icon: FileText, permission_key: 'sales' },
     { label: 'Penjualan SaaS', href: '/saas/penjualan', icon: TrendingUp, permission_key: 'sales' },
+    { label: 'Ticketing SaaS', href: '/saas/ticketing', icon: LifeBuoy, permission_key: 'sales' },
   ],
 }
 

@@ -91,6 +91,7 @@ export default async function DashboardLayout({
     { path: '/inventory/warehouses', requiredModule: 'Warehouse', aliases: ['Warehouse', 'WMS'], permissionKeys: ['inventory', 'warehouse'] },
     { path: '/accounting/audit', requiredModule: 'Audit', aliases: ['Audit', 'Audit Trail'], permissionKeys: ['audit', 'approval'] },
     { path: '/settings/audit', requiredModule: 'Audit', aliases: ['Audit', 'Audit Trail'], permissionKeys: ['audit', 'approval'] },
+    { path: '/settings/ticketing', requiredModule: 'Config', aliases: ['Config', 'Ticketing Support'], permissionKeys: ['business', 'support', 'ticketing'] },
     {
       path: '/accounting',
       requiredModule: 'Accounting',
