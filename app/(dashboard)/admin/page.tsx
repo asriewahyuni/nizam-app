@@ -51,7 +51,7 @@ const CORE_MODULES = [
   'Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward', 'Sales Page',
   'Karyawan (HRIS)', 'Absensi & Cuti', 'Payroll Components', 'Proses Penggajian', 'Akses & Jabatan',
   'Laporan', 'Strategi (BSC)', 'Proyeksi Kas',
-  'Audit Trail', 'Cabang & Divisi', 'Pengaturan Bisnis'
+  'Audit Trail', 'Cabang & Divisi', 'Pengaturan Bisnis', 'Ticketing', 'Doc Update Ticketing'
 ]
 
 const ADDON_MODULES = [
@@ -1262,7 +1262,7 @@ export default function SaaSAdminPage() {
                              { group: 'Marketing & Sales', items: ['Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward', 'Sales Page'] },
                              { group: 'HRIS', items: ['Karyawan (HRIS)', 'Absensi & Cuti', 'Payroll Components', 'Proses Penggajian', 'Akses & Jabatan'] },
                              { group: 'Insight', items: ['Laporan', 'Strategi (BSC)', 'Proyeksi Kas'] },
-                             { group: 'Config', items: ['Audit Trail', 'Cabang & Divisi', 'Pengaturan Bisnis'] }
+                             { group: 'Config', items: ['Audit Trail', 'Cabang & Divisi', 'Pengaturan Bisnis', 'Ticketing', 'Doc Update Ticketing'] }
                           ].map(cat => (
                              <div key={cat.group} className="space-y-2" data-module-group={cat.group}>
                                 <div className="flex items-center gap-2 px-2">

@@ -92,7 +92,7 @@ const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
   },
   {
     canonical: 'Config',
-    aliases: ['config', 'pengaturan bisnis', 'settings', 'business settings'],
+    aliases: ['config', 'pengaturan bisnis', 'settings', 'business settings', 'ticketing', 'doc update ticketing'],
   },
   {
     canonical: 'Attendance',
