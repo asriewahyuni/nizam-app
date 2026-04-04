@@ -45,7 +45,7 @@ async function getAccountBalancesFromEntries(
 
   let query = db
     .from('journal_lines')
-    .select('debit, credit, accounts!inner(id, code, name, type, normal_balance, cash_flow_category)')
+    .select('debit, credit, accounts!inner(id, code, name, type, normal_balance, parent_id, cash_flow_category)')
     .in('entry_id', entryIds) as any
 
   if (codeFilter && codeFilter.length > 0) {
@@ -109,30 +109,46 @@ export async function getBalanceSheet(
   const supabase = await createClient()
   const db = supabase as any
 
+  const { data: accountRows } = await db
+    .from('accounts')
+    .select('id, code, name, type, normal_balance, parent_id')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .order('code', { ascending: true })
+
+  const accounts = Array.isArray(accountRows) ? accountRows : []
   const entryIds = await getPostedEntryIds(db, orgId, { branchId, asOfDate })
 
-  if (entryIds.length === 0) {
-    const pl = await getProfitLoss(orgId, '1970-01-01', asOfDate, branchId)
-    return { assets: [], liabilities: [], equity: [{ code: '9999', name: 'Laba Ditahan / Periode Berjalan', balance: pl.netProfit, type: 'EQUITY' }] }
+  const balances = entryIds.length > 0 ? await getAccountBalancesFromEntries(db, entryIds) : []
+  const balancesById = new Map<string, any>(balances.map((b: any) => [b.id, b]))
+
+  const mapBalance = (account: any, positiveSide: 'DEBIT' | 'CREDIT') => {
+    const existing = balancesById.get(account.id)
+    const totalDebit = Number(existing?.total_debit || 0)
+    const totalCredit = Number(existing?.total_credit || 0)
+    const balance = positiveSide === 'DEBIT' ? totalDebit - totalCredit : totalCredit - totalDebit
+    return {
+      ...account,
+      total_debit: totalDebit,
+      total_credit: totalCredit,
+      balance,
+    }
   }
 
-  const balances = await getAccountBalancesFromEntries(db, entryIds)
-  if (balances.length === 0) return { assets: [], liabilities: [], equity: [] }
+  const assets = accounts
+    .filter((a: any) => a.type === 'ASSET' || String(a.code || '').startsWith('1'))
+    .map((a: any) => mapBalance(a, 'DEBIT'))
+    .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
-  const assets = balances
-    .filter((a: any) => a.type === 'ASSET' || a.code.startsWith('1'))
-    .map((a: any) => ({ ...a, balance: a.total_debit - a.total_credit }))
-    .sort((a: any, b: any) => a.code.localeCompare(b.code))
+  const liabilities = accounts
+    .filter((a: any) => a.type === 'LIABILITY' || String(a.code || '').startsWith('2'))
+    .map((a: any) => mapBalance(a, 'CREDIT'))
+    .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
-  const liabilities = balances
-    .filter((a: any) => a.type === 'LIABILITY' || a.code.startsWith('2'))
-    .map((a: any) => ({ ...a, balance: a.total_credit - a.total_debit }))
-    .sort((a: any, b: any) => a.code.localeCompare(b.code))
-
-  const equity = balances
-    .filter((a: any) => a.type === 'EQUITY' || a.code.startsWith('3'))
-    .map((a: any) => ({ ...a, balance: a.total_credit - a.total_debit }))
-    .sort((a: any, b: any) => a.code.localeCompare(b.code))
+  const equity = accounts
+    .filter((a: any) => a.type === 'EQUITY' || String(a.code || '').startsWith('3'))
+    .map((a: any) => mapBalance(a, 'CREDIT'))
+    .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
   const pl = await getProfitLoss(orgId, '1970-01-01', asOfDate, branchId)
   equity.push({ code: '9999', name: 'Laba Ditahan / Periode Berjalan', balance: pl.netProfit, type: 'EQUITY' })

@@ -120,7 +120,7 @@ export function AuditClient({ orgId, initialData }: AuditClientProps) {
                </div>
                <div>
                   <h3 className="text-lg font-black text-slate-900">Selisih Persediaan</h3>
-                  <p className="text-sm font-bold text-slate-400">Total Variance Fiskal vs Ledger (1301).</p>
+                  <p className="text-sm font-bold text-slate-400">Total Variance Fiskal vs Ledger Persediaan (1301-1399).</p>
                </div>
             </div>
             <div className="mt-8 flex items-end justify-between">
@@ -268,7 +268,7 @@ export function AuditClient({ orgId, initialData }: AuditClientProps) {
             <h3 className="font-black text-slate-900 text-xl flex items-center gap-3">
                <PackageSearch className="text-amber-500" />
                Analisis Selisih Inventaris vs Buku Besar
-               <span className="text-xs font-bold text-slate-400 italic font-mono">(Account 1301 vs Physical On-Hand)</span>
+               <span className="text-xs font-bold text-slate-400 italic font-mono">(Accounts 1301-1399 vs Physical On-Hand)</span>
             </h3>
             <button
               onClick={() => runReconcile('INVENTORY')}

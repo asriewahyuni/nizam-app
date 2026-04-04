@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { convertQuantityBetweenUnits } from '@/modules/factory/lib/unit-conversion'
 
 type ActiveBranchResult =
   | { branchId: string }
@@ -27,6 +28,18 @@ type FactoryWarehouseAccessRecord = {
   org_id: string
   branch_id: string | null
   is_active: boolean
+}
+
+type BomPayloadItem = {
+  productId: string
+  quantity: number
+  unit?: string | null
+}
+
+type BomItemProductRecord = {
+  id: string
+  name: string
+  unit: string | null
 }
 
 async function resolveFactoryBranchId(orgId: string, branchId?: string | null) {
@@ -107,6 +120,65 @@ async function getAccessibleWarehouse(
   return (data as FactoryWarehouseAccessRecord | null) ?? null
 }
 
+async function normalizeBomItemsForPersistence(
+  supabase: any,
+  orgId: string,
+  items: BomPayloadItem[]
+): Promise<{ data: Array<{ product_id: string; quantity: number; unit: string | null }> } | { error: string }> {
+  if (!items.length) return { data: [] }
+
+  const productIds = [...new Set(items.map((item) => item.productId).filter(Boolean))]
+  if (productIds.length === 0) {
+    return { error: 'Item BoM tidak valid.' }
+  }
+
+  const { data: productRows, error: productError } = await (supabase as any)
+    .from('products')
+    .select('id, name, unit')
+    .eq('org_id', orgId)
+    .in('id', productIds)
+
+  if (productError) {
+    return { error: `Gagal membaca data produk BoM: ${productError.message}` }
+  }
+
+  const productMap = new Map<string, BomItemProductRecord>(
+    ((productRows as BomItemProductRecord[] | null) || []).map((row) => [row.id, row])
+  )
+
+  const normalizedItems: Array<{ product_id: string; quantity: number; unit: string | null }> = []
+
+  for (const item of items) {
+    const qty = Number(item.quantity)
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return { error: 'Qty bahan baku harus lebih besar dari nol.' }
+    }
+
+    const product = productMap.get(item.productId)
+    if (!product) {
+      return { error: `Produk bahan baku tidak ditemukan: ${item.productId}` }
+    }
+
+    const productUnit = product.unit || item.unit || null
+
+    let convertedQty = qty
+    try {
+      convertedQty = convertQuantityBetweenUnits(qty, item.unit || productUnit, productUnit)
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Konversi satuan gagal.'
+      return { error: `Bahan "${product.name}": ${reason}` }
+    }
+
+    normalizedItems.push({
+      product_id: item.productId,
+      quantity: convertedQty,
+      unit: productUnit,
+    })
+  }
+
+  return { data: normalizedItems }
+}
+
 export async function getBoms(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
   const branchSelection = await resolveFactoryBranchId(orgId, branchId)
@@ -182,18 +254,25 @@ export async function createBom(orgId: string, payload: { productId: string; cod
 
   if (bomError) return { error: bomError.message }
 
-  const bomItems = payload.items.map((item: any) => ({
+  const normalizedItemsResult = await normalizeBomItemsForPersistence(
+    supabase as any,
+    orgId,
+    payload.items
+  )
+  if ('error' in normalizedItemsResult) return { error: normalizedItemsResult.error }
+
+  const bomItems = normalizedItemsResult.data.map((item) => ({
     bom_id: bom.id,
-    product_id: item.productId,
-    quantity: item.quantity,
-    unit: item.unit
+    ...item,
   }))
 
-  const { error: itemsError } = await (supabase as any)
-    .from('production_bom_items')
-    .insert(bomItems)
+  if (bomItems.length > 0) {
+    const { error: itemsError } = await (supabase as any)
+      .from('production_bom_items')
+      .insert(bomItems)
 
-  if (itemsError) return { error: itemsError.message }
+    if (itemsError) return { error: itemsError.message }
+  }
 
   revalidatePath('/factory')
   return { success: true }
@@ -234,18 +313,25 @@ export async function updateBom(orgId: string, bomId: string, payload: { product
 
   if (deleteError) return { error: deleteError.message }
 
-  const bomItems = payload.items.map((item: any) => ({
+  const normalizedItemsResult = await normalizeBomItemsForPersistence(
+    supabase as any,
+    orgId,
+    payload.items
+  )
+  if ('error' in normalizedItemsResult) return { error: normalizedItemsResult.error }
+
+  const bomItems = normalizedItemsResult.data.map((item) => ({
     bom_id: accessibleBom.id,
-    product_id: item.productId,
-    quantity: item.quantity,
-    unit: item.unit
+    ...item,
   }))
 
-  const { error: itemsError } = await (supabase as any)
-    .from('production_bom_items')
-    .insert(bomItems)
+  if (bomItems.length > 0) {
+    const { error: itemsError } = await (supabase as any)
+      .from('production_bom_items')
+      .insert(bomItems)
 
-  if (itemsError) return { error: itemsError.message }
+    if (itemsError) return { error: itemsError.message }
+  }
 
   revalidatePath('/factory')
   return { success: true }
@@ -269,7 +355,8 @@ export async function getWorkOrders(orgId: string, branchId?: string | null) {
         items:production_bom_items(
           product_id,
           quantity,
-          product:products(id, name, average_cost, purchase_price, sku)
+          unit,
+          product:products(id, name, average_cost, purchase_price, sku, unit)
         )
       )
     `)

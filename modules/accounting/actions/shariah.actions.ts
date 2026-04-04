@@ -26,7 +26,7 @@ export async function injectShariahPack(orgId: string) {
       .from('accounts')
       .select('id, code')
       .eq('org_id', orgId)
-      .in('code', ['2000', '3000', '6000'])
+      .in('code', ['1000', '2000', '3000', '6000'])
 
     const rootMap: Record<string, string> = {}
     for (const r of (roots || [])) rootMap[r.code] = r.id
@@ -39,6 +39,10 @@ export async function injectShariahPack(orgId: string) {
     // 2. LIABILITIES (QARD)
     const kewajSyariahId = await upsert('2600', 'Kewajiban Syariah', 'LIABILITY', 'CREDIT', rootMap['2000'] ?? null)
     await upsert('2601', 'Hutang Qard (Kebajikan)', 'LIABILITY', 'CREDIT', kewajSyariahId)
+    await upsert('2602', 'Hutang Salam', 'LIABILITY', 'CREDIT', kewajSyariahId)
+
+    // 2b. SALAM RECEIVABLE (ASSET)
+    await upsert('1404', 'Piutang Salam Vendor', 'ASSET', 'DEBIT', rootMap['1000'] ?? null)
 
     // 3. IJARAH (EXPENSES)
     const ijarahId = await upsert('6100', 'Beban Ijarah & Ujrah', 'EXPENSE', 'DEBIT', rootMap['6000'] ?? null)
@@ -63,7 +67,7 @@ export async function setShariahAccountsActive(orgId: string, active: boolean) {
   const supabase = await createClient()
 
   // Syariah codes from injectShariahPack
-  const syariahCodes = ['2600', '2601', '3100', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
+  const syariahCodes = ['1404', '2600', '2601', '2602', '3100', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
 
   const { error } = await (supabase as any)
     .from('accounts')

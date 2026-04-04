@@ -1,7 +1,6 @@
-import { defineConfig } from 'vitest/config'
 import path from 'path'
 
-export default defineConfig({
+export default {
   test: {
     environment: 'node',
     globals: true,
@@ -16,7 +15,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './')
+      '@': path.resolve(process.cwd(), './')
     }
   }
-})
+}

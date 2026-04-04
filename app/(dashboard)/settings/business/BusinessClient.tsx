@@ -247,6 +247,62 @@ export default function BusinessClient({
            </div>
         </div>
 
+        <div className="space-y-8">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
+              <Fingerprint size={20} className="text-slate-400" /> Format Kode Dokumen
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 bg-slate-50/50 rounded-[32px] border border-slate-100/50 shadow-inner">
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Format NIK Karyawan</label>
+              <input
+                name="emp_format"
+                defaultValue={String(settings.emp_format ?? 'EMP{MM}{YY}{0000}')}
+                placeholder="EMP{MM}{YY}{0000}"
+                className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Format Purchase Order (PO)</label>
+              <input
+                name="po_format"
+                defaultValue={String(settings.po_format ?? 'PO-{YYYY}{MM}-{0000}')}
+                placeholder="PO-{YYYY}{MM}-{0000}"
+                className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Format Sales Order (SO)</label>
+              <input
+                name="so_format"
+                defaultValue={String(settings.so_format ?? 'SO/{YY}/{MM}/{000}')}
+                placeholder="SO/{YY}/{MM}/{000}"
+                className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Format Invoice Umum</label>
+              <input
+                name="inv_format"
+                defaultValue={String(settings.inv_format ?? 'INV/NIZ/{YYYY}/{0000}')}
+                placeholder="INV/NIZ/{YYYY}/{0000}"
+                className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold"
+              />
+            </div>
+
+            <div className="md:col-span-2 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+              <p className="text-[11px] font-bold text-indigo-700 leading-relaxed">
+                Placeholder yang didukung untuk format: <code>{'{YYYY}'}</code>, <code>{'{YY}'}</code>, <code>{'{MM}'}</code>, <code>{'{DD}'}</code>, dan blok nomor seperti <code>{'{0000}'}</code>.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="flex justify-end pt-10 border-t border-slate-100 gap-6">
            <button type="submit" disabled={loading} className="flex items-center gap-3 px-12 py-5 bg-slate-900 text-white rounded-[24px] font-black text-[12px] uppercase tracking-[0.2em] hover:bg-black transition-all shadow-2xl shadow-slate-900/20 disabled:opacity-50 active:scale-95">
              <Save size={18}/>

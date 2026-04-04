@@ -4,6 +4,23 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getActiveBranch } from '@/modules/organization/actions/org.actions'
 
+type PosStockRequirement = {
+  productId: string
+  productName: string
+  requiredQty: number
+}
+
+const STOCK_EPSILON = 0.000001
+
+function formatQuantity(value: number): string {
+  if (!Number.isFinite(value)) return '0'
+  const rounded = Math.round(value * 1_000_000) / 1_000_000
+  if (Math.abs(rounded) < STOCK_EPSILON) return '0'
+  return Number.isInteger(rounded)
+    ? String(rounded)
+    : rounded.toFixed(6).replace(/\.?0+$/, '')
+}
+
 async function resolvePosWarehouseId(
   supabase: any,
   orgId: string,
@@ -43,6 +60,57 @@ async function resolvePosWarehouseId(
   return { warehouseId: warehouses[0].id }
 }
 
+async function ensurePosStockAvailability(
+  supabase: any,
+  orgId: string,
+  warehouseId: string,
+  requirements: PosStockRequirement[]
+) {
+  if (!requirements.length) return { success: true as const }
+
+  const productIds = requirements.map((item) => item.productId)
+  const { data: stockRows, error } = await (supabase as any)
+    .from('inventory_stocks')
+    .select('product_id, quantity')
+    .eq('org_id', orgId)
+    .eq('warehouse_id', warehouseId)
+    .in('product_id', productIds)
+
+  if (error) {
+    return { error: 'Gagal memvalidasi stok POS: ' + error.message }
+  }
+
+  const availableByProduct: Record<string, number> = {}
+  for (const row of (stockRows as any[]) || []) {
+    const productId = String((row as any).product_id || '')
+    if (!productId) continue
+    availableByProduct[productId] = (availableByProduct[productId] || 0) + Number((row as any).quantity || 0)
+  }
+
+  const shortages = requirements
+    .map((item) => {
+      const availableQty = Number(availableByProduct[item.productId] || 0)
+      return {
+        ...item,
+        availableQty,
+        shortage: item.requiredQty - availableQty,
+      }
+    })
+    .filter((item) => item.shortage > STOCK_EPSILON)
+
+  if (!shortages.length) return { success: true as const }
+
+  const first = shortages[0]
+  return {
+    error: `Stok POS tidak cukup untuk produk "${first.productName}". Dibutuhkan ${formatQuantity(
+      first.requiredQty
+    )}, tersedia ${formatQuantity(Math.max(
+      0,
+      first.availableQty
+    ))}. Penjualan tidak boleh melebihi stok (kecuali akad SALAM).`,
+  }
+}
+
 export async function processPosTransaction(orgId: string, payload: any) {
   const supabase = await createClient()
   const { data: { user } } = await (supabase as any).auth.getUser()
@@ -54,11 +122,12 @@ export async function processPosTransaction(orgId: string, payload: any) {
 
   const productIds = [...new Set((payload.lines || []).map((line: any) => line.product_id).filter(Boolean))]
   let requiresWarehouse = false
+  let inventoryRequirements: PosStockRequirement[] = []
 
   if (productIds.length > 0) {
     const { data: productRows, error: productError } = await (supabase as any)
       .from('products')
-      .select('id, type')
+      .select('id, type, name')
       .eq('org_id', orgId)
       .in('id', productIds)
 
@@ -66,7 +135,38 @@ export async function processPosTransaction(orgId: string, payload: any) {
       return { error: 'Gagal memvalidasi produk POS: ' + productError.message }
     }
 
-    requiresWarehouse = (productRows || []).some((product: any) => (product?.type || 'INVENTORY') === 'INVENTORY')
+    const productById = new Map<string, { type: string; name: string }>()
+    for (const product of (productRows as any[]) || []) {
+      productById.set(String(product?.id || ''), {
+        type: String(product?.type || 'INVENTORY').toUpperCase(),
+        name: String(product?.name || product?.id || 'Produk'),
+      })
+    }
+
+    const requirementMap = new Map<string, PosStockRequirement>()
+    for (const line of (payload.lines || []) as any[]) {
+      const productId = String(line?.product_id || '')
+      if (!productId) continue
+      const product = productById.get(productId)
+      if (!product || product.type !== 'INVENTORY') continue
+
+      const qty = Number(line?.quantity || 0)
+      if (!Number.isFinite(qty) || qty <= 0) continue
+
+      const current = requirementMap.get(productId)
+      if (current) {
+        current.requiredQty += qty
+      } else {
+        requirementMap.set(productId, {
+          productId,
+          productName: product.name,
+          requiredQty: qty,
+        })
+      }
+    }
+
+    inventoryRequirements = Array.from(requirementMap.values())
+    requiresWarehouse = inventoryRequirements.length > 0
   }
   let resolvedWarehouseId: string | null = null
 
@@ -82,6 +182,16 @@ export async function processPosTransaction(orgId: string, payload: any) {
     }
 
     resolvedWarehouseId = resolvedWarehouse.warehouseId
+
+    const stockCheck = await ensurePosStockAvailability(
+      supabase as any,
+      orgId,
+      resolvedWarehouseId,
+      inventoryRequirements
+    )
+    if ('error' in stockCheck) {
+      return { error: stockCheck.error }
+    }
   }
 
   // 1. Tuntaskan CRM dan Relational Integrity untuk Pelanggan (Cegah Not Null Constraints)

@@ -19,6 +19,10 @@ function agingBucket(dueDateStr: string, today: string): string {
   return '> 90 Days'
 }
 
+function isSalamMode(value: unknown) {
+  return String(value || '').trim().toUpperCase() === 'SALAM'
+}
+
 async function getPostedEntryIds(
   db: any,
   orgId: string,
@@ -31,7 +35,8 @@ async function getPostedEntryIds(
     .eq('status', 'POSTED')
 
   if (branchId) {
-    query = query.eq('branch_id', branchId)
+    // Include legacy rows with NULL branch_id so historical data is still visible after branch rollout.
+    query = query.or(`branch_id.eq.${branchId},branch_id.is.null`)
   }
 
   const { data, error } = await query
@@ -96,7 +101,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
   const supabase = await createClient()
   const db = supabase as any
   const today = getBusinessToday()
-  const settlementAccounts = await getSettlementAccounts(db, orgId, ['1201', '2101', '2201'])
+  const settlementAccounts = await getSettlementAccounts(db, orgId, ['1201', '1404', '2101', '2201', '2301', '2401', '2602'])
 
   let results: any[] = []
 
@@ -104,13 +109,13 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     // 1. Trade AR from Sales Module
     let salesQuery = db
       .from('sales')
-      .select('id, sale_number, sale_date, due_date, grand_total, customer_id, contacts!customer_id(name)')
+      .select('id, sale_number, sale_date, due_date, grand_total, shariah_mode, customer_id, contacts!customer_id(name)')
       .eq('org_id', orgId)
       .not('status', 'in', '("DRAFT","VOIDED")')
       .neq('payment_status', 'PAID')
 
     if (branchId) {
-      salesQuery = salesQuery.eq('branch_id', branchId)
+      salesQuery = salesQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
     }
 
     const { data: sales } = await salesQuery
@@ -122,7 +127,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
         .select('sale_id, amount, discount_amount')
         .in('sale_id', saleIds)
       if (branchId) {
-        paymentsQuery = paymentsQuery.eq('branch_id', branchId)
+        paymentsQuery = paymentsQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
       }
       const { data: payments } = await paymentsQuery
       const paidBySale: Record<string, number> = {}
@@ -135,7 +140,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
         .in('sale_id', saleIds)
         .neq('status', 'VOIDED')
       if (branchId) {
-        returnsQuery = returnsQuery.eq('branch_id', branchId)
+        returnsQuery = returnsQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
       }
       const { data: returns } = await returnsQuery
       const returnedBySale: Record<string, number> = {}
@@ -147,10 +152,12 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
         .map((s: any) => {
           const outstanding = Number(s.grand_total) - (paidBySale[s.id] || 0) - (returnedBySale[s.id] || 0)
           const finalDueDate = s.due_date || s.sale_date
+          const isSalamSale = isSalamMode(s.shariah_mode)
           return {
             id: s.id,
             contact_name: s.contacts?.name || 'Unknown',
             doc_number: s.sale_number,
+            doc_href: `/sales?pay=${s.id}`,
             due_date: finalDueDate,
             grand_total: Number(s.grand_total),
             paid_amount: paidBySale[s.id] || 0,
@@ -158,33 +165,131 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             outstanding,
             days_overdue: Math.max(0, diffDateOnlyStrings(today, finalDueDate)),
             aging_bucket: agingBucket(finalDueDate, today),
-            source_type: 'SALES'
+            source_type: 'SALES',
+            source_label: isSalamSale ? 'Tagihan Sales SALAM (SO)' : 'Piutang Usaha (1201)',
+            source_account_code: isSalamSale ? null : '1201',
           }
         })
         .filter((r: any) => r.outstanding > 0.01)
     }
 
-    // 2. Reconciliation with GL (1201)
-    const balances = await getAccountCodeBalances(db, orgId, ['1201'], branchId)
-    const glBalance = Number(balances['1201'] || 0);
-    const moduleTotal = results.reduce((s: any, r: any) => s + r.outstanding, 0);
-    const diff = glBalance - moduleTotal;
+    // 2. SALAM vendor receivable from Purchase module (1404)
+    let salamPurchasesQuery = db
+      .from('purchases')
+      .select('id, purchase_number, purchase_date, due_date, grand_total, status, payment_status, shariah_mode, vendor_id, contacts!vendor_id(name)')
+      .eq('org_id', orgId)
+      .not('status', 'in', '("DRAFT","VOIDED","RECEIVED")')
 
-    if (Math.abs(diff) > 10) {
+    if (branchId) {
+      salamPurchasesQuery = salamPurchasesQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
+    }
+
+    const { data: salamPurchases } = await salamPurchasesQuery
+
+    const salamPurchasesFiltered = (salamPurchases || []).filter((purchase: any) => isSalamMode(purchase.shariah_mode))
+
+    if (salamPurchasesFiltered.length > 0) {
+      const purchaseIds = salamPurchasesFiltered.map((p: any) => p.id)
+
+      let salamPaymentsQuery = db
+        .from('purchase_payments')
+        .select('purchase_id, amount, discount_amount')
+        .in('purchase_id', purchaseIds)
+
+      const { data: salamPayments } = await salamPaymentsQuery
+      const paidByPurchase: Record<string, number> = {}
+      for (const payment of salamPayments || []) {
+        paidByPurchase[payment.purchase_id] = (paidByPurchase[payment.purchase_id] || 0) + Number(payment.amount || 0) + Number(payment.discount_amount || 0)
+      }
+
+      let salamReturnsQuery = db
+        .from('purchase_returns')
+        .select('purchase_id, total_amount, status')
+        .in('purchase_id', purchaseIds)
+
+      const { data: salamReturns } = await salamReturnsQuery
+      const returnedByPurchase: Record<string, number> = {}
+      for (const purchaseReturn of salamReturns || []) {
+        if (purchaseReturn.status === 'VOIDED') continue
+        returnedByPurchase[purchaseReturn.purchase_id] = (returnedByPurchase[purchaseReturn.purchase_id] || 0) + Number(purchaseReturn.total_amount || 0)
+      }
+
+      const salamRows = salamPurchasesFiltered
+        .map((purchase: any) => {
+          const outstanding = (paidByPurchase[purchase.id] || 0) - (returnedByPurchase[purchase.id] || 0)
+          const finalDueDate = purchase.due_date || purchase.purchase_date
+          return {
+            id: purchase.id,
+            contact_name: purchase.contacts?.name || 'Unknown',
+            doc_number: purchase.purchase_number,
+            doc_href: `/purchasing?pay=${purchase.id}`,
+            due_date: finalDueDate,
+            grand_total: Number(purchase.grand_total || 0),
+            paid_amount: paidByPurchase[purchase.id] || 0,
+            returned_amount: returnedByPurchase[purchase.id] || 0,
+            outstanding,
+            days_overdue: Math.max(0, diffDateOnlyStrings(today, finalDueDate)),
+            aging_bucket: agingBucket(finalDueDate, today),
+            source_type: 'SALAM_VENDOR_RECEIVABLE',
+            source_label: 'Piutang Salam Vendor (1404)',
+            source_account_code: '1404',
+          }
+        })
+        .filter((row: any) => row.outstanding > 0.01)
+
+      results.push(...salamRows)
+    }
+
+    // 3. Reconciliation with GL (1201 + 1404)
+    const balances = await getAccountCodeBalances(db, orgId, ['1201', '1404'], branchId)
+    const tradeArGlBalance = Number(balances['1201'] || 0)
+    const tradeArModuleTotal = results
+      .filter((row: any) => row.source_type === 'SALES')
+      .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+    const tradeArDiff = tradeArGlBalance - tradeArModuleTotal
+
+    if (Math.abs(tradeArDiff) > 10) {
       results.push({
         id: 'manual-ar-adj',
         contact_name: 'Unallocated (Buku Besar)',
         doc_number: 'GL-1201-ADJ',
         due_date: today,
-        grand_total: diff,
+        grand_total: tradeArDiff,
         paid_amount: 0,
         returned_amount: 0,
-        outstanding: diff,
+        outstanding: tradeArDiff,
         days_overdue: 0,
         aging_bucket: 'Current',
         source_type: 'JOURNAL',
+        source_label: 'Penyesuaian Piutang Usaha (1201)',
+        source_account_code: '1201',
         settlement_account_id: settlementAccounts['1201'] || null,
       });
+    }
+
+    const salamReceivableGlBalance = Number(balances['1404'] || 0)
+    const salamReceivableModuleTotal = results
+      .filter((row: any) => row.source_type === 'SALAM_VENDOR_RECEIVABLE')
+      .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+    const salamReceivableDiff = salamReceivableGlBalance - salamReceivableModuleTotal
+
+    if (Math.abs(salamReceivableDiff) > 10) {
+      results.push({
+        id: 'manual-salam-ar-adj',
+        contact_name: 'Unallocated (Buku Besar)',
+        doc_number: 'GL-1404-ADJ',
+        due_date: today,
+        grand_total: salamReceivableDiff,
+        paid_amount: 0,
+        returned_amount: 0,
+        outstanding: salamReceivableDiff,
+        days_overdue: 0,
+        aging_bucket: 'Current',
+        source_type: 'JOURNAL',
+        source_label: 'Penyesuaian Piutang Salam Vendor (1404)',
+        source_account_code: '1404',
+        settlement_account_id: settlementAccounts['1404'] || null,
+      })
     }
 
   } else {
@@ -197,7 +302,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       .neq('payment_status', 'PAID')
 
     if (branchId) {
-      purchasesQuery = purchasesQuery.eq('branch_id', branchId)
+      purchasesQuery = purchasesQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
     }
 
     const { data: purchases } = await purchasesQuery
@@ -208,9 +313,6 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
         .from('purchase_payments')
         .select('purchase_id, amount, discount_amount')
         .in('purchase_id', purchaseIds)
-      if (branchId) {
-        paymentsQuery = paymentsQuery.eq('branch_id', branchId)
-      }
       const { data: payments } = await paymentsQuery
       const paidByPurchase: Record<string, number> = {}
       for (const p of payments || []) {
@@ -220,9 +322,6 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
         .from('purchase_returns')
         .select('purchase_id, total_amount, status')
         .in('purchase_id', purchaseIds)
-      if (branchId) {
-        returnsQuery = returnsQuery.eq('branch_id', branchId)
-      }
       const { data: returns } = await returnsQuery
       const returnedByPurchase: Record<string, number> = {}
       for (const r of returns || []) {
@@ -238,6 +337,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             id: p.id,
             contact_name: p.contacts?.name || 'Unknown',
             doc_number: p.purchase_number,
+            doc_href: `/purchasing?pay=${p.id}`,
             due_date: finalDueDate,
             grand_total: Number(p.grand_total),
             paid_amount: paidByPurchase[p.id] || 0,
@@ -245,58 +345,183 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             outstanding,
             days_overdue: Math.max(0, diffDateOnlyStrings(today, finalDueDate)),
             aging_bucket: agingBucket(finalDueDate, today),
-            source_type: 'PURCHASING'
+            source_type: 'PURCHASING',
+            source_label: 'Hutang Usaha (2101)',
+            source_account_code: '2101',
           }
         })
         .filter((r: any) => r.outstanding > 0.01)
     }
 
-    // 2. Direct AP (Non-Trade) & Taxes from GL (2101, 2201, 2301, 2401)
-    // Account 2201: Tax (PPN), 21XX: Other Payables
-    const balances = await getAccountCodeBalances(db, orgId, ['2101', '2201', '2301', '2401'], branchId)
-    const namedBalances = [
-      { code: '2101', balance: balances['2101'] || 0, name: 'Hutang Usaha' },
-      { code: '2201', balance: balances['2201'] || 0, name: 'PPN Keluaran (Pajak Dipungut)' },
-      { code: '2301', balance: balances['2301'] || 0, name: 'Pendapatan Diterima di Muka' },
-      { code: '2401', balance: balances['2401'] || 0, name: 'Hutang Gaji' },
-    ].filter((balance) => Math.abs(balance.balance) > 0.01)
+    // 2. SALAM liability (2602) from undelivered SALAM sales
+    let salamSalesQuery = db
+      .from('sales')
+      .select('id, sale_number, sale_date, due_date, grand_total, shariah_mode, status, customer_id, contacts!customer_id(name)')
+      .eq('org_id', orgId)
+      .not('status', 'in', '("DRAFT","VOIDED","FINISHED")')
 
-    for (const b of namedBalances) {
-      if (b.code === '2101') {
-        const tradeModuleTotal = results.filter((r: any) => r.source_type === 'PURCHASING').reduce((s: any, r: any) => s + r.outstanding, 0);
-        const diff = Number(b.balance) - tradeModuleTotal;
-        if (Math.abs(diff) > 10) {
-          results.push({
-            id: `gl-2101-manual`,
-            contact_name: 'Unallocated (Buku Besar)',
-            doc_number: 'GL-2101-ADJ',
-            due_date: today,
-            grand_total: diff,
-            paid_amount: 0,
-            returned_amount: 0,
-            outstanding: diff,
-            days_overdue: 0,
-            aging_bucket: 'Current',
-            source_type: 'JOURNAL',
-            settlement_account_id: settlementAccounts['2101'] || null,
-          });
-        }
-      } else if (b.code === '2201') {
-        results.push({
-          id: `gl-tax-${b.code}`,
-          contact_name: 'Pajak / Negara (PDI)',
-          doc_number: `PPN-OUTSTANDING`,
-          due_date: today,
-          grand_total: Number(b.balance),
-          paid_amount: 0,
-          returned_amount: 0,
-          outstanding: Number(b.balance),
-          days_overdue: 0,
-          aging_bucket: 'Current',
-          source_type: 'TAX',
-          settlement_account_id: settlementAccounts['2201'] || null,
-        });
+    if (branchId) {
+      salamSalesQuery = salamSalesQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
+    }
+
+    const { data: salamSales } = await salamSalesQuery
+
+    const salamSalesFiltered = (salamSales || []).filter((sale: any) => isSalamMode(sale.shariah_mode))
+
+    if (salamSalesFiltered.length > 0) {
+      const saleIds = salamSalesFiltered.map((sale: any) => sale.id)
+
+      let salamSalesPaymentQuery = db
+        .from('sales_payments')
+        .select('sale_id, amount, discount_amount')
+        .in('sale_id', saleIds)
+      if (branchId) {
+        salamSalesPaymentQuery = salamSalesPaymentQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
       }
+
+      const { data: salamSalesPayments } = await salamSalesPaymentQuery
+      const receivedBySale: Record<string, number> = {}
+      for (const payment of salamSalesPayments || []) {
+        receivedBySale[payment.sale_id] = (receivedBySale[payment.sale_id] || 0) + Number(payment.amount || 0) + Number(payment.discount_amount || 0)
+      }
+
+      let salamSalesReturnQuery = db
+        .from('sales_returns')
+        .select('sale_id, grand_total, status')
+        .in('sale_id', saleIds)
+        .neq('status', 'VOIDED')
+      if (branchId) {
+        salamSalesReturnQuery = salamSalesReturnQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
+      }
+
+      const { data: salamSalesReturns } = await salamSalesReturnQuery
+      const returnedBySale: Record<string, number> = {}
+      for (const saleReturn of salamSalesReturns || []) {
+        returnedBySale[saleReturn.sale_id] = (returnedBySale[saleReturn.sale_id] || 0) + Number(saleReturn.grand_total || 0)
+      }
+
+      const salamLiabilityRows = salamSalesFiltered
+        .map((sale: any) => {
+          const outstanding = (receivedBySale[sale.id] || 0) - (returnedBySale[sale.id] || 0)
+          const finalDueDate = sale.due_date || sale.sale_date
+          return {
+            id: sale.id,
+            contact_name: sale.contacts?.name || 'Unknown',
+            doc_number: sale.sale_number,
+            doc_href: `/sales?pay=${sale.id}`,
+            due_date: finalDueDate,
+            grand_total: Number(sale.grand_total || 0),
+            paid_amount: receivedBySale[sale.id] || 0,
+            returned_amount: returnedBySale[sale.id] || 0,
+            outstanding,
+            days_overdue: Math.max(0, diffDateOnlyStrings(today, finalDueDate)),
+            aging_bucket: agingBucket(finalDueDate, today),
+            source_type: 'SALAM_SALES_LIABILITY',
+            source_label: 'Hutang Salam (2602)',
+            source_account_code: '2602',
+          }
+        })
+        .filter((row: any) => row.outstanding > 0.01)
+
+      results.push(...salamLiabilityRows)
+    }
+
+    // 3. Direct AP (Non-Trade) & Taxes from GL (2101, 2201, 2301, 2401, 2602)
+    const balances = await getAccountCodeBalances(db, orgId, ['2101', '2201', '2301', '2401', '2602'], branchId)
+
+    const tradeApModuleTotal = results
+      .filter((row: any) => row.source_type === 'PURCHASING')
+      .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+    const tradeApDiff = Number(balances['2101'] || 0) - tradeApModuleTotal
+
+    if (Math.abs(tradeApDiff) > 10) {
+      results.push({
+        id: `gl-2101-manual`,
+        contact_name: 'Unallocated (Buku Besar)',
+        doc_number: 'GL-2101-ADJ',
+        due_date: today,
+        grand_total: tradeApDiff,
+        paid_amount: 0,
+        returned_amount: 0,
+        outstanding: tradeApDiff,
+        days_overdue: 0,
+        aging_bucket: 'Current',
+        source_type: 'JOURNAL',
+        source_label: 'Penyesuaian Hutang Usaha (2101)',
+        source_account_code: '2101',
+        settlement_account_id: settlementAccounts['2101'] || null,
+      })
+    }
+
+    const salamLiabilityModuleTotal = results
+      .filter((row: any) => row.source_type === 'SALAM_SALES_LIABILITY')
+      .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+    const salamLiabilityDiff = Number(balances['2602'] || 0) - salamLiabilityModuleTotal
+
+    if (Math.abs(salamLiabilityDiff) > 10) {
+      results.push({
+        id: 'gl-2602-adj',
+        contact_name: 'Unallocated (Buku Besar)',
+        doc_number: 'GL-2602-ADJ',
+        due_date: today,
+        grand_total: salamLiabilityDiff,
+        paid_amount: 0,
+        returned_amount: 0,
+        outstanding: salamLiabilityDiff,
+        days_overdue: 0,
+        aging_bucket: 'Current',
+        source_type: 'JOURNAL',
+        source_label: 'Penyesuaian Hutang Salam (2602)',
+        source_account_code: '2602',
+        settlement_account_id: settlementAccounts['2602'] || null,
+      })
+    }
+
+    const taxOutstanding = Number(balances['2201'] || 0)
+    if (Math.abs(taxOutstanding) > 0.01) {
+      results.push({
+        id: `gl-tax-2201`,
+        contact_name: 'Pajak / Negara (PDI)',
+        doc_number: `PPN-OUTSTANDING`,
+        due_date: today,
+        grand_total: taxOutstanding,
+        paid_amount: 0,
+        returned_amount: 0,
+        outstanding: taxOutstanding,
+        days_overdue: 0,
+        aging_bucket: 'Current',
+        source_type: 'TAX',
+        source_label: 'PPN Keluaran (2201)',
+        source_account_code: '2201',
+        settlement_account_id: settlementAccounts['2201'] || null,
+      })
+    }
+
+    const otherLiabilityRows = [
+      { code: '2301', label: 'Pendapatan Diterima di Muka (2301)' },
+      { code: '2401', label: 'Hutang Gaji (2401)' },
+    ]
+
+    for (const liability of otherLiabilityRows) {
+      const balance = Number((balances as any)[liability.code] || 0)
+      if (Math.abs(balance) <= 0.01) continue
+
+      results.push({
+        id: `gl-${liability.code}-out`,
+        contact_name: 'Unallocated (Buku Besar)',
+        doc_number: `GL-${liability.code}-OUT`,
+        due_date: today,
+        grand_total: balance,
+        paid_amount: 0,
+        returned_amount: 0,
+        outstanding: balance,
+        days_overdue: 0,
+        aging_bucket: 'Current',
+        source_type: 'JOURNAL',
+        source_label: liability.label,
+        source_account_code: liability.code,
+        settlement_account_id: settlementAccounts[liability.code] || null,
+      })
     }
   }
 

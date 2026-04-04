@@ -164,6 +164,15 @@ export function WarehouseClient({
       })
     }
 
+    if (!editingWarehouse && response?.data?.id) {
+      closeModal()
+      setSubmitting(false)
+      startTransition(() => {
+        router.push(`/inventory/warehouses/${response.data.id}?createBin=1`)
+      })
+      return
+    }
+
     setSuccess(editingWarehouse ? 'Gudang berhasil diperbarui.' : 'Gudang baru berhasil ditambahkan.')
     closeModal()
     startTransition(() => router.refresh())

@@ -37,7 +37,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
-import { createEmployee, updateEmployee } from '@/modules/hris/actions/employee.actions'
+import { createEmployee, deleteEmployee, updateEmployee } from '@/modules/hris/actions/employee.actions'
 import { createPayrollComponent, deletePayrollComponent, generatePayrollRun, payPayrollRun, fixEmptyPayrollJournals, getPayrollRunDetails, deletePayrollRun, voidPayrollRun } from '@/modules/hris/actions/payroll.actions'
 import { upsertAttendanceRecord } from '@/modules/hris/actions/attendance.actions'
 import { approveLeaveRequest, createLeaveRequest, rejectLeaveRequest } from '@/modules/hris/actions/leave.actions'
@@ -368,6 +368,20 @@ export default function HrisClient({
     const res = await deletePayrollComponent(id)
     if (res.error) showToast(res.error, 'error')
     else setPayrollComponents(payrollComponents.filter((p: any) => p.id !== id))
+    setLoading(false)
+  }
+
+  const handleDeleteEmployee = async (emp: any) => {
+    if (!confirm(`Yakin ingin menghapus karyawan ${emp.first_name} ${emp.last_name || ''}?`)) return
+    setLoading(true)
+    const res = await deleteEmployee(emp.id, orgId)
+    if (res.error) {
+      showToast(res.error, 'error')
+    } else {
+      setEmployees((current) => current.filter((row: any) => row.id !== emp.id))
+      showToast('Karyawan berhasil dihapus.', 'success')
+      refreshHrisPage()
+    }
     setLoading(false)
   }
 
@@ -707,6 +721,13 @@ export default function HrisClient({
                             className="p-3 bg-white text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition shadow-sm border border-slate-100"
                           >
                             <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={(e: any) => { e.stopPropagation(); handleDeleteEmployee(emp); }}
+                            className="p-3 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition shadow-sm border border-slate-100"
+                            title="Hapus karyawan"
+                          >
+                            <Trash2 size={16} />
                           </button>
                           
                           {emp.reset_requested && (

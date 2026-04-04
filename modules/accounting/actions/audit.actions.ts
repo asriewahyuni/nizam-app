@@ -72,7 +72,7 @@ export async function getAuditOverview(orgId: string) {
   }))
 
   // ======================================================
-  // 3. Inventory Sub-Ledger (Movements) vs General Ledger (1301)
+  // 3. Inventory Sub-Ledger (Movements) vs General Ledger (1301-1399)
   // ======================================================
   const { data: products } = await db
     .from('products')
@@ -92,20 +92,21 @@ export async function getAuditOverview(orgId: string) {
     stockByProduct[m.product_id] = (stockByProduct[m.product_id] || 0) + Number(m.quantity)
   }
 
-  // GL Inventory balance (account 1301)
-  const { data: invAcc } = await db
+  // GL Inventory balance (inventory asset block 1301-1399)
+  const { data: inventoryAccounts } = await db
     .from('accounts')
-    .select('id')
+    .select('id, code')
     .eq('org_id', orgId)
-    .eq('code', '1301')
-    .maybeSingle()
+    .gte('code', '1301')
+    .lte('code', '1399')
 
   let glInventoryBalance = 0
-  if (invAcc && entryIds.length > 0) {
+  const inventoryAccountIds = (inventoryAccounts || []).map((acc: any) => acc.id)
+  if (inventoryAccountIds.length > 0 && entryIds.length > 0) {
     const { data: invLines } = await db
       .from('journal_lines')
       .select('debit, credit')
-      .eq('account_id', invAcc.id)
+      .in('account_id', inventoryAccountIds)
       .in('entry_id', entryIds)
 
     for (const l of invLines || []) {

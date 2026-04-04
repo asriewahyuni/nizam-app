@@ -49,11 +49,96 @@ type InventorySyncParams = {
   diff: number
 }
 
-function isAdjustInventoryStockSchemaCacheMiss(error: { code?: string | null; message?: string | null } | null | undefined) {
+function normalizePurchaseShariahMode(value?: string | null): 'CASH' | 'SALAM' | 'ISTISHNA' {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase()
+
+  if (normalized === 'SALAM' || normalized === 'ISTISHNA') {
+    return normalized
+  }
+
+  return 'CASH'
+}
+
+function isAdjustInventoryStockUnavailable(error: { code?: string | null; message?: string | null } | null | undefined) {
   if (!error) return false
 
+  const message = String(error.message || '').toLowerCase()
+
+  if (error.code === 'PGRST202' || error.code === '42883' || error.code === '42P10') {
+    return true
+  }
+
+  if (!message.includes('adjust_inventory_stock')) {
+    return false
+  }
+
+  return (
+    message.includes('schema cache')
+    || message.includes('does not exist')
+    || message.includes('undefined function')
+    || message.includes('no unique or exclusion constraint matching the on conflict specification')
+  )
+}
+
+function isPurchaseWarehouseColumnSchemaCacheMiss(
+  error: { code?: string | null; message?: string | null } | null | undefined
+) {
+  if (!error) return false
   const message = String(error.message || '')
-  return error.code === 'PGRST202' || (message.includes('adjust_inventory_stock') && message.includes('schema cache'))
+  return (
+    error.code === 'PGRST204' ||
+    (message.includes("Could not find the 'warehouse_id' column of 'purchases'") &&
+      message.includes('schema cache'))
+  )
+}
+
+async function markPurchaseAsReceived(
+  supabase: any,
+  {
+    orgId,
+    purchaseId,
+    warehouseId,
+  }: {
+    orgId: string
+    purchaseId: string
+    warehouseId: string
+  }
+) {
+  const basePayload = {
+    status: 'RECEIVED',
+    updated_at: new Date().toISOString(),
+  }
+
+  const { error: updateError } = await (supabase as any)
+    .from('purchases')
+    .update({
+      ...basePayload,
+      warehouse_id: warehouseId,
+    })
+    .eq('id', purchaseId)
+    .eq('org_id', orgId)
+
+  if (!updateError) {
+    return { success: true as const }
+  }
+
+  if (!isPurchaseWarehouseColumnSchemaCacheMiss(updateError)) {
+    return { error: updateError.message }
+  }
+
+  const { error: fallbackError } = await (supabase as any)
+    .from('purchases')
+    .update(basePayload)
+    .eq('id', purchaseId)
+    .eq('org_id', orgId)
+
+  if (fallbackError) {
+    return { error: fallbackError.message }
+  }
+
+  return { success: true as const }
 }
 
 async function fallbackInventoryStockSync({ orgId, productId, warehouseId, diff }: InventorySyncParams) {
@@ -117,7 +202,7 @@ async function syncInventoryStock(supabase: any, params: InventorySyncParams) {
     return { success: true as const }
   }
 
-  if (!isAdjustInventoryStockSchemaCacheMiss(inventorySyncError)) {
+  if (!isAdjustInventoryStockUnavailable(inventorySyncError)) {
     return { error: 'Gagal sinkron stok fisik gudang: ' + inventorySyncError.message }
   }
 
@@ -257,6 +342,17 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
     return { error: 'Pilih unit aktif terlebih dahulu untuk membuat purchase order.' }
   }
   const purchaseBranchId = branchSelection.branchId
+  const shariahMode = normalizePurchaseShariahMode(payload.shariah_mode)
+  const isSalamPurchase = shariahMode === 'SALAM'
+
+  if (isSalamPurchase && !payload.due_date) {
+    return { error: 'Akad SALAM pembelian wajib menetapkan tanggal barang disediakan.' }
+  }
+
+  const resolvedPaymentTerm: 'LUNAS' | 'TEMPO' = isSalamPurchase ? 'LUNAS' : payload.payment_term
+  const resolvedDueDate = resolvedPaymentTerm === 'TEMPO' || isSalamPurchase
+    ? (payload.due_date || null)
+    : null
 
   // 1. Calculate Subtotals to perform Value-Based Allocation for Landed Costs
   const totalOverhead = (payload.shipping_amount || 0) + (payload.insurance_amount || 0)
@@ -319,19 +415,19 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
   const headerGrand = headerSubtotal - headerDiscount + headerTax + headerShipping
 
   // Simpan info termin di metadata/notes sementara atau via RPC (Saya asumsikan RPC sudah diupdate atau kita pakai p_notes)
-  const notesWithTerm = `[TERMIN: ${payload.payment_term}] ${payload.payment_account_id ? `[ACC: ${payload.payment_account_id}] ` : ''}${payload.notes || ''}`
+  const notesWithTerm = `[TERMIN: ${resolvedPaymentTerm}] ${payload.payment_account_id ? `[ACC: ${payload.payment_account_id}] ` : ''}${payload.notes || ''}`
 
   const { data: rpcRes, error: rpcError } = await (supabase as any).rpc('process_purchase_atomic', {
       p_org_id: orgId,
       p_vendor_id: payload.vendor_id,
       p_date: payload.purchase_date || new Date().toISOString(),
-      p_due_date: payload.due_date || null, // Added due_date here
+      p_due_date: resolvedDueDate,
       p_total: headerSubtotal,
       p_tax: headerTax,
       p_shipping: headerShipping,
       p_grand_total: headerGrand,
       p_notes: notesWithTerm,
-      p_shariah_mode: payload.shariah_mode || 'CASH',
+      p_shariah_mode: shariahMode,
       p_lines: processedLines,
       p_user_id: user.id,
       p_branch_id: purchaseBranchId,
@@ -351,7 +447,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
   // 1. Fetch info
   const { data: purchase } = await (supabase as any)
     .from('purchases' as any)
-    .select('*, purchase_items(*)')
+    .select('*, purchase_items(*, products(asset_account_id))')
     .eq('id', purchaseId)
     .eq('org_id', orgId)
     .single()
@@ -360,6 +456,9 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
   const purchaseAccess = await ensurePurchaseDocumentAccess(orgId, purchase.branch_id)
   if ('error' in purchaseAccess) return { error: purchaseAccess.error }
   if (purchase.status === 'RECEIVED') return { success: true }
+  if (String(purchase.shariah_mode || '').toUpperCase() === 'SALAM' && purchase.payment_status !== 'PAID') {
+    return { error: 'Akad SALAM pembelian wajib lunas terlebih dahulu sebelum penerimaan barang.' }
+  }
 
   const shipping = purchase.shipping_amount || 0
   const insurance = purchase.insurance_amount || 0
@@ -414,7 +513,36 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 
   const movementBranchId = purchase.branch_id || receiptWarehouse.branch_id || null
 
+  // Idempotency guard:
+  // If stock movement already exists for this PO but status is not yet RECEIVED
+  // (e.g. previous run failed after stock posting), avoid double-posting.
+  const stockMovementTable = (supabase as any).from('stock_movements')
+  if (typeof stockMovementTable?.select === 'function') {
+    const { count: existingMovementCount } = await stockMovementTable
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .eq('reference_type', 'PURCHASE')
+      .eq('reference_id', purchase.id)
+
+    if ((existingMovementCount || 0) > 0) {
+      const statusSyncResult = await markPurchaseAsReceived(supabase as any, {
+        orgId,
+        purchaseId,
+        warehouseId: purchase.warehouse_id || receiptWarehouse.id,
+      })
+
+      if ('error' in statusSyncResult) {
+        return { error: 'Gagal menyinkronkan status PO existing: ' + statusSyncResult.error }
+      }
+
+      revalidatePath('/purchasing')
+      revalidatePath('/inventory')
+      return { success: true }
+    }
+  }
+
   const stockMovements: any[] = []
+  const inventoryDebitAllocations: Array<{ assetAccountId: string | null; amount: number }> = []
 
   // 3. Process Items for WAC & Stock Card
   for (const item of purchase.purchase_items) {
@@ -423,7 +551,8 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     // Landed Cost Calculation (Allocated based on Value)
     const itemSubtotal = (item.quantity * item.unit_price) - (item.discount_amount || 0)
     const allocatedOverhead = (itemSubtotal / totalItemsValue) * totalLandedOverhead
-    const landedUnitPrice = (itemSubtotal + allocatedOverhead) / item.quantity
+    const landedTotal = itemSubtotal + allocatedOverhead
+    const landedUnitPrice = landedTotal / item.quantity
 
     // A. Update Average Cost (HPP) in Master Data
     await (supabase as any).rpc('update_product_average_cost', {
@@ -443,6 +572,13 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
       reference_type: 'PURCHASE',
       reference_id: purchase.id,
       notes: 'Penerimaan PO ' + (purchase.purchase_number || '')
+    })
+
+    const productRel = Array.isArray((item as any).products) ? (item as any).products[0] : (item as any).products
+    const rawAssetAccountId = productRel?.asset_account_id
+    inventoryDebitAllocations.push({
+      assetAccountId: typeof rawAssetAccountId === 'string' ? rawAssetAccountId : null,
+      amount: landedTotal,
     })
   }
 
@@ -475,11 +611,12 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     .from('accounts' as any)
     .select('id, code')
     .eq('org_id', orgId)
-    .in('code', ['1301', '1401', '2101', '1403'])
+    .in('code', ['1301', '1401', '1403', '1404', '2101'])
 
   const accPersediaan = accounts?.find((a:any) => a.code === '1301')?.id
   const accPpnMasukan = accounts?.find((a:any) => a.code === '1401')?.id
   const accUangMuka = accounts?.find((a:any) => a.code === '1403')?.id
+  const accPiutangSalamVendor = accounts?.find((a:any) => a.code === '1404')?.id
   const defaultAccHutang = accounts?.find((a:any) => a.code === '2101')?.id
  
   let finalAccCredit = defaultAccHutang
@@ -490,13 +627,19 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
      if (match && match[1]) LunasAccountId = match[1]
   }
 
-  // Syariah Mod: For SALAM/ISTISHNA, credit should clear Uang Muka (Advances)
-  if ((purchase.shariah_mode === 'SALAM' || purchase.shariah_mode === 'ISTISHNA') && accUangMuka) {
+  // Syariah Mod:
+  // - SALAM: clear Piutang Salam Vendor (1404) on goods receipt
+  // - ISTISHNA: clear Uang Muka Pembelian (1403)
+  if (String(purchase.shariah_mode || '').toUpperCase() === 'SALAM') {
+     if (!accPiutangSalamVendor) {
+       return { error: 'Akun Piutang Salam Vendor (1404) belum tersedia di CoA. Jalankan migrasi terbaru / aktifkan akun syariah.' }
+     }
+     finalAccCredit = accPiutangSalamVendor
+  } else if (String(purchase.shariah_mode || '').toUpperCase() === 'ISTISHNA' && accUangMuka) {
      finalAccCredit = accUangMuka
   }
 
-  if (accPersediaan && finalAccCredit) {
-    const persediaanVal = (purchase.total_amount - (purchase.discount_amount || 0)) + shipping + insurance
+  if (finalAccCredit) {
     const pajakVal = purchase.tax_amount || 0
     const grandVal = purchase.grand_total
 
@@ -512,9 +655,23 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
        overheadAccId = overheadMatch[1]
     }
 
-    const journalLines: any[] = [
-      { account_id: accPersediaan, debit: persediaanVal, credit: 0, memo: 'Persediaan (Landed) ' + (purchase.purchase_number || '') }
-    ]
+    const inventoryDebitByAccount: Record<string, number> = {}
+    for (const allocation of inventoryDebitAllocations) {
+      const accountId = allocation.assetAccountId || accPersediaan || null
+      if (!accountId) continue
+      inventoryDebitByAccount[accountId] = (inventoryDebitByAccount[accountId] || 0) + Number(allocation.amount || 0)
+    }
+
+    if (Object.keys(inventoryDebitByAccount).length === 0 && inventoryDebitAllocations.length > 0) {
+      return { error: 'Akun persediaan produk belum lengkap. Set asset account produk atau siapkan akun 1301.' }
+    }
+
+    const journalLines: any[] = Object.entries(inventoryDebitByAccount).map(([accountId, amount]) => ({
+      account_id: accountId,
+      debit: amount,
+      credit: 0,
+      memo: 'Persediaan (Landed) ' + (purchase.purchase_number || '')
+    }))
 
     // PPN
     if (pajakVal > 0 && accPpnMasukan) {
@@ -553,7 +710,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     if (jErr) (console as any).error("Journal creation failed:", jErr)
     
     // Auto-Lunas Payment trigger for Bank history & AP clearing
-    if (LunasAccountId && vendorApAmount > 0) {
+    if (LunasAccountId && vendorApAmount > 0 && String(purchase.shariah_mode || '').toUpperCase() !== 'SALAM') {
        await createPurchasePayment(orgId, {
           purchase_id: purchase.id,
           account_id: LunasAccountId,
@@ -565,12 +722,13 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     }
   }
 
-  const { error: statusErr } = await (supabase as any)
-    .from('purchases' as any)
-    .update({ status: 'RECEIVED' })
-    .eq('id', purchaseId)
+  const statusResult = await markPurchaseAsReceived(supabase as any, {
+    orgId,
+    purchaseId,
+    warehouseId: purchase.warehouse_id || receiptWarehouse.id,
+  })
 
-  if (statusErr) return { error: 'Gagal memperbarui status PO: ' + statusErr.message }
+  if ('error' in statusResult) return { error: 'Gagal memperbarui status PO: ' + statusResult.error }
 
   revalidatePath('/purchasing')
   revalidatePath('/inventory')

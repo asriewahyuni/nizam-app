@@ -9,6 +9,11 @@ type BranchSelectionResult =
   | { branchId: string | null }
   | { error: string }
 
+function isMissingDepartmentIdColumnError(error: any) {
+  const msg = String(error?.message || '').toLowerCase()
+  return msg.includes('department_id') && (msg.includes('schema cache') || msg.includes('column'))
+}
+
 async function resolveEmployeeBranchSelection(orgId: string, branchId?: string | null): Promise<BranchSelectionResult> {
   const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
   if ('error' in branchSelection) {
@@ -78,7 +83,7 @@ export async function createEmployee(orgId: string, formData: FormData) {
   const basicSalary = Number(formData.get('basic_salary') || 0)
   const joinDate = formData.get('join_date') as string || new Date().toISOString().split('T')[0]
 
-  const { error } = await db.from('employees').insert({
+  const payload = {
     org_id: orgId,
     branch_id: activeBranch.branchId,
     nik,
@@ -97,7 +102,14 @@ export async function createEmployee(orgId: string, formData: FormData) {
     bank_name: formData.get('bank_name') || null,
     bank_account_number: formData.get('bank_account_number') || null,
     tax_status: formData.get('tax_status') || null
-  })
+  }
+
+  let { error } = await db.from('employees').insert(payload)
+  if (error && isMissingDepartmentIdColumnError(error)) {
+    const { department_id: _ignoredDepartmentId, ...legacyPayload } = payload
+    const retry = await db.from('employees').insert(legacyPayload)
+    error = retry.error
+  }
 
   if (error) return { error: error.message }
   revalidatePath('/hris')
@@ -132,32 +144,83 @@ export async function updateEmployee(id: string, orgId: string, formData: FormDa
   const basicSalary = Number(formData.get('basic_salary') || 0)
   const joinDate = formData.get('join_date') as string
 
-  const { error } = await db
+  const updatePayload = {
+    nik,
+    first_name: firstName,
+    last_name: lastName,
+    job_title: jobTitle,
+    employment_status: status,
+    basic_salary: basicSalary,
+    join_date: joinDate,
+    department: formData.get('department') || null,
+    department_id: formData.get('department_id') || null,
+    email: formData.get('email') || null,
+    gender: formData.get('gender') || null,
+    whatsapp: formData.get('whatsapp') || null,
+    avatar_url: formData.get('avatar_url') || null,
+    bank_name: formData.get('bank_name') || null,
+    bank_account_number: formData.get('bank_account_number') || null,
+    tax_status: formData.get('tax_status') || null,
+    updated_at: new Date().toISOString()
+  }
+
+  let { error } = await db
     .from('employees')
-    .update({
-      nik,
-      first_name: firstName,
-      last_name: lastName,
-      job_title: jobTitle,
-      employment_status: status,
-      basic_salary: basicSalary,
-      join_date: joinDate,
-      department: formData.get('department') || null,
-      department_id: formData.get('department_id') || null,
-      email: formData.get('email') || null,
-      gender: formData.get('gender') || null,
-      whatsapp: formData.get('whatsapp') || null,
-      avatar_url: formData.get('avatar_url') || null,
-      bank_name: formData.get('bank_name') || null,
-      bank_account_number: formData.get('bank_account_number') || null,
-      tax_status: formData.get('tax_status') || null,
-      updated_at: new Date().toISOString()
-    })
+    .update(updatePayload)
     .eq('id', id)
     .eq('org_id', orgId)
     .eq('branch_id', accessibleEmployee.branchId)
 
+  if (error && isMissingDepartmentIdColumnError(error)) {
+    const { department_id: _ignoredDepartmentId, ...legacyPayload } = updatePayload
+    const retry = await db
+      .from('employees')
+      .update(legacyPayload)
+      .eq('id', id)
+      .eq('org_id', orgId)
+      .eq('branch_id', accessibleEmployee.branchId)
+    error = retry.error
+  }
+
   if (error) return { error: error.message }
+  revalidatePath('/hris')
+  return { success: true }
+}
+
+export async function deleteEmployee(id: string, orgId: string) {
+  const supabase = await createClient()
+  const db = supabase as any
+
+  const { data: existingEmployee, error: existingEmployeeError } = await db
+    .from('employees')
+    .select('id, branch_id')
+    .eq('id', id)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (existingEmployeeError) return { error: existingEmployeeError.message }
+
+  const accessibleEmployee = await ensureEmployeeBranchAccess(
+    orgId,
+    existingEmployee?.branch_id ?? null,
+    'Data karyawan tidak ditemukan.'
+  )
+  if ('error' in accessibleEmployee) return { error: accessibleEmployee.error }
+
+  const { error } = await db
+    .from('employees')
+    .delete()
+    .eq('id', id)
+    .eq('org_id', orgId)
+    .eq('branch_id', accessibleEmployee.branchId)
+
+  if (error) {
+    if (error.code === '23503') {
+      return { error: 'Karyawan tidak bisa dihapus karena masih dipakai di data transaksi (absensi/payroll/cuti/dokumen terkait).' }
+    }
+    return { error: error.message }
+  }
+
   revalidatePath('/hris')
   return { success: true }
 }

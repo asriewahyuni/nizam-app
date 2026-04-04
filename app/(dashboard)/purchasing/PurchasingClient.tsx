@@ -94,6 +94,16 @@ export default function PurchasingClient({
   const [payOverheadNow, setPayOverheadNow] = useState(false)
   const [overheadAccountId, setOverheadAccountId] = useState('')
   const [shariahMode, setShariahMode] = useState<'CASH' | 'SALAM' | 'ISTISHNA'>('CASH')
+
+  useEffect(() => {
+    if (shariahMode !== 'SALAM') return
+    if (paymentTerm !== 'LUNAS') {
+      setPaymentTerm('LUNAS')
+    }
+    if (payOverheadNow) {
+      setPayOverheadNow(false)
+    }
+  }, [paymentTerm, payOverheadNow, shariahMode])
   
   // Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -208,9 +218,11 @@ export default function PurchasingClient({
 
   const handleCreatePurchase = async (e: React.FormEvent) => {
     e.preventDefault()
+    const resolvedPaymentTerm: 'TEMPO' | 'LUNAS' = shariahMode === 'SALAM' ? 'LUNAS' : paymentTerm
     if (!vendorId) return setError('Vendor harus dipilih!')
-    if (paymentTerm === 'LUNAS' && !paymentAccountId) return setError('Pilih akun pembayaran untuk transaksi Lunas!')
-    if (paymentTerm === 'TEMPO' && payOverheadNow && !overheadAccountId) return setError('Silakan pilih rekening Kas/Bank untuk membayar Ongkir/Asuransi yang dibayar terpisah secara tunai.')
+    if (resolvedPaymentTerm === 'LUNAS' && !paymentAccountId) return setError('Pilih akun pembayaran untuk transaksi Lunas!')
+    if (shariahMode === 'SALAM' && !dueDate) return setError('Akad SALAM wajib mengisi tanggal barang disediakan.')
+    if (resolvedPaymentTerm === 'TEMPO' && payOverheadNow && !overheadAccountId) return setError('Silakan pilih rekening Kas/Bank untuk membayar Ongkir/Asuransi yang dibayar terpisah secara tunai.')
     
     if (lines.some(l => !l.product_name || l.quantity <= 0 || l.unit_price < 0)) {
       return setError('Lengkapi detail barang, kuantitas, dan HPP untuk setiap baris.')
@@ -219,7 +231,7 @@ export default function PurchasingClient({
     setLoading(true)
     
     // Inject overhead account into notes if separated
-    const finalNotes = (paymentTerm === 'TEMPO' && payOverheadNow && overheadAccountId) 
+    const finalNotes = (resolvedPaymentTerm === 'TEMPO' && payOverheadNow && overheadAccountId) 
       ? (notes ? notes + '\n' : '') + `[OVERHEAD_ACC: ${overheadAccountId}]` 
       : notes
 
@@ -227,9 +239,9 @@ export default function PurchasingClient({
       vendor_id: vendorId,
       branch_id: activeBranchId || undefined,
       purchase_date: purchaseDate,
-      due_date: paymentTerm === 'TEMPO' ? dueDate : undefined,
+      due_date: (resolvedPaymentTerm === 'TEMPO' || shariahMode === 'SALAM') && dueDate ? dueDate : undefined,
       notes: finalNotes,
-      payment_term: paymentTerm,
+      payment_term: resolvedPaymentTerm,
       payment_account_id: paymentAccountId,
       discount_amount: appliedDiscount,
       tax_amount: calculatedTax,
@@ -286,6 +298,14 @@ export default function PurchasingClient({
     setLoading(false)
   }
 
+  const isPurchaseSalam = (purchase: any) => String(purchase?.shariah_mode || '').trim().toUpperCase() === 'SALAM'
+
+  const getOutstandingAmount = (purchase: any) => {
+    const paid = (purchase?.purchase_payments || []).reduce((sum: number, pay: any) => sum + (Number(pay.amount) + Number(pay.discount_amount)), 0)
+    const returned = (purchase?.purchase_returns || []).reduce((sum: number, ret: any) => sum + Number(ret.total_amount), 0)
+    return Math.max(0, Number(purchase?.grand_total || 0) - paid - returned)
+  }
+
   const handleCreateVendor = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
@@ -326,9 +346,7 @@ export default function PurchasingClient({
   }
 
   const handleOpenPayment = (p: any) => {
-    const paid = (p.purchase_payments || []).reduce((sum: number, pay: any) => sum + (Number(pay.amount) + Number(pay.discount_amount)), 0)
-    const returned = (p.purchase_returns || []).reduce((sum: number, ret: any) => sum + Number(ret.total_amount), 0)
-    const remaining = p.grand_total - paid - returned
+    const remaining = getOutstandingAmount(p)
     
     setSelectedPurchase(p)
     setDebtAmount(remaining)
@@ -341,6 +359,13 @@ export default function PurchasingClient({
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!payAccountId) return setError('Pilih akun pengeluaran!')
+    const salamPurchase = isPurchaseSalam(selectedPurchase)
+    if (salamPurchase) {
+      if (paymentDiscount > 0) return setError('Akad SALAM pembelian tidak mendukung potongan/cashback saat pelunasan.')
+      if (Math.abs((paymentAmount + paymentDiscount) - debtAmount) > 0.01) {
+        return setError(`Akad SALAM pembelian wajib lunas penuh. Nominal pembayaran: ${formatCurrency(debtAmount)}.`)
+      }
+    }
     setLoading(true)
     const res = await createPurchasePayment(orgId, {
       purchase_id: selectedPurchase.id,
@@ -608,7 +633,7 @@ export default function PurchasingClient({
                            </button>
                          )}
 
-                         {p.status === 'RECEIVED' && p.payment_status !== 'PAID' && (
+                         {(p.status === 'RECEIVED' || (isPurchaseSalam(p) && p.status === 'ORDERED')) && p.payment_status !== 'PAID' && (
                            <button onClick={() => handleOpenPayment(p)} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
                              <CreditCard size={14}/> Bayar
                            </button>
@@ -759,8 +784,12 @@ export default function PurchasingClient({
                        <div className="flex p-1 bg-white border border-slate-200 rounded-2xl h-[52px]">
                           <button 
                              type="button" 
-                             onClick={() => setPaymentTerm('TEMPO')}
-                             className={`flex-1 rounded-xl text-[10px] font-black transition-all ${paymentTerm === 'TEMPO' ? 'bg-amber-500 text-white shadow-md' : 'text-slate-400'}`}
+                             onClick={() => {
+                               if (shariahMode === 'SALAM') return
+                               setPaymentTerm('TEMPO')
+                             }}
+                             disabled={shariahMode === 'SALAM'}
+                             className={`flex-1 rounded-xl text-[10px] font-black transition-all ${paymentTerm === 'TEMPO' ? 'bg-amber-500 text-white shadow-md' : 'text-slate-400'} ${shariahMode === 'SALAM' ? 'opacity-40 cursor-not-allowed' : ''}`}
                           >
                              TEMPO
                           </button>
@@ -772,6 +801,9 @@ export default function PurchasingClient({
                              LUNAS
                           </button>
                        </div>
+                       {shariahMode === 'SALAM' && (
+                         <p className="text-[9px] font-bold text-emerald-600 italic mt-1 leading-tight px-1">* Akad SALAM pembelian wajib lunas di awal. Opsi TEMPO dinonaktifkan.</p>
+                       )}
                     </div>
 
                     <div className="space-y-2">
@@ -779,10 +811,10 @@ export default function PurchasingClient({
                       <input type="date" required value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-rose-500 transition-all" />
                     </div>
 
-                    {paymentTerm === 'TEMPO' && (
+                    {(paymentTerm === 'TEMPO' || shariahMode === 'SALAM') && (
                       <div className="space-y-2 animate-in slide-in-from-right-2">
-                        <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block px-1">Jatuh Tempo</label>
-                        <input type="date" required={paymentTerm === 'TEMPO'} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-white font-bold text-amber-600 shadow-sm focus:border-amber-500 transition-all" />
+                        <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block px-1">{shariahMode === 'SALAM' ? 'Tanggal Barang Disediakan' : 'Jatuh Tempo'}</label>
+                        <input type="date" required={paymentTerm === 'TEMPO' || shariahMode === 'SALAM'} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-white font-bold text-amber-600 shadow-sm focus:border-amber-500 transition-all" />
                       </div>
                     )}
 
@@ -796,7 +828,9 @@ export default function PurchasingClient({
                             placeholder="Pilih rekening untuk pelunasan langsung..."
                          />
                          <p className="text-[9px] font-bold text-emerald-600 mt-2 italic px-1">
-                               💡 Jurnal: (D) Persediaan vs (C) {paymentAccountId ? coa.find((a:any) => a.id === paymentAccountId)?.name : 'Kas/Bank'}. Tanpa melalui Hutang Usaha.
+                               {shariahMode === 'SALAM'
+                                 ? `💡 Akad SALAM: pembayaran ke vendor dicatat sebagai (D) Piutang Salam Vendor (1404) vs (C) ${paymentAccountId ? coa.find((a:any) => a.id === paymentAccountId)?.name : 'Kas/Bank'}.`
+                                 : `💡 Jurnal: (D) Persediaan vs (C) ${paymentAccountId ? coa.find((a:any) => a.id === paymentAccountId)?.name : 'Kas/Bank'}. Tanpa melalui Hutang Usaha.`}
                          </p>
                       </div>
                     )}
@@ -1121,6 +1155,11 @@ export default function PurchasingClient({
                         labelClassName="text-emerald-600"
                         value={paymentDiscount}
                         onChange={(val) => {
+                          if (isPurchaseSalam(selectedPurchase)) {
+                            setPaymentDiscount(0)
+                            setPaymentAmount(debtAmount)
+                            return
+                          }
                           setPaymentDiscount(val)
                           // If I have a discount, usually it reduces my cash payment
                           if (val > 0 && val <= debtAmount) {
@@ -1129,8 +1168,17 @@ export default function PurchasingClient({
                         }}
                         placeholder="0"
                         highlight={true}
+                        disabled={isPurchaseSalam(selectedPurchase)}
                       />
                     </div>
+
+                    {isPurchaseSalam(selectedPurchase) && (
+                      <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 mt-2">
+                        <p className="text-[10px] font-bold text-emerald-700">
+                          Akad SALAM pembelian: kas keluar dicatat sebagai Piutang Salam Vendor dan wajib lunas sebelum barang diterima.
+                        </p>
+                      </div>
+                    )}
 
                     <div className="pt-2 px-1">
                        <div className="flex justify-between items-center py-3 border-t border-slate-200">

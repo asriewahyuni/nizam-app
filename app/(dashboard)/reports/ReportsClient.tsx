@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   FileText, 
@@ -39,11 +39,73 @@ interface ReportsClientProps {
   }
 }
 
+interface BalanceTreeRow {
+  key: string
+  code: string
+  name: string
+  balance: number
+  level: number
+  hasChildren: boolean
+}
+
+const BALANCE_EPSILON = 0.01
+
+function buildBalanceTreeRows(accounts: any[] = [], showEmptyAccounts: boolean): BalanceTreeRow[] {
+  if (!Array.isArray(accounts) || accounts.length === 0) return []
+
+  const byId = new Map<string, any>()
+  accounts.forEach((acc: any) => {
+    if (acc?.id) byId.set(acc.id, acc)
+  })
+
+  const childrenByParent = new Map<string, any[]>()
+  const roots: any[] = []
+
+  accounts.forEach((acc: any) => {
+    const parentId = acc?.parent_id
+    if (parentId && byId.has(parentId)) {
+      const existing = childrenByParent.get(parentId) || []
+      existing.push(acc)
+      childrenByParent.set(parentId, existing)
+      return
+    }
+    roots.push(acc)
+  })
+
+  const sortByCode = (a: any, b: any) => String(a?.code || '').localeCompare(String(b?.code || ''))
+  roots.sort(sortByCode)
+  for (const [parentId, children] of childrenByParent.entries()) {
+    childrenByParent.set(parentId, children.sort(sortByCode))
+  }
+
+  const walk = (account: any, level: number): BalanceTreeRow[] => {
+    const children = account?.id ? (childrenByParent.get(account.id) || []) : []
+    const childRows = children.flatMap((child: any) => walk(child, level + 1))
+    const ownBalance = Number(account?.balance || 0)
+    const visible = showEmptyAccounts || Math.abs(ownBalance) > BALANCE_EPSILON || childRows.length > 0
+    if (!visible) return []
+
+    return [
+      {
+        key: String(account?.id || account?.code || `${account?.name || 'acc'}-${level}`),
+        code: String(account?.code || '-'),
+        name: String(account?.name || 'Tanpa Nama Akun'),
+        balance: ownBalance,
+        level,
+        hasChildren: children.length > 0,
+      },
+      ...childRows,
+    ]
+  }
+
+  return roots.flatMap((root) => walk(root, 0))
+}
+
 export default function ReportsClient({ orgId, orgName, branchId, balanceSheet, profitLoss, cashFlow }: ReportsClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<'PL' | 'BS' | 'CF'>('PL')
-  const [showEmptyAccounts, setShowEmptyAccounts] = useState(false)
+  const [showEmptyAccounts, setShowEmptyAccounts] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
 
   const handleExport = async (type: 'pl' | 'bs' | 'gl') => {
@@ -72,6 +134,32 @@ export default function ReportsClient({ orgId, orgName, branchId, balanceSheet, 
     title: '',
     items: []
   })
+  const assetTreeRows = useMemo(
+    () => buildBalanceTreeRows(balanceSheet?.assets || [], showEmptyAccounts),
+    [balanceSheet?.assets, showEmptyAccounts]
+  )
+  const liabilityTreeRows = useMemo(
+    () => buildBalanceTreeRows(balanceSheet?.liabilities || [], showEmptyAccounts),
+    [balanceSheet?.liabilities, showEmptyAccounts]
+  )
+  const equityTreeRows = useMemo(
+    () => buildBalanceTreeRows(balanceSheet?.equity || [], showEmptyAccounts),
+    [balanceSheet?.equity, showEmptyAccounts]
+  )
+
+  const renderBalanceRows = (rows: BalanceTreeRow[]) => (
+    rows.map((row) => (
+      <div key={row.key} className="flex justify-between items-center text-sm pb-2 border-b border-slate-50 gap-3">
+        <div className="flex items-center min-w-0" style={{ paddingLeft: `${row.level * 18}px` }}>
+          <span className="w-4 text-slate-300 text-xs">{row.level > 0 ? '-' : ''}</span>
+          <span className="w-4 text-slate-400">{row.hasChildren ? <ChevronDown size={12} /> : ''}</span>
+          <span className="text-[10px] font-mono text-slate-400 mr-2">{row.code}</span>
+          <span className={`truncate ${row.hasChildren ? 'text-slate-700 font-bold' : 'text-slate-600 font-medium'}`}>{row.name}</span>
+        </div>
+        <span className="text-slate-900 font-bold shrink-0">{formatRupiah(row.balance)}</span>
+      </div>
+    ))
+  )
 
   // Date Range State from URL
   const startDate = searchParams.get('startDate') || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
@@ -147,7 +235,7 @@ export default function ReportsClient({ orgId, orgName, branchId, balanceSheet, 
             className={`flex items-center gap-2 px-6 py-3 text-xs font-bold rounded-2xl border transition-all ${showEmptyAccounts ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
           >
             <Filter size={14} />
-            {showEmptyAccounts ? 'Sembunyikan Saldo 0' : 'Filter 0'}
+            {showEmptyAccounts ? 'Sembunyikan Saldo 0' : 'Tampilkan Saldo 0'}
           </button>
 
           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm print:hidden">
@@ -375,12 +463,7 @@ export default function ReportsClient({ orgId, orgName, branchId, balanceSheet, 
                     <h3 className="font-black text-slate-400 text-xs uppercase tracking-widest">Aktiva (Aset)</h3>
                   </div>
                   <div className="p-8 space-y-3">
-                    {balanceSheet.assets.filter((a: any) => showEmptyAccounts || Math.abs(a.balance) > 0.01).map((a: any) => (
-                      <div key={a.code} className="flex justify-between items-center text-sm pb-2 border-b border-slate-50">
-                        <span className="text-slate-600 font-medium">{a.name}</span>
-                        <span className="text-slate-900 font-bold">{formatRupiah(a.balance)}</span>
-                      </div>
-                    ))}
+                    {renderBalanceRows(assetTreeRows)}
                     <div className="flex justify-between items-center pt-4 text-emerald-600">
                       <span className="font-black uppercase text-xs">Total Aktiva</span>
                       <span className="font-black text-lg">{formatRupiah(balanceSheet.assets.reduce((s:any, x:any) => s + (x.balance || 0), 0))}</span>
@@ -399,22 +482,12 @@ export default function ReportsClient({ orgId, orgName, branchId, balanceSheet, 
                     {/* Liabilities */}
                     <div className="space-y-2">
                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Pasiva / Hutang</p>
-                       {balanceSheet.liabilities.filter((l: any) => showEmptyAccounts || Math.abs(l.balance) > 0.01).map((l: any) => (
-                        <div key={l.code} className="flex justify-between items-center text-sm pb-1">
-                          <span className="text-slate-600 font-medium">{l.name}</span>
-                          <span className="text-slate-900 font-bold">{formatRupiah(l.balance)}</span>
-                        </div>
-                      ))}
+                       {renderBalanceRows(liabilityTreeRows)}
                     </div>
                     {/* Equity */}
                     <div className="space-y-2">
                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Modal</p>
-                       {balanceSheet.equity.filter((e: any) => showEmptyAccounts || Math.abs(e.balance) > 0.01).map((e: any) => (
-                        <div key={e.code} className="flex justify-between items-center text-sm pb-1">
-                          <span className="text-slate-600 font-medium">{e.name}</span>
-                          <span className="text-slate-900 font-bold">{formatRupiah(e.balance)}</span>
-                        </div>
-                      ))}
+                       {renderBalanceRows(equityTreeRows)}
                     </div>
                     
                     <div className="flex justify-between items-center pt-6 text-blue-600 border-t-2 border-slate-100">

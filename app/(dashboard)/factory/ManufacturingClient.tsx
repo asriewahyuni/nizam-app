@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { createBom, updateBom, deleteBom, createWorkOrder, updateWorkOrderStatus, deleteWorkOrder, addWorkOrderCost, getFGBins, createPurchaseRequests } from '@/modules/factory/actions/factory.actions'
+import { convertQuantityBetweenUnits } from '@/modules/factory/lib/unit-conversion'
 
 interface ManufacturingClientProps {
   orgId: string
@@ -186,12 +187,25 @@ export function ManufacturingClient({
     setLoading(true)
     const items = wo.bom?.items || []
     const qtyPlanned = wo.quantity_planned
-    let shortItemsList = []
+    const shortItemsList = []
 
     for (const bi of items) {
-      const needed = bi.quantity * qtyPlanned
       const productId = bi.product?.id || bi.product_id
       const product = products.find(p => p.id === productId)
+      let needed = Number(bi.quantity || 0) * Number(qtyPlanned || 0)
+      try {
+        const qtyPerUnitInProductBase = convertQuantityBetweenUnits(
+          Number(bi.quantity || 0),
+          bi.unit || bi.product?.unit || product?.unit,
+          bi.product?.unit || product?.unit
+        )
+        needed = qtyPerUnitInProductBase * Number(qtyPlanned || 0)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Konversi satuan bahan gagal.'
+        alert(`BoM "${wo?.bom?.code || wo?.wo_number || ''}" bermasalah untuk bahan "${bi.product?.name || 'Bahan'}": ${message}`)
+        setLoading(false)
+        return
+      }
       const available = product?.stock_available || 0
       if (available < needed) {
         shortItemsList.push({ 
@@ -199,7 +213,7 @@ export function ManufacturingClient({
           productId: productId,
           needed, 
           available,
-          unit: bi.unit || bi.product?.unit
+          unit: bi.product?.unit || bi.unit
         })
       }
     }
@@ -624,9 +638,9 @@ export function ManufacturingClient({
                              const qty = Number((document.getElementById('item-qty') as HTMLInputElement).value)
                              const unit = (document.getElementById('item-unit') as HTMLSelectElement).value
                              if (!pId || !qty) return
-                             // Auto-detect unit from product master
+                             // Default unit follows product master, but can be overridden by user.
                              const selectedProduct = products.find(p => p.id === pId)
-                             const finalUnit = selectedProduct?.unit || unit || 'Pcs'
+                             const finalUnit = unit || selectedProduct?.unit || 'Pcs'
                              setBomItems([...bomItems, { productId: pId, quantity: qty, unit: finalUnit }])
                           }}
                           className="px-4 bg-blue-600 text-white rounded-xl"
@@ -752,7 +766,17 @@ export function ManufacturingClient({
                   {(() => {
                     const rawMaterialCost = selectedWo?.bom?.items?.reduce((sum: number, item: any) => {
                       const cost = item.product?.average_cost || item.product?.purchase_price || 0;
-                      return sum + (item.quantity * selectedWo.quantity_planned * cost)
+                      let qtyPerUnit = Number(item.quantity || 0)
+                      try {
+                        qtyPerUnit = convertQuantityBetweenUnits(
+                          Number(item.quantity || 0),
+                          item.unit || item.product?.unit,
+                          item.product?.unit
+                        )
+                      } catch {
+                        qtyPerUnit = Number(item.quantity || 0)
+                      }
+                      return sum + (qtyPerUnit * selectedWo.quantity_planned * cost)
                     }, 0) || 0
                     const totalOverhead = overheadCosts.reduce((s, c) => s + c.amount, 0)
                     const grandTotalHPP = rawMaterialCost + totalOverhead

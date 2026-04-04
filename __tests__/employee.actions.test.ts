@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createSupabaseMock, success } from './helpers/supabase-mock'
+import { createSupabaseMock, failure, success } from './helpers/supabase-mock'
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
 }))
 
-import { createEmployee, getEmployees, updateEmployee } from '@/modules/hris/actions/employee.actions'
+import { createEmployee, deleteEmployee, getEmployees, updateEmployee } from '@/modules/hris/actions/employee.actions'
 
 function buildEmployeeForm(overrides: Record<string, string> = {}) {
   const formData = new FormData()
@@ -124,6 +124,105 @@ describe('Employee Actions', () => {
     )
 
     expect(result).toEqual({ success: true })
+    expect(branchFilter?.args[1]).toBe('branch-1')
+  })
+
+  it('retries create without department_id when legacy schema does not have the column', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        employees: [
+          {
+            result: failure("Could not find the 'department_id' column of 'employees' in the schema cache"),
+          },
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
+
+    const result = await createEmployee('org-1', buildEmployeeForm({ department_id: 'HRIS' }))
+    const firstInsert = supabase.calls[0]?.operations.find((operation) => operation.method === 'insert')?.args[0] as Record<string, unknown>
+    const secondInsert = supabase.calls[1]?.operations.find((operation) => operation.method === 'insert')?.args[0] as Record<string, unknown>
+
+    expect(result).toEqual({ success: true })
+    expect(firstInsert).toHaveProperty('department_id')
+    expect(secondInsert).not.toHaveProperty('department_id')
+  })
+
+  it('retries update without department_id when legacy schema does not have the column', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        employees: [
+          {
+            maybeSingleResult: success({
+              id: 'emp-1',
+              branch_id: 'branch-1',
+            }),
+          },
+          {
+            result: failure("Could not find the 'department_id' column of 'employees' in the schema cache"),
+          },
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
+
+    const result = await updateEmployee('emp-1', 'org-1', buildEmployeeForm({ department_id: 'HRIS' }))
+    const firstUpdate = supabase.calls[1]?.operations.find((operation) => operation.method === 'update')?.args[0] as Record<string, unknown>
+    const secondUpdate = supabase.calls[2]?.operations.find((operation) => operation.method === 'update')?.args[0] as Record<string, unknown>
+
+    expect(result).toEqual({ success: true })
+    expect(firstUpdate).toHaveProperty('department_id')
+    expect(secondUpdate).not.toHaveProperty('department_id')
+  })
+
+  it('deletes employee only inside accessible branch', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        employees: [
+          {
+            maybeSingleResult: success({
+              id: 'emp-1',
+              branch_id: 'branch-1',
+            }),
+          },
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
+
+    const result = await deleteEmployee('emp-1', 'org-1')
+    const deleteCall = supabase.calls[1]
+    const branchFilter = deleteCall?.operations.find(
+      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
+    )
+    const deleteOperation = deleteCall?.operations.find((operation) => operation.method === 'delete')
+
+    expect(result).toEqual({ success: true })
+    expect(deleteOperation).toBeTruthy()
     expect(branchFilter?.args[1]).toBe('branch-1')
   })
 })

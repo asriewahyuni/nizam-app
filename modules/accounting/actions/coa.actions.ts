@@ -189,7 +189,7 @@ export async function setShariahAccountsActive(orgId: string, active: boolean) {
   const supabase = await createClient()
 
   // Common syariah codes from migration 1006
-  const syariahCodes = ['2600', '2601', '3100', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
+  const syariahCodes = ['1404', '2600', '2601', '2602', '3100', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
 
   const { error } = await (supabase as any)
     .from('accounts')
