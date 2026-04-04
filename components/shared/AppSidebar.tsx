@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
-import { saasModuleMatches } from '@/lib/saas/module-catalog'
+import { saasModuleMatches, normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
 import {
   LayoutDashboard,
   BookOpen,
@@ -268,10 +268,23 @@ export function AppSidebar({
 
       // 1. SaaS Module Check
       if (item.module_key) {
-        const entitlementCandidates = [item.module_key, item.label]
-        const matches = enabledModules.some((moduleName) =>
-          entitlementCandidates.some((candidate) => saasModuleMatches(moduleName, candidate))
-        )
+        const matches = enabledModules.some((moduleName) => {
+          const enabledLower = moduleName.trim().toLowerCase()
+
+          // a. Exact label match — granular per-menu control
+          //    e.g. enabledModules has 'Akun (CoA)' → only shows 'Akun (CoA)', not 'Buku Besar'
+          if (enabledLower === item.label.trim().toLowerCase()) return true
+
+          // b. Canonical module match — backward compat with packages storing canonical names
+          //    Only applies when the enabledModule IS already a canonical name (normalizes to itself)
+          //    e.g. enabledModules has 'Purchasing' → matches item.module_key 'Purchasing'
+          const normalizedEnabled = normalizeSaasEntitlementName(moduleName)
+          if (normalizedEnabled.trim().toLowerCase() === enabledLower) {
+            if (saasModuleMatches(moduleName, item.module_key!)) return true
+          }
+
+          return false
+        })
         if (!matches) return false
       }
 

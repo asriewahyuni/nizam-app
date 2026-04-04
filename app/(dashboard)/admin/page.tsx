@@ -49,7 +49,7 @@ const CORE_MODULES = [
   'Akun (CoA)', 'Kas & Bank', 'Buku Besar', 'Aging (AR/AP)', 'Manajemen Zakat', 'Manajemen Pajak', 'Reimbursement', 'Penutupan Buku', 'Aset Tetap', 'Anggaran',
   'Pembelian', 'Inventori', 'Gudang (WMS)', 'Manufaktur (BoM)', 
   'Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward', 'Sales Page',
-  'Karyawan (HRIS)', 'Akses & Jabatan',
+  'Karyawan (HRIS)', 'Absensi & Cuti', 'Payroll Components', 'Proses Penggajian', 'Akses & Jabatan',
   'Laporan', 'Strategi (BSC)', 'Proyeksi Kas',
   'Audit Trail', 'Cabang & Divisi', 'Pengaturan Bisnis'
 ]
@@ -1260,24 +1260,28 @@ export default function SaaSAdminPage() {
                              { group: 'Operasional', items: ['Pembelian', 'Inventori', 'Gudang (WMS)', 'Manufaktur (BoM)'] },
                              { group: 'Tambahan (Premium)', items: ['Fleet & Rental', 'Job Order (Jasa)'] },
                              { group: 'Marketing & Sales', items: ['Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward', 'Sales Page'] },
-                             { group: 'HRIS', items: ['Karyawan (HRIS)', 'Akses & Jabatan'] },
+                             { group: 'HRIS', items: ['Karyawan (HRIS)', 'Absensi & Cuti', 'Payroll Components', 'Proses Penggajian', 'Akses & Jabatan'] },
                              { group: 'Insight', items: ['Laporan', 'Strategi (BSC)', 'Proyeksi Kas'] },
                              { group: 'Config', items: ['Audit Trail', 'Cabang & Divisi', 'Pengaturan Bisnis'] }
                           ].map(cat => (
-                             <div key={cat.group} className="space-y-2">
+                             <div key={cat.group} className="space-y-2" data-module-group={cat.group}>
                                 <div className="flex items-center gap-2 px-2">
                                    <div className="h-[1px] flex-1 bg-slate-200" />
                                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{cat.group}</span>
                                    <div className="h-[1px] flex-1 bg-slate-200" />
                                 </div>
                                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                                   {/* Opsi untuk centang "SATU GRUP" sekaligus */}
+                                   {/* Opsi untuk centang "SATU GRUP" sekaligus — hanya toggle UI, tidak submit value sendiri */}
                                    <label className="flex items-center gap-2 p-2.5 bg-indigo-50/50 rounded-xl border border-indigo-100/50 cursor-pointer hover:bg-indigo-100/50 transition-colors group">
                                       <input 
                                          type="checkbox" 
-                                         name="modules" 
-                                         value={cat.group} 
-                                         defaultChecked={pkgModal.editData?.modules?.includes(cat.group)}
+                                         defaultChecked={cat.items.every(item => pkgModal.editData?.modules?.includes(item))}
+                                         onChange={(e) => {
+                                           const container = e.target.closest('[data-module-group]')
+                                           if (!container) return
+                                           const checkboxes = container.querySelectorAll<HTMLInputElement>('input[name="modules"]')
+                                           checkboxes.forEach((cb) => { cb.checked = e.target.checked })
+                                         }}
                                          className="w-4 h-4 rounded text-indigo-600" 
                                       />
                                       <span className="text-[9px] font-black uppercase text-indigo-600 group-hover:underline italic">Pilih Semua {cat.group}</span>

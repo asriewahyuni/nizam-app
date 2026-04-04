@@ -44,11 +44,11 @@ type CatalogEntry = {
 const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
   {
     canonical: 'Accounting',
-    aliases: ['accounting', 'akun (coa)', 'buku besar', 'journal', 'jurnal'],
+    aliases: ['accounting', 'akun (coa)', 'buku besar', 'journal', 'jurnal', 'manajemen zakat', 'manajemen pajak', 'penutupan buku', 'anggaran'],
   },
   {
     canonical: 'Finance',
-    aliases: ['finance', 'kas & bank', 'cash', 'bank', 'aging', 'reimbursement'],
+    aliases: ['finance', 'kas & bank', 'cash', 'bank', 'aging', 'reimbursement', 'aging (ar/ap)', 'aset tetap', 'proyeksi kas'],
   },
   {
     canonical: 'Inventory',
@@ -60,7 +60,7 @@ const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
   },
   {
     canonical: 'Sales',
-    aliases: ['sales', 'penjualan', 'quotation', 'sales pipeline'],
+    aliases: ['sales', 'penjualan', 'quotation', 'sales pipeline', 'penawaran (quotation)', 'target & komisi', 'promo & reward'],
   },
   {
     canonical: 'POS',
@@ -72,19 +72,35 @@ const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
   },
   {
     canonical: 'Reports',
-    aliases: ['reports', 'laporan', 'insight', 'strategy', 'forecast'],
+    aliases: ['reports', 'laporan', 'insight', 'strategy', 'forecast', 'strategi (bsc)'],
   },
   {
     canonical: 'HRIS',
-    aliases: ['hris', 'karyawan (hris)', 'employees', 'employee', 'attendance', 'payroll', 'payroll process'],
+    aliases: ['hris', 'karyawan (hris)', 'karyawan (sdm)', 'employees', 'employee', 'akses & jabatan'],
   },
   {
     canonical: 'Manufacturing',
-    aliases: ['manufacturing', 'factory', 'manufaktur', 'bom'],
+    aliases: ['manufacturing', 'factory', 'manufaktur', 'bom', 'manufaktur (bom)'],
   },
   {
     canonical: 'Audit',
     aliases: ['audit', 'audit trail', 'audit integritas'],
+  },
+  {
+    canonical: 'Consolidation',
+    aliases: ['consolidation', 'cabang & divisi', 'branch', 'branches'],
+  },
+  {
+    canonical: 'Config',
+    aliases: ['config', 'pengaturan bisnis', 'settings', 'business settings'],
+  },
+  {
+    canonical: 'Attendance',
+    aliases: ['attendance', 'absensi & cuti', 'absensi', 'cuti'],
+  },
+  {
+    canonical: 'Payroll',
+    aliases: ['payroll', 'payroll components', 'proses penggajian', 'penggajian'],
   },
   {
     canonical: 'Fleet & Rental',
