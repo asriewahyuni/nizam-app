@@ -96,20 +96,17 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
   const description = (formData.get('description') as string).trim()
   const amount = parseFloat(formData.get('amount') as string)
   const type = formData.get('type') as 'IN' | 'OUT' | 'TRANSFER'
-  const categoryId = formData.get('category_id') as string // Opposite GL Account
+  const categoryId = formData.get('category_id') as string // Opposite Ledger Account for IN/OUT
+  const targetBankAccountId = (formData.get('target_bank_account_id') as string | null)?.trim() || null
   const referenceNumber = (formData.get('reference_number') as string | null)?.trim() || null
 
-  if (!bankAccountId || !transDate || !description || isNaN(amount) || !type || !categoryId) {
+  if (!bankAccountId || !transDate || !description || isNaN(amount) || amount <= 0 || !type) {
     return { error: 'Semua field wajib diisi.' }
-  }
-
-  if (type === 'TRANSFER') {
-    return { error: 'Transfer antar rekening belum didukung pada modul Kas & Bank versi ini.' }
   }
 
   const { data: bankAccount, error: bankAccountError } = await (supabase as any)
     .from('bank_accounts')
-    .select('id, branch_id')
+    .select('id, branch_id, account_id')
     .eq('id', bankAccountId)
     .eq('org_id', orgId)
     .maybeSingle()
@@ -122,6 +119,41 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
     return { error: 'Rekening kas/bank tersebut tidak tersedia pada unit aktif.' }
   }
 
+  let oppositeAccountId = categoryId
+
+  if (type === 'TRANSFER') {
+    const targetLookup = targetBankAccountId
+      ? (supabase as any)
+          .from('bank_accounts')
+          .select('id, branch_id, account_id')
+          .eq('id', targetBankAccountId)
+          .eq('org_id', orgId)
+      : (supabase as any)
+          .from('bank_accounts')
+          .select('id, branch_id, account_id')
+          .eq('account_id', categoryId)
+          .eq('org_id', orgId)
+          .eq('branch_id', activeBranchResult.branchId)
+
+    const { data: targetBankAccount, error: targetBankAccountError } = await targetLookup.maybeSingle()
+
+    if (targetBankAccountError || !targetBankAccount?.id) {
+      return { error: 'Rekening tujuan transfer tidak ditemukan.' }
+    }
+
+    if (targetBankAccount.branch_id !== activeBranchResult.branchId) {
+      return { error: 'Rekening tujuan transfer tidak tersedia pada unit aktif.' }
+    }
+
+    if (targetBankAccount.id === bankAccount.id || targetBankAccount.account_id === bankAccount.account_id) {
+      return { error: 'Rekening sumber dan tujuan transfer harus berbeda.' }
+    }
+
+    oppositeAccountId = targetBankAccount.account_id
+  } else if (!oppositeAccountId) {
+    return { error: 'Akun lawan transaksi wajib dipilih.' }
+  }
+
   const { error } = await (supabase as any).from('bank_transactions').insert({
     org_id: orgId,
     branch_id: activeBranchResult.branchId,
@@ -130,7 +162,7 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
     description,
     amount,
     type,
-    category_id: categoryId,
+    category_id: oppositeAccountId,
     reference_number: referenceNumber,
     status: 'POSTED' // Automatically post to GL via trigger
   })

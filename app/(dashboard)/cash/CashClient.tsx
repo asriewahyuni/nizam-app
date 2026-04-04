@@ -7,6 +7,7 @@ import {
   Plus, 
   ArrowUpRight, 
   ArrowDownRight, 
+  ArrowRightLeft,
   ChevronRight,
   MoreVertical,
   AlertCircle,
@@ -90,7 +91,9 @@ export function CashClient({
   const [selectedBankId, setSelectedBankId] = useState<string | null>(null)
 
   // Form states for transaction
-  const [txType, setTxType] = useState<'IN' | 'OUT'>('OUT')
+  const [txType, setTxType] = useState<'IN' | 'OUT' | 'TRANSFER'>('OUT')
+  const [txBankAccountId, setTxBankAccountId] = useState('')
+  const [txTargetBankId, setTxTargetBankId] = useState('')
   const [txAmount, setTxAmount] = useState(0)
   const [txDescription, setTxDescription] = useState('')
   const [txDate, setTxDate] = useState(getDateInTimeZone('Asia/Jakarta'))
@@ -116,7 +119,9 @@ export function CashClient({
 
     if (pay) {
       startTransition(() => {
-        if (type === 'IN' || type === 'OUT') setTxType(type)
+        if (type === 'IN' || type === 'OUT' || type === 'TRANSFER') setTxType(type)
+        setTxBankAccountId('')
+        setTxTargetBankId('')
         if (amount) setTxAmount(Number(amount))
         if (desc) setTxDescription(desc)
         setTxCategoryId(categoryId || '')
@@ -162,6 +167,8 @@ export function CashClient({
         router.replace(pathname)
       }
       setShowTransactionModal(false)
+      setTxBankAccountId('')
+      setTxTargetBankId('')
       setTxAmount(0)
       setTxDescription('')
       setTxCategoryId('')
@@ -269,6 +276,8 @@ export function CashClient({
               disabled={!canWriteCash}
               onClick={() => { 
                 setTxType('OUT'); 
+                setTxBankAccountId('');
+                setTxTargetBankId('');
                 setTxAmount(0);
                 setTxDescription('');
                 setTxCategoryId('');
@@ -690,14 +699,15 @@ export function CashClient({
                <div className="px-10 py-8 bg-blue-600 text-white flex justify-between items-start shrink-0">
                   <div>
                     <h3 className="text-2xl font-black tracking-tight flex items-center gap-3">
-                       {txType === 'IN' ? <ArrowDownRight /> : <ArrowUpRight />} 
-                       Record Mutation
+                       {txType === 'IN' ? <ArrowDownRight /> : txType === 'OUT' ? <ArrowUpRight /> : <ArrowRightLeft />}
+                       Record {txType === 'TRANSFER' ? 'Transfer' : 'Mutation'}
                     </h3>
                     <p className="text-xs text-blue-100 mt-1 font-medium italic">Create an instant double-entry transaction record.</p>
                   </div>
                   <div className="flex bg-white/10 p-1 rounded-2xl border border-white/20">
                      <button type="button" onClick={() => setTxType('IN')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${txType === 'IN' ? 'bg-white text-emerald-600 shadow-md' : 'text-blue-100 hover:bg-white/5'}`}>IN</button>
                      <button type="button" onClick={() => setTxType('OUT')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${txType === 'OUT' ? 'bg-white text-rose-600 shadow-md' : 'text-blue-100 hover:bg-white/5'}`}>OUT</button>
+                     <button type="button" onClick={() => setTxType('TRANSFER')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${txType === 'TRANSFER' ? 'bg-white text-blue-600 shadow-md' : 'text-blue-100 hover:bg-white/5'}`}>XFER</button>
                   </div>
                </div>
 
@@ -707,7 +717,19 @@ export function CashClient({
                  <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Source Account</label>
-                      <select name="bank_account_id" required className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold shadow-inner outline-none focus:bg-white focus:border-blue-500 transition-all">
+                      <select
+                        name="bank_account_id"
+                        required
+                        value={txBankAccountId}
+                        onChange={(e) => {
+                          const nextBankId = e.target.value
+                          setTxBankAccountId(nextBankId)
+                          if (nextBankId === txTargetBankId) {
+                            setTxTargetBankId('')
+                          }
+                        }}
+                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold shadow-inner outline-none focus:bg-white focus:border-blue-500 transition-all"
+                      >
                          <option value="">Select Account...</option>
                          {bankAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.bank_name}</option>)}
                       </select>
@@ -741,36 +763,64 @@ export function CashClient({
                     
                     <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] ml-1 flex items-center gap-1.5">
-                          <ExternalLink size={12}/> Counterparty Account
+                          <ExternalLink size={12}/> {txType === 'TRANSFER' ? 'Target Account' : 'Counterparty Account'}
                         </label>
-                        {isCategoryLocked && <input type="hidden" name="category_id" value={txCategoryId} />}
-                        <select name="category_id" value={txCategoryId} onChange={(e) => setTxCategoryId(e.target.value)} required disabled={isCategoryLocked} className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
-                           <option value="">Select Ledger Account...</option>
-                           {['EXPENSE', 'LIABILITY', 'ASSET', 'REVENUE', 'EQUITY'].map(type => {
-                             const group = categoryAccounts.filter(a => a.type === type);
-                             if (group.length === 0) return null;
-                             return (
-                               <optgroup key={type} className="text-slate-400" label={type}>
-                                  {group.map(a => <option key={a.id} value={a.id} className="text-white">{a.code} - {a.name}</option>)}
-                               </optgroup>
-                             )
-                           })}
-                        </select>
-                        {isCategoryLocked && (
-                          <p className="text-[10px] font-bold text-indigo-500 ml-1">Akun lawan dikunci dari shortcut aging agar settlement tetap masuk ke akun piutang/hutang yang benar.</p>
+                        {txType === 'TRANSFER' ? (
+                          <>
+                            <select
+                              name="target_bank_account_id"
+                              value={txTargetBankId}
+                              onChange={(e) => setTxTargetBankId(e.target.value)}
+                              required
+                              className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all"
+                            >
+                               <option value="">Select Target...</option>
+                               {bankAccounts
+                                 .filter((bankAccount) => bankAccount.id !== txBankAccountId)
+                                 .map((bankAccount) => (
+                                   <option key={bankAccount.id} value={bankAccount.id} className="text-white">
+                                     {bankAccount.bank_name} {bankAccount.account_number ? `(${bankAccount.account_number})` : ''}
+                                   </option>
+                                 ))}
+                            </select>
+                            <p className="text-[10px] font-bold text-blue-500 ml-1">Target harus rekening kas/bank lain dalam unit aktif yang sama.</p>
+                          </>
+                        ) : (
+                          <>
+                            {isCategoryLocked && <input type="hidden" name="category_id" value={txCategoryId} />}
+                            <select name="category_id" value={txCategoryId} onChange={(e) => setTxCategoryId(e.target.value)} required disabled={isCategoryLocked} className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
+                               <option value="">Select Ledger Account...</option>
+                               {['EXPENSE', 'LIABILITY', 'ASSET', 'REVENUE', 'EQUITY'].map(type => {
+                                 const group = categoryAccounts.filter(a => a.type === type);
+                                 if (group.length === 0) return null;
+                                 return (
+                                   <optgroup key={type} className="text-slate-400" label={type}>
+                                      {group.map(a => <option key={a.id} value={a.id} className="text-white">{a.code} - {a.name}</option>)}
+                                   </optgroup>
+                                 )
+                               })}
+                            </select>
+                            {isCategoryLocked && (
+                              <p className="text-[10px] font-bold text-indigo-500 ml-1">Akun lawan dikunci dari shortcut aging agar settlement tetap masuk ke akun piutang/hutang yang benar.</p>
+                            )}
+                          </>
                         )}
                     </div>
                  </div>
 
                  <div className="bg-slate-50 p-6 rounded-[28px] border border-slate-100 text-[10px] font-medium text-slate-400 leading-relaxed italic flex gap-3">
                     <AlertCircle size={16} className="shrink-0 text-slate-300" />
-                    {txType === 'OUT' ? 'Choosing an EXPENSE account will decrease equity. Choosing a LIABILITY will settle or create a debt.' : 'Choosing REVENUE will increase equity. Choosing an ASSET account like Accounts Receivable will settle a customer debt.'}
+                    {txType === 'OUT'
+                      ? 'Choosing an EXPENSE account will decrease equity. Choosing a LIABILITY will settle or create a debt.'
+                      : txType === 'IN'
+                        ? 'Choosing REVENUE will increase equity. Choosing an ASSET account like Accounts Receivable will settle a customer debt.'
+                        : 'A transfer credits the source bank account and debits the target bank account in the same unit.'}
                  </div>
 
                  <div className="flex gap-4 pt-4 shrink-0">
                    <button type="button" onClick={closeTransactionModal} className="flex-1 py-5 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">Abort</button>
                    <SafeButton type="submit" variant="primary" size="lg" className="flex-[2] shadow-2xl shadow-blue-100" isLoading={loading}>
-                     {txType === 'IN' ? 'RECEIVE FUNDS' : 'SEND PAYMENT'}
+                     {txType === 'IN' ? 'RECEIVE FUNDS' : txType === 'OUT' ? 'SEND PAYMENT' : 'PROCESS TRANSFER'}
                    </SafeButton>
                  </div>
                </form>
