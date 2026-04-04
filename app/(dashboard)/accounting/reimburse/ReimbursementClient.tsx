@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   FileText, 
@@ -20,7 +21,7 @@ import {
   AlertCircle,
   Image as ImageIcon
 } from 'lucide-react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah, formatDate, getDateInTimeZone } from '@/lib/utils'
 import { submitReimbursement, approveReimbursement, rejectReimbursement, payReimbursement, uploadReceipt } from '@/modules/accounting/actions/reimburse.actions'
 import { detectReceiptDetails } from '@/modules/ai/actions/vision.actions'
 
@@ -45,20 +46,22 @@ const SIMPLE_CATEGORIES = [
 ]
 
 export default function ReimbursementClient({ reimbursements, bankAccounts, expenseAccounts, orgId, currentUserId }: ReimbursementClientProps) {
+  const router = useRouter()
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false)
   const [selectedReimbursement, setSelectedReimbursement] = useState<any>(null)
   const [isPayModalOpen, setIsPayModalOpen] = useState(false)
   const [selectedBankId, setSelectedBankId] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const defaultExpenseDate = getDateInTimeZone('Asia/Jakarta')
 
   // Form State
   const [description, setDescription] = useState('')
   const [items, setItems] = useState<any[]>([
-    { expense_date: new Date().toISOString().split('T')[0], category_account_id: '', description: '', amount: 0, receipt_url: '', receipt_file: null as File | null, receipt_preview: '', isScanning: false, isUploading: false }
+    { expense_date: defaultExpenseDate, category_account_id: '', description: '', amount: 0, receipt_url: '', receipt_file: null as File | null, receipt_preview: '', isScanning: false, isUploading: false }
   ])
 
   const addItem = () => {
-    setItems([...items, { expense_date: new Date().toISOString().split('T')[0], category_account_id: '', description: '', amount: 0, receipt_url: '', receipt_file: null, receipt_preview: '', isScanning: false, isUploading: false }])
+    setItems([...items, { expense_date: defaultExpenseDate, category_account_id: '', description: '', amount: 0, receipt_url: '', receipt_file: null, receipt_preview: '', isScanning: false, isUploading: false }])
   }
 
   const removeItem = (idx: number) => {
@@ -122,7 +125,8 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
     if (result.success) {
         setIsSubmitModalOpen(false)
         setDescription('')
-        setItems([{ expense_date: new Date().toISOString().split('T')[0], category_account_id: '', description: '', amount: 0, receipt_url: '', receipt_file: null as File | null, receipt_preview: '', isScanning: false, isUploading: false, ai_items: [] as any[] }])
+        setItems([{ expense_date: defaultExpenseDate, category_account_id: '', description: '', amount: 0, receipt_url: '', receipt_file: null as File | null, receipt_preview: '', isScanning: false, isUploading: false, ai_items: [] as any[] }])
+        router.refresh()
     } else {
         alert(result.error)
     }
@@ -187,13 +191,23 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
 
   const handleApprove = async (id: string) => {
     if (!confirm('Setujui pengajuan ini?')) return
-    await approveReimbursement(id, orgId)
+    const result = await approveReimbursement(id, orgId)
+    if ('error' in result) {
+      alert(result.error)
+      return
+    }
+    router.refresh()
   }
 
   const handleReject = async (id: string) => {
     const reason = prompt('Alasan penolakan:')
     if (reason === null) return
-    await rejectReimbursement(id, orgId, reason)
+    const result = await rejectReimbursement(id, orgId, reason)
+    if ('error' in result) {
+      alert(result.error)
+      return
+    }
+    router.refresh()
   }
 
   const handlePay = async () => {
@@ -204,6 +218,7 @@ export default function ReimbursementClient({ reimbursements, bankAccounts, expe
     if (!('error' in result)) {
         setIsPayModalOpen(false)
         setSelectedReimbursement(null)
+        router.refresh()
     } else {
         alert(result.error)
     }

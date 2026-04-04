@@ -18,7 +18,7 @@ vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
 }))
 
-import { createBankAccount, createBankTransaction, getRecentBankTransactions } from '@/modules/cash/actions/bank.actions'
+import { createBankAccount, createBankTransaction, deleteBankTransaction, getRecentBankTransactions } from '@/modules/cash/actions/bank.actions'
 
 describe('Cash & Bank Branch Context', () => {
   beforeEach(() => {
@@ -143,5 +143,68 @@ describe('Cash & Bank Branch Context', () => {
 
     expect(txQuery.eq).toHaveBeenCalledWith('branch_id', 'branch-1')
     expect(result).toEqual([{ id: 'tx-1', branch_id: 'branch-1' }])
+  })
+
+  it('voids bank transactions instead of deleting the source record', async () => {
+    const txLookup = {
+      select: vi.fn(() => txLookup),
+      eq: vi.fn(() => txLookup),
+      single: vi.fn().mockResolvedValue({
+        data: {
+          id: 'tx-1',
+          journal_entry_id: 'je-1',
+          branch_id: 'branch-1',
+          status: 'POSTED',
+        },
+        error: null,
+      }),
+    }
+    const txUpdateEq = vi.fn(() => txUpdate)
+    const txUpdate = {
+      eq: txUpdateEq,
+    }
+    const journalUpdateEq = vi.fn(() => journalUpdate)
+    const journalUpdate = {
+      eq: journalUpdateEq,
+    }
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: {
+        accessibleBranches: [],
+        accessibleBranchIds: ['branch-1'],
+        canAccessAllBranches: false,
+        membershipId: 'member-1',
+        role: 'owner',
+      },
+      branchId: 'branch-1',
+    })
+
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'bank_transactions') {
+          return {
+            select: vi.fn(() => txLookup),
+            update: vi.fn(() => txUpdate),
+          }
+        }
+        if (table === 'journal_entries') {
+          return {
+            update: vi.fn(() => journalUpdate),
+          }
+        }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const result = await deleteBankTransaction('org-1', 'tx-1')
+
+    expect(result).toEqual({ success: true })
+    expect(journalUpdateEq).toHaveBeenCalledWith('org_id', 'org-1')
+    expect(txUpdateEq).toHaveBeenCalledWith('org_id', 'org-1')
   })
 })

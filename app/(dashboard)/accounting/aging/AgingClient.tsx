@@ -200,8 +200,20 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
                                else if (row.source_type === 'PURCHASING') router.push(`/purchasing?pay=${row.id}`)
                                else if (row.source_type === 'TAX') router.push(`/accounting/tax`)
                                else if (row.source_type === 'JOURNAL') {
+                                 if (!row.settlement_account_id) {
+                                   router.push(`/accounting/journal`)
+                                   return
+                                 }
                                  const side = activeView === 'AR' ? 'IN' : 'OUT'
-                                 router.push(`/cash?pay=${row.id}&type=${side}&amount=${Math.abs(row.outstanding)}&desc=Pelunasan ${row.doc_number}`)
+                                 const params = new URLSearchParams({
+                                   pay: row.id,
+                                   type: side,
+                                   amount: String(Math.abs(row.outstanding)),
+                                   desc: `Pelunasan ${row.doc_number}`,
+                                   category_id: row.settlement_account_id,
+                                   lock_category: '1',
+                                 })
+                                 router.push(`/cash?${params.toString()}`)
                                }
                                else router.push(`/accounting/journal`)
                              }}

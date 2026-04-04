@@ -15,6 +15,7 @@ import { getAgingReport } from '@/modules/accounting/actions/aging.actions'
 describe('Aging Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()
   })
 
   it('filters AR aging data and GL reconciliation by active branch', async () => {
@@ -75,6 +76,62 @@ describe('Aging Branch Context', () => {
         expect.objectContaining({ method: 'eq', args: ['org_id', 'org-1'] }),
         expect.objectContaining({ method: 'eq', args: ['branch_id', 'branch-1'] }),
       ])
+    )
+  })
+
+  it('uses Asia/Jakarta business date when bucketing due dates around midnight UTC', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-03T18:30:00.000Z'))
+
+    const supabase = createSupabaseMock({
+      tables: {
+        accounts: [
+          {
+            result: success([{ id: 'acc-ar', code: '1201' }]),
+          },
+        ],
+        sales: [
+          {
+            result: success([
+              {
+                id: 'sale-1',
+                sale_number: 'SO-001',
+                sale_date: '2026-04-04',
+                due_date: '2026-04-04',
+                grand_total: 100000,
+                contacts: { name: 'PT Test' },
+              },
+            ]),
+          },
+        ],
+        sales_payments: [
+          {
+            result: success([]),
+          },
+        ],
+        sales_returns: [
+          {
+            result: success([]),
+          },
+        ],
+        journal_entries: [
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+
+    const result = await getAgingReport('org-1', 'AR', 'branch-1')
+    const row = result.find((item) => item.doc_number === 'SO-001')
+
+    expect(row).toEqual(
+      expect.objectContaining({
+        aging_bucket: 'Current',
+        days_overdue: 0,
+      })
     )
   })
 })

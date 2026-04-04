@@ -23,7 +23,7 @@ vi.mock('@/modules/accounting/actions/journal.actions', () => ({
   createJournalEntry: mocks.createJournalEntry,
 }))
 
-import { getReimbursements, payReimbursement, submitReimbursement } from '@/modules/accounting/actions/reimburse.actions'
+import { approveReimbursement, getReimbursements, payReimbursement, rejectReimbursement, submitReimbursement } from '@/modules/accounting/actions/reimburse.actions'
 
 describe('Reimbursement Branch Context', () => {
   beforeEach(() => {
@@ -231,5 +231,92 @@ describe('Reimbursement Branch Context', () => {
     )
     expect(reimbursementQuery.eq).toHaveBeenCalledWith('branch_id', 'branch-1')
     expect(reimbursementUpdateEq).toHaveBeenCalledWith('branch_id', 'branch-1')
+  })
+
+  it('syncs approval request when approving reimbursement from the reimbursement page', async () => {
+    const reimbursementUpdateEq = vi.fn(() => reimbursementUpdate)
+    const reimbursementUpdate = {
+      eq: reimbursementUpdateEq,
+    }
+    const approvalUpdateEq = vi.fn(() => approvalUpdate)
+    const approvalUpdate = {
+      eq: approvalUpdateEq,
+    }
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'manager' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'approver-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'reimbursements') {
+          return { update: vi.fn(() => reimbursementUpdate) }
+        }
+        if (table === 'approval_requests') {
+          return { update: vi.fn(() => approvalUpdate) }
+        }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const result = await approveReimbursement('reim-1', 'org-1')
+
+    expect(result).toEqual({ success: true })
+    expect(reimbursementUpdateEq).toHaveBeenCalledWith('branch_id', 'branch-1')
+    expect(approvalUpdateEq).toHaveBeenCalledWith('branch_id', 'branch-1')
+    expect(approvalUpdateEq).toHaveBeenCalledWith('source_id', 'reim-1')
+    expect(approvalUpdateEq).toHaveBeenCalledWith('status', 'PENDING')
+  })
+
+  it('syncs rejection notes back to approval request when rejecting reimbursement directly', async () => {
+    const reimbursementUpdateEq = vi.fn(() => reimbursementUpdate)
+    const reimbursementUpdate = {
+      eq: reimbursementUpdateEq,
+    }
+    const approvalUpdateEq = vi.fn(() => approvalUpdate)
+    const approvalUpdate = {
+      eq: approvalUpdateEq,
+    }
+    const approvalUpdateSpy = vi.fn(() => approvalUpdate)
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'manager' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'approver-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'reimbursements') {
+          return { update: vi.fn(() => reimbursementUpdate) }
+        }
+        if (table === 'approval_requests') {
+          return { update: approvalUpdateSpy }
+        }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const result = await rejectReimbursement('reim-1', 'org-1', 'Budget tidak valid')
+
+    expect(result).toEqual({ success: true })
+    expect(reimbursementUpdateEq).toHaveBeenCalledWith('branch_id', 'branch-1')
+    expect(approvalUpdateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'REJECTED',
+        notes: 'Budget tidak valid',
+        approver_id: 'approver-1',
+      })
+    )
+    expect(approvalUpdateEq).toHaveBeenCalledWith('branch_id', 'branch-1')
+    expect(approvalUpdateEq).toHaveBeenCalledWith('source_id', 'reim-1')
   })
 })

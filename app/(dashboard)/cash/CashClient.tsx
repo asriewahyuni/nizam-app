@@ -1,13 +1,12 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import React, { startTransition, useState, useEffect } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Plus, 
   ArrowUpRight, 
   ArrowDownRight, 
-  ArrowRightLeft,
   ChevronRight,
   MoreVertical,
   AlertCircle,
@@ -41,7 +40,7 @@ import { useRouter } from 'next/navigation'
 import { createBankAccount, createBankTransaction, deleteBankAccount, deleteBankTransaction } from '@/modules/cash/actions/bank.actions'
 import { processBankCSV } from '@/modules/cash/actions/reconcile.actions'
 import { BankTransaction, BankAccount, Account } from '@/types/database.types'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah, formatDate, getDateInTimeZone } from '@/lib/utils'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 
@@ -91,28 +90,42 @@ export function CashClient({
   const [selectedBankId, setSelectedBankId] = useState<string | null>(null)
 
   // Form states for transaction
-  const [txType, setTxType] = useState<'IN' | 'OUT' | 'TRANSFER'>('OUT')
+  const [txType, setTxType] = useState<'IN' | 'OUT'>('OUT')
   const [txAmount, setTxAmount] = useState(0)
   const [txDescription, setTxDescription] = useState('')
+  const [txDate, setTxDate] = useState(getDateInTimeZone('Asia/Jakarta'))
+  const [txCategoryId, setTxCategoryId] = useState('')
+  const [isCategoryLocked, setIsCategoryLocked] = useState(false)
   const [filterStatus, setFilterStatus] = useState<'POSTED' | 'VOIDED'>('POSTED')
   const [filterAccountId, setFilterAccountId] = useState<string | null>(null)
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const isOwner = userRole === 'owner'
   const canWriteCash = Boolean(activeBranchId)
+  const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
+  const hasSettlementPrefill = Boolean(searchParams.get('pay'))
 
   useEffect(() => {
     const pay = searchParams.get('pay')
     const type = searchParams.get('type')
     const amount = searchParams.get('amount')
     const desc = searchParams.get('desc')
+    const categoryId = searchParams.get('category_id')
+    const lockCategory = searchParams.get('lock_category') === '1'
+    const date = searchParams.get('date')
 
     if (pay) {
-      if (type === 'IN' || type === 'OUT' || type === 'TRANSFER') setTxType(type)
-      if (amount) setTxAmount(Number(amount))
-      if (desc) setTxDescription(desc)
-      setShowTransactionModal(true)
+      startTransition(() => {
+        if (type === 'IN' || type === 'OUT') setTxType(type)
+        if (amount) setTxAmount(Number(amount))
+        if (desc) setTxDescription(desc)
+        setTxCategoryId(categoryId || '')
+        setIsCategoryLocked(lockCategory && Boolean(categoryId))
+        setTxDate(date || todayInJakarta)
+        setShowTransactionModal(true)
+      })
     }
-  }, [searchParams])
+  }, [searchParams, todayInJakarta])
 
   const handleCreateAccount = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -129,6 +142,13 @@ export function CashClient({
     setLoading(false)
   }
 
+  const closeTransactionModal = () => {
+    setShowTransactionModal(false)
+    if (hasSettlementPrefill) {
+      router.replace(pathname)
+    }
+  }
+
   const handleCreateTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
@@ -138,8 +158,15 @@ export function CashClient({
     if (res?.error) setError(res.error)
     else {
       setSuccess('Transaksi berhasil dicatat.')
+      if (hasSettlementPrefill) {
+        router.replace(pathname)
+      }
       setShowTransactionModal(false)
       setTxAmount(0)
+      setTxDescription('')
+      setTxCategoryId('')
+      setIsCategoryLocked(false)
+      setTxDate(todayInJakarta)
       router.refresh()
       setTimeout(() => setSuccess(null), 3000)
     }
@@ -170,8 +197,9 @@ export function CashClient({
         setSuccess(`${res.count} mutasi berhasil diunggah.`)
         setTimeout(() => setSuccess(null), 3000)
       }
-    } catch (err: any) {
-      setError('Gagal membaca file: ' + err.message)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError('Gagal membaca file: ' + message)
     }
     setLoading(false)
   }
@@ -190,12 +218,12 @@ export function CashClient({
   }
 
   const handleDeleteTransaction = async (id: string) => {
-    if (!confirm('Hapus transaksi ini? Saldo buku besar akan disesuaikan otomatis.')) return
+    if (!confirm('Void transaksi ini? Mutasi sumber tetap disimpan untuk audit dan jurnal terkait akan ikut di-void.')) return
     setLoading(true)
     const res = await deleteBankTransaction(orgId, id)
     if (res?.error) setError(res.error)
     else {
-      setSuccess('Transaksi berhasil dihapus.')
+      setSuccess('Transaksi berhasil di-void.')
       router.refresh()
       setTimeout(() => setSuccess(null), 3000)
     }
@@ -243,6 +271,9 @@ export function CashClient({
                 setTxType('OUT'); 
                 setTxAmount(0);
                 setTxDescription('');
+                setTxCategoryId('');
+                setIsCategoryLocked(false);
+                setTxDate(todayInJakarta);
                 setShowTransactionModal(true); 
               }}
             >
@@ -282,7 +313,7 @@ export function CashClient({
         />
         <StatCard 
           label="Pengeluaran Hari Ini" 
-          value={formatRupiah(recentTransactions.filter(t => t.type === 'OUT' && t.transaction_date === new Date().toISOString().split('T')[0]).reduce((sum, t) => sum + (t.amount || 0), 0))} 
+          value={formatRupiah(recentTransactions.filter(t => t.status === 'POSTED' && t.type === 'OUT' && t.transaction_date === todayInJakarta).reduce((sum, t) => sum + (t.amount || 0), 0))} 
           icon={TrendingDown}
           color="rose"
           sub="Mutasi keluar terposting"
@@ -654,20 +685,19 @@ export function CashClient({
 
         {showTransactionModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowTransactionModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeTransactionModal} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-xl bg-white rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                <div className="px-10 py-8 bg-blue-600 text-white flex justify-between items-start shrink-0">
                   <div>
                     <h3 className="text-2xl font-black tracking-tight flex items-center gap-3">
-                       {txType === 'IN' ? <ArrowDownRight /> : txType === 'OUT' ? <ArrowUpRight /> : <ArrowRightLeft />} 
-                       Record {txType === 'TRANSFER' ? 'Transfer' : 'Mutation'}
+                       {txType === 'IN' ? <ArrowDownRight /> : <ArrowUpRight />} 
+                       Record Mutation
                     </h3>
                     <p className="text-xs text-blue-100 mt-1 font-medium italic">Create an instant double-entry transaction record.</p>
                   </div>
                   <div className="flex bg-white/10 p-1 rounded-2xl border border-white/20">
                      <button type="button" onClick={() => setTxType('IN')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${txType === 'IN' ? 'bg-white text-emerald-600 shadow-md' : 'text-blue-100 hover:bg-white/5'}`}>IN</button>
                      <button type="button" onClick={() => setTxType('OUT')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${txType === 'OUT' ? 'bg-white text-rose-600 shadow-md' : 'text-blue-100 hover:bg-white/5'}`}>OUT</button>
-                     <button type="button" onClick={() => setTxType('TRANSFER')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${txType === 'TRANSFER' ? 'bg-white text-blue-600 shadow-md' : 'text-blue-100 hover:bg-white/5'}`}>XFER</button>
                   </div>
                </div>
 
@@ -684,7 +714,7 @@ export function CashClient({
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Date</label>
-                      <input type="date" name="transaction_date" defaultValue={new Date().toISOString().split('T')[0]} required className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold shadow-inner outline-none focus:bg-white focus:border-blue-500 transition-all font-mono" />
+                      <input type="date" name="transaction_date" value={txDate} onChange={(e) => setTxDate(e.target.value)} required className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold shadow-inner outline-none focus:bg-white focus:border-blue-500 transition-all font-mono" />
                     </div>
                  </div>
 
@@ -711,43 +741,36 @@ export function CashClient({
                     
                     <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] ml-1 flex items-center gap-1.5">
-                          <ExternalLink size={12}/> {txType === 'TRANSFER' ? 'Target Account' : 'Counterparty Account'}
+                          <ExternalLink size={12}/> Counterparty Account
                         </label>
-                        <select name="category_id" required className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all">
-                           <option value="">{txType === 'TRANSFER' ? 'Select Target...' : 'Select Ledger Account...'}</option>
-                           {txType === 'TRANSFER' ? 
-                             bankAccounts.map(b => (
-                               <option key={b.id} value={b.account_id}>
-                                 {b.bank_name} ({b.account_number})
-                               </option>
-                             )) :
-                             <>
-                               {['EXPENSE', 'LIABILITY', 'ASSET', 'REVENUE', 'EQUITY'].map(type => {
-                                 const group = categoryAccounts.filter(a => a.type === type);
-                                 if (group.length === 0) return null;
-                                 return (
-                                   <optgroup key={type} className="text-slate-400" label={type}>
-                                      {group.map(a => <option key={a.id} value={a.id} className="text-white">{a.code} - {a.name}</option>)}
-                                   </optgroup>
-                                 )
-                               })}
-                             </>
-                           }
+                        {isCategoryLocked && <input type="hidden" name="category_id" value={txCategoryId} />}
+                        <select name="category_id" value={txCategoryId} onChange={(e) => setTxCategoryId(e.target.value)} required disabled={isCategoryLocked} className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
+                           <option value="">Select Ledger Account...</option>
+                           {['EXPENSE', 'LIABILITY', 'ASSET', 'REVENUE', 'EQUITY'].map(type => {
+                             const group = categoryAccounts.filter(a => a.type === type);
+                             if (group.length === 0) return null;
+                             return (
+                               <optgroup key={type} className="text-slate-400" label={type}>
+                                  {group.map(a => <option key={a.id} value={a.id} className="text-white">{a.code} - {a.name}</option>)}
+                               </optgroup>
+                             )
+                           })}
                         </select>
+                        {isCategoryLocked && (
+                          <p className="text-[10px] font-bold text-indigo-500 ml-1">Akun lawan dikunci dari shortcut aging agar settlement tetap masuk ke akun piutang/hutang yang benar.</p>
+                        )}
                     </div>
                  </div>
 
                  <div className="bg-slate-50 p-6 rounded-[28px] border border-slate-100 text-[10px] font-medium text-slate-400 leading-relaxed italic flex gap-3">
                     <AlertCircle size={16} className="shrink-0 text-slate-300" />
-                    {txType === 'OUT' ? 'Choosing an EXPENSE account will decrease equity. Choosing a LIABILITY will settle or create a debt.' : 
-                     txType === 'IN' ? 'Choosing REVENUE will increase equity. Choosing ASSET (e.g. Accounts Receivable) will settle a customer debt.' : 
-                     'A transfer involves two asset accounts. The source will be credited and the target will be debited.'}
+                    {txType === 'OUT' ? 'Choosing an EXPENSE account will decrease equity. Choosing a LIABILITY will settle or create a debt.' : 'Choosing REVENUE will increase equity. Choosing an ASSET account like Accounts Receivable will settle a customer debt.'}
                  </div>
 
                  <div className="flex gap-4 pt-4 shrink-0">
-                   <button type="button" onClick={() => setShowTransactionModal(false)} className="flex-1 py-5 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">Abort</button>
+                   <button type="button" onClick={closeTransactionModal} className="flex-1 py-5 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">Abort</button>
                    <SafeButton type="submit" variant="primary" size="lg" className="flex-[2] shadow-2xl shadow-blue-100" isLoading={loading}>
-                     {txType === 'IN' ? 'RECEIVE FUNDS' : txType === 'OUT' ? 'SEND PAYMENT' : 'PROCESS TRANSFER'}
+                     {txType === 'IN' ? 'RECEIVE FUNDS' : 'SEND PAYMENT'}
                    </SafeButton>
                  </div>
                </form>

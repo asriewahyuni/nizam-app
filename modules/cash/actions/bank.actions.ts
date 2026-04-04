@@ -211,48 +211,63 @@ export async function deleteBankAccount(orgId: string, accountId: string) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// deleteBankTransaction — Remove a cash movement
+// deleteBankTransaction — Void a cash movement while preserving audit trail
 // ─────────────────────────────────────────────────────────────
 export async function deleteBankTransaction(orgId: string, transactionId: string) {
   const supabase = await createClient()
   const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
 
-  // 1. Fetch the linked journal entry BEFORE deleting (SET NULL on delete)
-  const { data: tx } = await (supabase as any)
+  // 1. Fetch the linked journal entry and current status first
+  const { data: tx, error: txError } = await (supabase as any)
     .from('bank_transactions')
-    .select('journal_entry_id, branch_id')
+    .select('id, journal_entry_id, branch_id, status')
     .eq('id', transactionId)
     .eq('org_id', orgId)
     .single()
+
+  if (txError || !tx?.id) {
+    return { error: 'Transaksi kas/bank tidak ditemukan.' }
+  }
 
   if (tx?.branch_id) {
     const branchSelection = await resolveAccessibleBranchSelection(orgId, tx.branch_id)
     if ('error' in branchSelection) return { error: branchSelection.error }
   }
 
+  if (tx.status === 'VOIDED') {
+    return { success: true }
+  }
+
   // 2. Void the linked journal entry so GL stays balanced
   if (tx?.journal_entry_id) {
-    await (supabase as any)
+    const { error: journalError } = await (supabase as any)
       .from('journal_entries')
       .update({
         status: 'VOIDED',
-        void_reason: 'Transaksi Kas/Bank dihapus manual',
+        void_reason: 'Transaksi Kas/Bank di-void manual',
         voided_by: user.id,
         voided_at: new Date().toISOString()
       })
       .eq('id', tx.journal_entry_id)
+      .eq('org_id', orgId)
+
+    if (journalError) {
+      return { error: 'Gagal me-void jurnal transaksi kas/bank.' }
+    }
   }
 
-  // 3. Delete the transaction
+  // 3. Soft-void the source transaction for auditability
   const { error } = await (supabase as any)
     .from('bank_transactions')
-    .delete()
+    .update({
+      status: 'VOIDED',
+    })
     .eq('id', transactionId)
     .eq('org_id', orgId)
 
   if (error) {
-    return { error: 'Gagal menghapus mutasi: ' + error.message }
+    return { error: 'Gagal me-void mutasi: ' + error.message }
   }
 
   revalidatePath('/cash')

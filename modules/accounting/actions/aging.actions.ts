@@ -1,16 +1,17 @@
 'use server'
 
+import { diffDateOnlyStrings, getDateInTimeZone } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
-
-const TODAY = new Date().toISOString().split('T')[0]
 
 type BranchFilter = string | null | undefined
 
-function agingBucket(dueDateStr: string): string {
+function getBusinessToday() {
+  return getDateInTimeZone('Asia/Jakarta')
+}
+
+function agingBucket(dueDateStr: string, today: string): string {
   if (!dueDateStr) return '> 90 Days'
-  const due = new Date(dueDateStr)
-  const today = new Date(TODAY)
-  const days = Math.floor((today.getTime() - due.getTime()) / 86400000)
+  const days = diffDateOnlyStrings(today, dueDateStr)
   if (days <= 0) return 'Current'
   if (days <= 30) return '0-30 Days'
   if (days <= 60) return '31-60 Days'
@@ -70,9 +71,32 @@ async function getAccountCodeBalances(
   return balances
 }
 
+async function getSettlementAccounts(
+  db: any,
+  orgId: string,
+  codes: string[]
+) {
+  const { data, error } = await db
+    .from('accounts')
+    .select('id, code')
+    .eq('org_id', orgId)
+    .in('code', codes)
+
+  if (error || !Array.isArray(data)) return {}
+
+  return data.reduce((map: Record<string, string>, account: any) => {
+    if (account.code && account.id) {
+      map[account.code] = account.id
+    }
+    return map
+  }, {})
+}
+
 export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?: BranchFilter) {
   const supabase = await createClient()
   const db = supabase as any
+  const today = getBusinessToday()
+  const settlementAccounts = await getSettlementAccounts(db, orgId, ['1201', '2101', '2201'])
 
   let results: any[] = []
 
@@ -132,8 +156,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             paid_amount: paidBySale[s.id] || 0,
             returned_amount: returnedBySale[s.id] || 0,
             outstanding,
-            days_overdue: Math.max(0, Math.floor((new Date().getTime() - new Date(finalDueDate).getTime()) / 86400000)),
-            aging_bucket: agingBucket(finalDueDate),
+            days_overdue: Math.max(0, diffDateOnlyStrings(today, finalDueDate)),
+            aging_bucket: agingBucket(finalDueDate, today),
             source_type: 'SALES'
           }
         })
@@ -151,14 +175,15 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
         id: 'manual-ar-adj',
         contact_name: 'Unallocated (Buku Besar)',
         doc_number: 'GL-1201-ADJ',
-        due_date: TODAY,
+        due_date: today,
         grand_total: diff,
         paid_amount: 0,
         returned_amount: 0,
         outstanding: diff,
         days_overdue: 0,
         aging_bucket: 'Current',
-        source_type: 'JOURNAL'
+        source_type: 'JOURNAL',
+        settlement_account_id: settlementAccounts['1201'] || null,
       });
     }
 
@@ -179,20 +204,29 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
 
     if (purchases && purchases.length > 0) {
       const purchaseIds = purchases.map((p: any) => p.id)
-      const { data: payments } = await db
+      let paymentsQuery = db
         .from('purchase_payments')
         .select('purchase_id, amount, discount_amount')
         .in('purchase_id', purchaseIds)
+      if (branchId) {
+        paymentsQuery = paymentsQuery.eq('branch_id', branchId)
+      }
+      const { data: payments } = await paymentsQuery
       const paidByPurchase: Record<string, number> = {}
       for (const p of payments || []) {
         paidByPurchase[p.purchase_id] = (paidByPurchase[p.purchase_id] || 0) + Number(p.amount) + Number(p.discount_amount || 0)
       }
-      const { data: returns } = await db
+      let returnsQuery = db
         .from('purchase_returns')
-        .select('purchase_id, total_amount')
+        .select('purchase_id, total_amount, status')
         .in('purchase_id', purchaseIds)
+      if (branchId) {
+        returnsQuery = returnsQuery.eq('branch_id', branchId)
+      }
+      const { data: returns } = await returnsQuery
       const returnedByPurchase: Record<string, number> = {}
       for (const r of returns || []) {
+        if (r.status === 'VOIDED') continue
         returnedByPurchase[r.purchase_id] = (returnedByPurchase[r.purchase_id] || 0) + Number(r.total_amount)
       }
 
@@ -209,8 +243,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             paid_amount: paidByPurchase[p.id] || 0,
             returned_amount: returnedByPurchase[p.id] || 0,
             outstanding,
-            days_overdue: Math.max(0, Math.floor((new Date().getTime() - new Date(finalDueDate).getTime()) / 86400000)),
-            aging_bucket: agingBucket(finalDueDate),
+            days_overdue: Math.max(0, diffDateOnlyStrings(today, finalDueDate)),
+            aging_bucket: agingBucket(finalDueDate, today),
             source_type: 'PURCHASING'
           }
         })
@@ -236,14 +270,15 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             id: `gl-2101-manual`,
             contact_name: 'Unallocated (Buku Besar)',
             doc_number: 'GL-2101-ADJ',
-            due_date: TODAY,
+            due_date: today,
             grand_total: diff,
             paid_amount: 0,
             returned_amount: 0,
             outstanding: diff,
             days_overdue: 0,
             aging_bucket: 'Current',
-            source_type: 'JOURNAL'
+            source_type: 'JOURNAL',
+            settlement_account_id: settlementAccounts['2101'] || null,
           });
         }
       } else if (b.code === '2201') {
@@ -251,14 +286,15 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
           id: `gl-tax-${b.code}`,
           contact_name: 'Pajak / Negara (PDI)',
           doc_number: `PPN-OUTSTANDING`,
-          due_date: TODAY,
+          due_date: today,
           grand_total: Number(b.balance),
           paid_amount: 0,
           returned_amount: 0,
           outstanding: Number(b.balance),
           days_overdue: 0,
           aging_bucket: 'Current',
-          source_type: 'TAX'
+          source_type: 'TAX',
+          settlement_account_id: settlementAccounts['2201'] || null,
         });
       }
     }

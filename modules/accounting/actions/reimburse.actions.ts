@@ -1,5 +1,6 @@
 'use server'
 
+import { getDateInTimeZone } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createJournalEntry } from './journal.actions'
@@ -25,6 +26,36 @@ async function resolveActiveBranchId(orgId: string, branchId?: string | null) {
   }
 
   return { branchId: branchSelection.branchId }
+}
+
+async function syncReimbursementApprovalRequest(params: {
+  supabase: any
+  orgId: string
+  reimbursementId: string
+  branchId: string
+  status: 'APPROVED' | 'REJECTED'
+  approverId: string
+  notes?: string
+}) {
+  const { supabase, orgId, reimbursementId, branchId, status, approverId, notes } = params
+
+  const { error } = await (supabase as any)
+    .from('approval_requests')
+    .update({
+      status,
+      approver_id: approverId,
+      notes: notes || null,
+      decided_at: new Date().toISOString(),
+    })
+    .eq('org_id', orgId)
+    .eq('branch_id', branchId)
+    .eq('source_type', 'REIMBURSEMENT')
+    .eq('source_id', reimbursementId)
+    .eq('status', 'PENDING')
+
+  if (error) {
+    (console as any).error('Failed to sync reimbursement approval request:', error)
+  }
 }
 
 export async function uploadReceipt(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
@@ -165,6 +196,8 @@ export async function submitReimbursement(orgId: string, input: {
 
 export async function approveReimbursement(id: string, orgId: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Tidak terautentikasi.' }
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk menyetujui reimbursement.'
@@ -173,18 +206,29 @@ export async function approveReimbursement(id: string, orgId: string) {
 
   const { error } = await (supabase as any)
     .from('reimbursements')
-    .update({ status: 'APPROVED' })
+    .update({ status: 'APPROVED', updated_at: new Date().toISOString() })
     .eq('id', id)
     .eq('org_id', orgId)
     .eq('branch_id', activeBranchResult.branchId)
 
   if (error) return { error: 'Gagal menyetujui reimbursement.' }
+  await syncReimbursementApprovalRequest({
+    supabase,
+    orgId,
+    reimbursementId: id,
+    branchId: activeBranchResult.branchId,
+    status: 'APPROVED',
+    approverId: user.id,
+  })
   revalidatePath('/accounting/reimburse')
+  revalidatePath('/accounting/approvals')
   return { success: true }
 }
 
 export async function rejectReimbursement(id: string, orgId: string, reason: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Tidak terautentikasi.' }
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk menolak reimbursement.'
@@ -193,13 +237,23 @@ export async function rejectReimbursement(id: string, orgId: string, reason: str
 
   const { error } = await (supabase as any)
     .from('reimbursements')
-    .update({ status: 'REJECTED', notes: reason })
+    .update({ status: 'REJECTED', notes: reason, updated_at: new Date().toISOString() })
     .eq('id', id)
     .eq('org_id', orgId)
     .eq('branch_id', activeBranchResult.branchId)
 
   if (error) return { error: 'Gagal menolak reimbursement.' }
+  await syncReimbursementApprovalRequest({
+    supabase,
+    orgId,
+    reimbursementId: id,
+    branchId: activeBranchResult.branchId,
+    status: 'REJECTED',
+    approverId: user.id,
+    notes: reason,
+  })
   revalidatePath('/accounting/reimburse')
+  revalidatePath('/accounting/approvals')
   return { success: true }
 }
 
@@ -267,7 +321,7 @@ export async function payReimbursement(id: string, orgId: string, bankAccountId:
   const journalResult = await createJournalEntry({
     org_id: orgId,
     branch_id: activeBranchId,
-    entry_date: new Date().toISOString().split('T')[0],
+    entry_date: getDateInTimeZone('Asia/Jakarta'),
     description: `Pembayaran Reimburse ${reim.claim_number} - ${reim.description}`,
     reference_type: 'CASH_OUT',
     reference_id: reim.id,
