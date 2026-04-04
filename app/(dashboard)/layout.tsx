@@ -92,6 +92,10 @@ export default async function DashboardLayout({
     { path: '/accounting/audit', requiredModule: 'Audit', aliases: ['Audit', 'Audit Trail'], permissionKeys: ['audit', 'approval'] },
     { path: '/settings/audit', requiredModule: 'Audit', aliases: ['Audit', 'Audit Trail'], permissionKeys: ['audit', 'approval'] },
     { path: '/settings/ticketing', requiredModule: 'Config', aliases: ['Config', 'Ticketing', 'Doc Update Ticketing'], permissionKeys: ['business', 'support', 'ticketing'] },
+    { path: '/settings/roles', requiredModule: 'HRIS', aliases: ['HRIS', 'Akses & Jabatan'], permissionKeys: ['business'] },
+    { path: '/settings/branches', requiredModule: 'Config', aliases: ['Config', 'Cabang & Divisi'], permissionKeys: ['branch'] },
+    { path: '/settings/business', requiredModule: 'Config', aliases: ['Config', 'Pengaturan Bisnis'], permissionKeys: ['business'] },
+    { path: '/settings/accounts', requiredModule: 'Finance', aliases: ['Finance', 'Akun (CoA)'], permissionKeys: ['coa'] },
     {
       path: '/accounting',
       requiredModule: 'Accounting',
