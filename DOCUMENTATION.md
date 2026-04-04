@@ -583,6 +583,7 @@ Core reusable components:
 - `AppHeader` — org info, branch switcher, pending approvals, AI token badge
 - `StartupWizard` — first-time onboarding wizard
 - `MobileBottomNav` — mobile navigation
+- `MobilePullToRefresh` — pull-to-refresh gesture on touch devices (HP/Tablet/iPad) in dashboard scroll container
 - `DemoBanner` — demo mode indicator
 - `FloatingPlanBadge` — plan indicator
 - `AdminImpersonationBanner` — admin impersonation indicator
@@ -1116,6 +1117,7 @@ When adding new modules to the SaaS system, update:
 - Added migration `1114_support_ticketing.sql` for `support_tickets` table + RLS.
 - Added migration `1115_support_ticket_updates_doc_update.sql` for progress timeline + public doc update.
 - Fixed runtime error in `/saas/ticketing` form submit by preserving HTML form reference before async transition.
+- Added mobile/tablet/iPad pull-to-refresh interaction in dashboard layout to support PWA usage on touch devices.
 
 ### Branch Context Expansion (April 2026)
 

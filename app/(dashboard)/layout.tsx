@@ -18,6 +18,7 @@ import { DemoBanner } from '@/components/shared/DemoBanner'
 import { StartupWizard } from '@/components/shared/StartupWizard'
 import { FloatingPlanBadge } from '@/components/shared/FloatingPlanBadge'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
+import { MobilePullToRefresh } from '@/components/shared/MobilePullToRefresh'
 
 type RouteModuleEntry = {
   path: string
@@ -196,7 +197,8 @@ export default async function DashboardLayout({
           aiTokens={aiTokens}
         />
         <StartupWizard isDemo={isDemo} />
-        <main className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6 print:overflow-visible print:p-0 print:pb-0">
+        <MobilePullToRefresh scrollContainerId="dashboard-scroll-root" />
+        <main id="dashboard-scroll-root" className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6 print:overflow-visible print:p-0 print:pb-0">
           <div className="max-w-7xl mx-auto print:max-w-none">
             {allowAllBranchSelection && !activeBranch && branches.length > 1 && (
               <div className="mb-6 rounded-[28px] border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50 px-5 py-4 shadow-sm">
