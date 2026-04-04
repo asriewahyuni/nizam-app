@@ -238,8 +238,8 @@ export async function getActiveOrg() {
     if (a.name) enabledModules.push(normalizeSaasEntitlementName(String(a.name)))
   })
 
-  // Clean and unique
-  enabledModules = Array.from(new Set(enabledModules.map((m: string) => normalizeSaasEntitlementName(String(m))).filter(Boolean)))
+  // Clean and unique, preserving the granular names for precise sidebar permission checks
+  enabledModules = Array.from(new Set(enabledModules.map((m: string) => String(m).trim()).filter(Boolean)))
 
   // Fetch Job Title from employees table
   const { data: empData } = await db
