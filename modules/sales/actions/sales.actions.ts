@@ -1,6 +1,8 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { Prisma } from '@prisma/client'
+import { getAuthUser } from '@/lib/auth/permissions'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
@@ -11,6 +13,306 @@ type ActiveBranchResult =
 type DeliveryWarehouseResult =
   | { warehouseId: string }
   | { error: string }
+
+type SalesRpcResult = {
+  success?: boolean
+  error?: string
+  return_id?: string
+  payment_id?: string
+}
+
+const saleSnapshotSelect = {
+  id: true,
+  org_id: true,
+  sale_number: true,
+  sale_date: true,
+  customer_id: true,
+  total_amount: true,
+  tax_amount: true,
+  discount_amount: true,
+  grand_total: true,
+  status: true,
+  payment_status: true,
+  due_date: true,
+  notes: true,
+  created_by: true,
+  created_at: true,
+  updated_at: true,
+  shariah_mode: true,
+  payment_term: true,
+  branch_id: true,
+  warehouse_id: true,
+  branches: {
+    select: {
+      name: true,
+      code: true,
+    },
+  },
+  contacts: {
+    select: {
+      name: true,
+      phone: true,
+      email: true,
+    },
+  },
+  sales_items: {
+    select: {
+      id: true,
+      org_id: true,
+      sale_id: true,
+      product_id: true,
+      description: true,
+      quantity: true,
+      unit_price: true,
+      discount_amount: true,
+      tax_amount: true,
+      total_amount: true,
+      created_at: true,
+      updated_at: true,
+      branch_id: true,
+      products: {
+        select: {
+          name: true,
+          sku: true,
+          unit: true,
+          type: true,
+        },
+      },
+    },
+  },
+  sales_returns: {
+    select: {
+      status: true,
+      grand_total: true,
+      return_number: true,
+    },
+  },
+  sales_payments: {
+    select: {
+      amount: true,
+      discount_amount: true,
+    },
+  },
+} as const satisfies Prisma.salesSelect
+
+type SaleSnapshotRecord = Prisma.salesGetPayload<{ select: typeof saleSnapshotSelect }>
+
+type SaleInsertInput = {
+  orgId: string
+  branchId: string
+  warehouseId?: string | null
+  customerId?: string | null
+  saleDate: string
+  dueDate?: string | null
+  paymentTerm: string
+  totalAmount: number
+  taxAmount: number
+  discountAmount: number
+  grandTotal: number
+  shariahMode: string
+  notes?: string | null
+  createdBy: string
+  status: string
+  paymentStatus: string
+}
+
+function toNumber(value: unknown) {
+  const normalized = Number(value ?? 0)
+  return Number.isFinite(normalized) ? normalized : 0
+}
+
+function normalizeDateOnly(value: Date | null | undefined) {
+  if (!value) return null
+
+  const year = value.getUTCFullYear()
+  const month = String(value.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(value.getUTCDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function normalizeDateTime(value: Date | null | undefined) {
+  return value ? value.toISOString() : null
+}
+
+function extractDatabaseError(error: unknown) {
+  const metaMessage = typeof (error as any)?.meta?.message === 'string'
+    ? String((error as any).meta.message)
+    : null
+  const metaCode = typeof (error as any)?.meta?.code === 'string'
+    ? String((error as any).meta.code)
+    : null
+  const errorCode = typeof (error as any)?.code === 'string'
+    ? String((error as any).code)
+    : null
+
+  return {
+    message: metaMessage || (error instanceof Error ? error.message : 'Unknown error'),
+    code: metaCode || errorCode,
+  }
+}
+
+function formatRpcError(error: unknown) {
+  const detail = extractDatabaseError(error)
+  return detail.code
+    ? `[RPC ERROR]: ${detail.message} (Code: ${detail.code})`
+    : `[RPC ERROR]: ${detail.message}`
+}
+
+function buildSaleTotals(lines: any[], taxAmountValue?: unknown, discountAmountValue?: unknown) {
+  const totalAmount = (lines || []).reduce(
+    (acc: number, line: any) => acc + (toNumber(line?.quantity) * toNumber(line?.unit_price)),
+    0
+  )
+  const taxAmount = toNumber(taxAmountValue)
+  const discountAmount = toNumber(discountAmountValue)
+
+  return {
+    totalAmount,
+    taxAmount,
+    discountAmount,
+    grandTotal: totalAmount - discountAmount + taxAmount,
+  }
+}
+
+async function requireUser(errorMessage: string) {
+  const user = await getAuthUser()
+  if (!user) {
+    return { error: errorMessage } as const
+  }
+
+  return user
+}
+
+async function withDbUserContext<T>(
+  userId: string,
+  action: (tx: Prisma.TransactionClient) => Promise<T>
+): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('request.jwt.claim.sub', ${userId}, true)`
+    await tx.$executeRaw`SELECT set_config('request.jwt.claim.role', 'authenticated', true)`
+    return action(tx)
+  })
+}
+
+async function insertSaleHeader(tx: Prisma.TransactionClient, input: SaleInsertInput) {
+  const rows = await tx.$queryRaw<Array<{ id: string }>>`
+    INSERT INTO public.sales (
+      org_id,
+      branch_id,
+      warehouse_id,
+      customer_id,
+      sale_date,
+      due_date,
+      payment_term,
+      total_amount,
+      tax_amount,
+      discount_amount,
+      grand_total,
+      shariah_mode,
+      notes,
+      created_by,
+      status,
+      payment_status
+    )
+    VALUES (
+      CAST(${input.orgId} AS uuid),
+      CAST(${input.branchId} AS uuid),
+      CAST(${input.warehouseId ?? null} AS uuid),
+      CAST(${input.customerId ?? null} AS uuid),
+      CAST(${input.saleDate} AS date),
+      CAST(${input.dueDate ?? null} AS date),
+      ${input.paymentTerm},
+      ${input.totalAmount},
+      ${input.taxAmount},
+      ${input.discountAmount},
+      ${input.grandTotal},
+      CAST(${input.shariahMode} AS public.shariah_mode),
+      ${input.notes ?? null},
+      CAST(${input.createdBy} AS uuid),
+      CAST(${input.status} AS public.document_status),
+      CAST(${input.paymentStatus} AS public.payment_status)
+    )
+    RETURNING id::text AS id
+  `
+
+  const saleId = rows[0]?.id
+  if (!saleId) {
+    throw new Error('Gagal menyimpan header penjualan.')
+  }
+
+  return saleId
+}
+
+function normalizeSale(record: SaleSnapshotRecord) {
+  return {
+    id: record.id,
+    org_id: record.org_id,
+    sale_number: record.sale_number,
+    sale_date: normalizeDateOnly(record.sale_date),
+    customer_id: record.customer_id,
+    total_amount: toNumber(record.total_amount),
+    tax_amount: toNumber(record.tax_amount),
+    discount_amount: toNumber(record.discount_amount),
+    grand_total: toNumber(record.grand_total),
+    status: record.status,
+    payment_status: record.payment_status,
+    due_date: normalizeDateOnly(record.due_date),
+    notes: record.notes,
+    created_by: record.created_by,
+    created_at: record.created_at.toISOString(),
+    updated_at: record.updated_at.toISOString(),
+    shariah_mode: record.shariah_mode,
+    payment_term: record.payment_term,
+    branch_id: record.branch_id,
+    warehouse_id: record.warehouse_id,
+    branches: record.branches
+      ? {
+          name: record.branches.name,
+          code: record.branches.code,
+        }
+      : null,
+    contacts: record.contacts
+      ? {
+          name: record.contacts.name,
+          phone: record.contacts.phone,
+          email: record.contacts.email,
+        }
+      : null,
+    sales_items: record.sales_items.map((item) => ({
+      id: item.id,
+      org_id: item.org_id,
+      sale_id: item.sale_id,
+      product_id: item.product_id,
+      description: item.description,
+      quantity: toNumber(item.quantity),
+      unit_price: toNumber(item.unit_price),
+      discount_amount: toNumber(item.discount_amount),
+      tax_amount: toNumber(item.tax_amount),
+      total_amount: toNumber(item.total_amount),
+      created_at: normalizeDateTime(item.created_at),
+      updated_at: normalizeDateTime(item.updated_at),
+      branch_id: item.branch_id,
+      products: item.products
+        ? {
+            name: item.products.name,
+            sku: item.products.sku,
+            unit: item.products.unit,
+            type: item.products.type,
+          }
+        : null,
+    })),
+    sales_returns: record.sales_returns.map((saleReturn) => ({
+      status: saleReturn.status,
+      grand_total: toNumber(saleReturn.grand_total),
+      return_number: saleReturn.return_number,
+    })),
+    sales_payments: record.sales_payments.map((payment) => ({
+      amount: toNumber(payment.amount),
+      discount_amount: toNumber(payment.discount_amount),
+    })),
+  }
+}
 
 async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
   const branchSelection = await resolveAccessibleBranchSelection(orgId)
@@ -31,33 +333,45 @@ async function resolveActiveBranchId(orgId: string, branchId?: string | null) {
 }
 
 async function resolveDeliveryWarehouseId(
-  supabase: any,
   orgId: string,
   branchId: string,
   explicitWarehouseId?: string | null
 ): Promise<DeliveryWarehouseResult> {
-  let query = (supabase as any)
-    .from('warehouses')
-    .select('id, name, branch_id')
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .eq('branch_id', branchId)
-
   if (explicitWarehouseId) {
-    const { data, error } = await query.eq('id', explicitWarehouseId).maybeSingle()
-    if (error || !data) {
+    const warehouse = await prisma.warehouses.findFirst({
+      where: {
+        id: explicitWarehouseId,
+        org_id: orgId,
+        is_active: true,
+        branch_id: branchId,
+      },
+      select: {
+        id: true,
+      },
+    })
+
+    if (!warehouse) {
       return { error: 'Gudang pengiriman tidak tersedia pada unit aktif.' }
     }
 
-    return { warehouseId: data.id }
+    return { warehouseId: warehouse.id }
   }
 
-  const { data, error } = await query.order('name', { ascending: true }).limit(2)
-  if (error) {
-    return { error: 'Gagal memuat gudang pengiriman.' }
-  }
+  const warehouses = await prisma.warehouses.findMany({
+    where: {
+      org_id: orgId,
+      is_active: true,
+      branch_id: branchId,
+    },
+    select: {
+      id: true,
+    },
+    orderBy: {
+      name: 'asc',
+    },
+    take: 2,
+  })
 
-  const warehouses = (data as Array<{ id: string }>) || []
   if (warehouses.length === 0) {
     return { error: 'Belum ada gudang aktif di unit ini. Tambahkan gudang terlebih dahulu.' }
   }
@@ -70,117 +384,129 @@ async function resolveDeliveryWarehouseId(
 }
 
 export async function getSales(orgId: string, branchId?: string | null) {
-  const supabase = await createClient()
   const branchSelection = await resolveActiveBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
-  const effectiveBranchId = branchSelection.branchId
-  let query = supabase
-    .from('sales' as any)
-    .select('*, branches(name, code), contacts(name), sales_items(*, products(name, sku, unit, type)), sales_returns(status, grand_total, return_number), sales_payments(amount, discount_amount)' as any)
-    .eq('org_id', orgId)
 
-  if (effectiveBranchId) {
-    query = query.eq('branch_id', effectiveBranchId)
-  }
+  const data = await prisma.sales.findMany({
+    where: {
+      org_id: orgId,
+      ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+    },
+    select: saleSnapshotSelect,
+    orderBy: {
+      created_at: 'desc',
+    },
+  })
 
-  const { data, error } = await query.order('created_at', { ascending: false })
-
-  if (error) return []
-  return data
+  return data.map(normalizeSale)
 }
 
-export async function createSaleEntry(orgId: string, payload: any) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+export async function createSaleEntry(
+  orgId: string,
+  payload: any
+): Promise<
+  | { success: true; saleId: string; error?: undefined }
+  | { success?: false; error: string; saleId?: undefined }
+> {
+  const user = await requireUser('Not authenticated')
+  if ('error' in user) return user
+
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk membuat sales order.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
-  const activeBranchId = activeBranchResult.branchId
 
-  const { data: sale, error: saleErr } = await (supabase as any)
-    .from('sales')
-    .insert({
-      org_id: orgId,
-      branch_id: activeBranchId,
-      customer_id: payload.customer_id,
-      sale_date: payload.sale_date,
-      due_date: payload.due_date, // ADDED
-      payment_term: payload.payment_term, // ADDED
-      total_amount: payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0),
-      tax_amount: payload.tax_amount || 0,
-      discount_amount: payload.discount_amount || 0,
-      grand_total: (payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)) - (payload.discount_amount || 0) + (payload.tax_amount || 0),
-      shariah_mode: payload.shariah_mode || 'CASH',
-      notes: payload.notes,
-      created_by: user.id,
-      status: 'DRAFT'
+  const lines = Array.isArray(payload?.lines) ? payload.lines : []
+  const totals = buildSaleTotals(lines, payload?.tax_amount, payload?.discount_amount)
+  const reason = `Sales Order Baru (${payload?.shariah_mode || 'CASH'}) - Customer: ${payload?.customer_name || ''} - ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(totals.grandTotal)}`
+
+  try {
+    const saleId = await withDbUserContext(user.userId, async (tx) => {
+      const createdSaleId = await insertSaleHeader(tx, {
+        orgId,
+        branchId: activeBranchResult.branchId,
+        customerId: payload?.customer_id || null,
+        saleDate: payload?.sale_date,
+        dueDate: payload?.due_date || null,
+        paymentTerm: payload?.payment_term || 'TEMPO',
+        totalAmount: totals.totalAmount,
+        taxAmount: totals.taxAmount,
+        discountAmount: totals.discountAmount,
+        grandTotal: totals.grandTotal,
+        shariahMode: payload?.shariah_mode || 'CASH',
+        notes: payload?.notes || null,
+        createdBy: user.userId,
+        status: 'DRAFT',
+        paymentStatus: 'UNPAID',
+      })
+
+      if (lines.length > 0) {
+        await tx.sales_items.createMany({
+          data: lines.map((line: any) => ({
+            org_id: orgId,
+            branch_id: activeBranchResult.branchId,
+            sale_id: createdSaleId,
+            product_id: line?.product_id || null,
+            description: line?.product_name || '',
+            quantity: toNumber(line?.quantity),
+            unit_price: toNumber(line?.unit_price),
+            discount_amount: toNumber(line?.discount_amount),
+            tax_amount: toNumber(line?.tax_amount),
+          })),
+        })
+      }
+
+      await tx.approval_requests.create({
+        data: {
+          org_id: orgId,
+          branch_id: activeBranchResult.branchId,
+          requester_id: user.userId,
+          source_type: 'SALES_ORDER',
+          source_id: createdSaleId,
+          status: 'PENDING',
+          reason,
+        },
+      })
+
+      return createdSaleId
     })
-    .select('id')
-    .single()
 
-  if (saleErr) return { error: saleErr.message }
-
-  const { error: linesErr } = await (supabase as any)
-    .from('sales_items')
-    .insert(payload.lines.map((l: any) => ({
-      org_id: orgId,
-      branch_id: activeBranchId,
-      sale_id: sale.id,
-      product_id: l.product_id,
-      description: l.product_name,
-      quantity: l.quantity,
-      unit_price: l.unit_price,
-      discount_amount: l.discount_amount || 0,
-      tax_amount: l.tax_amount || 0
-    })))
-
-  if (linesErr) {
-    // Cleanup if lines fail
-    await (supabase as any).from('sales').delete().eq('id', sale.id)
-    return { error: linesErr.message }
+    revalidatePath('/sales')
+    return { success: true, saleId, error: undefined }
+  } catch (error) {
+    return { error: extractDatabaseError(error).message }
   }
-
-  // Insert to approval flow
-  const computedTotal = payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0) - (payload.discount_amount || 0) + (payload.tax_amount || 0)
-  await (supabase as any).from('approval_requests' as any).insert({
-    org_id: orgId,
-    branch_id: activeBranchId,
-    requester_id: user.id,
-    source_type: 'SALES_ORDER',
-    source_id: sale.id,
-    status: 'PENDING',
-    reason: `Sales Order Baru (${payload.shariah_mode || 'CASH'}) - Customer: ${payload.customer_name || ''} - ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(computedTotal)}`
-  })
-
-  revalidatePath('/sales')
-  return { success: true, saleId: sale.id }
 }
 
 export async function deliverSale(orgId: string, saleId: string, warehouseId?: string | null) {
-  const supabase = await createClient()
+  const user = await requireUser('Tidak terautentikasi.')
+  if ('error' in user) return user
+
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk mengirim sales order.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  const { data: sale } = await (supabase as any)
-    .from('sales' as any)
-    .select('status, warehouse_id')
-    .eq('id', saleId)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchResult.branchId)
-    .single()
+  const sale = await prisma.sales.findFirst({
+    where: {
+      id: saleId,
+      org_id: orgId,
+      branch_id: activeBranchResult.branchId,
+    },
+    select: {
+      status: true,
+      warehouse_id: true,
+    },
+  })
+
   if (!sale) return { error: 'Order tidak ditemukan.' }
-  if (sale.status === 'FINISHED') return { success: true }
+  if (sale.status === 'FINISHED') return { success: true, error: undefined }
 
   let resolvedWarehouseId: string | null = null
   if (warehouseId || sale.warehouse_id) {
     const resolvedWarehouse = await resolveDeliveryWarehouseId(
-      supabase as any,
       orgId,
       activeBranchResult.branchId,
       warehouseId || sale.warehouse_id || null
@@ -193,355 +519,438 @@ export async function deliverSale(orgId: string, saleId: string, warehouseId?: s
     resolvedWarehouseId = resolvedWarehouse.warehouseId
   }
 
-  const { error } = await (supabase as any).rpc('process_sales_delivery_atomic', {
-    p_org_id: orgId,
-    p_sale_id: saleId,
-    p_warehouse_id: resolvedWarehouseId,
-  })
-
-  if (error) {
-    (console as any).error('Failed to deliver sale via atomic engine:', error)
-    return { error: `[RPC ERROR]: ${error.message} (Code: ${error.code})` }
+  try {
+    await withDbUserContext(user.userId, async (tx) => {
+      await tx.$executeRaw`
+        SELECT public.process_sales_delivery_atomic(
+          CAST(${orgId} AS uuid),
+          CAST(${saleId} AS uuid),
+          CAST(${resolvedWarehouseId} AS uuid)
+        )
+      `
+    })
+  } catch (error) {
+    ;(console as any).error('Failed to deliver sale via atomic engine:', error)
+    return { error: formatRpcError(error) }
   }
 
   revalidatePath('/sales')
   revalidatePath('/inventory')
-  return { success: true }
+  return { success: true, error: undefined }
 }
 
 export async function voidSale(orgId: string, saleId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Tidak terautentikasi.' }
+  const user = await requireUser('Tidak terautentikasi.')
+  if ('error' in user) return user
+
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk membatalkan sales order.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
-  const activeBranchId = activeBranchResult.branchId
 
-  // 1. Check current status — only DRAFT or FINISHED can be voided
-  const { data: sale } = await (supabase as any)
-    .from('sales')
-    .select('status')
-    .eq('id', saleId)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchId)
-    .single()
+  const sale = await prisma.sales.findFirst({
+    where: {
+      id: saleId,
+      org_id: orgId,
+      branch_id: activeBranchResult.branchId,
+    },
+    select: {
+      status: true,
+    },
+  })
 
   if (!sale) return { error: 'Order tidak ditemukan.' }
-  if (sale.status === 'VOIDED') return { success: true }
+  if (sale.status === 'VOIDED') return { success: true, error: undefined }
 
-  // 2. Void related journal entry (find by reference)
-  const { data: journalEntry } = await (supabase as any)
-    .from('journal_entries')
-    .select('id')
-    .eq('reference_id', saleId)
-    .eq('org_id', orgId)
-    .eq('status', 'POSTED')
-    .maybeSingle()
+  try {
+    await withDbUserContext(user.userId, async (tx) => {
+      const journalEntry = await tx.journal_entries.findFirst({
+        where: {
+          reference_id: saleId,
+          org_id: orgId,
+          status: 'POSTED',
+        },
+        select: {
+          id: true,
+        },
+      })
 
-  if (journalEntry) {
-    await (supabase as any)
-      .from('journal_entries')
-      .update({ status: 'VOIDED', void_reason: 'Pembatalan Sales Order', voided_by: user.id, voided_at: new Date().toISOString() })
-      .eq('id', journalEntry.id)
+      if (journalEntry?.id) {
+        await tx.journal_entries.update({
+          where: { id: journalEntry.id },
+          data: {
+            status: 'VOIDED',
+            void_reason: 'Pembatalan Sales Order',
+            voided_by: user.userId,
+            voided_at: new Date(),
+          },
+        })
+      }
+
+      await tx.stock_movements.deleteMany({
+        where: {
+          reference_id: saleId,
+          reference_type: 'SALE',
+        },
+      })
+
+      await tx.sales.updateMany({
+        where: {
+          id: saleId,
+          org_id: orgId,
+          branch_id: activeBranchResult.branchId,
+        },
+        data: {
+          status: 'VOIDED',
+          updated_at: new Date(),
+        },
+      })
+
+      await tx.approval_requests.updateMany({
+        where: {
+          source_type: 'SALES_ORDER',
+          source_id: saleId,
+          branch_id: activeBranchResult.branchId,
+          status: 'PENDING',
+        },
+        data: {
+          status: 'CANCELLED',
+          reason: 'Sales Order Dibatalkan',
+          decided_at: new Date(),
+        },
+      })
+    })
+  } catch (error) {
+    return { error: extractDatabaseError(error).message }
   }
-
-  // 3. Revert stock movements caused by this sale
-  await supabase
-    .from('stock_movements')
-    .delete()
-    .eq('reference_id', saleId)
-    .eq('reference_type', 'SALE')
-
-  // 4. Update sales status
-  await (supabase as any).from('sales' as any).update({ status: 'VOIDED' }).eq('id', saleId).eq('org_id', orgId)
-    .eq('branch_id', activeBranchId)
-
-  // 5. Cancel any pending approval requests for this order
-  await (supabase as any)
-    .from('approval_requests')
-    .update({ status: 'VOIDED', reason: 'Sales Order Dibatalkan', decided_at: new Date().toISOString() })
-    .eq('source_type', 'SALES_ORDER')
-    .eq('source_id', saleId)
-    .eq('branch_id', activeBranchId)
-    .eq('status', 'PENDING')
 
   revalidatePath('/sales')
   revalidatePath('/inventory')
   revalidatePath('/accounting/journal')
-  return { success: true }
+  return { success: true, error: undefined }
 }
 
 export async function paySale(orgId: string, saleId: string) {
-  // ⚠️ Deprecated: gunakan processSalesPayment() untuk mencatat pembayaran dengan jurnal yang benar.
-  // Fungsi ini hanya update flag dan TIDAK membuat jurnal penerimaan kas.
-  const supabase = await createClient()
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk menerima pembayaran.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
-  await (supabase as any)
-    .from('sales' as any)
-    .update({ payment_status: 'PAID' })
-    .eq('id', saleId)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchResult.branchId)
+
+  await prisma.sales.updateMany({
+    where: {
+      id: saleId,
+      org_id: orgId,
+      branch_id: activeBranchResult.branchId,
+    },
+    data: {
+      payment_status: 'PAID',
+      updated_at: new Date(),
+    },
+  })
+
   revalidatePath('/sales')
-  return { success: true }
+  return { success: true, error: undefined }
 }
 
-
 export async function processSalesReturn(orgId: string, payload: {
-  sale_id: string, return_number: string, nota_retur: string,
-  items: Array<{ product_id: string, quantity: number, unit_price: number, sale_item_id: string }>,
+  sale_id: string
+  return_number: string
+  nota_retur: string
+  items: Array<{ product_id: string; quantity: number; unit_price: number; sale_item_id: string }>
   refund_account_id?: string
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Tidak terautentikasi.' }
+  const user = await requireUser('Tidak terautentikasi.')
+  if ('error' in user) return user
+
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk memproses retur penjualan.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  const { data: sale } = await (supabase as any)
-    .from('sales')
-    .select('id')
-    .eq('id', payload.sale_id)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchResult.branchId)
-    .maybeSingle()
+  const sale = await prisma.sales.findFirst({
+    where: {
+      id: payload.sale_id,
+      org_id: orgId,
+      branch_id: activeBranchResult.branchId,
+    },
+    select: {
+      id: true,
+    },
+  })
 
   if (!sale) return { error: 'Transaksi penjualan tidak tersedia pada unit aktif.' }
 
-  const { data, error } = await (supabase as any).rpc('process_sales_return_atomic', {
-    p_org_id: orgId, p_sale_id: payload.sale_id, p_return_number: payload.return_number,
-    p_nota_retur: payload.nota_retur, p_items: payload.items, p_user_id: user.id,
-    p_refund_account_id: payload.refund_account_id || null
-  })
+  try {
+    const rows = await withDbUserContext(user.userId, async (tx) =>
+      tx.$queryRaw<Array<{ result: SalesRpcResult }>>`
+        SELECT public.process_sales_return_atomic(
+          CAST(${orgId} AS uuid),
+          CAST(${payload.sale_id} AS uuid),
+          ${payload.return_number},
+          ${payload.nota_retur},
+          CAST(${JSON.stringify(payload.items || [])} AS jsonb),
+          CAST(${user.userId} AS uuid),
+          CAST(${payload.refund_account_id || null} AS uuid)
+        ) AS result
+      `
+    )
 
-  if (error || !data?.success) return { error: 'Gagal memproses retur: ' + (data?.error || error?.message) }
+    const result = rows[0]?.result
+    if (!result?.success) {
+      return { error: 'Gagal memproses retur: ' + (result?.error || 'Unknown error') }
+    }
 
-  revalidatePath('/sales')
-  revalidatePath('/inventory')
-  revalidatePath('/accounting/ledgers')
-  revalidatePath('/accounting/reports')
-  return { success: true, returnId: data.return_id }
+    revalidatePath('/sales')
+    revalidatePath('/inventory')
+    revalidatePath('/accounting/ledgers')
+    revalidatePath('/accounting/reports')
+    return { success: true, returnId: result.return_id, error: undefined }
+  } catch (error) {
+    return { error: 'Gagal memproses retur: ' + extractDatabaseError(error).message }
+  }
 }
 
 export async function processSalesPayment(orgId: string, payload: {
-  sale_id: string, account_id: string, amount: number, payment_date: string, notes?: string, discount_amount?: number
+  sale_id: string
+  account_id: string
+  amount: number
+  payment_date: string
+  notes?: string
+  discount_amount?: number
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Tidak terautentikasi.' }
+  const user = await requireUser('Tidak terautentikasi.')
+  if ('error' in user) return user
+
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk memproses pembayaran penjualan.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  const { data: sale } = await (supabase as any)
-    .from('sales')
-    .select('id')
-    .eq('id', payload.sale_id)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchResult.branchId)
-    .maybeSingle()
+  const sale = await prisma.sales.findFirst({
+    where: {
+      id: payload.sale_id,
+      org_id: orgId,
+      branch_id: activeBranchResult.branchId,
+    },
+    select: {
+      id: true,
+    },
+  })
 
   if (!sale) return { error: 'Transaksi penjualan tidak tersedia pada unit aktif.' }
 
-  const { data, error } = await (supabase as any).rpc('process_sales_payment_atomic', {
-    p_org_id: orgId, p_sale_id: payload.sale_id, p_account_id: payload.account_id,
-    p_amount: payload.amount, p_discount: payload.discount_amount || 0,
-    p_payment_date: payload.payment_date, p_notes: payload.notes || '',
-    p_user_id: user.id
-  })
+  try {
+    const rows = await withDbUserContext(user.userId, async (tx) =>
+      tx.$queryRaw<Array<{ result: SalesRpcResult }>>`
+        SELECT public.process_sales_payment_atomic(
+          CAST(${orgId} AS uuid),
+          CAST(${payload.sale_id} AS uuid),
+          CAST(${payload.account_id} AS uuid),
+          ${toNumber(payload.amount)},
+          ${toNumber(payload.discount_amount)},
+          CAST(${payload.payment_date} AS timestamptz),
+          ${payload.notes || ''},
+          CAST(${user.userId} AS uuid)
+        ) AS result
+      `
+    )
 
-  if (error || !data?.success) return { error: 'Gagal memproses pembayaran: ' + (data?.error || error?.message) }
+    const result = rows[0]?.result
+    if (!result?.success) {
+      return { error: 'Gagal memproses pembayaran: ' + (result?.error || 'Unknown error') }
+    }
 
-  revalidatePath('/sales')
-  revalidatePath('/accounting/ledgers')
-  revalidatePath('/accounting/reports')
-  return { success: true, paymentId: data.payment_id }
+    revalidatePath('/sales')
+    revalidatePath('/accounting/ledgers')
+    revalidatePath('/accounting/reports')
+    return { success: true, paymentId: result.payment_id, error: undefined }
+  } catch (error) {
+    return { error: 'Gagal memproses pembayaran: ' + extractDatabaseError(error).message }
+  }
 }
 
 export async function getQuotations(orgId: string, branchId?: string | null) {
-  const supabase = await createClient()
   const branchSelection = await resolveActiveBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
-  const effectiveBranchId = branchSelection.branchId
-  let query = supabase
-    .from('sales' as any)
-    .select('*, branches(name, code), contacts(name), sales_items(*, products(name, sku, unit, type))' as any)
-    .eq('org_id', orgId)
-    .eq('status', 'QUOTATION')
 
-  if (effectiveBranchId) {
-    query = query.eq('branch_id', effectiveBranchId)
-  }
+  const data = await prisma.sales.findMany({
+    where: {
+      org_id: orgId,
+      status: 'QUOTATION',
+      ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+    },
+    select: saleSnapshotSelect,
+    orderBy: {
+      created_at: 'desc',
+    },
+  })
 
-  const { data, error } = await query.order('created_at', { ascending: false })
-
-  if (error) return []
-  return data
+  return data.map(normalizeSale)
 }
 
 export async function createQuotation(orgId: string, payload: any) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const user = await requireUser('Not authenticated')
+  if ('error' in user) return user
+
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk membuat quotation.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
-  const activeBranchId = activeBranchResult.branchId
 
-  const total = payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)
-  const grandTotal = total - (payload.discount_amount || 0) + (payload.tax_amount || 0)
+  const lines = Array.isArray(payload?.lines) ? payload.lines : []
+  const totals = buildSaleTotals(lines, payload?.tax_amount, payload?.discount_amount)
 
-  const { data: quote, error: quoteErr } = await (supabase as any)
-    .from('sales')
-    .insert({
-      org_id: orgId,
-      branch_id: activeBranchId,
-      customer_id: payload.customer_id,
-      sale_date: payload.sale_date,
-      due_date: payload.due_date,
-      payment_term: payload.payment_term || 'TEMPO',
-      total_amount: total,
-      tax_amount: payload.tax_amount || 0,
-      discount_amount: payload.discount_amount || 0,
-      grand_total: grandTotal,
-      shariah_mode: payload.shariah_mode || 'CASH',
-      notes: payload.notes,
-      created_by: user.id,
-      status: 'QUOTATION'
+  try {
+    const quotationId = await withDbUserContext(user.userId, async (tx) => {
+      const createdSaleId = await insertSaleHeader(tx, {
+        orgId,
+        branchId: activeBranchResult.branchId,
+        customerId: payload?.customer_id || null,
+        saleDate: payload?.sale_date,
+        dueDate: payload?.due_date || null,
+        paymentTerm: payload?.payment_term || 'TEMPO',
+        totalAmount: totals.totalAmount,
+        taxAmount: totals.taxAmount,
+        discountAmount: totals.discountAmount,
+        grandTotal: totals.grandTotal,
+        shariahMode: payload?.shariah_mode || 'CASH',
+        notes: payload?.notes || null,
+        createdBy: user.userId,
+        status: 'QUOTATION',
+        paymentStatus: 'UNPAID',
+      })
+
+      if (lines.length > 0) {
+        await tx.sales_items.createMany({
+          data: lines.map((line: any) => ({
+            org_id: orgId,
+            branch_id: activeBranchResult.branchId,
+            sale_id: createdSaleId,
+            product_id: line?.product_id || null,
+            description: line?.product_name || '',
+            quantity: toNumber(line?.quantity),
+            unit_price: toNumber(line?.unit_price),
+            discount_amount: toNumber(line?.discount_amount),
+            tax_amount: toNumber(line?.tax_amount),
+          })),
+        })
+      }
+
+      return createdSaleId
     })
-    .select('id')
-    .single()
 
-  if (quoteErr) return { error: quoteErr.message }
-
-  const { error: linesErr } = await (supabase as any)
-    .from('sales_items')
-    .insert(payload.lines.map((l: any) => ({
-      org_id: orgId,
-      branch_id: activeBranchId,
-      sale_id: quote.id,
-      product_id: l.product_id,
-      description: l.product_name,
-      quantity: l.quantity,
-      unit_price: l.unit_price,
-      discount_amount: l.discount_amount || 0,
-    })))
-
-  if (linesErr) return { error: linesErr.message }
-
-  revalidatePath('/sales/quotations')
-  return { success: true, quotationId: quote.id }
+    revalidatePath('/sales/quotations')
+    return { success: true, quotationId, error: undefined }
+  } catch (error) {
+    return { error: extractDatabaseError(error).message }
+  }
 }
 
 export async function convertQuotationToOrder(orgId: string, quoteId: string) {
-  const supabase = await createClient()
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk mengonversi quotation.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
-  const { error } = await (supabase as any)
-    .from('sales')
-    .update({ status: 'DRAFT', updated_at: new Date().toISOString() })
-    .eq('id', quoteId)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchResult.branchId)
 
-  if (error) return { error: error.message }
-  
+  await prisma.sales.updateMany({
+    where: {
+      id: quoteId,
+      org_id: orgId,
+      branch_id: activeBranchResult.branchId,
+    },
+    data: {
+      status: 'DRAFT',
+      updated_at: new Date(),
+    },
+  })
+
   revalidatePath('/sales/quotations')
   revalidatePath('/sales')
-  return { success: true }
+  return { success: true, error: undefined }
 }
 
 export async function updateSaleStatus(orgId: string, saleId: string, status: string) {
-  const supabase = await createClient()
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk mengubah status pipeline.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
-  const { error } = await (supabase as any)
-    .from('sales')
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq('id', saleId)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchResult.branchId)
 
-  if (error) return { error: error.message }
-  
+  await prisma.sales.updateMany({
+    where: {
+      id: saleId,
+      org_id: orgId,
+      branch_id: activeBranchResult.branchId,
+    },
+    data: {
+      status: status as any,
+      updated_at: new Date(),
+    },
+  })
+
   revalidatePath('/sales/pipeline')
   revalidatePath('/sales')
-  return { success: true }
+  return { success: true, error: undefined }
 }
 
 export async function createQuickKanbanCard(
-  orgId: string, 
+  orgId: string,
   payload: { name: string; phone: string; email: string; amount: number; notes: string; status: string }
 ) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const user = await requireUser('Not authenticated')
+  if ('error' in user) return user
+
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk membuat card pipeline.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
-  const activeBranchId = activeBranchResult.branchId
 
-  // 1. Create a rapid generic contact
-  const { data: contact, error: contactErr } = await (supabase as any)
-    .from('contacts')
-    .insert({
-      org_id: orgId,
-      name: payload.name || 'Anonymous Lead',
-      type: 'CUSTOMER',
-      phone: payload.phone || null,
-      email: payload.email || null,
+  try {
+    const saleId = await withDbUserContext(user.userId, async (tx) => {
+      const contact = await tx.contacts.create({
+        data: {
+          org_id: orgId,
+          name: payload.name || 'Anonymous Lead',
+          type: 'CUSTOMER',
+          phone: payload.phone || null,
+          email: payload.email || null,
+        },
+        select: {
+          id: true,
+        },
+      })
+
+      return insertSaleHeader(tx, {
+        orgId,
+        branchId: activeBranchResult.branchId,
+        customerId: contact.id,
+        saleDate: new Date().toISOString().split('T')[0],
+        dueDate: null,
+        paymentTerm: 'TEMPO',
+        totalAmount: toNumber(payload.amount),
+        taxAmount: 0,
+        discountAmount: 0,
+        grandTotal: toNumber(payload.amount),
+        shariahMode: 'CASH',
+        notes: payload.notes || 'via Kanban Add Card',
+        createdBy: user.userId,
+        status: payload.status,
+        paymentStatus: 'UNPAID',
+      })
     })
-    .select('id')
-    .single()
 
-  if (contactErr) return { error: 'Gagal membuat kontak: ' + contactErr.message }
-
-  // 2. Create the Sale (Kanban Card)
-  const { data: sale, error: saleErr } = await (supabase as any)
-    .from('sales')
-    .insert({
-      org_id: orgId,
-      branch_id: activeBranchId,
-      customer_id: contact.id,
-      sale_date: new Date().toISOString().split('T')[0],
-      total_amount: payload.amount,
-      tax_amount: 0,
-      discount_amount: 0,
-      grand_total: payload.amount,
-      status: payload.status,
-      shariah_mode: 'CASH',
-      notes: payload.notes || 'via Kanban Add Card',
-      created_by: user.id
-    })
-    .select('id')
-    .single()
-
-  if (saleErr) return { error: 'Gagal membuat card: ' + saleErr.message }
-
-  revalidatePath('/sales/pipeline')
-  return { success: true, saleId: sale.id }
+    revalidatePath('/sales/pipeline')
+    return { success: true, saleId, error: undefined }
+  } catch (error) {
+    return { error: 'Gagal membuat card: ' + extractDatabaseError(error).message }
+  }
 }
 
 export async function updateSalesCard(
@@ -549,74 +958,92 @@ export async function updateSalesCard(
   saleId: string,
   payload: { name: string; phone: string; email: string; amount: number; notes: string; status: string }
 ) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const user = await requireUser('Not authenticated')
+  if ('error' in user) return user
+
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk mengubah card pipeline.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
-  const activeBranchId = activeBranchResult.branchId
 
-  const { data: sale } = await (supabase as any)
-    .from('sales')
-    .select('customer_id')
-    .eq('id', saleId)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchId)
-    .single()
+  const sale = await prisma.sales.findFirst({
+    where: {
+      id: saleId,
+      org_id: orgId,
+      branch_id: activeBranchResult.branchId,
+    },
+    select: {
+      customer_id: true,
+    },
+  })
 
-  if (!sale) return { error: 'Card tidak ditemukan' }
+  if (!sale?.customer_id) return { error: 'Card tidak ditemukan' }
 
-  // Update contact
-  await (supabase as any)
-    .from('contacts')
-    .update({
-      name: payload.name,
-      phone: payload.phone || null,
-      email: payload.email || null,
+  const customerId = sale.customer_id
+
+  try {
+    await withDbUserContext(user.userId, async (tx) => {
+      await tx.contacts.updateMany({
+        where: {
+          id: customerId,
+          org_id: orgId,
+        },
+        data: {
+          name: payload.name,
+          phone: payload.phone || null,
+          email: payload.email || null,
+          updated_at: new Date(),
+        },
+      })
+
+      await tx.sales.updateMany({
+        where: {
+          id: saleId,
+          org_id: orgId,
+          branch_id: activeBranchResult.branchId,
+        },
+        data: {
+          total_amount: toNumber(payload.amount),
+          grand_total: toNumber(payload.amount),
+          notes: payload.notes,
+          status: payload.status as any,
+          updated_at: new Date(),
+        },
+      })
     })
-    .eq('id', sale.customer_id)
-    .eq('org_id', orgId)
-
-  // Update sale
-  const { error: saleErr } = await (supabase as any)
-    .from('sales')
-    .update({
-      total_amount: payload.amount,
-      grand_total: payload.amount,
-      notes: payload.notes,
-      status: payload.status,
-    })
-    .eq('id', saleId)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchId)
-
-  if (saleErr) return { error: 'Gagal mengedit card: ' + saleErr.message }
+  } catch (error) {
+    return { error: 'Gagal mengedit card: ' + extractDatabaseError(error).message }
+  }
 
   revalidatePath('/sales/pipeline')
-  return { success: true }
+  return { success: true, error: undefined }
 }
 
 export async function deleteSalesCard(orgId: string, saleId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const user = await requireUser('Not authenticated')
+  if ('error' in user) return user
+
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk menghapus card pipeline.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  const { error } = await (supabase as any)
-    .from('sales')
-    .delete()
-    .eq('id', saleId)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchResult.branchId)
+  try {
+    await withDbUserContext(user.userId, async (tx) => {
+      await tx.sales.deleteMany({
+        where: {
+          id: saleId,
+          org_id: orgId,
+          branch_id: activeBranchResult.branchId,
+        },
+      })
+    })
+  } catch (error) {
+    return { error: 'Gagal menghapus card: ' + extractDatabaseError(error).message }
+  }
 
-  if (error) return { error: 'Gagal menghapus card: ' + error.message }
   revalidatePath('/sales/pipeline')
-  return { success: true }
+  return { success: true, error: undefined }
 }

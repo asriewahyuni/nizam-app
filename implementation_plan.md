@@ -1,7 +1,7 @@
 # AI Handover Document: Supabase -> Prisma/Auth Migration Status
 
-**Updated:** 2026-04-05 (sesi ke-12, shared accounting/contact/service slice + server page cleanup)  
-**Status:** `IN PROGRESS` — Org + Auth + Branch access selesai. HRIS actions + role management + settings/users member management + audit/billing/approval action slice selesai. Billing UI + invoice print page + pricing catalog UI + admin SaaS backoffice sudah dipindahkan dari Supabase browser ke server actions. Slice contacts/services/accounting shared read model dan sejumlah server page shell juga sudah keluar dari Supabase.
+**Updated:** 2026-04-05 (sesi ke-13, sales action layer migration)  
+**Status:** `IN PROGRESS` — Org + Auth + Branch access selesai. HRIS actions + role management + settings/users member management + audit/billing/approval action slice selesai. Billing UI + invoice print page + pricing catalog UI + admin SaaS backoffice sudah dipindahkan dari Supabase browser ke server actions. Slice contacts/services/accounting shared read model, sales action layer utama, dan sejumlah server page shell juga sudah keluar dari Supabase.
 
 Dokumen ini menggantikan rencana eksekusi lama dan dimaksudkan sebagai handover aktif untuk agent berikutnya. Target awal migrasi `modules/organization/actions/org.actions.ts` sudah lama selesai; sesi-sesi setelah itu melanjutkan migrasi slice organisasi yang masih bergantung ke Supabase.
 
@@ -15,8 +15,11 @@ Dokumen ini menggantikan rencana eksekusi lama dan dimaksudkan sebagai handover 
 - Hasil validasi terakhir:
   - `36` file test lulus
   - `178` test lulus
-- Footprint Supabase yang masih tersisa setelah sesi ini: `35` file aplikasi (`app/`, `modules/`, `lib/`) masih mengandung import/client call Supabase.
-- Sesi ini tidak hanya menyelaraskan dokumen; ada migrasi lanjutan nyata pada action layer shared dan server page shell.
+- Footprint Supabase yang masih tersisa setelah sesi ini: `33` file aplikasi (`app/`, `modules/`, `lib/`) masih mengandung import/client call/helper Supabase berdasarkan pencarian import/helper saat ini.
+- Validasi tambahan sesi ini yang sudah lulus:
+  - `npx tsc --noEmit`
+  - `npx vitest run __tests__/sales.actions.test.ts`
+- Sesi ini tidak hanya menyelaraskan dokumen; ada migrasi lanjutan nyata pada action layer sales.
 
 ---
 
@@ -56,6 +59,7 @@ File-file berikut **sudah tidak lagi memakai Supabase data client**:
 - `modules/accounting/actions/audit.actions.ts` ✅
 - `modules/contacts/actions/contact.actions.ts` ✅
 - `modules/services/actions/service.actions.ts` ✅
+- `modules/sales/actions/sales.actions.ts` ✅
 - `app/abs/page.tsx` ✅
 - `app/(dashboard)/cash/page.tsx` ✅
 - `app/(dashboard)/contacts/page.tsx` ✅
@@ -232,6 +236,8 @@ Selain itu:
 - billing actions sekarang punya membership guard eksplisit di app layer, tidak lagi mengandalkan Supabase session/RLS.
 - approval actions sekarang tidak lagi memakai Supabase query builder; side effect dokumen sumber (`sales`, `purchases`, `reimbursements`, `leave_requests`) juga sudah Prisma.
 - billing page dan invoice print page tidak lagi instantiate `createClient()` di sisi browser untuk kebutuhan data-layer.
+- `modules/sales/actions/sales.actions.ts` sekarang tidak lagi instantiate Supabase client untuk list/create/update/void sales, quotation, pipeline card, atau precheck pembayaran/retur.
+- fungsi SQL legacy `process_sales_delivery_atomic`, `process_sales_payment_atomic`, dan `process_sales_return_atomic` tetap dipakai, tetapi sekarang dipanggil via Prisma transaction dengan injeksi `request.jwt.claim.sub` agar engine SQL lama tetap membaca konteks user tanpa client Supabase.
 
 ### D. Pola keamanan yang dipakai
 
@@ -350,9 +356,9 @@ Berikut file yang **masih memakai Supabase** dan relevan untuk lanjutan migrasi:
 
 ### Prioritas tinggi
 
-- `modules/sales/actions/sales.actions.ts`
-  - masih jadi bottleneck utama domain sales setelah page shell `sales/*` sudah bersih
-  - mempengaruhi `sales`, `quotation`, `pipeline`, `commission`, dan sebagian POS flow
+- `modules/sales/actions/pos.actions.ts`
+  - `sales.actions.ts` sudah Prisma/Auth, tetapi POS flow masih memakai Supabase server client dan RPC browser-style
+  - menjadi sisa blocker terdekat agar domain sales/POS benar-benar mendekati zero Supabase
 - `modules/purchasing/actions/purchasing.actions.ts`
   - domain purchasing page shell sudah bersih, tetapi action layer dan approval/journal flow masih Supabase-heavy
 - `modules/inventory/actions/inventory.actions.ts`
@@ -418,12 +424,12 @@ Berikut file yang **masih memakai Supabase** dan relevan untuk lanjutan migrasi:
 Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file dan dampak terbesarnya:
 
 ### PRIORITAS 1: Core Sales / Purchasing Backbone
-- `modules/sales/actions/sales.actions.ts`
+- `modules/sales/actions/pos.actions.ts`
 - `modules/purchasing/actions/purchasing.actions.ts`
 - `modules/inventory/actions/inventory.actions.ts`
 - `modules/inventory/actions/warehouse.actions.ts`
 - alasan:
-  - page shell penjualan/purchasing/POS sudah bersih, jadi value tertinggi sekarang ada di action layer inti ini
+  - page shell penjualan/purchasing/POS sudah bersih, dan `sales.actions.ts` inti sudah keluar dari Supabase; value tertinggi berikutnya ada di POS + purchasing + inventory backbone
   - setelah empat file ini pindah, banyak route dashboard akan otomatis mendekati zero Supabase
 
 ### PRIORITAS 2: Billing / Operator Backoffice

@@ -1,14 +1,66 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  revalidatePath: vi.fn(),
-  getActiveBranch: vi.fn(),
-  resolveAccessibleBranchSelection: vi.fn(),
-}))
+const mocks = vi.hoisted(() => {
+  const tx = {
+    $queryRaw: vi.fn(),
+    $executeRaw: vi.fn(),
+    sales_items: {
+      createMany: vi.fn(),
+    },
+    approval_requests: {
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    journal_entries: {
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
+    stock_movements: {
+      deleteMany: vi.fn(),
+    },
+    contacts: {
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    sales: {
+      updateMany: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+  }
+
+  return {
+    createClient: vi.fn(),
+    revalidatePath: vi.fn(),
+    getActiveBranch: vi.fn(),
+    resolveAccessibleBranchSelection: vi.fn(),
+    getAuthUser: vi.fn(),
+    prisma: {
+      sales: {
+        findMany: vi.fn(),
+        findFirst: vi.fn(),
+        updateMany: vi.fn(),
+        deleteMany: vi.fn(),
+      },
+      warehouses: {
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+      },
+      $transaction: vi.fn(),
+    },
+    tx,
+  }
+})
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: mocks.createClient,
+}))
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: mocks.prisma,
+}))
+
+vi.mock('@/lib/auth/permissions', () => ({
+  getAuthUser: mocks.getAuthUser,
 }))
 
 vi.mock('next/cache', () => ({
@@ -26,26 +78,33 @@ vi.mock('@/modules/organization/lib/branch-access.server', () => ({
 import { processPosTransaction } from '@/modules/sales/actions/pos.actions'
 import { createSaleEntry, deliverSale, getSales } from '@/modules/sales/actions/sales.actions'
 
+function makeBranchSelection(branchId: string | null = 'branch-1') {
+  return {
+    scope: {
+      accessibleBranches: [],
+      accessibleBranchIds: branchId ? [branchId] : [],
+      canAccessAllBranches: branchId === null,
+      membershipId: 'member-1',
+      role: 'staff',
+    },
+    branchId,
+  }
+}
+
 describe('Sales Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+
+    mocks.getAuthUser.mockResolvedValue({
+      userId: 'user-1',
+      email: 'sales@example.com',
+      name: 'Sales User',
+    })
+    mocks.prisma.$transaction.mockImplementation(async (callback: any) => callback(mocks.tx))
   })
 
   it('rejects creating sales order when no active branch is selected', async () => {
-    const fromMock = vi.fn()
-
-    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
-      scope: { accessibleBranches: [], accessibleBranchIds: [], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
-      branchId: null,
-    })
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1' } },
-        }),
-      },
-      from: fromMock,
-    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue(makeBranchSelection(null))
 
     const result = await createSaleEntry('org-1', {
       customer_id: 'cust-1',
@@ -56,53 +115,14 @@ describe('Sales Branch Context', () => {
     expect(result).toEqual({
       error: 'Pilih unit aktif terlebih dahulu untuk membuat sales order.',
     })
-    expect(fromMock).not.toHaveBeenCalled()
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
   })
 
   it('stamps active branch on sales order, line items, and approval request', async () => {
-    const saleSingle = vi.fn().mockResolvedValue({
-      data: { id: 'sale-1' },
-      error: null,
-    })
-    const saleInsert = vi.fn(() => ({
-      select: vi.fn(() => ({
-        single: saleSingle,
-      })),
-    }))
-    const lineInsert = vi.fn().mockResolvedValue({ error: null })
-    const approvalInsert = vi.fn().mockResolvedValue({ error: null })
-
-    mocks.getActiveBranch.mockResolvedValue({
-      id: 'branch-1',
-      org_id: 'org-1',
-      name: 'Unit A',
-      code: 'UA',
-      address: null,
-      is_active: true,
-    })
-    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
-      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
-      branchId: 'branch-1',
-    })
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1' } },
-        }),
-      },
-      from: vi.fn((table: string) => {
-        if (table === 'sales') {
-          return { insert: saleInsert }
-        }
-        if (table === 'sales_items') {
-          return { insert: lineInsert }
-        }
-        if (table === 'approval_requests') {
-          return { insert: approvalInsert }
-        }
-        throw new Error(`Unexpected table ${table}`)
-      }),
-    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue(makeBranchSelection('branch-1'))
+    mocks.tx.$queryRaw.mockResolvedValue([{ id: 'sale-1' }])
+    mocks.tx.sales_items.createMany.mockResolvedValue({ count: 1 })
+    mocks.tx.approval_requests.create.mockResolvedValue({ id: 'approval-1' })
 
     const result = await createSaleEntry('org-1', {
       customer_id: 'cust-1',
@@ -114,55 +134,72 @@ describe('Sales Branch Context', () => {
     })
 
     expect(result).toEqual({ success: true, saleId: 'sale-1' })
-    expect(saleInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        org_id: 'org-1',
-        branch_id: 'branch-1',
-        customer_id: 'cust-1',
-      })
+    expect(mocks.tx.$queryRaw.mock.calls[0]).toEqual(
+      expect.arrayContaining(['org-1', 'branch-1', 'cust-1'])
     )
-    expect(lineInsert).toHaveBeenCalledWith([
-      expect.objectContaining({
-        org_id: 'org-1',
-        branch_id: 'branch-1',
-        sale_id: 'sale-1',
-      }),
-    ])
-    expect(approvalInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
+    expect(mocks.tx.sales_items.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          org_id: 'org-1',
+          branch_id: 'branch-1',
+          sale_id: 'sale-1',
+        }),
+      ],
+    })
+    expect(mocks.tx.approval_requests.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
         org_id: 'org-1',
         branch_id: 'branch-1',
         source_id: 'sale-1',
-      })
-    )
+      }),
+    })
   })
 
   it('filters sales list by branch when a unit is active', async () => {
-    const orderMock = vi.fn().mockResolvedValue({
-      data: [],
-      error: null,
-    })
-    const salesQuery = {
-      select: vi.fn(() => salesQuery),
-      eq: vi.fn(() => salesQuery),
-      order: orderMock,
-    }
-
-    mocks.createClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table !== 'sales') throw new Error(`Unexpected table ${table}`)
-        return salesQuery
-      }),
-    })
-    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
-      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
-      branchId: 'branch-1',
-    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue(makeBranchSelection('branch-1'))
+    mocks.prisma.sales.findMany.mockResolvedValue([])
 
     await getSales('org-1', 'branch-1')
 
-    expect(salesQuery.eq).toHaveBeenCalledWith('org_id', 'org-1')
-    expect(salesQuery.eq).toHaveBeenCalledWith('branch_id', 'branch-1')
+    expect(mocks.prisma.sales.findMany).toHaveBeenCalledWith({
+      where: {
+        org_id: 'org-1',
+        branch_id: 'branch-1',
+      },
+      select: expect.any(Object),
+      orderBy: {
+        created_at: 'desc',
+      },
+    })
+  })
+
+  it('delivers sales order using selected warehouse for physical stock sync', async () => {
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue(makeBranchSelection('branch-1'))
+    mocks.prisma.sales.findFirst.mockResolvedValue({
+      status: 'ORDERED',
+      warehouse_id: null,
+    })
+    mocks.prisma.warehouses.findFirst.mockResolvedValue({ id: 'wh-1' })
+    mocks.tx.$executeRaw.mockResolvedValue(1)
+
+    const result = await deliverSale('org-1', 'sale-1', 'wh-1')
+
+    expect(result).toEqual({ success: true })
+    expect(mocks.prisma.warehouses.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'wh-1',
+        org_id: 'org-1',
+        is_active: true,
+        branch_id: 'branch-1',
+      },
+      select: {
+        id: true,
+      },
+    })
+    expect(mocks.tx.$executeRaw).toHaveBeenCalledTimes(3)
+    expect(mocks.tx.$executeRaw.mock.calls[2]).toEqual(
+      expect.arrayContaining(['org-1', 'sale-1', 'wh-1'])
+    )
   })
 
   it('rejects POS transaction when no active branch is selected', async () => {
@@ -276,47 +313,6 @@ describe('Sales Branch Context', () => {
         branch_id: 'branch-1',
       }),
     ])
-    expect(rpcMock).toHaveBeenCalledWith('process_sales_delivery_atomic', {
-      p_org_id: 'org-1',
-      p_sale_id: 'sale-1',
-      p_warehouse_id: 'wh-1',
-    })
-  })
-
-  it('delivers sales order using selected warehouse for physical stock sync', async () => {
-    const saleQuery = {
-      select: vi.fn(() => saleQuery),
-      eq: vi.fn(() => saleQuery),
-      single: vi.fn().mockResolvedValue({
-        data: { status: 'ORDERED', warehouse_id: null },
-      }),
-    }
-    const warehouseQuery = {
-      select: vi.fn(() => warehouseQuery),
-      eq: vi.fn(() => warehouseQuery),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { id: 'wh-1', name: 'Gudang Utama', branch_id: 'branch-1' },
-        error: null,
-      }),
-    }
-    const rpcMock = vi.fn().mockResolvedValue({ error: null })
-
-    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
-      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
-      branchId: 'branch-1',
-    })
-    mocks.createClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table === 'sales') return saleQuery
-        if (table === 'warehouses') return warehouseQuery
-        throw new Error(`Unexpected table ${table}`)
-      }),
-      rpc: rpcMock,
-    })
-
-    const result = await deliverSale('org-1', 'sale-1', 'wh-1')
-
-    expect(result).toEqual({ success: true })
     expect(rpcMock).toHaveBeenCalledWith('process_sales_delivery_atomic', {
       p_org_id: 'org-1',
       p_sale_id: 'sale-1',
