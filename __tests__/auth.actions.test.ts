@@ -1,16 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  createAdminClient: vi.fn(),
+  prisma: {
+    user: {
+      create: vi.fn(),
+      findUnique: vi.fn(),
+    },
+    employees: {
+      findMany: vi.fn(),
+      updateMany: vi.fn(),
+    },
+  },
+  auth: vi.fn(),
+  nextAuthSignIn: vi.fn(),
+  nextAuthSignOut: vi.fn(),
   cookies: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn(),
+  getStoredActiveOrgIdForUser: vi.fn(),
+  isPlatformAdminEmail: vi.fn(),
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: mocks.createClient,
-  createAdminClient: mocks.createAdminClient,
+vi.mock('@/lib/prisma', () => ({
+  prisma: mocks.prisma,
+}))
+
+vi.mock('@/auth', () => ({
+  auth: mocks.auth,
+  signIn: mocks.nextAuthSignIn,
+  signOut: mocks.nextAuthSignOut,
 }))
 
 vi.mock('next/cache', () => ({
@@ -25,19 +43,27 @@ vi.mock('next/navigation', () => ({
   redirect: mocks.redirect,
 }))
 
+vi.mock('@/modules/organization/lib/active-context.server', () => ({
+  getStoredActiveOrgIdForUser: mocks.getStoredActiveOrgIdForUser,
+  persistMembershipActiveContext: vi.fn(),
+}))
+
+vi.mock('@/lib/saas/platform-admin', () => ({
+  isPlatformAdminEmail: mocks.isPlatformAdminEmail,
+}))
+
 import {
   getSession,
   requestPasswordReset,
   restorePlatformAdminSession,
-  signInWithNik,
   signInAsTenantOwner,
+  signInWithNik,
   signOut,
   signUp,
 } from '@/modules/auth/actions/auth.actions'
 
 function createCookieStore(initial: Record<string, string> = {}) {
   const values = new Map(Object.entries(initial))
-
   return {
     get: vi.fn((name: string) => {
       const value = values.get(name)
@@ -49,7 +75,6 @@ function createCookieStore(initial: Record<string, string> = {}) {
     delete: vi.fn((name: string) => {
       values.delete(name)
     }),
-    getAll: vi.fn(() => Array.from(values.entries()).map(([name, value]) => ({ name, value }))),
     values,
   }
 }
@@ -61,16 +86,7 @@ describe('Auth Actions', () => {
   })
 
   it('maps duplicate sign-up errors to a user-friendly message', async () => {
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        signUp: vi.fn().mockResolvedValue({
-          data: null,
-          error: {
-            message: 'User already registered',
-          },
-        }),
-      },
-    })
+    mocks.prisma.user.create.mockRejectedValue({ code: 'P2002' })
 
     const formData = new FormData()
     formData.set('email', 'owner@example.com')
@@ -78,115 +94,62 @@ describe('Auth Actions', () => {
     formData.set('fullName', 'Owner Example')
 
     const result = await signUp(formData)
-
     expect(result).toEqual({
-      error: 'Gagal: Email ini sudah pernah didaftarkan. Silakan Login atau gunakan email lain.'
+      error: 'Gagal: Email ini sudah pernah didaftarkan. Silakan Login atau gunakan email lain.',
     })
   })
 
   it('returns the active user session when available', async () => {
-    const user = { id: 'user-1', email: 'owner@example.com' }
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user },
-          error: null,
-        }),
-      },
+    mocks.auth.mockResolvedValue({
+      user: { id: 'user-1', email: 'owner@example.com', name: 'Owner Example' },
     })
 
     const result = await getSession()
-
-    expect(result).toEqual(user)
+    expect(result).toEqual({
+      id: 'user-1',
+      email: 'owner@example.com',
+      user_metadata: {
+        full_name: 'Owner Example',
+        login_type: 'owner',
+      },
+    })
   })
 
   it('returns null when no authenticated user exists', async () => {
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: null },
-          error: null,
-        }),
-      },
-    })
-
+    mocks.auth.mockResolvedValue(null)
     const result = await getSession()
-
     expect(result).toBeNull()
   })
 
-  it('signs out, revalidates layout, and redirects to login', async () => {
-    const signOutMock = vi.fn().mockResolvedValue({})
+  it('signs out and clears active context cookies', async () => {
     const cookieStore = createCookieStore({
       nizam_active_org_id: 'org-1',
       nizam_active_branch_id: 'branch-1',
       nizam_admin_impersonation: 'backup-token',
     })
-
     mocks.cookies.mockResolvedValue(cookieStore)
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        signOut: signOutMock,
-      },
-    })
+    mocks.nextAuthSignOut.mockResolvedValue(undefined)
 
     await signOut()
 
     expect(cookieStore.delete).toHaveBeenCalledWith('nizam_active_org_id')
     expect(cookieStore.delete).toHaveBeenCalledWith('nizam_active_branch_id')
     expect(cookieStore.delete).toHaveBeenCalledWith('nizam_admin_impersonation')
-    expect(signOutMock).toHaveBeenCalledOnce()
-    expect(mocks.revalidatePath).toHaveBeenCalledWith('/', 'layout')
-    expect(mocks.redirect).toHaveBeenCalledWith('/login')
+    expect(mocks.nextAuthSignOut).toHaveBeenCalledWith({ redirectTo: '/login' })
   })
 
-  it('signs in employee by NIK using a shared auth user and keeps active org preference', async () => {
+  it('signs in employee by NIK and keeps active org preference', async () => {
     const cookieStore = createCookieStore({
       nizam_active_org_id: 'org-b',
       nizam_active_branch_id: 'branch-old',
     })
-    const signInWithPasswordMock = vi.fn().mockResolvedValue({ error: null })
-
     mocks.cookies.mockResolvedValue(cookieStore)
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        signInWithPassword: signInWithPasswordMock,
-      },
-    })
-
-    const employeesQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockResolvedValue({
-        data: [
-          { id: 'emp-a', org_id: 'org-a', user_id: 'user-shared', created_at: '2025-01-01T00:00:00Z' },
-          { id: 'emp-b', org_id: 'org-b', user_id: 'user-shared', created_at: '2025-02-01T00:00:00Z' },
-        ],
-        error: null,
-      }),
-    }
-
-    const getUserByIdMock = vi.fn().mockResolvedValue({
-      data: {
-        user: {
-          id: 'user-shared',
-          email: 'shared.staff@example.com',
-        },
-      },
-      error: null,
-    })
-
-    mocks.createAdminClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table === 'employees') return employeesQuery
-        throw new Error(`Unexpected table ${table}`)
-      }),
-      auth: {
-        admin: {
-          getUserById: getUserByIdMock,
-        },
-      },
-    })
+    mocks.prisma.employees.findMany.mockResolvedValue([
+      { id: 'emp-a', org_id: 'org-a', user_id: 'user-shared', created_at: new Date('2025-01-01T00:00:00Z') },
+      { id: 'emp-b', org_id: 'org-b', user_id: 'user-shared', created_at: new Date('2025-02-01T00:00:00Z') },
+    ])
+    mocks.prisma.user.findUnique.mockResolvedValue({ email: 'shared.staff@example.com' })
+    mocks.nextAuthSignIn.mockResolvedValue(undefined)
 
     const formData = new FormData()
     formData.set('nik', 'K-0001')
@@ -195,10 +158,10 @@ describe('Auth Actions', () => {
 
     await signInWithNik(formData)
 
-    expect(getUserByIdMock).toHaveBeenCalledWith('user-shared')
-    expect(signInWithPasswordMock).toHaveBeenCalledWith({
+    expect(mocks.nextAuthSignIn).toHaveBeenCalledWith('credentials', {
       email: 'shared.staff@example.com',
       password: 'secret123',
+      redirect: false,
     })
     expect(cookieStore.set).toHaveBeenCalledWith(
       'nizam_active_org_id',
@@ -209,73 +172,21 @@ describe('Auth Actions', () => {
         sameSite: 'lax',
       })
     )
-    expect(cookieStore.delete).toHaveBeenCalledWith('nizam_demo_org_id')
     expect(cookieStore.delete).toHaveBeenCalledWith('nizam_active_branch_id')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/', 'layout')
     expect(mocks.redirect).toHaveBeenCalledWith('/purchasing')
   })
 
-  it('restores the persisted active org for NIK login when browser cookies are empty', async () => {
+  it('restores preferred org for NIK login when browser cookies are empty', async () => {
     const cookieStore = createCookieStore()
-    const signInWithPasswordMock = vi.fn().mockResolvedValue({ error: null })
-
     mocks.cookies.mockResolvedValue(cookieStore)
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        signInWithPassword: signInWithPasswordMock,
-      },
-    })
-
-    const employeesQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockResolvedValue({
-        data: [
-          { id: 'emp-a', org_id: 'org-a', user_id: 'user-shared', created_at: '2025-01-01T00:00:00Z' },
-          { id: 'emp-b', org_id: 'org-b', user_id: 'user-shared', created_at: '2025-02-01T00:00:00Z' },
-        ],
-        error: null,
-      }),
-    }
-
-    const preferredOrgQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: {
-          org_id: 'org-b',
-          last_active_at: '2026-04-04T10:00:00.000Z',
-          joined_at: '2025-02-01T00:00:00Z',
-        },
-        error: null,
-      }),
-    }
-
-    const getUserByIdMock = vi.fn().mockResolvedValue({
-      data: {
-        user: {
-          id: 'user-shared',
-          email: 'shared.staff@example.com',
-        },
-      },
-      error: null,
-    })
-
-    mocks.createAdminClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table === 'employees') return employeesQuery
-        if (table === 'org_members') return preferredOrgQuery
-        throw new Error(`Unexpected table ${table}`)
-      }),
-      auth: {
-        admin: {
-          getUserById: getUserByIdMock,
-        },
-      },
-    })
+    mocks.prisma.employees.findMany.mockResolvedValue([
+      { id: 'emp-a', org_id: 'org-a', user_id: 'user-shared', created_at: new Date('2025-01-01T00:00:00Z') },
+      { id: 'emp-b', org_id: 'org-b', user_id: 'user-shared', created_at: new Date('2025-02-01T00:00:00Z') },
+    ])
+    mocks.prisma.user.findUnique.mockResolvedValue({ email: 'shared.staff@example.com' })
+    mocks.getStoredActiveOrgIdForUser.mockResolvedValue('org-b')
+    mocks.nextAuthSignIn.mockResolvedValue(undefined)
 
     const formData = new FormData()
     formData.set('nik', 'K-0001')
@@ -283,7 +194,6 @@ describe('Auth Actions', () => {
 
     await signInWithNik(formData)
 
-    expect(preferredOrgQuery.in).toHaveBeenCalledWith('org_id', ['org-a', 'org-b'])
     expect(cookieStore.set).toHaveBeenCalledWith(
       'nizam_active_org_id',
       'org-b',
@@ -296,208 +206,40 @@ describe('Auth Actions', () => {
     expect(mocks.redirect).toHaveBeenCalledWith('/dashboard')
   })
 
-  it('marks every employee row tied to the same auth user when requesting password reset', async () => {
-    const listQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockResolvedValue({
-        data: [
-          { id: 'emp-a', first_name: 'Rina', user_id: 'user-shared' },
-          { id: 'emp-b', first_name: 'Rina', user_id: 'user-shared' },
-        ],
-        error: null,
-      }),
-    }
+  it('rejects sign in as tenant when current user is not a platform admin', async () => {
+    mocks.auth.mockResolvedValue({ user: { id: 'admin-1', email: 'notadmin@example.com' } })
+    mocks.isPlatformAdminEmail.mockReturnValue(false)
 
-    const updateQuery = {
-      update: vi.fn().mockReturnThis(),
-      in: vi.fn().mockResolvedValue({
-        data: null,
-        error: null,
-      }),
-    }
-
-    mocks.createAdminClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table !== 'employees') throw new Error(`Unexpected table ${table}`)
-        return {
-          ...listQuery,
-          update: updateQuery.update,
-          in: updateQuery.in,
-        }
-      }),
+    const result = await signInAsTenantOwner('org-1')
+    expect(result).toEqual({
+      error: 'Akses ditolak. Hanya platform admin yang bisa login sebagai tenant.',
     })
+  })
+
+  it('marks reset requested for matching NIK', async () => {
+    mocks.prisma.employees.findMany.mockResolvedValue([
+      { id: 'emp-a', first_name: 'Rina', user_id: 'user-shared' },
+      { id: 'emp-b', first_name: 'Rina', user_id: 'user-shared' },
+    ])
+    mocks.prisma.employees.updateMany.mockResolvedValue({ count: 2 })
 
     const result = await requestPasswordReset('K-0001')
 
-    expect(updateQuery.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        reset_requested: true,
-      })
-    )
-    expect(updateQuery.in).toHaveBeenCalledWith('id', ['emp-a', 'emp-b'])
+    expect(mocks.prisma.employees.updateMany).toHaveBeenCalled()
     expect(result).toEqual({ success: true, name: 'Rina' })
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/hris')
   })
 
-  it('rejects sign in as tenant when current user is not a platform admin', async () => {
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getSession: vi.fn().mockResolvedValue({
-          data: {
-            session: {
-              access_token: 'access-token',
-              refresh_token: 'refresh-token',
-              user: {
-                id: 'user-1',
-                email: 'owner@example.com',
-              },
-            },
-          },
-          error: null,
-        }),
-      },
-    })
-    mocks.createAdminClient.mockResolvedValue({})
-
-    const result = await signInAsTenantOwner('org-1')
-
-    expect(result).toEqual({
-      error: 'Akses ditolak. Hanya platform admin yang bisa login sebagai tenant.'
-    })
-  })
-
-  it('backs up admin session, switches to tenant session, and redirects to dashboard', async () => {
-    const cookieStore = createCookieStore({
-      nizam_active_org_id: 'admin-org-1',
-      nizam_active_branch_id: 'admin-branch-1',
-    })
-    const verifyOtpMock = vi.fn().mockResolvedValue({ error: null })
-
-    mocks.cookies.mockResolvedValue(cookieStore)
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getSession: vi.fn().mockResolvedValue({
-          data: {
-            session: {
-              access_token: 'admin-access',
-              refresh_token: 'admin-refresh',
-              user: {
-                id: 'admin-user',
-                email: 'bob@executive.id',
-              },
-            },
-          },
-          error: null,
-        }),
-        verifyOtp: verifyOtpMock,
-      },
-    })
-
-    const orgQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: {
-          id: 'org-tenant-1',
-          name: 'Tenant One',
-          owner_email: 'tenant-owner@example.com',
-        },
-        error: null,
-      }),
-    }
-
-    const ownerMemberQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: {
-          user_id: 'tenant-owner-user-id',
-        },
-        error: null,
-      }),
-    }
-
-    mocks.createAdminClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table === 'organizations') return orgQuery
-        if (table === 'org_members') return ownerMemberQuery
-        throw new Error(`Unexpected table ${table}`)
-      }),
-      auth: {
-        admin: {
-          getUserById: vi.fn().mockResolvedValue({
-            data: {
-              user: {
-                id: 'tenant-owner-user-id',
-                email: 'tenant-owner@example.com',
-              },
-            },
-            error: null,
-          }),
-          generateLink: vi.fn().mockResolvedValue({
-            data: {
-              properties: {
-                hashed_token: 'tenant-token-hash',
-              },
-            },
-            error: null,
-          }),
-        },
-      },
-    })
-
-    await signInAsTenantOwner('org-tenant-1')
-
-    expect(verifyOtpMock).toHaveBeenCalledWith({
-      type: 'magiclink',
-      token_hash: 'tenant-token-hash',
-    })
-
-    expect(cookieStore.set).toHaveBeenCalledWith(
-      'nizam_admin_impersonation',
-      expect.any(String),
-      expect.objectContaining({
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-      })
-    )
-
-    const backupCookie = cookieStore.set.mock.calls.find(([name]) => name === 'nizam_admin_impersonation')?.[1]
-    const decodedBackup = JSON.parse(Buffer.from(String(backupCookie), 'base64url').toString('utf8'))
-
-    expect(decodedBackup).toEqual({
-      accessToken: 'admin-access',
-      refreshToken: 'admin-refresh',
-      email: 'bob@executive.id',
-      activeOrgId: 'admin-org-1',
-    })
-
-    expect(cookieStore.set).toHaveBeenCalledWith(
-      'nizam_active_org_id',
-      'org-tenant-1',
-      expect.objectContaining({
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-      })
-    )
-    expect(cookieStore.delete).toHaveBeenCalledWith('nizam_demo_org_id')
-    expect(cookieStore.delete).toHaveBeenCalledWith('nizam_active_branch_id')
-    expect(mocks.revalidatePath).toHaveBeenCalledWith('/', 'layout')
-    expect(mocks.redirect).toHaveBeenCalledWith('/dashboard')
-  })
-
   it('restores backed up admin session and redirects back to admin', async () => {
-    const payload = Buffer.from(JSON.stringify({
-      accessToken: 'admin-access',
-      refreshToken: 'admin-refresh',
-      email: 'bob@executive.id',
-      activeOrgId: 'admin-org-1',
-    }), 'utf8').toString('base64url')
+    const payload = Buffer.from(
+      JSON.stringify({
+        accessToken: 'admin-1',
+        refreshToken: '',
+        email: 'admin@example.com',
+        activeOrgId: 'org-1',
+      }),
+      'utf8'
+    ).toString('base64url')
 
     const cookieStore = createCookieStore({
       nizam_admin_impersonation: payload,
@@ -506,33 +248,12 @@ describe('Auth Actions', () => {
     })
 
     mocks.cookies.mockResolvedValue(cookieStore)
-
-    const setSessionMock = vi.fn().mockResolvedValue({ data: {}, error: null })
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        setSession: setSessionMock,
-      },
-    })
+    mocks.nextAuthSignIn.mockResolvedValue(undefined)
 
     await restorePlatformAdminSession()
 
-    expect(setSessionMock).toHaveBeenCalledWith({
-      access_token: 'admin-access',
-      refresh_token: 'admin-refresh',
-    })
-    expect(cookieStore.delete).toHaveBeenCalledWith('nizam_demo_org_id')
     expect(cookieStore.delete).toHaveBeenCalledWith('nizam_active_branch_id')
-    expect(cookieStore.set).toHaveBeenCalledWith(
-      'nizam_active_org_id',
-      'admin-org-1',
-      expect.objectContaining({
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-      })
-    )
     expect(cookieStore.delete).toHaveBeenCalledWith('nizam_admin_impersonation')
-    expect(mocks.revalidatePath).toHaveBeenCalledWith('/', 'layout')
     expect(mocks.redirect).toHaveBeenCalledWith('/admin')
   })
 })

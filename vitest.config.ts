@@ -14,9 +14,13 @@ export default defineConfig({
       exclude: ['node_modules/', '.next/', 'supabase/', '**/*.config.*']
     }
   },
+  ssr: {
+    noExternal: ['next-auth'],
+  },
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './')
-    }
+    alias: [
+      { find: '@', replacement: path.resolve(__dirname, './') },
+      { find: /^next\/server$/, replacement: 'next/server.js' },
+    ],
   }
 })

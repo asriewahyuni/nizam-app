@@ -1,15 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createSupabaseMock, success } from './helpers/supabase-mock'
-
 const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
+  prisma: {
+    attendance: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      updateMany: vi.fn(),
+      create: vi.fn(),
+    },
+    employees: {
+      findFirst: vi.fn(),
+    },
+  },
   revalidatePath: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: mocks.createClient,
+vi.mock('@/lib/prisma', () => ({
+  prisma: mocks.prisma,
 }))
 
 vi.mock('next/cache', () => ({
@@ -42,17 +50,7 @@ describe('Attendance Actions', () => {
   })
 
   it('filters attendance records by resolved branch selection', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        attendance: [
-          {
-            result: success([]),
-          },
-        ],
-      },
-    })
-
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.attendance.findMany.mockResolvedValue([])
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-1'] },
       branchId: 'branch-1',
@@ -60,42 +58,24 @@ describe('Attendance Actions', () => {
 
     await getAttendanceRecords('org-1')
 
-    const branchFilter = supabase.calls[0]?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
-    )
-    expect(branchFilter?.args[1]).toBe('branch-1')
+    const findManyArgs = mocks.prisma.attendance.findMany.mock.calls[0]?.[0]
+    expect(findManyArgs.where.branch_id).toBe('branch-1')
   })
 
   it('derives branch_id from employee when creating an attendance record', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'emp-1',
-              branch_id: 'branch-2',
-            }),
-          },
-        ],
-        attendance: [
-          {
-            maybeSingleResult: success(null),
-          },
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.prisma.employees.findFirst.mockResolvedValue({
+      id: 'emp-1',
+      branch_id: 'branch-2',
     })
-
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.attendance.findFirst.mockResolvedValue(null)
+    mocks.prisma.attendance.create.mockResolvedValue({ id: 'att-1' })
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-2'] },
       branchId: 'branch-2',
     })
 
     const result = await upsertAttendanceRecord('org-1', buildAttendanceForm())
-    const insertPayload = supabase.calls[2]?.operations.find((operation) => operation.method === 'insert')?.args[0] as Record<string, string>
+    const insertPayload = mocks.prisma.attendance.create.mock.calls[0]?.[0]?.data as Record<string, any>
 
     expect(result).toEqual({ success: true })
     expect(insertPayload.branch_id).toBe('branch-2')
@@ -104,43 +84,23 @@ describe('Attendance Actions', () => {
   })
 
   it('updates an existing attendance record only inside its own branch', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'emp-1',
-              branch_id: 'branch-3',
-            }),
-          },
-        ],
-        attendance: [
-          {
-            maybeSingleResult: success({
-              id: 'att-1',
-            }),
-          },
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.prisma.employees.findFirst.mockResolvedValue({
+      id: 'emp-1',
+      branch_id: 'branch-3',
     })
-
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.attendance.findFirst.mockResolvedValue({
+      id: 'att-1',
+    })
+    mocks.prisma.attendance.updateMany.mockResolvedValue({ count: 1 })
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-3'] },
       branchId: 'branch-3',
     })
 
     const result = await upsertAttendanceRecord('org-1', buildAttendanceForm({ status: 'LATE' }))
-    const updateCall = supabase.calls[2]
-    const branchFilter = updateCall?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
-    )
+    const updateWhere = mocks.prisma.attendance.updateMany.mock.calls[0]?.[0]?.where
 
     expect(result).toEqual({ success: true })
-    expect(updateCall?.operations.some((operation) => operation.method === 'update')).toBe(true)
-    expect(branchFilter?.args[1]).toBe('branch-3')
+    expect(updateWhere.branch_id).toBe('branch-3')
   })
 })

@@ -1,6 +1,7 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
@@ -66,9 +67,8 @@ async function createLeaveApprovalRequest(db: any, input: {
   requesterId: string
   reason: string
 }) {
-  const { error } = await db
-    .from('approval_requests')
-    .insert({
+  await db.approval_requests.create({
+    data: {
       org_id: input.orgId,
       branch_id: input.branchId,
       requester_id: input.requesterId,
@@ -76,10 +76,9 @@ async function createLeaveApprovalRequest(db: any, input: {
       source_id: input.leaveId,
       status: 'PENDING',
       reason: input.reason,
-      requested_at: new Date().toISOString(),
-    })
-
-  return error
+      requested_at: new Date(),
+    },
+  })
 }
 
 async function syncLeaveApprovalStatus(db: any, input: {
@@ -90,60 +89,61 @@ async function syncLeaveApprovalStatus(db: any, input: {
   approverId: string
   notes?: string | null
 }) {
-  const updatePayload: Record<string, string | null> = {
-    status: input.status,
-    approver_id: input.approverId,
-    decided_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }
-
-  if (input.notes !== undefined) {
-    updatePayload.notes = input.notes
-  }
-
-  return db
-    .from('approval_requests')
-    .update(updatePayload)
-    .eq('org_id', input.orgId)
-    .eq('source_type', LEAVE_APPROVAL_SOURCE)
-    .eq('source_id', input.leaveId)
-    .eq('branch_id', input.branchId)
+  await db.approval_requests.updateMany({
+    where: {
+      org_id: input.orgId,
+      source_type: LEAVE_APPROVAL_SOURCE,
+      source_id: input.leaveId,
+      branch_id: input.branchId,
+    },
+    data: {
+      status: input.status,
+      approver_id: input.approverId,
+      decided_at: new Date(),
+      ...(input.notes !== undefined ? { notes: input.notes } : {}),
+      updated_at: new Date(),
+    },
+  })
 }
 
 export async function getLeaveRequests(orgId: string, branchId?: string | null) {
-  const supabase = await createClient()
-  const db = supabase as any
   const branchSelection = await resolveLeaveBranchSelection(orgId, branchId)
   if ('error' in branchSelection) return []
 
-  let query = db
-    .from('leave_requests')
-    .select(`
-      *,
-      branch:branches(id, name, code),
-      employee:employee_id(id, first_name, last_name, nik, job_title, branch_id)
-    `)
-    .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
+  const requests = await prisma.leave_requests.findMany({
+    where: {
+      org_id: orgId,
+      ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+    },
+    include: {
+      branches: { select: { id: true, name: true, code: true } },
+      employees: {
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          nik: true,
+          job_title: true,
+          branch_id: true,
+        },
+      },
+    },
+    orderBy: { created_at: 'desc' },
+  })
 
-  if (branchSelection.branchId) {
-    query = query.eq('branch_id', branchSelection.branchId)
-  }
-
-  const { data, error } = await query
-
-  if (error) return []
-  return data
+  return requests.map((request) => ({
+    ...request,
+    branch: request.branches,
+    employee: request.employees,
+    branches: undefined,
+    employees: undefined,
+  }))
 }
 
 export async function createLeaveRequest(orgId: string, formData: FormData) {
-  const supabase = await createClient()
-  const db = supabase as any
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) return { error: 'Unauthorized' }
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Unauthorized' }
 
   const employeeId = String(formData.get('employee_id') || '').trim()
   const leaveType = String(formData.get('leave_type') || '').trim()
@@ -159,14 +159,10 @@ export async function createLeaveRequest(orgId: string, formData: FormData) {
   }
   if (!reason) return { error: 'Alasan cuti wajib diisi.' }
 
-  const { data: employee, error: employeeError } = await db
-    .from('employees')
-    .select('id, branch_id')
-    .eq('id', employeeId)
-    .eq('org_id', orgId)
-    .maybeSingle()
-
-  if (employeeError) return { error: employeeError.message }
+  const employee = await prisma.employees.findFirst({
+    where: { id: employeeId, org_id: orgId },
+    select: { id: true, branch_id: true },
+  })
 
   const accessibleEmployee = await ensureLeaveBranchAccess(
     orgId,
@@ -175,41 +171,34 @@ export async function createLeaveRequest(orgId: string, formData: FormData) {
   )
   if ('error' in accessibleEmployee) return { error: accessibleEmployee.error }
 
-  const { data: leaveRequest, error } = await db
-    .from('leave_requests')
-    .insert({
-      org_id: orgId,
-      branch_id: accessibleEmployee.branchId,
-      employee_id: employeeId,
-      leave_type: leaveType,
-      start_date: startDate,
-      end_date: endDate,
-      days_taken: calculateDaysTaken(startDate, endDate),
-      reason,
-      status: 'PENDING',
+  try {
+    await prisma.$transaction(async (tx) => {
+      const leaveRequest = await tx.leave_requests.create({
+        data: {
+          org_id: orgId,
+          branch_id: accessibleEmployee.branchId,
+          employee_id: employeeId,
+          leave_type: leaveType,
+          start_date: new Date(`${startDate}T00:00:00.000Z`),
+          end_date: new Date(`${endDate}T00:00:00.000Z`),
+          days_taken: calculateDaysTaken(startDate, endDate),
+          reason,
+          status: 'PENDING',
+        },
+        select: { id: true },
+      })
+
+      await createLeaveApprovalRequest(tx, {
+        orgId,
+        branchId: accessibleEmployee.branchId,
+        leaveId: leaveRequest.id,
+        requesterId: userId,
+        reason: `Leave Request: ${leaveType} (${startDate} s/d ${endDate})`,
+      })
     })
-    .select('id')
-    .single()
-
-  if (error) return { error: error.message }
-
-  const approvalError = await createLeaveApprovalRequest(db, {
-    orgId,
-    branchId: accessibleEmployee.branchId,
-    leaveId: leaveRequest.id,
-    requesterId: user.id,
-    reason: `Leave Request: ${leaveType} (${startDate} s/d ${endDate})`,
-  })
-
-  if (approvalError) {
-    await db
-      .from('leave_requests')
-      .delete()
-      .eq('id', leaveRequest.id)
-      .eq('org_id', orgId)
-      .eq('branch_id', accessibleEmployee.branchId)
-
-    return { error: approvalError.message }
+  } catch (error) {
+    console.error('createLeaveRequest Error:', error)
+    return { error: 'Gagal membuat pengajuan cuti.' }
   }
 
   revalidatePath('/hris')
@@ -218,21 +207,15 @@ export async function createLeaveRequest(orgId: string, formData: FormData) {
 }
 
 async function updateLeaveStatus(leaveId: string, nextStatus: 'APPROVED' | 'REJECTED' | 'CANCELLED') {
-  const supabase = await createClient()
-  const db = supabase as any
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Unauthorized' }
 
-  if (!user) return { error: 'Unauthorized' }
+  const leaveRequest = await prisma.leave_requests.findFirst({
+    where: { id: leaveId },
+    select: { id: true, org_id: true, branch_id: true, status: true },
+  })
 
-  const { data: leaveRequest, error: leaveRequestError } = await db
-    .from('leave_requests')
-    .select('id, org_id, branch_id, status')
-    .eq('id', leaveId)
-    .maybeSingle()
-
-  if (leaveRequestError) return { error: leaveRequestError.message }
   if (!leaveRequest?.id) return { error: 'Pengajuan cuti tidak ditemukan.' }
   if (!LEAVE_STATUSES.has(String(leaveRequest.status || '').toUpperCase())) {
     return { error: 'Status cuti tidak valid.' }
@@ -249,29 +232,38 @@ async function updateLeaveStatus(leaveId: string, nextStatus: 'APPROVED' | 'REJE
     return { error: 'Pengajuan cuti ini sudah diproses.' }
   }
 
-  const { error } = await db
-    .from('leave_requests')
-    .update({
-      status: nextStatus,
-      approved_by: user.id,
-      approved_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+  try {
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.leave_requests.updateMany({
+        where: {
+          id: leaveId,
+          org_id: leaveRequest.org_id,
+          branch_id: accessibleLeave.branchId,
+        },
+        data: {
+          status: nextStatus as any,
+          approved_by: userId,
+          approved_at: new Date(),
+          updated_at: new Date(),
+        },
+      })
+
+      if (updated.count === 0) {
+        throw new Error('Leave request not found within branch scope.')
+      }
+
+      await syncLeaveApprovalStatus(tx, {
+        orgId: leaveRequest.org_id,
+        branchId: accessibleLeave.branchId,
+        leaveId,
+        status: nextStatus,
+        approverId: userId,
+      })
     })
-    .eq('id', leaveId)
-    .eq('org_id', leaveRequest.org_id)
-    .eq('branch_id', accessibleLeave.branchId)
-
-  if (error) return { error: error.message }
-
-  const { error: approvalError } = await syncLeaveApprovalStatus(db, {
-    orgId: leaveRequest.org_id,
-    branchId: accessibleLeave.branchId,
-    leaveId,
-    status: nextStatus,
-    approverId: user.id,
-  })
-
-  if (approvalError) return { error: approvalError.message }
+  } catch (error) {
+    console.error('updateLeaveStatus Error:', error)
+    return { error: 'Gagal memperbarui status cuti.' }
+  }
 
   revalidatePath('/hris')
   revalidatePath('/accounting/approvals')

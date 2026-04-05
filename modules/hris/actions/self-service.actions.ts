@@ -1,6 +1,7 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 
 type SelfEmployee = {
@@ -40,126 +41,125 @@ function calculateDaysTaken(startDate: string, endDate: string) {
 }
 
 async function getAuthenticatedEmployee(orgId: string): Promise<{ employee: SelfEmployee } | { error: string }> {
-  const supabase = await createClient()
-  const db = supabase as any
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Unauthorized' }
 
-  if (!user) return { error: 'Unauthorized' }
+  const employee = await prisma.employees.findFirst({
+    where: { org_id: orgId, user_id: userId },
+    select: {
+      id: true,
+      branch_id: true,
+      first_name: true,
+      last_name: true,
+      job_title: true,
+      nik: true,
+    },
+  })
 
-  const { data: employee, error } = await db
-    .from('employees')
-    .select('id, branch_id, first_name, last_name, job_title, nik')
-    .eq('org_id', orgId)
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  if (error) return { error: error.message }
   if (!employee?.id) return { error: 'Data karyawan Anda tidak ditemukan.' }
   if (!employee.branch_id) return { error: 'Anda belum terhubung ke unit aktif.' }
 
-  return { employee }
+  return { employee: employee as any }
 }
 
 export async function getMyAttendanceRecords(orgId: string, startDate?: string | null) {
   const selfEmployee = await getAuthenticatedEmployee(orgId)
   if ('error' in selfEmployee) return []
 
-  const supabase = await createClient()
-  const db = supabase as any
   const normalizedStartDate = normalizeDateOnly(String(startDate || '').trim())
   const defaultStartDate = new Date()
   defaultStartDate.setUTCDate(defaultStartDate.getUTCDate() - 14)
   const fallbackStartDate = defaultStartDate.toISOString().split('T')[0]
 
-  const { data, error } = await db
-    .from('attendance')
-    .select('*, branch:branches(id, name, code)')
-    .eq('org_id', orgId)
-    .eq('employee_id', selfEmployee.employee.id)
-    .gte('record_date', normalizedStartDate || fallbackStartDate)
-    .order('record_date', { ascending: false })
-    .order('created_at', { ascending: false })
+  const records = await prisma.attendance.findMany({
+    where: {
+      org_id: orgId,
+      employee_id: selfEmployee.employee.id,
+      record_date: {
+        gte: new Date(`${(normalizedStartDate || fallbackStartDate) as string}T00:00:00.000Z`),
+      },
+    },
+    include: { branches: { select: { id: true, name: true, code: true } } },
+    orderBy: [{ record_date: 'desc' }, { created_at: 'desc' }],
+  })
 
-  if (error) return []
-  return data
+  return records.map((record) => ({
+    ...record,
+    branch: record.branches,
+    branches: undefined,
+  }))
 }
 
 export async function getMyLeaveRequests(orgId: string) {
   const selfEmployee = await getAuthenticatedEmployee(orgId)
   if ('error' in selfEmployee) return []
 
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data, error } = await db
-    .from('leave_requests')
-    .select('*, branch:branches(id, name, code)')
-    .eq('org_id', orgId)
-    .eq('employee_id', selfEmployee.employee.id)
-    .order('created_at', { ascending: false })
-    .limit(10)
+  const requests = await prisma.leave_requests.findMany({
+    where: { org_id: orgId, employee_id: selfEmployee.employee.id },
+    include: { branches: { select: { id: true, name: true, code: true } } },
+    orderBy: { created_at: 'desc' },
+    take: 10,
+  })
 
-  if (error) return []
-  return data
+  return requests.map((request) => ({
+    ...request,
+    branch: request.branches,
+    branches: undefined,
+  }))
 }
 
 export async function getMyExpenseClaims(orgId: string) {
   const selfEmployee = await getAuthenticatedEmployee(orgId)
   if ('error' in selfEmployee) return []
 
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data, error } = await db
-    .from('expense_claims')
-    .select('*, branch:branches(id, name, code)')
-    .eq('org_id', orgId)
-    .eq('employee_id', selfEmployee.employee.id)
-    .order('claim_date', { ascending: false })
-    .limit(10)
+  const claims = await prisma.expense_claims.findMany({
+    where: { org_id: orgId, employee_id: selfEmployee.employee.id },
+    include: { branches: { select: { id: true, name: true, code: true } } },
+    orderBy: { claim_date: 'desc' },
+    take: 10,
+  })
 
-  if (error) return []
-  return data
+  return claims.map((claim) => ({
+    ...claim,
+    branch: claim.branches,
+    branches: undefined,
+  }))
 }
 
 export async function clockMyAttendance(orgId: string, payload: { type: 'IN' | 'OUT'; notes?: string }) {
   const selfEmployee = await getAuthenticatedEmployee(orgId)
   if ('error' in selfEmployee) return { error: selfEmployee.error }
 
-  const supabase = await createClient()
-  const db = supabase as any
   const today = new Date().toISOString().split('T')[0]
   const now = new Date().toISOString()
   const notes = String(payload.notes || '').trim()
 
-  const { data: existingRecord, error: existingRecordError } = await db
-    .from('attendance')
-    .select('id, status, check_out, notes')
-    .eq('org_id', orgId)
-    .eq('employee_id', selfEmployee.employee.id)
-    .eq('record_date', today)
-    .maybeSingle()
-
-  if (existingRecordError) return { error: existingRecordError.message }
+  const existingRecord = await prisma.attendance.findFirst({
+    where: {
+      org_id: orgId,
+      employee_id: selfEmployee.employee.id,
+      record_date: new Date(`${today}T00:00:00.000Z`),
+    },
+    select: { id: true, status: true, check_out: true, notes: true },
+  })
 
   if (payload.type === 'IN') {
     if (existingRecord?.id) {
       return { error: 'Anda sudah clock-in hari ini.' }
     }
 
-    const { error } = await db
-      .from('attendance')
-      .insert({
+    await prisma.attendance.create({
+      data: {
         org_id: orgId,
         branch_id: selfEmployee.employee.branch_id,
         employee_id: selfEmployee.employee.id,
-        record_date: today,
-        check_in: now,
+        record_date: new Date(`${today}T00:00:00.000Z`),
+        check_in: new Date(now),
         status: 'PRESENT',
         notes: notes || null,
-      })
-
-    if (error) return { error: error.message }
+      },
+    })
   } else {
     if (!existingRecord?.id) {
       return { error: 'Anda belum clock-in hari ini.' }
@@ -173,18 +173,14 @@ export async function clockMyAttendance(orgId: string, payload: { type: 'IN' | '
       ? (existingRecord.notes ? `${existingRecord.notes} | ${notes}` : notes)
       : existingRecord.notes
 
-    const { error } = await db
-      .from('attendance')
-      .update({
-        check_out: now,
+    await prisma.attendance.updateMany({
+      where: { id: existingRecord.id, org_id: orgId, employee_id: selfEmployee.employee.id },
+      data: {
+        check_out: new Date(now),
         notes: mergedNotes || null,
-        updated_at: now,
-      })
-      .eq('id', existingRecord.id)
-      .eq('org_id', orgId)
-      .eq('employee_id', selfEmployee.employee.id)
-
-    if (error) return { error: error.message }
+        updated_at: new Date(now),
+      },
+    })
   }
 
   revalidatePath('/profil-saya')
@@ -196,13 +192,9 @@ export async function submitMyLeaveRequest(orgId: string, formData: FormData) {
   const selfEmployee = await getAuthenticatedEmployee(orgId)
   if ('error' in selfEmployee) return { error: selfEmployee.error }
 
-  const supabase = await createClient()
-  const db = supabase as any
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) return { error: 'Unauthorized' }
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Unauthorized' }
 
   const leaveType = String(formData.get('leave_type') || '').trim()
   const startDate = normalizeDateOnly(String(formData.get('start_date') || ''))
@@ -216,46 +208,39 @@ export async function submitMyLeaveRequest(orgId: string, formData: FormData) {
   }
   if (!reason) return { error: 'Alasan cuti wajib diisi.' }
 
-  const { data: leaveRequest, error } = await db
-    .from('leave_requests')
-    .insert({
-      org_id: orgId,
-      branch_id: selfEmployee.employee.branch_id,
-      employee_id: selfEmployee.employee.id,
-      leave_type: leaveType,
-      start_date: startDate,
-      end_date: endDate,
-      days_taken: calculateDaysTaken(startDate, endDate),
-      reason,
-      status: 'PENDING',
+  try {
+    await prisma.$transaction(async (tx) => {
+      const leaveRequest = await tx.leave_requests.create({
+        data: {
+          org_id: orgId,
+          branch_id: selfEmployee.employee.branch_id as string,
+          employee_id: selfEmployee.employee.id,
+          leave_type: leaveType,
+          start_date: new Date(`${startDate}T00:00:00.000Z`),
+          end_date: new Date(`${endDate}T00:00:00.000Z`),
+          days_taken: calculateDaysTaken(startDate, endDate),
+          reason,
+          status: 'PENDING',
+        },
+        select: { id: true },
+      })
+
+      await tx.approval_requests.create({
+        data: {
+          org_id: orgId,
+          branch_id: selfEmployee.employee.branch_id as string,
+          requester_id: userId,
+          source_type: LEAVE_APPROVAL_SOURCE,
+          source_id: leaveRequest.id,
+          status: 'PENDING',
+          reason: `Leave Request: ${leaveType} (${startDate} s/d ${endDate})`,
+          requested_at: new Date(),
+        },
+      })
     })
-    .select('id')
-    .single()
-
-  if (error) return { error: error.message }
-
-  const { error: approvalError } = await db
-    .from('approval_requests')
-    .insert({
-      org_id: orgId,
-      branch_id: selfEmployee.employee.branch_id,
-      requester_id: user.id,
-      source_type: LEAVE_APPROVAL_SOURCE,
-      source_id: leaveRequest.id,
-      status: 'PENDING',
-      reason: `Leave Request: ${leaveType} (${startDate} s/d ${endDate})`,
-      requested_at: new Date().toISOString(),
-    })
-
-  if (approvalError) {
-    await db
-      .from('leave_requests')
-      .delete()
-      .eq('id', leaveRequest.id)
-      .eq('org_id', orgId)
-      .eq('employee_id', selfEmployee.employee.id)
-
-    return { error: approvalError.message }
+  } catch (error) {
+    console.error('submitMyLeaveRequest Error:', error)
+    return { error: 'Gagal membuat pengajuan cuti.' }
   }
 
   revalidatePath('/profil-saya')
@@ -268,8 +253,6 @@ export async function submitMyExpenseClaim(orgId: string, formData: FormData) {
   const selfEmployee = await getAuthenticatedEmployee(orgId)
   if ('error' in selfEmployee) return { error: selfEmployee.error }
 
-  const supabase = await createClient()
-  const db = supabase as any
   const claimDate = normalizeDateOnly(String(formData.get('claim_date') || ''))
   const category = String(formData.get('category') || '').trim()
   const amount = Number(formData.get('amount') || 0)
@@ -282,21 +265,19 @@ export async function submitMyExpenseClaim(orgId: string, formData: FormData) {
   if (!Number.isFinite(amount) || amount <= 0) return { error: 'Nominal klaim wajib lebih besar dari nol.' }
   if (!description) return { error: 'Deskripsi klaim wajib diisi.' }
 
-  const { error } = await db
-    .from('expense_claims')
-    .insert({
+  await prisma.expense_claims.create({
+    data: {
       org_id: orgId,
-      branch_id: selfEmployee.employee.branch_id,
+      branch_id: selfEmployee.employee.branch_id as string,
       employee_id: selfEmployee.employee.id,
-      claim_date: claimDate,
+      claim_date: new Date(`${claimDate}T00:00:00.000Z`),
       category,
       amount,
       description,
       receipt_url: receiptUrl,
       status: 'PENDING',
-    })
-
-  if (error) return { error: error.message }
+    },
+  })
 
   revalidatePath('/profil-saya')
   revalidatePath('/hris')
@@ -307,56 +288,52 @@ export async function cancelMyLeaveRequest(orgId: string, leaveId: string) {
   const selfEmployee = await getAuthenticatedEmployee(orgId)
   if ('error' in selfEmployee) return { error: selfEmployee.error }
 
-  const supabase = await createClient()
-  const db = supabase as any
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Unauthorized' }
 
-  if (!user) return { error: 'Unauthorized' }
-  const { data: leaveRequest, error: leaveRequestError } = await db
-    .from('leave_requests')
-    .select('id, status')
-    .eq('id', leaveId)
-    .eq('org_id', orgId)
-    .eq('employee_id', selfEmployee.employee.id)
-    .maybeSingle()
+  const leaveRequest = await prisma.leave_requests.findFirst({
+    where: { id: leaveId, org_id: orgId, employee_id: selfEmployee.employee.id },
+    select: { id: true, status: true },
+  })
 
-  if (leaveRequestError) return { error: leaveRequestError.message }
   if (!leaveRequest?.id) return { error: 'Pengajuan cuti tidak ditemukan.' }
   if (String(leaveRequest.status || '').toUpperCase() !== 'PENDING') {
     return { error: 'Hanya pengajuan cuti berstatus pending yang bisa dibatalkan.' }
   }
 
-  const { error } = await db
-    .from('leave_requests')
-    .update({
-      status: 'CANCELLED',
-      approved_by: user.id,
-      approved_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.leave_requests.updateMany({
+        where: { id: leaveId, org_id: orgId, employee_id: selfEmployee.employee.id },
+        data: {
+          status: 'CANCELLED',
+          approved_by: userId,
+          approved_at: new Date(),
+          updated_at: new Date(),
+        },
+      })
+
+      await tx.approval_requests.updateMany({
+        where: {
+          org_id: orgId,
+          branch_id: selfEmployee.employee.branch_id as string,
+          source_type: LEAVE_APPROVAL_SOURCE,
+          source_id: leaveId,
+        },
+        data: {
+          status: 'CANCELLED',
+          approver_id: userId,
+          notes: 'Pengajuan cuti dibatalkan oleh pemohon.',
+          decided_at: new Date(),
+          updated_at: new Date(),
+        },
+      })
     })
-    .eq('id', leaveId)
-    .eq('org_id', orgId)
-    .eq('employee_id', selfEmployee.employee.id)
-
-  if (error) return { error: error.message }
-
-  const { error: approvalError } = await db
-    .from('approval_requests')
-    .update({
-      status: 'CANCELLED',
-      approver_id: user.id,
-      notes: 'Pengajuan cuti dibatalkan oleh pemohon.',
-      decided_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('org_id', orgId)
-    .eq('branch_id', selfEmployee.employee.branch_id)
-    .eq('source_type', LEAVE_APPROVAL_SOURCE)
-    .eq('source_id', leaveId)
-
-  if (approvalError) return { error: approvalError.message }
+  } catch (error) {
+    console.error('cancelMyLeaveRequest Error:', error)
+    return { error: 'Gagal membatalkan pengajuan cuti.' }
+  }
 
   revalidatePath('/profil-saya')
   revalidatePath('/hris')
@@ -368,17 +345,11 @@ export async function deleteMyExpenseClaim(orgId: string, claimId: string) {
   const selfEmployee = await getAuthenticatedEmployee(orgId)
   if ('error' in selfEmployee) return { error: selfEmployee.error }
 
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data: claim, error: claimError } = await db
-    .from('expense_claims')
-    .select('id, status')
-    .eq('id', claimId)
-    .eq('org_id', orgId)
-    .eq('employee_id', selfEmployee.employee.id)
-    .maybeSingle()
+  const claim = await prisma.expense_claims.findFirst({
+    where: { id: claimId, org_id: orgId, employee_id: selfEmployee.employee.id },
+    select: { id: true, status: true },
+  })
 
-  if (claimError) return { error: claimError.message }
   if (!claim?.id) return { error: 'Klaim biaya tidak ditemukan.' }
 
   const normalizedStatus = String(claim.status || '').toUpperCase()
@@ -386,14 +357,9 @@ export async function deleteMyExpenseClaim(orgId: string, claimId: string) {
     return { error: 'Hanya klaim berstatus pending atau rejected yang bisa dihapus.' }
   }
 
-  const { error } = await db
-    .from('expense_claims')
-    .delete()
-    .eq('id', claimId)
-    .eq('org_id', orgId)
-    .eq('employee_id', selfEmployee.employee.id)
-
-  if (error) return { error: error.message }
+  await prisma.expense_claims.deleteMany({
+    where: { id: claimId, org_id: orgId, employee_id: selfEmployee.employee.id },
+  })
 
   revalidatePath('/profil-saya')
   revalidatePath('/hris')

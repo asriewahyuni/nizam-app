@@ -1,16 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createSupabaseMock, success } from './helpers/supabase-mock'
-
 const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  createAdminClient: vi.fn(),
+  prisma: {
+    org_members: {
+      findFirst: vi.fn(),
+    },
+    branches: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+      create: vi.fn(),
+    },
+    org_member_units: {
+      findMany: vi.fn(),
+    },
+  },
+  auth: vi.fn(),
   cookies: vi.fn(),
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: mocks.createClient,
-  createAdminClient: mocks.createAdminClient,
+vi.mock('@/lib/prisma', () => ({
+  prisma: mocks.prisma,
+}))
+
+vi.mock('@/auth', () => ({
+  auth: mocks.auth,
 }))
 
 vi.mock('next/headers', () => ({
@@ -49,48 +63,18 @@ describe('Branch Access Server Helper', () => {
   })
 
   it('limits non-owner members to explicitly assigned branches', async () => {
-    const createScopedClient = () => {
-      const supabase = createSupabaseMock({
-        tables: {
-          org_members: [
-            {
-              maybeSingleResult: success({
-                id: 'member-1',
-                role: 'staff',
-              }),
-            },
-          ],
-          branches: [
-            {
-              result: success([
-                { id: 'branch-1', org_id: 'org-1', name: 'Unit A', code: 'UA', address: null, is_active: true },
-                { id: 'branch-2', org_id: 'org-1', name: 'Unit B', code: 'UB', address: null, is_active: true },
-              ]),
-            },
-          ],
-          org_member_units: [
-            {
-              result: success([{ branch_id: 'branch-2' }]),
-            },
-          ],
-        },
-      })
-
-      return {
-        authed: {
-          ...supabase.client,
-          auth: {
-            getUser: vi.fn().mockResolvedValue({
-              data: { user: { id: 'user-1' } },
-            }),
-          },
-        },
-        admin: supabase.client,
-      }
-    }
-
-    mocks.createClient.mockImplementation(async () => createScopedClient().authed)
-    mocks.createAdminClient.mockImplementation(async () => createScopedClient().admin)
+    mocks.auth.mockResolvedValue({ user: { id: 'user-1' } })
+    mocks.prisma.org_members.findFirst.mockResolvedValue({
+      id: 'member-1',
+      role: 'staff',
+      last_active_at: null,
+      last_active_branch_id: null,
+    })
+    mocks.prisma.branches.findMany.mockResolvedValue([
+      { id: 'branch-1', org_id: 'org-1', name: 'Unit A', code: 'UA', address: null, is_active: true },
+      { id: 'branch-2', org_id: 'org-1', name: 'Unit B', code: 'UB', address: null, is_active: true },
+    ])
+    mocks.prisma.org_member_units.findMany.mockResolvedValue([{ branch_id: 'branch-2' }])
 
     const scope = await getBranchAccessScope('org-1')
     const currentBranch = await getCurrentAccessibleBranch('org-1')
@@ -107,43 +91,17 @@ describe('Branch Access Server Helper', () => {
   })
 
   it('keeps owner/admin on all-branch scope when multiple branches exist', async () => {
-    const createScopedClient = () => {
-      const supabase = createSupabaseMock({
-        tables: {
-          org_members: [
-            {
-              maybeSingleResult: success({
-                id: 'member-1',
-                role: 'owner',
-              }),
-            },
-          ],
-          branches: [
-            {
-              result: success([
-                { id: 'branch-1', org_id: 'org-1', name: 'Unit A', code: 'UA', address: null, is_active: true },
-                { id: 'branch-2', org_id: 'org-1', name: 'Unit B', code: 'UB', address: null, is_active: true },
-              ]),
-            },
-          ],
-        },
-      })
-
-      return {
-        authed: {
-          ...supabase.client,
-          auth: {
-            getUser: vi.fn().mockResolvedValue({
-              data: { user: { id: 'owner-1' } },
-            }),
-          },
-        },
-        admin: supabase.client,
-      }
-    }
-
-    mocks.createClient.mockImplementation(async () => createScopedClient().authed)
-    mocks.createAdminClient.mockImplementation(async () => createScopedClient().admin)
+    mocks.auth.mockResolvedValue({ user: { id: 'owner-1' } })
+    mocks.prisma.org_members.findFirst.mockResolvedValue({
+      id: 'member-1',
+      role: 'owner',
+      last_active_at: null,
+      last_active_branch_id: null,
+    })
+    mocks.prisma.branches.findMany.mockResolvedValue([
+      { id: 'branch-1', org_id: 'org-1', name: 'Unit A', code: 'UA', address: null, is_active: true },
+      { id: 'branch-2', org_id: 'org-1', name: 'Unit B', code: 'UB', address: null, is_active: true },
+    ])
 
     const currentBranch = await getCurrentAccessibleBranch('org-1')
     const canAccessAll = await canAccessAllBranchesForOrg('org-1')
@@ -159,45 +117,17 @@ describe('Branch Access Server Helper', () => {
   })
 
   it('reuses the persisted branch preference when the user last opened a specific unit', async () => {
-    const createScopedClient = () => {
-      const supabase = createSupabaseMock({
-        tables: {
-          org_members: [
-            {
-              maybeSingleResult: success({
-                id: 'member-1',
-                role: 'owner',
-                last_active_at: '2026-04-04T10:00:00.000Z',
-                last_active_branch_id: 'branch-2',
-              }),
-            },
-          ],
-          branches: [
-            {
-              result: success([
-                { id: 'branch-1', org_id: 'org-1', name: 'Unit A', code: 'UA', address: null, is_active: true },
-                { id: 'branch-2', org_id: 'org-1', name: 'Unit B', code: 'UB', address: null, is_active: true },
-              ]),
-            },
-          ],
-        },
-      })
-
-      return {
-        authed: {
-          ...supabase.client,
-          auth: {
-            getUser: vi.fn().mockResolvedValue({
-              data: { user: { id: 'owner-1' } },
-            }),
-          },
-        },
-        admin: supabase.client,
-      }
-    }
-
-    mocks.createClient.mockImplementation(async () => createScopedClient().authed)
-    mocks.createAdminClient.mockImplementation(async () => createScopedClient().admin)
+    mocks.auth.mockResolvedValue({ user: { id: 'owner-1' } })
+    mocks.prisma.org_members.findFirst.mockResolvedValue({
+      id: 'member-1',
+      role: 'owner',
+      last_active_at: new Date('2026-04-04T10:00:00.000Z'),
+      last_active_branch_id: 'branch-2',
+    })
+    mocks.prisma.branches.findMany.mockResolvedValue([
+      { id: 'branch-1', org_id: 'org-1', name: 'Unit A', code: 'UA', address: null, is_active: true },
+      { id: 'branch-2', org_id: 'org-1', name: 'Unit B', code: 'UB', address: null, is_active: true },
+    ])
 
     const currentBranch = await getCurrentAccessibleBranch('org-1')
     const selection = await resolveAccessibleBranchSelection('org-1')
@@ -211,42 +141,16 @@ describe('Branch Access Server Helper', () => {
   })
 
   it('defaults owner/admin writes to the sole accessible branch when only one branch exists', async () => {
-    const createScopedClient = () => {
-      const supabase = createSupabaseMock({
-        tables: {
-          org_members: [
-            {
-              maybeSingleResult: success({
-                id: 'member-1',
-                role: 'owner',
-              }),
-            },
-          ],
-          branches: [
-            {
-              result: success([
-                { id: 'branch-1', org_id: 'org-1', name: 'Unit Utama', code: 'MAIN', address: null, is_active: true },
-              ]),
-            },
-          ],
-        },
-      })
-
-      return {
-        authed: {
-          ...supabase.client,
-          auth: {
-            getUser: vi.fn().mockResolvedValue({
-              data: { user: { id: 'owner-1' } },
-            }),
-          },
-        },
-        admin: supabase.client,
-      }
-    }
-
-    mocks.createClient.mockImplementation(async () => createScopedClient().authed)
-    mocks.createAdminClient.mockImplementation(async () => createScopedClient().admin)
+    mocks.auth.mockResolvedValue({ user: { id: 'owner-1' } })
+    mocks.prisma.org_members.findFirst.mockResolvedValue({
+      id: 'member-1',
+      role: 'owner',
+      last_active_at: null,
+      last_active_branch_id: null,
+    })
+    mocks.prisma.branches.findMany.mockResolvedValue([
+      { id: 'branch-1', org_id: 'org-1', name: 'Unit Utama', code: 'MAIN', address: null, is_active: true },
+    ])
 
     const currentBranch = await getCurrentAccessibleBranch('org-1')
     const selection = await resolveAccessibleBranchSelection('org-1')
@@ -260,81 +164,37 @@ describe('Branch Access Server Helper', () => {
   })
 
   it('self-heals legacy owner orgs by creating the default branch when no active branch exists', async () => {
-    const createScopedClient = () => {
-      const supabase = createSupabaseMock({
-        tables: {
-          org_members: [
-            {
-              maybeSingleResult: success({
-                id: 'member-1',
-                role: 'owner',
-              }),
-            },
-          ],
-          branches: [
-            {
-              result: success([]),
-            },
-            {
-              maybeSingleResult: success(null),
-            },
-            {
-              singleResult: success({
-                id: 'branch-1',
-                org_id: 'org-1',
-                name: 'Unit Utama',
-                code: 'MAIN',
-                address: null,
-                is_active: true,
-              }),
-            },
-          ],
-        },
-      })
-
-      return {
-        authed: {
-          ...supabase.client,
-          auth: {
-            getUser: vi.fn().mockResolvedValue({
-              data: { user: { id: 'owner-1' } },
-            }),
-          },
-        },
-        admin: supabase.client,
-        calls: supabase.calls,
-      }
-    }
-
-    const scopedClient = createScopedClient()
-    mocks.createClient.mockImplementation(async () => scopedClient.authed)
-    mocks.createAdminClient.mockImplementation(async () => scopedClient.admin)
+    mocks.auth.mockResolvedValue({ user: { id: 'owner-1' } })
+    mocks.prisma.org_members.findFirst.mockResolvedValue({
+      id: 'member-1',
+      role: 'owner',
+      last_active_at: null,
+      last_active_branch_id: null,
+    })
+    mocks.prisma.branches.findMany.mockResolvedValue([])
+    mocks.prisma.branches.findFirst.mockResolvedValue(null)
+    mocks.prisma.branches.create.mockResolvedValue({
+      id: 'branch-1',
+      org_id: 'org-1',
+      name: 'Unit Utama',
+      code: 'MAIN',
+      address: null,
+      is_active: true,
+    })
 
     const scope = await getBranchAccessScope('org-1')
 
     expect(scope.accessibleBranchIds).toEqual(['branch-1'])
     expect(scope.canAccessAllBranches).toBe(true)
-
-    const branchCalls = scopedClient.calls.filter((call) => call.table === 'branches')
-    const insertCall = branchCalls.find((call) =>
-      call.operations.some((operation) => operation.method === 'insert')
-    )
-
-    expect(insertCall).toBeTruthy()
-    expect(insertCall?.operations).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          method: 'insert',
-          args: [
-            expect.objectContaining({
-              org_id: 'org-1',
-              name: 'Unit Utama',
-              code: 'MAIN',
-              is_active: true,
-            }),
-          ],
+    expect(mocks.prisma.branches.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          org_id: 'org-1',
+          name: 'Unit Utama',
+          code: 'MAIN',
+          is_active: true,
         }),
-      ])
+      })
     )
   })
 })

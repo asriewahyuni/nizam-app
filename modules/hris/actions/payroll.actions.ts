@@ -1,12 +1,17 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
 type BranchSelectionResult =
   | { branchId: string | null }
   | { error: string }
+
+type ActionResult =
+  | { success: true; error?: undefined }
+  | { success?: undefined; error: string }
 
 async function resolvePayrollBranchSelection(orgId: string, branchId?: string | null): Promise<BranchSelectionResult> {
   const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
@@ -41,73 +46,79 @@ async function ensurePayrollBranchAccess(orgId: string, branchId: string | null,
 }
 
 export async function getPayrollComponents(orgId: string) {
-  const supabase = await createClient()
-  const { data, error } = await (supabase as any)
-    .from('payroll_components')
-    .select(`
-      *,
-      account:account_id(name, code)
-    `)
-    .eq('org_id', orgId)
-    .order('type', { ascending: true })
-    .order('name', { ascending: true })
+  const components = await prisma.payroll_components.findMany({
+    where: { org_id: orgId },
+    include: {
+      accounts: { select: { name: true, code: true } },
+    },
+    orderBy: [{ type: 'asc' }, { name: 'asc' }],
+  })
 
-  if (error) return []
-  return data
+  return components.map((component) => ({
+    ...component,
+    account: component.accounts,
+    accounts: undefined,
+  }))
 }
 
-export async function createPayrollComponent(orgId: string, formData: FormData) {
-  const supabase = await createClient()
-
+export async function createPayrollComponent(orgId: string, formData: FormData): Promise<ActionResult> {
   const isPercentage = formData.get('is_percentage') === 'on'
   const isTaxable = formData.get('is_taxable') === 'on'
 
-  const { error } = await (supabase as any).from('payroll_components').insert({
-    org_id: orgId,
-    name: formData.get('name') as string,
-    type: formData.get('type') as string,
-    is_taxable: isTaxable,
-    is_percentage: isPercentage,
-    default_amount: isPercentage ? 0 : Number(formData.get('amount') || 0),
-    percentage_value: isPercentage ? Number(formData.get('amount') || 0) : null,
-    account_id: formData.get('account_id') as string || null
-  })
+  try {
+    await prisma.payroll_components.create({
+      data: {
+        org_id: orgId,
+        name: formData.get('name') as string,
+        type: (formData.get('type') as any) || 'EARNING',
+        is_taxable: isTaxable,
+        is_percentage: isPercentage,
+        default_amount: isPercentage ? 0 : Number(formData.get('amount') || 0),
+        percentage_value: isPercentage ? Number(formData.get('amount') || 0) : null,
+        account_id: (formData.get('account_id') as string) || null,
+      },
+    })
+  } catch (error) {
+    console.error('createPayrollComponent Error:', error)
+    return { error: 'Gagal menambahkan komponen payroll.' }
+  }
 
-  if (error) return { error: error.message }
   revalidatePath('/hris')
   return { success: true }
 }
 
-export async function deletePayrollComponent(componentId: string) {
-  const supabase = await createClient()
-  const { error } = await (supabase as any).from('payroll_components').delete().eq('id', componentId)
-  if (error) return { error: error.message }
+export async function deletePayrollComponent(componentId: string): Promise<ActionResult> {
+  try {
+    await prisma.payroll_components.deleteMany({ where: { id: componentId } })
+  } catch (error) {
+    console.error('deletePayrollComponent Error:', error)
+    return { error: 'Gagal menghapus komponen payroll.' }
+  }
+
   revalidatePath('/hris')
   return { success: true }
 }
 export async function getPayrollRuns(orgId: string, branchId?: string | null) {
-  const supabase = await createClient()
   const branchSelection = await resolvePayrollBranchSelection(orgId, branchId)
   if ('error' in branchSelection) return []
 
-  let query = (supabase as any)
-    .from('payroll_runs')
-    .select('*, branch:branches(id, name, code)')
-    .eq('org_id', orgId)
-    .order('period_start', { ascending: false })
+  const runs = await prisma.payroll_runs.findMany({
+    where: {
+      org_id: orgId,
+      ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+    },
+    include: { branches: { select: { id: true, name: true, code: true } } },
+    orderBy: { period_start: 'desc' },
+  })
 
-  if (branchSelection.branchId) {
-    query = query.eq('branch_id', branchSelection.branchId)
-  }
-
-  const { data, error } = await query
-
-  if (error) return []
-  return data
+  return runs.map((run) => ({
+    ...run,
+    branch: run.branches,
+    branches: undefined,
+  }))
 }
 
 export async function generatePayrollRun(orgId: string, formData: FormData) {
-  const supabase = await createClient()
   const activeBranch = await requirePayrollRunBranch(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk membuat payroll run.'
@@ -119,27 +130,24 @@ export async function generatePayrollRun(orgId: string, formData: FormData) {
   const paymentDate = formData.get('payment_date') as string
 
   // 1. Create the Run Header
-  const { data: run, error: runErr } = await (supabase as any)
-    .from('payroll_runs')
-    .insert({
+  const run = await prisma.payroll_runs.create({
+    data: {
       org_id: orgId,
       branch_id: activeBranch.branchId,
-      period_start: periodStart,
-      period_end: periodEnd,
-      payment_date: paymentDate,
-      status: 'DRAFT'
-    })
-    .select()
-    .single()
-
-  if (runErr) return { error: runErr.message }
-
-  // 2. Execute SQL generation function
-  const { error: genErr } = await (supabase as any).rpc('generate_payslips_for_run', { 
-    p_run_id: run.id 
+      period_start: new Date(`${periodStart}T00:00:00.000Z`),
+      period_end: new Date(`${periodEnd}T00:00:00.000Z`),
+      payment_date: new Date(`${paymentDate}T00:00:00.000Z`),
+      status: 'DRAFT',
+    },
+    select: { id: true },
   })
 
-  if (genErr) return { error: 'Gagal memproses payslip: ' + genErr.message }
+  try {
+    await prisma.$executeRaw`SELECT public.generate_payslips_for_run(${run.id}::uuid)`
+  } catch (error) {
+    console.error('generatePayrollRun Error:', error)
+    return { error: 'Gagal memproses payslip.' }
+  }
 
   revalidatePath('/hris')
   return { success: true }
@@ -147,20 +155,14 @@ export async function generatePayrollRun(orgId: string, formData: FormData) {
 
 
 export async function payPayrollRun(runId: string, orgId: string, accountId: string) {
-  const supabase = await createClient()
-  const db = supabase as any
-  
-  const { data: { user } } = await db.auth.getUser()
-  if (!user) return { error: 'Unauthorized' }
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Unauthorized' }
 
-  const { data: run, error: runError } = await db
-    .from('payroll_runs')
-    .select('id, branch_id')
-    .eq('id', runId)
-    .eq('org_id', orgId)
-    .maybeSingle()
-
-  if (runError) return { error: runError.message }
+  const run = await prisma.payroll_runs.findFirst({
+    where: { id: runId, org_id: orgId },
+    select: { id: true, branch_id: true },
+  })
 
   const accessibleRun = await ensurePayrollBranchAccess(
     orgId,
@@ -170,21 +172,17 @@ export async function payPayrollRun(runId: string, orgId: string, accountId: str
   if ('error' in accessibleRun) return { error: accessibleRun.error }
 
   // 1. Update the run with selected bank account before processing
-  await db
-    .from('payroll_runs')
-    .update({ disbursement_account_id: accountId })
-    .eq('id', runId)
-    .eq('org_id', orgId)
-    .eq('branch_id', accessibleRun.branchId)
-
-  // 2. Execute SQL payment/journalizing function
-  const { error } = await db.rpc('process_payroll_payment', {
-    p_run_id: runId,
-    p_bank_account_id: accountId, // This is now a fallback in the SQL function
-    p_created_by: user.id
+  await prisma.payroll_runs.updateMany({
+    where: { id: runId, org_id: orgId, branch_id: accessibleRun.branchId },
+    data: { disbursement_account_id: accountId, updated_at: new Date() },
   })
 
-  if (error) return { error: 'Gagal memproses pembayaran: ' + error.message }
+  try {
+    await prisma.$executeRaw`SELECT public.process_payroll_payment(${runId}::uuid, ${accountId}::uuid, ${userId}::uuid)`
+  } catch (error) {
+    console.error('payPayrollRun Error:', error)
+    return { error: 'Gagal memproses pembayaran.' }
+  }
 
   revalidatePath('/hris')
   return { success: true }
@@ -192,125 +190,146 @@ export async function payPayrollRun(runId: string, orgId: string, accountId: str
 
 
 export async function fixEmptyPayrollJournals(orgId: string) {
-  const supabase = await createClient()
   const activeBranch = await requirePayrollRunBranch(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk menjalankan perbaikan jurnal payroll.'
   )
   if ('error' in activeBranch) return { error: activeBranch.error }
 
-  const { data: runs } = await (supabase as any)
-    .from('payroll_runs')
-    .select('*')
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranch.branchId)
-    .eq('status', 'PAID')
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Unauthorized' }
 
-  if (!runs) return { success: true, count: 0 }
+  const runs = await prisma.payroll_runs.findMany({
+    where: {
+      org_id: orgId,
+      branch_id: activeBranch.branchId,
+      status: 'PAID',
+    },
+  })
 
   let fixedCount = 0
   // 1. SMART ACCOUNT LOOKUP (CDO Logic: No Hardcode)
-  let { data: accExpense } = await (supabase as any).from('accounts').select('id').eq('org_id', orgId).eq('code', '6001').maybeSingle()
+  let accExpense = await prisma.accounts.findFirst({
+    where: { org_id: orgId, code: '6001' },
+    select: { id: true },
+  })
   if (!accExpense) {
-     const { data: altAcc } = await (supabase as any).from('accounts').select('id').eq('org_id', orgId).ilike('name', '%Beban Gaji%').limit(1).maybeSingle()
-     accExpense = altAcc
+    accExpense = await prisma.accounts.findFirst({
+      where: { org_id: orgId, name: { contains: 'Beban Gaji', mode: 'insensitive' } },
+      select: { id: true },
+    })
   }
-  
-  const { data: firstBank } = await (supabase as any)
-    .from('bank_accounts')
-    .select('account_id')
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranch.branchId)
-    .limit(1)
-    .maybeSingle()
 
-  if (!accExpense || !firstBank) {
-      console.warn('Fallback Account for Payroll not found (Code 6001 or "Beban Gaji") or Bank Account missing.');
-      return { error: 'Konfigurasi Akun Gaji (6001) atau Bank Account tidak ditemukan. Selesaikan CoA Anda!' }
+  const firstBank = await prisma.bank_accounts.findFirst({
+    where: { org_id: orgId, branch_id: activeBranch.branchId },
+    select: { account_id: true },
+    orderBy: { created_at: 'asc' },
+  })
+
+  if (!accExpense?.id || !firstBank?.account_id) {
+    return { error: 'Konfigurasi Akun Gaji (6001) atau Bank Account tidak ditemukan. Selesaikan CoA Anda!' }
   }
 
   for (const run of runs) {
-    if (!run.journal_entry_id) continue
+    const journalEntryId = run.journal_entry_id
+    if (!journalEntryId) continue
     
     // Check if lines are truly missing or just have basic 2 lines while should have more
-    const { count } = await (supabase as any).from('journal_lines').select('*', { count: 'exact', head: true }).eq('entry_id', run.journal_entry_id)
+    const journalLineCount = await prisma.journal_lines.count({
+      where: { entry_id: journalEntryId },
+    })
 
-    // Get Payslip Data to see if we HAVE more details than currently in JE
-    const { data: slips } = await (supabase as any).from('payslips').select('id').eq('run_id', run.id)
-    const slipIds = slips?.map((s: any) => s.id) || []
-    const { data: allLines } = await (supabase as any).from('payslip_lines').select('id').in('payslip_id', slipIds)
-
-    const detailCount = allLines?.length || 0
+    const slips = await prisma.payslips.findMany({
+      where: { run_id: run.id },
+      select: { id: true },
+    })
+    const slipIds = slips.map((s) => s.id)
+    const detailCount = slipIds.length
+      ? await prisma.payslip_lines.count({ where: { payslip_id: { in: slipIds } } })
+      : 0
     
     // CONDITION: Either missing (count=0) OR only has 2 lines while we have many detail lines
-    if ((count ?? 0) === 0 || ((count ?? 0) === 2 && detailCount > 0)) {
+    if (journalLineCount === 0 || (journalLineCount === 2 && detailCount > 0)) {
        // Proceed to fix (VOID old, create new)
-       await (supabase as any).from('journal_entries').update({ 
-         status: 'VOIDED', 
-         void_reason: 'Deep-reconciliation to include detailed PPh/Components' 
-       }).eq('id', run.journal_entry_id)
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.journal_entries.updateMany({
+            where: { id: journalEntryId },
+            data: {
+              status: 'VOIDED',
+              void_reason: 'Deep-reconciliation to include detailed PPh/Components',
+              updated_at: new Date(),
+            },
+          })
 
-       const { data: newEntry } = await (supabase as any).from('journal_entries').insert({
-         org_id: orgId,
-         branch_id: run.branch_id,
-         entry_date: run.payment_date,
-         description: `[RE-SYNC] Pembayaran Gaji Periode ${run.period_start} s/d ${run.period_end}`,
-         reference_id: run.id,
-         reference_type: 'PAYROLL',
-         status: 'DRAFT',
-         is_auto: true
-       }).select().single()
+          const newEntry = await tx.journal_entries.create({
+            data: {
+              org_id: orgId,
+              branch_id: run.branch_id,
+              entry_number: '',
+              entry_date: run.payment_date,
+              description: `[RE-SYNC] Pembayaran Gaji Periode ${run.period_start.toISOString().split('T')[0]} s/d ${run.period_end.toISOString().split('T')[0]}`,
+              reference_id: run.id,
+              reference_type: 'PAYROLL',
+              status: 'DRAFT',
+              is_auto: true,
+              created_by: userId,
+            },
+            select: { id: true },
+          })
 
-       if (newEntry) {
-          // 2.1 Get and Aggregate Detailed Lines if they exist
-          const { data: slips } = await (supabase as any).from('payslips').select('id').eq('run_id', run.id)
-          const slipIds = slips?.map((s: any) => s.id) || []
-          const { data: allLines } = await (supabase as any).from('payslip_lines').select('*').in('payslip_id', slipIds)
+          const journalLinesBody: Array<{ entry_id: string; account_id: string; debit: any; credit: any; memo: string }> = []
 
-          const journalLinesBody: any[] = []
-          
-          if (allLines && allLines.length > 0) {
-             const accountTotals = new Map<string, { debit: number; credit: number }>()
-             for (const line of allLines) {
-                // @ts-ignore
+          if (slipIds.length) {
+            const allLines = await tx.payslip_lines.findMany({
+              where: { payslip_id: { in: slipIds } },
+              select: { account_id: true, type: true, amount: true },
+            })
+
+            if (allLines.length) {
+              const accountTotals = new Map<string, { debit: number; credit: number }>()
+              for (const line of allLines) {
                 const accId = line.account_id || accExpense.id
                 const current = accountTotals.get(accId) || { debit: 0, credit: 0 }
-                if (line.type === 'EARNING' || line.type === 'BENEFIT') current.debit += Number(line.amount)
-                else if (line.type === 'DEDUCTION' || line.type === 'TAX') current.credit += Number(line.amount)
+                const amount = Number(line.amount || 0)
+                if (line.type === 'EARNING' || line.type === 'BENEFIT') current.debit += amount
+                else if (line.type === 'DEDUCTION' || line.type === 'TAX') current.credit += amount
                 accountTotals.set(accId, current)
-             }
+              }
 
-             accountTotals.forEach((val: any, accId: any) => {
-               if (val.debit > 0) journalLinesBody.push({ entry_id: newEntry.id, account_id: accId, debit: val.debit, credit: 0, memo: '[AUTO-FIX] Beban Komponen' })
-               if (val.credit > 0) journalLinesBody.push({ entry_id: newEntry.id, account_id: accId, debit: 0, credit: val.credit, memo: '[AUTO-FIX] Potongan/Pajak' })
-             })
-             
-             // Balancer
-             // Balancer: Use stored disbursement account or from current run
-             const bankAccId = run.disbursement_account_id || firstBank.account_id
-             journalLinesBody.push({ entry_id: newEntry.id, account_id: bankAccId, debit: 0, credit: run.total_net, memo: '[AUTO-FIX] Disbursement' })
-          } else {
-             // Fallback to simple 2-line if no details found
-             const bankAccId = run.disbursement_account_id || firstBank.account_id
-             journalLinesBody.push({ entry_id: newEntry.id, account_id: accExpense.id, debit: run.total_net, credit: 0, memo: '[AUTO-FIX] Beban Gaji (Glongongan)' })
-             journalLinesBody.push({ entry_id: newEntry.id, account_id: bankAccId, debit: 0, credit: run.total_net, memo: '[AUTO-FIX] Disbursement' })
+              accountTotals.forEach((val, accId) => {
+                if (val.debit > 0) journalLinesBody.push({ entry_id: newEntry.id, account_id: accId, debit: val.debit, credit: 0, memo: '[AUTO-FIX] Beban Komponen' })
+                if (val.credit > 0) journalLinesBody.push({ entry_id: newEntry.id, account_id: accId, debit: 0, credit: val.credit, memo: '[AUTO-FIX] Potongan/Pajak' })
+              })
+
+              const bankAccId = run.disbursement_account_id || firstBank.account_id
+              journalLinesBody.push({ entry_id: newEntry.id, account_id: bankAccId, debit: 0, credit: run.total_net, memo: '[AUTO-FIX] Disbursement' })
+            }
           }
 
-          // Insert Ledger Lines
-          const { error: linesErr } = await (supabase as any).from('journal_lines').insert(journalLinesBody)
-
-          if (linesErr) {
-            await (supabase as any).from('journal_entries').delete().eq('id', newEntry.id)
-            continue
+          if (journalLinesBody.length === 0) {
+            const bankAccId = run.disbursement_account_id || firstBank.account_id
+            journalLinesBody.push({ entry_id: newEntry.id, account_id: accExpense.id, debit: run.total_net, credit: 0, memo: '[AUTO-FIX] Beban Gaji (Glongongan)' })
+            journalLinesBody.push({ entry_id: newEntry.id, account_id: bankAccId, debit: 0, credit: run.total_net, memo: '[AUTO-FIX] Disbursement' })
           }
 
-          // Post it!
-          await (supabase as any).from('journal_entries').update({ status: 'POSTED' }).eq('id', newEntry.id)
+          await tx.journal_lines.createMany({ data: journalLinesBody })
 
-          // 3. Update Run Link
-          await (supabase as any).from('payroll_runs').update({ journal_entry_id: newEntry.id }).eq('id', run.id)
-          fixedCount++
-       }
+          await tx.journal_entries.updateMany({
+            where: { id: newEntry.id },
+            data: { status: 'POSTED', updated_at: new Date() },
+          })
+
+          await tx.payroll_runs.updateMany({
+            where: { id: run.id },
+            data: { journal_entry_id: newEntry.id, updated_at: new Date() },
+          })
+        })
+        fixedCount++
+      } catch (error) {
+        console.error('fixEmptyPayrollJournals Error:', error)
+      }
     }
   }
 
@@ -319,16 +338,12 @@ export async function fixEmptyPayrollJournals(orgId: string) {
 }
 
 export async function getPayrollRunDetails(orgId: string, runId: string) {
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data: run, error: runError } = await db
-    .from('payroll_runs')
-    .select('id, branch_id')
-    .eq('id', runId)
-    .eq('org_id', orgId)
-    .maybeSingle()
+  const run = await prisma.payroll_runs.findFirst({
+    where: { id: runId, org_id: orgId },
+    select: { id: true, branch_id: true },
+  })
 
-  if (runError || !run) return []
+  if (!run) return []
 
   const accessibleRun = await ensurePayrollBranchAccess(
     orgId,
@@ -336,33 +351,32 @@ export async function getPayrollRunDetails(orgId: string, runId: string) {
     'Payroll run tidak ditemukan.'
   )
   if ('error' in accessibleRun) return []
-  
-  const { data: slips, error } = await db
-    .from('payslips')
-    .select(`
-      *,
-      branch:branches(id, name, code),
-      employee:employee_id(nik, first_name, last_name, job_title, branch_id),
-      lines:payslip_lines(*)
-    `)
-    .eq('run_id', runId)
-    .eq('branch_id', accessibleRun.branchId)
 
-  if (error) return []
-  return slips
+  const slips = await prisma.payslips.findMany({
+    where: { run_id: runId, branch_id: accessibleRun.branchId },
+    include: {
+      branches: { select: { id: true, name: true, code: true } },
+      employees: { select: { nik: true, first_name: true, last_name: true, job_title: true, branch_id: true } },
+      payslip_lines: true,
+    },
+  })
+
+  return slips.map((slip) => ({
+    ...slip,
+    branch: slip.branches,
+    employee: slip.employees,
+    lines: slip.payslip_lines,
+    branches: undefined,
+    employees: undefined,
+    payslip_lines: undefined,
+  }))
 }
 
 export async function deletePayrollRun(runId: string, orgId: string) {
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data: run, error: runError } = await db
-    .from('payroll_runs')
-    .select('id, branch_id')
-    .eq('id', runId)
-    .eq('org_id', orgId)
-    .maybeSingle()
-
-  if (runError) return { error: runError.message }
+  const run = await prisma.payroll_runs.findFirst({
+    where: { id: runId, org_id: orgId },
+    select: { id: true, branch_id: true },
+  })
 
   const accessibleRun = await ensurePayrollBranchAccess(
     orgId,
@@ -371,28 +385,19 @@ export async function deletePayrollRun(runId: string, orgId: string) {
   )
   if ('error' in accessibleRun) return { error: accessibleRun.error }
 
-  const { error } = await db
-    .from('payroll_runs')
-    .delete()
-    .eq('id', runId)
-    .eq('org_id', orgId)
-    .eq('branch_id', accessibleRun.branchId)
-  if (error) return { error: error.message }
+  await prisma.payroll_runs.deleteMany({
+    where: { id: runId, org_id: orgId, branch_id: accessibleRun.branchId },
+  })
+
   revalidatePath('/hris')
   return { success: true }
 }
 
 export async function voidPayrollRun(runId: string, orgId: string) {
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data: run, error: runError } = await db
-    .from('payroll_runs')
-    .select('id, branch_id')
-    .eq('id', runId)
-    .eq('org_id', orgId)
-    .maybeSingle()
-
-  if (runError) return { error: runError.message }
+  const run = await prisma.payroll_runs.findFirst({
+    where: { id: runId, org_id: orgId },
+    select: { id: true, branch_id: true },
+  })
 
   const accessibleRun = await ensurePayrollBranchAccess(
     orgId,
@@ -401,8 +406,13 @@ export async function voidPayrollRun(runId: string, orgId: string) {
   )
   if ('error' in accessibleRun) return { error: accessibleRun.error }
 
-  const { error } = await db.rpc('void_payroll_run', { p_run_id: runId })
-  if (error) return { error: error.message }
+  try {
+    await prisma.$executeRaw`SELECT public.void_payroll_run(${runId}::uuid)`
+  } catch (error) {
+    console.error('voidPayrollRun Error:', error)
+    return { error: 'Gagal membatalkan payroll run.' }
+  }
+
   revalidatePath('/hris')
   return { success: true }
 }

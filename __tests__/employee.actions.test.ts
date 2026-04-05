@@ -1,17 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createSupabaseMock, success } from './helpers/supabase-mock'
-
 const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  createAdminClient: vi.fn(),
+  prisma: {
+    employees: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+  },
+  auth: vi.fn(),
   revalidatePath: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: mocks.createClient,
-  createAdminClient: mocks.createAdminClient,
+vi.mock('@/lib/prisma', () => ({
+  prisma: mocks.prisma,
+}))
+
+vi.mock('@/auth', () => ({
+  auth: mocks.auth,
 }))
 
 vi.mock('next/cache', () => ({
@@ -45,17 +53,7 @@ describe('Employee Actions', () => {
   })
 
   it('filters employees by resolved branch selection', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            result: success([]),
-          },
-        ],
-      },
-    })
-
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.employees.findMany.mockResolvedValue([])
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-1'] },
       branchId: 'branch-1',
@@ -63,31 +61,19 @@ describe('Employee Actions', () => {
 
     await getEmployees('org-1')
 
-    const branchFilter = supabase.calls[0]?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
-    )
-    expect(branchFilter?.args[1]).toBe('branch-1')
+    const findManyArgs = mocks.prisma.employees.findMany.mock.calls[0]?.[0]
+    expect(findManyArgs.where.branch_id).toBe('branch-1')
   })
 
   it('stamps branch_id when creating an employee', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            result: success([]),
-          },
-        ],
-      },
-    })
-
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.employees.create.mockResolvedValue({ id: 'emp-new' })
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-1'] },
       branchId: 'branch-1',
     })
 
     const result = await createEmployee('org-1', buildEmployeeForm())
-    const insertPayload = supabase.calls[0]?.operations.find((operation) => operation.method === 'insert')?.args[0] as Record<string, string>
+    const insertPayload = mocks.prisma.employees.create.mock.calls[0]?.[0]?.data as Record<string, any>
 
     expect(result).toEqual({ success: true })
     expect(insertPayload.branch_id).toBe('branch-1')
@@ -95,35 +81,20 @@ describe('Employee Actions', () => {
   })
 
   it('updates employees only inside their own branch', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'emp-1',
-              branch_id: 'branch-1',
-            }),
-          },
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.prisma.employees.findFirst.mockResolvedValue({
+      id: 'emp-1',
+      branch_id: 'branch-1',
     })
-
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.employees.updateMany.mockResolvedValue({ count: 1 })
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-1'] },
       branchId: 'branch-1',
     })
 
     const result = await updateEmployee('emp-1', 'org-1', buildEmployeeForm({ first_name: 'Raka' }))
-    const updateCall = supabase.calls[1]
-    const branchFilter = updateCall?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
-    )
+    const updateWhere = mocks.prisma.employees.updateMany.mock.calls[0]?.[0]?.where
 
     expect(result).toEqual({ success: true })
-    expect(branchFilter?.args[1]).toBe('branch-1')
+    expect(updateWhere.branch_id).toBe('branch-1')
   })
 })

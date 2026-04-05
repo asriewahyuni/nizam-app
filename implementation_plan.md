@@ -1,7 +1,7 @@
 # AI Handover Document: `org.actions.ts` Migration Status
 
 **Updated:** 2026-04-05 (sesi ke-3)  
-**Status:** `IN PROGRESS` — Auth actions dan org module selesai. Branch-access selesai.
+**Status:** `IN PROGRESS` — Org + Auth + Branch access selesai. HRIS actions selesai (tanpa `createClient`).
 
 Dokumen ini menggantikan rencana eksekusi lama. Refactor target untuk sesi ini, yaitu migrasi `modules/organization/actions/org.actions.ts` dari Supabase data access ke Prisma/Auth.js, sudah dieksekusi dan tervalidasi.
 
@@ -13,8 +13,14 @@ File-file berikut **sudah tidak lagi memakai Supabase data client**:
 
 - `modules/organization/actions/org.actions.ts` ✅ (sesi sebelumnya)
 - `modules/organization/lib/active-context.server.ts` ✅ (sesi sebelumnya)
-- `modules/organization/lib/branch-access.server.ts` ✅ **BARU - sesi ini**
-- `modules/auth/actions/auth.actions.ts` ✅ **BARU - sesi ini** (semua fungsi termasuk signInAsTenantOwner, restorePlatformAdminSession, requestPasswordReset, resetEmployeePassword, sendPasswordResetEmail)
+- `modules/organization/lib/branch-access.server.ts` ✅ (sesi sebelumnya)
+- `modules/auth/actions/auth.actions.ts` ✅ (sesi sebelumnya)
+- `modules/hris/actions/employee.actions.ts` ✅ (tanpa `createClient`; avatar upload masih lewat Supabase Storage via admin client)
+- `modules/hris/actions/attendance.actions.ts` ✅
+- `modules/hris/actions/leave.actions.ts` ✅
+- `modules/hris/actions/expense.actions.ts` ✅
+- `modules/hris/actions/payroll.actions.ts` ✅
+- `modules/hris/actions/self-service.actions.ts` ✅
 
 ---
 
@@ -118,19 +124,20 @@ Perintah yang sudah dijalankan dan lulus:
 
 ```bash
 npx tsc --noEmit
-npx vitest run __tests__/org.actions.test.ts
+npm test
 ```
 
 Hasil:
 
 - TypeScript compile bersih
-- test file `__tests__/org.actions.test.ts` lulus
+- seluruh test suite (Vitest) lulus
+- Catatan: `npm run lint` di repo ini masih fail karena banyak issue lint legacy (bukan efek perubahan HRIS saja)
 
 ---
 
 ## 5. Perubahan Test
 
-`__tests__/org.actions.test.ts` sudah diperbarui dari model mock Supabase lama ke model mock baru berbasis:
+Test yang sudah diperbarui dari model mock Supabase lama ke model mock baru berbasis Prisma/Auth:
 
 - `auth()`
 - `prisma`
@@ -138,7 +145,17 @@ Hasil:
 - `persistMembershipActiveContext()`
 - branch access helpers
 
-Jika agent berikutnya mengubah kontrak `org.actions.ts`, test ini harus ikut di-review karena sekarang test memang merefleksikan arsitektur Prisma/Auth yang baru.
+File test yang disentuh pada sesi HRIS migration:
+
+- `__tests__/attendance.actions.test.ts`
+- `__tests__/employee.actions.test.ts`
+- `__tests__/leave.actions.test.ts`
+- `__tests__/expense.actions.test.ts`
+- `__tests__/payroll.actions.test.ts`
+- `__tests__/self-service.actions.test.ts`
+- `__tests__/proxy.test.ts` (update mock karena `proxy.ts` tidak lagi lewat Supabase middleware)
+- `__tests__/branch-access.server.test.ts` (mock Prisma + `auth()`)
+- `__tests__/auth.actions.test.ts` (mock Prisma + NextAuth)
 
 ---
 
@@ -148,16 +165,14 @@ Berikut file yang **masih memakai Supabase** dan relevan untuk lanjutan migrasi:
 
 ### Prioritas tinggi
 
-- `modules/organization/lib/branch-access.server.ts`
-  - masih memakai `createClient()` / `createAdminClient()`
-  - `org.actions.ts` sekarang bergantung pada helper ini untuk branch scope
-  - ini target paling logis berikutnya
+- `app/(dashboard)/hris/HrisClient.tsx`
+  - masih ada akses Supabase langsung untuk CRUD roles/positions (table `roles`)
+- `app/(dashboard)/hris/page.tsx`
+  - masih inisialisasi Supabase client untuk kebutuhan page-level tertentu
 
 ### Prioritas menengah
 
 - `app/(dashboard)/settings/users/page.tsx`
-  - masih query `roles` via Supabase
-- `app/(dashboard)/hris/page.tsx`
   - masih query `roles` via Supabase
 
 ### Masih dalam area organization module
@@ -178,6 +193,8 @@ Berikut file yang **masih memakai Supabase** dan relevan untuk lanjutan migrasi:
 - `modules/organization/lib/logo-storage.server.ts`
   - masih memakai bucket `brand_assets`
   - ini sengaja dipisahkan agar `org.actions.ts` tetap bersih
+- `modules/hris/actions/employee.actions.ts` (avatar upload)
+  - masih upload ke bucket `avatars` via Supabase Storage admin client
 
 ---
 
@@ -185,14 +202,9 @@ Berikut file yang **masih memakai Supabase** dan relevan untuk lanjutan migrasi:
 
 Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file dan dampak terbesarnya:
 
-### PRIORITAS 1: Modul HRIS (`modules/hris/`)
-File yang harus dimigrasikan:
-- `modules/hris/actions/employee.actions.ts` — `createClient` + `createAdminClient`
-- `modules/hris/actions/payroll.actions.ts`
-- `modules/hris/actions/attendance.actions.ts`
-- `modules/hris/actions/leave.actions.ts`
-- `modules/hris/actions/expense.actions.ts`
-- `modules/hris/actions/self-service.actions.ts`
+### PRIORITAS 1: HRIS UI (hapus Supabase direct call di app/)
+- `app/(dashboard)/hris/HrisClient.tsx` (roles/positions CRUD)
+- `app/(dashboard)/hris/page.tsx`
 
 ### PRIORITAS 2: Modul Organization Actions lainnya
 - `modules/organization/actions/billing.actions.ts`
@@ -215,17 +227,31 @@ File yang harus dimigrasikan:
 - Jangan rollback `org.actions.ts` ke Supabase lagi.
 - Jika agent berikutnya ingin memperketat authorization, cek dulu permission key nyata yang benar-benar dipakai role table. Jangan mengandalkan nama key hipotetis dari dokumen lama.
 - `uploadLogo()` saat ini valid, tetapi masih tergantung Supabase Storage wrapper.
+- `approveExpenseClaim()` sekarang tidak lagi pakai SQL RPC Supabase; ia membuat journal entry + lines via Prisma transaction. Saat ini `entry_number` diisi string kosong untuk entry auto; jika UI/accounting butuh format nomor entry, perlu disesuaikan dengan generator yang dipakai di modul accounting.
 - `getActiveOrg()` sudah dinormalisasi untuk kompatibilitas caller lama; ubah shape return ini dengan sangat hati-hati.
 
 ---
 
 ## 9. File Inventory Dari Sesi Ini
 
-- `modules/organization/actions/org.actions.ts`
-- `modules/organization/actions/org-id.actions.ts`
-- `modules/organization/lib/branch-access.server.ts`
-- `modules/organization/lib/logo-storage.server.ts`
-- `modules/demo/actions/demo.actions.ts`
-- `__tests__/org.actions.test.ts`
+- HRIS actions:
+  - `modules/hris/actions/employee.actions.ts`
+  - `modules/hris/actions/attendance.actions.ts`
+  - `modules/hris/actions/leave.actions.ts`
+  - `modules/hris/actions/expense.actions.ts`
+  - `modules/hris/actions/payroll.actions.ts`
+  - `modules/hris/actions/self-service.actions.ts`
+- Test updates:
+  - `__tests__/attendance.actions.test.ts`
+  - `__tests__/employee.actions.test.ts`
+  - `__tests__/leave.actions.test.ts`
+  - `__tests__/expense.actions.test.ts`
+  - `__tests__/payroll.actions.test.ts`
+  - `__tests__/self-service.actions.test.ts`
+  - `__tests__/proxy.test.ts`
+  - `__tests__/branch-access.server.test.ts`
+  - `__tests__/auth.actions.test.ts`
+- Test infra:
+  - `vitest.config.ts`
 
 Dokumen ini siap diberikan ke agent berikutnya sebagai status handover terbaru.

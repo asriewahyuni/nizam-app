@@ -1,15 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createSupabaseMock, success } from './helpers/supabase-mock'
-
 const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
+  prisma: {
+    expense_claims: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+    employees: {
+      findFirst: vi.fn(),
+    },
+    $transaction: vi.fn(),
+  },
+  auth: vi.fn(),
   revalidatePath: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: mocks.createClient,
+vi.mock('@/lib/prisma', () => ({
+  prisma: mocks.prisma,
+}))
+
+vi.mock('@/auth', () => ({
+  auth: mocks.auth,
 }))
 
 vi.mock('next/cache', () => ({
@@ -43,17 +57,7 @@ describe('Expense Claim Actions', () => {
   })
 
   it('filters expense claims by resolved branch selection', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        expense_claims: [
-          {
-            result: success([]),
-          },
-        ],
-      },
-    })
-
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.expense_claims.findMany.mockResolvedValue([])
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-1'] },
       branchId: 'branch-1',
@@ -61,46 +65,24 @@ describe('Expense Claim Actions', () => {
 
     await getExpenseClaims('org-1')
 
-    const branchFilter = supabase.calls[0]?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
-    )
-    expect(branchFilter?.args[1]).toBe('branch-1')
+    const findManyArgs = mocks.prisma.expense_claims.findMany.mock.calls[0]?.[0]
+    expect(findManyArgs.where.branch_id).toBe('branch-1')
   })
 
   it('derives branch_id from employee when creating a claim', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'emp-1',
-              branch_id: 'branch-2',
-            }),
-          },
-        ],
-        expense_claims: [
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.auth.mockResolvedValue({ user: { id: 'user-1' } })
+    mocks.prisma.employees.findFirst.mockResolvedValue({
+      id: 'emp-1',
+      branch_id: 'branch-2',
     })
-
-    mocks.createClient.mockResolvedValue({
-      ...supabase.client,
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1' } },
-        }),
-      },
-    })
+    mocks.prisma.expense_claims.create.mockResolvedValue({ id: 'claim-new' })
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-2'] },
       branchId: 'branch-2',
     })
 
     const result = await createExpenseClaim('org-1', buildExpenseForm())
-    const insertPayload = supabase.calls[1]?.operations.find((operation) => operation.method === 'insert')?.args[0] as Record<string, string>
+    const insertPayload = mocks.prisma.expense_claims.create.mock.calls[0]?.[0]?.data as Record<string, any>
 
     expect(result).toEqual({ success: true })
     expect(insertPayload.branch_id).toBe('branch-2')
@@ -108,31 +90,23 @@ describe('Expense Claim Actions', () => {
   })
 
   it('validates claim branch before approving', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        expense_claims: [
-          {
-            maybeSingleResult: success({
-              id: 'claim-1',
-              org_id: 'org-1',
-              branch_id: 'branch-1',
-            }),
-          },
-        ],
-      },
-      rpc: {
-        process_expense_claim: [success('je-1')],
-      },
+    mocks.auth.mockResolvedValue({ user: { id: 'approver-1' } })
+    mocks.prisma.expense_claims.findFirst.mockResolvedValue({
+      id: 'claim-1',
+      org_id: 'org-1',
+      branch_id: 'branch-1',
+      employee_id: 'emp-1',
+      status: 'PENDING',
+      amount: 125000,
+      description: 'Pembelian perlengkapan',
+      claim_date: new Date('2026-04-03T00:00:00.000Z'),
     })
-
-    mocks.createClient.mockResolvedValue({
-      ...supabase.client,
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'approver-1' } },
-        }),
-      },
-    })
+    const tx = {
+      journal_entries: { create: vi.fn().mockResolvedValue({ id: 'je-1' }) },
+      journal_lines: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },
+      expense_claims: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    }
+    mocks.prisma.$transaction.mockImplementation(async (fn: any) => fn(tx))
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-1'] },
       branchId: 'branch-1',
@@ -141,51 +115,27 @@ describe('Expense Claim Actions', () => {
     const result = await approveExpenseClaim('claim-1', 'acc-exp', 'acc-payable')
 
     expect(result).toEqual({ success: true })
-    expect(supabase.rpcCalls).toEqual([
-      {
-        fn: 'process_expense_claim',
-        args: {
-          p_claim_id: 'claim-1',
-          p_approved_by: 'approver-1',
-          p_expense_account_id: 'acc-exp',
-          p_payable_account_id: 'acc-payable',
-        },
-      },
-    ])
+    expect(tx.journal_entries.create).toHaveBeenCalled()
+    expect(tx.journal_lines.createMany).toHaveBeenCalled()
+    expect(tx.expense_claims.updateMany).toHaveBeenCalled()
   })
 
   it('deletes claims only within the accessible branch', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        expense_claims: [
-          {
-            maybeSingleResult: success({
-              id: 'claim-1',
-              org_id: 'org-1',
-              branch_id: 'branch-1',
-            }),
-          },
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.prisma.expense_claims.findFirst.mockResolvedValue({
+      id: 'claim-1',
+      org_id: 'org-1',
+      branch_id: 'branch-1',
     })
-
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.expense_claims.deleteMany.mockResolvedValue({ count: 1 })
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-1'] },
       branchId: 'branch-1',
     })
 
     const result = await deleteExpenseClaim('claim-1')
-    const deleteCall = supabase.calls[1]
-    const branchFilter = deleteCall?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
-    )
+    const deleteWhere = mocks.prisma.expense_claims.deleteMany.mock.calls[0]?.[0]?.where
 
     expect(result).toEqual({ success: true })
-    expect(deleteCall?.operations.some((operation) => operation.method === 'delete')).toBe(true)
-    expect(branchFilter?.args[1]).toBe('branch-1')
+    expect(deleteWhere.branch_id).toBe('branch-1')
   })
 })

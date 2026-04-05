@@ -1,14 +1,42 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createSupabaseMock, success } from './helpers/supabase-mock'
-
 const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
+  prisma: {
+    employees: {
+      findFirst: vi.fn(),
+    },
+    attendance: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    leave_requests: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    expense_claims: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+    approval_requests: {
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    $transaction: vi.fn(),
+  },
+  auth: vi.fn(),
   revalidatePath: vi.fn(),
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: mocks.createClient,
+vi.mock('@/lib/prisma', () => ({
+  prisma: mocks.prisma,
+}))
+
+vi.mock('@/auth', () => ({
+  auth: mocks.auth,
 }))
 
 vi.mock('next/cache', () => ({
@@ -25,17 +53,6 @@ import {
   submitMyExpenseClaim,
   submitMyLeaveRequest,
 } from '@/modules/hris/actions/self-service.actions'
-
-function mockAuthedClient(supabaseClient: ReturnType<typeof createSupabaseMock>['client']) {
-  return {
-    ...supabaseClient,
-    auth: {
-      getUser: vi.fn().mockResolvedValue({
-        data: { user: { id: 'user-1' } },
-      }),
-    },
-  }
-}
 
 function buildLeaveForm(overrides: Record<string, string> = {}) {
   const formData = new FormData()
@@ -64,70 +81,38 @@ describe('Employee Self Service Actions', () => {
   })
 
   it('loads only the current employee attendance records', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'emp-1',
-              branch_id: 'branch-1',
-              first_name: 'Nadia',
-              last_name: 'Putri',
-              job_title: 'Staff',
-              nik: 'EMP-001',
-            }),
-          },
-        ],
-        attendance: [
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.auth.mockResolvedValue({ user: { id: 'user-1' } })
+    mocks.prisma.employees.findFirst.mockResolvedValue({
+      id: 'emp-1',
+      branch_id: 'branch-1',
+      first_name: 'Nadia',
+      last_name: 'Putri',
+      job_title: 'Staff',
+      nik: 'EMP-001',
     })
-
-    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+    mocks.prisma.attendance.findMany.mockResolvedValue([])
 
     await getMyAttendanceRecords('org-1')
 
-    const employeeFilter = supabase.calls[1]?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'employee_id'
-    )
-    expect(employeeFilter?.args[1]).toBe('emp-1')
+    const findManyArgs = mocks.prisma.attendance.findMany.mock.calls[0]?.[0]
+    expect(findManyArgs.where.employee_id).toBe('emp-1')
   })
 
   it('creates a self attendance clock-in with the employee branch', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'emp-1',
-              branch_id: 'branch-2',
-              first_name: 'Nadia',
-              last_name: 'Putri',
-              job_title: 'Staff',
-              nik: 'EMP-001',
-            }),
-          },
-        ],
-        attendance: [
-          {
-            maybeSingleResult: success(null),
-          },
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.auth.mockResolvedValue({ user: { id: 'user-1' } })
+    mocks.prisma.employees.findFirst.mockResolvedValue({
+      id: 'emp-1',
+      branch_id: 'branch-2',
+      first_name: 'Nadia',
+      last_name: 'Putri',
+      job_title: 'Staff',
+      nik: 'EMP-001',
     })
-
-    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+    mocks.prisma.attendance.findFirst.mockResolvedValue(null)
+    mocks.prisma.attendance.create.mockResolvedValue({ id: 'att-1' })
 
     const result = await clockMyAttendance('org-1', { type: 'IN', notes: 'On site' })
-    const insertPayload = supabase.calls[2]?.operations.find(
-      (operation) => operation.method === 'insert'
-    )?.args[0] as Record<string, string>
+    const insertPayload = mocks.prisma.attendance.create.mock.calls[0]?.[0]?.data as Record<string, any>
 
     expect(result).toEqual({ success: true })
     expect(insertPayload.employee_id).toBe('emp-1')
@@ -136,121 +121,67 @@ describe('Employee Self Service Actions', () => {
   })
 
   it('updates the current employee attendance on clock-out', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'emp-1',
-              branch_id: 'branch-2',
-              first_name: 'Nadia',
-              last_name: 'Putri',
-              job_title: 'Staff',
-              nik: 'EMP-001',
-            }),
-          },
-        ],
-        attendance: [
-          {
-            maybeSingleResult: success({
-              id: 'att-1',
-              status: 'PRESENT',
-              check_out: null,
-              notes: 'On site',
-            }),
-          },
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.auth.mockResolvedValue({ user: { id: 'user-1' } })
+    mocks.prisma.employees.findFirst.mockResolvedValue({
+      id: 'emp-1',
+      branch_id: 'branch-2',
+      first_name: 'Nadia',
+      last_name: 'Putri',
+      job_title: 'Staff',
+      nik: 'EMP-001',
     })
-
-    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+    mocks.prisma.attendance.findFirst.mockResolvedValue({
+      id: 'att-1',
+      status: 'PRESENT',
+      check_out: null,
+      notes: 'On site',
+    })
+    mocks.prisma.attendance.updateMany.mockResolvedValue({ count: 1 })
 
     const result = await clockMyAttendance('org-1', { type: 'OUT', notes: 'Selesai shift' })
-    const updateCall = supabase.calls[2]
-    const employeeFilter = updateCall?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'employee_id'
-    )
+    const updateWhere = mocks.prisma.attendance.updateMany.mock.calls[0]?.[0]?.where
 
     expect(result).toEqual({ success: true })
-    expect(updateCall?.operations.some((operation) => operation.method === 'update')).toBe(true)
-    expect(employeeFilter?.args[1]).toBe('emp-1')
+    expect(updateWhere.employee_id).toBe('emp-1')
   })
 
   it('loads only the current employee leave requests', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'emp-2',
-              branch_id: 'branch-3',
-              first_name: 'Rafi',
-              last_name: 'Aulia',
-              job_title: 'Admin',
-              nik: 'EMP-002',
-            }),
-          },
-        ],
-        leave_requests: [
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.auth.mockResolvedValue({ user: { id: 'user-1' } })
+    mocks.prisma.employees.findFirst.mockResolvedValue({
+      id: 'emp-2',
+      branch_id: 'branch-3',
+      first_name: 'Rafi',
+      last_name: 'Aulia',
+      job_title: 'Admin',
+      nik: 'EMP-002',
     })
-
-    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+    mocks.prisma.leave_requests.findMany.mockResolvedValue([])
 
     await getMyLeaveRequests('org-1')
 
-    const employeeFilter = supabase.calls[1]?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'employee_id'
-    )
-    expect(employeeFilter?.args[1]).toBe('emp-2')
+    const findManyArgs = mocks.prisma.leave_requests.findMany.mock.calls[0]?.[0]
+    expect(findManyArgs.where.employee_id).toBe('emp-2')
   })
 
   it('submits a leave request for the current employee only', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'emp-2',
-              branch_id: 'branch-3',
-              first_name: 'Rafi',
-              last_name: 'Aulia',
-              job_title: 'Admin',
-              nik: 'EMP-002',
-            }),
-          },
-        ],
-        leave_requests: [
-          {
-            singleResult: success({
-              id: 'leave-1',
-            }),
-          },
-        ],
-        approval_requests: [
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.auth.mockResolvedValue({ user: { id: 'user-1' } })
+    mocks.prisma.employees.findFirst.mockResolvedValue({
+      id: 'emp-2',
+      branch_id: 'branch-3',
+      first_name: 'Rafi',
+      last_name: 'Aulia',
+      job_title: 'Admin',
+      nik: 'EMP-002',
     })
-
-    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+    const tx = {
+      leave_requests: { create: vi.fn().mockResolvedValue({ id: 'leave-1' }) },
+      approval_requests: { create: vi.fn().mockResolvedValue({ id: 'approval-1' }) },
+    }
+    mocks.prisma.$transaction.mockImplementation(async (fn: any) => fn(tx))
 
     const result = await submitMyLeaveRequest('org-1', buildLeaveForm())
-    const insertPayload = supabase.calls[1]?.operations.find(
-      (operation) => operation.method === 'insert'
-    )?.args[0] as Record<string, string | number>
-    const approvalPayload = supabase.calls[2]?.operations.find(
-      (operation) => operation.method === 'insert'
-    )?.args[0] as Record<string, string>
+    const insertPayload = tx.leave_requests.create.mock.calls[0]?.[0]?.data as Record<string, any>
+    const approvalPayload = tx.approval_requests.create.mock.calls[0]?.[0]?.data as Record<string, any>
 
     expect(result).toEqual({ success: true })
     expect(insertPayload.employee_id).toBe('emp-2')
@@ -262,67 +193,37 @@ describe('Employee Self Service Actions', () => {
   })
 
   it('loads only the current employee expense claims', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'emp-3',
-              branch_id: 'branch-4',
-              first_name: 'Alya',
-              last_name: 'Sari',
-              job_title: 'Sales',
-              nik: 'EMP-003',
-            }),
-          },
-        ],
-        expense_claims: [
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.auth.mockResolvedValue({ user: { id: 'user-1' } })
+    mocks.prisma.employees.findFirst.mockResolvedValue({
+      id: 'emp-3',
+      branch_id: 'branch-4',
+      first_name: 'Alya',
+      last_name: 'Sari',
+      job_title: 'Sales',
+      nik: 'EMP-003',
     })
-
-    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+    mocks.prisma.expense_claims.findMany.mockResolvedValue([])
 
     await getMyExpenseClaims('org-1')
 
-    const employeeFilter = supabase.calls[1]?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'employee_id'
-    )
-    expect(employeeFilter?.args[1]).toBe('emp-3')
+    const findManyArgs = mocks.prisma.expense_claims.findMany.mock.calls[0]?.[0]
+    expect(findManyArgs.where.employee_id).toBe('emp-3')
   })
 
   it('submits an expense claim for the current employee only', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'emp-3',
-              branch_id: 'branch-4',
-              first_name: 'Alya',
-              last_name: 'Sari',
-              job_title: 'Sales',
-              nik: 'EMP-003',
-            }),
-          },
-        ],
-        expense_claims: [
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.auth.mockResolvedValue({ user: { id: 'user-1' } })
+    mocks.prisma.employees.findFirst.mockResolvedValue({
+      id: 'emp-3',
+      branch_id: 'branch-4',
+      first_name: 'Alya',
+      last_name: 'Sari',
+      job_title: 'Sales',
+      nik: 'EMP-003',
     })
-
-    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+    mocks.prisma.expense_claims.create.mockResolvedValue({ id: 'claim-new' })
 
     const result = await submitMyExpenseClaim('org-1', buildExpenseForm({ receipt_url: 'https://example.com/nota.jpg' }))
-    const insertPayload = supabase.calls[1]?.operations.find(
-      (operation) => operation.method === 'insert'
-    )?.args[0] as Record<string, string | number | null>
+    const insertPayload = mocks.prisma.expense_claims.create.mock.calls[0]?.[0]?.data as Record<string, any>
 
     expect(result).toEqual({ success: true })
     expect(insertPayload.employee_id).toBe('emp-3')
@@ -331,97 +232,54 @@ describe('Employee Self Service Actions', () => {
   })
 
   it('deletes only the current employee pending or rejected expense claims', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'emp-3',
-              branch_id: 'branch-4',
-              first_name: 'Alya',
-              last_name: 'Sari',
-              job_title: 'Sales',
-              nik: 'EMP-003',
-            }),
-          },
-        ],
-        expense_claims: [
-          {
-            maybeSingleResult: success({
-              id: 'claim-1',
-              status: 'PENDING',
-            }),
-          },
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.auth.mockResolvedValue({ user: { id: 'user-1' } })
+    mocks.prisma.employees.findFirst.mockResolvedValue({
+      id: 'emp-3',
+      branch_id: 'branch-4',
+      first_name: 'Alya',
+      last_name: 'Sari',
+      job_title: 'Sales',
+      nik: 'EMP-003',
     })
-
-    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+    mocks.prisma.expense_claims.findFirst.mockResolvedValue({
+      id: 'claim-1',
+      status: 'PENDING',
+    })
+    mocks.prisma.expense_claims.deleteMany.mockResolvedValue({ count: 1 })
 
     const result = await deleteMyExpenseClaim('org-1', 'claim-1')
-    const deleteCall = supabase.calls[2]
-    const employeeFilter = deleteCall?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'employee_id'
-    )
+    const deleteWhere = mocks.prisma.expense_claims.deleteMany.mock.calls[0]?.[0]?.where
 
     expect(result).toEqual({ success: true })
-    expect(deleteCall?.operations.some((operation) => operation.method === 'delete')).toBe(true)
-    expect(employeeFilter?.args[1]).toBe('emp-3')
+    expect(deleteWhere.employee_id).toBe('emp-3')
   })
 
   it('cancels only the current employee pending leave request', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'emp-2',
-              branch_id: 'branch-3',
-              first_name: 'Rafi',
-              last_name: 'Aulia',
-              job_title: 'Admin',
-              nik: 'EMP-002',
-            }),
-          },
-        ],
-        leave_requests: [
-          {
-            maybeSingleResult: success({
-              id: 'leave-1',
-              status: 'PENDING',
-            }),
-          },
-          {
-            result: success([]),
-          },
-        ],
-        approval_requests: [
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.auth.mockResolvedValue({ user: { id: 'user-1' } })
+    mocks.prisma.employees.findFirst.mockResolvedValue({
+      id: 'emp-2',
+      branch_id: 'branch-3',
+      first_name: 'Rafi',
+      last_name: 'Aulia',
+      job_title: 'Admin',
+      nik: 'EMP-002',
     })
-
-    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+    mocks.prisma.leave_requests.findFirst.mockResolvedValue({
+      id: 'leave-1',
+      status: 'PENDING',
+    })
+    const tx = {
+      leave_requests: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      approval_requests: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    }
+    mocks.prisma.$transaction.mockImplementation(async (fn: any) => fn(tx))
 
     const result = await cancelMyLeaveRequest('org-1', 'leave-1')
-    const updateCall = supabase.calls[2]
-    const approvalUpdateCall = supabase.calls[3]
-    const employeeFilter = updateCall?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'employee_id'
-    )
-    const approvalBranchFilter = approvalUpdateCall?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
-    )
+    const leaveUpdateWhere = tx.leave_requests.updateMany.mock.calls[0]?.[0]?.where
+    const approvalUpdateWhere = tx.approval_requests.updateMany.mock.calls[0]?.[0]?.where
 
     expect(result).toEqual({ success: true })
-    expect(updateCall?.operations.some((operation) => operation.method === 'update')).toBe(true)
-    expect(employeeFilter?.args[1]).toBe('emp-2')
-    expect(approvalUpdateCall?.operations.some((operation) => operation.method === 'update')).toBe(true)
-    expect(approvalBranchFilter?.args[1]).toBe('branch-3')
+    expect(leaveUpdateWhere.employee_id).toBe('emp-2')
+    expect(approvalUpdateWhere.branch_id).toBe('branch-3')
   })
 })

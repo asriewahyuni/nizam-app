@@ -1,6 +1,7 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
@@ -32,49 +33,42 @@ async function ensureExpenseBranchAccess(orgId: string, branchId: string | null,
 }
 
 export async function getExpenseClaims(orgId: string, branchId?: string | null) {
-  const supabase = await createClient()
-  const db = supabase as any
   const branchSelection = await resolveExpenseBranchSelection(orgId, branchId)
   if ('error' in branchSelection) return []
 
-  let query = db
-    .from('expense_claims')
-    .select(`
-      *,
-      branch:branches(id, name, code),
-      employee:employee_id(first_name, last_name, nik, branch_id)
-    `)
-    .eq('org_id', orgId)
-    .order('claim_date', { ascending: false })
+  const claims = await prisma.expense_claims.findMany({
+    where: {
+      org_id: orgId,
+      ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+    },
+    include: {
+      branches: { select: { id: true, name: true, code: true } },
+      employees: { select: { first_name: true, last_name: true, nik: true, branch_id: true } },
+    },
+    orderBy: { claim_date: 'desc' },
+  })
 
-  if (branchSelection.branchId) {
-    query = query.eq('branch_id', branchSelection.branchId)
-  }
-
-  const { data, error } = await query
-
-  if (error) return []
-  return data
+  return claims.map((claim) => ({
+    ...claim,
+    branch: claim.branches,
+    employee: claim.employees,
+    branches: undefined,
+    employees: undefined,
+  }))
 }
 
 export async function createExpenseClaim(orgId: string, formData: FormData) {
-  const supabase = await createClient()
-  const db = supabase as any
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized' }
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Unauthorized' }
 
   const employeeId = String(formData.get('employee_id') || '').trim()
   if (!employeeId) return { error: 'Karyawan wajib dipilih.' }
 
-  const { data: employee, error: employeeError } = await db
-    .from('employees')
-    .select('id, branch_id')
-    .eq('id', employeeId)
-    .eq('org_id', orgId)
-    .maybeSingle()
-
-  if (employeeError) return { error: employeeError.message }
+  const employee = await prisma.employees.findFirst({
+    where: { id: employeeId, org_id: orgId },
+    select: { id: true, branch_id: true },
+  })
 
   const accessibleEmployee = await ensureExpenseBranchAccess(
     orgId,
@@ -88,18 +82,20 @@ export async function createExpenseClaim(orgId: string, formData: FormData) {
   const description = formData.get('description') as string
   const claimDate = formData.get('claim_date') as string || new Date().toISOString().split('T')[0]
 
-  const { error } = await db.from('expense_claims').insert({
-    org_id: orgId,
-    branch_id: accessibleEmployee.branchId,
-    employee_id: employeeId,
-    amount,
-    category,
-    description,
-    claim_date: claimDate,
-    status: 'PENDING'
+  await prisma.expense_claims.create({
+    data: {
+      org_id: orgId,
+      branch_id: accessibleEmployee.branchId,
+      employee_id: employeeId,
+      amount,
+      category,
+      description,
+      claim_date: new Date(`${claimDate}T00:00:00.000Z`),
+      status: 'PENDING',
+      approved_by: null,
+    },
   })
 
-  if (error) return { error: error.message }
   revalidatePath('/hris')
   return { success: true }
 }
@@ -109,19 +105,28 @@ export async function approveExpenseClaim(
   expenseAccountId: string, 
   payableAccountId: string
 ) {
-  const supabase = await createClient()
-  const db = supabase as any
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized' }
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Unauthorized' }
 
-  const { data: claim, error: claimError } = await db
-    .from('expense_claims')
-    .select('id, org_id, branch_id')
-    .eq('id', claimId)
-    .maybeSingle()
+  const claim = await prisma.expense_claims.findFirst({
+    where: { id: claimId },
+    select: {
+      id: true,
+      org_id: true,
+      branch_id: true,
+      employee_id: true,
+      status: true,
+      amount: true,
+      description: true,
+      claim_date: true,
+    },
+  })
 
-  if (claimError) return { error: claimError.message }
+  if (!claim?.id) return { error: 'Klaim tidak ditemukan.' }
+  if (String(claim.status || '').toUpperCase() !== 'PENDING') {
+    return { error: 'Klaim sudah diproses.' }
+  }
 
   const accessibleClaim = await ensureExpenseBranchAccess(
     claim?.org_id ?? '',
@@ -130,45 +135,80 @@ export async function approveExpenseClaim(
   )
   if ('error' in accessibleClaim) return { error: accessibleClaim.error }
 
-  const { error } = await db.rpc('process_expense_claim', {
-    p_claim_id: claimId,
-    p_approved_by: user.id,
-    p_expense_account_id: expenseAccountId,
-    p_payable_account_id: payableAccountId
-  })
+  try {
+    await prisma.$transaction(async (tx) => {
+      const entry = await tx.journal_entries.create({
+        data: {
+          org_id: claim.org_id,
+          branch_id: accessibleClaim.branchId,
+          entry_number: '',
+          entry_date: claim.claim_date,
+          description: `Reimbursement: ${claim.description}`,
+          reference_type: 'EMPLOYEE_EXPENSE',
+          reference_id: claim.id,
+          status: 'POSTED',
+          is_auto: true,
+          created_by: userId,
+        },
+        select: { id: true },
+      })
 
-  if (error) return { error: error.message }
+      await tx.journal_lines.createMany({
+        data: [
+          {
+            entry_id: entry.id,
+            account_id: expenseAccountId,
+            debit: claim.amount,
+            credit: 0,
+            memo: claim.description,
+          },
+          {
+            entry_id: entry.id,
+            account_id: payableAccountId,
+            debit: 0,
+            credit: claim.amount,
+            memo: `Payable to employee: ${claim.employee_id}`,
+          },
+        ],
+      })
+
+      await tx.expense_claims.updateMany({
+        where: { id: claimId, org_id: claim.org_id, branch_id: accessibleClaim.branchId },
+        data: {
+          status: 'APPROVED',
+          approved_by: userId,
+          journal_entry_id: entry.id,
+          updated_at: new Date(),
+        },
+      })
+    })
+  } catch (error) {
+    console.error('approveExpenseClaim Error:', error)
+    return { error: 'Gagal memproses klaim biaya.' }
+  }
+
   revalidatePath('/hris')
   return { success: true }
 }
 
 export async function deleteExpenseClaim(claimId: string) {
-  const supabase = await createClient()
-  const db = supabase as any
-
-  const { data: claim, error: claimError } = await db
-    .from('expense_claims')
-    .select('id, org_id, branch_id')
-    .eq('id', claimId)
-    .maybeSingle()
-
-  if (claimError) return { error: claimError.message }
+  const claim = await prisma.expense_claims.findFirst({
+    where: { id: claimId },
+    select: { id: true, org_id: true, branch_id: true },
+  })
+  if (!claim?.id) return { error: 'Klaim tidak ditemukan.' }
 
   const accessibleClaim = await ensureExpenseBranchAccess(
-    claim?.org_id ?? '',
-    claim?.branch_id ?? null,
+    claim.org_id,
+    claim.branch_id ?? null,
     'Klaim tidak ditemukan.'
   )
   if ('error' in accessibleClaim) return { error: accessibleClaim.error }
 
-  const { error } = await db
-    .from('expense_claims')
-    .delete()
-    .eq('id', claimId)
-    .eq('org_id', claim.org_id)
-    .eq('branch_id', accessibleClaim.branchId)
+  await prisma.expense_claims.deleteMany({
+    where: { id: claimId, org_id: claim.org_id, branch_id: accessibleClaim.branchId },
+  })
 
-  if (error) return { error: error.message }
   revalidatePath('/hris')
   return { success: true }
 }
