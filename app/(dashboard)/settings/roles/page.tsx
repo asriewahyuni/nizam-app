@@ -4,10 +4,15 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence, Reorder } from 'framer-motion'
 import { ShieldAlert, Check, X, Shield, Users, Plus, Trash2, Edit2, ChevronRight, Settings2, Lock, GripVertical, CornerDownRight, AlertCircle, Sparkles } from 'lucide-react'
 import { PageHeader, SectionCard, SafeButton, ConfirmDialog } from '@/components/ui/NizamUI'
-import { createClient } from '@/lib/supabase/client'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
-
-const supabase = createClient()
+import {
+  createOrgRole,
+  deleteOrgRole,
+  getOrgRoles,
+  reorderOrgRoles,
+  updateOrgRole,
+  updateOrgRolePermissions,
+} from '@/modules/organization/actions/hris.actions'
 
 const MODULE_CATEGORIES = [
   {
@@ -86,8 +91,6 @@ const MODULE_CATEGORIES = [
 
 export default function RolesManagementPage() {
   const { orgId: resolvedOrgId } = useActiveOrgId()
-  const [org, setOrg] = useState<{ org_id: string } | null>(null)
-  const [userId, setUserId] = useState<string | null>(null)
   const [roles, setRoles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeRoleId, setActiveRoleId] = useState<string | null>(null)
@@ -105,14 +108,6 @@ export default function RolesManagementPage() {
     setLoading(true)
     setErrorMsg(null)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setErrorMsg('Sesi tidak ditemukan. Silakan login ulang.')
-        return
-      }
-      setUserId(session.user.id)
-
-      // Use resolvedOrgId from hook (consistent with getActiveOrg server logic)
       const activeOrgId = resolvedOrgId
       if (!activeOrgId) {
         setErrorMsg('Organisasi belum terdeteksi. Silakan tunggu atau refresh halaman.')
@@ -120,20 +115,13 @@ export default function RolesManagementPage() {
         return
       }
 
-      setOrg({ org_id: activeOrgId })
-
-      const { data: rolesData, error: rolesError } = await (supabase as any)
-        .from('roles')
-        .select('*')
-        .eq('org_id', activeOrgId)
-        .order('name')
-
-      if (rolesError) {
-        setErrorMsg('Gagal memuat daftar jabatan: ' + rolesError.message)
-      } else if (rolesData) {
-        setRoles(rolesData)
-        if (shouldSelectFirst || !activeRoleId) {
-          setActiveRoleId(rolesData[0]?.id || null)
+      const result = await getOrgRoles(activeOrgId)
+      if ('error' in result) {
+        setErrorMsg('Gagal memuat daftar jabatan: ' + result.error)
+      } else {
+        setRoles(result.roles)
+        if (shouldSelectFirst || !activeRoleId || !result.roles.some((role) => role.id === activeRoleId)) {
+          setActiveRoleId(result.roles[0]?.id || null)
         }
       }
     } catch (e: any) {
@@ -172,25 +160,38 @@ export default function RolesManagementPage() {
   }, [activeRole])
 
   const togglePermission = async (perm: string) => {
-    if (!activeRole) return
-    const pSet = new Set(activeRole.permissions || [])
+    if (!activeRole || !resolvedOrgId) return
+    const pSet = new Set<string>((activeRole.permissions || []) as string[])
     if (pSet.has(perm)) pSet.delete(perm)
     else pSet.add(perm)
 
     const updatedPerms = Array.from(pSet)
+    const previousRoles = roles
     const updatedRoles = roles.map(r => r.id === activeRoleId ? { ...r, permissions: updatedPerms } : r)
     setRoles(updatedRoles)
 
-    const { error } = await (supabase as any).from('roles').update({ permissions: updatedPerms }).eq('id', activeRoleId)
-    if (error) alert('Gagal update izin: ' + error.message)
+    const result = await updateOrgRolePermissions(resolvedOrgId, activeRoleId as string, updatedPerms)
+    if ('error' in result) {
+      setRoles(previousRoles)
+      setErrorMsg('Gagal update izin: ' + result.error)
+      return
+    }
+
+    setRoles(current => current.map(role => role.id === activeRoleId ? result.role : role))
   }
 
   const updateRolesOrder = async (newOrder: any[]) => {
+    if (!resolvedOrgId) return
+    const previousRoles = roles
     setRoles(newOrder)
-    const promises = newOrder.map((role, index) => 
-      (supabase as any).from('roles').update({ priority: index }).eq('id', role.id)
-    )
-    await Promise.all(promises)
+    const result = await reorderOrgRoles(resolvedOrgId, newOrder.map((role) => role.id))
+    if ('error' in result) {
+      setRoles(previousRoles)
+      setErrorMsg('Gagal menyimpan urutan jabatan: ' + result.error)
+      return
+    }
+
+    setRoles(result.roles)
   }
 
   const resetModal = () => {
@@ -212,7 +213,7 @@ export default function RolesManagementPage() {
 
   const submitRole = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newRoleName.trim() || !org?.org_id) {
+    if (!newRoleName.trim() || !resolvedOrgId) {
        setErrorMsg('Pastikan nama jabatan terisi dan organisasi terdeteksi.')
        return
     }
@@ -220,40 +221,33 @@ export default function RolesManagementPage() {
     setErrorMsg(null)
     const payload = {
       name: newRoleName.trim(),
-      org_id: org.org_id,
-      department_ids: newRoleDepts,
-      parent_id: newRoleParent,
+      departmentIds: newRoleDepts,
+      parentId: newRoleParent,
     }
 
     let result
     if (editingInfo) {
-      result = await (supabase as any).from('roles').update(payload).eq('id', editingInfo.id)
+      result = await updateOrgRole(resolvedOrgId, editingInfo.id, payload)
     } else {
-      result = await (supabase as any).from('roles').insert([{
-        ...payload,
-        permissions: [],
-        is_system: false,
-        priority: roles.length
-      }])
+      result = await createOrgRole(resolvedOrgId, payload)
     }
     
-    if (result.error) {
-       const msg = result.error.message.includes('roles_org_id_name_key') 
-         ? 'Nama jabatan ini sudah ada di organisasi Anda.' 
-         : result.error.message
-       setErrorMsg('Gagal simpan: ' + msg)
+    if ('error' in result) {
+       setErrorMsg('Gagal simpan: ' + result.error)
     } else {
+       const nextActiveRoleId = result.role.id
        resetModal()
-       loadData()
+       await loadData()
+       setActiveRoleId(nextActiveRoleId)
     }
   }
 
   const deleteRole = async () => {
-    if (!confirmDelete.id) return
-    const { error } = await (supabase as any).from('roles').delete().eq('id', confirmDelete.id)
-    if (error) alert('Gagal hapus: ' + error.message)
+    if (!confirmDelete.id || !resolvedOrgId) return
+    const result = await deleteOrgRole(resolvedOrgId, confirmDelete.id)
+    if ('error' in result) setErrorMsg('Gagal hapus: ' + result.error)
     setConfirmDelete({ open: false, id: '', name: '' })
-    loadData(true)
+    await loadData(true)
   }
 
   if (loading && roles.length === 0) return <div className="p-20 text-center animate-pulse text-slate-400 font-black uppercase tracking-widest text-[10px]">Menyinkronkan Struktur...</div>

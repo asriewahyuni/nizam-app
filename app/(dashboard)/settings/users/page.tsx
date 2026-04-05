@@ -1,21 +1,16 @@
 import { getActiveOrg, getBranches, getInvitations, getOrgMembers } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
 import UsersClient from './UsersClient'
-import { createClient } from '@/lib/supabase/server'
+import { getOrgRoles } from '@/modules/organization/actions/hris.actions'
 
 export default async function UsersPage() {
   const orgData = await getActiveOrg()
   if (!orgData || !['owner', 'admin'].includes(orgData.role)) return redirect('/dashboard')
 
-  const supabase = await createClient()
-  const [members, branches, { data: roles }, invitations] = await Promise.all([
+  const [members, branches, rolesResult, invitations] = await Promise.all([
     getOrgMembers(orgData.org.id),
     getBranches(orgData.org.id),
-    supabase
-      .from('roles')
-      .select('*')
-      .eq('org_id', orgData.org.id)
-      .order('name'),
+    getOrgRoles(orgData.org.id),
     getInvitations(orgData.org.id)
   ])
 
@@ -24,7 +19,7 @@ export default async function UsersPage() {
       orgId={orgData.org.id}
       initialMembers={members || []}
       branches={branches || []}
-      roles={roles || []}
+      roles={rolesResult.roles || []}
       initialInvitations={invitations || []}
     />
   )

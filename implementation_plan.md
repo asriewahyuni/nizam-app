@@ -1,7 +1,7 @@
 # AI Handover Document: `org.actions.ts` Migration Status
 
-**Updated:** 2026-04-05 (sesi ke-3)  
-**Status:** `IN PROGRESS` — Org + Auth + Branch access selesai. HRIS actions selesai (tanpa `createClient`).
+**Updated:** 2026-04-05 (sesi ke-4)  
+**Status:** `IN PROGRESS` — Org + Auth + Branch access selesai. HRIS actions + role management UI slice selesai.
 
 Dokumen ini menggantikan rencana eksekusi lama. Refactor target untuk sesi ini, yaitu migrasi `modules/organization/actions/org.actions.ts` dari Supabase data access ke Prisma/Auth.js, sudah dieksekusi dan tervalidasi.
 
@@ -21,6 +21,11 @@ File-file berikut **sudah tidak lagi memakai Supabase data client**:
 - `modules/hris/actions/expense.actions.ts` ✅
 - `modules/hris/actions/payroll.actions.ts` ✅
 - `modules/hris/actions/self-service.actions.ts` ✅
+- `modules/organization/actions/hris.actions.ts` ✅
+- `app/(dashboard)/hris/page.tsx` ✅
+- `app/(dashboard)/hris/HrisClient.tsx` ✅
+- `app/(dashboard)/settings/users/page.tsx` ✅ (preload roles)
+- `app/(dashboard)/settings/roles/page.tsx` ✅
 
 ---
 
@@ -56,7 +61,29 @@ File-file berikut **sudah tidak lagi memakai Supabase data client**:
 - `deleteInvitation`
 - `getInvitationByCode`
 
-### C. Pola keamanan yang dipakai
+### C. Slice baru yang selesai pada sesi ini
+
+Role management yang sebelumnya tersebar di beberapa page/client component dan masih query langsung ke tabel `roles` via Supabase sekarang sudah dipindahkan ke server actions Prisma/Auth di:
+
+- `modules/organization/actions/hris.actions.ts`
+
+Action yang ditambahkan:
+
+- `getOrgRoles`
+- `createOrgRole`
+- `updateOrgRole`
+- `updateOrgRolePermissions`
+- `reorderOrgRoles`
+- `deleteOrgRole`
+
+Selain itu:
+
+- `getResetRequestsCount()` di file yang sama juga sudah pindah ke Prisma.
+- `HrisClient` tidak lagi membuat Supabase browser client untuk CRUD posisi/jabatan.
+- `settings/roles/page.tsx` tidak lagi memakai Supabase client untuk load/update/delete/reorder role.
+- `hris/page.tsx` dan `settings/users/page.tsx` tidak lagi preload `roles` lewat Supabase server client.
+
+### D. Pola keamanan yang dipakai
 
 Rencana awal mengasumsikan ada helper `checkPermission(session, orgId, ...)` dengan signature session-based. Itu **tidak sesuai** dengan helper aktual di repo saat ini.
 
@@ -131,6 +158,7 @@ Hasil:
 
 - TypeScript compile bersih
 - seluruh test suite (Vitest) lulus
+- test baru `__tests__/organization-hris.actions.test.ts` lulus
 - Catatan: `npm run lint` di repo ini masih fail karena banyak issue lint legacy (bukan efek perubahan HRIS saja)
 
 ---
@@ -165,22 +193,21 @@ Berikut file yang **masih memakai Supabase** dan relevan untuk lanjutan migrasi:
 
 ### Prioritas tinggi
 
-- `app/(dashboard)/hris/HrisClient.tsx`
-  - masih ada akses Supabase langsung untuk CRUD roles/positions (table `roles`)
-- `app/(dashboard)/hris/page.tsx`
-  - masih inisialisasi Supabase client untuk kebutuhan page-level tertentu
+- `app/(dashboard)/settings/users/UsersClient.tsx`
+  - masih update/delete `org_members` via Supabase client
+- `modules/organization/actions/approval.actions.ts`
+  - masih full Supabase query + mutation
+- `modules/organization/actions/audit.actions.ts`
+  - masih Supabase
+- `modules/organization/actions/billing.actions.ts`
+  - masih Supabase
 
 ### Prioritas menengah
 
-- `app/(dashboard)/settings/users/page.tsx`
-  - masih query `roles` via Supabase
-
-### Masih dalam area organization module
-
-- `modules/organization/actions/billing.actions.ts`
-- `modules/organization/actions/hris.actions.ts`
-- `modules/organization/actions/audit.actions.ts`
-- `modules/organization/actions/approval.actions.ts`
+- `app/api/export/route.ts`
+  - masih query `org_members` via Supabase
+- `modules/organization/actions/org-id.actions.ts`
+  - aman, tetapi tetap perlu dicek jika ada asumsi lama terkait context persistence
 
 ### Masih Supabase-heavy tetapi di luar scope target file
 
@@ -203,18 +230,16 @@ Berikut file yang **masih memakai Supabase** dan relevan untuk lanjutan migrasi:
 Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file dan dampak terbesarnya:
 
 ### PRIORITAS 1: HRIS UI (hapus Supabase direct call di app/)
-- `app/(dashboard)/hris/HrisClient.tsx` (roles/positions CRUD)
-- `app/(dashboard)/hris/page.tsx`
+- `app/(dashboard)/settings/users/UsersClient.tsx`
+- `app/api/export/route.ts`
 
 ### PRIORITAS 2: Modul Organization Actions lainnya
 - `modules/organization/actions/billing.actions.ts`
-- `modules/organization/actions/hris.actions.ts`
 - `modules/organization/actions/audit.actions.ts`
 - `modules/organization/actions/approval.actions.ts`
 
 ### PRIORITAS 3: Page Components (app/)
-- `app/(dashboard)/settings/users/page.tsx`
-- `app/(dashboard)/hris/page.tsx`
+- audit lagi page/client lain yang masih instantiate `createClient()` hanya untuk mutasi ringan
 
 ### DEPRIORITIZE (Terlalu besar, lakukan terpisah):
 - `modules/accounting/` — Banyak file, tapi tidak berimpact ke autentikasi
@@ -253,5 +278,12 @@ Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file 
   - `__tests__/auth.actions.test.ts`
 - Test infra:
   - `vitest.config.ts`
+- Role management migration:
+  - `modules/organization/actions/hris.actions.ts`
+  - `app/(dashboard)/hris/page.tsx`
+  - `app/(dashboard)/hris/HrisClient.tsx`
+  - `app/(dashboard)/settings/users/page.tsx`
+  - `app/(dashboard)/settings/roles/page.tsx`
+  - `__tests__/organization-hris.actions.test.ts`
 
 Dokumen ini siap diberikan ke agent berikutnya sebagai status handover terbaru.

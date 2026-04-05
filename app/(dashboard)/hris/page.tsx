@@ -5,7 +5,7 @@ import { getPayrollComponents, getPayrollRuns } from '@/modules/hris/actions/pay
 import { getAttendanceRecords } from '@/modules/hris/actions/attendance.actions'
 import { getLeaveRequests } from '@/modules/hris/actions/leave.actions'
 import { getAccountBalances } from '@/modules/accounting/actions/coa.actions'
-import { createClient } from '@/lib/supabase/server'
+import { getOrgRoles } from '@/modules/organization/actions/hris.actions'
 import HrisClient from './HrisClient'
 
 export default async function HrisPage(props: { searchParams: Promise<{ tab?: string }> }) {
@@ -16,10 +16,7 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
   if (!orgData) return redirect('/onboarding')
   const activeBranch = await getActiveBranch(orgData.org.id)
 
-  const supabase = await createClient()
-  const { data: roles } = await supabase.from('roles').select('*').eq('org_id', orgData.org.id).order('name')
-
-  const [employees, payrollComponents, accounts, payrollRuns, attendanceRecords, leaveRequests, invitations, allowAllBranchSelection] = await Promise.all([
+  const [employees, payrollComponents, accounts, payrollRuns, attendanceRecords, leaveRequests, invitations, allowAllBranchSelection, rolesResult] = await Promise.all([
     getEmployees(orgData.org.id, activeBranch?.id),
     getPayrollComponents(orgData.org.id),
     getAccountBalances(orgData.org.id),
@@ -28,6 +25,7 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
     getLeaveRequests(orgData.org.id, activeBranch?.id),
     getInvitations(orgData.org.id),
     canSelectAllBranches(orgData.org.id),
+    getOrgRoles(orgData.org.id),
   ])
 
   return <HrisClient 
@@ -42,7 +40,7 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
     initialLeaveRequests={leaveRequests}
     accounts={accounts}
     settings={orgData.org.settings}
-    roles={roles || []}
+    roles={rolesResult.roles || []}
     initialInvitations={invitations || []}
     defaultTab={defaultTab as any}
   />

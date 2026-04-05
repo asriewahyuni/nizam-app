@@ -35,12 +35,11 @@ import {
   MessageCircle
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { createClient } from '@/lib/supabase/client'
-import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
 import { createEmployee, updateEmployee } from '@/modules/hris/actions/employee.actions'
 import { createPayrollComponent, deletePayrollComponent, generatePayrollRun, payPayrollRun, fixEmptyPayrollJournals, getPayrollRunDetails, deletePayrollRun, voidPayrollRun } from '@/modules/hris/actions/payroll.actions'
 import { upsertAttendanceRecord } from '@/modules/hris/actions/attendance.actions'
 import { approveLeaveRequest, createLeaveRequest, rejectLeaveRequest } from '@/modules/hris/actions/leave.actions'
+import { createOrgRole, deleteOrgRole, getOrgRoles, updateOrgRole } from '@/modules/organization/actions/hris.actions'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import {
@@ -86,7 +85,6 @@ export default function HrisClient({
   defaultTab?: string
 }) {
   const router = useRouter()
-  const supabase = createClient()
   const [employees, setEmployees] = useState(initialEmployees)
   const [payrollComponents, setPayrollComponents] = useState(initialPayrollComponents)
   const [payrollRuns, setPayrollRuns] = useState(initialPayrollRuns || [])
@@ -136,6 +134,10 @@ export default function HrisClient({
   useEffect(() => {
     setInvitations(initialInvitations || [])
   }, [initialInvitations])
+
+  useEffect(() => {
+    setRolesList(roles || [])
+  }, [roles])
   const [editingEmp, setEditingEmp] = useState<any>(null)
   const [viewingRun, setViewingRun] = useState<any>(null)
   const [viewingRunData, setViewingRunData] = useState<any[]>([])
@@ -189,22 +191,6 @@ export default function HrisClient({
   const [isPayModalOpen, setIsPayModalOpen] = useState<any>(null) // selected run to pay
   const [loading, setLoading] = useState(false)
   const [selectedRole, setSelectedRole] = useState<string>('')
-
-  // Use shared hook — same org_id resolution as Settings/Roles and getActiveOrg()
-  const { orgId: activeOrgId } = useActiveOrgId()
-
-  // Sync roles whenever activeOrgId resolves
-  useEffect(() => {
-    if (!activeOrgId) return
-    ;(supabase as any)
-      .from('roles')
-      .select('*')
-      .eq('org_id', activeOrgId)
-      .order('name')
-      .then(({ data }: any) => {
-        if (data && data.length > 0) setRolesList(data)
-      })
-  }, [activeOrgId])
 
   // Basic Form State
   const [basicSalary, setBasicSalary] = useState(0)
@@ -325,8 +311,13 @@ export default function HrisClient({
   }
 
   const fetchRoles = async () => {
-    const { data } = await (supabase as any).from('roles').select('*').eq('org_id', activeOrgId).order('name')
-    if (data) setRolesList(data)
+    const result = await getOrgRoles(orgId)
+    if ('error' in result) {
+      showToast(result.error, 'error')
+      return
+    }
+
+    setRolesList(result.roles)
   }
 
   const handleSavePosition = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -336,13 +327,19 @@ export default function HrisClient({
     const name = formData.get('name') as string
 
     if (editingPosition) {
-       const { error } = await (supabase as any).from('roles').update({ name }).eq('id', editingPosition.id)
-       if (error) showToast(error.message, 'error')
-       else { setIsPositionModalOpen(false); fetchRoles(); }
+       const result = await updateOrgRole(orgId, editingPosition.id, { name })
+       if ('error' in result) showToast(result.error, 'error')
+       else {
+         setIsPositionModalOpen(false)
+         await fetchRoles()
+       }
     } else {
-       const { error } = await (supabase as any).from('roles').insert({ org_id: orgId, name, permissions: [], priority: rolesList.length })
-       if (error) showToast(error.message, 'error')
-       else { setIsPositionModalOpen(false); fetchRoles(); }
+       const result = await createOrgRole(orgId, { name })
+       if ('error' in result) showToast(result.error, 'error')
+       else {
+         setIsPositionModalOpen(false)
+         await fetchRoles()
+       }
     }
     setLoading(false)
   }
@@ -350,9 +347,11 @@ export default function HrisClient({
   const handleDeletePosition = async (id: string, isSystem: boolean) => {
     if (isSystem) return showToast('Role sistem ini tidak dapat dihapus.', 'error')
     if (!confirm('Yakin ingin menghapus Posisi/Jabatan ini?')) return
-    const { error } = await (supabase as any).from('roles').delete().eq('id', id)
-    if (error) showToast(error.message, 'error')
-    else fetchRoles()
+    setLoading(true)
+    const result = await deleteOrgRole(orgId, id)
+    if ('error' in result) showToast(result.error, 'error')
+    else await fetchRoles()
+    setLoading(false)
   }
 
   const handleDeleteInvite = async (id: string) => {
