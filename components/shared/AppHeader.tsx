@@ -199,7 +199,7 @@ export function AppHeader({
     startHierarchyTransition(async () => {
       const result: Awaited<ReturnType<typeof updateChildOrganization>> = await updateChildOrganization(childOrgId, nextName)
       if ('error' in result) {
-        setOrgFeedback({ type: 'error', message: result.error })
+        setOrgFeedback({ type: 'error', message: result.error ?? '' })
         return
       }
 
@@ -220,7 +220,7 @@ export function AppHeader({
     startHierarchyTransition(async () => {
       const result: Awaited<ReturnType<typeof deleteChildOrganization>> = await deleteChildOrganization(childOrgId)
       if ('error' in result) {
-        setOrgFeedback({ type: 'error', message: result.error })
+        setOrgFeedback({ type: 'error', message: result.error ?? '' })
         return
       }
 
