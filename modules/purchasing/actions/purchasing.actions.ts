@@ -611,11 +611,12 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     .from('accounts' as any)
     .select('id, code')
     .eq('org_id', orgId)
-    .in('code', ['1301', '1401', '1403', '1404', '2101'])
+    .in('code', ['1205', '1301', '1401', '1403', '1404', '2101'])
 
   const accPersediaan = accounts?.find((a:any) => a.code === '1301')?.id
   const accPpnMasukan = accounts?.find((a:any) => a.code === '1401')?.id
   const accUangMuka = accounts?.find((a:any) => a.code === '1403')?.id
+  const accIstishnaAsset = accounts?.find((a:any) => a.code === '1205')?.id
   const accPiutangSalamVendor = accounts?.find((a:any) => a.code === '1404')?.id
   const defaultAccHutang = accounts?.find((a:any) => a.code === '2101')?.id
  
@@ -635,8 +636,13 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
        return { error: 'Akun Piutang Salam Vendor (1404) belum tersedia di CoA. Jalankan migrasi terbaru / aktifkan akun syariah.' }
      }
      finalAccCredit = accPiutangSalamVendor
-  } else if (String(purchase.shariah_mode || '').toUpperCase() === 'ISTISHNA' && accUangMuka) {
-     finalAccCredit = accUangMuka
+  } else if (String(purchase.shariah_mode || '').toUpperCase() === 'ISTISHNA') {
+     // Gunakan akun 1205 (Piutang Barang Istishna) jika ada, fallback ke 1403 (Uang Muka)
+     if (accIstishnaAsset) {
+        finalAccCredit = accIstishnaAsset
+     } else if (accUangMuka) {
+        finalAccCredit = accUangMuka
+     }
   }
 
   if (finalAccCredit) {

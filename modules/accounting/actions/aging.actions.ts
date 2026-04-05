@@ -23,6 +23,10 @@ function isSalamMode(value: unknown) {
   return String(value || '').trim().toUpperCase() === 'SALAM'
 }
 
+function isIstishnaMode(value: unknown) {
+  return String(value || '').trim().toUpperCase() === 'ISTISHNA'
+}
+
 async function getPostedEntryIds(
   db: any,
   orgId: string,
@@ -101,7 +105,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
   const supabase = await createClient()
   const db = supabase as any
   const today = getBusinessToday()
-  const settlementAccounts = await getSettlementAccounts(db, orgId, ['1201', '1404', '2101', '2201', '2301', '2401', '2602'])
+  const settlementAccounts = await getSettlementAccounts(db, orgId, ['1201', '1205', '1404', '2101', '2201', '2301', '2401', '2602', '2603'])
 
   let results: any[] = []
 
@@ -166,8 +170,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             days_overdue: Math.max(0, diffDateOnlyStrings(today, finalDueDate)),
             aging_bucket: agingBucket(finalDueDate, today),
             source_type: 'SALES',
-            source_label: isSalamSale ? 'Tagihan Sales SALAM (SO)' : 'Piutang Usaha (1201)',
-            source_account_code: isSalamSale ? null : '1201',
+            source_label: isSalamSale ? 'Tagihan Sales SALAM (SO)' : (isIstishnaMode(s.shariah_mode) ? 'Tagihan Sales ISTISHNA (SO)' : 'Piutang Usaha (1201)'),
+            source_account_code: isSalamSale ? null : (isIstishnaMode(s.shariah_mode) ? null : '1201'),
           }
         })
         .filter((r: any) => r.outstanding > 0.01)
@@ -186,7 +190,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
 
     const { data: salamPurchases } = await salamPurchasesQuery
 
-    const salamPurchasesFiltered = (salamPurchases || []).filter((purchase: any) => isSalamMode(purchase.shariah_mode))
+    const salamPurchasesFiltered = (salamPurchases || []).filter((purchase: any) => isSalamMode(purchase.shariah_mode) || isIstishnaMode(purchase.shariah_mode))
 
     if (salamPurchasesFiltered.length > 0) {
       const purchaseIds = salamPurchasesFiltered.map((p: any) => p.id)
@@ -230,9 +234,9 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             outstanding,
             days_overdue: Math.max(0, diffDateOnlyStrings(today, finalDueDate)),
             aging_bucket: agingBucket(finalDueDate, today),
-            source_type: 'SALAM_VENDOR_RECEIVABLE',
-            source_label: 'Piutang Salam Vendor (1404)',
-            source_account_code: '1404',
+            source_type: isSalamMode(purchase.shariah_mode) ? 'SALAM_VENDOR_RECEIVABLE' : 'ISTISHNA_VENDOR_RECEIVABLE',
+            source_label: isSalamMode(purchase.shariah_mode) ? 'Piutang Salam Vendor (1404)' : 'Piutang Barang Istishna (1205)',
+            source_account_code: isSalamMode(purchase.shariah_mode) ? '1404' : '1205',
           }
         })
         .filter((row: any) => row.outstanding > 0.01)
@@ -240,8 +244,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       results.push(...salamRows)
     }
 
-    // 3. Reconciliation with GL (1201 + 1404)
-    const balances = await getAccountCodeBalances(db, orgId, ['1201', '1404'], branchId)
+    // 3. Reconciliation with GL (1201 + 1404 + 1205)
+    const balances = await getAccountCodeBalances(db, orgId, ['1201', '1404', '1205'], branchId)
     const tradeArGlBalance = Number(balances['1201'] || 0)
     const tradeArModuleTotal = results
       .filter((row: any) => row.source_type === 'SALES')
@@ -289,6 +293,31 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
         source_label: 'Penyesuaian Piutang Salam Vendor (1404)',
         source_account_code: '1404',
         settlement_account_id: settlementAccounts['1404'] || null,
+      })
+    }
+
+    const istishnaReceivableGlBalance = Number(balances['1205'] || 0)
+    const istishnaReceivableModuleTotal = results
+      .filter((row: any) => row.source_type === 'ISTISHNA_VENDOR_RECEIVABLE')
+      .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+    const istishnaReceivableDiff = istishnaReceivableGlBalance - istishnaReceivableModuleTotal
+
+    if (Math.abs(istishnaReceivableDiff) > 10) {
+      results.push({
+        id: 'manual-istishna-ar-adj',
+        contact_name: 'Unallocated (Buku Besar)',
+        doc_number: 'GL-1205-ADJ',
+        due_date: today,
+        grand_total: istishnaReceivableDiff,
+        paid_amount: 0,
+        returned_amount: 0,
+        outstanding: istishnaReceivableDiff,
+        days_overdue: 0,
+        aging_bucket: 'Current',
+        source_type: 'JOURNAL',
+        source_label: 'Penyesuaian Piutang Barang Istishna (1205)',
+        source_account_code: '1205',
+        settlement_account_id: settlementAccounts['1205'] || null,
       })
     }
 
@@ -346,8 +375,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             days_overdue: Math.max(0, diffDateOnlyStrings(today, finalDueDate)),
             aging_bucket: agingBucket(finalDueDate, today),
             source_type: 'PURCHASING',
-            source_label: 'Hutang Usaha (2101)',
-            source_account_code: '2101',
+            source_label: isSalamMode(p.shariah_mode) ? 'Hutang Pembelian SALAM' : (isIstishnaMode(p.shariah_mode) ? 'Hutang Pembelian ISTISHNA' : 'Hutang Usaha (2101)'),
+            source_account_code: isSalamMode(p.shariah_mode) || isIstishnaMode(p.shariah_mode) ? null : '2101',
           }
         })
         .filter((r: any) => r.outstanding > 0.01)
@@ -366,7 +395,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
 
     const { data: salamSales } = await salamSalesQuery
 
-    const salamSalesFiltered = (salamSales || []).filter((sale: any) => isSalamMode(sale.shariah_mode))
+    const salamSalesFiltered = (salamSales || []).filter((sale: any) => isSalamMode(sale.shariah_mode) || isIstishnaMode(sale.shariah_mode))
 
     if (salamSalesFiltered.length > 0) {
       const saleIds = salamSalesFiltered.map((sale: any) => sale.id)
@@ -416,9 +445,9 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             outstanding,
             days_overdue: Math.max(0, diffDateOnlyStrings(today, finalDueDate)),
             aging_bucket: agingBucket(finalDueDate, today),
-            source_type: 'SALAM_SALES_LIABILITY',
-            source_label: 'Hutang Salam (2602)',
-            source_account_code: '2602',
+            source_type: isSalamMode(sale.shariah_mode) ? 'SALAM_SALES_LIABILITY' : 'ISTISHNA_SALES_LIABILITY',
+            source_label: isSalamMode(sale.shariah_mode) ? 'Hutang Salam (2602)' : 'Hutang Istishna (2603)',
+            source_account_code: isSalamMode(sale.shariah_mode) ? '2602' : '2603',
           }
         })
         .filter((row: any) => row.outstanding > 0.01)
@@ -426,8 +455,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       results.push(...salamLiabilityRows)
     }
 
-    // 3. Direct AP (Non-Trade) & Taxes from GL (2101, 2201, 2301, 2401, 2602)
-    const balances = await getAccountCodeBalances(db, orgId, ['2101', '2201', '2301', '2401', '2602'], branchId)
+    // 3. Direct AP (Non-Trade) & Taxes from GL (2101, 2201, 2301, 2401, 2602, 2603)
+    const balances = await getAccountCodeBalances(db, orgId, ['2101', '2201', '2301', '2401', '2602', '2603'], branchId)
 
     const tradeApModuleTotal = results
       .filter((row: any) => row.source_type === 'PURCHASING')
@@ -474,6 +503,30 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
         source_label: 'Penyesuaian Hutang Salam (2602)',
         source_account_code: '2602',
         settlement_account_id: settlementAccounts['2602'] || null,
+      })
+    }
+
+    const istishnaLiabilityModuleTotal = results
+      .filter((row: any) => row.source_type === 'ISTISHNA_SALES_LIABILITY')
+      .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+    const istishnaLiabilityDiff = Number(balances['2603'] || 0) - istishnaLiabilityModuleTotal
+
+    if (Math.abs(istishnaLiabilityDiff) > 10) {
+      results.push({
+        id: 'gl-2603-adj',
+        contact_name: 'Unallocated (Buku Besar)',
+        doc_number: 'GL-2603-ADJ',
+        due_date: today,
+        grand_total: istishnaLiabilityDiff,
+        paid_amount: 0,
+        returned_amount: 0,
+        outstanding: istishnaLiabilityDiff,
+        days_overdue: 0,
+        aging_bucket: 'Current',
+        source_type: 'JOURNAL',
+        source_label: 'Penyesuaian Hutang Istishna (2603)',
+        source_account_code: '2603',
+        settlement_account_id: settlementAccounts['2603'] || null,
       })
     }
 

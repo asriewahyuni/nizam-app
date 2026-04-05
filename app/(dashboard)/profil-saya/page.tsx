@@ -16,7 +16,7 @@ export default async function ProfilSayaPage() {
   // Find this user's employee record
   const { data: employee } = await (supabase as any)
     .from('employees')
-    .select('*, branch:branches(id, name, code)')
+    .select('*, branch:branches!employees_branch_id_fkey(id, name, code)')
     .eq('org_id', orgData.org.id)
     .eq('user_id', user?.id)
     .maybeSingle()

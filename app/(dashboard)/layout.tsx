@@ -83,6 +83,7 @@ export default async function DashboardLayout({
   // 3. SAAS MODULE & RBAC GUARD (Protect direct URL access)
   // ─────────────────────────────────────────────────────────────
   const isOwnerOrAdmin = orgData.role === 'owner' || orgData.role === 'admin'
+  const canManageSubOrganizations = isOwnerOrAdmin
   const pathname = (await headers()).get('x-pathname') || ''
 
   // Map paths to their required module names (matching saas_packages.modules)
@@ -168,6 +169,7 @@ export default async function DashboardLayout({
         hrisNotifications={resetRequests}
         isDemo={isDemo}
         planName={orgData.org.settings?.plan}
+        canManageSubOrganizations={canManageSubOrganizations}
       />
 
       {/* Main content */}

@@ -1,9 +1,9 @@
 'use client'
 
 import { getInitials } from '@/lib/utils'
-import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert } from 'lucide-react'
+import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type FormEvent } from 'react'
 import Link from 'next/link'
 import type { Organization } from '@/types/database.types'
 import type { AiTokenHeaderSummary } from '@/modules/ai/lib/ai-token'
@@ -15,8 +15,11 @@ import type {
 import {
   createBranch,
   createOrganizationQuick,
+  deleteChildOrganization,
   setActiveBranch,
   setActiveOrg,
+  setOrganizationParent,
+  updateChildOrganization,
 } from '@/modules/organization/actions/org.actions'
 
 interface AppHeaderProps {
@@ -67,11 +70,13 @@ export function AppHeader({
   const router = useRouter()
   const [isCreatingOrg, startCreateOrgTransition] = useTransition()
   const [isCreatingBranch, startCreateBranchTransition] = useTransition()
+  const [isUpdatingHierarchy, startHierarchyTransition] = useTransition()
   const [pendingContextSwitch, setPendingContextSwitch] = useState<PendingContextSwitch | null>(null)
   const [isTokenPopupOpen, setIsTokenPopupOpen] = useState(false)
   const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false)
   const [isQuickCreateOrgOpen, setIsQuickCreateOrgOpen] = useState(false)
   const [orgFeedback, setOrgFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [draggingOrgId, setDraggingOrgId] = useState<string | null>(null)
   const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false)
   const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false)
   const [branchFeedback, setBranchFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -145,6 +150,98 @@ export function AppHeader({
       form.reset()
       router.refresh()
     })
+  }
+
+  const handleHierarchyDrop = (childOrgId: string, parentOrgId: string | null) => {
+    if (!canManageAffiliates) return
+
+    const normalizedChildId = String(childOrgId || '').trim()
+    const normalizedParentId = String(parentOrgId || '').trim() || null
+
+    if (!normalizedChildId) return
+    if (normalizedParentId && normalizedParentId === normalizedChildId) return
+
+    setDraggingOrgId(null)
+    setOrgFeedback(null)
+    startHierarchyTransition(async () => {
+      const result: Awaited<ReturnType<typeof setOrganizationParent>> = await setOrganizationParent(
+        normalizedChildId,
+        normalizedParentId
+      )
+      if ('error' in result) {
+        setOrgFeedback({ type: 'error', message: result.error })
+        return
+      }
+
+      setOrgFeedback({
+        type: 'success',
+        message: normalizedParentId
+          ? 'Hierarki organisasi berhasil diperbarui.'
+          : 'Organisasi berhasil dipindahkan ke level ROOT.',
+      })
+      router.refresh()
+    })
+  }
+
+  const handleEditChildFromMenu = (childOrgId: string, currentName: string) => {
+    if (!canManageAffiliates || !activeOrgIsParent) return
+
+    const nextNameRaw = window.prompt('Ubah nama anak perusahaan:', currentName)
+    if (nextNameRaw === null) return
+    const nextName = String(nextNameRaw || '').trim()
+    if (!nextName) {
+      setOrgFeedback({ type: 'error', message: 'Nama organisasi wajib diisi.' })
+      return
+    }
+    if (nextName === currentName.trim()) return
+
+    setOrgFeedback(null)
+    startHierarchyTransition(async () => {
+      const result: Awaited<ReturnType<typeof updateChildOrganization>> = await updateChildOrganization(childOrgId, nextName)
+      if ('error' in result) {
+        setOrgFeedback({ type: 'error', message: result.error })
+        return
+      }
+
+      setOrgFeedback({ type: 'success', message: 'Nama anak perusahaan berhasil diperbarui.' })
+      router.refresh()
+    })
+  }
+
+  const handleDeleteChildFromMenu = (childOrgId: string, childName: string) => {
+    if (!canManageAffiliates || !activeOrgIsParent) return
+
+    const agreed = window.confirm(
+      `Hapus anak perusahaan "${childName}"?\nTindakan ini permanen dan seluruh data organisasi akan ikut terhapus.`
+    )
+    if (!agreed) return
+
+    setOrgFeedback(null)
+    startHierarchyTransition(async () => {
+      const result: Awaited<ReturnType<typeof deleteChildOrganization>> = await deleteChildOrganization(childOrgId)
+      if ('error' in result) {
+        setOrgFeedback({ type: 'error', message: result.error })
+        return
+      }
+
+      setOrgFeedback({ type: 'success', message: 'Anak perusahaan berhasil dihapus.' })
+      router.refresh()
+    })
+  }
+
+  const handleDragStart = (event: DragEvent<HTMLElement>, orgId: string) => {
+    if (!canManageAffiliates || isUpdatingHierarchy) {
+      event.preventDefault()
+      return
+    }
+
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', orgId)
+    setDraggingOrgId(orgId)
+  }
+
+  const handleDragEnd = () => {
+    setDraggingOrgId(null)
   }
 
   const handleBranchChange = async (branchId: string | null) => {
@@ -273,6 +370,14 @@ export function AppHeader({
         : 'Tidak ada unit aktif'
       : 'Transaksi butuh unit aktif'
   const activeOrganization = organizations.find((membership) => membership.orgId === activeOrgId) || null
+  const activeOrgParentName = activeOrganization?.org.parent_org_name || null
+  const activeOrgIsParent = !activeOrganization?.org.parent_org_id
+  const activeOrgHierarchyLabel = activeOrgParentName
+    ? `↳ ${activeOrgParentName}`
+    : 'ROOT'
+  const canManageAffiliates =
+    Boolean(activeOrganization) &&
+    (activeOrganization?.role === 'owner' || activeOrganization?.role === 'admin')
   const contextSwitchLabel = pendingContextSwitch
     ? pendingContextSwitch.kind === 'org'
       ? `Membuka ${pendingContextSwitch.label}...`
@@ -317,6 +422,9 @@ export function AppHeader({
                 <span className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 mt-1 leading-none">
                   {activeOrganization?.role || 'member'}
                 </span>
+                <span className="text-[9px] font-semibold text-slate-500 mt-1 leading-none truncate max-w-[170px]">
+                  {activeOrgIsParent ? 'PARENT' : 'CHILD'} • {activeOrgHierarchyLabel}
+                </span>
               </div>
               <ChevronDown size={12} className={`text-slate-400 ml-1 transition-transform ${isOrgMenuOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -326,33 +434,199 @@ export function AppHeader({
                 <div className="px-2 pt-1 pb-3 border-b border-slate-100">
                   <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Konteks Organisasi</div>
                   <div className="mt-1 text-sm font-black text-slate-900">{org.name}</div>
+                  <div className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">
+                    {activeOrgHierarchyLabel}
+                  </div>
                   <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">
                     Pilih organisasi aktif sebelum memilih unit kerja. Setiap organisasi punya konteks unit, data, dan paketnya sendiri.
                   </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${activeOrgIsParent ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
+                      {activeOrgIsParent ? 'Parent (Holding)' : 'Child (Anak Perusahaan)'}
+                    </span>
+                    <span className="text-[10px] font-semibold text-slate-500">
+                      {activeOrgIsParent
+                        ? 'Bisa buka Laporan Konsolidasi'
+                        : 'Laporan konsolidasi hanya dari Parent'}
+                    </span>
+                  </div>
+                  {canManageAffiliates && (
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-blue-600">
+                      Drag handle ≡ ke organisasi lain untuk ubah hierarki, atau drop ke ROOT.
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-3">
+                  <Link
+                    href={activeOrgIsParent ? '/reports?consolidated=true' : '/reports'}
+                    onClick={() => setIsOrgMenuOpen(false)}
+                    className={`flex items-center justify-between gap-2 p-3 border rounded-2xl transition group ${
+                      activeOrgIsParent
+                        ? 'bg-blue-50/50 hover:bg-blue-50 border-blue-100'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                       <div className={`p-1.5 rounded-xl ${activeOrgIsParent ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-500'}`}>
+                         <Layers size={14} />
+                       </div>
+                       <div className="flex flex-col">
+                         <span className={`text-xs font-black leading-none ${activeOrgIsParent ? 'text-blue-900' : 'text-slate-700'}`}>
+                           Laporan Gabungan Grup
+                         </span>
+                         <span className={`text-[9px] font-bold mt-1 uppercase tracking-wider ${activeOrgIsParent ? 'text-blue-600' : 'text-slate-500'}`}>
+                           {activeOrgIsParent ? 'Khusus Parent (Holding)' : 'Mode Child: Entitas Tunggal'}
+                         </span>
+                       </div>
+                    </div>
+                    <ArrowUpRight size={14} className={`${activeOrgIsParent ? 'text-blue-400 group-hover:text-blue-600' : 'text-slate-400'} transition`} />
+                  </Link>
                 </div>
 
                 <div className="space-y-1 mt-3">
+                  {canManageAffiliates && (
+                    <div
+                      onDragOver={(event) => {
+                        if (!draggingOrgId || isUpdatingHierarchy) return
+                        event.preventDefault()
+                        event.dataTransfer.dropEffect = 'move'
+                      }}
+                      onDrop={(event) => {
+                        if (!canManageAffiliates || isUpdatingHierarchy) return
+                        event.preventDefault()
+                        const droppedOrgId = event.dataTransfer.getData('text/plain') || draggingOrgId
+                        if (!droppedOrgId) return
+                        handleHierarchyDrop(droppedOrgId, null)
+                      }}
+                      className={`rounded-2xl border border-dashed px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.14em] transition ${
+                        draggingOrgId && !isUpdatingHierarchy
+                          ? 'border-blue-300 bg-blue-50 text-blue-700'
+                          : 'border-slate-200 bg-slate-50 text-slate-500'
+                      }`}
+                    >
+                      ROOT
+                    </div>
+                  )}
+
                   {organizations.map((membership) => {
                     const isPendingTarget = pendingContextSwitch?.kind === 'org' && pendingContextSwitch.orgId === membership.orgId
+                    const isDraggingThis = draggingOrgId === membership.orgId
+                    const canDropHere = Boolean(draggingOrgId && draggingOrgId !== membership.orgId && canManageAffiliates && !isUpdatingHierarchy)
+                    const isDirectChildOfActiveParent = membership.org.parent_org_id === activeOrgId
+                    const canRenderChildActions = canManageAffiliates && activeOrgIsParent && isDirectChildOfActiveParent
 
                     return (
-                      <button
+                      <div
                         key={membership.orgId}
-                        type="button"
-                        disabled={isSwitchingContext || isCreatingOrg}
-                        onClick={() => handleOrgChange(membership.orgId)}
-                        className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl text-left transition disabled:cursor-wait disabled:opacity-60 ${
-                          activeOrgId === membership.orgId ? 'bg-slate-900 text-white' : 'hover:bg-slate-50 text-slate-700'
-                        }`}
+                        onDragOver={(event) => {
+                          if (!canDropHere) return
+                          event.preventDefault()
+                          event.dataTransfer.dropEffect = 'move'
+                        }}
+                        onDrop={(event) => {
+                          if (!canDropHere) return
+                          event.preventDefault()
+                          const droppedOrgId = event.dataTransfer.getData('text/plain') || draggingOrgId
+                          if (!droppedOrgId || droppedOrgId === membership.orgId) return
+                          handleHierarchyDrop(droppedOrgId, membership.orgId)
+                        }}
+                        className={`relative rounded-2xl transition ${
+                          canDropHere ? 'ring-1 ring-blue-200 bg-blue-50/40' : ''
+                        } ${isDraggingThis ? 'opacity-60' : ''}`}
                       >
-                        <div className="min-w-0">
-                          <div className="text-xs font-black truncate">{membership.org.name}</div>
-                          <div className={`text-[9px] font-black uppercase tracking-[0.18em] ${activeOrgId === membership.orgId ? 'text-slate-300' : 'text-slate-400'}`}>
-                            {membership.role}
+                        <button
+                          type="button"
+                          disabled={isSwitchingContext || isCreatingOrg || isUpdatingHierarchy}
+                          onClick={() => handleOrgChange(membership.orgId)}
+                          className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl text-left transition disabled:cursor-wait disabled:opacity-60 ${
+                            activeOrgId === membership.orgId ? 'bg-slate-900 text-white' : 'hover:bg-slate-50 text-slate-700'
+                          } ${canManageAffiliates ? 'pr-10' : ''}`}
+                        >
+                          <div className="min-w-0">
+                            <div className="text-xs font-black truncate">{membership.org.name}</div>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <span className={`text-[9px] font-black uppercase tracking-[0.18em] ${activeOrgId === membership.orgId ? 'text-slate-300' : 'text-slate-400'}`}>
+                                {membership.role}
+                              </span>
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
+                                membership.org.parent_org_id
+                                  ? activeOrgId === membership.orgId
+                                    ? 'bg-orange-500/20 text-orange-200'
+                                    : 'bg-orange-100 text-orange-700'
+                                  : activeOrgId === membership.orgId
+                                    ? 'bg-emerald-500/20 text-emerald-200'
+                                    : 'bg-emerald-100 text-emerald-700'
+                              }`}>
+                                {membership.org.parent_org_id ? 'Child' : 'Parent'}
+                              </span>
+                            </div>
+                            <div className={`text-[9px] font-semibold truncate mt-1 ${activeOrgId === membership.orgId ? 'text-slate-200' : 'text-slate-500'}`}>
+                              {membership.org.parent_org_name
+                                ? `↳ ${membership.org.parent_org_name}`
+                                : 'ROOT'}
+                            </div>
                           </div>
-                        </div>
-                        {isPendingTarget ? <LoaderCircle size={14} className="animate-spin" /> : activeOrgId === membership.orgId ? <CheckCircle2 size={14} /> : null}
-                      </button>
+                          {isPendingTarget ? <LoaderCircle size={14} className="animate-spin" /> : activeOrgId === membership.orgId ? <CheckCircle2 size={14} /> : null}
+                        </button>
+
+                        {canManageAffiliates && (
+                          <button
+                            type="button"
+                            draggable={!isUpdatingHierarchy && !isSwitchingContext}
+                            onDragStart={(event) => handleDragStart(event, membership.orgId)}
+                            onDragEnd={handleDragEnd}
+                            onClick={(event) => event.stopPropagation()}
+                            className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-lg border p-1 transition ${
+                              activeOrgId === membership.orgId
+                                ? 'border-slate-600 bg-slate-700 text-slate-100'
+                                : 'border-slate-200 bg-white text-slate-500 hover:text-blue-700'
+                            }`}
+                            title="Drag untuk ubah hierarki"
+                          >
+                            <GripVertical size={13} />
+                          </button>
+                        )}
+
+                        {canRenderChildActions && (
+                          <div className={`px-3 pb-2.5 pt-0.5 flex items-center gap-2 ${activeOrgId === membership.orgId ? 'bg-slate-900 rounded-b-2xl' : ''}`}>
+                            <button
+                              type="button"
+                              disabled={isSwitchingContext || isUpdatingHierarchy}
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                handleEditChildFromMenu(membership.orgId, membership.org.name)
+                              }}
+                              className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] transition disabled:cursor-wait disabled:opacity-60 ${
+                                activeOrgId === membership.orgId
+                                  ? 'border-slate-600 bg-slate-800 text-slate-100'
+                                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                              }`}
+                            >
+                              <Pencil size={10} />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isSwitchingContext || isUpdatingHierarchy}
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                handleDeleteChildFromMenu(membership.orgId, membership.org.name)
+                              }}
+                              className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] transition disabled:cursor-wait disabled:opacity-60 ${
+                                activeOrgId === membership.orgId
+                                  ? 'border-rose-500/40 bg-rose-500/20 text-rose-100'
+                                  : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                              }`}
+                            >
+                              <Trash2 size={10} />
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     )
                   })}
                 </div>
@@ -369,24 +643,42 @@ export function AppHeader({
                 )}
 
                 <div className="mt-3 border-t border-slate-100 pt-3 space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOrgFeedback(null)
-                      setIsQuickCreateOrgOpen((prev) => !prev)
-                    }}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50 transition-all"
-                  >
-                    <Plus size={14} />
-                    Tambah Org
-                  </button>
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOrgFeedback(null)
+                        setIsQuickCreateOrgOpen((prev) => !prev)
+                      }}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50 transition-all"
+                    >
+                      <Plus size={14} />
+                      Tambah Org Mandiri
+                    </button>
+                    {canManageAffiliates && (
+                      <Link
+                        href="/settings/sub-orgs"
+                        onClick={() => setIsOrgMenuOpen(false)}
+                        className="text-[11px] font-black uppercase tracking-[0.14em] text-[#003366] hover:text-[#00264d]"
+                      >
+                        Kelola Anak Perusahaan
+                      </Link>
+                    )}
+                  </div>
+
+                  {canManageAffiliates && (
+                    <p className="rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] font-semibold leading-relaxed text-blue-800">
+                      Pendaftaran anak perusahaan hanya melalui menu <span className="font-black">Kelola Anak Perusahaan</span>.
+                      Tombol <span className="font-black">Tambah Org Mandiri</span> membuat organisasi baru yang berdiri sendiri.
+                    </p>
+                  )}
 
                   {isQuickCreateOrgOpen && (
                     <form onSubmit={handleCreateOrganization} className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
                       <input
                         name="name"
                         required
-                        placeholder="Nama organisasi"
+                        placeholder="Nama organisasi mandiri"
                         className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-slate-900"
                       />
                       <button

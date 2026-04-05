@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText } from 'lucide-react'
+import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createSaleEntry, deliverSale, voidSale, paySale, processSalesReturn, processSalesPayment } from '@/modules/sales/actions/sales.actions'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
@@ -30,6 +30,7 @@ export default function SalesClient({
   const [showCustomerModal, setShowCustomerModal] = useState(false)
    const [loading, setLoading] = useState(false)
    const searchParams = useSearchParams()
+   const router = useRouter()
 
   // QR Approval state
   const [approvalQr, setApprovalQr] = useState<string | null>(null)
@@ -242,7 +243,7 @@ export default function SalesClient({
       return setError('Nilai Uang Muka (DP) tidak boleh melebihi Total Penjualan.')
     }
 
-    if (resolvedShariahMode !== 'SALAM') {
+    if (resolvedShariahMode !== 'SALAM' && resolvedShariahMode !== 'ISTISHNA') {
       const stockShortage = getFirstNonSalamStockShortage()
       if (stockShortage) {
         const stockMessage = `Stok produk "${stockShortage.productName}" tidak mencukupi. Dibutuhkan ${formatStockQuantity(
@@ -250,7 +251,7 @@ export default function SalesClient({
         )}, tersedia ${formatStockQuantity(Math.max(0, stockShortage.availableQty))} ${stockShortage.unit}.`
 
         const wantsSalam = confirm(
-          `${stockMessage}\n\nUbah transaksi ke akad SALAM sekarang? (Pesanan tetap tercatat tanpa mengurangi stok saat ini)`
+          `${stockMessage}\n\nOtomatis ubah ke akad SALAM agar bisa diproses tanpa stok?\n\n(Pilih Cancel jika Anda ingin membatalkan dan mengubah manual menjadi akad ISTISHNA untuk dimanufaktur)`
         )
         if (wantsSalam) {
           resolvedShariahMode = 'SALAM'
@@ -260,7 +261,7 @@ export default function SalesClient({
           setHasDp(false)
           setError(null)
         } else {
-          return setError(`${stockMessage} Invoice biasa tidak bisa dibuat jika stok kurang. Gunakan akad SALAM.`)
+          return setError(`${stockMessage} Invoice biasa dibatalkan. Silakan ubah Dropdown mode akad ke ISTISHNA (jika diproduksi) atau SALAM.`)
         }
       }
     }
@@ -293,7 +294,7 @@ export default function SalesClient({
       // DIRECTLY PROCESS DOWN PAYMENT IF SUPPLIED
       if (resolvedPaymentTerm === 'TEMPO' && hasDp && dpFinalAmount > 0 && dpAccountId && res.saleId) {
          try {
-           await processSalesPayment(orgId, {
+           const dpRes = await processSalesPayment(orgId, {
              sale_id: res.saleId,
              account_id: dpAccountId,
              amount: dpFinalAmount,
@@ -301,9 +302,17 @@ export default function SalesClient({
              notes: 'Down Payment (Uang Muka) PO',
              discount_amount: 0
            })
+           
+           if (dpRes?.error) {
+             console.error("Gagal menyimpan data uang muka", dpRes.error)
+             setError(`Faktur berhasil dibuat, namun Uang Muka (DP) gagal diproses: ${dpRes.error}. Silakan input ulang uang muka lewat menu 'Terima Bayar'.`)
+             setLoading(false)
+             return
+           }
          } catch (dpErr) {
            console.error("Gagal menyimpan data uang muka", dpErr)
            setError("Faktur berhasil dibuat, namun Uang Muka (DP) gagal diproses. Silakan input ulang uang muka lewat menu 'Terima Bayar'.")
+           setLoading(false)
            return
          }
       }
@@ -686,7 +695,28 @@ export default function SalesClient({
                             </>
                          )}
 
-                         {s.payment_status !== 'PAID' && (s.status === 'FINISHED' || (isSaleSalam(s) && s.status === 'ORDERED')) && (
+                         {String(s?.shariah_mode || '').trim().toUpperCase() === 'ISTISHNA' && s.status === 'ORDERED' && (
+                           <button 
+                             onClick={async () => {
+                               const proceed = confirm('Sistem akan otomatis membuat BoM baru dan mem-publish SPK (Work Order) untuk pesanan ini dengan tenggat waktu mengikuti Jatuh Tempo pengiriman. Lanjutkan?');
+                               if (!proceed) return;
+                               setLoading(true);
+                               const { generateProductionFromSO } = await import('@/modules/factory/actions/soToBom.actions');
+                               const res = await generateProductionFromSO(orgId, s.id);
+                               if (res?.error) setError(res.error);
+                               else {
+                                 setSuccess('BoM dan SPK diproses! Mengarahkan ke Pabrik...');
+                                 setTimeout(() => router.push('/factory'), 2000);
+                               }
+                               setLoading(false);
+                             }}
+                             disabled={loading}
+                             className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-purple-700 transition-all shadow-lg shadow-purple-100 disabled:opacity-50" title="Auto-Generate BoM & SPK dari SO">
+                             <Factory size={14}/> {loading ? 'Memproses...' : 'Proses Produksi'}
+                           </button>
+                         )}
+
+                         {s.payment_status !== 'PAID' && (s.status === 'FINISHED' || ((isSaleSalam(s) || String(s?.shariah_mode || '').trim().toUpperCase() === 'ISTISHNA') && s.status === 'ORDERED')) && (
                            <button onClick={() => handleOpenPayment(s)} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100">
                              <DollarSign size={14}/> Terima Bayar
                            </button>

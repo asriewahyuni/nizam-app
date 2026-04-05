@@ -1,6 +1,6 @@
 # NIZAM ERP — Comprehensive Codebase Documentation
 
-> **Last updated:** 5 April 2026 — generated from direct repository audit.
+> **Last updated:** 5 April 2026 (rev 3) — updated to include migrations 1128–1131, SaaS limits enforcement, branch delete safeguards, and PostgREST ambiguous join resolutions for HRIS.
 
 ---
 
@@ -12,10 +12,10 @@ NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **
 
 | Metric | Value |
 |---|---|
-| Page routes (`page.tsx`) | **64** |
-| Client components (`*Client.tsx`) | **45** |
+| Page routes (`page.tsx`) | **65** |
+| Client components (`*Client.tsx`) | **46** |
 | Server action files | **47** |
-| Migration SQL files | **166** (latest: `1125`) |
+| Migration SQL files | **172** (latest: `1131`) |
 | Test files | **33** |
 | API route handlers | **2** (`/api/export`, `/api/sales-pages/lead`) |
 | Proxy (middleware) | `proxy.ts` |
@@ -37,8 +37,9 @@ NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **
 | UI Components | Custom `NizamUI` component library + Radix UI primitives |
 | Charts | Recharts |
 | XLSX Export | ExcelJS |
-| OCR / AI | Google Gemini via `@google/generative-ai` |
+| OCR / AI | Google Gemini via `@google/generative-ai` + Google Vertex AI via `@google-cloud/vertexai` |
 | Email | Resend |
+| Icons | Lucide React |
 | QR / Barcode | `html5-qrcode`, `qrcode.react`, `react-barcode` |
 | Testing | Vitest **4.1.1** + `@vitest/coverage-v8` |
 | Node.js | **≥ 20.0.0** (enforced in `package.json` engines) |
@@ -91,7 +92,7 @@ nizam-app/
 │   └── database.types.ts # Auto-generated Supabase types
 ├── __tests__/           # Vitest test suites (33 files)
 ├── supabase/
-│   └── migrations/      # 165 SQL migration files
+│   └── migrations/      # 169 SQL migration files
 ├── scripts/             # Data migration scripts
 └── public/              # PWA manifest, logo, static assets
 ```
@@ -239,10 +240,13 @@ Client components import server actions and call them via `startTransition` or f
 1. Read session user
 2. Support demo mode via `nizam_demo_org_id` cookie
 3. Get earliest active membership
-4. Resolve plan + enabled modules from `saas_packages`
-5. Merge `active_addons`
-6. Fetch `job_title` from `employees` table
-7. Return org context with `orgId`, `role`, `enabledModules`, `permissions`, etc.
+4. Read persisted active org/branch preference from `org_member_context` (migration `1112`)
+5. Resolve plan + enabled modules from `saas_packages`
+6. Merge `active_addons`
+7. Fetch `job_title` from `employees` table
+8. Return org context with `orgId`, `role`, `enabledModules`, `permissions`, etc.
+
+User's last opened organization and branch preference is persisted in `org_member_context` table so the context survives logout and new devices (`active-context.server.ts`).
 
 ### 5.4 RBAC & Module Gating
 
@@ -358,6 +362,7 @@ Guards both `/admin` and `/saas/*` routes.
 | `/settings/roles` | Role hierarchy & permissions |
 | `/settings/users` | Organization membership |
 | `/settings/branches` | Branch/division management |
+| `/settings/sub-orgs` | Child organization (subsidiaries) management |
 | `/settings/audit` | Admin audit trail |
 | `/settings/ticketing` | User bug ticketing (menu, waktu kejadian, upload screenshot) |
 | `/settings/ticketing/doc-update` | Feed progres perbaikan bug yang dipublikasikan |
@@ -606,9 +611,9 @@ Core reusable components:
 
 ### 9.1 Overview
 
-- **166 migration files** in `supabase/migrations/`
+- **169 migration files** in `supabase/migrations/`
 - `master_init.sql` — legacy bootstrap SQL (foundation reference)
-- Latest migration: `1125_hris_department_id_schema_repair.sql`
+- Latest migration: `1128_sub_org_enhancements.sql`
 
 ### 9.2 Core Entities
 
@@ -660,6 +665,9 @@ Core reusable components:
 | `process_work_order_completion_v2` | Manufacturing WO completion |
 | `create_fleet_medical_record` | Fleet maintenance record |
 | `process_asset_disposal` | Fixed asset disposal |
+| `get_consolidated_org_ids` | Recursive org-tree expansion for holding consolidation (parent + all descendants) |
+| `is_org_in_consolidation_tree` | Boolean helper to validate whether an org is inside a specific parent consolidation tree |
+| `get_consolidated_org_hierarchy` | Displays parent + direct children org list with hierarchy label for UI display |
 | `reset_org_data` | Organization data reset (v2) |
 
 ### 9.4 Migration Timeline
@@ -679,6 +687,15 @@ Core reusable components:
 | `1083`–`1084` | SaaS invoice column fixes, discount/tax |
 | `1085`–`1086` | Module catalog sync, permission names fix |
 | `1087`–`1104` | **Branch context expansion** (purchasing, inventory, sales, reimbursement, services, fleet, HRIS, expenses, payroll, leave, attendance, factory, fixed assets, budgets, journals) |
+| `1105` | Fix `process_sales_delivery_atomic` RLS — diubah ke `SECURITY DEFINER` agar insert jurnal delivery melewati RLS dengan benar |
+| `1106` | **Cash & Bank branch context** — bank accounts & transactions branch-aware; auto-posted cash journals carry correct `branch_id` |
+| `1107` | Orphan journal cleanup — remove legacy journal rows not belonging to any active org |
+| `1108` | Sales delivery inventory sync — store source warehouse on sales documents; fix physical stock not decreasing on delivery |
+| `1109` | Multi-Org / Multi-Unit hardening — lock down org membership bootstrap, reduce roster visibility, align branch management privileges |
+| `1110` | Legacy helper objects consolidation — normalize previously untracked helper migrations with invalid filenames |
+| `1111` | Core multi-unit RLS hardening — enforce branch-aware access on core transactional tables; backfill default branch for legacy data |
+| `1112` | **Active context preference** — persist user's last active org/unit per membership in `org_member_context` (survives logout + new devices) |
+| `1113` | Restore bank transfer journal reference type — correct label for transfers vs generic cash-out |
 | `1114`–`1115` | Support ticketing + public doc update progress feed |
 | `1116` | Inventory/Sales/Purchase consistency guard (void + return stock synchronization) |
 | `1117` | Factory UoM conversion + raw-material stock sync hardening |
@@ -690,6 +707,12 @@ Core reusable components:
 | `1123` | Purchase SALAM enforcement: cash-out ke vendor jadi Piutang Salam Vendor (`1404`) + wajib lunas sebelum receive |
 | `1124` | Purchase SALAM due-date guard: wajib isi tanggal barang disediakan saat create PO |
 | `1125` | HRIS schema repair: ensure `employees.department_id` exists to avoid employee form save failure on legacy schema |
+| `1126` | CoA governance hardening: add `parent_org_id`, enforce finance-master mutation only from Main Org + Main Branch authority |
+| `1127` | Holding consolidation foundation: add recursive org-tree RPC (`get_consolidated_org_ids`) + membership helper (`is_org_in_consolidation_tree`) |
+| `1128` | Sub-org PIC enhancement: add `branches.pic_employee_id` and `get_holding_employees` RPC for manager assignment. Caused PostgREST ambiguous join resolved via explicit `!employees_branch_id_fkey`. |
+| `1129` | SaaS limit groundwork (placeholder to sync timeline). |
+| `1130` | Branch delete safeguards: prevent deletion of the MAIN branch and any branch that has active stock, HRIS, or financial data. |
+| `1131` | SaaS resource limits: add `max_users`, `max_branches`, `max_child_orgs` to `saas_packages`. Includes RLS/Trigger blockers for preventing limits bypass based on tenant sub-plan. |
 
 ### 9.5 Storage Buckets
 
@@ -904,7 +927,7 @@ The project uses **Tailwind CSS 4.2.2** with `@tailwindcss/postcss`. Custom colo
 | Layout | `layout.tsx` | `app/(dashboard)/layout.tsx` |
 | Types | `*.types.ts` | `database.types.ts` |
 | Tests | `*.test.ts` | `sales.actions.test.ts` |
-| Migrations | `NNNN_description.sql` | `1125_hris_department_id_schema_repair.sql` |
+| Migrations | `NNNN_description.sql` | `1128_sub_org_enhancements.sql` |
 
 ### 14.3 Module Structure
 
@@ -929,7 +952,7 @@ modules/[domain]/
 
 ### 14.5 Adding a New Migration
 
-- File naming: `NNNN_description.sql` (next number after `1125` is `1126`)
+- File naming: `NNNN_description.sql` (next number after `1128` is **`1129`**)
 - Always make migrations **idempotent** (use `IF NOT EXISTS`, `DO $$ ... $$`)
 - Include `NOTIFY pgrst, 'reload schema'` if adding/removing columns
 - Add appropriate RLS policies for new tables
@@ -1034,7 +1057,7 @@ When adding new modules to the SaaS system, update:
 
 </details>
 
-### 15.2 Page Routes (64)
+### 15.2 Page Routes (65)
 
 <details>
 <summary>Click to expand</summary>
@@ -1053,7 +1076,7 @@ When adding new modules to the SaaS system, update:
 - `app/(auth)/update-password/page.tsx`
 - `app/(auth)/join/[token]/page.tsx`
 
-**Dashboard (54):**
+**Dashboard (55):**
 - `app/(dashboard)/dashboard/page.tsx`
 - `app/(dashboard)/profil-saya/page.tsx`
 - `app/(dashboard)/billing/page.tsx`
@@ -1100,6 +1123,7 @@ When adding new modules to the SaaS system, update:
 - `app/(dashboard)/settings/branches/page.tsx`
 - `app/(dashboard)/settings/business/page.tsx`
 - `app/(dashboard)/settings/roles/page.tsx`
+- `app/(dashboard)/settings/sub-orgs/page.tsx`
 - `app/(dashboard)/settings/users/page.tsx`
 - `app/(dashboard)/settings/ticketing/page.tsx`
 - `app/(dashboard)/settings/ticketing/doc-update/page.tsx`
@@ -1111,7 +1135,7 @@ When adding new modules to the SaaS system, update:
 
 </details>
 
-### 15.3 Client Components (45)
+### 15.3 Client Components (46)
 
 <details>
 <summary>Click to expand</summary>
@@ -1125,11 +1149,12 @@ When adding new modules to the SaaS system, update:
 - `InventoryClient.tsx`, `StockLedgerClient.tsx`, `WarehouseDetailClient.tsx`, `WarehouseClient.tsx`
 - `POSClient.tsx`, `ProfilSayaClient.tsx`, `PurchasingClient.tsx`
 - `BSCClient.tsx`, `ParetoClient.tsx`, `ReportsClient.tsx`
-- `SaasOperatorClient.tsx`, `SaasDocumentView.tsx`
+- `SaasOperatorClient.tsx` (at `/saas/`), `SaasTicketingClient.tsx` (at `/saas/ticketing/`)
+- `SaasDocumentView.tsx` embedded inside `app/(dashboard)/saas/dokumen/[id]/page.tsx`
 - `CommissionClient.tsx`, `SalesPageStudioClient.tsx`, `PipelineClient.tsx`
 - `PromoClient.tsx`, `QuotationClient.tsx`, `SalesClient.tsx`
 - `ServiceOrderClient.tsx`
-- `BranchManagementClient.tsx`, `BusinessClient.tsx`, `UsersClient.tsx`
+- `BranchManagementClient.tsx`, `BusinessClient.tsx`, `SubOrgClient.tsx`, `UsersClient.tsx`
 - `TicketingClient.tsx`, `TicketingDocUpdateClient.tsx`
 - `SaasTicketingClient.tsx`
 - `AbsClient.tsx`, `DemoClient.tsx`
@@ -1139,6 +1164,67 @@ When adding new modules to the SaaS system, update:
 ---
 
 ## 16. Changelog (Recent Updates)
+
+### Sub-Org PIC Assignment Fix (April 2026)
+
+Memperbaiki bug di mana dropdown PIC Direktur/Manager pada halaman Anak Perusahaan (`/settings/sub-orgs`) kosong atau tidak berfungsi.
+
+**Root cause — 3 bug:**
+
+1. **RLS Branch memotong daftar karyawan:** `getEmployees(orgId, null)` menggunakan `createClient()` yang terikat sesi user + `resolveAccessibleBranchSelection`. Jika user sedang pada context branch tertentu (bukan "semua cabang"), fungsi ini memfilter karyawan hanya dari branch tersebut — sehingga dropdown PIC kosong atau tidak lengkap.
+2. **Props `canMutate` & `picFeatureEnabled` tidak diterima client:** Interface `Props` di `SubOrgClient.tsx` tidak mendefinisikan kedua props tersebut padahal `page.tsx` sudah mengirimkan — menyebabkan feature flag tidak terbaca.
+3. **Tidak ada loading/feedback saat assign PIC:** Tidak ada state loading per-card sehingga user tidak mendapat respons visual dan bisa klik berkali-kali.
+
+**Perbaikan:**
+
+- Added `getHoldingEmployees(orgId)` di `modules/organization/actions/org.actions.ts` — menggunakan `createAdminClient()` untuk mengambil **semua karyawan holding** melewati RLS branch, mengembalikan `id, first_name, last_name, job_title, branch_id`.
+- Updated `app/(dashboard)/settings/sub-orgs/page.tsx`: ganti `getEmployees` → `getHoldingEmployees`.
+- Updated `app/(dashboard)/settings/sub-orgs/SubOrgClient.tsx`:
+  - Tambahkan `canMutate` dan `picFeatureEnabled` ke interface `Props` (dengan default aman).
+  - Tambahkan `assigningPICChildId` state (loading spinner per-card) untuk mencegah double-click.
+  - Tambahkan `localManagerMap` state untuk **optimistic update** — selector langsung berubah tanpa `window.location.reload()`.
+  - Guard tombol Hapus dengan `canMutate` (hanya owner).
+  - Tampilkan badge nama manager yang sudah dipilih (green badge) di atas dropdown.
+  - Tampilkan pesan informatif jika karyawan kosong atau fitur belum aktif (migrasi 1128 belum jalan).
+
+### Cash & Bank Branch Context + Multi-Unit RLS Hardening (April 2026)
+
+- Added migration `1106_cash_bank_branch_context.sql`: bank accounts dan bank transactions kini branch-aware; jurnal kas yang di-auto-post membawa `branch_id` yang benar.
+- Added migration `1109_multi_org_multi_unit_hardening.sql`: memperketat bootstrap membership org, membatasi visibilitas roster, dan menyelaraskan hak manajemen cabang.
+- Added migration `1111_core_multi_unit_rls_hardening.sql`: enforce branch-aware RLS pada tabel transaksional inti; backfill default branch untuk data legacy.
+
+### Active Context Preference Persistence (April 2026)
+
+- Added migration `1112_active_context_preferences.sql` untuk tabel `org_member_context` menyimpan preferensi last-active org dan branch per keanggotaan di database.
+- Updated `modules/organization/lib/active-context.server.ts` untuk membaca dan menulis preferensi ini, sehingga context user bertahan setelah logout dan di device baru.
+- `getActiveOrg()` kini membaca `org_member_context` sebelum fallback ke membership pertama.
+
+### Sales Delivery Inventory Sync + RLS Fix (April 2026)
+
+- Added migration `1105_fix_sales_delivery_atomic_rls.sql`: `process_sales_delivery_atomic` diubah ke `SECURITY DEFINER` agar insert jurnal melewati RLS dengan benar.
+- Added migration `1107_orphan_journal_cleanup.sql`: membersihkan baris jurnal legacy yang tidak lagi milik org mana pun.
+- Added migration `1108_sales_delivery_inventory_sync.sql`: menyimpan warehouse sumber pada dokumen penjualan; memperbaiki stok fisik yang tidak berkurang saat pengiriman.
+- Added migration `1113_restore_bank_transfer_reference_type.sql`: mengembalikan label reference type transfer bank yang benar (`bank_transfer`, bukan `cash_out`).
+
+### Legacy Consolidation & Helper Normalization (April 2026)
+
+- Added migration `1110_legacy_helper_objects.sql`: menormalisasi helper migration yang sebelumnya menggunakan nama file tidak valid dan dilewati Supabase CLI.
+
+### Sub Organization Manager Assignment (April 2026)
+
+- Added migration `1128_sub_org_enhancements.sql` to add `organizations.manager_employee_id` (FK to `employees`) and supporting index for better assignment query performance.
+- Updated Sub-Org management UI (`app/(dashboard)/settings/sub-orgs/SubOrgClient.tsx`) with PIC Direktur/Manager selector per child organization.
+- Added action-path integration for manager assignment (`assignSubOrgManager`) to persist and update child org PIC directly from the settings page.
+
+### Holding & Organization Consolidation (April 2026)
+
+- Added feature for multi-unit holding consolidation allowing parent organizations to fetch financial reporting aggregated across their child organizations.
+- Added database migration `1127_organization_consolidation_foundation.sql` introducing `get_consolidated_org_ids()` RPC (recursive CTE traversal) and helper `is_org_in_consolidation_tree()` for membership checks.
+- Core accounting server actions (`getBalanceSheet`, `getProfitLoss`, `getCashFlow`) now accept a `consolidated` boolean parameter. When enabled, transactions from all descendant organizations are queried and aggregated.
+- Changed account balance aggregation in `reports.actions.ts` to group by `account_code` rather than `account_id`, allowing standardized Cross-Org Chart of Accounts to be correctly summed up.
+- Upgraded `getPostedEntryIds` to automatically map out child org branch IDs using the recursive RPC when requested.
+- Created UI for Child Organizations at `app/(dashboard)/settings/sub-orgs/SubOrgClient.tsx` allowing Owners and Admins to register child units directly.
+- Added "Mode Holding (Gabungan)" toggle in `app/(dashboard)/reports/ReportsClient.tsx` for easy one-click switching between single entity and consolidated views.
 
 ### Business Settings Document Format Panel Restore (April 2026)
 

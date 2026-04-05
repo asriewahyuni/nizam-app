@@ -10,12 +10,22 @@ async function getPostedEntryIds(
     startDate?: string
     endDate?: string
     asOfDate?: string
+    consolidated?: boolean
   } = {}
 ) {
+  let orgIdsToSearch = [orgId]
+
+  if (options.consolidated) {
+    const { data: consolidatedOrgs, error: rpcError } = await db.rpc('get_consolidated_org_ids', { p_parent_org_id: orgId })
+    if (!rpcError && Array.isArray(consolidatedOrgs)) {
+      orgIdsToSearch = consolidatedOrgs.map((o: any) => o.org_id)
+    }
+  }
+
   let query = db
     .from('journal_entries')
     .select('id')
-    .eq('org_id', orgId)
+    .in('org_id', orgIdsToSearch)
     .eq('status', 'POSTED')
 
   if (options.branchId) {
@@ -58,18 +68,18 @@ async function getAccountBalancesFromEntries(
   const accountMap: Record<string, any> = {}
   data.forEach((line: any) => {
     const account = line.accounts
-    if (!account) return
+    if (!account || !account.code) return
 
-    if (!accountMap[account.id]) {
-      accountMap[account.id] = {
+    if (!accountMap[account.code]) {
+      accountMap[account.code] = {
         ...account,
         total_debit: 0,
         total_credit: 0,
       }
     }
 
-    accountMap[account.id].total_debit += Number(line.debit || 0)
-    accountMap[account.id].total_credit += Number(line.credit || 0)
+    accountMap[account.code].total_debit += Number(line.debit || 0)
+    accountMap[account.code].total_credit += Number(line.credit || 0)
   })
 
   return Object.values(accountMap)
@@ -104,11 +114,13 @@ export async function getGeneralLedger(orgId: string, branchId?: BranchFilter) {
 export async function getBalanceSheet(
   orgId: string,
   asOfDate: string = new Date().toISOString().split('T')[0],
-  branchId?: BranchFilter
+  branchId?: BranchFilter,
+  consolidated: boolean = false
 ) {
   const supabase = await createClient()
   const db = supabase as any
 
+  // 1. Fetch reference accounts from current org
   const { data: accountRows } = await db
     .from('accounts')
     .select('id, code, name, type, normal_balance, parent_id')
@@ -117,13 +129,13 @@ export async function getBalanceSheet(
     .order('code', { ascending: true })
 
   const accounts = Array.isArray(accountRows) ? accountRows : []
-  const entryIds = await getPostedEntryIds(db, orgId, { branchId, asOfDate })
+  const entryIds = await getPostedEntryIds(db, orgId, { branchId, asOfDate, consolidated })
 
   const balances = entryIds.length > 0 ? await getAccountBalancesFromEntries(db, entryIds) : []
-  const balancesById = new Map<string, any>(balances.map((b: any) => [b.id, b]))
+  const balancesByCode = new Map<string, any>(balances.map((b: any) => [b.code, b]))
 
   const mapBalance = (account: any, positiveSide: 'DEBIT' | 'CREDIT') => {
-    const existing = balancesById.get(account.id)
+    const existing = balancesByCode.get(account.code)
     const totalDebit = Number(existing?.total_debit || 0)
     const totalCredit = Number(existing?.total_credit || 0)
     const balance = positiveSide === 'DEBIT' ? totalDebit - totalCredit : totalCredit - totalDebit
@@ -150,13 +162,13 @@ export async function getBalanceSheet(
     .map((a: any) => mapBalance(a, 'CREDIT'))
     .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
-  const pl = await getProfitLoss(orgId, '1970-01-01', asOfDate, branchId)
+  const pl = await getProfitLoss(orgId, '1970-01-01', asOfDate, branchId, consolidated)
   equity.push({ code: '9999', name: 'Laba Ditahan / Periode Berjalan', balance: pl.netProfit, type: 'EQUITY' })
 
   return { assets, liabilities, equity }
 }
 
-export async function getProfitLoss(orgId: string, startDate?: string, endDate?: string, branchId?: BranchFilter) {
+export async function getProfitLoss(orgId: string, startDate?: string, endDate?: string, branchId?: BranchFilter, consolidated: boolean = false) {
   const supabase = await createClient()
   const db = supabase as any
 
@@ -168,6 +180,7 @@ export async function getProfitLoss(orgId: string, startDate?: string, endDate?:
     branchId,
     startDate: sDate,
     endDate: eDate,
+    consolidated,
   })
 
   if (entryIds.length === 0) {
@@ -193,7 +206,7 @@ export async function getProfitLoss(orgId: string, startDate?: string, endDate?:
   return { revenue, expenses, totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses }
 }
 
-export async function getCashFlow(orgId: string, branchId?: BranchFilter) {
+export async function getCashFlow(orgId: string, branchId?: BranchFilter, consolidated: boolean = false) {
   const supabase = await createClient()
   const db = supabase as any
 
@@ -222,7 +235,7 @@ export async function getCashFlow(orgId: string, branchId?: BranchFilter) {
     cashAccountCodes.push('1101', '1102', '1103', '1104', '1105')
   }
 
-  const allEntryIds = await getPostedEntryIds(db, orgId, { branchId })
+  const allEntryIds = await getPostedEntryIds(db, orgId, { branchId, consolidated })
   const accounts = await getAccountBalancesFromEntries(db, allEntryIds)
 
   if (accounts.length === 0) return { ocf: 0, icf: 0, fcf: 0, netChange: 0, ocfItems: [], icfItems: [], fcfItems: [] }
@@ -231,6 +244,7 @@ export async function getCashFlow(orgId: string, branchId?: BranchFilter) {
   const currentEntryIds = await getPostedEntryIds(db, orgId, {
     branchId,
     startDate: currentMonthStart,
+    consolidated,
   })
   const currentMonthLines = currentEntryIds.length > 0
     ? (await (supabase as any).from('journal_lines')
@@ -243,6 +257,7 @@ export async function getCashFlow(orgId: string, branchId?: BranchFilter) {
     branchId,
     startDate: lastMonthStart,
     endDate: lastMonthEnd,
+    consolidated,
   })
   const lastMonthLines = lastEntryIds.length > 0
     ? (await (supabase as any).from('journal_lines')

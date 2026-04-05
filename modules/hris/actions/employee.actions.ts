@@ -50,11 +50,13 @@ export async function getEmployees(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
   const db = supabase as any
   const branchSelection = await resolveEmployeeBranchSelection(orgId, branchId)
-  if ('error' in branchSelection) return []
+  if ('error' in branchSelection) {
+    throw new Error('Branch Selection Error: ' + branchSelection.error)
+  }
 
   let query = db
     .from('employees')
-    .select('*, branch:branches(id, name, code)')
+    .select('*, branch:branches!employees_branch_id_fkey(id, name, code)')
     .eq('org_id', orgId)
     .order('first_name')
 

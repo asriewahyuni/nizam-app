@@ -135,9 +135,9 @@ async function ensureCreateSaleStockAvailability(
   if (!firstShortage) return { success: true }
 
   return {
-    error: `Stok produk "${firstShortage.name}" tidak mencukupi untuk invoice biasa. Dibutuhkan ${formatQuantity(
+    error: `Stok produk "${firstShortage.name}" tidak mencukupi. Dibutuhkan ${formatQuantity(
       firstShortage.required
-    )}, tersedia ${formatQuantity(Math.max(0, firstShortage.available))}. Ubah transaksi ke akad SALAM agar pesanan tetap bisa dicatat tanpa mengurangi stok saat ini.`,
+    )}, tersedia ${formatQuantity(Math.max(0, firstShortage.available))}. Silakan ubah mode transaksi menjadi akad SALAM atau ISTISHNA.`,
   }
 }
 
@@ -493,7 +493,7 @@ export async function createSaleEntry(orgId: string, payload: any) {
     return { error: 'Akad SALAM wajib dibayar lunas (tunai) di awal.' }
   }
 
-  if (!salamMode) {
+  if (!salamMode && shariahMode !== 'ISTISHNA') {
     const createStockCheck = await ensureCreateSaleStockAvailability(
       supabase as any,
       orgId,

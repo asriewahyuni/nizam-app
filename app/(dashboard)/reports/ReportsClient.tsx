@@ -15,7 +15,8 @@ import {
   TrendingDown,
   ArrowUpRight,
   ArrowDownRight,
-  Triangle
+  Triangle,
+  Layers
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatRupiah, formatDate } from '@/lib/utils'
@@ -24,6 +25,8 @@ interface ReportsClientProps {
   orgId: string
   orgName: string
   branchId?: string | null
+  isConsolidated?: boolean
+  isParentOrg?: boolean
   balanceSheet: any
   profitLoss: any
   cashFlow: {
@@ -101,7 +104,16 @@ function buildBalanceTreeRows(accounts: any[] = [], showEmptyAccounts: boolean):
   return roots.flatMap((root) => walk(root, 0))
 }
 
-export default function ReportsClient({ orgId, orgName, branchId, balanceSheet, profitLoss, cashFlow }: ReportsClientProps) {
+export default function ReportsClient({
+  orgId,
+  orgName,
+  branchId,
+  balanceSheet,
+  profitLoss,
+  cashFlow,
+  isConsolidated,
+  isParentOrg,
+}: ReportsClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<'PL' | 'BS' | 'CF'>('PL')
@@ -166,9 +178,20 @@ export default function ReportsClient({ orgId, orgName, branchId, balanceSheet, 
   const endDate = searchParams.get('endDate') || new Date().toISOString().split('T')[0]
 
   const updateDates = (s: string, e: string) => {
-    const params = new URLSearchParams(searchParams)
+    const params = new URLSearchParams(searchParams.toString())
     params.set('startDate', s)
     params.set('endDate', e)
+    router.push(`/reports?${params.toString()}`)
+  }
+
+  const toggleConsolidated = () => {
+    if (!isParentOrg) return
+    const params = new URLSearchParams(searchParams.toString())
+    if (isConsolidated) {
+      params.delete('consolidated')
+    } else {
+      params.set('consolidated', 'true')
+    }
     router.push(`/reports?${params.toString()}`)
   }
 
@@ -188,6 +211,44 @@ export default function ReportsClient({ orgId, orgName, branchId, balanceSheet, 
 
   return (
     <div className="flex flex-col gap-8 pb-20">
+      {/* Consolidation Control (Top) */}
+      <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Status Struktur</span>
+          <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wider ${isParentOrg ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
+            {isParentOrg ? 'Parent (Holding)' : 'Child (Anak Perusahaan)'}
+          </span>
+          {isConsolidated && (
+            <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-indigo-700">
+              Mode Konsolidasi Aktif
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <p className="text-sm text-slate-500 font-medium">
+            {isParentOrg
+              ? 'Parent dapat menarik laporan gabungan Parent + seluruh Child langsung dari halaman ini.'
+              : 'Child hanya melihat laporan entitas sendiri. Konsolidasi diaktifkan dari akun Parent.'}
+          </p>
+
+          <button
+            onClick={toggleConsolidated}
+            disabled={!isParentOrg}
+            className={`flex items-center justify-center gap-2 px-6 py-3 text-xs font-bold rounded-2xl border transition-all ${
+              isConsolidated
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200'
+                : isParentOrg
+                  ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+            }`}
+          >
+            <Layers size={14} />
+            {isConsolidated ? 'Laporan Konsolidasi: ON' : 'Laporan Konsolidasi: OFF'}
+          </button>
+        </div>
+      </div>
+
       {/* Header & Toggle */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="flex flex-col gap-2">

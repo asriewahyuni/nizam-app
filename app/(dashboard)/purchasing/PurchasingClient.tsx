@@ -95,6 +95,13 @@ export default function PurchasingClient({
   const [overheadAccountId, setOverheadAccountId] = useState('')
   const [shariahMode, setShariahMode] = useState<'CASH' | 'SALAM' | 'ISTISHNA'>('CASH')
 
+  // Down Payment State
+  const [hasDp, setHasDp] = useState(false)
+  const [dpAmount, setDpAmount] = useState('0')
+  const [dpAccountId, setDpAccountId] = useState('')
+  const [dpMode, setDpMode] = useState<'NOMINAL' | 'PERCENT'>('NOMINAL')
+  const [dpPercent, setDpPercent] = useState('0')
+
   useEffect(() => {
     if (shariahMode !== 'SALAM') return
     if (paymentTerm !== 'LUNAS') {
@@ -271,6 +278,28 @@ export default function PurchasingClient({
 
     if (res?.error) setError(res.error)
     else {
+      const dpFinalAmount = dpMode === 'PERCENT' ? (grandTotal * (parseFloat(dpPercent) || 0) / 100) : (parseFloat(dpAmount) || 0)
+      if (resolvedPaymentTerm === 'TEMPO' && hasDp && dpFinalAmount > 0 && dpAccountId && res.purchaseId) {
+         try {
+           const { createPurchasePayment } = await import('@/modules/purchasing/actions/purchasing.actions')
+           const dpRes = await createPurchasePayment(orgId, {
+             purchase_id: res.purchaseId,
+             account_id: dpAccountId,
+             amount: dpFinalAmount,
+             payment_date: purchaseDate,
+             notes: 'DP / Uang Muka',
+             discount: 0
+           })
+           if (dpRes?.error) {
+              setError(`Purchase Order berhasil dibuat, namun Uang Muka gagal diproses: ${dpRes.error}`)
+              setLoading(false)
+              return
+           }
+         } catch (e) {
+           console.error(e)
+         }
+      }
+
       setSuccess('PO Baru berhasil disimpan!')
       setShowModal(false)
       // Reset form
@@ -278,6 +307,9 @@ export default function PurchasingClient({
       setVendorId('')
       setNotes('')
       setPaymentAccountId('')
+      setHasDp(false)
+      setDpAmount('0')
+      setDpAccountId('')
       setPaymentTerm('TEMPO')
       setDueDate('')
       setCustomGlobalDiscount(null)
@@ -815,6 +847,54 @@ export default function PurchasingClient({
                       <div className="space-y-2 animate-in slide-in-from-right-2">
                         <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block px-1">{shariahMode === 'SALAM' ? 'Tanggal Barang Disediakan' : 'Jatuh Tempo'}</label>
                         <input type="date" required={paymentTerm === 'TEMPO' || shariahMode === 'SALAM'} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-white font-bold text-amber-600 shadow-sm focus:border-amber-500 transition-all" />
+                      </div>
+                    )}
+
+                    {paymentTerm === 'TEMPO' && (
+                      <div className="md:col-span-4 mt-2 p-5 bg-indigo-50/50 rounded-3xl border border-indigo-100 flex flex-col gap-4">
+                        <div className="flex items-center gap-3">
+                           <input type="checkbox" id="dp_checkbox" checked={hasDp} onChange={(e) => setHasDp(e.target.checked)} className="w-5 h-5 rounded-md accent-indigo-600" />
+                           <label htmlFor="dp_checkbox" className="text-xs font-black text-indigo-900 cursor-pointer">{shariahMode === 'ISTISHNA' ? 'Proses DP Istishna / Titip Dana' : 'Bayar Down Payment (Uang Muka)'}</label>
+                        </div>
+                        {hasDp && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300 border-t border-indigo-100 pt-4">
+                             <div>
+                               <SearchableSelect 
+                                 label="Akun Sumber DP (Kas/Bank)"
+                                 options={paymentAccounts}
+                                 value={dpAccountId}
+                                 onChange={setDpAccountId}
+                                 placeholder="Pilih rekening Kas DP..."
+                               />
+                             </div>
+                             <div className="flex flex-col gap-1">
+                                <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block px-1">Nominal DP</label>
+                                <div className="flex bg-white rounded-2xl p-1 border border-indigo-200 shadow-sm">
+                                   <button type="button" onClick={() => setDpMode('NOMINAL')} className={`px-4 py-2 text-[10px] font-black rounded-xl transition flex-1 ${dpMode === 'NOMINAL' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Nominal (Rp)</button>
+                                   <button type="button" onClick={() => setDpMode('PERCENT')} className={`px-4 py-2 text-[10px] font-black rounded-xl transition flex-1 ${dpMode === 'PERCENT' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Persentase (%)</button>
+                                </div>
+                                {dpMode === 'NOMINAL' ? (
+                                   <CurrencyInput 
+                                      label="Nilai DP"
+                                      labelClassName="hidden"
+                                      value={parseFloat(dpAmount) || 0}
+                                      onChange={(val) => setDpAmount(val.toString())}
+                                      placeholder="Contoh: 500.000"
+                                      className="mt-2 h-[42px] px-4 py-2 rounded-xl text-sm border-indigo-200 font-bold"
+                                   />
+                                ) : (
+                                   <div className="relative mt-2">
+                                     <input 
+                                       type="number" min="0" max="100" 
+                                       value={dpPercent} onChange={(e) => setDpPercent(e.target.value)}
+                                       className="w-full h-[42px] px-4 py-2 border border-indigo-200 rounded-xl outline-none text-sm font-bold text-slate-900 pr-10"
+                                     />
+                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 font-black text-slate-400">%</span>
+                                   </div>
+                                )}
+                             </div>
+                          </div>
+                        )}
                       </div>
                     )}
 

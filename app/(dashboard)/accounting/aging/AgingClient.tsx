@@ -48,8 +48,15 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
   const arSalamReceivable = (initialData.ar || [])
     .filter((row: any) => row.source_account_code === '1404' || row.source_type === 'SALAM_VENDOR_RECEIVABLE')
     .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+  const arIstishnaReceivable = (initialData.ar || [])
+    .filter((row: any) => row.source_account_code === '1205' || row.source_type === 'ISTISHNA_VENDOR_RECEIVABLE')
+    .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+
   const apSalamLiability = (initialData.ap || [])
     .filter((row: any) => row.source_account_code === '2602' || row.source_type === 'SALAM_SALES_LIABILITY')
+    .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+  const apIstishnaLiability = (initialData.ap || [])
+    .filter((row: any) => row.source_account_code === '2603' || row.source_type === 'ISTISHNA_SALES_LIABILITY')
     .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
 
   const openRowAction = (row: any) => {
@@ -160,6 +167,10 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
                   <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Piutang Salam (1404)</span>
                   <span className="text-sm font-black text-indigo-600">{formatRupiah(arSalamReceivable)}</span>
                </div>
+               <div className="pt-1 flex justify-between items-center opacity-80">
+                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Piutang Istishna (1205)</span>
+                  <span className="text-sm font-black text-indigo-500">{formatRupiah(arIstishnaReceivable)}</span>
+               </div>
             </div>
          </div>
 
@@ -196,6 +207,10 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
                <div className="pt-3 flex justify-between items-center">
                   <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Hutang Salam (2602)</span>
                   <span className="text-sm font-black text-indigo-600">{formatRupiah(apSalamLiability)}</span>
+               </div>
+               <div className="pt-1 flex justify-between items-center opacity-80">
+                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Hutang Istishna (2603)</span>
+                  <span className="text-sm font-black text-indigo-500">{formatRupiah(apIstishnaLiability)}</span>
                </div>
             </div>
          </div>

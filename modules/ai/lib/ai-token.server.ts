@@ -60,6 +60,24 @@ export async function ensureAiTokenWallet(db: LooseDb, orgId: string, lowBalance
     .single()
 
   if (createError || !created) {
+    // Handle race conditions where another parallel request just created the wallet
+    if ((createError as any)?.code === '23505' || createError?.message?.includes('duplicate key value')) {
+      const { data: existingAfterConflict } = await db
+        .from('ai_token_wallets')
+        .select('org_id, balance_tokens, total_purchased_tokens, total_used_tokens, low_balance_threshold')
+        .eq('org_id', orgId)
+        .maybeSingle()
+
+      if (existingAfterConflict?.org_id) {
+        return {
+          org_id: String(existingAfterConflict.org_id),
+          balance_tokens: toNumber(existingAfterConflict.balance_tokens, 0),
+          total_purchased_tokens: toNumber(existingAfterConflict.total_purchased_tokens, 0),
+          total_used_tokens: toNumber(existingAfterConflict.total_used_tokens, 0),
+          low_balance_threshold: toNumber(existingAfterConflict.low_balance_threshold, lowBalanceThreshold),
+        }
+      }
+    }
     throw new Error(createError?.message || 'Gagal membuat wallet token AI')
   }
 

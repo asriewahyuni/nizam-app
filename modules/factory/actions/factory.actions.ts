@@ -388,6 +388,7 @@ export async function createWorkOrder(orgId: string, formData: FormData) {
   const wo_number = formData.get('wo_number') as string
   const quantity_planned = Number(formData.get('quantity_planned'))
   const notes = formData.get('notes') as string
+  const deadline_date = formData.get('deadline_date') as string
 
   const accessibleBom = await getAccessibleBom(supabase as any, orgId, bom_id, activeBranchResult.branchId)
   if (!accessibleBom) {
@@ -403,7 +404,8 @@ export async function createWorkOrder(orgId: string, formData: FormData) {
       wo_number,
       quantity_planned,
       status: 'DRAFT',
-      notes
+      notes,
+      deadline_date: deadline_date || null
     })
 
   if (error) return { error: error.message }

@@ -51,7 +51,7 @@ const CORE_MODULES = [
   'Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward', 'Sales Page',
   'Karyawan (HRIS)', 'Absensi & Cuti', 'Payroll Components', 'Proses Penggajian', 'Akses & Jabatan',
   'Laporan', 'Strategi (BSC)', 'Proyeksi Kas',
-  'Audit Trail', 'Cabang & Divisi', 'Pengaturan Bisnis', 'Ticketing', 'Doc Update Ticketing'
+  'Audit Trail', 'Cabang & Divisi', 'Anak Perusahaan', 'Pengaturan Bisnis', 'Ticketing', 'Doc Update Ticketing'
 ]
 
 const ADDON_MODULES = [
@@ -499,7 +499,10 @@ export default function SaaSAdminPage() {
         modules: modules,
         duration_days: Number(fd.get('duration_days') || 30),
         max_orgs: Number(fd.get('max_orgs') || 1),
-        max_warehouses: Number(fd.get('max_warehouses') || 1)
+        max_warehouses: Number(fd.get('max_warehouses') || 1),
+        max_branches: fd.get('max_branches') ? Number(fd.get('max_branches')) : null,
+        max_child_orgs: fd.get('max_child_orgs') ? Number(fd.get('max_child_orgs')) : null,
+        max_users: fd.get('max_users') ? Number(fd.get('max_users')) : null,
       }
 
       const { error } = pkgModal.editData?.id
@@ -1241,12 +1244,27 @@ export default function SaaSAdminPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Branch / Cabang</label>
+                          <input name="max_branches" type="number" defaultValue={pkgModal.editData?.max_branches ?? ''} placeholder="Kosong = Unlimited" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Anak Perusahaan</label>
+                          <input name="max_child_orgs" type="number" defaultValue={pkgModal.editData?.max_child_orgs ?? ''} placeholder="Kosong = Unlimited" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                       <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Org</label>
                           <input name="max_orgs" type="number" required defaultValue={pkgModal.editData?.max_orgs ?? 1} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                        </div>
                        <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Warehouse</label>
                           <input name="max_warehouses" type="number" required defaultValue={pkgModal.editData?.max_warehouses ?? 1} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Users</label>
+                          <input name="max_users" type="number" defaultValue={pkgModal.editData?.max_users ?? ''} placeholder="Unlimited" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                        </div>
                     </div>
 
@@ -1262,7 +1280,7 @@ export default function SaaSAdminPage() {
                              { group: 'Marketing & Sales', items: ['Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward', 'Sales Page'] },
                              { group: 'HRIS', items: ['Karyawan (HRIS)', 'Absensi & Cuti', 'Payroll Components', 'Proses Penggajian', 'Akses & Jabatan'] },
                              { group: 'Insight', items: ['Laporan', 'Strategi (BSC)', 'Proyeksi Kas'] },
-                             { group: 'Config', items: ['Audit Trail', 'Cabang & Divisi', 'Pengaturan Bisnis', 'Ticketing', 'Doc Update Ticketing'] }
+                             { group: 'Config', items: ['Audit Trail', 'Cabang & Divisi', 'Anak Perusahaan', 'Pengaturan Bisnis', 'Ticketing', 'Doc Update Ticketing'] }
                           ].map(cat => (
                              <div key={cat.group} className="space-y-2" data-module-group={cat.group}>
                                 <div className="flex items-center gap-2 px-2">

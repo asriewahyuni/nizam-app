@@ -361,7 +361,7 @@ export function ManufacturingClient({
                          <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">No. SPK & Produk</th>
                          <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Qty Rencana</th>
                          <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Status</th>
-                         <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Tanggal</th>
+                         <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Waktu & Dateline</th>
                          <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>
                       </tr>
                    </thead>
@@ -371,10 +371,17 @@ export function ManufacturingClient({
                            <td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-bold italic">Belum ada perintah kerja yang aktif.</td>
                         </tr>
                       ) : (
-                        workOrders.map((wo) => (
-                          <tr key={wo.id} className="hover:bg-slate-50/50 transition">
+                        workOrders.map((wo) => {
+                          const isUrgent = wo.status !== 'COMPLETED' && wo.deadline_date && new Date(wo.deadline_date) <= new Date(new Date().getTime() + 3 * 24 * 60 * 60 * 1000);
+                          const isOverdue = wo.status !== 'COMPLETED' && wo.deadline_date && new Date(wo.deadline_date) < new Date();
+                          return (
+                          <tr key={wo.id} className={`hover:bg-slate-50/50 transition ${isOverdue ? 'bg-rose-50/30' : isUrgent ? 'bg-amber-50/30' : ''}`}>
                              <td className="px-8 py-5">
-                                <p className="text-sm font-black text-slate-900">{wo.wo_number}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-black text-slate-900">{wo.wo_number}</p>
+                                  {isOverdue && <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[9px] font-black uppercase rounded-full tracking-widest flex items-center gap-1"><AlertTriangle size={10}/> Terlambat</span>}
+                                  {!isOverdue && isUrgent && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-black uppercase rounded-full tracking-widest flex items-center gap-1"><Clock size={10}/> Segera</span>}
+                                </div>
                                 <p className="text-xs text-slate-500">{wo.bom?.product?.name}</p>
                                 <div className="flex items-center gap-2 mt-1">
                                   <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-[0.18em] border border-blue-100">
@@ -397,7 +404,14 @@ export function ManufacturingClient({
                                    {wo.status}
                                 </span>
                              </td>
-                             <td className="px-6 py-5 text-xs text-slate-500 font-medium">{formatDate(wo.created_at)}</td>
+                             <td className="px-6 py-5">
+                               <p className="text-xs text-slate-500 font-medium">Buat: {formatDate(wo.created_at)}</p>
+                               {wo.deadline_date && (
+                                 <p className={`text-xs font-bold mt-0.5 ${isOverdue ? 'text-rose-600' : isUrgent ? 'text-amber-600' : 'text-slate-600'}`}>
+                                   Batas: {formatDate(wo.deadline_date)}
+                                 </p>
+                               )}
+                             </td>
                              <td className="px-8 py-5 text-right flex justify-end gap-2">
                                  {wo.status === 'DRAFT' && (
                                    <button 
@@ -438,7 +452,8 @@ export function ManufacturingClient({
                                 </button>
                              </td>
                           </tr>
-                        ))
+                          )
+                        })
                       )}
                    </tbody>
                 </table>
@@ -569,9 +584,15 @@ export function ManufacturingClient({
                         ))}
                      </select>
                   </div>
-                  <div className="space-y-2 text-left">
-                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Jumlah Target Produksi</label>
-                     <input name="quantity_planned" type="number" required placeholder="0" className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-bold text-xl" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2 text-left">
+                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Jumlah Target Produksi</label>
+                       <input name="quantity_planned" type="number" required placeholder="0" className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-bold text-xl" />
+                    </div>
+                    <div className="space-y-2 text-left">
+                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Batas Selesai (Dateline)</label>
+                       <input name="deadline_date" type="date" required className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:border-rose-500 font-bold text-slate-700" />
+                    </div>
                   </div>
                   <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-500 text-white font-black rounded-2xl shadow-xl shadow-emerald-100">
                      {loading ? 'Processing...' : 'Terbitkan Sekarang'}

@@ -186,7 +186,7 @@ export async function processPosTransaction(orgId: string, payload: any) {
     const stockCheck = await ensurePosStockAvailability(
       supabase as any,
       orgId,
-      resolvedWarehouseId,
+      resolvedWarehouseId as string,
       inventoryRequirements
     )
     if ('error' in stockCheck) {
