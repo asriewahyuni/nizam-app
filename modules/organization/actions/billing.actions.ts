@@ -116,7 +116,7 @@ function normalizePackageModules(value: unknown) {
 }
 
 export async function getBillingDashboardData(orgId?: string | null) {
-  const [configRows, tokenPackages] = await Promise.all([
+  const [configRows, tokenPackages, packageRows] = await Promise.all([
     prisma.saas_config.findMany({
       select: {
         key: true,
@@ -140,6 +140,24 @@ export async function getBillingDashboardData(orgId?: string | null) {
         sort_order: true,
       },
     }),
+    prisma.saas_packages.findMany({
+      where: {
+        is_active: true,
+      },
+      orderBy: {
+        price: 'asc',
+      },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        billing: true,
+        duration_days: true,
+        max_orgs: true,
+        max_warehouses: true,
+        modules: true,
+      },
+    }),
   ])
 
   const { bankInfo, supportInfo } = normalizeConfigMap(configRows)
@@ -151,12 +169,22 @@ export async function getBillingDashboardData(orgId?: string | null) {
     price_idr: toNumber(pkg.price_idr),
     sort_order: pkg.sort_order,
   }))
+  const normalizedPackages = packageRows.map((pkg) => ({
+    id: pkg.id,
+    name: pkg.name,
+    price: toNumber(pkg.price),
+    billing: pkg.billing,
+    duration_days: pkg.duration_days ?? null,
+    max_orgs: pkg.max_orgs ?? null,
+    max_warehouses: pkg.max_warehouses ?? null,
+    modules: normalizePackageModules(pkg.modules),
+  }))
 
   const emptyResult = {
     bankInfo,
     supportInfo,
     activeOrg: null,
-    packages: [] as Array<{
+    packages: normalizedPackages as Array<{
       id: string
       name: string
       price: number
@@ -190,7 +218,7 @@ export async function getBillingDashboardData(orgId?: string | null) {
     return emptyResult
   }
 
-  const [org, packages, wallet, invoices] = await Promise.all([
+  const [org, wallet, invoices] = await Promise.all([
     prisma.organizations.findUnique({
       where: {
         id: access.orgId,
@@ -202,24 +230,6 @@ export async function getBillingDashboardData(orgId?: string | null) {
         settings: true,
         active_addons: true,
         is_demo: true,
-      },
-    }),
-    prisma.saas_packages.findMany({
-      where: {
-        is_active: true,
-      },
-      orderBy: {
-        price: 'asc',
-      },
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        billing: true,
-        duration_days: true,
-        max_orgs: true,
-        max_warehouses: true,
-        modules: true,
       },
     }),
     prisma.ai_token_wallets.findUnique({
@@ -250,22 +260,8 @@ export async function getBillingDashboardData(orgId?: string | null) {
     }),
   ])
 
-  const normalizedPackages = packages.map((pkg) => ({
-    id: pkg.id,
-    name: pkg.name,
-    price: toNumber(pkg.price),
-    billing: pkg.billing,
-    duration_days: pkg.duration_days ?? null,
-    max_orgs: pkg.max_orgs ?? null,
-    max_warehouses: pkg.max_warehouses ?? null,
-    modules: normalizePackageModules(pkg.modules),
-  }))
-
   if (!org) {
-    return {
-      ...emptyResult,
-      packages: normalizedPackages,
-    }
+    return emptyResult
   }
 
   const settings = normalizeSettings(org.settings)

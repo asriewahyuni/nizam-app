@@ -2,14 +2,27 @@
 
 import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle2, Zap, Crown, Shield, Package, ArrowRight, Loader2, Building2, Store, Users, Warehouse } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import {
+  CheckCircle2,
+  Zap,
+  Crown,
+  Shield,
+  Package,
+  Loader2,
+  Building2,
+  Store,
+  Users,
+  Warehouse,
+  type LucideIcon,
+} from 'lucide-react'
 import Link from 'next/link'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
+import { getBillingDashboardData } from '@/modules/organization/actions/billing.actions'
 
-const db = createClient() as any
+type BillingSnapshot = Awaited<ReturnType<typeof getBillingDashboardData>>
+type PricingPackage = BillingSnapshot['packages'][number]
 
-const PLAN_ICON: Record<string, any> = {
+const PLAN_ICON: Record<string, LucideIcon> = {
   Trial: Shield,
   Demo: Zap,
   Basic: Package,
@@ -27,7 +40,7 @@ const PLAN_GRADIENT: Record<string, string> = {
 
 export default function PricingPage() {
   const { orgId: activeOrgId, loading: activeOrgLoading } = useActiveOrgId()
-  const [packages, setPackages] = useState<any[]>([])
+  const [packages, setPackages] = useState<PricingPackage[]>([])
   const [loading, setLoading] = useState(true)
   const [currentPlan, setCurrentPlan] = useState<string>('')
 
@@ -36,24 +49,19 @@ export default function PricingPage() {
       if (activeOrgLoading) return
 
       setLoading(true)
-      // Fetch packages
-      const { data: pkgs } = await db.from('saas_packages').select('*').eq('is_active', true).order('price', { ascending: true })
-      if (pkgs) {
-        setPackages(pkgs.map((p: any) => ({
-          ...p,
-          modules: Array.isArray(p.modules) ? p.modules : JSON.parse(p.modules || '[]')
-        })))
+      try {
+        const snapshot = await getBillingDashboardData(activeOrgId)
+        setPackages(snapshot.packages || [])
+        setCurrentPlan(
+          typeof snapshot.activeOrg?.settings?.plan === 'string'
+            ? snapshot.activeOrg.settings.plan
+            : ''
+        )
+      } finally {
+        setLoading(false)
       }
-
-      // Fetch current org plan
-      if (activeOrgId) {
-        const { data: org } = await db.from('organizations').select('settings').eq('id', activeOrgId).maybeSingle()
-        setCurrentPlan(org?.settings?.plan || '')
-      } else {
-        setCurrentPlan('')
-      }
-      setLoading(false)
     }
+
     load()
   }, [activeOrgId, activeOrgLoading])
 

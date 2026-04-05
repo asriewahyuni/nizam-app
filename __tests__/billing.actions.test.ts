@@ -337,6 +337,54 @@ describe('Billing Actions', () => {
     })
   })
 
+  it('returns the package catalog even when no active org is resolved yet', async () => {
+    mocks.prisma.saas_config.findMany.mockResolvedValue([
+      { key: 'support_info', value: { wa: '62811', label: 'Support Billing' } },
+    ])
+    mocks.prisma.saas_packages.findMany.mockResolvedValue([
+      {
+        id: 'pkg-1',
+        name: 'Basic',
+        price: 49000,
+        billing: 'Bulan',
+        duration_days: 30,
+        max_orgs: 1,
+        max_warehouses: 3,
+        modules: ['Inventory'],
+      },
+    ])
+
+    const result = await getBillingDashboardData(null)
+
+    expect(result).toEqual({
+      bankInfo: {
+        bank: 'BANK MANDIRI (KCP BANDUNG)',
+        account: '1310022339999',
+        name: 'PT NIZAM TEKNOLOGI BERKAH',
+      },
+      supportInfo: { wa: '62811', label: 'Support Billing' },
+      activeOrg: null,
+      packages: [
+        {
+          id: 'pkg-1',
+          name: 'Basic',
+          price: 49000,
+          billing: 'Bulan',
+          duration_days: 30,
+          max_orgs: 1,
+          max_warehouses: 3,
+          modules: ['Inventory'],
+        },
+      ],
+      invoices: [],
+      aiTokenBalance: 0,
+      aiTokenPackages: [],
+      totalMonthly: 0,
+    })
+    expect(mocks.getMembership).not.toHaveBeenCalled()
+    expect(mocks.prisma.organizations.findUnique).not.toHaveBeenCalled()
+  })
+
   it('uploads billing proof and forwards the public URL into invoice submission', async () => {
     mocks.prisma.saas_invoices.findFirst
       .mockResolvedValueOnce({ invoice_number: 'INV-001' })
