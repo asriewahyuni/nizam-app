@@ -1,7 +1,7 @@
 # AI Handover Document: `org.actions.ts` Migration Status
 
-**Updated:** 2026-04-05 (sesi ke-7)  
-**Status:** `IN PROGRESS` — Org + Auth + Branch access selesai. HRIS actions + role management + settings/users member management + audit/billing/approval action slice selesai.
+**Updated:** 2026-04-05 (sesi ke-8)  
+**Status:** `IN PROGRESS` — Org + Auth + Branch access selesai. HRIS actions + role management + settings/users member management + audit/billing/approval action slice selesai. Billing UI load path juga sudah dipindahkan dari Supabase browser ke server actions.
 
 Dokumen ini menggantikan rencana eksekusi lama. Refactor target untuk sesi ini, yaitu migrasi `modules/organization/actions/org.actions.ts` dari Supabase data access ke Prisma/Auth.js, sudah dieksekusi dan tervalidasi.
 
@@ -32,6 +32,8 @@ File-file berikut **sudah tidak lagi memakai Supabase data client**:
 - `app/(dashboard)/settings/audit/page.tsx` ✅
 - `modules/organization/actions/billing.actions.ts` ✅
 - `modules/organization/actions/approval.actions.ts` ✅
+- `app/(dashboard)/billing/page.tsx` ✅
+- `app/(dashboard)/billing/invoice/[id]/page.tsx` ✅
 
 ---
 
@@ -103,7 +105,23 @@ Billing migration yang selesai:
   - `createBillingInvoice`
   - `submitPaymentProof`
   - `applyVoucher`
+  - `getBillingDashboardData`
+  - `uploadBillingPaymentProof`
+  - `getBillingInvoicePrintData`
   - seluruhnya sudah memakai Prisma/Auth, tanpa `createClient()`
+
+Billing UI migration yang selesai:
+
+- `app/(dashboard)/billing/page.tsx`
+  - tidak lagi memakai Supabase browser client untuk load config, org, wallet, invoices, atau topup package
+  - refresh data sekarang lewat `getBillingDashboardData()`
+  - upload bukti bayar sekarang lewat server action `uploadBillingPaymentProof()`
+- `app/(dashboard)/billing/invoice/[id]/page.tsx`
+  - tidak lagi fetch invoice/config via Supabase browser client
+  - sekarang memanggil `getBillingInvoicePrintData()`
+- wrapper storage baru:
+  - `modules/organization/lib/billing-proof-storage.server.ts`
+  - upload `billing-proofs` sekarang lewat Supabase admin storage wrapper di server, bukan browser
 
 Approval migration yang selesai:
 
@@ -130,6 +148,7 @@ Selain itu:
 - halaman audit settings sekarang memanggil action audit yang berbasis Prisma dengan scope org aktif.
 - billing actions sekarang punya membership guard eksplisit di app layer, tidak lagi mengandalkan Supabase session/RLS.
 - approval actions sekarang tidak lagi memakai Supabase query builder; side effect dokumen sumber (`sales`, `purchases`, `reimbursements`, `leave_requests`) juga sudah Prisma.
+- billing page dan invoice print page tidak lagi instantiate `createClient()` di sisi browser untuk kebutuhan data-layer.
 
 ### D. Pola keamanan yang dipakai
 
@@ -211,6 +230,7 @@ Hasil:
 - `__tests__/organization-audit.actions.test.ts` lulus
 - `__tests__/billing.actions.test.ts` lulus
 - `__tests__/approval.actions.test.ts` sudah direwrite ke Prisma/Auth mock dan lulus
+- `__tests__/billing.actions.test.ts` diperluas untuk snapshot loader, upload proof wrapper, dan invoice print data loader
 - Catatan: `npm run lint` di repo ini masih fail karena banyak issue lint legacy (bukan efek perubahan HRIS saja)
 
 ---
@@ -245,16 +265,17 @@ Berikut file yang **masih memakai Supabase** dan relevan untuk lanjutan migrasi:
 
 ### Prioritas tinggi
 
-- `app/(dashboard)/billing/page.tsx`
-  - masih banyak query Supabase client untuk load package/invoice/wallet/config
-  - upload bukti bayar masih ke Supabase Storage `billing-proofs`
-
-### Prioritas menengah
-
 - `modules/organization/actions/org-id.actions.ts`
   - aman, tetapi tetap perlu dicek jika ada asumsi lama terkait context persistence
 - `modules/settings/actions/audit.actions.ts`
   - reset engine masih memakai `createAdminClient()` untuk bulk delete
+
+### Prioritas menengah
+
+- `app/(dashboard)/pricing/page.tsx`
+  - masih load paket + current plan via Supabase browser client
+- `modules/organization/lib/billing-proof-storage.server.ts`
+  - billing proof sudah pindah ke server wrapper, tetapi storage backend masih Supabase
 
 ### Masih Supabase-heavy tetapi di luar scope target file
 
@@ -280,9 +301,9 @@ Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file 
 - audit lagi route/api yang masih instantiate `createClient()` untuk kebutuhan auth sederhana
 
 ### PRIORITAS 2: Modul Organization Actions lainnya
-### PRIORITAS 2.5: Billing UI / Client
-- `app/(dashboard)/billing/page.tsx`
-- storage proof upload untuk `billing-proofs` jika ingin benar-benar bebas dari Supabase browser usage
+### PRIORITAS 2.5: Pricing / SaaS UI
+- `app/(dashboard)/pricing/page.tsx`
+- audit lagi page/client SaaS lain yang masih instantiate `createClient()` hanya untuk katalog / invoice lookup
 
 ### PRIORITAS 3: Page Components (app/)
 - audit lagi page/client lain yang masih instantiate `createClient()` hanya untuk mutasi ringan
@@ -337,6 +358,9 @@ Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file 
   - `modules/settings/actions/audit.actions.ts`
   - `modules/organization/actions/billing.actions.ts`
   - `modules/organization/actions/approval.actions.ts`
+  - `modules/organization/lib/billing-proof-storage.server.ts`
+  - `app/(dashboard)/billing/page.tsx`
+  - `app/(dashboard)/billing/invoice/[id]/page.tsx`
   - `__tests__/org.actions.test.ts`
   - `__tests__/export.route.test.ts`
   - `__tests__/organization-audit.actions.test.ts`

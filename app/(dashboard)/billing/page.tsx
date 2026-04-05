@@ -4,20 +4,21 @@ import React, { useState, useEffect, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Zap, CreditCard, History, Package, Plus, CheckCircle2, 
-  Building2, Warehouse, Store, Users, ExternalLink, 
-  ArrowUpRight, ShieldCheck, AlertCircle, Clock, Truck, Edit3, Coins, Megaphone,
+  Building2, Warehouse, Users,
+  ArrowUpRight, Clock, Truck, Edit3, Coins, Megaphone,
   type LucideIcon
 } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { createBillingInvoice, submitPaymentProof, applyVoucher } from '@/modules/organization/actions/billing.actions'
-import { normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
+import {
+  applyVoucher,
+  createBillingInvoice,
+  getBillingDashboardData,
+  uploadBillingPaymentProof,
+} from '@/modules/organization/actions/billing.actions'
 import { OPERATOR_ADDON_OPTIONS } from '@/lib/saas/operator-pricing'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
-
-const db = createClient() as any
 
 const BANK_INFO = {
   bank: 'BANK MANDIRI (KCP BANDUNG)',
@@ -94,18 +95,21 @@ function BillingContent() {
   // Billing Financial Status
   const [totalMonthly, setTotalMonthly] = useState(0)
 
-  useEffect(() => {
-    async function loadConfig() {
-      const { data } = await db.from('saas_config').select('*')
-      if (data) {
-        const config: any = {}
-        data.forEach((item: any) => config[item.key] = item.value)
-        if (config.bank_info) setBankInfo(config.bank_info)
-        if (config.support_info) setSupportInfo(config.support_info)
-      }
-    }
-    loadConfig()
-  }, [])
+  const applyBillingSnapshot = (snapshot: any) => {
+    setBankInfo(snapshot.bankInfo || BANK_INFO)
+    setSupportInfo(snapshot.supportInfo || SUPPORT_INFO)
+    setActiveOrg(snapshot.activeOrg || null)
+    setInvoices(snapshot.invoices || [])
+    setAiTokenBalance(Number(snapshot.aiTokenBalance || 0))
+    setAiTokenPackages(snapshot.aiTokenPackages || [])
+    setTotalMonthly(Number(snapshot.totalMonthly || 0))
+    return snapshot
+  }
+
+  const refreshBillingSnapshot = async (orgId: string | null | undefined) => {
+    const snapshot = await getBillingDashboardData(orgId)
+    return applyBillingSnapshot(snapshot)
+  }
 
   useEffect(() => {
     if (!showCheckoutModal) return
@@ -141,12 +145,7 @@ function BillingContent() {
         })
         setTimeLeft(900)
         setShowCheckoutModal(true)
-        
-        const { data: invs } = await db.from('saas_invoices')
-          .select('*')
-          .eq('org_id', orgId)
-          .order('created_at', { ascending: false })
-        setInvoices(invs || [])
+        await refreshBillingSnapshot(orgId)
       } else {
         alert('Gagal membuat tagihan: ' + (res as any).error)
       }
@@ -161,59 +160,18 @@ function BillingContent() {
       if (activeOrgLoading) return
 
       setLoading(true)
-      const { data: tokenPackages } = await db
-        .from('ai_token_topup_packages')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true })
-        .order('tokens', { ascending: true })
-
-      setAiTokenPackages(tokenPackages || [])
-
-      if (!activeOrgId) {
-        setActiveOrg(null)
-        setInvoices([])
-        setAiTokenBalance(0)
-        setTotalMonthly(0)
-        setLoading(false)
-        return
-      }
-
-      const [{ data: org }, { data: pkgs }, { data: walletData }, { data: invs }] = await Promise.all([
-        db.from('organizations').select('*').eq('id', activeOrgId).maybeSingle(),
-        db.from('saas_packages').select('*'),
-        db.from('ai_token_wallets').select('balance_tokens').eq('org_id', activeOrgId).maybeSingle(),
-        db.from('saas_invoices').select('*').eq('org_id', activeOrgId).order('created_at', { ascending: false }),
-      ])
-
-      if (org) {
-        setActiveOrg(org)
-        setAiTokenBalance(Number(walletData?.balance_tokens || 0))
-
-        const planPkg = pkgs?.find((p: any) => p.name === org.settings?.plan)
-        let total = planPkg?.price || 0
-
-        const activeAddons = Array.isArray(org.active_addons) ? org.active_addons : []
-        activeAddons.forEach((a: any) => {
-          const addonName = normalizeSaasEntitlementName(String(a?.name || ''))
-          const addonPrice = AVAILABLE_ADDONS.find((ma) => ma.name === addonName)?.price || 0
-          total += addonPrice
-        })
-        setTotalMonthly(total)
-
-        if (pkgId) {
-          const pkg = pkgs?.find((p: any) => p.id === pkgId)
-          if (pkg) {
-            handleBuyItem(org.id, { id: pkg.id, name: pkg.name, price: pkg.price, type: 'PACKAGE' })
-          }
+      const snapshot = await refreshBillingSnapshot(activeOrgId)
+      if (pkgId && snapshot.activeOrg) {
+        const pkg = snapshot.packages?.find((entry: any) => entry.id === pkgId)
+        if (pkg) {
+          await handleBuyItem(snapshot.activeOrg.id, {
+            id: pkg.id,
+            name: pkg.name,
+            price: Number(pkg.price || 0),
+            type: 'PACKAGE',
+          })
         }
-      } else {
-        setActiveOrg(null)
-        setAiTokenBalance(0)
-        setTotalMonthly(0)
       }
-
-      setInvoices(invs || [])
       setLoading(false)
     }
     loadData()
@@ -232,21 +190,15 @@ function BillingContent() {
     
     setProcessing(true)
     try {
-      const fileExt = proofFile.name.split('.').pop()
-      const fileName = `${checkoutInvoice.invoice_number}-${Date.now()}.${fileExt}`
-      const { data: uploadData, error: uploadErr } = await db.storage
-        .from('billing-proofs')
-        .upload(fileName, proofFile)
-      
-      if (uploadErr) throw uploadErr
+      const formData = new FormData()
+      formData.set('proof', proofFile)
 
-      const proofUrl = db.storage.from('billing-proofs').getPublicUrl(fileName).data.publicUrl
-
-      const res = await submitPaymentProof(activeOrg.id, checkoutInvoice.id, proofUrl, 'BANK_TRANSFER')
-      if (res.success) {
+      const res = await uploadBillingPaymentProof(activeOrg.id, checkoutInvoice.id, formData, 'BANK_TRANSFER')
+      if ('success' in res && res.success) {
         alert('BUKTI TERUNGGAH! Pembayaran Anda sedang diverifikasi admin. Paket akan aktif otomatis setelah disetujui.')
         setShowCheckoutModal(false)
-        window.location.reload()
+        setProofFile(null)
+        await refreshBillingSnapshot(activeOrg.id)
       } else {
         alert('Gagal: ' + (res as any).error)
       }
@@ -265,7 +217,8 @@ function BillingContent() {
       const res = await applyVoucher(activeOrg.id, voucherCode)
       if (res.success) {
         alert(res.message || 'Voucher Berhasil Di-apply!')
-        window.location.reload()
+        await refreshBillingSnapshot(activeOrg.id)
+        setVoucherCode('')
       } else {
         alert('Gagal: ' + (res as any).error)
       }
@@ -360,7 +313,7 @@ function BillingContent() {
              <Zap size={48} className="text-amber-400 fill-amber-400/20 mb-4 animate-bounce" />
              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">PAKET ANDA</p>
              <h2 className="text-3xl font-black tracking-tighter uppercase">{activeOrg?.settings?.plan || 'Free'}</h2>
-             {activeOrg?.settings?.is_demo && (
+             {activeOrg?.is_demo && (
                <div className="mt-2 px-3 py-1 bg-amber-500/20 border border-amber-500/50 rounded-full text-[9px] font-black text-amber-500 uppercase tracking-widest">
                  SESI DEMO
                </div>

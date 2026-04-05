@@ -2,11 +2,9 @@
 
 import React, { useEffect, useState } from 'react'
 import { Printer, ArrowLeft, Mail, Phone, MapPin, Building2, CreditCard } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { formatRupiah } from '@/lib/utils'
 import { useParams, useRouter } from 'next/navigation'
-
-const db = createClient() as any
+import { getBillingInvoicePrintData } from '@/modules/organization/actions/billing.actions'
 
 export default function InvoicePrintPage() {
   const params = useParams()
@@ -17,20 +15,14 @@ export default function InvoicePrintPage() {
 
   useEffect(() => {
     async function fetchData() {
-      // 1. Fetch Invoice
-      const { data: inv } = await db.from('saas_invoices')
-        .select('*, organization:organizations(*)')
-        .eq('id', params.id)
-        .single()
-      
-      if (inv) setInvoice(inv)
+      const invoiceId = Array.isArray(params.id) ? params.id[0] : params.id
+      const result = await getBillingInvoicePrintData(String(invoiceId || ''))
 
-      // 2. Fetch SaaS Global Config for Bank Info
-      const { data: config } = await db.from('saas_config').select('*')
-      if (config) {
-        const mapped: any = {}
-        config.forEach((c: any) => mapped[c.key] = c.value)
-        setSaasConfig(mapped)
+      if ('error' in result) {
+        setInvoice(null)
+      } else {
+        setInvoice(result.invoice)
+        setSaasConfig(result.saasConfig || {})
       }
       setLoading(false)
     }

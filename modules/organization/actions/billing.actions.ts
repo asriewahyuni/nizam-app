@@ -4,6 +4,20 @@ import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { getMembership } from '@/lib/auth/permissions'
 import { revalidatePath } from 'next/cache'
+import { normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
+import { OPERATOR_ADDON_OPTIONS } from '@/lib/saas/operator-pricing'
+import { uploadBillingProofAsset } from '@/modules/organization/lib/billing-proof-storage.server'
+
+const DEFAULT_BANK_INFO = {
+  bank: 'BANK MANDIRI (KCP BANDUNG)',
+  account: '1310022339999',
+  name: 'PT NIZAM TEKNOLOGI BERKAH',
+}
+
+const DEFAULT_SUPPORT_INFO = {
+  wa: '628123456789',
+  label: 'Admin Nizam Support',
+}
 
 async function requireBillingMembership(orgId: string) {
   const session = await auth()
@@ -44,6 +58,364 @@ function mergePlanSetting(
     ...baseSettings,
     plan: nextPlan,
     updated_at: new Date().toISOString(),
+  }
+}
+
+function normalizeSettings(value: unknown) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return { ...(value as Record<string, unknown>) }
+  }
+
+  return {}
+}
+
+function normalizeArray<T = unknown>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : []
+}
+
+function toNumber(value: unknown) {
+  if (typeof value === 'number') return value
+  if (typeof value === 'bigint') return Number(value)
+
+  if (
+    value
+    && typeof value === 'object'
+    && 'toNumber' in value
+    && typeof value.toNumber === 'function'
+  ) {
+    return value.toNumber()
+  }
+
+  const normalized = Number(value ?? 0)
+  return Number.isFinite(normalized) ? normalized : 0
+}
+
+function normalizeConfigMap(rows: Array<{ key: string; value: unknown }>) {
+  const config = rows.reduce<Record<string, unknown>>((acc, row) => {
+    acc[row.key] = row.value
+    return acc
+  }, {})
+
+  const bankInfo =
+    config.bank_info && typeof config.bank_info === 'object' && !Array.isArray(config.bank_info)
+      ? { ...DEFAULT_BANK_INFO, ...(config.bank_info as Record<string, unknown>) }
+      : DEFAULT_BANK_INFO
+
+  const supportInfo =
+    config.support_info && typeof config.support_info === 'object' && !Array.isArray(config.support_info)
+      ? { ...DEFAULT_SUPPORT_INFO, ...(config.support_info as Record<string, unknown>) }
+      : DEFAULT_SUPPORT_INFO
+
+  return { bankInfo, supportInfo }
+}
+
+function normalizePackageModules(value: unknown) {
+  return normalizeArray(value)
+    .map((entry) => String(entry || '').trim())
+    .filter(Boolean)
+}
+
+export async function getBillingDashboardData(orgId?: string | null) {
+  const [configRows, tokenPackages] = await Promise.all([
+    prisma.saas_config.findMany({
+      select: {
+        key: true,
+        value: true,
+      },
+    }),
+    prisma.ai_token_topup_packages.findMany({
+      where: {
+        is_active: true,
+      },
+      orderBy: [
+        { sort_order: 'asc' },
+        { tokens: 'asc' },
+      ],
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        tokens: true,
+        price_idr: true,
+        sort_order: true,
+      },
+    }),
+  ])
+
+  const { bankInfo, supportInfo } = normalizeConfigMap(configRows)
+  const normalizedTokenPackages = tokenPackages.map((pkg) => ({
+    id: pkg.id,
+    name: pkg.name,
+    description: pkg.description,
+    tokens: toNumber(pkg.tokens),
+    price_idr: toNumber(pkg.price_idr),
+    sort_order: pkg.sort_order,
+  }))
+
+  const emptyResult = {
+    bankInfo,
+    supportInfo,
+    activeOrg: null,
+    packages: [] as Array<{
+      id: string
+      name: string
+      price: number
+      billing: string
+      duration_days: number | null
+      max_orgs: number | null
+      max_warehouses: number | null
+      modules: string[]
+    }>,
+    invoices: [] as Array<{
+      id: string
+      invoice_number: string
+      amount: number
+      status: string
+      created_at: string | null
+      due_date: string | null
+      item_name: string | null
+      payment_proof_url: string | null
+    }>,
+    aiTokenBalance: 0,
+    aiTokenPackages: normalizedTokenPackages,
+    totalMonthly: 0,
+  }
+
+  if (!orgId) {
+    return emptyResult
+  }
+
+  const access = await requireBillingMembership(orgId)
+  if ('error' in access) {
+    return emptyResult
+  }
+
+  const [org, packages, wallet, invoices] = await Promise.all([
+    prisma.organizations.findUnique({
+      where: {
+        id: access.orgId,
+      },
+      select: {
+        id: true,
+        name: true,
+        logo_url: true,
+        settings: true,
+        active_addons: true,
+        is_demo: true,
+      },
+    }),
+    prisma.saas_packages.findMany({
+      where: {
+        is_active: true,
+      },
+      orderBy: {
+        price: 'asc',
+      },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        billing: true,
+        duration_days: true,
+        max_orgs: true,
+        max_warehouses: true,
+        modules: true,
+      },
+    }),
+    prisma.ai_token_wallets.findUnique({
+      where: {
+        org_id: access.orgId,
+      },
+      select: {
+        balance_tokens: true,
+      },
+    }),
+    prisma.saas_invoices.findMany({
+      where: {
+        org_id: access.orgId,
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+      select: {
+        id: true,
+        invoice_number: true,
+        amount: true,
+        status: true,
+        created_at: true,
+        due_date: true,
+        item_name: true,
+        payment_proof_url: true,
+      },
+    }),
+  ])
+
+  const normalizedPackages = packages.map((pkg) => ({
+    id: pkg.id,
+    name: pkg.name,
+    price: toNumber(pkg.price),
+    billing: pkg.billing,
+    duration_days: pkg.duration_days ?? null,
+    max_orgs: pkg.max_orgs ?? null,
+    max_warehouses: pkg.max_warehouses ?? null,
+    modules: normalizePackageModules(pkg.modules),
+  }))
+
+  if (!org) {
+    return {
+      ...emptyResult,
+      packages: normalizedPackages,
+    }
+  }
+
+  const settings = normalizeSettings(org.settings)
+  const activeAddons = normalizeArray(org.active_addons)
+  const currentPlan = String(settings.plan || '')
+  const currentPlanPackage = normalizedPackages.find((pkg) => pkg.name === currentPlan) ?? null
+  const monthlyAddonsTotal = activeAddons.reduce((sum: number, addon) => {
+    const addonName = normalizeSaasEntitlementName(String((addon as any)?.name || ''))
+    const price = OPERATOR_ADDON_OPTIONS.find((entry) => entry.name === addonName)?.price ?? 0
+    return sum + price
+  }, 0)
+
+  return {
+    bankInfo,
+    supportInfo,
+    activeOrg: {
+      id: org.id,
+      name: org.name,
+      logo_url: org.logo_url ?? null,
+      settings,
+      active_addons: activeAddons,
+      package_limit: {
+        max_orgs: currentPlanPackage?.max_orgs ?? 1,
+        max_warehouses: currentPlanPackage?.max_warehouses ?? 3,
+        max_users: 10,
+      },
+      is_demo: org.is_demo ?? false,
+    },
+    packages: normalizedPackages,
+    invoices: invoices.map((invoice) => ({
+      id: invoice.id,
+      invoice_number: invoice.invoice_number,
+      amount: toNumber(invoice.amount),
+      status: String(invoice.status || 'UNPAID'),
+      created_at: invoice.created_at?.toISOString() ?? null,
+      due_date: invoice.due_date?.toISOString() ?? null,
+      item_name: invoice.item_name ?? null,
+      payment_proof_url: invoice.payment_proof_url ?? null,
+    })),
+    aiTokenBalance: toNumber(wallet?.balance_tokens ?? 0),
+    aiTokenPackages: normalizedTokenPackages,
+    totalMonthly: (currentPlanPackage?.price ?? 0) + monthlyAddonsTotal,
+  }
+}
+
+export async function uploadBillingPaymentProof(
+  orgId: string,
+  invoiceId: string,
+  formData: FormData,
+  method: string = 'BANK_TRANSFER'
+) {
+  const access = await requireBillingMembership(orgId)
+  if ('error' in access) return { error: access.error }
+
+  const fileEntry = formData.get('proof')
+  if (!(fileEntry instanceof File) || fileEntry.size <= 0) {
+    return { error: 'Silakan unggah bukti transfer terlebih dahulu.' }
+  }
+
+  const invoice = await prisma.saas_invoices.findFirst({
+    where: {
+      id: invoiceId,
+      org_id: access.orgId,
+    },
+    select: {
+      invoice_number: true,
+    },
+  })
+
+  if (!invoice?.invoice_number) {
+    return { error: 'Invoice tidak ditemukan.' }
+  }
+
+  const uploadResult = await uploadBillingProofAsset(access.orgId, invoice.invoice_number, fileEntry)
+  if ('error' in uploadResult) {
+    return { error: uploadResult.error }
+  }
+
+  return submitPaymentProof(access.orgId, invoiceId, uploadResult.url, method)
+}
+
+export async function getBillingInvoicePrintData(invoiceId: string) {
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Unauthorized' as const }
+
+  const trimmedInvoiceId = String(invoiceId || '').trim()
+  if (!trimmedInvoiceId) {
+    return { error: 'Invoice tidak valid.' as const }
+  }
+
+  const invoice = await prisma.saas_invoices.findUnique({
+    where: {
+      id: trimmedInvoiceId,
+    },
+    include: {
+      organizations: {
+        select: {
+          id: true,
+          name: true,
+          logo_url: true,
+          settings: true,
+          owner_email: true,
+        },
+      },
+    },
+  })
+
+  const orgId = String(invoice?.org_id || '').trim()
+  if (!invoice || !orgId) {
+    return { error: 'Invoice tidak ditemukan.' as const }
+  }
+
+  const membership = await getMembership(userId, orgId)
+  if (!membership) {
+    return { error: 'Akses organisasi ditolak.' as const }
+  }
+
+  const configRows = await prisma.saas_config.findMany({
+    select: {
+      key: true,
+      value: true,
+    },
+  })
+  const { bankInfo, supportInfo } = normalizeConfigMap(configRows)
+  const orgSettings = normalizeSettings(invoice.organizations?.settings)
+
+  return {
+    invoice: {
+      id: invoice.id,
+      invoice_number: invoice.invoice_number,
+      amount: toNumber(invoice.amount),
+      status: String(invoice.status || 'UNPAID'),
+      created_at: invoice.created_at?.toISOString() ?? null,
+      due_date: invoice.due_date?.toISOString() ?? null,
+      item_name: invoice.item_name ?? null,
+      organization: invoice.organizations
+        ? {
+            id: invoice.organizations.id,
+            name: invoice.organizations.name,
+            logo_url: invoice.organizations.logo_url ?? null,
+            owner_email: invoice.organizations.owner_email ?? null,
+            settings: orgSettings,
+          }
+        : null,
+    },
+    saasConfig: {
+      bank_info: bankInfo,
+      support_info: supportInfo,
+    },
   }
 }
 
