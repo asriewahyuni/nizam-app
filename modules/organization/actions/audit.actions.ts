@@ -1,49 +1,97 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { getMembership } from '@/lib/auth/permissions'
+import { prisma } from '@/lib/prisma'
 
-export async function getAuditLogs(limit: number = 50) {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
-
-  // 1. Try specialized RPC first (Phase 1)
-  const { data: rpcData, error: rpcError } = await (supabase as any)
-    .rpc('get_admin_audit_trail', { p_limit: limit })
-
-  if (!rpcError && rpcData) {
-    return rpcData
+function buildAuditDescription(action: string, tableName: string) {
+  switch (String(action || '').toUpperCase()) {
+    case 'CREATE':
+      return `Menambahkan data baru di ${tableName}`
+    case 'UPDATE':
+      return `Mengubah data di ${tableName}`
+    case 'DELETE':
+      return `Menghapus data dari ${tableName}`
+    case 'VOID':
+      return `Membatalkan (VOID) transaksi di ${tableName}`
+    default:
+      return `${action} pada ${tableName}`
   }
+}
 
-  // 2. Fallback: Direct Query (Phase 2)
-  // If RPC is missing (PGRST202/PGRST205), we fetch directly to ensure the UI doesn't crash
-  console.warn('RPC Audit failed, using fallback query.')
-  const { data: directData, error: directError } = await (supabase as any)
-    .from('audit_logs')
-    .select(`
-      id,
-      org_id,
-      created_at,
-      action,
-      table_name,
-      record_id,
-      old_data,
-      new_data
-    `)
-    .order('created_at', { ascending: false })
-    .limit(limit)
+export async function getAuditLogs(orgId: string, limit: number = 50) {
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) throw new Error('Unauthorized')
 
-  if (directError) {
-    (console as any).error('Audit Fallback Error:', directError)
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) return []
+
+  const membership = await getMembership(userId, trimmedOrgId)
+  if (!membership?.isOwnerOrAdmin) {
     return []
   }
 
-  // Map to the format expected by the UI (v_admin_audit_trail format)
-  return directData.map((log: any) => ({
-    ...log,
-    user_email: 'System / User', // auth.users isn't directly joinable via anon/direct query easily
-    user_name: 'Logged Actor',
-    description: `${log.action} pada ${log.table_name}`
-  }))
+  const normalizedLimit = Number.isFinite(limit) ? Math.max(1, Math.min(limit, 500)) : 50
+
+  const logs = await prisma.audit_logs.findMany({
+    where: {
+      org_id: trimmedOrgId,
+    },
+    orderBy: {
+      created_at: 'desc',
+    },
+    take: normalizedLimit,
+    select: {
+      id: true,
+      org_id: true,
+      created_at: true,
+      user_id: true,
+      action: true,
+      table_name: true,
+      record_id: true,
+      old_data: true,
+      new_data: true,
+    },
+  })
+
+  const userIds = Array.from(
+    new Set(
+      logs
+        .map((log) => String(log.user_id || '').trim())
+        .filter(Boolean)
+    )
+  )
+
+  const users = userIds.length > 0
+    ? await prisma.user.findMany({
+        where: {
+          id: { in: userIds },
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      })
+    : []
+
+  const usersById = new Map(users.map((entry) => [entry.id, entry]))
+
+  return logs.map((log) => {
+    const actor = log.user_id ? usersById.get(log.user_id) : null
+    return {
+      id: log.id,
+      org_id: log.org_id,
+      created_at: log.created_at.toISOString(),
+      user_email: actor?.email || 'System / User',
+      user_name: actor?.name || actor?.email || 'Logged Actor',
+      action: log.action,
+      table_name: log.table_name,
+      record_id: log.record_id,
+      old_data: log.old_data,
+      new_data: log.new_data,
+      description: buildAuditDescription(log.action, log.table_name),
+    }
+  })
 }

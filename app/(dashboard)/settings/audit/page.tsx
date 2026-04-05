@@ -14,7 +14,7 @@ export default async function AuditPage() {
     redirect('/dashboard')
   }
 
-  const logs = await getAuditLogs(100)
+  const logs = await getAuditLogs(orgData.org.id, 100)
 
   return (
     <div className="p-8">

@@ -1,7 +1,7 @@
 # AI Handover Document: `org.actions.ts` Migration Status
 
-**Updated:** 2026-04-05 (sesi ke-5)  
-**Status:** `IN PROGRESS` — Org + Auth + Branch access selesai. HRIS actions + role management + settings/users member management selesai.
+**Updated:** 2026-04-05 (sesi ke-7)  
+**Status:** `IN PROGRESS` — Org + Auth + Branch access selesai. HRIS actions + role management + settings/users member management + audit/billing/approval action slice selesai.
 
 Dokumen ini menggantikan rencana eksekusi lama. Refactor target untuk sesi ini, yaitu migrasi `modules/organization/actions/org.actions.ts` dari Supabase data access ke Prisma/Auth.js, sudah dieksekusi dan tervalidasi.
 
@@ -28,6 +28,10 @@ File-file berikut **sudah tidak lagi memakai Supabase data client**:
 - `app/(dashboard)/settings/roles/page.tsx` ✅
 - `app/(dashboard)/settings/users/UsersClient.tsx` ✅
 - `app/api/export/route.ts` ✅
+- `modules/organization/actions/audit.actions.ts` ✅
+- `app/(dashboard)/settings/audit/page.tsx` ✅
+- `modules/organization/actions/billing.actions.ts` ✅
+- `modules/organization/actions/approval.actions.ts` ✅
 
 ---
 
@@ -83,6 +87,38 @@ Action membership management yang ditambahkan di `modules/organization/actions/o
 - `updateOrgMemberRole`
 - `removeOrgMember`
 
+Audit migration yang selesai:
+
+- `modules/organization/actions/audit.actions.ts`
+  - tidak lagi memakai Supabase RPC/view `get_admin_audit_trail`
+  - sekarang memakai `auth()` + `getMembership()` + `prisma.audit_logs`
+  - lookup actor (`user_name`, `user_email`) via tabel `users`
+- `modules/settings/actions/audit.actions.ts`
+  - `getAuditLogs` dan `createAuditLog` sudah pindah ke Prisma/Auth
+  - `resetOrganizationData` masih memakai `createAdminClient()` hanya untuk bulk delete lintas tabel, tetapi auth check + org lookup + audit insert sudah Prisma/Auth
+
+Billing migration yang selesai:
+
+- `modules/organization/actions/billing.actions.ts`
+  - `createBillingInvoice`
+  - `submitPaymentProof`
+  - `applyVoucher`
+  - seluruhnya sudah memakai Prisma/Auth, tanpa `createClient()`
+
+Approval migration yang selesai:
+
+- `modules/organization/actions/approval.actions.ts`
+  - `getPendingApprovals`
+  - `getApprovalHistory`
+  - `getApprovalDetail`
+  - `getPendingApprovalsCount`
+  - `decideApproval`
+  - `getApprovalForSource`
+  - seluruhnya sudah memakai `auth()` + `getMembership()` + Prisma + branch access helper
+  - enrichment `requester/approver` sekarang via tabel `users`
+  - shape detail legacy untuk modal (`items/account`, `branch`, `employee`, nested `contacts/products`) dipertahankan
+  - serialisasi `Decimal`/tanggal dinormalisasi agar aman ke client
+
 Selain itu:
 
 - `getResetRequestsCount()` di file yang sama juga sudah pindah ke Prisma.
@@ -91,6 +127,9 @@ Selain itu:
 - `hris/page.tsx` dan `settings/users/page.tsx` tidak lagi preload `roles` lewat Supabase server client.
 - `settings/users/UsersClient.tsx` tidak lagi update/delete `org_members` via Supabase browser client.
 - `app/api/export/route.ts` tidak lagi memakai Supabase untuk auth, verifikasi membership, atau lookup organisasi.
+- halaman audit settings sekarang memanggil action audit yang berbasis Prisma dengan scope org aktif.
+- billing actions sekarang punya membership guard eksplisit di app layer, tidak lagi mengandalkan Supabase session/RLS.
+- approval actions sekarang tidak lagi memakai Supabase query builder; side effect dokumen sumber (`sales`, `purchases`, `reimbursements`, `leave_requests`) juga sudah Prisma.
 
 ### D. Pola keamanan yang dipakai
 
@@ -169,6 +208,9 @@ Hasil:
 - seluruh test suite (Vitest) lulus
 - test baru `__tests__/organization-hris.actions.test.ts` lulus
 - `__tests__/org.actions.test.ts` diperbarui untuk member role/remove guards dan lulus
+- `__tests__/organization-audit.actions.test.ts` lulus
+- `__tests__/billing.actions.test.ts` lulus
+- `__tests__/approval.actions.test.ts` sudah direwrite ke Prisma/Auth mock dan lulus
 - Catatan: `npm run lint` di repo ini masih fail karena banyak issue lint legacy (bukan efek perubahan HRIS saja)
 
 ---
@@ -203,17 +245,16 @@ Berikut file yang **masih memakai Supabase** dan relevan untuk lanjutan migrasi:
 
 ### Prioritas tinggi
 
-- `modules/organization/actions/approval.actions.ts`
-  - masih full Supabase query + mutation
-- `modules/organization/actions/audit.actions.ts`
-  - masih Supabase
-- `modules/organization/actions/billing.actions.ts`
-  - masih Supabase
+- `app/(dashboard)/billing/page.tsx`
+  - masih banyak query Supabase client untuk load package/invoice/wallet/config
+  - upload bukti bayar masih ke Supabase Storage `billing-proofs`
 
 ### Prioritas menengah
 
 - `modules/organization/actions/org-id.actions.ts`
   - aman, tetapi tetap perlu dicek jika ada asumsi lama terkait context persistence
+- `modules/settings/actions/audit.actions.ts`
+  - reset engine masih memakai `createAdminClient()` untuk bulk delete
 
 ### Masih Supabase-heavy tetapi di luar scope target file
 
@@ -239,9 +280,9 @@ Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file 
 - audit lagi route/api yang masih instantiate `createClient()` untuk kebutuhan auth sederhana
 
 ### PRIORITAS 2: Modul Organization Actions lainnya
-- `modules/organization/actions/billing.actions.ts`
-- `modules/organization/actions/audit.actions.ts`
-- `modules/organization/actions/approval.actions.ts`
+### PRIORITAS 2.5: Billing UI / Client
+- `app/(dashboard)/billing/page.tsx`
+- storage proof upload untuk `billing-proofs` jika ingin benar-benar bebas dari Supabase browser usage
 
 ### PRIORITAS 3: Page Components (app/)
 - audit lagi page/client lain yang masih instantiate `createClient()` hanya untuk mutasi ringan
@@ -291,8 +332,16 @@ Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file 
   - `app/(dashboard)/settings/roles/page.tsx`
   - `app/(dashboard)/settings/users/UsersClient.tsx`
   - `app/api/export/route.ts`
+  - `app/(dashboard)/settings/audit/page.tsx`
+  - `modules/organization/actions/audit.actions.ts`
+  - `modules/settings/actions/audit.actions.ts`
+  - `modules/organization/actions/billing.actions.ts`
+  - `modules/organization/actions/approval.actions.ts`
   - `__tests__/org.actions.test.ts`
   - `__tests__/export.route.test.ts`
+  - `__tests__/organization-audit.actions.test.ts`
+  - `__tests__/billing.actions.test.ts`
+  - `__tests__/approval.actions.test.ts`
   - `__tests__/organization-hris.actions.test.ts`
 
 Dokumen ini siap diberikan ke agent berikutnya sebagai status handover terbaru.

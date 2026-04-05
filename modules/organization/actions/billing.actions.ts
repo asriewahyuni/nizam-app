@@ -1,7 +1,51 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
+import { getMembership } from '@/lib/auth/permissions'
 import { revalidatePath } from 'next/cache'
+
+async function requireBillingMembership(orgId: string) {
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) {
+    return { error: 'Unauthorized' as const }
+  }
+
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) {
+    return { error: 'Organisasi tidak valid.' as const }
+  }
+
+  const membership = await getMembership(userId, trimmedOrgId)
+  if (!membership) {
+    return { error: 'Akses organisasi ditolak.' as const }
+  }
+
+  return {
+    userId,
+    orgId: trimmedOrgId,
+    membership,
+  }
+}
+
+function mergePlanSetting(
+  currentSettings: unknown,
+  nextPlan: string
+) {
+  const baseSettings =
+    currentSettings &&
+    typeof currentSettings === 'object' &&
+    !Array.isArray(currentSettings)
+      ? { ...(currentSettings as Record<string, unknown>) }
+      : {}
+
+  return {
+    ...baseSettings,
+    plan: nextPlan,
+    updated_at: new Date().toISOString(),
+  }
+}
 
 export async function createBillingInvoice(
   orgId: string,
@@ -14,27 +58,36 @@ export async function createBillingInvoice(
     tokens?: number
   },
 ) {
-  const supabase = await createClient()
+  const access = await requireBillingMembership(orgId)
+  if ('error' in access) return { error: access.error }
+
   const invoiceKey = `${item.type}-${item.id}`
   const isPackage = item.type === 'PACKAGE'
   const isTopup = item.type === 'AI_TOKEN_TOPUP'
 
   // 1. Cek apakah sudah ada invoice UNPAID untuk item ini di org ini (agar tidak double)
-  const { data: existing } = await (supabase as any)
-    .from('saas_invoices')
-    .select('id, invoice_number, amount')
-    .eq('org_id', orgId)
-    .eq('package_id', isPackage ? item.id : (null as any))
-    .eq('status', 'UNPAID')
-    .ilike('invoice_number', `%${invoiceKey}%`)
-    .maybeSingle()
+  const existing = await prisma.saas_invoices.findFirst({
+    where: {
+      org_id: access.orgId,
+      package_id: isPackage ? item.id : null,
+      status: 'UNPAID',
+      invoice_number: {
+        contains: invoiceKey,
+      },
+    },
+    select: {
+      id: true,
+      invoice_number: true,
+      amount: true,
+    },
+  })
 
   if (existing) {
     return {
       success: true,
-      id: (existing as any).id,
-      invoiceNumber: (existing as any).invoice_number,
-      amount: Number((existing as any).amount),
+      id: existing.id,
+      invoiceNumber: existing.invoice_number,
+      amount: Number(existing.amount),
       message: 'Harap selesaikan pembayaran invoice sebelumnya.',
     }
   }
@@ -48,132 +101,155 @@ export async function createBillingInvoice(
     : item.name
 
   // 3. Insert Invoice
-  const { data, error } = await (supabase as any)
-    .from('saas_invoices')
-    .insert({
-      org_id: orgId,
-      package_id: isPackage ? item.id : null,
-      item_name: itemName,
-      invoice_number: invoiceNumber,
-      amount: item.price,
-      status: 'UNPAID',
-      due_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() 
-    } as any)
-    .select()
-    .single()
+  try {
+    const data = await prisma.saas_invoices.create({
+      data: {
+        org_id: access.orgId,
+        package_id: isPackage ? item.id : null,
+        item_name: itemName,
+        invoice_number: invoiceNumber,
+        amount: item.price,
+        status: 'UNPAID',
+        due_date: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+      select: {
+        id: true,
+        invoice_number: true,
+        amount: true,
+      },
+    })
 
-  if (error) {
-    (console as any).error('Gagal membuat invoice SaaS:', error)
-    return { error: 'Gagal membuat tagihan: ' + error.message }
-  }
+    if (isTopup) {
+      if (!item.topupPackageId || !item.tokens) {
+        return { error: 'Konfigurasi paket token tidak lengkap.' }
+      }
 
-  if (isTopup) {
-    if (!item.topupPackageId || !item.tokens) {
-      return { error: 'Konfigurasi paket token tidak lengkap.' }
-    }
-
-    const { error: topupError } = await (supabase as any)
-      .from('ai_token_topup_orders')
-      .insert({
-        org_id: orgId,
-        package_id: item.topupPackageId,
-        invoice_id: (data as any).id,
-        status: 'PENDING',
-        tokens: Math.max(1, Number(item.tokens)),
-        price_idr: item.price,
+      await prisma.ai_token_topup_orders.create({
+        data: {
+          org_id: access.orgId,
+          package_id: item.topupPackageId,
+          invoice_id: data.id,
+          status: 'PENDING',
+          tokens: BigInt(Math.max(1, Number(item.tokens))),
+          price_idr: item.price,
+        },
       })
-
-    if (topupError) {
-      return { error: 'Tagihan dibuat, tetapi gagal membuat order topup token: ' + topupError.message }
     }
-  }
 
-  revalidatePath('/billing')
-  revalidatePath('/', 'layout')
-  return { success: true, id: (data as any).id, invoiceNumber: (data as any).invoice_number, amount: Number((data as any).amount) }
+    revalidatePath('/billing')
+    revalidatePath('/', 'layout')
+    return { success: true, id: data.id, invoiceNumber: data.invoice_number, amount: Number(data.amount) }
+  } catch (error: any) {
+    console.error('Gagal membuat invoice SaaS:', error)
+    return { error: 'Gagal membuat tagihan: ' + (error?.message || 'Unknown error') }
+  }
 }
 
 export async function submitPaymentProof(orgId: string, invoiceId: string, proofUrl: string, method: string) {
-  const supabase = await createClient()
+  const access = await requireBillingMembership(orgId)
+  if ('error' in access) return { error: access.error }
 
   // 1. Fetch invoice info for activation
-  const { data: inv } = await (supabase as any)
-    .from('saas_invoices')
-    .select('*, saas_packages(name)')
-    .eq('id', invoiceId)
-    .single()
+  const [inv, topupOrder] = await Promise.all([
+    prisma.saas_invoices.findFirst({
+      where: {
+        id: invoiceId,
+        org_id: access.orgId,
+      },
+      include: {
+        saas_packages: {
+          select: {
+            name: true,
+          },
+        },
+        organizations: {
+          select: {
+            settings: true,
+          },
+        },
+      },
+    }),
+    prisma.ai_token_topup_orders.findUnique({
+      where: {
+        invoice_id: invoiceId,
+      },
+    }),
+  ])
 
-  const { data: topupOrder } = await (supabase as any)
-    .from('ai_token_topup_orders')
-    .select('*')
-    .eq('invoice_id', invoiceId)
-    .maybeSingle()
+  if (!inv) {
+    return { error: 'Invoice tidak ditemukan.' }
+  }
 
   // 2. Update Invoice to PAID
-  await (supabase as any).from('saas_invoices')
-    .update({ 
+  await prisma.saas_invoices.update({
+    where: { id: invoiceId },
+    data: {
       status: 'PAID',
       payment_method: method,
       payment_proof_url: proofUrl,
-      updated_at: new Date().toISOString()
-    } as any)
-    .eq('id', invoiceId)
+      updated_at: new Date(),
+    },
+  })
 
   // 2.1 Apply token topup if invoice linked to ai_token_topup_orders
   if (topupOrder) {
-    if ((topupOrder as any).status === 'PAID') {
+    if (topupOrder.status === 'PAID') {
       revalidatePath('/billing')
       revalidatePath('/', 'layout')
       return { success: true }
     }
 
-    const tokenAmount = Number((topupOrder as any).tokens || 0)
-    const { data: wallet } = await (supabase as any)
-      .from('ai_token_wallets')
-      .select('*')
-      .eq('org_id', orgId)
-      .maybeSingle()
+    const tokenAmount = BigInt(topupOrder.tokens || 0)
+    const wallet = await prisma.ai_token_wallets.findUnique({
+      where: {
+        org_id: access.orgId,
+      },
+    })
 
-    if ((wallet as any)?.org_id) {
-      await (supabase as any)
-        .from('ai_token_wallets')
-        .update({
-          balance_tokens: Number((wallet as any).balance_tokens || 0) + tokenAmount,
-          total_purchased_tokens: Number((wallet as any).total_purchased_tokens || 0) + tokenAmount,
-          updated_at: new Date().toISOString(),
-        } as any)
-        .eq('org_id', orgId)
+    if (wallet) {
+      await prisma.ai_token_wallets.update({
+        where: {
+          org_id: access.orgId,
+        },
+        data: {
+          balance_tokens: wallet.balance_tokens + tokenAmount,
+          total_purchased_tokens: wallet.total_purchased_tokens + tokenAmount,
+          updated_at: new Date(),
+        },
+      })
     } else {
-      await (supabase as any)
-        .from('ai_token_wallets')
-        .insert({
-          org_id: orgId,
+      await prisma.ai_token_wallets.create({
+        data: {
+          org_id: access.orgId,
           balance_tokens: tokenAmount,
           total_purchased_tokens: tokenAmount,
-          total_used_tokens: 0,
-        } as any)
+          total_used_tokens: BigInt(0),
+        },
+      })
     }
 
-    await (supabase as any)
-      .from('ai_token_usage_logs')
-      .insert({
-        org_id: orgId,
+    await prisma.ai_token_usage_logs.create({
+      data: {
+        org_id: access.orgId,
         source: 'topup',
         direction: 'CREDIT',
         tokens: tokenAmount,
         related_invoice_id: invoiceId,
         note: `Topup token AI dari invoice ${invoiceId}`,
-        meta: { topup_order_id: (topupOrder as any).id, package_id: (topupOrder as any).package_id },
-      } as any)
+        meta: { topup_order_id: topupOrder.id, package_id: topupOrder.package_id } as any,
+      },
+    })
 
-    await (supabase as any)
-      .from('ai_token_topup_orders')
-      .update({
+    await prisma.ai_token_topup_orders.update({
+      where: {
+        id: topupOrder.id,
+      },
+      data: {
         status: 'PAID',
-        paid_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as any)
-      .eq('id', (topupOrder as any).id)
+        paid_at: new Date(),
+        updated_at: new Date(),
+      },
+    })
 
     revalidatePath('/billing')
     revalidatePath('/', 'layout')
@@ -181,15 +257,15 @@ export async function submitPaymentProof(orgId: string, invoiceId: string, proof
   }
 
   // 3. Update Org Settings (Instant Upgrade for Demo)
-  if ((inv as any)?.saas_packages && (inv as any).saas_packages.name) {
-    await (supabase as any).from('organizations')
-      .update({
-        settings: {
-          plan: (inv as any).saas_packages.name,
-          updated_at: new Date().toISOString()
-        } as any
-      } as any)
-      .eq('id', orgId)
+  if (inv.saas_packages?.name) {
+    await prisma.organizations.update({
+      where: {
+        id: access.orgId,
+      },
+      data: {
+        settings: mergePlanSetting(inv.organizations?.settings, inv.saas_packages.name) as any,
+      },
+    })
   }
 
   revalidatePath('/billing')
@@ -198,38 +274,41 @@ export async function submitPaymentProof(orgId: string, invoiceId: string, proof
 }
 
 export async function applyVoucher(orgId: string, voucherCode: string) {
-  const supabase = await createClient()
+  const access = await requireBillingMembership(orgId)
+  if ('error' in access) return { error: access.error }
 
   // 1. Validasi Voucher
-  const { data: voucher, error: vErr } = await (supabase as any)
-    .from('saas_vouchers')
-    .select('*, saas_packages(*)')
-    .eq('code', voucherCode)
-    .eq('is_active', true)
-    .single()
+  const voucher = await prisma.saas_vouchers.findFirst({
+    where: {
+      code: voucherCode,
+      is_active: true,
+    },
+    include: {
+      saas_packages: true,
+    },
+  })
 
-  if (vErr || !voucher) {
+  if (!voucher) {
     return { error: 'Voucher tidak ditemukan atau sudah tidak aktif.' }
   }
 
   // 2. Cek kuota dan masa berlaku
-  if ((voucher as any).uses_count >= (voucher as any).max_uses) {
+  if (Number(voucher.uses_count || 0) >= Number(voucher.max_uses || 0)) {
     return { error: 'Kuota voucher sudah habis.' }
   }
 
-  if (new Date((voucher as any).expires_at) < new Date()) {
+  if (voucher.expires_at && new Date(voucher.expires_at) < new Date()) {
     return { error: 'Voucher sudah kedaluwarsa.' }
   }
 
   // 3. Ambil paket ABS (Default if not specified in voucher)
-  let targetPackage = (voucher as any).saas_packages
+  let targetPackage = voucher.saas_packages
   if (!targetPackage) {
-    const { data: absPkg } = await (supabase as any)
-      .from('saas_packages')
-      .select('*')
-      .eq('name', 'ABS Special')
-      .maybeSingle()
-    targetPackage = absPkg
+    targetPackage = await prisma.saas_packages.findFirst({
+      where: {
+        name: 'ABS Special',
+      },
+    })
   }
 
   if (!targetPackage) {
@@ -240,37 +319,49 @@ export async function applyVoucher(orgId: string, voucherCode: string) {
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase()
   const invoiceNumber = `ABS-${randomStr}`
 
-  const { error: invErr } = await (supabase as any)
-    .from('saas_invoices')
-    .insert({
-      org_id: orgId,
-      package_id: targetPackage.id,
-      item_name: `Voucher: ${targetPackage.name}`,
-      invoice_number: invoiceNumber,
-      amount: 0,
-      status: 'PAID',
-      payment_method: 'VOUCHER',
-      due_date: new Date().toISOString()
-    } as any)
+  try {
+    const organization = await prisma.organizations.findUnique({
+      where: {
+        id: access.orgId,
+      },
+      select: {
+        settings: true,
+      },
+    })
 
-  if (invErr) {
-    return { error: 'Gagal aktivasi: ' + invErr.message }
+    await prisma.$transaction([
+      prisma.saas_invoices.create({
+        data: {
+          org_id: access.orgId,
+          package_id: targetPackage.id,
+          item_name: `Voucher: ${targetPackage.name}`,
+          invoice_number: invoiceNumber,
+          amount: 0,
+          status: 'PAID',
+          payment_method: 'VOUCHER',
+          due_date: new Date(),
+        },
+      }),
+      prisma.organizations.update({
+        where: {
+          id: access.orgId,
+        },
+        data: {
+          settings: mergePlanSetting(organization?.settings, targetPackage.name) as any,
+        },
+      }),
+      prisma.saas_vouchers.update({
+        where: {
+          id: voucher.id,
+        },
+        data: {
+          uses_count: Number(voucher.uses_count || 0) + 1,
+        },
+      }),
+    ])
+  } catch (error: any) {
+    return { error: 'Gagal aktivasi: ' + (error?.message || 'Unknown error') }
   }
-
-  // 5. Update Org Settings
-  await (supabase as any).from('organizations')
-    .update({
-      settings: {
-        plan: targetPackage.name,
-        updated_at: new Date().toISOString()
-      } as any
-    } as any)
-    .eq('id', orgId)
-
-  // 6. Increment Voucher Count
-  await (supabase as any).from('saas_vouchers')
-    .update({ uses_count: (voucher as any).uses_count + 1 } as any)
-    .eq('id', (voucher as any).id)
 
   revalidatePath('/billing')
   revalidatePath('/', 'layout')
