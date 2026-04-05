@@ -132,10 +132,10 @@ describe('Employee Actions', () => {
       tables: {
         employees: [
           {
-            result: failure("Could not find the 'department_id' column of 'employees' in the schema cache"),
+            singleResult: failure("Could not find the 'department_id' column of 'employees' in the schema cache"),
           },
           {
-            result: success([]),
+            singleResult: success({ id: 'emp-1' }),
           },
         ],
       },
@@ -224,5 +224,75 @@ describe('Employee Actions', () => {
     expect(result).toEqual({ success: true })
     expect(deleteOperation).toBeTruthy()
     expect(branchFilter?.args[1]).toBe('branch-1')
+  })
+
+  it('syncs managed child organizations assignment from employee form', async () => {
+    const formData = buildEmployeeForm()
+    formData.set('managed_child_orgs', JSON.stringify(['child-1', 'child-2']))
+
+    const supabase = createSupabaseMock({
+      tables: {
+        employees: [
+          {
+            maybeSingleResult: success({
+              id: 'emp-1',
+              branch_id: 'branch-1',
+            }),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        organizations: [
+          {
+            maybeSingleResult: success({
+              id: 'org-1',
+              parent_org_id: null,
+            }),
+          },
+          {
+            result: success([
+              { id: 'child-1' },
+              { id: 'child-2' },
+              { id: 'child-3' },
+            ]),
+          },
+          {
+            result: success([]),
+          },
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
+
+    const result = await updateEmployee('emp-1', 'org-1', formData)
+    const organizationCalls = supabase.calls.filter((call) => call.table === 'organizations')
+    const clearAssignmentCall = organizationCalls[2]
+    const setAssignmentCall = organizationCalls[3]
+
+    expect(result).toEqual({ success: true })
+    expect(clearAssignmentCall?.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ method: 'update', args: [expect.objectContaining({ manager_employee_id: null })] }),
+        expect.objectContaining({ method: 'eq', args: ['parent_org_id', 'org-1'] }),
+        expect.objectContaining({ method: 'eq', args: ['manager_employee_id', 'emp-1'] }),
+        expect.objectContaining({ method: 'not', args: ['id', 'in', '(child-1,child-2)'] }),
+      ])
+    )
+    expect(setAssignmentCall?.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ method: 'update', args: [expect.objectContaining({ manager_employee_id: 'emp-1' })] }),
+        expect.objectContaining({ method: 'eq', args: ['parent_org_id', 'org-1'] }),
+        expect.objectContaining({ method: 'in', args: ['id', ['child-1', 'child-2']] }),
+      ])
+    )
   })
 })

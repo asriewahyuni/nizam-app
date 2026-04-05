@@ -1,6 +1,6 @@
 # NIZAM ERP — Comprehensive Codebase Documentation
 
-> **Last updated:** 5 April 2026 (rev 4) — updated to include migrations 1132–1136, Istishna purchasing workflow, DP support, Aging AR/AP Istishna integration, and journal description improvements.
+> **Last updated:** 6 April 2026 (rev 8) — updated to include HRIS multi-PIC assignment (employee can manage multiple child orgs and branches), plus inter-organization capital transfer guardrail hardening.
 
 ---
 
@@ -15,7 +15,7 @@ NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **
 | Page routes (`page.tsx`) | **65** |
 | Client components (`*Client.tsx`) | **46** |
 | Server action files | **47** |
-| Migration SQL files | **177** (latest: `1136`) |
+| Migration SQL files | **188** (latest: `1147`) |
 | Test files | **33** |
 | API route handlers | **2** (`/api/export`, `/api/sales-pages/lead`) |
 | Proxy (middleware) | `proxy.ts` |
@@ -92,7 +92,7 @@ nizam-app/
 │   └── database.types.ts # Auto-generated Supabase types
 ├── __tests__/           # Vitest test suites (33 files)
 ├── supabase/
-│   └── migrations/      # 169 SQL migration files
+│   └── migrations/      # 184 SQL migration files
 ├── scripts/             # Data migration scripts
 └── public/              # PWA manifest, logo, static assets
 ```
@@ -432,11 +432,12 @@ Guards both `/admin` and `/saas/*` routes.
 
 **Actions:** `modules/cash/actions/` (2 files)
 
-- CRUD bank accounts
+- CRUD bank accounts (**hanya Parent/Holding**, Child/Branch diarahkan ke request workflow)
 - Cash/bank transactions with linked journal entries
 - CSV bank statement upload & parse
 - Unmatched mutation listing
 - Delete transaction with automatic journal void
+- **Governance:** `createBankAccount` menolak non-Parent org dengan pesan `requiresRequest: true`; UI menampilkan tombol "Ajukan Rekening" yang mengarah ke `/accounting/coa-requests`
 
 ### 7.4 Inventory & WMS
 
@@ -511,6 +512,8 @@ Guards both `/admin` and `/saas/*` routes.
 - Expense claims with approval
 - Self-service portal for employees
 - Invitation-based employee activation
+- Branch PIC assignment dari form karyawan (`managed_branches` → sinkron ke `branches.pic_employee_id`)
+- Child-to-child employee mutation (same holding) dengan wizard, auto status source `RESIGNED`, opsi assign PIC target, dan audit trail
 - Branch-aware HR (since migrations `1095`–`1098`)
 
 ### 7.9 Manufacturing
@@ -619,9 +622,9 @@ Core reusable components:
 
 ### 9.1 Overview
 
-- **169 migration files** in `supabase/migrations/`
+- **184 migration files** in `supabase/migrations/`
 - `master_init.sql` — legacy bootstrap SQL (foundation reference)
-- Latest migration: `1128_sub_org_enhancements.sql`
+- Latest migration: `1143_interorg_capital_transfer.sql`
 
 ### 9.2 Core Entities
 
@@ -677,6 +680,12 @@ Core reusable components:
 | `get_consolidated_org_ids` | Recursive org-tree expansion for holding consolidation (parent + all descendants) |
 | `is_org_in_consolidation_tree` | Boolean helper to validate whether an org is inside a specific parent consolidation tree |
 | `get_consolidated_org_hierarchy` | Displays parent + direct children org list with hierarchy label for UI display |
+| `is_main_organization` | Returns TRUE if org has no `parent_org_id` (i.e. is Holding/Root) |
+| `can_manage_finance_master` | Returns TRUE if current user may create/edit CoA or bank accounts directly on an org (must be Main Org + Main Branch context) |
+| `submit_coa_request` | Child/Branch submits a CoA account request to Parent for approval |
+| `approve_coa_request` | Parent approves request and auto-creates the account in CoA |
+| `reject_coa_request` | Parent rejects request with mandatory reason notes |
+| `cancel_coa_request` | Requester cancels their own pending request |
 | `reset_org_data` | Organization data reset (v2) |
 
 ### 9.4 Migration Timeline
@@ -727,6 +736,13 @@ Core reusable components:
 | `1134` | **Fix payment status enum** — perbaikan bug `invalid input value for enum document_status: ""` pada fungsi `process_purchase_payment_atomic`. |
 | `1135` | **DP description in journals** — memperbarui `process_sales_payment_atomic` agar deskripsi jurnal menyertakan tipe pembayaran, nomor referensi, dan keterangan DP/Uang Muka secara eksplisit. |
 | `1136` | **Purchasing Istishna receivable** — menambahkan akun `1205 — Aset / Piutang Barang Istishna (Pembelian)` ke CoA; memperbarui `process_purchase_payment_atomic` agar pembayaran/DP pembelian Istishna diposting ke `1205` (bukan `2101`); serah terima barang Istishna memindahkan saldo `1205` → `1301`. |
+| `1137` | **CoA account request workflow** — tabel `coa_account_requests` + enum `coa_request_status`; RPC `submit_coa_request`, `approve_coa_request`, `reject_coa_request`, `cancel_coa_request`; view `coa_request_summary`; trigger `enforce_coa_request_governance`; RLS policies untuk Parent (melihat semua) dan Child/Branch (melihat milik sendiri). |
+| `1138` | **Fix CoA governance functions** — repair idempotent untuk `is_main_organization()` dan `can_manage_finance_master()` yang tidak terbuat saat migration 1126 partial fail; backfill `managed_branch_id`; re-attach trigger `enforce_accounts_governance` dan `enforce_accounts_delete_governance`. |
+| `1139` | Fix parameter order untuk `submit_coa_request` agar kompatibel dengan call site di action layer. |
+| `1140` | Grant execute + permission repair untuk fungsi-fungsi governance CoA request. |
+| `1141` | Repair fungsi konsolidasi yang hilang (`get_consolidated_org_ids`, `is_org_in_consolidation_tree`, `get_consolidated_org_hierarchy`). |
+| `1142` | Perbaikan cast tipe pada approval CoA request agar stabil pada berbagai environment schema. |
+| `1143` | **Inter-org capital transfer RPC** — parent dapat posting transfer modal lintas entitas secara atomik (`OUT` sumber + `IN` tujuan) dengan validasi tree konsolidasi dan validasi akun lawan per entitas. |
 
 ### 9.5 Storage Buckets
 
@@ -1179,6 +1195,116 @@ When adding new modules to the SaaS system, update:
 
 ## 16. Changelog (Recent Updates)
 
+### Finance Governance + Cash/Bank Consolidation Updates (April 2026)
+
+- **Zakat scope fix (Perdagangan only):**
+  - Updated `modules/accounting/actions/zakat.actions.ts` and `app/(dashboard)/accounting/zakat/ZakatClient.tsx` so zakat perdagangan hanya dihitung untuk aktivitas perdagangan/persediaan.
+  - Aktivitas layanan jasa/labour tidak lagi diperlakukan sebagai objek zakat perdagangan.
+  - Added test coverage update in `__tests__/zakat.actions.test.ts` untuk memastikan service-only flow tidak memunculkan zakat perdagangan.
+
+- **CoA parent-child synchronization hardening:**
+  - Parent CoA sekarang disinkronkan ke child agar struktur akun konsisten antara parent dan anak/cabang.
+  - Update parent pada account master otomatis dipropagasi ke descendant org melalui sinkronisasi by account code, termasuk parent account mapping.
+  - Child membuka halaman CoA akan menarik pembaruan parent terbaru sebelum render daftar akun.
+
+- **Runtime fix for CoA permission RPC call:**
+  - Fixed runtime error `Cannot read properties of undefined (reading 'rest')` pada `checkCanManageCoA`.
+  - Root cause: kehilangan konteks method pada destructuring `rpc`.
+  - Fix: panggil RPC langsung melalui `(supabase as any).rpc(...)` agar context client tetap valid.
+
+- **Bank account visibility from parent across entities:**
+  - Parent dashboard kas kini menampilkan rekening bank lintas konsolidasi (parent + child/cabang) menggunakan `get_consolidated_org_ids`.
+  - Rekening lintas entitas diberi label org/cabang untuk visibilitas transfer modal.
+
+- **Inter-organization capital transfer (Parent → Child/Cabang):**
+  - Added migration `1143_interorg_capital_transfer.sql` dengan RPC baru `create_interorg_capital_transfer(...)` (`SECURITY DEFINER`):
+    - Validasi otorisasi parent via `can_manage_finance_master`.
+    - Validasi target berada dalam tree konsolidasi parent (`is_org_in_consolidation_tree`).
+    - Validasi rekening sumber/tujuan dan akun lawan per entitas.
+    - Posting atomik dua sisi: `OUT` di parent + `IN` di entitas tujuan, keduanya `POSTED` agar auto-journal tetap berjalan.
+  - Added server action `createInterOrgCapitalTransfer` di `modules/cash/actions/bank.actions.ts`.
+  - Updated `CashClient` transfer modal:
+    - Parent dapat memilih rekening target lintas entitas.
+    - Jika target beda org, UI meminta dua akun lawan (sisi sumber dan sisi tujuan) dan memanggil RPC inter-org.
+    - Jika target satu org, flow transfer internal lama tetap dipakai.
+    - Added **available cash indicator** di field `Total Amount` untuk transaksi `OUT/TRANSFER`:
+      - Menampilkan saldo kas/bank tersedia dari rekening sumber.
+      - Menampilkan warning jika nominal melebihi saldo tersedia.
+      - Tombol submit otomatis disabled saat nominal melampaui available kas.
+  - Added/updated test coverage di `__tests__/bank.actions.test.ts` untuk RPC transfer modal antar entitas.
+
+### HRIS Child-to-Child Employee Mutation + Branch PIC Workflow (April 2026)
+
+- Fixed runtime error `ReferenceError: branches is not defined` di HRIS modal employee dengan alias prop aman (`branches: branchOptions`) pada `HrisClient`.
+- Added branch PIC assignment workflow langsung dari form employee:
+  - Multi-select cabang yang dikelola karyawan (`managed_branches` payload).
+  - `createEmployee`/`updateEmployee` kini sinkronisasi `branches.pic_employee_id` sesuai pilihan terbaru.
+- Added server actions baru di `modules/hris/actions/employee.actions.ts`:
+  - `transferEmployeeToChildOrg(orgId, payload)` untuk mutasi karyawan lintas child dalam holding yang sama.
+  - `getEmployeeTransferHistory(orgId)` untuk membaca 20 log mutasi terbaru.
+- Mutasi workflow (`transferEmployeeToChildOrg`) mencakup:
+  - Validasi akses owner/admin pada child asal **dan** membership owner/admin pada holding.
+  - Validasi child tujuan aktif, masih satu holding, cabang tujuan valid, dan anti-duplikasi NIK.
+  - Clone profil employee ke child tujuan.
+  - Menandai employee asal sebagai `RESIGNED` + set `end_date`.
+  - Melepas PIC cabang lama (`pic_employee_id = null`) dan opsi set PIC cabang tujuan.
+  - Upsert `org_members` tujuan untuk user yang sudah terhubung (`employees.user_id`) agar akun tetap bisa akses child baru.
+  - Menulis audit trail ke `audit_logs` pada org asal dan tujuan dengan `table_name = 'EMPLOYEE_CHILD_TRANSFER'`.
+- Updated `app/(dashboard)/hris/page.tsx`:
+  - Menyediakan `transferTargets` otomatis dari org membership user (child lain dalam holding yang sama, role owner/admin, dan punya cabang aktif).
+  - Memuat `initialTransferHistory` via `getEmployeeTransferHistory`.
+- Updated `app/(dashboard)/hris/HrisClient.tsx`:
+  - Tombol mutasi (`ArrowRightLeft`) pada card employee.
+  - Modal wizard mutasi (pilih child, cabang, opsi assign PIC target, catatan mutasi).
+  - Panel “Riwayat Mutasi Antar Child” di tab Employees.
+  - Toast/refresh integration dan optimistic append ke history lokal.
+
+> Catatan: fitur ini memanfaatkan tabel existing (`audit_logs`, `employees`, `branches`, `org_members`, `organizations`) dan **tidak memerlukan migration baru**.
+
+### CoA & Bank Account Governance — Child/Branch Request Workflow (April 2026)
+
+Mengimplementasikan sistem pengendalian hierarki rekening keuangan: hanya Parent/Holding yang boleh membuat rekening CoA dan rekening bank secara langsung. Child org dan Branch wajib mengajukan request.
+
+**Masalah yang diselesaikan:** Child org bisa menambah rekening CoA dan rekening bank langsung tanpa approval dari Parent/Holding.
+
+**Migrasi baru:**
+
+- `1137_coa_account_request_workflow.sql` — tabel `coa_account_requests`, enum `coa_request_status` (`pending`/`approved`/`rejected`/`cancelled`), 4 RPC (submit/approve/reject/cancel), view `coa_request_summary`, trigger `enforce_coa_request_governance`, dan RLS policies.
+- `1138_fix_coa_governance_functions.sql` — repair idempotent: menambah kolom `parent_org_id` (organizations) dan `managed_branch_id` (accounts) jika belum ada, backfill data, lalu CREATE OR REPLACE `is_main_organization()` dan `can_manage_finance_master()` yang gagal dibuat di migration 1126.
+
+**3 Lapis Proteksi (CoA & Bank Account):**
+
+| Layer | Lokasi | Mekanisme |
+|---|---|---|
+| **1. UI** | `accounts/page.tsx`, `CashClient.tsx` | Child/Branch hanya melihat tombol "Ajukan Rekening" yang redirect ke `/accounting/coa-requests` |
+| **2. Server Action** | `coa.actions.ts → createAccount()`, `bank.actions.ts → createBankAccount()` | `checkCanManageCoA()` → `can_manage_finance_master()` RPC → return `{ error, requiresRequest: true }` |
+| **3. Database** | Trigger `enforce_accounts_governance` | `can_manage_finance_master()` dipanggil level PostgreSQL → `RAISE EXCEPTION` |
+
+**Route guard baru:**
+`app/(dashboard)/settings/accounts/new/page.tsx` dikonversi dari pure client component menjadi **server component** dengan redirect:
+```ts
+if (!canManageDirect) redirect('/accounting/coa-requests')
+```
+Form dipindahkan ke `NewAccountForm.tsx` (client component terpisah).
+
+**Halaman baru:**
+- `/accounting/coa-requests` — CoA request dashboard: Parent melihat semua pending request (approve/reject), Child/Branch melihat form pengajuan + riwayat request mereka.
+- `CoaRequestClient.tsx` — komponen UI untuk kedua tampilan (view berbeda tergantung `isParentOrg`).
+
+**Alur governance:**
+```
+Child/Branch → Ajukan request di /accounting/coa-requests
+    ↓
+Parent/Holding menerima notifikasi (list "Permintaan Masuk")
+    ↓
+Parent Approve → akun otomatis dibuat via approve_coa_request() RPC
+Parent Reject  → request ditolak dengan catatan alasan wajib
+```
+
+**Database functions:**
+- `is_main_organization(p_org_id UUID)` — TRUE jika org tidak punya `parent_org_id` (Holding/Root).
+- `can_manage_finance_master(p_org_id UUID)` — TRUE jika user adalah member aktif di Main Org dengan role owner/admin (atau permission `coa:write`/`accounting:write`) DAN sedang berada di konteks Main Branch.
+
 ### Sub-Org PIC Assignment Fix (April 2026)
 
 Memperbaiki bug di mana dropdown PIC Direktur/Manager pada halaman Anak Perusahaan (`/settings/sub-orgs`) kosong atau tidak berfungsi.
@@ -1404,6 +1530,17 @@ Major initiative to add branch-level scoping across all business modules:
 - Attendance, leave management
 - Expense claims
 - Branch-aware HRIS operations
+
+### HRIS Multi-PIC Assignment (April 2026)
+
+- Employee form HRIS sekarang mendukung penugasan PIC ke banyak cabang sekaligus (`managed_branches`) dan banyak anak perusahaan sekaligus (`managed_child_orgs`).
+- Action `createEmployee` dan `updateEmployee` melakukan sinkronisasi assignment:
+  - `branches.pic_employee_id` untuk PIC cabang multi-select.
+  - `organizations.manager_employee_id` untuk PIC Direktur/Manager multi anak perusahaan (scope holding aktif).
+- Saat karyawan `RESIGNED` atau dimutasi antar entitas holding, assignment PIC anak perusahaan dilepas otomatis agar tidak meninggalkan referensi stale.
+- Ditambahkan fallback kompatibilitas schema lama: jika kolom `manager_employee_id` belum tersedia, proses simpan employee tetap berjalan.
+- UI HRIS (`/hris`) menampilkan blok baru “Penugasan PIC Anak Perusahaan (Opsional)” pada modal create/edit karyawan.
+- Added test coverage di `__tests__/employee.actions.test.ts` untuk memastikan sinkronisasi multi anak perusahaan berjalan konsisten.
 
 ---
 
