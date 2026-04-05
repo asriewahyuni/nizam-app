@@ -26,6 +26,9 @@ const mocks = vi.hoisted(() => ({
       create: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn(),
     },
     branches: {
       create: vi.fn(),
@@ -107,8 +110,10 @@ import {
   createOrganization,
   createOrganizationQuick,
   getActiveBranch,
+  removeOrgMember,
   setActiveBranch,
   setActiveOrg,
+  updateOrgMemberRole,
 } from '@/modules/organization/actions/org.actions'
 import {
   getActiveBranchIdAction,
@@ -171,6 +176,9 @@ describe('Organization Branch Bootstrap', () => {
     })
     mocks.prisma.$transaction.mockReset()
     mocks.prisma.org_members.findFirst.mockReset()
+    mocks.prisma.org_members.update.mockReset()
+    mocks.prisma.org_members.delete.mockReset()
+    mocks.prisma.org_members.count.mockReset()
     mocks.prisma.branches.findFirst.mockReset()
     mocks.prisma.branches.create.mockReset()
   })
@@ -539,5 +547,69 @@ describe('Organization Branch Bootstrap', () => {
     expect(result).toEqual({
       error: 'Hanya owner atau admin yang dapat menambahkan unit.',
     })
+  })
+
+  it('prevents demoting the last remaining owner', async () => {
+    mocks.prisma.org_members.findFirst.mockResolvedValue({
+      id: 'member-owner',
+      user_id: 'owner-1',
+      role: 'owner',
+      role_id: null,
+    })
+    mocks.prisma.org_members.count.mockResolvedValue(1)
+
+    const result = await updateOrgMemberRole('org-1', 'member-owner', 'admin')
+
+    expect(result).toEqual({
+      error: 'Organisasi harus memiliki minimal satu owner aktif.',
+    })
+    expect(mocks.prisma.org_members.update).not.toHaveBeenCalled()
+  })
+
+  it('updates org member role for owner/admin actors', async () => {
+    mocks.prisma.org_members.findFirst.mockResolvedValue({
+      id: 'member-2',
+      user_id: 'user-2',
+      role: 'staff',
+      role_id: 'role-staff',
+    })
+    mocks.prisma.org_members.update.mockResolvedValue({
+      id: 'member-2',
+      role: 'manager',
+      role_id: 'role-staff',
+    })
+
+    const result = await updateOrgMemberRole('org-1', 'member-2', 'manager')
+
+    expect(result).toEqual({
+      success: true,
+      memberId: 'member-2',
+      role: 'manager',
+      roleId: 'role-staff',
+    })
+    expect(mocks.prisma.org_members.update).toHaveBeenCalledWith({
+      where: { id: 'member-2' },
+      data: { role: 'manager' },
+      select: {
+        id: true,
+        role: true,
+        role_id: true,
+      },
+    })
+  })
+
+  it('prevents deleting the actor membership itself', async () => {
+    mocks.prisma.org_members.findFirst.mockResolvedValue({
+      id: 'member-1',
+      user_id: 'user-1',
+      role: 'admin',
+    })
+
+    const result = await removeOrgMember('org-1', 'member-1')
+
+    expect(result).toEqual({
+      error: 'Anda tidak dapat menghapus keanggotaan Anda sendiri.',
+    })
+    expect(mocks.prisma.org_members.delete).not.toHaveBeenCalled()
   })
 })

@@ -77,6 +77,17 @@ type ActionError = {
   error: string
 }
 
+type OrgMemberRole = 'owner' | 'admin' | 'manager' | 'staff' | 'viewer' | 'hr'
+
+const ALLOWED_MEMBER_ROLES: OrgMemberRole[] = [
+  'owner',
+  'admin',
+  'manager',
+  'staff',
+  'viewer',
+  'hr',
+]
+
 function getActiveContextCookieOptions() {
   return {
     maxAge: ACTIVE_CONTEXT_COOKIE_MAX_AGE,
@@ -154,6 +165,15 @@ function membershipHasPermission(
       permission.includes(requiredKey.toLowerCase())
     )
   )
+}
+
+function normalizeMemberRole(value: unknown): OrgMemberRole | null {
+  const normalizedValue = String(value || '').trim().toLowerCase()
+  if (!normalizedValue) return null
+
+  return ALLOWED_MEMBER_ROLES.includes(normalizedValue as OrgMemberRole)
+    ? (normalizedValue as OrgMemberRole)
+    : null
 }
 
 function isUniqueConstraintError(
@@ -1106,6 +1126,175 @@ export async function updateMemberUnitAccess(
     success: true,
     branchIds: normalizedBranchIds,
     branches: validBranches,
+  }
+}
+
+export async function updateOrgMemberRole(
+  orgId: string,
+  memberId: string,
+  nextRole: string
+) {
+  const user = await getAuthenticatedUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const trimmedOrgId = String(orgId || '').trim()
+  const trimmedMemberId = String(memberId || '').trim()
+  const normalizedRole = normalizeMemberRole(nextRole)
+
+  if (!trimmedOrgId || !trimmedMemberId) {
+    return { error: 'Data anggota tidak valid.' }
+  }
+
+  if (!normalizedRole) {
+    return { error: 'Peran tidak valid.' }
+  }
+
+  const actorMembership = await getOrgMembership(user.id, trimmedOrgId)
+  if (!actorMembership) {
+    return { error: 'Anda tidak memiliki akses ke organisasi ini.' }
+  }
+
+  if (!actorMembership.isOwnerOrAdmin) {
+    return { error: 'Hanya owner atau admin yang dapat mengubah peran anggota.' }
+  }
+
+  const targetMembership = await prisma.org_members.findFirst({
+    where: {
+      id: trimmedMemberId,
+      org_id: trimmedOrgId,
+      is_active: true,
+    },
+    select: {
+      id: true,
+      user_id: true,
+      role: true,
+      role_id: true,
+    },
+  })
+
+  if (!targetMembership) {
+    return { error: 'Anggota organisasi tidak ditemukan.' }
+  }
+
+  const currentRole = String(targetMembership.role || 'staff').toLowerCase()
+  if (currentRole === normalizedRole) {
+    return {
+      success: true,
+      memberId: trimmedMemberId,
+      role: normalizedRole,
+      roleId: targetMembership.role_id ?? null,
+    }
+  }
+
+  if (currentRole === 'owner' && normalizedRole !== 'owner') {
+    const ownerCount = await prisma.org_members.count({
+      where: {
+        org_id: trimmedOrgId,
+        role: 'owner',
+        is_active: true,
+      },
+    })
+
+    if (ownerCount <= 1) {
+      return { error: 'Organisasi harus memiliki minimal satu owner aktif.' }
+    }
+  }
+
+  try {
+    const updatedMembership = await prisma.org_members.update({
+      where: { id: trimmedMemberId },
+      data: {
+        role: normalizedRole,
+      },
+      select: {
+        id: true,
+        role: true,
+        role_id: true,
+      },
+    })
+
+    revalidatePath('/settings/users')
+    revalidatePath('/', 'layout')
+    return {
+      success: true,
+      memberId: updatedMembership.id,
+      role: updatedMembership.role,
+      roleId: updatedMembership.role_id ?? null,
+    }
+  } catch (error) {
+    console.error('updateOrgMemberRole Error:', error)
+    return { error: 'Gagal memperbarui peran anggota.' }
+  }
+}
+
+export async function removeOrgMember(orgId: string, memberId: string) {
+  const user = await getAuthenticatedUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const trimmedOrgId = String(orgId || '').trim()
+  const trimmedMemberId = String(memberId || '').trim()
+  if (!trimmedOrgId || !trimmedMemberId) {
+    return { error: 'Data anggota tidak valid.' }
+  }
+
+  const actorMembership = await getOrgMembership(user.id, trimmedOrgId)
+  if (!actorMembership) {
+    return { error: 'Anda tidak memiliki akses ke organisasi ini.' }
+  }
+
+  if (!actorMembership.isOwnerOrAdmin) {
+    return { error: 'Hanya owner atau admin yang dapat menghapus anggota.' }
+  }
+
+  const targetMembership = await prisma.org_members.findFirst({
+    where: {
+      id: trimmedMemberId,
+      org_id: trimmedOrgId,
+      is_active: true,
+    },
+    select: {
+      id: true,
+      user_id: true,
+      role: true,
+    },
+  })
+
+  if (!targetMembership) {
+    return { error: 'Anggota organisasi tidak ditemukan.' }
+  }
+
+  if (targetMembership.user_id === user.id) {
+    return { error: 'Anda tidak dapat menghapus keanggotaan Anda sendiri.' }
+  }
+
+  if (String(targetMembership.role || '').toLowerCase() === 'owner') {
+    const ownerCount = await prisma.org_members.count({
+      where: {
+        org_id: trimmedOrgId,
+        role: 'owner',
+        is_active: true,
+      },
+    })
+
+    if (ownerCount <= 1) {
+      return { error: 'Organisasi harus memiliki minimal satu owner aktif.' }
+    }
+  }
+
+  try {
+    await prisma.org_members.delete({
+      where: { id: trimmedMemberId },
+    })
+  } catch (error) {
+    console.error('removeOrgMember Error:', error)
+    return { error: 'Gagal menghapus anggota organisasi.' }
+  }
+
+  revalidatePath('/settings/users')
+  revalidatePath('/', 'layout')
+  return {
+    success: true,
+    memberId: trimmedMemberId,
   }
 }
 

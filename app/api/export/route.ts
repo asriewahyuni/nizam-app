@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
 import { getBranchAccessScope } from '@/modules/organization/lib/branch-access.server'
+import { getMembership } from '@/lib/auth/permissions'
+import { prisma } from '@/lib/prisma'
 import {
   exportProfitLossXLSX,
   exportBalanceSheetXLSX,
@@ -9,10 +11,9 @@ import {
 } from '@/modules/accounting/actions/export.actions'
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const session = await auth()
+  const user = session?.user
+  if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const searchParams = request.nextUrl.searchParams
   const type = searchParams.get('type') // pl | bs | gl | zakat
@@ -27,16 +28,8 @@ export async function GET(request: NextRequest) {
 
   if (!orgId) return NextResponse.json({ error: 'orgId diperlukan' }, { status: 400 })
 
-  // Verify user has access to this org
-  const { data: member } = await db
-    .from('org_members')
-    .select('org_id')
-    .eq('org_id', orgId)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const membership = await getMembership(user.id, orgId)
+  if (!membership) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const branchAccessScope = await getBranchAccessScope(orgId)
   if (!branchAccessScope.role) {
@@ -52,7 +45,10 @@ export async function GET(request: NextRequest) {
   }
 
   // Get org name for header
-  const { data: org } = await (supabase as any).from('organizations').select('name').eq('id', orgId).single()
+  const org = await prisma.organizations.findUnique({
+    where: { id: orgId },
+    select: { name: true },
+  })
   const orgName = org?.name || 'Organisasi'
 
   try {

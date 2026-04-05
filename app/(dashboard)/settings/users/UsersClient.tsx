@@ -1,8 +1,15 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { startTransition, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, Shield, Trash2, Edit2, ShieldAlert, Link as LinkIcon, Copy, X } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import {
+  createInvitationToken,
+  deleteInvitation,
+  removeOrgMember,
+  updateMemberUnitAccess,
+  updateOrgMemberRole,
+} from '@/modules/organization/actions/org.actions'
 
 type UsersClientProps = {
   orgId: string
@@ -21,6 +28,7 @@ export default function UsersClient({
   roles = [],
   initialInvitations = [],
 }: UsersClientProps) {
+  const router = useRouter()
   const [members, setMembers] = useState(initialMembers)
   const [invitations, setInvitations] = useState(initialInvitations)
   const [loading, setLoading] = useState(false)
@@ -30,7 +38,6 @@ export default function UsersClient({
   const [latestInviteUrl, setLatestInviteUrl] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [memberUnitsModal, setMemberUnitsModal] = useState<{ memberId: string; email: string; branchIds: string[] } | null>(null)
-  const supabase = createClient()
 
   useEffect(() => {
     setMembers(initialMembers)
@@ -60,6 +67,12 @@ export default function UsersClient({
     }
   }
 
+  const refreshUsersPage = () => {
+    startTransition(() => {
+      router.refresh()
+    })
+  }
+
   const handleInvite = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
@@ -69,7 +82,6 @@ export default function UsersClient({
     formData.set('duration', inviteDuration)
     if (roleIdToInvite) formData.set('role_id', roleIdToInvite)
 
-    const { createInvitationToken } = await import('@/modules/organization/actions/org.actions')
     const res = await createInvitationToken(orgId, formData)
 
     if (res.error) {
@@ -95,12 +107,13 @@ export default function UsersClient({
     if (!confirm('Hapus pengguna ini dari organisasi?')) return
 
     setLoading(true)
-    const { error } = await (supabase as any).from('org_members').delete().eq('id', memberId)
+    const res = await removeOrgMember(orgId, memberId)
 
-    if (!error) {
+    if (res.success) {
       setMembers((current: any[]) => current.filter((member: any) => member.id !== memberId))
+      refreshUsersPage()
     } else {
-      alert(error.message)
+      alert(res.error)
     }
 
     setLoading(false)
@@ -110,7 +123,6 @@ export default function UsersClient({
     if (!confirm('Hapus link aktivasi ini?')) return
 
     setLoading(true)
-    const { deleteInvitation } = await import('@/modules/organization/actions/org.actions')
     const res = await deleteInvitation(invitationId)
 
     if (res.success) {
@@ -131,15 +143,15 @@ export default function UsersClient({
     }
 
     setLoading(true)
-    const { error } = await (supabase as any).from('org_members').update({ role: normalizedRole }).eq('id', memberId)
+    const res = await updateOrgMemberRole(orgId, memberId, normalizedRole)
 
-    if (!error) {
+    if (res.success) {
       setMembers((current: any[]) => current.map((member: any) => (
         member.id === memberId ? { ...member, role: normalizedRole } : member
       )))
-      window.location.reload()
+      refreshUsersPage()
     } else {
-      alert(error.message)
+      alert(res.error)
     }
 
     setLoading(false)
@@ -177,7 +189,6 @@ export default function UsersClient({
     if (!memberUnitsModal) return
     setLoading(true)
 
-    const { updateMemberUnitAccess } = await import('@/modules/organization/actions/org.actions')
     const res = await updateMemberUnitAccess(orgId, memberUnitsModal.memberId, memberUnitsModal.branchIds)
 
     if ((res as any).error) {

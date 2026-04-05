@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-import { createSupabaseMock, success } from './helpers/supabase-mock'
-
 const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
+  auth: vi.fn(),
+  getMembership: vi.fn(),
+  prisma: {
+    organizations: {
+      findUnique: vi.fn(),
+    },
+  },
   getBranchAccessScope: vi.fn(),
   exportProfitLossXLSX: vi.fn(),
   exportBalanceSheetXLSX: vi.fn(),
@@ -12,8 +16,16 @@ const mocks = vi.hoisted(() => ({
   exportZakatReportXLSX: vi.fn(),
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: mocks.createClient,
+vi.mock('@/auth', () => ({
+  auth: mocks.auth,
+}))
+
+vi.mock('@/lib/auth/permissions', () => ({
+  getMembership: mocks.getMembership,
+}))
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: mocks.prisma,
 }))
 
 vi.mock('@/modules/organization/lib/branch-access.server', () => ({
@@ -29,35 +41,22 @@ vi.mock('@/modules/accounting/actions/export.actions', () => ({
 
 import { GET } from '@/app/api/export/route'
 
-function buildSupabaseClient() {
-  const supabase = createSupabaseMock({
-    tables: {
-      org_members: [
-        {
-          singleResult: success({ org_id: 'org-1' }),
-        },
-      ],
-      organizations: [
-        {
-          singleResult: success({ name: 'Org Demo' }),
-        },
-      ],
-    },
-  })
-
-  return {
-    ...supabase.client,
-    auth: {
-      getUser: vi.fn().mockResolvedValue({
-        data: { user: { id: 'user-1' } },
-      }),
-    },
-  }
-}
-
 describe('Export Route Boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.auth.mockResolvedValue({ user: { id: 'user-1' } })
+    mocks.getMembership.mockResolvedValue({
+      memberId: 'member-1',
+      userId: 'user-1',
+      orgId: 'org-1',
+      role: 'staff',
+      roleId: null,
+      permissions: [],
+      isOwner: false,
+      isAdmin: false,
+      isOwnerOrAdmin: false,
+    })
+    mocks.prisma.organizations.findUnique.mockResolvedValue({ name: 'Org Demo' })
     mocks.getBranchAccessScope.mockResolvedValue({
       membershipId: 'member-1',
       role: 'staff',
@@ -68,7 +67,6 @@ describe('Export Route Boundary', () => {
   })
 
   it('allows zakat export without a branch selection because it is org-scoped', async () => {
-    mocks.createClient.mockResolvedValue(buildSupabaseClient())
     mocks.exportZakatReportXLSX.mockResolvedValue(Buffer.from('zakat-xlsx'))
 
     const response = await GET(
@@ -80,8 +78,6 @@ describe('Export Route Boundary', () => {
   })
 
   it('still blocks branch-scoped exports when no branch is selected for limited staff', async () => {
-    mocks.createClient.mockResolvedValue(buildSupabaseClient())
-
     const response = await GET(
       new NextRequest('http://localhost:3000/api/export?type=pl&orgId=org-1')
     )
