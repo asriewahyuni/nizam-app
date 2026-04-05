@@ -79,11 +79,108 @@ function normalizeEmail(value: unknown) {
   return normalized || null
 }
 
+function isDuplicateAuthRegistrationError(message: unknown) {
+  if (typeof message !== 'string') return false
+  const lowered = message.toLowerCase()
+  return (
+    lowered.includes('duplicate key value') ||
+    lowered.includes('already registered') ||
+    lowered.includes('already been registered') ||
+    lowered.includes('email address has already been registered') ||
+    (/already.*registered/.test(lowered))
+  )
+}
+
+async function findAuthUserByEmail(
+  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
+  email: string,
+) {
+  const normalizedTargetEmail = normalizeEmail(email)
+  if (!normalizedTargetEmail) {
+    return { user: null as { id?: string; email?: string | null } | null, error: null as string | null }
+  }
+
+  const perPage = 100
+  let page = 1
+
+  while (true) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage })
+    if (error) {
+      return {
+        user: null as { id?: string; email?: string | null } | null,
+        error: `Gagal membaca akun autentikasi: ${error.message}`,
+      }
+    }
+
+    const users = Array.isArray(data?.users) ? data.users : []
+    const matchedUser = users.find((user) => normalizeEmail(user?.email) === normalizedTargetEmail)
+    if (matchedUser) {
+      return { user: matchedUser, error: null }
+    }
+
+    if (users.length < perPage) break
+    page += 1
+  }
+
+  return { user: null as { id?: string; email?: string | null } | null, error: null }
+}
+
 type StaffLoginCandidate = {
   userId: string
   orgIds: string[]
   preferredOrgId: string
-  authEmailFallback: string | null
+  authEmailFallbacks: string[]
+}
+
+function isEmployeeEmploymentActive(status: unknown) {
+  const normalized = String(status || '').trim().toUpperCase()
+  return normalized !== 'RESIGNED' && normalized !== 'TERMINATED'
+}
+
+async function deactivateStaleStaffMemberships(
+  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
+  userId: string,
+  activeOrgIds: string[],
+) {
+  const normalizedUserId = String(userId || '').trim()
+  if (!normalizedUserId) return
+
+  const normalizedActiveOrgIds = Array.from(
+    new Set(
+      activeOrgIds
+        .map((orgId) => String(orgId || '').trim())
+        .filter(Boolean)
+    )
+  )
+
+  try {
+    const { data: activeStaffMemberships, error: membershipReadError } = await (adminClient as any)
+      .from('org_members')
+      .select('org_id')
+      .eq('user_id', normalizedUserId)
+      .eq('role', 'staff')
+      .eq('is_active', true)
+
+    if (membershipReadError || !Array.isArray(activeStaffMemberships) || activeStaffMemberships.length === 0) {
+      return
+    }
+
+    const staleOrgIds = activeStaffMemberships
+      .map((membership: { org_id?: string | null }) => String(membership?.org_id || '').trim())
+      .filter((orgId) => orgId && !normalizedActiveOrgIds.includes(orgId))
+
+    if (staleOrgIds.length === 0) return
+
+    await (adminClient as any)
+      .from('org_members')
+      .update({ is_active: false })
+      .eq('user_id', normalizedUserId)
+      .eq('role', 'staff')
+      .eq('is_active', true)
+      .in('org_id', staleOrgIds)
+  } catch {
+    return
+  }
 }
 
 async function resolveRoleIdForEmployee(adminClient: Awaited<ReturnType<typeof createAdminClient>>, inviteRoleId: string | null | undefined, emp: any) {
@@ -177,18 +274,20 @@ function buildStaffLoginCandidates(employees: any[], nik: string, activeOrgId: s
         existing.preferredOrgId = activeOrgId
       }
 
-      if (!existing.authEmailFallback) {
-        existing.authEmailFallback = buildInternalStaffEmail(employee.org_id, nik)
+      const fallbackEmail = buildInternalStaffEmail(employee.org_id, nik)
+      if (!existing.authEmailFallbacks.includes(fallbackEmail)) {
+        existing.authEmailFallbacks.push(fallbackEmail)
       }
 
       continue
     }
 
+    const fallbackEmail = buildInternalStaffEmail(employee.org_id, nik)
     candidates.set(employee.user_id, {
       userId: employee.user_id,
       orgIds: [employee.org_id],
       preferredOrgId: activeOrgId === employee.org_id ? activeOrgId : employee.org_id,
-      authEmailFallback: buildInternalStaffEmail(employee.org_id, nik),
+      authEmailFallbacks: [fallbackEmail],
     })
   }
 
@@ -408,17 +507,62 @@ export async function registerEmployeeAccount(formData: FormData) {
 
   // 5. Generate internal email and create new auth user for fresh staff registration.
   const internalEmail = buildInternalStaffEmail(emp.org_id, nik)
+  const employeeMetadata = {
+    full_name: `${emp.first_name} ${emp.last_name}`,
+    nik,
+    login_type: 'employee',
+    employee_email: normalizeEmail(emp.email),
+  }
+
   const { data: authData, error: authErr } = await adminClient.auth.admin.createUser({
     email: internalEmail,
     password,
     email_confirm: true,
-    user_metadata: {
-      full_name: `${emp.first_name} ${emp.last_name}`,
-      nik,
-      login_type: 'employee',
-      employee_email: normalizeEmail(emp.email),
-    },
+    user_metadata: employeeMetadata,
   })
+
+  if (authErr && isDuplicateAuthRegistrationError(authErr.message)) {
+    const lookupResult = await findAuthUserByEmail(adminClient, internalEmail)
+    if (lookupResult.error) return { error: lookupResult.error }
+
+    const existingUserId = lookupResult.user?.id
+    if (!existingUserId) {
+      return { error: 'Akun login sudah terdaftar, tetapi gagal dipetakan ke data karyawan. Hubungi admin.' }
+    }
+
+    const { error: syncErr } = await adminClient.auth.admin.updateUserById(existingUserId, {
+      password,
+      email_confirm: true,
+      user_metadata: employeeMetadata,
+    })
+
+    if (syncErr) {
+      return { error: `Akun login lama ditemukan, tetapi gagal disinkronkan: ${syncErr.message}` }
+    }
+
+    const relinkResult = await linkEmployeeToUser(adminClient, emp, existingUserId, roleId)
+    if ('error' in relinkResult) return relinkResult
+
+    await trackInvitationUsage(adminClient, invite)
+
+    const { error: reloginErr } = await publicClient.auth.signInWithPassword({
+      email: internalEmail,
+      password,
+    })
+
+    if (reloginErr) {
+      return { error: 'Akun lama berhasil ditautkan ulang, tapi login otomatis gagal. Silakan login manual pakai NIK & password baru.' }
+    }
+
+    await persistMembershipActiveContext(adminClient as any, {
+      userId: existingUserId,
+      orgId: emp.org_id,
+      branchId: emp.branch_id ? String(emp.branch_id) : null,
+    })
+    setActiveOrganizationCookie(cookieStore, emp.org_id)
+    revalidatePath('/', 'layout')
+    return { success: true, redirectTo: '/dashboard' }
+  }
 
   if (authErr) {
     return { error: authErr.message || 'Gagal membuat akun autentikasi.' }
@@ -473,7 +617,7 @@ export async function signInWithNik(formData: FormData) {
 
   const { data: employees, error: empErr } = await (adminClient as any)
     .from('employees')
-    .select('id, org_id, user_id, created_at')
+    .select('id, org_id, user_id, created_at, employment_status')
     .eq('nik', nik)
     .order('created_at', { ascending: true })
 
@@ -486,33 +630,75 @@ export async function signInWithNik(formData: FormData) {
     return redirect(`/login?error=${encodeURIComponent('NIK tidak ditemukan.')}&tab=karyawan`)
   }
 
-  const loginCandidates = buildStaffLoginCandidates(matchingEmployees, nik, activeOrgIdPreference)
+  const activeEmployeeRows = matchingEmployees.filter((employee: { employment_status?: unknown }) =>
+    isEmployeeEmploymentActive(employee?.employment_status)
+  )
+
+  if (activeEmployeeRows.length === 0) {
+    return redirect(`/login?error=${encodeURIComponent('Akun karyawan sudah tidak aktif. Hubungi admin HRIS.')}&tab=karyawan`)
+  }
+
+  const linkedUserIds = Array.from(
+    new Set(
+      activeEmployeeRows
+        .map((employee: { user_id?: string | null }) => String(employee?.user_id || '').trim())
+        .filter(Boolean)
+    )
+  )
+
+  for (const userId of linkedUserIds) {
+    const activeOrgIds = Array.from(
+      new Set(
+        activeEmployeeRows
+          .filter((employee: { user_id?: string | null }) => String(employee?.user_id || '').trim() === userId)
+          .map((employee: { org_id?: string | null }) => String(employee?.org_id || '').trim())
+          .filter(Boolean)
+      )
+    )
+
+    await deactivateStaleStaffMemberships(adminClient, userId, activeOrgIds)
+  }
+
+  const loginCandidates = buildStaffLoginCandidates(activeEmployeeRows, nik, activeOrgIdPreference)
   if (loginCandidates.length === 0) {
     return redirect(`/login?error=${encodeURIComponent('Akun belum diaktivasi. Silakan pendaftaran terlebih dahulu.')}&tab=karyawan`)
   }
 
   for (const candidate of loginCandidates) {
-    const authEmail = await getAuthEmailByUserId(adminClient, candidate.userId, candidate.authEmailFallback)
-    if (!authEmail) continue
+    const authEmailFromAdmin = await getAuthEmailByUserId(
+      adminClient,
+      candidate.userId,
+      candidate.authEmailFallbacks[0] || null
+    )
 
-    const { error } = await publicClient.auth.signInWithPassword({
-      email: authEmail,
-      password,
-    })
+    const emailAttempts = Array.from(
+      new Set(
+        [authEmailFromAdmin, ...candidate.authEmailFallbacks]
+          .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+          .map((value) => value.trim().toLowerCase())
+      )
+    )
 
-    if (!error) {
-      const preferredOrgId = activeOrgIdPreference && candidate.orgIds.includes(activeOrgIdPreference)
-        ? activeOrgIdPreference
-        : await resolvePreferredOrgIdForStaffLogin(
-            adminClient,
-            candidate.userId,
-            candidate.orgIds,
-            candidate.preferredOrgId
-          )
+    for (const email of emailAttempts) {
+      const { error } = await publicClient.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-      setActiveOrganizationCookie(cookieStore, preferredOrgId)
-      revalidatePath('/', 'layout')
-      return redirect(redirectTo || '/dashboard')
+      if (!error) {
+        const preferredOrgId = activeOrgIdPreference && candidate.orgIds.includes(activeOrgIdPreference)
+          ? activeOrgIdPreference
+          : await resolvePreferredOrgIdForStaffLogin(
+              adminClient,
+              candidate.userId,
+              candidate.orgIds,
+              candidate.preferredOrgId
+            )
+
+        setActiveOrganizationCookie(cookieStore, preferredOrgId)
+        revalidatePath('/', 'layout')
+        return redirect(redirectTo || '/dashboard')
+      }
     }
   }
 

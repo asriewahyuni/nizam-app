@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 
-import { getChartOfAccounts, seedInitialCoA } from '@/modules/accounting/actions/coa.actions'
+import { getChartOfAccounts, seedInitialCoA, checkCanManageCoA, syncParentCoAToChildOrg } from '@/modules/accounting/actions/coa.actions'
 import AccountRowActions from './components/AccountRowActions'
 
 import { redirect } from 'next/navigation'
@@ -21,7 +21,22 @@ export default async function ChartOfAccountsPage() {
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
 
-  const accounts = await getChartOfAccounts(orgData.org.id)
+  const orgEntity = orgData.org as typeof orgData.org & { parent_org_id?: string | null }
+  const parentOrgId = orgEntity.parent_org_id ?? null
+
+  // Self-healing sync:
+  // setiap child membuka halaman CoA, tarik pembaruan terbaru dari parent dulu.
+  if (parentOrgId) {
+    const syncResult = await syncParentCoAToChildOrg(parentOrgId, orgData.org.id)
+    if (!syncResult.success) {
+      ;(console as any).warn('CoA sync warning (ChartOfAccountsPage):', syncResult.error)
+    }
+  }
+
+  const [accounts, { canManageDirect, isParentOrg }] = await Promise.all([
+    getChartOfAccounts(orgData.org.id),
+    checkCanManageCoA(orgData.org.id),
+  ])
 
   // Group by type
   const grouped = accounts.reduce(
@@ -44,14 +59,30 @@ export default async function ChartOfAccountsPage() {
             {accounts.length} akun • Standar PSAK • Otomatis dibuat saat registrasi
           </p>
         </div>
-        <a
-          href="/settings/accounts/new"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white
-            hover:opacity-90 transition-all"
-          style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
-        >
-          + Tambah Akun
-        </a>
+        {canManageDirect ? (
+          /* Parent/Holding: bisa tambah langsung */
+          <a
+            href="/settings/accounts/new"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-all"
+            style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
+          >
+            + Tambah Akun
+          </a>
+        ) : (
+          /* Child/Branch: harus melalui sistem request */
+          <div className="flex items-center gap-2">
+            <a
+              href="/accounting/coa-requests"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-all"
+              style={{ background: 'linear-gradient(135deg, #7c3aed, #8b5cf6)' }}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Ajukan Rekening Baru
+            </a>
+          </div>
+        )}
       </div>
 
       {/* Empty State */}

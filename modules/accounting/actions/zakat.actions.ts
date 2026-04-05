@@ -50,6 +50,96 @@ const GRAMS_PER_DIRHAM = 2.975       // 1 Dirham = 2.975 gram perak
 const NISHAB_SILVER_GRAMS = NISHAB_DIRHAM_COUNT * GRAMS_PER_DIRHAM  // = 595 gram
 
 const ZAKAT_RATE = 0.025             // 2.5%
+const SERVICE_BUSINESS_KEYWORDS = ['SERVICE', 'SERVICES', 'JASA', 'LAYANAN', 'LABOR', 'LABOUR', 'IJARAH']
+
+type TradeZakatApplicability = {
+  isTradeZakatApplicable: boolean
+  reason: string | null
+  source: 'SETTINGS' | 'PRODUCTS' | 'SERVICE_ORDERS' | 'UNKNOWN'
+}
+
+function normalizeBusinessHint(value: unknown): string {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, ' ')
+}
+
+function isServiceBusinessHint(value: unknown): boolean {
+  const normalized = normalizeBusinessHint(value)
+  if (!normalized) return false
+  return SERVICE_BUSINESS_KEYWORDS.some((keyword) => normalized.includes(keyword))
+}
+
+async function resolveTradeZakatApplicability(supabase: any, orgId: string): Promise<TradeZakatApplicability> {
+  const { data: orgData } = await (supabase as any)
+    .from('organizations')
+    .select('settings')
+    .eq('id', orgId)
+    .maybeSingle()
+
+  const settings = (orgData as any)?.settings as Record<string, unknown> | undefined
+  const businessHints = [
+    settings?.business_type,
+    settings?.businessType,
+    settings?.business_model,
+    settings?.businessModel,
+    settings?.industry,
+    settings?.sector,
+    settings?.company_type,
+    settings?.companyType,
+  ]
+
+  if (businessHints.some(isServiceBusinessHint)) {
+    return {
+      isTradeZakatApplicable: false,
+      reason: 'Zakat tijarah tidak berlaku untuk usaha layanan/jasa (labour).',
+      source: 'SETTINGS',
+    }
+  }
+
+  const { count: activeProductCount, error: activeProductError } = await (supabase as any)
+    .from('products')
+    .select('id', { count: 'exact', head: true })
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+
+  if (!activeProductError && (activeProductCount ?? 0) > 0) {
+    const { count: nonServiceProductCount, error: nonServiceProductError } = await (supabase as any)
+      .from('products')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .eq('is_active', true)
+      .neq('type', 'SERVICE')
+
+    if (!nonServiceProductError && (nonServiceProductCount ?? 0) === 0) {
+      return {
+        isTradeZakatApplicable: false,
+        reason: 'Zakat tijarah tidak berlaku karena katalog aktif seluruhnya bertipe layanan/jasa.',
+        source: 'PRODUCTS',
+      }
+    }
+  }
+
+  const { count: serviceOrderCount, error: serviceOrderError } = await (supabase as any)
+    .from('service_orders')
+    .select('id', { count: 'exact', head: true })
+    .eq('org_id', orgId)
+
+  if (!serviceOrderError && (serviceOrderCount ?? 0) > 0 && (activeProductCount ?? 0) === 0) {
+    return {
+      isTradeZakatApplicable: false,
+      reason: 'Zakat tijarah tidak berlaku karena aktivitas organisasi terdeteksi sebagai layanan/jasa.',
+      source: 'SERVICE_ORDERS',
+    }
+  }
+
+  return {
+    isTradeZakatApplicable: true,
+    reason: null,
+    source: 'UNKNOWN',
+  }
+}
 
 // ============================================================
 // Get Zakat-able assets — correct Fiqh Zakat Tijarah formula:
@@ -127,6 +217,7 @@ async function getTotalZakatAssets(orgId: string) {
 // ============================================================
 export async function getZakatSummary(orgId: string, currentPrices: { goldPerGram: number, silverPerGram: number }) {
   const supabase = await createClient()
+  const tradeZakatApplicability = await resolveTradeZakatApplicability(supabase, orgId)
 
   // 1. Get current assets
   const { zakatAssets, totalAssets, breakdown } = await getTotalZakatAssets(orgId)
@@ -147,10 +238,10 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
   const nishabGold   = NISHAB_GOLD_GRAMS   * hauledPrices.goldPerGram
   const nishabSilver = NISHAB_SILVER_GRAMS * hauledPrices.silverPerGram
 
-  const isReachedGold   = totalAssets >= nishabGold
-  const isReachedSilver = totalAssets >= nishabSilver
+  const isReachedGold   = tradeZakatApplicability.isTradeZakatApplicable && totalAssets >= nishabGold
+  const isReachedSilver = tradeZakatApplicability.isTradeZakatApplicable && totalAssets >= nishabSilver
 
-  const isZakatObligated = isReachedSilver || isReachedGold
+  const isZakatObligated = tradeZakatApplicability.isTradeZakatApplicable && (isReachedSilver || isReachedGold)
   const zakatAmount = isZakatObligated ? totalAssets * ZAKAT_RATE : 0
 
   // 4. Haul status
@@ -162,8 +253,12 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
 
   if (activeHaul) {
     if (!isZakatObligated) {
-      const formatRupiah = (v: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(v)
-      haulBatalReason = `Otomatis: Harta (${formatRupiah(totalAssets)}) turun di bawah nishab perak pada ${new Date().toLocaleString('id-ID')}`
+      if (!tradeZakatApplicability.isTradeZakatApplicable) {
+        haulBatalReason = `${tradeZakatApplicability.reason} (otomatis dibatalkan pada ${new Date().toLocaleString('id-ID')})`
+      } else {
+        const formatRupiah = (v: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(v)
+        haulBatalReason = `Otomatis: Harta (${formatRupiah(totalAssets)}) turun di bawah nishab perak pada ${new Date().toLocaleString('id-ID')}`
+      }
       
       await (supabase as any).from('zakat_haul')
         .update({ status: 'BATAL', batal_reason: haulBatalReason })
@@ -273,6 +368,9 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
     isReachedSilver,
     isZakatObligated,
     zakatAmount,
+    isTradeZakatApplicable: tradeZakatApplicability.isTradeZakatApplicable,
+    tradeZakatIneligibilityReason: tradeZakatApplicability.reason,
+    tradeZakatIneligibilitySource: tradeZakatApplicability.source,
     hauledPrices,
     currentPrices,
     haulStatus,
@@ -301,6 +399,13 @@ export async function startZakatHaul(
   goldPriceEvidenceUrl?: string
 ) {
   const supabase = await createClient()
+  const tradeZakatApplicability = await resolveTradeZakatApplicability(supabase, orgId)
+  if (!tradeZakatApplicability.isTradeZakatApplicable) {
+    return {
+      error: tradeZakatApplicability.reason || 'Zakat tijarah tidak berlaku untuk tipe usaha ini.',
+    }
+  }
+
   const { data: { user } } = await supabase.auth.getUser()
 
   const nishabGold   = NISHAB_GOLD_GRAMS   * goldPrice
@@ -336,6 +441,7 @@ export async function startZakatHaul(
 
 export async function checkAndCancelHaul(orgId: string) {
   const supabase = await createClient()
+  const tradeZakatApplicability = await resolveTradeZakatApplicability(supabase, orgId)
 
   const { data: activeHaul } = await (supabase as any)
     .from('zakat_haul')
@@ -343,6 +449,20 @@ export async function checkAndCancelHaul(orgId: string) {
     .eq('org_id', orgId)
     .eq('status', 'ACTIVE')
     .maybeSingle()
+
+  if (!tradeZakatApplicability.isTradeZakatApplicable) {
+    if (activeHaul) {
+      const today = getIslamicToday()
+      await (supabase as any).from('zakat_haul').update({
+        status: 'BATAL',
+        batal_reason: `${tradeZakatApplicability.reason} (otomatis dibatalkan pada ${today})`
+      }).eq('id', activeHaul.id)
+      revalidatePath('/accounting/zakat')
+      return { batal: true, notApplicable: true, reason: tradeZakatApplicability.reason }
+    }
+
+    return { alreadyInactive: true, notApplicable: true, reason: tradeZakatApplicability.reason }
+  }
 
   if (!activeHaul) return { alreadyInactive: true }
 
@@ -366,6 +486,7 @@ export async function checkAndCancelHaul(orgId: string) {
 
 export async function evaluateZakatDaily(orgId: string, currentPrices: { gold: number, silver: number }) {
   const supabase = await createClient()
+  const tradeZakatApplicability = await resolveTradeZakatApplicability(supabase, orgId)
 
   const { totalAssets } = await getTotalZakatAssets(orgId)
 
@@ -375,6 +496,16 @@ export async function evaluateZakatDaily(orgId: string, currentPrices: { gold: n
     .eq('org_id', orgId)
     .eq('status', 'ACTIVE')
     .maybeSingle()
+
+  if (!tradeZakatApplicability.isTradeZakatApplicable) {
+    if (activeHaul?.id) {
+      await (supabase as any).from('zakat_haul').update({
+        status: 'BATAL',
+        batal_reason: `${tradeZakatApplicability.reason} (otomatis dibatalkan pada ${getIslamicToday()})`
+      }).eq('id', activeHaul.id)
+    }
+    return { skipped: true, reason: tradeZakatApplicability.reason }
+  }
 
   const today = getIslamicToday()
   let activeId = activeHaul?.id
@@ -425,6 +556,10 @@ export async function evaluateZakatDaily(orgId: string, currentPrices: { gold: n
 
 export async function payZakat(orgId: string, accountId: string, amount: number) {
   const supabase = await createClient()
+  const tradeZakatApplicability = await resolveTradeZakatApplicability(supabase, orgId)
+  if (!tradeZakatApplicability.isTradeZakatApplicable) {
+    return { error: tradeZakatApplicability.reason || 'Zakat tijarah tidak berlaku untuk tipe usaha ini.' }
+  }
 
   let { data: zakatAcc } = await (supabase as any).from('accounts').select('id').eq('org_id', orgId).ilike('name', '%Zakat Tijarah%').single()
   if (!zakatAcc) {

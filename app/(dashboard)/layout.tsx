@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
+import { unstable_noStore as noStore } from 'next/cache'
 import { getAdminImpersonationState, getSession } from '@/modules/auth/actions/auth.actions'
 import { getActiveBranch, getActiveOrg, getBranches, getMyOrganizations } from '@/modules/organization/actions/org.actions'
 import { getPendingApprovalsCount } from '@/modules/organization/actions/approval.actions'
@@ -11,6 +12,7 @@ import { canAccessAllBranchesForOrg } from '@/modules/organization/lib/branch-ac
 import { isDemoSession } from '@/modules/demo/actions/demo.actions'
 import { getAiTokenHeaderSummary } from '@/modules/ai/lib/ai-token.server'
 import { saasModuleMatches } from '@/lib/saas/module-catalog'
+import { getPendingCoaRequestCount } from '@/modules/accounting/actions/coa-request.actions'
 import { AppSidebar } from '@/components/shared/AppSidebar'
 import { AppHeader } from '@/components/shared/AppHeader'
 import { AdminImpersonationBanner } from '@/components/shared/AdminImpersonationBanner'
@@ -47,6 +49,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
+  noStore()
   const session = await getSession()
   if (!session) redirect('/login')
 
@@ -68,6 +71,7 @@ export default async function DashboardLayout({
     getMyOrganizations(),
     isDemoSession(),
     getAiTokenHeaderSummary(orgData.org.id),
+    getPendingCoaRequestCount(orgData.org.id),
   ])
   const pendingApprovals = resolveDashboardDependency('pending approvals', dependencyResults[0], 0)
   const unpostedJournals = resolveDashboardDependency('unposted journals', dependencyResults[1], 0)
@@ -78,6 +82,7 @@ export default async function DashboardLayout({
   const organizations = resolveDashboardDependency('accessible organizations', dependencyResults[6], [])
   const isDemo = resolveDashboardDependency('demo session state', dependencyResults[7], false)
   const aiTokens = resolveDashboardDependency('AI token summary', dependencyResults[8], null)
+  const pendingCoaRequests = resolveDashboardDependency('pending coa requests', dependencyResults[9], 0)
 
   // ─────────────────────────────────────────────────────────────
   // 3. SAAS MODULE & RBAC GUARD (Protect direct URL access)
@@ -167,6 +172,7 @@ export default async function DashboardLayout({
         unpostedJournals={unpostedJournals} 
         pendingPurchaseRequests={pendingPurchaseRequests}
         hrisNotifications={resetRequests}
+        pendingCoaRequests={pendingCoaRequests}
         isDemo={isDemo}
         planName={orgData.org.settings?.plan}
         canManageSubOrganizations={canManageSubOrganizations}

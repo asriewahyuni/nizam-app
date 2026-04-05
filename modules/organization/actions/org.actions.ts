@@ -22,6 +22,7 @@ import {
   getCurrentAccessibleBranch,
 } from '@/modules/organization/lib/branch-access.server'
 import { applyVoucher } from './billing.actions'
+import { syncParentCoAToChildOrg } from '@/modules/accounting/actions/coa.actions'
 
 const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 const DEFAULT_BRANCH_NAME = 'Unit Utama'
@@ -64,7 +65,8 @@ type CreateOrganizationFailure = {
 type CreateOrganizationActionResult = CreateOrganizationSuccess | CreateOrganizationFailure
 
 type HoldingContextSuccess = {
-  db: Awaited<ReturnType<typeof createClient>>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any
   userId: string
   activeOrgId: string
 }
@@ -377,6 +379,12 @@ export async function linkSubOrganization(parentOrgId: string, childOrgId: strin
     .eq('id', trimmedChildOrgId)
 
   if (error) return { error: error.message }
+
+  const coaSync = await syncParentCoAToChildOrg(activeOrgId, trimmedChildOrgId)
+  if (!coaSync.success) {
+    ;(console as any).warn('CoA sync warning (linkSubOrganization):', coaSync.error)
+  }
+
   revalidatePath('/settings/sub-orgs')
   revalidatePath('/reports')
   return { success: true }
@@ -612,7 +620,7 @@ export async function setOrganizationParent(childOrgId: string, parentOrgId: str
         return { error: 'Relasi induk-anak tidak valid karena membentuk siklus.' }
       }
 
-      const { data: currentOrg, error: currentOrgError } = await db
+      const { data: currentOrg, error: currentOrgError }: { data: { parent_org_id: string | null } | null; error: unknown } = await db
         .from('organizations')
         .select('parent_org_id')
         .eq('id', cursor)
@@ -633,6 +641,13 @@ export async function setOrganizationParent(childOrgId: string, parentOrgId: str
     .eq('id', trimmedChildOrgId)
 
   if (updateError) return { error: updateError.message }
+
+  if (trimmedParentOrgId) {
+    const coaSync = await syncParentCoAToChildOrg(trimmedParentOrgId, trimmedChildOrgId)
+    if (!coaSync.success) {
+      ;(console as any).warn('CoA sync warning (setOrganizationParent):', coaSync.error)
+    }
+  }
 
   revalidatePath('/', 'layout')
   revalidatePath('/settings/sub-orgs')
@@ -772,30 +787,29 @@ export async function getMyOrganizations(): Promise<AccessibleOrganization[]> {
     }
   }
 
-  return data
-    .map((membership: any) => {
-      const org = membership.organizations
-      if (!org || typeof org !== 'object') return null
-      const parentOrgId = typeof org.parent_org_id === 'string' ? org.parent_org_id : null
+  const mapped: (AccessibleOrganization | null)[] = data.map((membership: any) => {
+    const org = membership.organizations
+    if (!org || typeof org !== 'object') return null
+    const parentOrgId = typeof org.parent_org_id === 'string' ? org.parent_org_id : null
 
-      return {
-        orgId: membership.org_id,
-        role: membership.role || 'staff',
-        roleId: membership.role_id || null,
-        joinedAt: membership.joined_at || new Date(0).toISOString(),
-        org: {
-          id: org.id,
-          name: org.name,
-          slug: org.slug,
-          logo_url: org.logo_url ?? null,
-          settings: org.settings ?? {},
-          is_active: Boolean(org.is_active),
-          parent_org_id: parentOrgId,
-          parent_org_name: parentOrgId ? parentOrgNameById.get(parentOrgId) || null : null,
-        },
-      } satisfies AccessibleOrganization
-    })
-    .filter((membership): membership is AccessibleOrganization => Boolean(membership))
+    return {
+      orgId: membership.org_id,
+      role: membership.role || 'staff',
+      roleId: membership.role_id || null,
+      joinedAt: membership.joined_at || new Date(0).toISOString(),
+      org: {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        logo_url: org.logo_url ?? null,
+        settings: org.settings ?? {},
+        is_active: Boolean(org.is_active),
+        parent_org_id: parentOrgId,
+        parent_org_name: parentOrgId ? parentOrgNameById.get(parentOrgId) ?? null : null,
+      },
+    } satisfies AccessibleOrganization
+  })
+  return mapped.filter((m): m is AccessibleOrganization => m !== null)
 }
 
 export async function setActiveOrg(orgId: string) {

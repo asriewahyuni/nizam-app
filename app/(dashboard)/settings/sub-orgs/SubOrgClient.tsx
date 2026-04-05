@@ -2,9 +2,8 @@
 
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Layers, Plus, Building, Calendar, Activity, Link as LinkIcon, UserCircle, Pencil, Trash2, CheckCircle2, Loader2 } from 'lucide-react'
+import { Layers, Building, Calendar, Activity, Link as LinkIcon, UserCircle, Pencil, Trash2, CheckCircle2, Loader2 } from 'lucide-react'
 import {
-  createOrganizationQuick,
   linkSubOrganization,
   assignSubOrgManager,
   updateChildOrganization,
@@ -34,7 +33,6 @@ export default function SubOrgClient({
   picFeatureEnabled = false,
   limits,
 }: Props) {
-  const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [editingChild, setEditingChild] = useState<{ id: string; name: string } | null>(null)
@@ -47,23 +45,6 @@ export default function SubOrgClient({
     childOrgs.forEach((c: any) => { if (c.id) map[c.id] = c.manager_employee_id || '' })
     return map
   })
-
-  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setLoading(true)
-    const formData = new FormData(e.currentTarget)
-    formData.append('parent_org_id', orgId)
-    formData.append('plan', 'Trial')
-
-    const res = await createOrganizationQuick(formData) as any
-    if (res?.error) {
-      alert(res.error)
-    } else {
-      setIsModalOpen(false)
-      window.location.reload()
-    }
-    setLoading(false)
-  }
 
   const handleLinkOrg = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -146,9 +127,6 @@ export default function SubOrgClient({
              Anak Perusahaan / Afiliasi
            </h1>
            <p className="text-sm text-slate-500 font-medium">Kelola organisasi anak yang strukturnya berada di bawah naungan Holding ini.</p>
-           <p className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 w-fit">
-             Satu pintu pendaftaran anak perusahaan ada di halaman ini.
-           </p>
          </div>
          <div className="flex flex-col md:items-end gap-3 shrink-0">
            {limits && (
@@ -165,16 +143,6 @@ export default function SubOrgClient({
                  className="px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-2 flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
                >
                  <LinkIcon size={16} /> Tautkan Entitas
-               </button>
-             )}
-             {canMutate && (
-               <button 
-                 onClick={() => setIsModalOpen(true)}
-                 disabled={limits?.maxChildOrgs !== null && limits!.currentChildOrgs >= limits!.maxChildOrgs}
-                 title={limits?.maxChildOrgs !== null && limits!.currentChildOrgs >= limits!.maxChildOrgs ? 'Batas entitas tercapai.' : ''}
-                 className="px-6 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg flex items-center justify-center gap-2 flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
-               >
-                 <Plus size={16} /> Registrasi Baru
                </button>
              )}
            </div>
@@ -304,34 +272,10 @@ export default function SubOrgClient({
           <div className="col-span-1 md:col-span-2 py-20 text-center border-2 border-dashed border-slate-200 rounded-[32px] bg-slate-50 flex flex-col items-center justify-center space-y-4">
             <Layers size={48} className="text-slate-300" />
             <h3 className="text-lg font-black text-slate-700">Belum Ada Anak Perusahaan</h3>
-            <p className="text-sm text-slate-500">Klik tombol di atas untuk menautkan atau mendaftarkan afiliasi.</p>
+            <p className="text-sm text-slate-500">Klik tombol di atas untuk menautkan afiliasi.</p>
           </div>
         )}
       </div>
-
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !loading && setIsModalOpen(false)} />
-          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl p-10">
-            <h3 className="text-2xl font-black text-slate-900 mb-2">Unit Anak Baru</h3>
-            <p className="text-sm text-slate-500 mb-8">Data master untuk anak perusahaan ini terisolasi, namun laporannya dapat ditarik konsolidasi oleh Holding ini.</p>
-            
-            <form onSubmit={handleCreate} className="space-y-6">
-               <div className="space-y-2">
-                 <label className="text-[10px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Nama Organisasi Anak</label>
-                 <input required name="name" placeholder="Misal: PT Anak Sukses Abadi" className="w-full px-5 py-4 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold" />
-               </div>
-               
-               <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all">Batal</button>
-                  <button type="submit" disabled={loading} className="px-8 py-3 rounded-2xl bg-slate-900 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-slate-900/20 hover:bg-black transition-all disabled:opacity-50">
-                     {loading ? 'Menyimpan...' : 'Buat Sekarang'}
-                  </button>
-               </div>
-            </form>
-          </motion.div>
-        </div>
-      )}
 
       {isLinkModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">

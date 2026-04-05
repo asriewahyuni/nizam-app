@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { checkCanManageCoA } from '@/modules/accounting/actions/coa.actions'
 import type { BankAccount, BankTransaction } from '@/types/database.types'
 
 type ActiveBranchResult = { branchId: string } | { error: string }
@@ -39,28 +40,59 @@ export async function getBankAccounts(orgId: string, branchId?: string | null) {
 
 // ─────────────────────────────────────────────────────────────
 // createBankAccount — Add a new bank account
+// HANYA untuk Parent/Holding. Child/Branch gunakan:
+// → /accounting/coa-requests untuk mengajukan rekening baru
 // ─────────────────────────────────────────────────────────────
 export async function createBankAccount(orgId: string, formData: FormData) {
   const supabase = await createClient()
+
+  // ── Guard 1: Branch aktif wajib ada ──
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk membuat rekening kas/bank.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
+  // ── Guard 2: Hanya Parent/Holding yang boleh membuat rekening bank langsung ──
+  const { canManageDirect } = await checkCanManageCoA(orgId)
+  if (!canManageDirect) {
+    return {
+      error:
+        'Hanya Organisasi Utama (Parent/Holding) yang dapat menambahkan rekening bank secara langsung. ' +
+        'Silakan ajukan melalui menu "Pengajuan Rekening CoA".',
+      requiresRequest: true,
+    }
+  }
+
+
   const accountId = formData.get('account_id') as string // The GL Account ID
   const bankName = String(formData.get('bank_name') || '').trim()
   const accountNumber = String(formData.get('account_number') || '').trim() || null
   const accountHolder = String(formData.get('account_holder') || '').trim() || null
   const currency = (formData.get('currency') as string) || 'IDR'
+  
+  const explicitBranchId = formData.get('target_branch_id') as string | null
+  const targetOrgBranch = formData.get('target_org_branch') as string | null
+
+  let finalOrgId = orgId;
+  let finalBranchId: string | null = explicitBranchId && explicitBranchId.trim() ? explicitBranchId.trim() : activeBranchResult.branchId;
+
+  if (targetOrgBranch) {
+    const parts = targetOrgBranch.split('|');
+    if (parts.length >= 1 && parts[0].trim()) {
+      finalOrgId = parts[0].trim();
+    }
+    // parts[1] might be empty if "Kantor Utama" is selected and it has no default branch ID? Actually branches are mandatory. But if it's empty, use NULL (kantor utama fallback)
+    finalBranchId = parts.length >= 2 && parts[1].trim() ? parts[1].trim() : null;
+  }
 
   if (!accountId || !bankName) {
     return { error: 'Akun GL dan Nama Bank wajib diisi.' }
   }
 
   const { error } = await (supabase as any).from('bank_accounts').insert({
-    org_id: orgId,
-    branch_id: activeBranchResult.branchId,
+    org_id: finalOrgId,
+    branch_id: finalBranchId as string,
     account_id: accountId,
     bank_name: bankName,
     account_number: accountNumber,
@@ -154,6 +186,10 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
     return { error: 'Akun lawan transaksi wajib dipilih.' }
   }
 
+  if (oppositeAccountId === bankAccount.account_id) {
+    return { error: 'Akun lawan tidak boleh sama dengan akun kas/bank sumber karena jurnal akan bernilai nol.' }
+  }
+
   const { error } = await (supabase as any).from('bank_transactions').insert({
     org_id: orgId,
     branch_id: activeBranchResult.branchId,
@@ -173,7 +209,88 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
 
   revalidatePath('/cash')
   revalidatePath('/accounting/journal')
+  revalidatePath('/reports')
+  revalidatePath('/dashboard')
   return { success: true }
+}
+
+// ─────────────────────────────────────────────────────────────
+// createInterOrgCapitalTransfer — Parent transfer modal ke Child/Cabang
+// Mencatat 2 transaksi atomik:
+// 1) OUT di org sumber (parent)
+// 2) IN  di org tujuan (child/cabang)
+// ─────────────────────────────────────────────────────────────
+export async function createInterOrgCapitalTransfer(orgId: string, formData: FormData) {
+  const supabase = await createClient()
+
+  const sourceBankAccountId = String(formData.get('bank_account_id') || '').trim()
+  const targetBankAccountId = String(formData.get('target_bank_account_id') || '').trim()
+  const sourceCounterAccountId = String(formData.get('source_counter_account_id') || '').trim()
+  const targetCounterAccountId = String(formData.get('target_counter_account_id') || '').trim()
+  const transactionDate = String(formData.get('transaction_date') || '').trim()
+  const description = String(formData.get('description') || '').trim()
+  const amount = Number(formData.get('amount') || 0)
+  const referenceNumber = String(formData.get('reference_number') || '').trim() || null
+
+  if (
+    !sourceBankAccountId ||
+    !targetBankAccountId ||
+    !sourceCounterAccountId ||
+    !targetCounterAccountId ||
+    !transactionDate ||
+    !description ||
+    !Number.isFinite(amount) ||
+    amount <= 0
+  ) {
+    return { error: 'Field transfer modal antar entitas belum lengkap.' }
+  }
+
+  const { data: sourceCounterAccount, error: sourceCounterError } = await (supabase as any)
+    .from('accounts')
+    .select('id, code, name, type')
+    .eq('id', sourceCounterAccountId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (sourceCounterError || !sourceCounterAccount?.id) {
+    return { error: 'Akun lawan parent (sumber) tidak ditemukan.' }
+  }
+
+  const sourceCounterCode = String(sourceCounterAccount.code || '')
+  const sourceCounterName = String(sourceCounterAccount.name || '').toLowerCase()
+  const isSourceCashBankLike =
+    sourceCounterAccount.type === 'ASSET'
+    && (sourceCounterCode.startsWith('11') || sourceCounterName.includes('kas') || sourceCounterName.includes('bank'))
+
+  if (!isSourceCashBankLike) {
+    return {
+      error:
+        'Akun lawan parent harus akun kas/bank anak (kelompok 11xx). ' +
+        'Gunakan rekening anak/cabang yang sudah direquest, bukan akun investasi.',
+    }
+  }
+
+  const { data, error } = await (supabase as any).rpc('create_interorg_capital_transfer', {
+    p_source_org_id: orgId,
+    p_source_bank_account_id: sourceBankAccountId,
+    p_source_counter_account_id: sourceCounterAccountId,
+    p_target_bank_account_id: targetBankAccountId,
+    p_target_counter_account_id: targetCounterAccountId,
+    p_transaction_date: transactionDate,
+    p_amount: amount,
+    p_description: description,
+    p_reference_number: referenceNumber,
+  })
+
+  if (error) {
+    return { error: `Gagal mencatat transfer modal antar entitas: ${error.message}` }
+  }
+
+  revalidatePath('/cash')
+  revalidatePath('/accounting/journal')
+  revalidatePath('/reports')
+  revalidatePath('/dashboard')
+  return { success: true, data }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -304,5 +421,7 @@ export async function deleteBankTransaction(orgId: string, transactionId: string
 
   revalidatePath('/cash')
   revalidatePath('/accounting/journal')
+  revalidatePath('/reports')
+  revalidatePath('/dashboard')
   return { success: true }
 }

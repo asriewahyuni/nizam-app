@@ -38,26 +38,48 @@ import {
   ExternalLink
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { createBankAccount, createBankTransaction, deleteBankAccount, deleteBankTransaction } from '@/modules/cash/actions/bank.actions'
+import { createBankAccount, createBankTransaction, createInterOrgCapitalTransfer, deleteBankAccount, deleteBankTransaction } from '@/modules/cash/actions/bank.actions'
 import { processBankCSV } from '@/modules/cash/actions/reconcile.actions'
 import { BankTransaction, BankAccount, Account } from '@/types/database.types'
 import { formatRupiah, formatDate, getDateInTimeZone } from '@/lib/utils'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 
+type CashBankAccount = BankAccount & {
+  account: Account
+  balances?: { balance: number }
+  org_name?: string | null
+  branch_name?: string | null
+}
+
 interface CashClientProps {
   orgId: string
   orgName: string
   activeBranchId: string | null
   activeBranchName: string | null
-  bankAccounts: (BankAccount & {
-    account: Account;
-    balances?: { balance: number }
-  })[]
+  bankAccounts: CashBankAccount[]
+  managedBankAccounts?: CashBankAccount[]
   categoryAccounts: Account[]
   bankGlAccounts: Account[]
   recentTransactions: (BankTransaction & { bank_account: any; category: any })[]
   userRole: string
+  /** TRUE jika org adalah Parent/Holding dan user bisa kelola rekening langsung */
+  canManageDirect: boolean
+  /** TRUE jika org adalah induk (parent_org_id IS NULL) */
+  isParentOrg: boolean
+  pendingCoaRequests?: number
+  branches?: { id: string; name: string }[]
+  placementNodes?: {
+    orgId: string;
+    orgName: string;
+    branches: { id: string; name: string }[];
+    accounts: { id: string; code: string; name: string }[];
+  }[]
+  transferCategoryNodes?: {
+    orgId: string
+    orgName: string
+    accounts: { id: string; code: string; name: string; type: string }[]
+  }[]
 }
 
 const container = {
@@ -76,15 +98,30 @@ export function CashClient({
   activeBranchId,
   activeBranchName,
   bankAccounts,
+  managedBankAccounts = [],
   categoryAccounts,
   bankGlAccounts,
   recentTransactions,
   userRole,
+  canManageDirect,
+  isParentOrg,
+  pendingCoaRequests = 0,
+  branches = [],
+  placementNodes = [],
+  transferCategoryNodes = [],
 }: CashClientProps) {
   const router = useRouter()
   const [showTransactionModal, setShowTransactionModal] = useState(false)
   const [showAccountModal, setShowAccountModal] = useState(false)
   const [loading, setLoading] = useState(false)
+  
+  // Dynamic mapped accounts logic
+  const [targetOrgId, setTargetOrgId] = useState<string>(orgId)
+  
+  // Find currently active node to supply dynamic GL accounts
+  const activePlacementNode = placementNodes.find(n => n.orgId === targetOrgId)
+  const dynamicGlAccounts = activePlacementNode ? activePlacementNode.accounts : bankGlAccounts
+  const displayBankAccounts = canManageDirect && managedBankAccounts.length > 0 ? managedBankAccounts : bankAccounts
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'overview' | 'reconcile'>('overview')
@@ -98,15 +135,34 @@ export function CashClient({
   const [txDescription, setTxDescription] = useState('')
   const [txDate, setTxDate] = useState(getDateInTimeZone('Asia/Jakarta'))
   const [txCategoryId, setTxCategoryId] = useState('')
+  const [txSourceCounterAccountId, setTxSourceCounterAccountId] = useState('')
+  const [txTargetCounterAccountId, setTxTargetCounterAccountId] = useState('')
   const [isCategoryLocked, setIsCategoryLocked] = useState(false)
   const [filterStatus, setFilterStatus] = useState<'POSTED' | 'VOIDED'>('POSTED')
   const [filterAccountId, setFilterAccountId] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const pathname = usePathname()
+  const categoryNodeByOrg = new Map(transferCategoryNodes.map((node) => [node.orgId, node]))
+  const transferTargetBankOptions = (canManageDirect ? displayBankAccounts : bankAccounts).filter(
+    (bankAccount) => bankAccount.id !== txBankAccountId
+  )
+  const selectedTransferTarget = transferTargetBankOptions.find((bankAccount) => bankAccount.id === txTargetBankId) || null
+  const isInterOrgTransfer = txType === 'TRANSFER' && Boolean(selectedTransferTarget?.org_id && selectedTransferTarget.org_id !== orgId)
+  const targetOrgTransferAccounts = selectedTransferTarget?.org_id
+    ? categoryNodeByOrg.get(selectedTransferTarget.org_id)?.accounts || []
+    : []
+  const selectedSourceBankAccount = bankAccounts.find((bankAccount) => bankAccount.id === txBankAccountId) || null
+  const sourceInterOrgCounterAccounts = bankGlAccounts.filter(
+    (account) => account.id !== selectedSourceBankAccount?.account_id
+  )
   const isOwner = userRole === 'owner'
   const canWriteCash = Boolean(activeBranchId)
   const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
   const hasSettlementPrefill = Boolean(searchParams.get('pay'))
+  const hasCrossEntityAccounts = displayBankAccounts.some((account) => account.org_id !== orgId)
+  const availableCashBalance = Number(selectedSourceBankAccount?.balances?.balance || 0)
+  const shouldCheckAvailableCash = txType === 'OUT' || txType === 'TRANSFER'
+  const isAmountExceedingAvailable = shouldCheckAvailableCash && Boolean(txBankAccountId) && txAmount > availableCashBalance
 
   useEffect(() => {
     const pay = searchParams.get('pay')
@@ -122,6 +178,8 @@ export function CashClient({
         if (type === 'IN' || type === 'OUT' || type === 'TRANSFER') setTxType(type)
         setTxBankAccountId('')
         setTxTargetBankId('')
+        setTxSourceCounterAccountId('')
+        setTxTargetCounterAccountId('')
         if (amount) setTxAmount(Number(amount))
         if (desc) setTxDescription(desc)
         setTxCategoryId(categoryId || '')
@@ -156,13 +214,22 @@ export function CashClient({
 
   const handleCreateTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setLoading(true)
     setError(null)
+
+    if (isAmountExceedingAvailable) {
+      setError(`Nominal melebihi available kas. Saldo tersedia: ${formatRupiah(availableCashBalance)}.`)
+      return
+    }
+
+    setLoading(true)
     const formData = new FormData(e.currentTarget)
-    const res = await createBankTransaction(orgId, formData)
+    const useInterOrgTransfer = txType === 'TRANSFER' && isInterOrgTransfer
+    const res = useInterOrgTransfer
+      ? await createInterOrgCapitalTransfer(orgId, formData)
+      : await createBankTransaction(orgId, formData)
     if (res?.error) setError(res.error)
     else {
-      setSuccess('Transaksi berhasil dicatat.')
+      setSuccess(useInterOrgTransfer ? 'Transfer modal antar entitas berhasil dicatat.' : 'Transaksi berhasil dicatat.')
       if (hasSettlementPrefill) {
         router.replace(pathname)
       }
@@ -172,6 +239,8 @@ export function CashClient({
       setTxAmount(0)
       setTxDescription('')
       setTxCategoryId('')
+      setTxSourceCounterAccountId('')
+      setTxTargetCounterAccountId('')
       setIsCategoryLocked(false)
       setTxDate(todayInJakarta)
       router.refresh()
@@ -262,14 +331,39 @@ export function CashClient({
                  Rekonsiliasi
                </button>
             </div>
-            <SafeButton 
-              variant="white"
-              icon={<Building2 size={16} />}
-              disabled={!canWriteCash}
-              onClick={() => setShowAccountModal(true)}
-            >
-              Rekening
-            </SafeButton>
+            {canManageDirect ? (
+              /* Parent/Holding: bisa tambah rekening langsung */
+              <div className="flex items-center gap-2">
+                <a
+                  href="/accounting/coa-requests"
+                  className="flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all shadow-sm"
+                  title="Persetujuan & Riwayat CoA"
+                >
+                  Persetujuan CoA
+                  <span className={`flex items-center justify-center px-1.5 min-w-[20px] h-5 rounded-full text-[9px] shadow-sm transition-colors ${pendingCoaRequests > 0 ? 'bg-rose-500 text-white animate-pulse-slow' : 'bg-slate-100 text-slate-400 font-bold'}`}>
+                    {pendingCoaRequests || 0}
+                  </span>
+                </a>
+                <SafeButton 
+                  variant="white"
+                  icon={<Building2 size={16} />}
+                  disabled={!canWriteCash}
+                  onClick={() => setShowAccountModal(true)}
+                >
+                  Rekening
+                </SafeButton>
+              </div>
+            ) : (
+              /* Child/Branch: diarahkan ke halaman pengajuan */
+              <a
+                href="/accounting/coa-requests"
+                className="flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition-all shadow-sm"
+                title="Ajukan rekening baru melalui Parent/Holding"
+              >
+                <Building2 size={14} />
+                Ajukan Rekening
+              </a>
+            )}
             <SafeButton 
               variant="primary"
               icon={<Plus size={18} />}
@@ -281,6 +375,8 @@ export function CashClient({
                 setTxAmount(0);
                 setTxDescription('');
                 setTxCategoryId('');
+                setTxSourceCounterAccountId('');
+                setTxTargetCounterAccountId('');
                 setIsCategoryLocked(false);
                 setTxDate(todayInJakarta);
                 setShowTransactionModal(true); 
@@ -297,11 +393,16 @@ export function CashClient({
           Pilih unit aktif terlebih dahulu untuk menambah rekening, mencatat transaksi, atau unggah mutasi bank.
         </div>
       ) : null}
+      {hasCrossEntityAccounts ? (
+        <div className="rounded-3xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-900 shadow-sm">
+          Parent melihat rekening lintas entitas (anak perusahaan/cabang). Rekening lintas entitas tampil untuk visibilitas, sementara transaksi tetap diproses pada unit aktif.
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           label="Total Likuiditas" 
-          value={formatRupiah(bankAccounts.reduce((sum, acc) => sum + (acc.balances?.balance || 0), 0))} 
+          value={formatRupiah(displayBankAccounts.reduce((sum, acc) => sum + (acc.balances?.balance || 0), 0))} 
           icon={Wallet}
           color="emerald"
           sub="Total Saldo dari Seluruh Rekening"
@@ -340,7 +441,7 @@ export function CashClient({
           >
             {/* Account Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {bankAccounts.length === 0 ? (
+              {displayBankAccounts.length === 0 ? (
                 <div className="col-span-full py-24 bg-white rounded-[40px] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-center space-y-6 shadow-inner">
                   <div className="w-20 h-20 rounded-[32px] bg-slate-50 flex items-center justify-center text-slate-200 border border-slate-100 shadow-sm">
                     <PiggyBank size={36} strokeWidth={1.5} />
@@ -351,66 +452,80 @@ export function CashClient({
                   </div>
                 </div>
               ) : (
-                bankAccounts.map((acc, idx) => (
-                  <motion.div
-                    key={acc.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                    whileHover={{ y: -8, scale: 1.02 }}
-                    className="bg-white rounded-[40px] p-8 border border-slate-100 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.03)] group relative overflow-hidden"
-                  >
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-all duration-500 ease-out" />
-                    
-                    <div className="flex items-start justify-between mb-10 relative z-10">
-                      <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-emerald-500 group-hover:text-white transition-all duration-500 shadow-sm">
-                        <Wallet size={28} strokeWidth={2} />
-                      </div>
-                      <div className="text-right">
-                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">{acc.bank_name}</span>
-                         <span className="text-xs font-black text-slate-900 font-mono tracking-tighter bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">{acc.account_number || 'Cash Asset'}</span>
-                      </div>
-                    </div>
+                displayBankAccounts.map((acc, idx) => {
+                  const isCrossEntity = acc.org_id !== orgId
+                  return (
+                    <motion.div
+                      key={acc.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.1 }}
+                      whileHover={{ y: -8, scale: 1.02 }}
+                      className="bg-white rounded-[40px] p-8 border border-slate-100 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.03)] group relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-all duration-500 ease-out" />
 
-                    <div className="space-y-1 relative z-10">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Saldo Saat Ini</p>
-                      <h2 className="text-3xl font-black text-slate-900 leading-none tracking-tighter font-mono">
-                        {formatRupiah(acc.balances?.balance || 0)}
-                      </h2>
-                      <div className="flex items-center gap-2 mt-4">
-                        <StatusBadge label={acc.account.code} variant="indigo" />
-                        <span className="text-[10px] text-slate-400 font-bold truncate max-w-[120px]">{acc.account.name}</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-10 pt-8 border-t border-slate-50 flex items-center justify-between relative z-10">
-                      <button 
-                        onClick={() => {
-                          setFilterAccountId(acc.id)
-                          document.getElementById('recent-activities')?.scrollIntoView({ behavior: 'smooth' })
-                        }}
-                        className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-2 uppercase tracking-widest bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100"
-                      >
-                        Mutasi Detail <ChevronRight size={14} strokeWidth={3} />
-                      </button>
-                      <div className="relative group/menu">
-                        <button className="p-3 text-slate-300 hover:text-slate-900 transition-colors bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-100">
-                          <MoreHorizontal size={18} />
-                        </button>
-                        <div className="absolute right-0 bottom-full mb-3 w-52 bg-white rounded-3xl border border-slate-100 shadow-2xl opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all z-30 overflow-hidden ring-4 ring-slate-900/5">
-                          {isOwner && (
-                            <button
-                              onClick={() => handleDeleteAccount(acc.id, acc.bank_name)}
-                              className="w-full flex items-center gap-3 px-5 py-4 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50 transition-colors"
-                            >
-                              <Trash2 size={16} /> Hapus Rekening
-                            </button>
-                          )}
+                      <div className="flex items-start justify-between mb-10 relative z-10">
+                        <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-emerald-500 group-hover:text-white transition-all duration-500 shadow-sm">
+                          <Wallet size={28} strokeWidth={2} />
+                        </div>
+                        <div className="text-right">
+                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">{acc.bank_name}</span>
+                           <span className="text-xs font-black text-slate-900 font-mono tracking-tighter bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">{acc.account_number || 'Cash Asset'}</span>
+                           {isCrossEntity && (
+                             <span className="mt-2 inline-flex items-center rounded-lg bg-blue-50 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-blue-700 border border-blue-100">
+                               {acc.org_name || 'Entitas Anak'} {acc.branch_name ? `• ${acc.branch_name}` : ''}
+                             </span>
+                           )}
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                ))
+
+                      <div className="space-y-1 relative z-10">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Saldo Saat Ini</p>
+                        <h2 className="text-3xl font-black text-slate-900 leading-none tracking-tighter font-mono">
+                          {formatRupiah(acc.balances?.balance || 0)}
+                        </h2>
+                        <div className="flex items-center gap-2 mt-4">
+                          <StatusBadge label={acc.account.code} variant="indigo" />
+                          <span className="text-[10px] text-slate-400 font-bold truncate max-w-[120px]">{acc.account.name}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-10 pt-8 border-t border-slate-50 flex items-center justify-between relative z-10">
+                        {isCrossEntity ? (
+                          <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-4 py-2 rounded-xl border border-blue-100">
+                            Lintas Entitas
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setFilterAccountId(acc.id)
+                              document.getElementById('recent-activities')?.scrollIntoView({ behavior: 'smooth' })
+                            }}
+                            className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-2 uppercase tracking-widest bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100"
+                          >
+                            Mutasi Detail <ChevronRight size={14} strokeWidth={3} />
+                          </button>
+                        )}
+                        <div className="relative group/menu">
+                          <button className="p-3 text-slate-300 hover:text-slate-900 transition-colors bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-100">
+                            <MoreHorizontal size={18} />
+                          </button>
+                          <div className="absolute right-0 bottom-full mb-3 w-52 bg-white rounded-3xl border border-slate-100 shadow-2xl opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all z-30 overflow-hidden ring-4 ring-slate-900/5">
+                            {isOwner && !isCrossEntity && (
+                              <button
+                                onClick={() => handleDeleteAccount(acc.id, acc.bank_name)}
+                                className="w-full flex items-center gap-3 px-5 py-4 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50 transition-colors"
+                              >
+                                <Trash2 size={16} /> Hapus Rekening
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )
+                })
               )}
             </div>
 
@@ -670,12 +785,53 @@ export function CashClient({
                     </div>
                  </div>
 
+                 {placementNodes.length > 0 ? (
+                   <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penempatan Rekening (Organisasi & Cabang)</label>
+                      <div className="relative">
+                        <select 
+                          name="target_org_branch" 
+                          defaultValue={`${orgId}|${activeBranchId || ''}`}
+                          onChange={(e) => {
+                             const selectedOrgId = e.target.value.split('|')[0]
+                             setTargetOrgId(selectedOrgId)
+                          }}
+                          className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-bold appearance-none focus:bg-white focus:border-emerald-500 transition-all shadow-inner"
+                        >
+                           {placementNodes.map(node => (
+                             <optgroup key={node.orgId} label={`Organisasi: ${node.orgName}`}>
+                               {node.branches.length === 0 && (
+                                 <option value={`${node.orgId}|`}>Kantor Utama</option>
+                               )}
+                               {node.branches.map(b => (
+                                 <option key={b.id} value={`${node.orgId}|${b.id}`}>{b.name}</option>
+                               ))}
+                             </optgroup>
+                           ))}
+                        </select>
+                        <ChevronRight className="absolute right-5 top-1/2 -translate-y-1/2 rotate-90 text-slate-300 pointer-events-none" size={16} />
+                      </div>
+                   </div>
+                 ) : (
+                   branches.length > 0 && (
+                     <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penempatan Rekening (Cabang)</label>
+                        <div className="relative">
+                          <select name="target_branch_id" defaultValue={activeBranchId || undefined} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-bold appearance-none focus:bg-white focus:border-emerald-500 transition-all shadow-inner">
+                             {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                          </select>
+                          <ChevronRight className="absolute right-5 top-1/2 -translate-y-1/2 rotate-90 text-slate-300 pointer-events-none" size={16} />
+                        </div>
+                     </div>
+                   )
+                 )}
+
                  <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mapped GL Account (CoA)</label>
                     <div className="relative">
                       <select name="account_id" required className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-bold appearance-none focus:bg-white focus:border-emerald-500 transition-all shadow-inner">
                          <option value="">Select Asset Account...</option>
-                         {bankGlAccounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
+                         {dynamicGlAccounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
                       </select>
                       <ChevronRight className="absolute right-5 top-1/2 -translate-y-1/2 rotate-90 text-slate-300 pointer-events-none" size={16} />
                     </div>
@@ -753,13 +909,31 @@ export function CashClient({
                  </div>
 
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-                    <CurrencyInput
-                       label="Total Amount"
-                       value={txAmount}
-                       onChange={setTxAmount}
-                       name="amount"
-                       highlight={true}
-                    />
+                    <div className="space-y-1">
+                      <CurrencyInput
+                         label="Total Amount"
+                         value={txAmount}
+                         onChange={setTxAmount}
+                         name="amount"
+                         highlight={true}
+                      />
+                      {shouldCheckAvailableCash ? (
+                        !txBankAccountId ? (
+                          <p className="text-[10px] font-bold text-slate-400 ml-1">Pilih rekening sumber untuk melihat available kas.</p>
+                        ) : (
+                          <div className="space-y-1 ml-1">
+                            <p className="text-[10px] font-bold text-emerald-600">
+                              Available Kas: {formatRupiah(availableCashBalance)}
+                            </p>
+                            {isAmountExceedingAvailable ? (
+                              <p className="text-[10px] font-black text-rose-600">
+                                Nominal melampaui available sebesar {formatRupiah(txAmount - availableCashBalance)}.
+                              </p>
+                            ) : null}
+                          </div>
+                        )
+                      ) : null}
+                    </div>
                     
                     <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] ml-1 flex items-center gap-1.5">
@@ -770,20 +944,28 @@ export function CashClient({
                             <select
                               name="target_bank_account_id"
                               value={txTargetBankId}
-                              onChange={(e) => setTxTargetBankId(e.target.value)}
+                              onChange={(e) => {
+                                setTxTargetBankId(e.target.value)
+                                setTxSourceCounterAccountId('')
+                                setTxTargetCounterAccountId('')
+                              }}
                               required
                               className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all"
                             >
                                <option value="">Select Target...</option>
-                               {bankAccounts
-                                 .filter((bankAccount) => bankAccount.id !== txBankAccountId)
-                                 .map((bankAccount) => (
+                               {transferTargetBankOptions.map((bankAccount) => (
                                    <option key={bankAccount.id} value={bankAccount.id} className="text-white">
-                                     {bankAccount.bank_name} {bankAccount.account_number ? `(${bankAccount.account_number})` : ''}
+                                     {bankAccount.bank_name}
+                                     {bankAccount.account_number ? ` (${bankAccount.account_number})` : ''}
+                                     {bankAccount.org_id !== orgId ? ` — ${(bankAccount.org_name || 'Entitas Anak')}${bankAccount.branch_name ? ` / ${bankAccount.branch_name}` : ''}` : ''}
                                    </option>
                                  ))}
                             </select>
-                            <p className="text-[10px] font-bold text-blue-500 ml-1">Target harus rekening kas/bank lain dalam unit aktif yang sama.</p>
+                            <p className="text-[10px] font-bold text-blue-500 ml-1">
+                              {isInterOrgTransfer
+                                ? 'Transfer lintas entitas: sistem akan posting OUT di parent dan IN di entitas tujuan.'
+                                : 'Target harus rekening kas/bank lain dalam unit aktif yang sama.'}
+                            </p>
                           </>
                         ) : (
                           <>
@@ -808,18 +990,77 @@ export function CashClient({
                     </div>
                  </div>
 
+                 {txType === 'TRANSFER' && isInterOrgTransfer && (
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div className="space-y-1">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] ml-1">
+                         Akun Lawan Parent (OUT)
+                       </label>
+                       <select
+                         name="source_counter_account_id"
+                         required
+                         value={txSourceCounterAccountId}
+                         onChange={(e) => setTxSourceCounterAccountId(e.target.value)}
+                         className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all"
+                       >
+                         <option value="">Select Child/Branch Cash Account...</option>
+                         {sourceInterOrgCounterAccounts.map((account) => (
+                           <option key={account.id} value={account.id} className="text-white">
+                             {account.code} - {account.name}
+                           </option>
+                         ))}
+                       </select>
+                       <p className="text-[10px] font-bold text-blue-500 ml-1">
+                         Gunakan akun kas/bank anak (11xx), bukan akun investasi (12xx).
+                       </p>
+                     </div>
+                     <div className="space-y-1">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] ml-1">
+                         Akun Lawan Entitas Tujuan (IN)
+                       </label>
+                       <select
+                         name="target_counter_account_id"
+                         required
+                         value={txTargetCounterAccountId}
+                         onChange={(e) => setTxTargetCounterAccountId(e.target.value)}
+                         className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all"
+                       >
+                         <option value="">Select Target Counterparty...</option>
+                         {['EXPENSE', 'LIABILITY', 'ASSET', 'REVENUE', 'EQUITY'].map(type => {
+                           const group = targetOrgTransferAccounts.filter(a => a.type === type)
+                           if (group.length === 0) return null
+                           return (
+                             <optgroup key={`target-${type}`} className="text-slate-400" label={type}>
+                               {group.map(a => <option key={a.id} value={a.id} className="text-white">{a.code} - {a.name}</option>)}
+                             </optgroup>
+                           )
+                         })}
+                       </select>
+                     </div>
+                   </div>
+                 )}
+
                  <div className="bg-slate-50 p-6 rounded-[28px] border border-slate-100 text-[10px] font-medium text-slate-400 leading-relaxed italic flex gap-3">
                     <AlertCircle size={16} className="shrink-0 text-slate-300" />
                     {txType === 'OUT'
                       ? 'Choosing an EXPENSE account will decrease equity. Choosing a LIABILITY will settle or create a debt.'
                       : txType === 'IN'
                         ? 'Choosing REVENUE will increase equity. Choosing an ASSET account like Accounts Receivable will settle a customer debt.'
-                        : 'A transfer credits the source bank account and debits the target bank account in the same unit.'}
+                        : isInterOrgTransfer
+                          ? 'Transfer modal antar entitas membuat dua jurnal otomatis: OUT pada parent/sumber dan IN pada entitas tujuan.'
+                          : 'A transfer credits the source bank account and debits the target bank account in the same unit.'}
                  </div>
 
                  <div className="flex gap-4 pt-4 shrink-0">
                    <button type="button" onClick={closeTransactionModal} className="flex-1 py-5 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">Abort</button>
-                   <SafeButton type="submit" variant="primary" size="lg" className="flex-[2] shadow-2xl shadow-blue-100" isLoading={loading}>
+                   <SafeButton
+                     type="submit"
+                     variant="primary"
+                     size="lg"
+                     className="flex-[2] shadow-2xl shadow-blue-100"
+                     isLoading={loading}
+                     disabled={isAmountExceedingAvailable}
+                   >
                      {txType === 'IN' ? 'RECEIVE FUNDS' : txType === 'OUT' ? 'SEND PAYMENT' : 'PROCESS TRANSFER'}
                    </SafeButton>
                  </div>

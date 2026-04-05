@@ -19,7 +19,7 @@ import {
   Layers
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah, formatDate, getDateInTimeZone } from '@/lib/utils'
 
 interface ReportsClientProps {
   orgId: string
@@ -116,6 +116,8 @@ export default function ReportsClient({
 }: ReportsClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
+  const currentMonthStart = `${todayInJakarta.slice(0, 7)}-01`
   const [activeTab, setActiveTab] = useState<'PL' | 'BS' | 'CF'>('PL')
   const [showEmptyAccounts, setShowEmptyAccounts] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
@@ -126,11 +128,13 @@ export default function ReportsClient({
       const params = new URLSearchParams({
         type,
         orgId,
-        startDate: searchParams.get('startDate') || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-        endDate: searchParams.get('endDate') || new Date().toISOString().split('T')[0],
-        asOfDate: searchParams.get('endDate') || new Date().toISOString().split('T')[0],
+        startDate: searchParams.get('startDate') || currentMonthStart,
+        endDate: searchParams.get('endDate') || todayInJakarta,
+        asOfDate: searchParams.get('endDate') || todayInJakarta,
       })
-      if (branchId) {
+      if (isConsolidated) {
+        params.set('consolidated', 'true')
+      } else if (branchId) {
         params.set('branchId', branchId)
       }
       const url = `/api/export?${params.toString()}`
@@ -174,8 +178,8 @@ export default function ReportsClient({
   )
 
   // Date Range State from URL
-  const startDate = searchParams.get('startDate') || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
-  const endDate = searchParams.get('endDate') || new Date().toISOString().split('T')[0]
+  const startDate = searchParams.get('startDate') || currentMonthStart
+  const endDate = searchParams.get('endDate') || todayInJakarta
 
   const updateDates = (s: string, e: string) => {
     const params = new URLSearchParams(searchParams.toString())

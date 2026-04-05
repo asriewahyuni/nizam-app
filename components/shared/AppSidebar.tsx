@@ -192,6 +192,7 @@ interface AppSidebarProps {
   unpostedJournals?: number
   pendingPurchaseRequests?: number
   hrisNotifications?: number
+  pendingCoaRequests?: number
   isDemo?: boolean
   planName?: string
   canManageSubOrganizations?: boolean
@@ -207,6 +208,7 @@ export function AppSidebar({
   unpostedJournals = 0, 
   pendingPurchaseRequests = 0,
   hrisNotifications = 0,
+  pendingCoaRequests = 0,
   isDemo = false,
   planName = 'Trial',
   canManageSubOrganizations = true,
@@ -406,6 +408,7 @@ export function AppSidebar({
                       if (item.href === '/accounting/journal') badgeCount = unpostedJournals
                       if (item.href === '/purchasing') badgeCount = pendingPurchaseRequests
                       if (item.href === '/hris') badgeCount = hrisNotifications
+                      if (item.href === '/cash') badgeCount = pendingCoaRequests
 
                       return (
                         <li key={item.href}>
@@ -470,6 +473,7 @@ export function AppSidebar({
                     if (item.href === '/accounting/journal') badgeCount = unpostedJournals
                     if (item.href === '/purchasing') badgeCount = pendingPurchaseRequests
                     if (item.href === '/hris') badgeCount = hrisNotifications
+                    if (item.href === '/cash') badgeCount = pendingCoaRequests
 
                     return (
                       <li key={item.href}>
