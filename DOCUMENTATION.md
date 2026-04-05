@@ -1,6 +1,6 @@
 # NIZAM ERP — Comprehensive Codebase Documentation
 
-> **Last updated:** 5 April 2026 (rev 3) — updated to include migrations 1128–1131, SaaS limits enforcement, branch delete safeguards, and PostgREST ambiguous join resolutions for HRIS.
+> **Last updated:** 5 April 2026 (rev 4) — updated to include migrations 1132–1136, Istishna purchasing workflow, DP support, Aging AR/AP Istishna integration, and journal description improvements.
 
 ---
 
@@ -15,7 +15,7 @@ NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **
 | Page routes (`page.tsx`) | **65** |
 | Client components (`*Client.tsx`) | **46** |
 | Server action files | **47** |
-| Migration SQL files | **172** (latest: `1131`) |
+| Migration SQL files | **177** (latest: `1136`) |
 | Test files | **33** |
 | API route handlers | **2** (`/api/export`, `/api/sales-pages/lead`) |
 | Proxy (middleware) | `proxy.ts` |
@@ -413,7 +413,9 @@ Guards both `/admin` and `/saas/*` routes.
 - XLSX export
 - Dashboard analytics + pareto
 - AR/AP aging reports
-- Aging AR/AP traceability: setiap baris menampilkan sumber (mis. `Piutang Usaha 1201`, `Piutang Salam Vendor 1404`, `Hutang Usaha 2101`, `Hutang Salam 2602`) serta nomor dokumen SO/PO yang bisa diklik ke halaman transaksi terkait
+- Aging AR/AP traceability: setiap baris menampilkan sumber (mis. `Piutang Usaha 1201`, `Piutang Salam Vendor 1404`, `Piutang Barang Istishna 1205`, `Hutang Usaha 2101`, `Hutang Salam 2602`, `Hutang Istishna 2603`) serta nomor dokumen SO/PO yang bisa diklik ke halaman transaksi terkait
+- Istishna AR/AP support: PO maupun SO dengan mode Istishna kini tampil di Aging Dashboard dengan label dan CoA code yang tepat (`1205` di sisi AR, `2603` di sisi AP). Ringkasan di card stat juga menampilkan sub-total Piutang Istishna dan Hutang Istishna secara terpisah
+- GL reconciliation fallback: jika selisih antara saldo GL akun Istishna dengan total modul > Rp10, muncul baris penyesuaian otomatis (GL-1205-ADJ / GL-2603-ADJ)
 - Tax ledger summary
 - Zakat haul with gold/silver nishab and asset timeline
 - Fixed assets: capitalization, depreciation preview/run, disposal
@@ -459,6 +461,12 @@ Guards both `/admin` and `/saas/*` routes.
 - Fallback stock sync path when `adjust_inventory_stock` signature/schema/index is not yet compatible (`1118`/`1119`)
 - Inventory debit journal allocation per product `asset_account_id` (not only hardcoded `1301`)
 - SALAM purchase enforcement: pembayaran vendor diposting ke `Piutang Salam Vendor (1404)`, wajib lunas sebelum barang diterima, dan wajib ada tanggal barang disediakan
+- **ISTISHNA purchase workflow** (migration `1136`):
+  - Pembelian aset dengan mode ISTISHNA tidak memicu alur manufaktur internal (BoM/SPK)
+  - Sifatnya sebagai piutang/aset: setiap DP / cicilan diposting ke akun `1205 — Aset / Piutang Barang Istishna (Pembelian)` di CoA
+  - Saat barang diterima (`receivePurchase`), saldo akun `1205` di-transfer ke `1301 Persediaan Barang`
+  - Form PO: saat mode TEMPO + ISTISHNA dipilih, tersedia seksi **Down Payment** dengan toggle Nominal (Rp) atau Persentase (%), pilihan rekening sumber DP (Kas/Bank), dan auto-posting DP setelah PO tersimpan
+  - Fungsi `ensure_istishna_vendor_asset_account` memastikan akun `1205` selalu ada di CoA sebelum jurnal diproses
 - Void purchase via atomic RPC
 - Purchase payments and returns
 - Purchase requests (internal/manufacturing)
@@ -655,6 +663,7 @@ Core reusable components:
 | `guard_sales_non_salam_stock_after_delivery` | Trigger guard so non-SALAM delivery cannot end with negative stock |
 | `ensure_salam_liability_account` | Ensure CoA syariah account `2602` (Hutang Salam) exists and return its account id |
 | `ensure_salam_vendor_receivable_account` | Ensure CoA syariah account `1404` (Piutang Salam Vendor) exists and return its account id |
+| `ensure_istishna_vendor_asset_account` | Ensure CoA account `1205` (Aset / Piutang Barang Istishna Pembelian) exists and return its account id |
 | `update_product_average_cost` | Average cost recalculation |
 | `resolve_inventory_asset_account` | Resolve inventory account per product / segment (`1301`–`1304`) |
 | `ensure_inventory_segment_accounts` | Ensure default segment accounts (WIP, raw material, finished goods) per org |
@@ -713,6 +722,11 @@ Core reusable components:
 | `1129` | SaaS limit groundwork (placeholder to sync timeline). |
 | `1130` | Branch delete safeguards: prevent deletion of the MAIN branch and any branch that has active stock, HRIS, or financial data. |
 | `1131` | SaaS resource limits: add `max_users`, `max_branches`, `max_child_orgs` to `saas_packages`. Includes RLS/Trigger blockers for preventing limits bypass based on tenant sub-plan. |
+| `1132` | **Istishna enforcement & liability** — akun `2603 — Hutang Istishna` ditambahkan ke CoA syariah. SO dengan mode ISTISHNA mencatat uang masuk dari pelanggan sebagai Hutang Istishna. |
+| `1133` | **Work order deadline** — kolom `deadline` ditambahkan ke `production_work_orders`; deadline PO/SO disalin otomatis ke SPK saat proses produksi diklik. |
+| `1134` | **Fix payment status enum** — perbaikan bug `invalid input value for enum document_status: ""` pada fungsi `process_purchase_payment_atomic`. |
+| `1135` | **DP description in journals** — memperbarui `process_sales_payment_atomic` agar deskripsi jurnal menyertakan tipe pembayaran, nomor referensi, dan keterangan DP/Uang Muka secara eksplisit. |
+| `1136` | **Purchasing Istishna receivable** — menambahkan akun `1205 — Aset / Piutang Barang Istishna (Pembelian)` ke CoA; memperbarui `process_purchase_payment_atomic` agar pembayaran/DP pembelian Istishna diposting ke `1205` (bukan `2101`); serah terima barang Istishna memindahkan saldo `1205` → `1301`. |
 
 ### 9.5 Storage Buckets
 
