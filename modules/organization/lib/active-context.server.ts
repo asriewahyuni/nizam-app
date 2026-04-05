@@ -1,4 +1,5 @@
 import { ACTIVE_ORG_COOKIE } from './org-context'
+import { prisma } from '@/lib/prisma'
 
 const DEMO_EMAIL = 'demo@nizam.app'
 const DEFAULT_ACTIVE_MEMBERSHIP_SELECT =
@@ -20,58 +21,52 @@ type PersistMembershipActiveContextInput = {
   branchId: string | null
 }
 
-async function findMembershipByOrg(db: any, userId: string, orgId: string, select: string) {
+async function findMembershipByOrg(userId: string, orgId: string, selectFields: any = null) {
   const trimmedOrgId = String(orgId || '').trim()
   if (!trimmedOrgId) return null
 
-  const { data } = await db
-    .from('org_members')
-    .select(select)
-    .eq('user_id', userId)
-    .eq('org_id', trimmedOrgId)
-    .eq('is_active', true)
-    .maybeSingle()
+  // Assuming selectFields is optional since Prisma returns all fields by default
+  // Add include for related tables if standard DEFAULT_ACTIVE_MEMBERSHIP_SELECT is needed 
+  const data = await prisma.org_members.findFirst({
+    where: { user_id: userId, org_id: trimmedOrgId, is_active: true },
+    include: {
+      organizations: true,
+      roles: {
+        select: { permissions: true }
+      }
+    }
+  })
 
   return data
 }
 
 export async function getStoredActiveOrgIdForUser(
-  db: any,
   userId: string,
   allowedOrgIds?: string[] | null
 ) {
   const normalizedOrgIds = Array.isArray(allowedOrgIds)
-    ? Array.from(
-        new Set(
-          allowedOrgIds
-            .map((orgId) => String(orgId || '').trim())
-            .filter(Boolean)
-        )
-      )
+    ? Array.from(new Set(allowedOrgIds.map((orgId) => String(orgId || '').trim()).filter(Boolean)))
     : null
 
-  let query = db
-    .from('org_members')
-    .select('org_id, last_active_at, joined_at')
-    .eq('user_id', userId)
-    .eq('is_active', true)
-
+  const whereClause: any = { user_id: userId, is_active: true }
   if (normalizedOrgIds && normalizedOrgIds.length > 0) {
-    query = query.in('org_id', normalizedOrgIds)
+    whereClause.org_id = { in: normalizedOrgIds }
   }
 
-  const { data, error } = await query
-    .order('last_active_at', { ascending: false, nullsFirst: false })
-    .order('joined_at', { ascending: true })
-    .limit(1)
-    .maybeSingle()
-
-  if (error) {
+  try {
+    const data = await prisma.org_members.findFirst({
+      where: whereClause,
+      orderBy: [
+        { last_active_at: 'desc' },
+        { joined_at: 'asc' }
+      ],
+      select: { org_id: true }
+    })
+    return data?.org_id ? String(data.org_id) : null
+  } catch (error) {
     console.error('getStoredActiveOrgIdForUser Error:', error)
     return null
   }
-
-  return data?.org_id ? String(data.org_id) : null
 }
 
 /**
@@ -80,10 +75,9 @@ export async function getStoredActiveOrgIdForUser(
  * 4. oldest active membership as a legacy fallback.
  */
 export async function resolveActiveMembership(
-  db: any,
   user: ActiveContextUser,
   cookieStore: CookieStoreLike,
-  select: string = DEFAULT_ACTIVE_MEMBERSHIP_SELECT
+  selectFields: any = null
 ) {
   const isDemoUser = user.email === DEMO_EMAIL || user.user_metadata?.is_demo
   const demoOrgId = cookieStore.get('nizam_demo_org_id')?.value
@@ -92,34 +86,33 @@ export async function resolveActiveMembership(
   let memberData = null
 
   if (isDemoUser && demoOrgId) {
-    memberData = await findMembershipByOrg(db, user.id, demoOrgId, select)
+    memberData = await findMembershipByOrg(user.id, demoOrgId, selectFields)
   }
 
   if (!memberData && activeOrgIdCookie) {
-    memberData = await findMembershipByOrg(db, user.id, activeOrgIdCookie, select)
+    memberData = await findMembershipByOrg(user.id, activeOrgIdCookie, selectFields)
   }
 
   if (!memberData) {
-    const storedOrgId = await getStoredActiveOrgIdForUser(db, user.id)
+    const storedOrgId = await getStoredActiveOrgIdForUser(user.id)
     if (storedOrgId) {
-      memberData = await findMembershipByOrg(db, user.id, storedOrgId, select)
+      memberData = await findMembershipByOrg(user.id, storedOrgId, selectFields)
     }
   }
 
   if (!memberData) {
-    const { data, error } = await db
-      .from('org_members')
-      .select(select)
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('joined_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-
-    if (error) {
+    try {
+      memberData = await prisma.org_members.findFirst({
+        where: { user_id: user.id, is_active: true },
+        orderBy: { joined_at: 'asc' },
+        include: {
+          organizations: true,
+          roles: { select: { permissions: true } }
+        }
+      })
+    } catch (error) {
       console.error('resolveActiveMembership Error:', error)
     }
-    memberData = data
   }
 
   return memberData
@@ -130,7 +123,6 @@ export async function resolveActiveMembership(
  * logout and works across devices, while cookies remain a short-term cache.
  */
 export async function persistMembershipActiveContext(
-  admin: any,
   input: PersistMembershipActiveContextInput
 ) {
   const trimmedUserId = String(input.userId || '').trim()
@@ -141,20 +133,18 @@ export async function persistMembershipActiveContext(
   }
 
   const normalizedBranchId = input.branchId ? String(input.branchId).trim() || null : null
-  const { error } = await admin
-    .from('org_members')
-    .update({
-      last_active_at: new Date().toISOString(),
-      last_active_branch_id: normalizedBranchId,
-    })
-    .eq('user_id', trimmedUserId)
-    .eq('org_id', trimmedOrgId)
-    .eq('is_active', true)
 
-  if (error) {
+  try {
+    await prisma.org_members.updateMany({
+      where: { user_id: trimmedUserId, org_id: trimmedOrgId, is_active: true },
+      data: {
+        last_active_at: new Date(),
+        last_active_branch_id: normalizedBranchId
+      }
+    })
+    return { success: true as const }
+  } catch (error) {
     console.error('persistMembershipActiveContext Error:', error)
     return { error: 'Gagal menyimpan konteks aktif.' }
   }
-
-  return { success: true as const }
 }

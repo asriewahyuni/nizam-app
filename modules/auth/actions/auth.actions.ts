@@ -10,6 +10,10 @@ import {
   getStoredActiveOrgIdForUser,
   persistMembershipActiveContext,
 } from '@/modules/organization/lib/active-context.server'
+import { signIn as nextAuthSignIn } from '@/auth'
+import { AuthError } from 'next-auth'
+import bcrypt from 'bcrypt'
+import { prisma } from '@/lib/prisma'
 
 const ADMIN_IMPERSONATION_COOKIE = 'nizam_admin_impersonation'
 const ADMIN_IMPERSONATION_MAX_AGE = 60 * 60 * 4
@@ -86,13 +90,13 @@ type StaffLoginCandidate = {
   authEmailFallback: string | null
 }
 
-async function resolveRoleIdForEmployee(adminClient: Awaited<ReturnType<typeof createAdminClient>>, inviteRoleId: string | null | undefined, emp: any) {
+async function resolveRoleIdForEmployee(inviteRoleId: string | null | undefined, emp: any) {
   if (inviteRoleId) return inviteRoleId
 
-  const { data: allRoles } = await (adminClient as any)
-    .from('roles')
-    .select('id, name')
-    .eq('org_id', emp.org_id)
+  const allRoles = await prisma.roles.findMany({
+    where: { org_id: emp.org_id },
+    select: { id: true, name: true }
+  })
 
   const matchingRole = allRoles?.find((role: any) =>
     role.name.toLowerCase().trim() === emp.job_title?.toLowerCase().trim()
@@ -102,63 +106,72 @@ async function resolveRoleIdForEmployee(adminClient: Awaited<ReturnType<typeof c
 }
 
 async function linkEmployeeToUser(
-  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
   emp: any,
   userId: string,
   roleId: string | null,
 ) {
-  const { error: updateErr } = await (adminClient as any)
-    .from('employees')
-    .update({
-      user_id: userId,
-      employment_status: emp.employment_status || 'PROBATION',
-      registration_status: 'REGISTERED',
-    })
-    .eq('id', emp.id)
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.employees.update({
+        where: { id: emp.id },
+        data: {
+          user_id: userId,
+          employment_status: emp.employment_status || 'PROBATION',
+          registration_status: 'REGISTERED',
+        }
+      })
 
-  if (updateErr) {
+      const existingMember = await tx.org_members.findFirst({
+        where: { org_id: emp.org_id, user_id: userId }
+      })
+
+      if (existingMember) {
+        await tx.org_members.update({
+          where: { id: existingMember.id },
+          data: { role: 'staff', role_id: roleId, is_active: true }
+        })
+      } else {
+        await tx.org_members.create({
+          data: {
+            org_id: emp.org_id,
+            user_id: userId,
+            role: 'staff',
+            role_id: roleId,
+            is_active: true,
+          }
+        })
+      }
+    })
+    return { success: true as const }
+  } catch (err) {
     return { error: 'Gagal menautkan user ke data karyawan.' }
   }
-
-  const { error: memberErr } = await (adminClient as any)
-    .from('org_members')
-    .upsert({
-      org_id: emp.org_id,
-      user_id: userId,
-      role: 'staff',
-      role_id: roleId,
-      is_active: true,
-    }, { onConflict: 'org_id,user_id' })
-
-  if (memberErr) {
-    return { error: 'Gagal mendaftarkan keanggotaan organisasi.' }
-  }
-
-  return { success: true as const }
 }
 
-async function trackInvitationUsage(adminClient: Awaited<ReturnType<typeof createAdminClient>>, invite: any) {
+async function trackInvitationUsage(invite: any) {
   const nextUseCount = Number(invite.use_count || 0) + 1
   const maxUses = Number(invite.max_uses || 0)
   const shouldDeactivate = maxUses > 0 && nextUseCount >= maxUses
 
-  await (adminClient as any)
-    .from('org_invitations')
-    .update({
+  await prisma.org_invitations.update({
+    where: { id: invite.id },
+    data: {
       use_count: nextUseCount,
       ...(shouldDeactivate ? { is_active: false } : {}),
-    })
-    .eq('id', invite.id)
+    }
+  })
 }
 
 async function getAuthEmailByUserId(
-  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
   userId: string,
   fallbackEmail?: string | null,
 ) {
-  const { data, error } = await adminClient.auth.admin.getUserById(userId)
-  if (error) return fallbackEmail || null
-  return data.user?.email?.trim().toLowerCase() || fallbackEmail || null
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true }
+  })
+  if (!user) return fallbackEmail || null
+  return user.email?.trim().toLowerCase() || fallbackEmail || null
 }
 
 function buildStaffLoginCandidates(employees: any[], nik: string, activeOrgId: string | null) {
@@ -202,42 +215,29 @@ function buildStaffLoginCandidates(employees: any[], nik: string, activeOrgId: s
 }
 
 async function resolvePreferredOrgIdForStaffLogin(
-  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
   userId: string,
   orgIds: string[],
   fallbackOrgId: string,
 ) {
-  const storedOrgId = await getStoredActiveOrgIdForUser(adminClient as any, userId, orgIds)
+  const storedOrgId = await getStoredActiveOrgIdForUser(userId, orgIds)
   return storedOrgId || fallbackOrgId
 }
 
 async function resolveExistingStaffIdentity(
-  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
-  publicClient: Awaited<ReturnType<typeof createClient>>,
   emp: any,
   nik: string,
   password: string,
 ) {
-  const { data: { user: currentUser } } = await publicClient.auth.getUser()
+  const session = await auth()
+  const currentUser = session?.user
   const normalizedEmail = normalizeEmail(emp.email)
 
-  if (currentUser?.id && currentUser.user_metadata?.login_type === 'employee') {
-    const currentNik = typeof currentUser.user_metadata?.nik === 'string'
-      ? currentUser.user_metadata.nik.trim().toUpperCase()
-      : null
-
-    if (currentNik === nik) {
-      return { userId: currentUser.id, authEmail: currentUser.email?.trim().toLowerCase() || null }
-    }
-
+  if (currentUser?.id) {
     if (normalizedEmail) {
-      const { data: linkedSelf } = await (adminClient as any)
-        .from('employees')
-        .select('id')
-        .eq('user_id', currentUser.id)
-        .ilike('email', normalizedEmail)
-        .limit(1)
-        .maybeSingle()
+      const linkedSelf = await prisma.employees.findFirst({
+        where: { user_id: currentUser.id, email: { equals: normalizedEmail, mode: 'insensitive' } },
+        select: { id: true }
+      })
 
       if (linkedSelf) {
         return { userId: currentUser.id, authEmail: currentUser.email?.trim().toLowerCase() || null }
@@ -247,30 +247,26 @@ async function resolveExistingStaffIdentity(
 
   if (!normalizedEmail) return null
 
-  const { data: existingEmployee } = await (adminClient as any)
-    .from('employees')
-    .select('user_id')
-    .neq('id', emp.id)
-    .ilike('email', normalizedEmail)
-    .not('user_id', 'is', null)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle()
+  const existingEmployee = await prisma.employees.findFirst({
+    where: {
+      id: { not: emp.id },
+      email: { equals: normalizedEmail, mode: 'insensitive' },
+      user_id: { not: null }
+    },
+    orderBy: { created_at: 'asc' },
+    select: { user_id: true }
+  })
 
   if (!existingEmployee?.user_id) return null
 
-  const authEmail = await getAuthEmailByUserId(adminClient, existingEmployee.user_id)
+  const authEmail = await getAuthEmailByUserId(existingEmployee.user_id)
   if (!authEmail) {
     return { error: 'Akun karyawan terdeteksi di organisasi lain, tetapi email login tidak ditemukan. Hubungi admin.' }
   }
 
-  const { error: loginError } = await publicClient.auth.signInWithPassword({
-    email: authEmail,
-    password,
-  })
-
-  if (loginError) {
-    return { error: 'Akun Anda sudah terhubung ke organisasi lain. Login dulu memakai akun yang sudah aktif, lalu buka kembali link undangan ini.' }
+  const existingUser = await prisma.user.findUnique({ where: { email: authEmail } })
+  if (!existingUser || !existingUser.password || !bcrypt.compareSync(password, existingUser.password)) {
+    return { error: 'Akun Anda sudah terhubung ke organisasi lain. Password salah.' }
   }
 
   return { userId: existingEmployee.user_id, authEmail }
@@ -280,34 +276,24 @@ async function resolveExistingStaffIdentity(
 // signUp — Create a new Business Owner account
 // ─────────────────────────────────────────────────────────────
 export async function signUp(formData: FormData) {
-  const supabase = await createClient()
-
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const fullName = formData.get('fullName') as string
+  const isDemo = formData.get('plan') === 'demo'
 
-  // Use regular signUp for owners so they get logged in automatically
-  // and are prompted for email confirmation if enabled in dashboard.
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { 
-        full_name: fullName,
-        login_type: 'owner',
-        is_demo: formData.get('plan') === 'demo'
-      },
-    },
-  })
+  const hashedPassword = bcrypt.hashSync(password, 10)
 
-  if (error) {
-     // Identifikasi error jika email sudah terdaftar. (Terkadang Supabase mengeluarkan "Database error saving new user" karena trigger atau batas duplikasi).
-     if (error.message.includes("Database error saving new user") || error.message.includes("already registered")) {
-        return { error: 'Gagal: Email ini sudah pernah didaftarkan. Silakan Login atau gunakan email lain.' }
-     }
-     
-     // Error lainnya
-     return { error: error.message }
+  try {
+    await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        name: fullName,
+      }
+    })
+  } catch (err: any) {
+    if (err.code === 'P2002') return { error: 'Gagal: Email ini sudah pernah didaftarkan. Silakan Login atau gunakan email lain.' }
+    return { error: 'Terjadi kesalahan saat menyimpan data akun.' }
   }
 
   return { success: true, email }
@@ -317,29 +303,36 @@ export async function signUp(formData: FormData) {
 // signIn — Regular Business Owner/Admin login via email
 // ─────────────────────────────────────────────────────────────
 export async function signIn(formData: FormData) {
-  const supabase = await createClient()
-
   const email = formData.get('email') as string
   const password = formData.get('password') as string
-  const redirectTo = formData.get('redirectTo') as string | null
+  const redirectTo = (formData.get('redirectTo') as string) || '/dashboard'
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
-
-  if (error) {
-    const msg = encodeURIComponent('Email atau password salah.')
-    redirect(`/login?error=${msg}`)
+  try {
+    await nextAuthSignIn('credentials', {
+      email,
+      password,
+      redirect: false,
+    })
+  } catch (error) {
+    if (error instanceof AuthError) {
+      if (error.type === 'CredentialsSignin') {
+        const msg = encodeURIComponent('Email atau password salah.')
+        redirect(`/login?error=${msg}`)
+      }
+      const msg = encodeURIComponent('Terjadi kesalahan saat login.')
+      redirect(`/login?error=${msg}`)
+    }
+    throw error
   }
 
   revalidatePath('/', 'layout')
-  redirect(redirectTo || '/dashboard')
+  redirect(redirectTo)
 }
 
 // ─────────────────────────────────────────────────────────────
 // registerEmployeeAccount — Converts employee to auth user
 // ─────────────────────────────────────────────────────────────
 export async function registerEmployeeAccount(formData: FormData) {
-  const adminClient = await createAdminClient()
-  const publicClient = await createClient()
   const cookieStore = await cookies()
 
   const nik = (formData.get('nik') as string)?.trim().toUpperCase()
@@ -350,16 +343,11 @@ export async function registerEmployeeAccount(formData: FormData) {
     return { error: 'Data aktivasi tidak lengkap. Pastikan NIK, password, dan token valid.' }
   }
 
-  // 1. Validate invitation first
-  const { data: invite, error: inviteErr } = await (adminClient as any)
-    .from('org_invitations')
-    .select('id, org_id, role_id, use_count, max_uses, is_active, expires_at')
-    .eq('id', inviteId)
-    .maybeSingle()
+  const invite = await prisma.org_invitations.findUnique({
+    where: { id: inviteId },
+    select: { id: true, org_id: true, role_id: true, use_count: true, max_uses: true, is_active: true, expires_at: true }
+  })
 
-  if (inviteErr) {
-    return { error: `Gagal memverifikasi token aktivasi: ${inviteErr.message}` }
-  }
   if (!invite) return { error: 'Link aktivasi tidak ditemukan.' }
   if (!invite.is_active) return { error: 'Link aktivasi sudah dinonaktifkan.' }
   if (invite.expires_at && new Date(invite.expires_at).getTime() <= Date.now()) {
@@ -369,33 +357,26 @@ export async function registerEmployeeAccount(formData: FormData) {
     return { error: 'Link aktivasi sudah mencapai batas penggunaan.' }
   }
 
-  // 2. Get employee scoped by invitation org
-  const { data: emp, error: empErr } = await (adminClient as any)
-    .from('employees')
-    .select('*')
-    .eq('org_id', invite.org_id)
-    .eq('nik', nik)
-    .maybeSingle()
+  const emp = await prisma.employees.findFirst({
+    where: { org_id: invite.org_id!, nik: nik }
+  })
 
-  if (empErr) return { error: `Gagal verifikasi NIK: ${empErr.message}` }
   if (!emp) return { error: 'NIK tidak valid atau tidak ditemukan di organisasi ini.' }
   if (emp.user_id) return { error: 'NIK ini sudah memiliki akun aktif. Silakan Login.' }
 
-  // 3. Map role
-  const roleId = await resolveRoleIdForEmployee(adminClient, invite?.role_id, emp)
+  const roleId = await resolveRoleIdForEmployee(invite?.role_id, emp)
 
-  // 4. Reuse an already-linked staff identity when possible.
-  const existingIdentity = await resolveExistingStaffIdentity(adminClient, publicClient, emp, nik, password)
+  const existingIdentity = await resolveExistingStaffIdentity(emp, nik, password)
   if (existingIdentity && 'error' in existingIdentity) {
     return { error: existingIdentity.error }
   }
 
   if (existingIdentity?.userId) {
-    const linkResult = await linkEmployeeToUser(adminClient, emp, existingIdentity.userId, roleId)
+    const linkResult = await linkEmployeeToUser(emp, existingIdentity.userId, roleId)
     if ('error' in linkResult) return linkResult
 
-    await trackInvitationUsage(adminClient, invite)
-    await persistMembershipActiveContext(adminClient as any, {
+    await trackInvitationUsage(invite)
+    await persistMembershipActiveContext({
       userId: existingIdentity.userId,
       orgId: emp.org_id,
       branchId: emp.branch_id ? String(emp.branch_id) : null,
@@ -406,43 +387,44 @@ export async function registerEmployeeAccount(formData: FormData) {
     return { success: true, redirectTo: '/dashboard' }
   }
 
-  // 5. Generate internal email and create new auth user for fresh staff registration.
   const internalEmail = buildInternalStaffEmail(emp.org_id, nik)
-  const { data: authData, error: authErr } = await adminClient.auth.admin.createUser({
-    email: internalEmail,
-    password,
-    email_confirm: true,
-    user_metadata: {
-      full_name: `${emp.first_name} ${emp.last_name}`,
-      nik,
-      login_type: 'employee',
-      employee_email: normalizeEmail(emp.email),
-    },
-  })
+  const hashedPassword = bcrypt.hashSync(password, 10)
 
-  if (authErr) {
+  let authData;
+  try {
+    authData = await prisma.user.create({
+      data: {
+        email: internalEmail,
+        password: hashedPassword,
+        name: `${emp.first_name} ${emp.last_name}`,
+      }
+    })
+  } catch (authErr: any) {
     return { error: authErr.message || 'Gagal membuat akun autentikasi.' }
   }
 
-  const userId = authData.user?.id
+  const userId = authData.id
   if (!userId) return { error: 'Gagal membuat user ID.' }
 
-  const linkResult = await linkEmployeeToUser(adminClient, emp, userId, roleId)
+  const linkResult = await linkEmployeeToUser(emp, userId, roleId)
   if ('error' in linkResult) return linkResult
 
-  await trackInvitationUsage(adminClient, invite)
+  await trackInvitationUsage(invite)
 
-  // 9. Now Log in the user on the client side
-  const { error: loginErr } = await publicClient.auth.signInWithPassword({ 
-    email: internalEmail, 
-    password 
-  })
-
-  if (loginErr) {
-     return { error: 'Akun berhasil dibuat, tapi login otomatis gagal. Silakan login manual pakai NIK & password baru.' }
+  try {
+    await nextAuthSignIn('credentials', { 
+      email: internalEmail, 
+      password,
+      redirect: false
+    })
+  } catch (error: any) {
+    if (error instanceof AuthError) {
+      return { error: 'Akun berhasil dibuat, tapi login otomatis gagal. Silakan login manual pakai NIK & password baru.' }
+    }
+    throw error;
   }
 
-  await persistMembershipActiveContext(adminClient as any, {
+  await persistMembershipActiveContext({
     userId,
     orgId: emp.org_id,
     branchId: emp.branch_id ? String(emp.branch_id) : null,
@@ -456,8 +438,6 @@ export async function registerEmployeeAccount(formData: FormData) {
 // signInWithNik — Standard login for staff
 // ─────────────────────────────────────────────────────────────
 export async function signInWithNik(formData: FormData) {
-  const adminClient = await createAdminClient()
-  const publicClient = await createClient()
   const cookieStore = await cookies()
 
   let nik = (formData.get('nik') as string)?.trim()
@@ -471,40 +451,44 @@ export async function signInWithNik(formData: FormData) {
   nik = nik.toUpperCase()
   const activeOrgIdPreference = cookieStore.get(ACTIVE_ORG_COOKIE)?.value?.trim() || null
 
-  const { data: employees, error: empErr } = await (adminClient as any)
-    .from('employees')
-    .select('id, org_id, user_id, created_at')
-    .eq('nik', nik)
-    .order('created_at', { ascending: true })
+  const employees = await prisma.employees.findMany({
+    where: { nik: nik },
+    select: { id: true, org_id: true, user_id: true, created_at: true },
+    orderBy: { created_at: 'asc' }
+  })
 
-  if (empErr) {
-     return redirect(`/login?error=${encodeURIComponent(`Database Error: ${empErr.message}`)}&tab=karyawan`)
-  }
-
-  const matchingEmployees = Array.isArray(employees) ? employees : []
-  if (matchingEmployees.length === 0) {
+  if (employees.length === 0) {
     return redirect(`/login?error=${encodeURIComponent('NIK tidak ditemukan.')}&tab=karyawan`)
   }
 
-  const loginCandidates = buildStaffLoginCandidates(matchingEmployees, nik, activeOrgIdPreference)
+  const loginCandidates = buildStaffLoginCandidates(employees, nik, activeOrgIdPreference)
   if (loginCandidates.length === 0) {
     return redirect(`/login?error=${encodeURIComponent('Akun belum diaktivasi. Silakan pendaftaran terlebih dahulu.')}&tab=karyawan`)
   }
 
   for (const candidate of loginCandidates) {
-    const authEmail = await getAuthEmailByUserId(adminClient, candidate.userId, candidate.authEmailFallback)
+    const authEmail = await getAuthEmailByUserId(candidate.userId, candidate.authEmailFallback)
     if (!authEmail) continue
 
-    const { error } = await publicClient.auth.signInWithPassword({
-      email: authEmail,
-      password,
-    })
+    let loginError = false;
+    try {
+      await nextAuthSignIn('credentials', {
+        email: authEmail,
+        password,
+        redirect: false,
+      })
+    } catch (error) {
+      if (error instanceof AuthError) {
+        loginError = true;
+      } else {
+        throw error;
+      }
+    }
 
-    if (!error) {
+    if (!loginError) {
       const preferredOrgId = activeOrgIdPreference && candidate.orgIds.includes(activeOrgIdPreference)
         ? activeOrgIdPreference
         : await resolvePreferredOrgIdForStaffLogin(
-            adminClient,
             candidate.userId,
             candidate.orgIds,
             candidate.preferredOrgId
@@ -520,22 +504,30 @@ export async function signInWithNik(formData: FormData) {
 }
 
 // REST REMAINING (signOut, verifyEmployeeNikByToken, etc.)
+import { auth, signOut as nextAuthSignOut } from '@/auth'
+
 export async function signOut() {
-  const supabase = await createClient()
   const cookieStore = await cookies()
   cookieStore.delete(ACTIVE_ORG_COOKIE)
   cookieStore.delete(ACTIVE_BRANCH_COOKIE)
   cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
-  await supabase.auth.signOut()
-  revalidatePath('/', 'layout')
-  redirect('/login')
+  await nextAuthSignOut({ redirectTo: '/login' })
 }
 
 export async function getSession() {
-  const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) return null
-  return user
+  const session = await auth()
+  if (!session?.user) return null
+
+  // Transform NextAuth user to be somewhat compatible with Supabase's user shape if needed,
+  // or just return the NextAuth user directly.
+  return {
+    id: session.user.id,
+    email: session.user.email,
+    user_metadata: {
+      full_name: session.user.name,
+      login_type: 'owner' // fallback
+    }
+  }
 }
 
 export async function getAdminImpersonationState() {
@@ -712,23 +704,14 @@ export async function restorePlatformAdminSession() {
 }
 
 export async function verifyEmployeeNikByToken(token: string, nik: string) {
-  const adminClient = await createAdminClient()
   const normalizedToken = token.toUpperCase().trim()
   const normalizedNik = nik.trim().toUpperCase()
 
-  const { data: invite, error: inviteErr } = await (adminClient as any)
-    .from('org_invitations')
-    .select('id, org_id, role_id, label, invitation_code, expires_at, is_active, max_uses, use_count, created_at')
-    .eq('invitation_code', normalizedToken)
-    .maybeSingle()
+  const invite = await prisma.org_invitations.findFirst({
+    where: { invitation_code: normalizedToken },
+    select: { id: true, org_id: true, role_id: true, label: true, invitation_code: true, expires_at: true, is_active: true, max_uses: true, use_count: true, created_at: true }
+  })
 
-  if (inviteErr) {
-    const inviteMessage = String(inviteErr.message || '')
-    if (inviteMessage.toLowerCase().includes('permission')) {
-      return { error: 'Link ditemukan, tetapi layanan verifikasi token belum berizin di server. Hubungi admin sistem.' }
-    }
-    return { error: `Gagal memverifikasi link aktivasi: ${inviteMessage}` }
-  }
   if (!invite) return { error: 'Link aktivasi tidak ditemukan.' }
   if (!invite.is_active) return { error: 'Link aktivasi sudah dinonaktifkan oleh admin.' }
   if (invite.expires_at && new Date(invite.expires_at).getTime() <= Date.now()) {
@@ -738,44 +721,33 @@ export async function verifyEmployeeNikByToken(token: string, nik: string) {
     return { error: 'Link aktivasi sudah mencapai batas penggunaan.' }
   }
 
-  const { data: emp, error: empErr } = await (adminClient as any)
-    .from('employees')
-    .select('id, first_name, last_name, user_id, org_id')
-    .eq('org_id', invite.org_id)
-    .eq('nik', normalizedNik)
-    .maybeSingle()
+  const emp = await prisma.employees.findFirst({
+    where: { org_id: invite.org_id!, nik: normalizedNik },
+    select: { id: true, first_name: true, last_name: true, user_id: true, org_id: true }
+  })
 
-  if (empErr) {
-    const empMessage = String(empErr.message || '')
-    if (empMessage.toLowerCase().includes('permission')) {
-      return { error: 'NIK tidak bisa diverifikasi karena layanan aktivasi belum berizin di server. Hubungi admin sistem.' }
-    }
-    return { error: `Gagal validasi NIK: ${empMessage}` }
-  }
   if (!emp) return { error: 'NIK Anda tidak terdaftar di bisnis ini.' }
   if (emp.user_id) return { error: 'NIK ini sudah memiliki akun aktif. Silakan Login.' }
 
   const [orgRes, roleRes] = await Promise.all([
-    (adminClient as any)
-      .from('organizations')
-      .select('id, name, logo_url')
-      .eq('id', invite.org_id)
-      .maybeSingle(),
+    prisma.organizations.findUnique({
+      where: { id: invite.org_id! },
+      select: { id: true, name: true, logo_url: true }
+    }),
     invite.role_id
-      ? (adminClient as any)
-          .from('roles')
-          .select('id, name')
-          .eq('id', invite.role_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
+      ? prisma.roles.findUnique({
+          where: { id: invite.role_id! },
+          select: { id: true, name: true }
+        })
+      : Promise.resolve(null),
   ])
 
   const invitePayload = {
     ...invite,
-    roles: roleRes?.data || null,
+    roles: roleRes || null,
   }
 
-  return { success: true, employee: emp, org: orgRes?.data || null, invite: invitePayload }
+  return { success: true, employee: emp, org: orgRes || null, invite: invitePayload }
 }
 
 export async function requestPasswordReset(nik: string) {

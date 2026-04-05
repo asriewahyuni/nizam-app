@@ -61,3 +61,5 @@ trace_*.js
 find_*.js
 verify_*.ts
 fix_*.js
+
+/lib/generated/prisma

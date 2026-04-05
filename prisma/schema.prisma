@@ -1,0 +1,2175 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model accounts {
+  id                                                                        String                  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id                                                                    String                  @db.Uuid
+  code                                                                      String
+  name                                                                      String
+  type                                                                      account_type
+  normal_balance                                                            normal_balance
+  parent_id                                                                 String?                 @db.Uuid
+  description                                                               String?
+  is_system                                                                 Boolean                 @default(false)
+  is_active                                                                 Boolean                 @default(true)
+  cash_flow_category                                                        String?
+  created_at                                                                DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at                                                                DateTime                @default(now()) @db.Timestamptz(6)
+  organizations                                                             organizations           @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  accounts                                                                  accounts?               @relation("accountsToaccounts", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_accounts                                                            accounts[]              @relation("accountsToaccounts")
+  bank_accounts                                                             bank_accounts[]
+  bank_transactions                                                         bank_transactions[]
+  budgets                                                                   budgets[]
+  fixed_assets_fixed_assets_accum_dep_account_idToaccounts                  fixed_assets[]          @relation("fixed_assets_accum_dep_account_idToaccounts")
+  fixed_assets_fixed_assets_asset_account_idToaccounts                      fixed_assets[]          @relation("fixed_assets_asset_account_idToaccounts")
+  fixed_assets_fixed_assets_dep_expense_account_idToaccounts                fixed_assets[]          @relation("fixed_assets_dep_expense_account_idToaccounts")
+  intercompany_accounts_intercompany_accounts_due_from_account_idToaccounts intercompany_accounts[] @relation("intercompany_accounts_due_from_account_idToaccounts")
+  intercompany_accounts_intercompany_accounts_due_to_account_idToaccounts   intercompany_accounts[] @relation("intercompany_accounts_due_to_account_idToaccounts")
+  journal_lines                                                             journal_lines[]
+  payroll_components                                                        payroll_components[]
+  payroll_runs                                                              payroll_runs[]
+  payslip_lines                                                             payslip_lines[]
+  products_products_asset_account_idToaccounts                              products[]              @relation("products_asset_account_idToaccounts")
+  products_products_expense_account_idToaccounts                            products[]              @relation("products_expense_account_idToaccounts")
+  products_products_income_account_idToaccounts                             products[]              @relation("products_income_account_idToaccounts")
+  purchase_payments                                                         purchase_payments[]
+  reimbursement_items                                                       reimbursement_items[]
+  sales_payments                                                            sales_payments[]
+
+  @@unique([org_id, code])
+  @@index([org_id], map: "idx_accounts_org_id")
+  @@index([parent_id], map: "idx_accounts_parent_id")
+  @@index([type], map: "idx_accounts_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model ai_token_topup_orders {
+  id                      String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id                  String                  @db.Uuid
+  package_id              String                  @db.Uuid
+  invoice_id              String                  @unique @db.Uuid
+  status                  String                  @default("PENDING")
+  tokens                  BigInt
+  price_idr               Decimal                 @db.Decimal(14, 2)
+  paid_at                 DateTime?               @db.Timestamptz(6)
+  created_at              DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime                @default(now()) @db.Timestamptz(6)
+  saas_invoices           saas_invoices           @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  organizations           organizations           @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  ai_token_topup_packages ai_token_topup_packages @relation(fields: [package_id], references: [id], onUpdate: NoAction)
+
+  @@index([org_id, status, created_at(sort: Desc)], map: "idx_ai_token_topup_orders_org_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model ai_token_topup_packages {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                  String                  @unique
+  description           String?
+  tokens                BigInt
+  price_idr             Decimal                 @db.Decimal(14, 2)
+  cost_idr              Decimal                 @default(0) @db.Decimal(14, 2)
+  is_active             Boolean                 @default(true)
+  sort_order            Int                     @default(0)
+  created_at            DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime                @default(now()) @db.Timestamptz(6)
+  ai_token_topup_orders ai_token_topup_orders[]
+
+  @@index([is_active, sort_order, price_idr], map: "idx_ai_token_topup_packages_active_sort")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model ai_token_usage_logs {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id             String         @db.Uuid
+  user_id            String?        @db.Uuid
+  source             String
+  direction          String
+  tokens             BigInt
+  estimated_cost_idr Decimal        @default(0) @db.Decimal(14, 2)
+  related_invoice_id String?        @db.Uuid
+  note               String?
+  meta               Json           @default("{}")
+  created_at         DateTime       @default(now()) @db.Timestamptz(6)
+  organizations      organizations  @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  saas_invoices      saas_invoices? @relation(fields: [related_invoice_id], references: [id], onUpdate: NoAction)
+
+  @@index([org_id, created_at(sort: Desc)], map: "idx_ai_token_usage_logs_org_created")
+  @@index([source], map: "idx_ai_token_usage_logs_source")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model ai_token_wallets {
+  org_id                 String        @id @db.Uuid
+  balance_tokens         BigInt        @default(0)
+  total_purchased_tokens BigInt        @default(0)
+  total_used_tokens      BigInt        @default(0)
+  low_balance_threshold  BigInt        @default(5000)
+  created_at             DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime      @default(now()) @db.Timestamptz(6)
+  organizations          organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([balance_tokens], map: "idx_ai_token_wallets_balance")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model approval_requests {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id        String          @db.Uuid
+  requester_id  String          @db.Uuid
+  approver_id   String?         @db.Uuid
+  source_type   String
+  source_id     String          @db.Uuid
+  status        approval_status @default(PENDING)
+  reason        String?
+  notes         String?
+  requested_at  DateTime        @default(now()) @db.Timestamptz(6)
+  decided_at    DateTime?       @db.Timestamptz(6)
+  updated_at    DateTime        @default(now()) @db.Timestamptz(6)
+  branch_id     String?         @db.Uuid
+  branches      branches?       @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  organizations organizations   @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([org_id, branch_id, status, requested_at(sort: Desc)], map: "idx_approval_requests_org_branch_status")
+  @@index([org_id, status], map: "idx_approvals_org_status")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model asset_depreciation_logs {
+  id               String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  asset_id         String        @db.Uuid
+  org_id           String        @db.Uuid
+  period_date      DateTime      @db.Date
+  amount           Decimal       @db.Decimal(19, 4)
+  journal_entry_id String?       @db.Uuid
+  created_at       DateTime      @default(now()) @db.Timestamptz(6)
+  branch_id        String        @db.Uuid
+  fixed_assets     fixed_assets  @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  branches         branches      @relation(fields: [branch_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  organizations    organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([org_id, branch_id, period_date(sort: Desc)], map: "idx_asset_depreciation_logs_org_branch_period")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model attendance {
+  id                 String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id             String            @db.Uuid
+  employee_id        String            @db.Uuid
+  record_date        DateTime          @db.Date
+  check_in           DateTime?         @db.Timestamptz(6)
+  check_out          DateTime?         @db.Timestamptz(6)
+  status             attendance_status @default(ABSENT)
+  notes              String?
+  created_at         DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime          @default(now()) @db.Timestamptz(6)
+  location_gps       String?
+  qr_scanned_payload String?
+  meta               Json?             @default("{}")
+  branch_id          String?           @db.Uuid
+  branches           branches?         @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  employees          employees         @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  organizations      organizations     @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([employee_id, record_date])
+  @@index([org_id, branch_id, record_date], map: "idx_attendance_org_branch_date")
+  @@index([org_id, record_date], map: "idx_attendance_org_date")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model audit_logs {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id        String        @db.Uuid
+  user_id       String?       @db.Uuid
+  action        String
+  table_name    String
+  record_id     String        @db.Uuid
+  old_data      Json?
+  new_data      Json?
+  ip_address    String?
+  user_agent    String?
+  created_at    DateTime      @default(now()) @db.Timestamptz(6)
+  organizations organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([org_id], map: "idx_audit_logs_org_id")
+  @@index([table_name, record_id], map: "idx_audit_logs_table_record")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bank_accounts {
+  id                String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id            String              @db.Uuid
+  account_id        String              @db.Uuid
+  bank_name         String
+  account_number    String?
+  account_holder    String?
+  currency          String              @default("IDR")
+  is_active         Boolean             @default(true)
+  created_at        DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime            @default(now()) @db.Timestamptz(6)
+  branch_id         String              @db.Uuid
+  accounts          accounts            @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  branches          branches            @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations     organizations       @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  bank_mutations    bank_mutations[]
+  bank_transactions bank_transactions[]
+
+  @@unique([org_id, account_number])
+  @@index([account_id], map: "idx_bank_accounts_account_id")
+  @@index([org_id, branch_id, is_active], map: "idx_bank_accounts_org_branch_active")
+  @@index([org_id], map: "idx_bank_accounts_org_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bank_mutations {
+  id                String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id            String                @db.Uuid
+  bank_account_id   String                @db.Uuid
+  mutation_date     DateTime              @db.Date
+  description       String
+  amount            Decimal               @db.Decimal(20, 2)
+  type              cash_transaction_type
+  balance           Decimal?              @db.Decimal(20, 2)
+  is_matched        Boolean               @default(false)
+  transaction_id    String?               @db.Uuid
+  created_at        DateTime              @default(now()) @db.Timestamptz(6)
+  branch_id         String                @db.Uuid
+  bank_accounts     bank_accounts         @relation(fields: [bank_account_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  branches          branches              @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations     organizations         @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  bank_transactions bank_transactions?    @relation(fields: [transaction_id], references: [id], onUpdate: NoAction)
+
+  @@index([bank_account_id], map: "idx_bank_mutations_account")
+  @@index([is_matched], map: "idx_bank_mutations_matched")
+  @@index([org_id, branch_id, mutation_date(sort: Desc)], map: "idx_bank_mutations_org_branch_date")
+  @@index([org_id], map: "idx_bank_mutations_org_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bank_transactions {
+  id               String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id           String                @db.Uuid
+  bank_account_id  String                @db.Uuid
+  transaction_date DateTime              @default(dbgenerated("CURRENT_DATE")) @db.Date
+  description      String
+  amount           Decimal               @db.Decimal(20, 2)
+  type             cash_transaction_type
+  reference_number String?
+  category_id      String?               @db.Uuid
+  journal_entry_id String?               @db.Uuid
+  status           String                @default("POSTED")
+  created_by       String?               @db.Uuid
+  created_at       DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime              @default(now()) @db.Timestamptz(6)
+  branch_id        String                @db.Uuid
+  bank_mutations   bank_mutations[]
+  bank_accounts    bank_accounts         @relation(fields: [bank_account_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  branches         branches              @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  accounts         accounts?             @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  journal_entries  journal_entries?      @relation(fields: [journal_entry_id], references: [id], onUpdate: NoAction)
+  organizations    organizations         @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([bank_account_id], map: "idx_bank_transactions_bank_account")
+  @@index([transaction_date], map: "idx_bank_transactions_date")
+  @@index([org_id, branch_id, transaction_date(sort: Desc)], map: "idx_bank_transactions_org_branch_date")
+  @@index([org_id], map: "idx_bank_transactions_org_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model branches {
+  id                                                                           String                      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id                                                                       String                      @db.Uuid
+  name                                                                         String
+  code                                                                         String
+  address                                                                      String?
+  is_active                                                                    Boolean                     @default(true)
+  created_at                                                                   DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                                                                   DateTime                    @default(now()) @db.Timestamptz(6)
+  approval_requests                                                            approval_requests[]
+  asset_depreciation_logs                                                      asset_depreciation_logs[]
+  attendance                                                                   attendance[]
+  bank_accounts                                                                bank_accounts[]
+  bank_mutations                                                               bank_mutations[]
+  bank_transactions                                                            bank_transactions[]
+  organizations                                                                organizations               @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  budgets                                                                      budgets[]
+  employees                                                                    employees[]
+  expense_claims                                                               expense_claims[]
+  fixed_assets                                                                 fixed_assets[]
+  fleet_assets                                                                 fleet_assets[]
+  fleet_bookings                                                               fleet_bookings[]
+  fleet_maintenance_labs                                                       fleet_maintenance_labs[]
+  fleet_routes                                                                 fleet_routes[]
+  fleet_schedules                                                              fleet_schedules[]
+  fleet_terminals                                                              fleet_terminals[]
+  fleet_tickets                                                                fleet_tickets[]
+  intercompany_accounts                                                        intercompany_accounts[]
+  intercompany_transactions_intercompany_transactions_from_branch_idTobranches intercompany_transactions[] @relation("intercompany_transactions_from_branch_idTobranches")
+  intercompany_transactions_intercompany_transactions_to_branch_idTobranches   intercompany_transactions[] @relation("intercompany_transactions_to_branch_idTobranches")
+  journal_entries                                                              journal_entries[]
+  leave_requests                                                               leave_requests[]
+  org_member_units                                                             org_member_units[]
+  payroll_runs                                                                 payroll_runs[]
+  payslips                                                                     payslips[]
+  production_boms                                                              production_boms[]
+  production_work_orders                                                       production_work_orders[]
+  purchase_requests                                                            purchase_requests[]
+  purchases                                                                    purchases[]
+  reimbursements                                                               reimbursements[]
+  sales                                                                        sales[]
+  sales_items                                                                  sales_items[]
+  sales_payments                                                               sales_payments[]
+  sales_returns                                                                sales_returns[]
+  service_orders                                                               service_orders[]
+  stock_movements                                                              stock_movements[]
+  warehouses                                                                   warehouses[]
+
+  @@unique([org_id, code])
+  @@unique([org_id, name])
+  @@index([org_id, is_active], map: "idx_branches_org_active")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model budgets {
+  id            String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id        String        @db.Uuid
+  account_id    String        @db.Uuid
+  period        DateTime      @db.Date
+  budget_amount Decimal       @default(0) @db.Decimal(20, 2)
+  created_at    DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime      @default(now()) @db.Timestamptz(6)
+  branch_id     String?       @db.Uuid
+  accounts      accounts      @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  branches      branches?     @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  organizations organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([org_id, account_id, period])
+  @@unique([org_id, branch_id, account_id, period], map: "uq_budget_account_period_per_branch", where: raw("(branch_id IS NOT NULL)"))
+  @@unique([org_id, account_id, period], map: "uq_budget_account_period_shared", where: raw("(branch_id IS NULL)"))
+  @@index([org_id, branch_id, period(sort: Desc)], map: "idx_budgets_org_branch_period")
+  @@index([org_id, period], map: "idx_budgets_org_period")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model contacts {
+  id             String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id         String           @db.Uuid
+  name           String
+  type           String
+  email          String?
+  phone          String?
+  address        String?
+  is_active      Boolean          @default(true)
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime         @default(now()) @db.Timestamptz(6)
+  phone_wa       String?
+  instagram      String?
+  organizations  organizations    @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  fleet_bookings fleet_bookings[]
+  fleet_tickets  fleet_tickets[]
+  purchases      purchases[]
+  sales          sales[]
+  service_orders service_orders[]
+
+  @@index([instagram], map: "idx_contacts_ig")
+  @@index([org_id], map: "idx_contacts_org_id")
+  @@index([type], map: "idx_contacts_type")
+  @@index([phone_wa], map: "idx_contacts_wa")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model employee_components {
+  id                 String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  employee_id        String             @db.Uuid
+  component_id       String             @db.Uuid
+  amount             Decimal?           @db.Decimal(20, 2)
+  is_active          Boolean            @default(true)
+  created_at         DateTime           @default(now()) @db.Timestamptz(6)
+  payroll_components payroll_components @relation(fields: [component_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employees          employees          @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([employee_id, component_id])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model employees {
+  id                                                   String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id                                               String                @db.Uuid
+  user_id                                              String?               @db.Uuid
+  nik                                                  String                @db.VarChar(50)
+  first_name                                           String                @db.VarChar(100)
+  last_name                                            String?               @db.VarChar(100)
+  email                                                String?               @db.VarChar(255)
+  phone                                                String?               @db.VarChar(50)
+  date_of_birth                                        DateTime?             @db.Date
+  gender                                               String?               @db.VarChar(20)
+  marital_status                                       String?               @db.VarChar(50)
+  tax_status                                           String?               @db.VarChar(20)
+  job_title                                            String                @db.VarChar(100)
+  department                                           String?               @db.VarChar(100)
+  join_date                                            DateTime              @db.Date
+  end_date                                             DateTime?             @db.Date
+  employment_status                                    employment_status     @default(FULL_TIME)
+  bank_name                                            String?               @db.VarChar(100)
+  bank_account_number                                  String?               @db.VarChar(100)
+  bank_account_holder                                  String?               @db.VarChar(100)
+  basic_salary                                         Decimal               @default(0) @db.Decimal(20, 2)
+  created_at                                           DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at                                           DateTime              @default(now()) @db.Timestamptz(6)
+  license_number                                       String?
+  license_expiry                                       DateTime?             @db.Date
+  blood_type                                           String?               @db.VarChar(5)
+  department_id                                        nizam_department?
+  registration_status                                  String                @default("PENDING")
+  reset_requested                                      Boolean?              @default(false)
+  reset_requested_at                                   DateTime?             @db.Timestamptz(6)
+  whatsapp                                             String?               @db.VarChar(100)
+  avatar_url                                           String?
+  branch_id                                            String?               @db.Uuid
+  attendance                                           attendance[]
+  employee_components                                  employee_components[]
+  branches                                             branches?             @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  organizations                                        organizations         @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  expense_claims                                       expense_claims[]
+  fleet_schedules_fleet_schedules_driver_idToemployees fleet_schedules[]     @relation("fleet_schedules_driver_idToemployees")
+  fleet_schedules_fleet_schedules_helper_idToemployees fleet_schedules[]     @relation("fleet_schedules_helper_idToemployees")
+  leave_requests                                       leave_requests[]
+  payslips                                             payslips[]
+
+  @@unique([org_id, nik])
+  @@index([nik, org_id], map: "idx_employees_nik_org")
+  @@index([org_id], map: "idx_employees_org")
+  @@index([org_id, branch_id], map: "idx_employees_org_branch")
+  @@index([employment_status], map: "idx_employees_status")
+  @@index([user_id], map: "idx_employees_user_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model expense_claims {
+  id               String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id           String           @db.Uuid
+  employee_id      String           @db.Uuid
+  claim_date       DateTime         @db.Date
+  category         String           @db.VarChar(50)
+  amount           Decimal          @db.Decimal(20, 2)
+  description      String
+  receipt_url      String?
+  status           leave_status     @default(PENDING)
+  approved_by      String?          @db.Uuid
+  journal_entry_id String?          @db.Uuid
+  created_at       DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime         @default(now()) @db.Timestamptz(6)
+  branch_id        String           @db.Uuid
+  branches         branches         @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees        employees        @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  journal_entries  journal_entries? @relation(fields: [journal_entry_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations    organizations    @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([org_id, branch_id, claim_date(sort: Desc)], map: "idx_expense_claims_org_branch_date")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fiscal_periods {
+  id            String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id        String        @db.Uuid
+  name          String
+  start_date    DateTime      @db.Date
+  end_date      DateTime      @db.Date
+  is_closed     Boolean       @default(false)
+  closed_at     DateTime?     @db.Timestamptz(6)
+  closed_by     String?       @db.Uuid
+  created_at    DateTime      @default(now()) @db.Timestamptz(6)
+  organizations organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([org_id, name])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fixed_assets {
+  id                                                     String                    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id                                                 String                    @db.Uuid
+  code                                                   String
+  name                                                   String
+  description                                            String?
+  category                                               String?
+  purchase_date                                          DateTime                  @db.Date
+  purchase_price                                         Decimal                   @default(0) @db.Decimal(19, 4)
+  salvage_value                                          Decimal                   @default(0) @db.Decimal(19, 4)
+  useful_life_months                                     Int                       @default(0)
+  asset_account_id                                       String?                   @db.Uuid
+  accum_dep_account_id                                   String?                   @db.Uuid
+  dep_expense_account_id                                 String?                   @db.Uuid
+  depreciation_method                                    depreciation_method       @default(STRAIGHT_LINE)
+  status                                                 String                    @default("ACTIVE")
+  accumulated_depreciation                               Decimal                   @default(0) @db.Decimal(19, 4)
+  current_book_value                                     Decimal                   @default(0) @db.Decimal(19, 4)
+  last_depreciation_date                                 DateTime?                 @db.Date
+  created_at                                             DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at                                             DateTime                  @default(now()) @db.Timestamptz(6)
+  should_capitalize_tax                                  Boolean                   @default(false)
+  branch_id                                              String                    @db.Uuid
+  asset_depreciation_logs                                asset_depreciation_logs[]
+  accounts_fixed_assets_accum_dep_account_idToaccounts   accounts?                 @relation("fixed_assets_accum_dep_account_idToaccounts", fields: [accum_dep_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  accounts_fixed_assets_asset_account_idToaccounts       accounts?                 @relation("fixed_assets_asset_account_idToaccounts", fields: [asset_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  branches                                               branches                  @relation(fields: [branch_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  accounts_fixed_assets_dep_expense_account_idToaccounts accounts?                 @relation("fixed_assets_dep_expense_account_idToaccounts", fields: [dep_expense_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations                                          organizations             @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([org_id, code])
+  @@index([org_id, branch_id, status, purchase_date(sort: Desc)], map: "idx_fixed_assets_org_branch_status")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fleet_assets {
+  id                     String                   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id                 String                   @db.Uuid
+  plate_number           String
+  model                  String
+  brand                  String?
+  type                   fleet_type               @default(CAR)
+  status                 fleet_status             @default(AVAILABLE)
+  odometer               Decimal?                 @default(0) @db.Decimal(20, 2)
+  daily_rate             Decimal?                 @default(0) @db.Decimal(20, 2)
+  notes                  String?
+  metadata               Json?
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  capacity               Int?                     @default(40)
+  branch_id              String                   @db.Uuid
+  branches               branches                 @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations          organizations            @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  fleet_bookings         fleet_bookings[]
+  fleet_maintenance_labs fleet_maintenance_labs[]
+  fleet_schedules        fleet_schedules[]
+
+  @@unique([org_id, plate_number])
+  @@index([org_id, branch_id], map: "idx_fleet_assets_org_branch")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fleet_bookings {
+  id             String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id         String         @db.Uuid
+  asset_id       String         @db.Uuid
+  contact_id     String         @db.Uuid
+  start_date     DateTime       @db.Timestamptz(6)
+  end_date       DateTime       @db.Timestamptz(6)
+  status         booking_status @default(RESERVED)
+  total_amount   Decimal        @default(0) @db.Decimal(20, 2)
+  deposit        Decimal?       @default(0) @db.Decimal(20, 2)
+  payment_status String?        @default("UNPAID")
+  notes          String?
+  created_at     DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime       @default(now()) @db.Timestamptz(6)
+  branch_id      String         @db.Uuid
+  fleet_assets   fleet_assets   @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  branches       branches       @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  contacts       contacts       @relation(fields: [contact_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  organizations  organizations  @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([org_id, branch_id], map: "idx_fleet_bookings_org_branch")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fleet_maintenance_labs {
+  id                 String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id             String        @db.Uuid
+  asset_id           String        @db.Uuid
+  service_date       DateTime      @default(dbgenerated("CURRENT_DATE")) @db.Date
+  description        String
+  cost               Decimal       @default(0) @db.Decimal(20, 2)
+  odometer_at        Decimal?      @db.Decimal(20, 2)
+  next_service_km    Decimal?      @db.Decimal(20, 2)
+  created_at         DateTime      @default(now()) @db.Timestamptz(6)
+  maintenance_number String?
+  maintenance_type   String?       @default("ROUTINE")
+  vendor_name        String?
+  technician_name    String?
+  parts_replaced     Json?         @default("[]")
+  lab_notes          String?
+  next_service_date  DateTime?     @db.Date
+  attachment_url     String?
+  technician_rating  Int?
+  branch_id          String        @db.Uuid
+  fleet_assets       fleet_assets  @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  branches           branches      @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations      organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([asset_id], map: "idx_fleet_maintenance_asset")
+  @@index([org_id], map: "idx_fleet_maintenance_org")
+  @@index([org_id, branch_id, service_date], map: "idx_fleet_maintenance_org_branch_date")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fleet_routes {
+  id              String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id          String            @db.Uuid
+  name            String
+  origin          String
+  destination     String
+  distance_km     Decimal?          @db.Decimal(10, 2)
+  base_price      Decimal?          @default(0) @db.Decimal(20, 2)
+  created_at      DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime          @default(now()) @db.Timestamptz(6)
+  branch_id       String            @db.Uuid
+  branches        branches          @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations   organizations     @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  fleet_schedules fleet_schedules[]
+
+  @@index([org_id, branch_id], map: "idx_fleet_routes_org_branch")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fleet_schedules {
+  id                                             String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id                                         String          @db.Uuid
+  route_id                                       String          @db.Uuid
+  asset_id                                       String          @db.Uuid
+  driver_id                                      String?         @db.Uuid
+  departure_time                                 DateTime        @db.Timestamptz(6)
+  arrival_time                                   DateTime?       @db.Timestamptz(6)
+  status                                         schedule_status @default(SCHEDULED)
+  created_at                                     DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at                                     DateTime        @default(now()) @db.Timestamptz(6)
+  helper_id                                      String?         @db.Uuid
+  branch_id                                      String          @db.Uuid
+  fleet_assets                                   fleet_assets    @relation(fields: [asset_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  branches                                       branches        @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees_fleet_schedules_driver_idToemployees employees?      @relation("fleet_schedules_driver_idToemployees", fields: [driver_id], references: [id], onUpdate: NoAction)
+  employees_fleet_schedules_helper_idToemployees employees?      @relation("fleet_schedules_helper_idToemployees", fields: [helper_id], references: [id], onUpdate: NoAction)
+  organizations                                  organizations   @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  fleet_routes                                   fleet_routes    @relation(fields: [route_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  fleet_tickets                                  fleet_tickets[]
+
+  @@index([org_id, branch_id, departure_time], map: "idx_fleet_schedules_org_branch_departure")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fleet_terminals {
+  id            String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id        String        @db.Uuid
+  name          String
+  location_name String?
+  gps_coords    String?
+  radius_meters Int?          @default(200)
+  qr_code_token String?       @unique
+  created_at    DateTime      @default(now()) @db.Timestamptz(6)
+  branch_id     String        @db.Uuid
+  branches      branches      @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([org_id, branch_id], map: "idx_fleet_terminals_org_branch")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fleet_tickets {
+  id              String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id          String          @db.Uuid
+  schedule_id     String          @db.Uuid
+  passenger_id    String          @db.Uuid
+  seat_number     String
+  price           Decimal         @default(0) @db.Decimal(20, 2)
+  status          ticket_status   @default(BOOKED)
+  notes           String?
+  created_at      DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime        @default(now()) @db.Timestamptz(6)
+  branch_id       String          @db.Uuid
+  branches        branches        @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations   organizations   @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  contacts        contacts        @relation(fields: [passenger_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  fleet_schedules fleet_schedules @relation(fields: [schedule_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([org_id, branch_id], map: "idx_fleet_tickets_org_branch")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model intercompany_accounts {
+  id                                                           String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id                                                       String        @db.Uuid
+  branch_id                                                    String?       @db.Uuid
+  due_from_account_id                                          String?       @db.Uuid
+  due_to_account_id                                            String?       @db.Uuid
+  created_at                                                   DateTime      @default(now()) @db.Timestamptz(6)
+  branches                                                     branches?     @relation(fields: [branch_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  accounts_intercompany_accounts_due_from_account_idToaccounts accounts?     @relation("intercompany_accounts_due_from_account_idToaccounts", fields: [due_from_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  accounts_intercompany_accounts_due_to_account_idToaccounts   accounts?     @relation("intercompany_accounts_due_to_account_idToaccounts", fields: [due_to_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations                                                organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([org_id, branch_id])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model intercompany_transactions {
+  id                                                          String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id                                                      String           @db.Uuid
+  from_branch_id                                              String?          @db.Uuid
+  to_branch_id                                                String?          @db.Uuid
+  journal_entry_id                                            String?          @db.Uuid
+  amount                                                      Decimal          @db.Decimal(20, 2)
+  description                                                 String?
+  transaction_date                                            DateTime         @db.Date
+  is_eliminated                                               Boolean          @default(false)
+  eliminated_at                                               DateTime?        @db.Timestamptz(6)
+  created_at                                                  DateTime         @default(now()) @db.Timestamptz(6)
+  branches_intercompany_transactions_from_branch_idTobranches branches?        @relation("intercompany_transactions_from_branch_idTobranches", fields: [from_branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  journal_entries                                             journal_entries? @relation(fields: [journal_entry_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations                                               organizations    @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  branches_intercompany_transactions_to_branch_idTobranches   branches?        @relation("intercompany_transactions_to_branch_idTobranches", fields: [to_branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([is_eliminated], map: "idx_intercompany_eliminated")
+  @@index([org_id], map: "idx_intercompany_org")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model inventory_adjustment_items {
+  id                    String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id                String                @db.Uuid
+  adjustment_id         String                @db.Uuid
+  product_id            String                @db.Uuid
+  warehouse_id          String?               @db.Uuid
+  actual_quantity       Decimal               @db.Decimal(20, 4)
+  diff_quantity         Decimal               @db.Decimal(20, 4)
+  unit_cost             Decimal               @db.Decimal(20, 2)
+  total_value           Decimal               @db.Decimal(20, 2)
+  notes                 String?
+  created_at            DateTime              @default(now()) @db.Timestamptz(6)
+  inventory_adjustments inventory_adjustments @relation(fields: [adjustment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  organizations         organizations         @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products              products              @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses            warehouses?           @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model inventory_adjustments {
+  id                         String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id                     String                       @db.Uuid
+  adj_number                 String
+  adj_date                   DateTime                     @default(dbgenerated("CURRENT_DATE")) @db.Date
+  type                       inventory_adjustment_type    @default(STOCK_COUNT)
+  status                     document_status              @default(DRAFT)
+  total_value                Decimal                      @default(0) @db.Decimal(20, 2)
+  notes                      String?
+  journal_entry_id           String?                      @db.Uuid
+  created_by                 String?                      @db.Uuid
+  created_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  inventory_adjustment_items inventory_adjustment_items[]
+  journal_entries            journal_entries?             @relation(fields: [journal_entry_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations              organizations                @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([org_id, adj_number])
+  @@index([org_id], map: "idx_inv_adj_org_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model inventory_stocks {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id         String          @db.Uuid
+  product_id     String          @db.Uuid
+  warehouse_id   String          @db.Uuid
+  quantity       Decimal         @default(0) @db.Decimal(20, 4)
+  batch_number   String?
+  expiry_date    DateTime?       @db.Date
+  created_at     DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime        @default(now()) @db.Timestamptz(6)
+  bin_id         String?         @db.Uuid
+  warehouse_bins warehouse_bins? @relation(fields: [bin_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations  organizations   @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products       products        @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouses     warehouses      @relation(fields: [warehouse_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([expiry_date], map: "idx_inv_stocks_expiry", where: raw("(expiry_date IS NOT NULL)"))
+  @@index([product_id, warehouse_id], map: "idx_inv_stocks_product_warehouse")
+  @@index([org_id, warehouse_id], map: "idx_inventory_stocks_org_warehouse")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model inventory_transfer_items {
+  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id              String              @db.Uuid
+  transfer_id         String              @db.Uuid
+  product_id          String              @db.Uuid
+  quantity            Decimal             @db.Decimal(20, 4)
+  notes               String?
+  created_at          DateTime            @default(now()) @db.Timestamptz(6)
+  organizations       organizations       @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products            products            @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  inventory_transfers inventory_transfers @relation(fields: [transfer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model inventory_transfers {
+  id                                                      String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id                                                  String                     @db.Uuid
+  transfer_number                                         String
+  transfer_date                                           DateTime                   @default(dbgenerated("CURRENT_DATE")) @db.Date
+  source_wh_id                                            String                     @db.Uuid
+  target_wh_id                                            String                     @db.Uuid
+  notes                                                   String?
+  status                                                  document_status            @default(DRAFT)
+  created_by                                              String?                    @db.Uuid
+  created_at                                              DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at                                              DateTime                   @default(now()) @db.Timestamptz(6)
+  inventory_transfer_items                                inventory_transfer_items[]
+  organizations                                           organizations              @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouses_inventory_transfers_source_wh_idTowarehouses warehouses                 @relation("inventory_transfers_source_wh_idTowarehouses", fields: [source_wh_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses_inventory_transfers_target_wh_idTowarehouses warehouses                 @relation("inventory_transfers_target_wh_idTowarehouses", fields: [target_wh_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([org_id, transfer_number])
+  @@index([org_id], map: "idx_inv_transfer_org_id")
+  @@index([source_wh_id], map: "idx_inv_transfer_source_wh")
+  @@index([target_wh_id], map: "idx_inv_transfer_target_wh")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model journal_entries {
+  id                        String                      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id                    String                      @db.Uuid
+  entry_number              String
+  entry_date                DateTime                    @default(dbgenerated("CURRENT_DATE")) @db.Date
+  description               String
+  reference_type            journal_reference_type      @default(MANUAL)
+  reference_id              String?                     @db.Uuid
+  status                    journal_status              @default(DRAFT)
+  is_auto                   Boolean                     @default(false)
+  notes                     String?
+  created_by                String?                     @db.Uuid
+  posted_at                 DateTime?                   @db.Timestamptz(6)
+  voided_at                 DateTime?                   @db.Timestamptz(6)
+  voided_by                 String?                     @db.Uuid
+  void_reason               String?
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  branch_id                 String?                     @db.Uuid
+  bank_transactions         bank_transactions[]
+  expense_claims            expense_claims[]
+  intercompany_transactions intercompany_transactions[]
+  inventory_adjustments     inventory_adjustments[]
+  branches                  branches?                   @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  organizations             organizations               @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  journal_lines             journal_lines[]
+  payroll_runs              payroll_runs[]
+  reimbursements            reimbursements[]
+
+  @@unique([org_id, entry_number])
+  @@unique([org_id, reference_type, reference_id], map: "uq_journal_ref_per_org")
+  @@index([branch_id], map: "idx_journal_branch", where: raw("(branch_id IS NOT NULL)"))
+  @@index([branch_id], map: "idx_journal_entries_branch_id", where: raw("(branch_id IS NOT NULL)"))
+  @@index([entry_date], map: "idx_journal_entries_entry_date")
+  @@index([org_id, branch_id, entry_date(sort: Desc)], map: "idx_journal_entries_org_branch_date")
+  @@index([org_id, entry_date(sort: Desc)], map: "idx_journal_entries_org_date")
+  @@index([org_id], map: "idx_journal_entries_org_id")
+  @@index([org_id, status], map: "idx_journal_entries_org_status")
+  @@index([reference_type, reference_id], map: "idx_journal_entries_reference")
+  @@index([status], map: "idx_journal_entries_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model journal_lines {
+  id              String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  entry_id        String          @db.Uuid
+  account_id      String          @db.Uuid
+  debit           Decimal         @default(0) @db.Decimal(20, 2)
+  credit          Decimal         @default(0) @db.Decimal(20, 2)
+  memo            String?
+  accounts        accounts        @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  journal_entries journal_entries @relation(fields: [entry_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([account_id, entry_id], map: "idx_journal_lines_account_entry")
+  @@index([account_id], map: "idx_journal_lines_account_id")
+  @@index([entry_id, account_id], map: "idx_journal_lines_entry_account")
+  @@index([entry_id], map: "idx_journal_lines_entry_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model leave_requests {
+  id            String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id        String        @db.Uuid
+  employee_id   String        @db.Uuid
+  leave_type    String        @db.VarChar(50)
+  start_date    DateTime      @db.Date
+  end_date      DateTime      @db.Date
+  days_taken    Decimal       @db.Decimal(5, 1)
+  reason        String
+  status        leave_status  @default(PENDING)
+  approved_by   String?       @db.Uuid
+  approved_at   DateTime?     @db.Timestamptz(6)
+  created_at    DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime      @default(now()) @db.Timestamptz(6)
+  branch_id     String        @db.Uuid
+  branches      branches      @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees     employees     @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  organizations organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([org_id, branch_id, start_date(sort: Desc), status], map: "idx_leave_requests_org_branch_period")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model org_invitations {
+  id              String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id          String?        @db.Uuid
+  role_id         String?        @db.Uuid
+  invitation_code String         @unique
+  label           String?
+  max_uses        Int?           @default(0)
+  use_count       Int?           @default(0)
+  expires_at      DateTime?      @db.Timestamptz(6)
+  is_active       Boolean?       @default(true)
+  created_at      DateTime?      @default(now()) @db.Timestamptz(6)
+  created_by      String?        @db.Uuid
+  organizations   organizations? @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  roles           roles?         @relation(fields: [role_id], references: [id], onUpdate: NoAction)
+
+  @@index([invitation_code], map: "idx_invitations_code")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model org_member_units {
+  id            String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_member_id String        @db.Uuid
+  org_id        String        @db.Uuid
+  branch_id     String        @db.Uuid
+  assigned_by   String?       @db.Uuid
+  created_at    DateTime      @default(now()) @db.Timestamptz(6)
+  branches      branches      @relation(fields: [branch_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  organizations organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  org_members   org_members   @relation(fields: [org_member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([org_member_id, branch_id])
+  @@index([org_member_id], map: "idx_org_member_units_member")
+  @@index([org_id, branch_id], map: "idx_org_member_units_org_branch")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model org_members {
+  id               String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id           String             @db.Uuid
+  user_id          String             @db.Uuid
+  role             member_role        @default(staff)
+  is_active        Boolean            @default(true)
+  invited_by            String?            @db.Uuid
+  joined_at             DateTime           @default(now()) @db.Timestamptz(6)
+  role_id               String?            @db.Uuid
+  last_active_at        DateTime?          @db.Timestamptz(6)
+  last_active_branch_id String?            @db.Uuid
+  org_member_units      org_member_units[]
+  organizations    organizations      @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  roles            roles?             @relation(fields: [role_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([org_id, user_id])
+  @@index([org_id], map: "idx_org_members_org_id")
+  @@index([user_id], map: "idx_org_members_user_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model organizations {
+  id                         String                       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                       String
+  slug                       String                       @unique
+  logo_url                   String?
+  settings                   Json                         @default("{}")
+  is_active                  Boolean                      @default(true)
+  created_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  enabled_modules            String[]                     @default(["finance", "accounting", "inventory", "purchasing", "sales", "pos", "hris", "reports"])
+  is_demo                    Boolean?                     @default(false)
+  subscription_end           DateTime?                    @db.Timestamptz(6)
+  parent_org_id              String?                      @db.Uuid
+  active_addons              Json?                        @default("[]")
+  owner_email                String?
+  accounts                   accounts[]
+  ai_token_topup_orders      ai_token_topup_orders[]
+  ai_token_usage_logs        ai_token_usage_logs[]
+  ai_token_wallets           ai_token_wallets?
+  approval_requests          approval_requests[]
+  asset_depreciation_logs    asset_depreciation_logs[]
+  attendance                 attendance[]
+  audit_logs                 audit_logs[]
+  bank_accounts              bank_accounts[]
+  bank_mutations             bank_mutations[]
+  bank_transactions          bank_transactions[]
+  branches                   branches[]
+  budgets                    budgets[]
+  contacts                   contacts[]
+  employees                  employees[]
+  expense_claims             expense_claims[]
+  fiscal_periods             fiscal_periods[]
+  fixed_assets               fixed_assets[]
+  fleet_assets               fleet_assets[]
+  fleet_bookings             fleet_bookings[]
+  fleet_maintenance_labs     fleet_maintenance_labs[]
+  fleet_routes               fleet_routes[]
+  fleet_schedules            fleet_schedules[]
+  fleet_terminals            fleet_terminals[]
+  fleet_tickets              fleet_tickets[]
+  intercompany_accounts      intercompany_accounts[]
+  intercompany_transactions  intercompany_transactions[]
+  inventory_adjustment_items inventory_adjustment_items[]
+  inventory_adjustments      inventory_adjustments[]
+  inventory_stocks           inventory_stocks[]
+  inventory_transfer_items   inventory_transfer_items[]
+  inventory_transfers        inventory_transfers[]
+  journal_entries            journal_entries[]
+  leave_requests             leave_requests[]
+  org_invitations            org_invitations[]
+  org_member_units           org_member_units[]
+  org_members                org_members[]
+  organizations              organizations?               @relation("organizationsToorganizations", fields: [parent_org_id], references: [id], onUpdate: NoAction)
+  other_organizations        organizations[]              @relation("organizationsToorganizations")
+  payroll_components         payroll_components[]
+  payroll_runs               payroll_runs[]
+  production_boms            production_boms[]
+  production_operations      production_operations[]
+  production_work_orders     production_work_orders[]
+  products                   products[]
+  purchase_items             purchase_items[]
+  purchase_payments          purchase_payments[]
+  purchase_requests          purchase_requests[]
+  purchase_returns           purchase_returns[]
+  purchases                  purchases[]
+  reimbursements             reimbursements[]
+  roles                      roles[]
+  saas_invoices              saas_invoices[]
+  sales                      sales[]
+  sales_items                sales_items[]
+  sales_page_leads           sales_page_leads[]
+  sales_pages                sales_pages[]
+  sales_payments             sales_payments[]
+  sales_returns              sales_returns[]
+  service_orders             service_orders[]
+  stock_movements            stock_movements[]
+  warehouse_bins             warehouse_bins[]
+  warehouses                 warehouses[]
+  zakat_asset_timeline       zakat_asset_timeline[]
+  zakat_haul                 zakat_haul?
+
+  @@index([parent_org_id], map: "idx_org_parent")
+  @@index([slug], map: "idx_organizations_slug")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model payroll_components {
+  id                  String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id              String                @db.Uuid
+  name                String                @db.VarChar(100)
+  type                payroll_item_type
+  is_taxable          Boolean               @default(true)
+  default_amount      Decimal?              @default(0) @db.Decimal(20, 2)
+  is_percentage       Boolean               @default(false)
+  percentage_value    Decimal?              @db.Decimal(5, 2)
+  account_id          String?               @db.Uuid
+  created_at          DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime              @default(now()) @db.Timestamptz(6)
+  employee_components employee_components[]
+  accounts            accounts?             @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations       organizations         @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payslip_lines       payslip_lines[]
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model payroll_runs {
+  id                      String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id                  String           @db.Uuid
+  period_start            DateTime         @db.Date
+  period_end              DateTime         @db.Date
+  payment_date            DateTime         @db.Date
+  status                  payroll_status   @default(DRAFT)
+  journal_entry_id        String?          @db.Uuid
+  total_gross             Decimal          @default(0) @db.Decimal(20, 2)
+  total_deductions        Decimal          @default(0) @db.Decimal(20, 2)
+  total_net               Decimal          @default(0) @db.Decimal(20, 2)
+  created_by              String?          @db.Uuid
+  created_at              DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime         @default(now()) @db.Timestamptz(6)
+  disbursement_account_id String?          @db.Uuid
+  branch_id               String           @db.Uuid
+  branches                branches         @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  accounts                accounts?        @relation(fields: [disbursement_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  journal_entries         journal_entries? @relation(fields: [journal_entry_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations           organizations    @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payslips                payslips[]
+
+  @@unique([org_id, period_start, period_end], map: "uq_payroll_period_per_org")
+  @@index([org_id, branch_id, period_start(sort: Desc)], map: "idx_payroll_runs_org_branch_period")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model payslip_lines {
+  id                 String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  payslip_id         String              @db.Uuid
+  component_name     String              @db.VarChar(100)
+  type               payroll_item_type
+  amount             Decimal             @db.Decimal(20, 2)
+  created_at         DateTime            @default(now()) @db.Timestamptz(6)
+  component_id       String?             @db.Uuid
+  account_id         String?             @db.Uuid
+  accounts           accounts?           @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payroll_components payroll_components? @relation(fields: [component_id], references: [id], onUpdate: NoAction)
+  payslips           payslips            @relation(fields: [payslip_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([component_id], map: "idx_payslip_lines_component")
+  @@index([payslip_id], map: "idx_payslip_lines_payslip")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model payslips {
+  id               String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  run_id           String          @db.Uuid
+  employee_id      String          @db.Uuid
+  basic_salary     Decimal         @db.Decimal(20, 2)
+  gross_salary     Decimal?        @default(0) @db.Decimal(20, 2)
+  total_deductions Decimal?        @default(0) @db.Decimal(20, 2)
+  net_salary       Decimal         @db.Decimal(20, 2)
+  payment_status   String?         @default("UNPAID") @db.VarChar(20)
+  created_at       DateTime        @default(now()) @db.Timestamptz(6)
+  branch_id        String          @db.Uuid
+  payslip_lines    payslip_lines[]
+  branches         branches        @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees        employees       @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payroll_runs     payroll_runs    @relation(fields: [run_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([employee_id, created_at(sort: Desc)], map: "idx_payslips_employee_created")
+  @@index([run_id, branch_id, employee_id], map: "idx_payslips_run_branch")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model production_bom_items {
+  id              String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  bom_id          String          @db.Uuid
+  product_id      String          @db.Uuid
+  quantity        Decimal         @default(1) @db.Decimal(20, 4)
+  unit            String?
+  created_at      DateTime        @default(now()) @db.Timestamptz(6)
+  production_boms production_boms @relation(fields: [bom_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products        products        @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model production_bom_routings {
+  id                    String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  bom_id                String                @db.Uuid
+  operation_id          String                @db.Uuid
+  sequence_order        Int                   @default(1)
+  notes                 String?
+  created_at            DateTime              @default(now()) @db.Timestamptz(6)
+  production_boms       production_boms       @relation(fields: [bom_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  production_operations production_operations @relation(fields: [operation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model production_boms {
+  id                      String                    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id                  String                    @db.Uuid
+  product_id              String                    @db.Uuid
+  code                    String
+  description             String?
+  is_active               Boolean                   @default(true)
+  created_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  branch_id               String?                   @db.Uuid
+  production_bom_items    production_bom_items[]
+  production_bom_routings production_bom_routings[]
+  branches                branches?                 @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  organizations           organizations             @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products                products                  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  production_work_orders  production_work_orders[]
+
+  @@unique([org_id, code])
+  @@index([product_id], map: "idx_boms_product")
+  @@index([org_id, branch_id, is_active], map: "idx_production_boms_org_branch_active")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model production_operations {
+  id                      String                    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id                  String                    @db.Uuid
+  name                    String
+  estimated_cost          Decimal?                  @default(0) @db.Decimal(20, 2)
+  description             String?
+  created_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  production_bom_routings production_bom_routings[]
+  organizations           organizations             @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model production_wo_costs {
+  id                     String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  wo_id                  String                 @db.Uuid
+  description            String
+  amount                 Decimal                @default(0) @db.Decimal(20, 2)
+  cost_type              String                 @default("LABOR")
+  created_at             DateTime               @default(now()) @db.Timestamptz(6)
+  production_work_orders production_work_orders @relation(fields: [wo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model production_work_orders {
+  id                  String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id              String                @db.Uuid
+  bom_id              String                @db.Uuid
+  wo_number           String
+  quantity_planned    Decimal               @default(1) @db.Decimal(20, 4)
+  quantity_actual     Decimal?              @default(0) @db.Decimal(20, 4)
+  status              String                @default("DRAFT")
+  released_at         DateTime?             @db.Timestamptz(6)
+  completed_at        DateTime?             @db.Timestamptz(6)
+  notes               String?
+  created_at          DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime              @default(now()) @db.Timestamptz(6)
+  branch_id           String                @db.Uuid
+  production_wo_costs production_wo_costs[]
+  production_boms     production_boms       @relation(fields: [bom_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  branches            branches              @relation(fields: [branch_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  organizations       organizations         @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([org_id, wo_number])
+  @@index([bom_id, branch_id], map: "idx_production_work_orders_bom_branch")
+  @@index([org_id, branch_id, status, created_at(sort: Desc)], map: "idx_production_work_orders_org_branch_status")
+  @@index([org_id, status], map: "idx_wo_status")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model products {
+  id                                             String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id                                         String                       @db.Uuid
+  sku                                            String?
+  name                                           String
+  type                                           product_type                 @default(INVENTORY)
+  description                                    String?
+  unit                                           String                       @default("Pcs")
+  purchase_price                                 Decimal                      @default(0) @db.Decimal(20, 2)
+  selling_price                                  Decimal                      @default(0) @db.Decimal(20, 2)
+  asset_account_id                               String?                      @db.Uuid
+  income_account_id                              String?                      @db.Uuid
+  expense_account_id                             String?                      @db.Uuid
+  is_active                                      Boolean                      @default(true)
+  created_at                                     DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                                     DateTime                     @default(now()) @db.Timestamptz(6)
+  average_cost                                   Decimal?                     @default(0) @db.Decimal(15, 2)
+  barcode                                        String?
+  category                                       String?                      @default("Bahan")
+  inventory_adjustment_items                     inventory_adjustment_items[]
+  inventory_stocks                               inventory_stocks[]
+  inventory_transfer_items                       inventory_transfer_items[]
+  production_bom_items                           production_bom_items[]
+  production_boms                                production_boms[]
+  accounts_products_asset_account_idToaccounts   accounts?                    @relation("products_asset_account_idToaccounts", fields: [asset_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  accounts_products_expense_account_idToaccounts accounts?                    @relation("products_expense_account_idToaccounts", fields: [expense_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  accounts_products_income_account_idToaccounts  accounts?                    @relation("products_income_account_idToaccounts", fields: [income_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations                                  organizations                @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  purchase_items                                 purchase_items[]
+  purchase_requests                              purchase_requests[]
+  purchase_return_items                          purchase_return_items[]
+  sales_items                                    sales_items[]
+  sales_return_items                             sales_return_items[]
+  stock_movements                                stock_movements[]
+
+  @@unique([org_id, barcode], map: "idx_products_barcode_unique_per_org", where: raw("((barcode IS NOT NULL) AND (barcode <> ''::text))"))
+  @@unique([org_id, sku])
+  @@index([barcode], map: "idx_products_barcode_fast", where: raw("((barcode IS NOT NULL) AND (barcode <> ''::text))"))
+  @@index([org_id], map: "idx_products_org_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model purchase_items {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id                String                  @db.Uuid
+  purchase_id           String                  @db.Uuid
+  product_id            String?                 @db.Uuid
+  description           String
+  quantity              Decimal                 @default(1) @db.Decimal(15, 2)
+  unit_price            Decimal                 @default(0) @db.Decimal(15, 2)
+  discount_amount       Decimal?                @default(0) @db.Decimal(15, 2)
+  tax_amount            Decimal?                @default(0) @db.Decimal(15, 2)
+  total_amount          Decimal?                @default(dbgenerated("(((quantity * unit_price) - discount_amount) + tax_amount)")) @db.Decimal(15, 2)
+  created_at            DateTime?               @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime?               @default(now()) @db.Timestamptz(6)
+  organizations         organizations           @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products              products?               @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  purchases             purchases               @relation(fields: [purchase_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  purchase_return_items purchase_return_items[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model purchase_payments {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id          String        @db.Uuid
+  purchase_id     String        @db.Uuid
+  account_id      String        @db.Uuid
+  payment_date    DateTime      @default(now()) @db.Timestamptz(6)
+  amount          Decimal       @db.Decimal(20, 2)
+  discount_amount Decimal       @default(0) @db.Decimal(20, 2)
+  payment_number  String
+  notes           String?
+  created_by      String?       @db.Uuid
+  created_at      DateTime      @default(now()) @db.Timestamptz(6)
+  accounts        accounts      @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations   organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  purchases       purchases     @relation(fields: [purchase_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([org_id, payment_number])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model purchase_requests {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id         String        @db.Uuid
+  request_number String
+  requester_id   String        @db.Uuid
+  product_id     String?       @db.Uuid
+  product_name   String
+  quantity       Decimal       @default(0) @db.Decimal(20, 4)
+  unit           String?
+  status         pr_status     @default(PENDING)
+  priority       String?       @default("NORMAL")
+  notes          String?
+  source_type    String?       @default("MANUFACTURING")
+  source_id      String?       @db.Uuid
+  created_at     DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime      @default(now()) @db.Timestamptz(6)
+  branch_id      String?       @db.Uuid
+  branches       branches?     @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  organizations  organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products       products?     @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([org_id, request_number])
+  @@index([org_id, branch_id, status, created_at(sort: Desc)], map: "idx_purchase_requests_org_branch_status")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model purchase_return_items {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  return_id        String           @db.Uuid
+  purchase_item_id String           @db.Uuid
+  product_id       String           @db.Uuid
+  quantity         Decimal          @db.Decimal(20, 2)
+  unit_price       Decimal          @db.Decimal(20, 2)
+  total_price      Decimal          @db.Decimal(20, 2)
+  products         products         @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  purchase_items   purchase_items   @relation(fields: [purchase_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  purchase_returns purchase_returns @relation(fields: [return_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model purchase_returns {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id                String                  @db.Uuid
+  purchase_id           String                  @db.Uuid
+  return_number         String
+  return_date           DateTime                @default(now()) @db.Timestamptz(6)
+  notes                 String?
+  total_amount          Decimal                 @default(0) @db.Decimal(20, 2)
+  tax_amount            Decimal                 @default(0) @db.Decimal(20, 2)
+  created_at            DateTime                @default(now()) @db.Timestamptz(6)
+  created_by            String?                 @db.Uuid
+  purchase_return_items purchase_return_items[]
+  organizations         organizations           @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  purchases             purchases               @relation(fields: [purchase_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([org_id, return_number])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model purchases {
+  id                String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id            String              @db.Uuid
+  purchase_number   String
+  purchase_date     DateTime            @default(dbgenerated("CURRENT_DATE")) @db.Date
+  vendor_id         String              @db.Uuid
+  total_amount      Decimal             @default(0) @db.Decimal(20, 2)
+  tax_amount        Decimal             @default(0) @db.Decimal(20, 2)
+  discount_amount   Decimal             @default(0) @db.Decimal(20, 2)
+  grand_total       Decimal             @default(0) @db.Decimal(20, 2)
+  status            document_status     @default(DRAFT)
+  payment_status    payment_status      @default(UNPAID)
+  due_date          DateTime?           @db.Date
+  notes             String?
+  created_by        String?             @db.Uuid
+  created_at        DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime            @default(now()) @db.Timestamptz(6)
+  shipping_amount   Decimal?            @default(0) @db.Decimal(19, 4)
+  shariah_mode      shariah_mode?       @default(CASH)
+  warehouse_id      String?             @db.Uuid
+  branch_id         String?             @db.Uuid
+  purchase_items    purchase_items[]
+  purchase_payments purchase_payments[]
+  purchase_returns  purchase_returns[]
+  branches          branches?           @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  organizations     organizations       @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  contacts          contacts            @relation(fields: [vendor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  warehouses        warehouses?         @relation(fields: [warehouse_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([org_id, purchase_number])
+  @@unique([org_id, purchase_number], map: "uq_purchase_number_per_org", where: raw("(status <> 'VOIDED'::document_status)"))
+  @@index([org_id, branch_id, purchase_date(sort: Desc)], map: "idx_purchases_org_branch_date")
+  @@index([org_id, purchase_date(sort: Desc)], map: "idx_purchases_org_date")
+  @@index([org_id], map: "idx_purchases_org_id")
+  @@index([vendor_id], map: "idx_purchases_vendor_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model reimbursement_items {
+  id                  String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  reimbursement_id    String         @db.Uuid
+  expense_date        DateTime       @db.Date
+  category_account_id String         @db.Uuid
+  description         String
+  amount              Decimal        @db.Decimal(20, 2)
+  receipt_url         String?
+  created_at          DateTime       @default(now()) @db.Timestamptz(6)
+  accounts            accounts       @relation(fields: [category_account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reimbursements      reimbursements @relation(fields: [reimbursement_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model reimbursements {
+  id                  String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id              String                @db.Uuid
+  claim_number        String
+  user_id             String                @db.Uuid
+  description         String
+  total_amount        Decimal               @default(0) @db.Decimal(20, 2)
+  status              String                @default("PENDING")
+  notes               String?
+  journal_id          String?               @db.Uuid
+  created_at          DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime              @default(now()) @db.Timestamptz(6)
+  branch_id           String?               @db.Uuid
+  reimbursement_items reimbursement_items[]
+  branches            branches?             @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  journal_entries     journal_entries?      @relation(fields: [journal_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations       organizations         @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([org_id, claim_number])
+  @@index([org_id, branch_id, status, created_at(sort: Desc)], map: "idx_reimbursements_org_branch_status_date")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model roles {
+  id              String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id          String            @db.Uuid
+  name            String
+  permissions     String[]          @default([])
+  is_system       Boolean           @default(false)
+  created_at      DateTime          @default(now()) @db.Timestamptz(6)
+  department_id   nizam_department?
+  priority        Int?              @default(999)
+  parent_id       String?           @db.Uuid
+  department_ids  String[]          @default([])
+  org_invitations org_invitations[]
+  org_members     org_members[]
+  organizations   organizations     @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  roles           roles?            @relation("rolesToroles", fields: [parent_id], references: [id], onUpdate: NoAction)
+  other_roles     roles[]           @relation("rolesToroles")
+
+  @@unique([org_id, name])
+  @@index([org_id], map: "idx_roles_org_id")
+  @@index([parent_id], map: "idx_roles_parent")
+  @@index([org_id, priority], map: "idx_roles_priority")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model saas_config {
+  key        String    @id
+  value      Json
+  updated_at DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model saas_invoices {
+  id                    String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id                String?                @db.Uuid
+  package_id            String?                @db.Uuid
+  invoice_number        String                 @unique
+  amount                Decimal                @db.Decimal(15, 2)
+  status                String?                @default("UNPAID")
+  payment_method        String?
+  payment_proof_url     String?
+  due_date              DateTime?              @default(dbgenerated("(now() + '24:00:00'::interval)")) @db.Timestamptz(6)
+  created_at            DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime?              @default(now()) @db.Timestamptz(6)
+  item_name             String?
+  item_description      String?
+  discount_percent      Decimal?               @default(0) @db.Decimal(5, 2)
+  discount_amount       Decimal?               @default(0) @db.Decimal(15, 2)
+  tax_percent           Decimal?               @default(0) @db.Decimal(5, 2)
+  tax_amount            Decimal?               @default(0) @db.Decimal(15, 2)
+  ai_token_topup_orders ai_token_topup_orders?
+  ai_token_usage_logs   ai_token_usage_logs[]
+  organizations         organizations?         @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  saas_packages         saas_packages?         @relation(fields: [package_id], references: [id], onUpdate: NoAction)
+
+  @@index([org_id], map: "idx_saas_invoices_org")
+  @@index([status], map: "idx_saas_invoices_status")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model saas_packages {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String          @unique @db.VarChar(255)
+  price          Decimal         @default(0) @db.Decimal(15, 2)
+  billing        String          @default("Bulan") @db.VarChar(50)
+  is_active      Boolean         @default(true)
+  modules        Json            @default("[]")
+  addons         Json            @default("[]")
+  created_at     DateTime        @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+  updated_at     DateTime        @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+  duration_days  Int?            @default(30)
+  max_orgs       Int?            @default(1)
+  max_warehouses Int?            @default(1)
+  saas_invoices  saas_invoices[]
+  saas_vouchers  saas_vouchers[]
+}
+
+model saas_vouchers {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code             String         @unique
+  discount_percent Decimal?       @default(0) @db.Decimal
+  package_id       String?        @db.Uuid
+  max_uses         Int?           @default(1)
+  uses_count       Int?           @default(0)
+  is_active        Boolean?       @default(true)
+  expires_at       DateTime?      @default(dbgenerated("(now() + '30 days'::interval)")) @db.Timestamptz(6)
+  created_at       DateTime?      @default(now()) @db.Timestamptz(6)
+  saas_packages    saas_packages? @relation(fields: [package_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model sales {
+  id              String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id          String           @db.Uuid
+  sale_number     String
+  sale_date       DateTime         @default(dbgenerated("CURRENT_DATE")) @db.Date
+  customer_id     String?          @db.Uuid
+  total_amount    Decimal          @default(0) @db.Decimal(20, 2)
+  tax_amount      Decimal          @default(0) @db.Decimal(20, 2)
+  discount_amount Decimal          @default(0) @db.Decimal(20, 2)
+  grand_total     Decimal          @default(0) @db.Decimal(20, 2)
+  status          document_status  @default(DRAFT)
+  payment_status  payment_status   @default(UNPAID)
+  due_date        DateTime?        @db.Date
+  notes           String?
+  created_by      String?          @db.Uuid
+  created_at      DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime         @default(now()) @db.Timestamptz(6)
+  shariah_mode    shariah_mode?    @default(CASH)
+  payment_term    String?          @default("TEMPO")
+  branch_id       String?          @db.Uuid
+  warehouse_id    String?          @db.Uuid
+  branches        branches?        @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  contacts        contacts?        @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations   organizations    @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouses      warehouses?      @relation(fields: [warehouse_id], references: [id], onUpdate: NoAction)
+  sales_items     sales_items[]
+  sales_payments  sales_payments[]
+  sales_returns   sales_returns[]
+
+  @@unique([org_id, sale_number])
+  @@unique([org_id, sale_number], map: "uq_sale_number_per_org", where: raw("(status <> 'VOIDED'::document_status)"))
+  @@index([customer_id], map: "idx_sales_customer_id")
+  @@index([org_id, branch_id, sale_date(sort: Desc)], map: "idx_sales_org_branch_date")
+  @@index([org_id, branch_id, warehouse_id, sale_date(sort: Desc)], map: "idx_sales_org_branch_warehouse_date")
+  @@index([org_id, sale_date(sort: Desc)], map: "idx_sales_org_date")
+  @@index([org_id], map: "idx_sales_org_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model sales_items {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id             String               @db.Uuid
+  sale_id            String               @db.Uuid
+  product_id         String?              @db.Uuid
+  description        String
+  quantity           Decimal              @default(1) @db.Decimal(15, 2)
+  unit_price         Decimal              @default(0) @db.Decimal(15, 2)
+  discount_amount    Decimal?             @default(0) @db.Decimal(15, 2)
+  tax_amount         Decimal?             @default(0) @db.Decimal(15, 2)
+  total_amount       Decimal?             @default(dbgenerated("(((quantity * unit_price) - discount_amount) + tax_amount)")) @db.Decimal(15, 2)
+  created_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  branch_id          String?              @db.Uuid
+  branches           branches?            @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  organizations      organizations        @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products           products?            @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sales              sales                @relation(fields: [sale_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sales_return_items sales_return_items[]
+
+  @@index([branch_id], map: "idx_sales_items_branch_id", where: raw("(branch_id IS NOT NULL)"))
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model sales_page_leads {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id        String        @db.Uuid
+  sales_page_id String        @db.Uuid
+  full_name     String
+  email         String?
+  phone         String?
+  company       String?
+  message       String?
+  status        String        @default("NEW")
+  source_url    String?
+  utm_params    Json          @default("{}")
+  meta          Json          @default("{}")
+  created_at    DateTime      @default(now()) @db.Timestamptz(6)
+  organizations organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sales_pages   sales_pages   @relation(fields: [sales_page_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([org_id], map: "idx_sales_page_leads_org_id")
+  @@index([sales_page_id], map: "idx_sales_page_leads_page_id")
+  @@index([status], map: "idx_sales_page_leads_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model sales_pages {
+  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id              String             @db.Uuid
+  title               String
+  slug                String
+  status              String             @default("DRAFT")
+  offer_badge         String?
+  headline            String
+  subheadline         String?
+  description         String?
+  target_audience     String?
+  price_label         String?
+  bonus_text          String?
+  guarantee_text      String?
+  urgency_text        String?
+  hero_image_url      String?
+  hero_image_alt      String?
+  primary_cta_label   String             @default("Hubungi Kami")
+  primary_cta_url     String             @default("#lead-form")
+  secondary_cta_label String?
+  secondary_cta_url   String?
+  meta_title          String?
+  meta_description    String?
+  meta_pixel_id       String?
+  theme               Json               @default("{}")
+  proof_points        Json               @default("[]")
+  benefits            Json               @default("[]")
+  offer_items         Json               @default("[]")
+  testimonials        Json               @default("[]")
+  faq_items           Json               @default("[]")
+  form_settings       Json               @default("{}")
+  created_by          String?            @db.Uuid
+  updated_by          String?            @db.Uuid
+  published_at        DateTime?          @db.Timestamptz(6)
+  created_at          DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime           @default(now()) @db.Timestamptz(6)
+  template_id         String             @default("LEAD_CAPTURE")
+  sales_page_leads    sales_page_leads[]
+  organizations       organizations      @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([org_id, slug])
+  @@index([org_id], map: "idx_sales_pages_org_id")
+  @@index([slug], map: "idx_sales_pages_slug")
+  @@index([status], map: "idx_sales_pages_status")
+  @@index([template_id], map: "idx_sales_pages_template_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model sales_payments {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id          String        @db.Uuid
+  sale_id         String        @db.Uuid
+  account_id      String        @db.Uuid
+  payment_date    DateTime      @default(now()) @db.Timestamptz(6)
+  amount          Decimal       @db.Decimal(20, 2)
+  discount_amount Decimal       @default(0) @db.Decimal(20, 2)
+  payment_number  String
+  notes           String?
+  created_by      String?       @db.Uuid
+  created_at      DateTime      @default(now()) @db.Timestamptz(6)
+  branch_id       String?       @db.Uuid
+  accounts        accounts      @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  branches        branches?     @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  organizations   organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sales           sales         @relation(fields: [sale_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([org_id], map: "idx_sales_payments_org")
+  @@index([org_id, branch_id, payment_date(sort: Desc)], map: "idx_sales_payments_org_branch_date")
+  @@index([sale_id], map: "idx_sales_payments_sale")
+}
+
+model sales_return_items {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  return_id     String        @db.Uuid
+  sale_item_id  String?       @db.Uuid
+  product_id    String        @db.Uuid
+  quantity      Decimal       @db.Decimal(15, 2)
+  unit_price    Decimal       @db.Decimal(15, 2)
+  total_price   Decimal       @db.Decimal(15, 2)
+  products      products      @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sales_returns sales_returns @relation(fields: [return_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sales_items   sales_items?  @relation(fields: [sale_item_id], references: [id], onUpdate: NoAction)
+}
+
+model sales_returns {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id             String               @db.Uuid
+  sale_id            String               @db.Uuid
+  return_number      String               @unique
+  return_date        DateTime             @default(now()) @db.Timestamptz(6)
+  nota_retur_number  String?
+  status             String               @default("COMPLETED")
+  notes              String?
+  total_amount       Decimal              @default(0) @db.Decimal(15, 2)
+  tax_amount         Decimal              @default(0) @db.Decimal(15, 2)
+  grand_total        Decimal              @default(0) @db.Decimal(15, 2)
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  created_by         String?              @db.Uuid
+  branch_id          String?              @db.Uuid
+  sales_return_items sales_return_items[]
+  branches           branches?            @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  organizations      organizations        @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sales              sales                @relation(fields: [sale_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([org_id, branch_id, return_date(sort: Desc)], map: "idx_sales_returns_org_branch_date")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model service_orders {
+  id             String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id         String             @db.Uuid
+  contact_id     String             @db.Uuid
+  job_number     String
+  description    String
+  status         service_job_status @default(PENDING)
+  start_date     DateTime?          @db.Date
+  end_date       DateTime?          @db.Date
+  assigned_to    String?            @db.Uuid
+  estimated_cost Decimal?           @default(0) @db.Decimal(20, 2)
+  actual_cost    Decimal?           @default(0) @db.Decimal(20, 2)
+  notes          String?
+  created_at     DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime           @default(now()) @db.Timestamptz(6)
+  branch_id      String             @db.Uuid
+  branches       branches           @relation(fields: [branch_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  contacts       contacts           @relation(fields: [contact_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  organizations  organizations      @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([org_id, job_number])
+  @@index([org_id], map: "idx_service_orders_org")
+  @@index([org_id, branch_id], map: "idx_service_orders_org_branch")
+  @@index([status], map: "idx_service_orders_status")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model stock_movements {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id         String        @db.Uuid
+  product_id     String        @db.Uuid
+  movement_date  DateTime      @default(now()) @db.Timestamptz(6)
+  quantity       Decimal       @db.Decimal(15, 2)
+  unit_price     Decimal       @db.Decimal(15, 2)
+  reference_type String
+  reference_id   String        @db.Uuid
+  notes          String?
+  created_at     DateTime      @default(now()) @db.Timestamptz(6)
+  branch_id      String?       @db.Uuid
+  branches       branches?     @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  organizations  organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products       products      @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([org_id, branch_id, product_id, movement_date(sort: Desc)], map: "idx_stock_movements_org_branch_product_date")
+  @@index([product_id, movement_date], map: "idx_stock_movements_product")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model warehouse_bins {
+  id               String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id           String             @db.Uuid
+  warehouse_id     String             @db.Uuid
+  code             String
+  description      String?
+  is_active        Boolean            @default(true)
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime           @default(now()) @db.Timestamptz(6)
+  barcode          String?
+  inventory_stocks inventory_stocks[]
+  organizations    organizations      @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  warehouses       warehouses         @relation(fields: [warehouse_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([org_id, barcode], map: "idx_bins_barcode_unique_per_org", where: raw("((barcode IS NOT NULL) AND (barcode <> ''::text))"))
+  @@unique([warehouse_id, code])
+  @@index([barcode], map: "idx_bins_barcode_fast", where: raw("((barcode IS NOT NULL) AND (barcode <> ''::text))"))
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model warehouses {
+  id                                                               String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id                                                           String                       @db.Uuid
+  code                                                             String
+  name                                                             String
+  address                                                          String?
+  is_active                                                        Boolean                      @default(true)
+  created_at                                                       DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                                                       DateTime                     @default(now()) @db.Timestamptz(6)
+  branch_id                                                        String?                      @db.Uuid
+  inventory_adjustment_items                                       inventory_adjustment_items[]
+  inventory_stocks                                                 inventory_stocks[]
+  inventory_transfers_inventory_transfers_source_wh_idTowarehouses inventory_transfers[]        @relation("inventory_transfers_source_wh_idTowarehouses")
+  inventory_transfers_inventory_transfers_target_wh_idTowarehouses inventory_transfers[]        @relation("inventory_transfers_target_wh_idTowarehouses")
+  purchases                                                        purchases[]
+  sales                                                            sales[]
+  warehouse_bins                                                   warehouse_bins[]
+  branches                                                         branches?                    @relation(fields: [branch_id], references: [id], onUpdate: NoAction)
+  organizations                                                    organizations                @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([org_id, code])
+  @@index([org_id, branch_id, is_active], map: "idx_warehouses_org_branch_active")
+  @@index([org_id], map: "idx_warehouses_org_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model zakat_asset_timeline {
+  id              String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  org_id          String        @db.Uuid
+  total_assets    Decimal       @db.Decimal(19, 4)
+  nishab_silver   Decimal?      @db.Decimal(19, 4)
+  is_above_nishab Boolean?
+  haul_id         String?       @db.Uuid
+  created_at      DateTime      @default(now()) @db.Timestamptz(6)
+  organizations   organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([org_id, created_at], map: "idx_zakat_timeline_org")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model zakat_haul {
+  id                      String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  org_id                  String              @unique(map: "idx_zakat_haul_org_active", where: raw("(status = 'ACTIVE'::text)")) @db.Uuid
+  haul_start_date         DateTime            @db.Date
+  gold_price_per_gram     Decimal             @db.Decimal
+  silver_price_per_gram   Decimal             @db.Decimal
+  nishab_gold             Decimal             @db.Decimal
+  nishab_silver           Decimal             @db.Decimal
+  status                  String              @default("ACTIVE")
+  batal_reason            String?
+  created_at              DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime?           @default(now()) @db.Timestamptz(6)
+  gold_price_source       String              @default("Manual Input")
+  gold_price_evidence_url String?
+  gold_price_set_by       String?             @db.Uuid
+  gold_price_set_at       DateTime?           @default(now()) @db.Timestamptz(6)
+  organizations           organizations       @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  zakat_haul_events       zakat_haul_events[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model zakat_haul_events {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  haul_id         String     @db.Uuid
+  org_id          String     @db.Uuid
+  event_date      DateTime   @db.Date
+  total_assets    Decimal    @db.Decimal
+  is_above_nishab Boolean
+  notes           String?
+  created_at      DateTime?  @default(now()) @db.Timestamptz(6)
+  zakat_haul      zakat_haul @relation(fields: [haul_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+enum account_type {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum approval_status {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum attendance_status {
+  PRESENT
+  LATE
+  ABSENT
+  LEAVE
+  SICK
+  HALFDAY
+}
+
+enum booking_status {
+  RESERVED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum cash_transaction_type {
+  IN
+  OUT
+  TRANSFER
+}
+
+enum depreciation_method {
+  STRAIGHT_LINE
+  DOUBLE_DECLINING_BALANCE
+  NON_DEPRECIABLE
+}
+
+enum document_status {
+  DRAFT
+  ORDERED
+  RECEIVED
+  FINISHED
+  VOIDED
+  DELIVERED
+  QUOTATION
+}
+
+enum employment_status {
+  FULL_TIME
+  CONTRACT
+  PROBATION
+  INTERN
+  TERMINATED
+  RESIGNED
+}
+
+enum fleet_status {
+  AVAILABLE
+  RENTED
+  MAINTENANCE
+  OUT_OF_SERVICE
+}
+
+enum fleet_type {
+  CAR
+  MOTORBIKE
+  BUS
+  TRUCK
+  OTHER
+}
+
+enum inventory_adjustment_type {
+  STOCK_COUNT
+  WRITE_OFF
+}
+
+enum journal_reference_type {
+  MANUAL
+  CASH_IN
+  CASH_OUT
+  SALE
+  PURCHASE
+  GOODS_RECEIPT
+  GOODS_SHIPMENT
+  PAYMENT_IN
+  PAYMENT_OUT
+  BANK_TRANSFER
+  PAYROLL
+  ADJUSTMENT
+  TAX
+  DEPRECIATION
+  SALES_RETURN
+  TRANSFER
+  PURCHASE_RETURN
+  PURCHASE_PAYMENT
+  EMPLOYEE_EXPENSE
+  INVENTORY_ADJ
+  PRODUCTION
+}
+
+enum journal_status {
+  DRAFT
+  POSTED
+  VOIDED
+}
+
+enum leave_status {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum member_role {
+  owner
+  admin
+  manager
+  staff
+  viewer
+  hr
+}
+
+enum nizam_department {
+  DASHBOARD_AUDIT
+  INSIGHT
+  CONFIG
+  FINANCE
+  OPERASIONAL
+  MARKETING_SALES
+  HRIS
+}
+
+enum normal_balance {
+  DEBIT
+  CREDIT
+}
+
+enum payment_status {
+  UNPAID
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+enum payroll_item_type {
+  EARNING
+  DEDUCTION
+  TAX
+  BENEFIT
+}
+
+enum payroll_status {
+  DRAFT
+  APPROVED
+  PAID
+}
+
+enum pr_status {
+  PENDING
+  ORDERED
+  RECEIVED
+  REJECTED
+  CANCELLED
+}
+
+enum product_type {
+  INVENTORY
+  NON_INVENTORY
+  SERVICE
+}
+
+enum schedule_status {
+  SCHEDULED
+  DEPARTED
+  ARRIVED
+  CANCELLED
+}
+
+enum service_job_status {
+  PENDING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum shariah_mode {
+  CASH
+  SALAM
+  ISTISHNA
+}
+
+enum ticket_status {
+  BOOKED
+  PAID
+  USED
+  CANCELLED
+}
+
+// ==========================================
+// NextAuth / Auth.js Models
+// ==========================================
+
+model User {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  accounts Account[]
+  sessions Session[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId            String  @map("user_id") @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("oauth_accounts")
+}
+
+model Session {
+  id           String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id") @db.Uuid
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
