@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => {
     },
     contacts: {
       create: vi.fn(),
+      findFirst: vi.fn(),
       updateMany: vi.fn(),
     },
     sales: {
@@ -35,6 +36,9 @@ const mocks = vi.hoisted(() => {
     resolveAccessibleBranchSelection: vi.fn(),
     getAuthUser: vi.fn(),
     prisma: {
+      products: {
+        findMany: vi.fn(),
+      },
       sales: {
         findMany: vi.fn(),
         findFirst: vi.fn(),
@@ -203,19 +207,7 @@ describe('Sales Branch Context', () => {
   })
 
   it('rejects POS transaction when no active branch is selected', async () => {
-    const fromMock = vi.fn()
-    const rpcMock = vi.fn()
-
     mocks.getActiveBranch.mockResolvedValue(null)
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1' } },
-        }),
-      },
-      from: fromMock,
-      rpc: rpcMock,
-    })
 
     const result = await processPosTransaction('org-1', {
       lines: [{ product_id: 'prod-1', product_name: 'Produk A', quantity: 1, unit_price: 1000 }],
@@ -226,47 +218,10 @@ describe('Sales Branch Context', () => {
     expect(result).toEqual({
       error: 'Pilih unit aktif terlebih dahulu untuk memproses transaksi POS.',
     })
-    expect(fromMock).not.toHaveBeenCalled()
-    expect(rpcMock).not.toHaveBeenCalled()
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
   })
 
   it('stamps active branch on POS sales transaction', async () => {
-    const productsQuery = {
-      select: vi.fn(() => productsQuery),
-      eq: vi.fn(() => productsQuery),
-      in: vi.fn(() => Promise.resolve({
-        data: [{ id: 'prod-1', type: 'INVENTORY' }],
-        error: null,
-      })),
-    }
-    const warehouseQuery = {
-      select: vi.fn(() => warehouseQuery),
-      eq: vi.fn(() => warehouseQuery),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { id: 'wh-1', name: 'Gudang Utama' },
-        error: null,
-      }),
-    }
-    const walkInQuery = {
-      select: vi.fn(() => walkInQuery),
-      eq: vi.fn(() => walkInQuery),
-      single: vi.fn().mockResolvedValue({
-        data: { id: 'cust-walkin' },
-        error: null,
-      }),
-    }
-    const saleSingle = vi.fn().mockResolvedValue({
-      data: { id: 'sale-1' },
-      error: null,
-    })
-    const salesInsert = vi.fn(() => ({
-      select: vi.fn(() => ({
-        single: saleSingle,
-      })),
-    }))
-    const salesItemsInsert = vi.fn().mockResolvedValue({ error: null })
-    const rpcMock = vi.fn().mockResolvedValue({ error: null })
-
     mocks.getActiveBranch.mockResolvedValue({
       id: 'branch-1',
       org_id: 'org-1',
@@ -275,22 +230,14 @@ describe('Sales Branch Context', () => {
       address: null,
       is_active: true,
     })
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1' } },
-        }),
-      },
-      from: vi.fn((table: string) => {
-        if (table === 'contacts') return walkInQuery
-        if (table === 'products') return productsQuery
-        if (table === 'warehouses') return warehouseQuery
-        if (table === 'sales') return { insert: salesInsert }
-        if (table === 'sales_items') return { insert: salesItemsInsert }
-        throw new Error(`Unexpected table ${table}`)
-      }),
-      rpc: rpcMock,
-    })
+    mocks.prisma.products.findMany.mockResolvedValue([{ id: 'prod-1', type: 'INVENTORY' }])
+    mocks.prisma.warehouses.findFirst.mockResolvedValue({ id: 'wh-1' })
+    mocks.tx.contacts.findFirst.mockResolvedValue({ id: 'cust-walkin' })
+    mocks.tx.$queryRaw
+      .mockResolvedValueOnce([{ id: 'sale-1' }])
+      .mockResolvedValueOnce([{ result: { success: true, payment_id: 'pay-1' } }])
+    mocks.tx.sales_items.createMany.mockResolvedValue({ count: 1 })
+    mocks.tx.$executeRaw.mockResolvedValue(1)
 
     const result = await processPosTransaction('org-1', {
       warehouse_id: 'wh-1',
@@ -300,23 +247,43 @@ describe('Sales Branch Context', () => {
     })
 
     expect(result).toEqual({ success: true, saleId: 'sale-1' })
-    expect(salesInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
+    expect(mocks.prisma.products.findMany).toHaveBeenCalledWith({
+      where: {
         org_id: 'org-1',
-        branch_id: 'branch-1',
-        warehouse_id: 'wh-1',
-      })
-    )
-    expect(salesItemsInsert).toHaveBeenCalledWith([
-      expect.objectContaining({
-        org_id: 'org-1',
-        branch_id: 'branch-1',
-      }),
-    ])
-    expect(rpcMock).toHaveBeenCalledWith('process_sales_delivery_atomic', {
-      p_org_id: 'org-1',
-      p_sale_id: 'sale-1',
-      p_warehouse_id: 'wh-1',
+        id: {
+          in: ['prod-1'],
+        },
+      },
+      select: {
+        id: true,
+        type: true,
+      },
     })
+    expect(mocks.tx.$queryRaw.mock.calls[0]).toEqual(
+      expect.arrayContaining(['org-1', 'branch-1', 'wh-1', 'cust-walkin'])
+    )
+    expect(mocks.tx.sales_items.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          org_id: 'org-1',
+          branch_id: 'branch-1',
+          sale_id: 'sale-1',
+        }),
+      ],
+    })
+    expect(
+      mocks.tx.$executeRaw.mock.calls.some((call) =>
+        JSON.stringify(call).includes('process_sales_delivery_atomic') &&
+        JSON.stringify(call).includes('sale-1') &&
+        JSON.stringify(call).includes('wh-1')
+      )
+    ).toBe(true)
+    expect(
+      mocks.tx.$queryRaw.mock.calls.some((call) =>
+        JSON.stringify(call).includes('process_sales_payment_atomic') &&
+        JSON.stringify(call).includes('sale-1') &&
+        JSON.stringify(call).includes('cash-1')
+      )
+    ).toBe(true)
   })
 })

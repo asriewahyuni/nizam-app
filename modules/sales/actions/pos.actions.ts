@@ -1,37 +1,66 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/permissions'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { getActiveBranch } from '@/modules/organization/actions/org.actions'
+import {
+  extractDatabaseError,
+  insertSaleHeader,
+  toNumber,
+  withDbUserContext,
+} from '@/modules/sales/lib/sales-write.server'
+
+type PosWarehouseResult =
+  | { warehouseId: string }
+  | { error: string }
+
+type SalesRpcResult = {
+  success?: boolean
+  error?: string
+  payment_id?: string
+}
 
 async function resolvePosWarehouseId(
-  supabase: any,
   orgId: string,
   branchId: string,
   explicitWarehouseId?: string | null
-) {
-  let query = (supabase as any)
-    .from('warehouses')
-    .select('id, name')
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .eq('branch_id', branchId)
-
+): Promise<PosWarehouseResult> {
   if (explicitWarehouseId) {
-    const { data, error } = await query.eq('id', explicitWarehouseId).maybeSingle()
-    if (error || !data) {
+    const warehouse = await prisma.warehouses.findFirst({
+      where: {
+        id: explicitWarehouseId,
+        org_id: orgId,
+        is_active: true,
+        branch_id: branchId,
+      },
+      select: {
+        id: true,
+      },
+    })
+
+    if (!warehouse) {
       return { error: 'Gudang POS tidak tersedia pada unit aktif.' }
     }
 
-    return { warehouseId: data.id }
+    return { warehouseId: warehouse.id }
   }
 
-  const { data, error } = await query.order('name', { ascending: true }).limit(2)
-  if (error) {
-    return { error: 'Gagal memuat gudang POS.' }
-  }
+  const warehouses = await prisma.warehouses.findMany({
+    where: {
+      org_id: orgId,
+      is_active: true,
+      branch_id: branchId,
+    },
+    select: {
+      id: true,
+    },
+    orderBy: {
+      name: 'asc',
+    },
+    take: 2,
+  })
 
-  const warehouses = (data as Array<{ id: string }>) || []
   if (warehouses.length === 0) {
     return { error: 'Belum ada gudang aktif di unit ini. Tambahkan gudang terlebih dahulu sebelum memakai POS.' }
   }
@@ -43,40 +72,68 @@ async function resolvePosWarehouseId(
   return { warehouseId: warehouses[0].id }
 }
 
-export async function processPosTransaction(orgId: string, payload: any) {
-  const supabase = await createClient()
-  const { data: { user } } = await (supabase as any).auth.getUser()
+export async function processPosTransaction(
+  orgId: string,
+  payload: any
+): Promise<
+  | { success: true; saleId: string; error?: undefined }
+  | { success?: false; error: string; saleId?: undefined }
+> {
+  const user = await getAuthUser()
   if (!user) return { error: 'Not authenticated' }
+
   const activeBranch = await getActiveBranch(orgId)
-  if (!activeBranch) {
+  if (!activeBranch?.id) {
     return { error: 'Pilih unit aktif terlebih dahulu untuk memproses transaksi POS.' }
   }
 
-  const productIds = [...new Set((payload.lines || []).map((line: any) => line.product_id).filter(Boolean))]
+  const lines: any[] = Array.isArray(payload?.lines) ? payload.lines : []
+  const rawProductIds: string[] = []
+
+  for (const line of lines) {
+    const productId = String(line?.product_id || '').trim()
+    if (productId) {
+      rawProductIds.push(productId)
+    }
+  }
+
+  const productIds: string[] = [...new Set(rawProductIds)]
+  const totalAmount = lines.reduce(
+    (acc: number, line: any) => acc + (toNumber(line?.quantity) * toNumber(line?.unit_price)),
+    0
+  )
+  const taxAmount = toNumber(payload?.tax_amount)
+  const discountAmount = toNumber(payload?.discount_amount)
+  const grandTotal = totalAmount + taxAmount - discountAmount
+
   let requiresWarehouse = false
 
   if (productIds.length > 0) {
-    const { data: productRows, error: productError } = await (supabase as any)
-      .from('products')
-      .select('id, type')
-      .eq('org_id', orgId)
-      .in('id', productIds)
+    const productRows = await prisma.products.findMany({
+      where: {
+        org_id: orgId,
+        id: {
+          in: productIds,
+        },
+      },
+      select: {
+        id: true,
+        type: true,
+      },
+    })
 
-    if (productError) {
-      return { error: 'Gagal memvalidasi produk POS: ' + productError.message }
-    }
-
-    requiresWarehouse = (productRows || []).some((product: any) => (product?.type || 'INVENTORY') === 'INVENTORY')
+    requiresWarehouse = productRows.some((product) => String(product.type || 'INVENTORY') === 'INVENTORY')
   }
+
   let resolvedWarehouseId: string | null = null
 
   if (requiresWarehouse) {
     const resolvedWarehouse = await resolvePosWarehouseId(
-      supabase as any,
       orgId,
       activeBranch.id,
-      payload.warehouse_id || null
+      payload?.warehouse_id || null
     )
+
     if ('error' in resolvedWarehouse) {
       return { error: resolvedWarehouse.error }
     }
@@ -84,113 +141,145 @@ export async function processPosTransaction(orgId: string, payload: any) {
     resolvedWarehouseId = resolvedWarehouse.warehouseId
   }
 
-  // 1. Tuntaskan CRM dan Relational Integrity untuk Pelanggan (Cegah Not Null Constraints)
-  let finalCustomerId = payload.customer_id
-  
-  if (!finalCustomerId && payload.new_customer_name) {
-    // A. Buat pelanggan baru untuk disimpan di CRM
-    const { data: newCust } = await (supabase as any).from('contacts').insert({
-      org_id: orgId,
-      name: payload.new_customer_name,
-      phone: payload.new_customer_phone || '-',
-      type: 'CUSTOMER'
-    }).select('id').single()
-    if (newCust) finalCustomerId = newCust.id
+  const transactionDate = new Date().toISOString().split('T')[0]
+  let saleId: string
+
+  try {
+    saleId = await withDbUserContext(user.userId, async (tx) => {
+      let finalCustomerId = String(payload?.customer_id || '').trim() || null
+
+      if (!finalCustomerId && payload?.new_customer_name) {
+        const newCustomer = await tx.contacts.create({
+          data: {
+            org_id: orgId,
+            name: String(payload.new_customer_name).trim(),
+            phone: String(payload?.new_customer_phone || '-').trim() || '-',
+            type: 'CUSTOMER',
+            is_active: true,
+          },
+          select: {
+            id: true,
+          },
+        })
+        finalCustomerId = newCustomer.id
+      }
+
+      if (!finalCustomerId) {
+        const walkIn = await tx.contacts.findFirst({
+          where: {
+            org_id: orgId,
+            name: 'Pelanggan Umum (Walk-In)',
+          },
+          select: {
+            id: true,
+          },
+        })
+
+        if (walkIn?.id) {
+          finalCustomerId = walkIn.id
+        } else {
+          const newWalkIn = await tx.contacts.create({
+            data: {
+              org_id: orgId,
+              name: 'Pelanggan Umum (Walk-In)',
+              phone: '-',
+              type: 'CUSTOMER',
+              is_active: true,
+            },
+            select: {
+              id: true,
+            },
+          })
+          finalCustomerId = newWalkIn.id
+        }
+      }
+
+      const createdSaleId = await insertSaleHeader(tx, {
+        orgId,
+        branchId: activeBranch.id,
+        warehouseId: resolvedWarehouseId,
+        customerId: finalCustomerId,
+        saleDate: transactionDate,
+        dueDate: transactionDate,
+        paymentTerm: 'CASH',
+        totalAmount,
+        taxAmount,
+        discountAmount,
+        grandTotal,
+        shariahMode: 'CASH',
+        notes: payload?.notes || 'POS Transaction',
+        createdBy: user.userId,
+        status: 'DRAFT',
+        paymentStatus: 'PAID',
+      })
+
+      if (lines.length > 0) {
+        await tx.sales_items.createMany({
+          data: lines.map((line: any) => ({
+            org_id: orgId,
+            branch_id: activeBranch.id,
+            sale_id: createdSaleId,
+            product_id: line?.product_id || null,
+            description: line?.product_name || '',
+            quantity: toNumber(line?.quantity),
+            unit_price: toNumber(line?.unit_price),
+            discount_amount: 0,
+            tax_amount: 0,
+          })),
+        })
+      }
+
+      return createdSaleId
+    })
+  } catch (error) {
+    return { error: extractDatabaseError(error).message }
   }
 
-  if (!finalCustomerId) {
-    // B. Tangkap pelanggan numpang lewat / Walk-in
-    const { data: walkIn } = await (supabase as any).from('contacts')
-      .select('id').eq('org_id', orgId).eq('name', 'Pelanggan Umum (Walk-In)').single()
+  let deliveryFailed = false
 
-    if (walkIn) {
-      finalCustomerId = walkIn.id
-    } else {
-      const { data: newWalkIn } = await (supabase as any).from('contacts').insert({
-        org_id: orgId,
-        name: 'Pelanggan Umum (Walk-In)',
-        phone: '-',
-        type: 'CUSTOMER'
-      }).select('id').single()
-      if (newWalkIn) finalCustomerId = newWalkIn.id
+  try {
+    await withDbUserContext(user.userId, async (tx) => {
+      await tx.$executeRaw`
+        SELECT public.process_sales_delivery_atomic(
+          CAST(${orgId} AS uuid),
+          CAST(${saleId} AS uuid),
+          CAST(${resolvedWarehouseId} AS uuid)
+        )
+      `
+    })
+  } catch (error) {
+    deliveryFailed = true
+    ;(console as any).error('Delivery error:', error)
+  }
+
+  if (!deliveryFailed && payload?.account_id) {
+    try {
+      const rows = await withDbUserContext(user.userId, async (tx) =>
+        tx.$queryRaw<Array<{ result: SalesRpcResult }>>`
+          SELECT public.process_sales_payment_atomic(
+            CAST(${orgId} AS uuid),
+            CAST(${saleId} AS uuid),
+            CAST(${payload.account_id} AS uuid),
+            ${grandTotal},
+            0,
+            CAST(${transactionDate} AS timestamptz),
+            ${'POS Payment'},
+            CAST(${user.userId} AS uuid)
+          ) AS result
+        `
+      )
+
+      const paymentResult = rows[0]?.result
+      if (paymentResult?.success === false) {
+        ;(console as any).error('POS payment error:', paymentResult.error)
+      }
+    } catch (error) {
+      ;(console as any).error('POS payment error:', error)
     }
-  }
-
-  // Calculate totals
-  const totalAmount = payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)
-  const taxAmount = payload.tax_amount || 0
-  const discountAmount = payload.discount_amount || 0
-  const grandTotal = totalAmount + taxAmount - discountAmount
-  
-  const { data: sale, error: saleErr } = await (supabase as any)
-    .from('sales' as any)
-    .insert({
-      org_id: orgId,
-      branch_id: activeBranch.id,
-      warehouse_id: resolvedWarehouseId,
-      customer_id: finalCustomerId,
-      sale_date: new Date().toISOString().split('T')[0],
-      due_date: new Date().toISOString().split('T')[0],
-      payment_term: 'CASH',
-      total_amount: totalAmount,
-      tax_amount: taxAmount,
-      discount_amount: discountAmount,
-      grand_total: grandTotal,
-      shariah_mode: 'CASH',
-      notes: payload.notes || 'POS Transaction',
-      created_by: user.id,
-      status: 'DRAFT',
-      payment_status: 'PAID'
-    })
-    .select('id')
-    .single()
-
-  if (saleErr) return { error: saleErr.message }
-
-  const { error: linesErr } = await (supabase as any)
-    .from('sales_items' as any)
-    .insert(payload.lines.map((l: any) => ({
-      org_id: orgId,
-      branch_id: activeBranch.id,
-      sale_id: sale.id,
-      product_id: l.product_id,
-      description: l.product_name,
-      quantity: l.quantity,
-      unit_price: l.unit_price,
-      discount_amount: 0,
-      tax_amount: 0
-    })))
-
-  if (linesErr) {
-    await (supabase as any).from('sales').delete().eq('id', sale.id)
-    return { error: linesErr.message }
-  }
-
-  // Auto-deliver (reduce stock)
-  const { error: deliverErr } = await (supabase as any).rpc('process_sales_delivery_atomic', {
-    p_org_id: orgId,
-    p_sale_id: sale.id,
-    p_warehouse_id: resolvedWarehouseId,
-  })
-
-  // Auto-pay (create journal entry)
-  if (!deliverErr && payload.account_id) {
-    await (supabase as any).rpc('process_sales_payment_atomic', {
-      p_org_id: orgId, 
-      p_sale_id: sale.id, 
-      p_account_id: payload.account_id,
-      p_amount: grandTotal, 
-      p_discount: 0,
-      p_payment_date: new Date().toISOString().split('T')[0],
-      p_notes: 'POS Payment',
-      p_user_id: user.id
-    })
-  } else if (deliverErr) {
-      (console as any).error("Delivery error:", deliverErr)
   }
 
   revalidatePath('/pos')
   revalidatePath('/sales')
   revalidatePath('/inventory')
-  return { success: true, saleId: sale.id }
+  return { success: true, saleId, error: undefined }
 }
