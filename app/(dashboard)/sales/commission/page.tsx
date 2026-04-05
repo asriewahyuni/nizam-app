@@ -1,29 +1,22 @@
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { redirect } from 'next/navigation'
 import CommissionClient from './CommissionClient'
+import { getSales } from '@/modules/sales/actions/sales.actions'
 
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 export default async function CommissionPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return null
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
 
   const orgData = await getActiveOrg()
-  if (!orgData) return null
+  if (!orgData) redirect('/onboarding')
 
   const orgId = orgData.org.id
   const activeBranch = await getActiveBranch(orgId)
-  
-  let query = supabase.from('sales').select('status, grand_total, created_at, created_by')
-    .eq('org_id', orgId)
-    .in('status', ['FINISHED', 'ORDERED'])
+  const sales = (await getSales(orgId, activeBranch?.id)).filter((sale: any) =>
+    ['FINISHED', 'ORDERED'].includes(String(sale.status || ''))
+  )
 
-  if (activeBranch?.id) {
-    query = query.eq('branch_id', activeBranch.id)
-  }
-
-  const { data: sales } = await query
-
-  return <CommissionClient sales={sales || []} />
+  return <CommissionClient sales={sales} />
 }

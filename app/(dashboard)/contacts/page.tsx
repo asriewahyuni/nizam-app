@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { redirect } from 'next/navigation'
 import { getContacts } from '@/modules/contacts/actions/contact.actions'
 import { getDashboardAnalytics } from '@/modules/accounting/actions/analytics.actions'
 import ContactClient from './ContactClient'
@@ -13,13 +14,11 @@ export default async function ContactsPage({
 }: {
   searchParams?: ContactsSearchParams
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return null
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
 
   const orgData = await getActiveOrg()
-  if (!orgData) return null
+  if (!orgData) redirect('/onboarding')
 
   const orgId = orgData.org.id
   const activeBranch = await getActiveBranch(orgId)

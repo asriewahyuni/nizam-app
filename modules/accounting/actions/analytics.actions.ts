@@ -1,55 +1,107 @@
-import { createClient } from '@/lib/supabase/server'
-import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns'
+import { format, subMonths, startOfMonth } from 'date-fns'
+import { getAuthUser, getMembership } from '@/lib/auth/permissions'
+import { prisma } from '@/lib/prisma'
+
+function createEmptyAnalytics() {
+  return {
+    chartData: [],
+    topExpenses: [],
+    topProducts: [],
+    paretoAnalysis: {
+      totalProducts: 0,
+      top20Count: 0,
+      top20Revenue: 0,
+      top20Profit: 0,
+      totalRevenue: 0,
+      totalProfit: 0,
+      paretoProducts: [],
+    },
+    customerPareto: {
+      totalCustomers: 0,
+      top20Count: 0,
+      top20Revenue: 0,
+      top20Profit: 0,
+      totalRevenue: 0,
+      totalProfit: 0,
+      paretoCustomers: [],
+    },
+  }
+}
 
 export async function getDashboardAnalytics(orgId: string, branchId?: string) {
-  const supabase = await createClient()
-  const db = supabase as any
+  const user = await getAuthUser()
+  if (!user) return createEmptyAnalytics()
 
-  const startDate = format(subMonths(new Date(), 5), 'yyyy-MM-01')
+  const membership = await getMembership(user.userId, orgId)
+  if (!membership) return createEmptyAnalytics()
+
+  const startDate = startOfMonth(subMonths(new Date(), 5))
 
   // 1. Financial Analytics (Journal Entries)
-  let entriesQuery = (supabase as any)
-    .from('journal_entries')
-    .select('id, entry_date')
-    .eq('org_id', orgId)
-    .eq('status', 'POSTED')
-    .gte('entry_date', startDate)
-
-  if (branchId) {
-    entriesQuery = entriesQuery.eq('branch_id', branchId)
-  }
-
-  const { data: entries } = await entriesQuery
+  const entries = await prisma.journal_entries.findMany({
+    where: {
+      org_id: orgId,
+      status: 'POSTED',
+      entry_date: {
+        gte: startDate,
+      },
+      ...(branchId ? { branch_id: branchId } : {}),
+    },
+    select: {
+      id: true,
+      entry_date: true,
+    },
+  })
 
   let chartData: any[] = []
   let topExpenses: any[] = []
 
-  if (entries && entries.length > 0) {
-    const entryIds = entries.map((e: any) => e.id)
-    const entryDateMap: Record<string, string> = {}
-    entries.forEach((e: any) => { entryDateMap[e.id] = e.entry_date })
+  if (entries.length > 0) {
+    const entryIds = entries.map((entry) => entry.id)
+    const entryDateMap = new Map(entries.map((entry) => [entry.id, entry.entry_date]))
 
-    const { data: lines } = await db
-      .from('journal_lines')
-      .select('debit, credit, entry_id, accounts!inner(code, name, type)')
-      .in('entry_id', entryIds) as any
+    const lines = await prisma.journal_lines.findMany({
+      where: {
+        entry_id: {
+          in: entryIds,
+        },
+      },
+      select: {
+        debit: true,
+        credit: true,
+        entry_id: true,
+        accounts: {
+          select: {
+            code: true,
+            name: true,
+            type: true,
+          },
+        },
+      },
+    })
 
-    if (lines) {
-      const monthlyData: Record<string, { revenue: number; expense: number }> = {}
+    if (lines.length > 0) {
+      const monthlyData: Record<string, { revenue: number; expense: number; sortKey: number }> = {}
       const expenseBreakdown: Record<string, number> = {}
 
-      lines.forEach((line: any) => {
-        const entryDate = entryDateMap[line.entry_id]
+      lines.forEach((line) => {
+        const entryDate = entryDateMap.get(line.entry_id)
         if (!entryDate) return
 
-        const month = format(new Date(entryDate), 'MMM yyyy')
-        if (!monthlyData[month]) monthlyData[month] = { revenue: 0, expense: 0 }
-
-        if (line.accounts.type === 'REVENUE') {
-          monthlyData[month].revenue += (Number(line.credit) - Number(line.debit))
+        const month = format(entryDate, 'MMM yyyy')
+        if (!monthlyData[month]) {
+          monthlyData[month] = {
+            revenue: 0,
+            expense: 0,
+            sortKey: startOfMonth(entryDate).getTime(),
+          }
         }
-        if (line.accounts.type === 'EXPENSE') {
-          const val = (Number(line.debit) - Number(line.credit))
+
+        if (line.accounts?.type === 'REVENUE') {
+          monthlyData[month].revenue += Number(line.credit || 0) - Number(line.debit || 0)
+        }
+        if (line.accounts?.type === 'EXPENSE') {
+          const val = Number(line.debit || 0) - Number(line.credit || 0)
           monthlyData[month].expense += val
           const name = line.accounts.name || line.accounts.code
           expenseBreakdown[name] = (expenseBreakdown[name] || 0) + val
@@ -57,8 +109,15 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
       })
 
       chartData = Object.entries(monthlyData)
-        .map(([name, vals]) => ({ name, revenue: vals.revenue, expense: vals.expense, profit: vals.revenue - vals.expense }))
-        .sort((a: any, b: any) => new Date(a.name).getTime() - new Date(b.name).getTime())
+        .map(([name, vals]) => ({
+          name,
+          revenue: vals.revenue,
+          expense: vals.expense,
+          profit: vals.revenue - vals.expense,
+          sortKey: vals.sortKey,
+        }))
+        .sort((a: any, b: any) => a.sortKey - b.sortKey)
+        .map(({ sortKey, ...item }) => item)
 
       topExpenses = Object.entries(expenseBreakdown)
         .map(([name, value]) => ({ name, value }))
@@ -69,51 +128,54 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
 
   // 2. Product Pareto Analytics (Top 10 & 20/80 Analysis)
   // Get sales in last 3 months for better Pareto sample
-  const paretoStartDate = format(subMonths(new Date(), 3), 'yyyy-MM-01')
-  
-  let salesQuery = (supabase as any)
-    .from('sales_items')
-    .select(`
-      quantity,
-      total_amount,
-      product:products(id, name, average_cost)
-    `)
-    .eq('org_id', orgId)
-    .gte('created_at', paretoStartDate)
+  const paretoStartDate = startOfMonth(subMonths(new Date(), 3))
 
-  if (branchId) {
-    salesQuery = salesQuery.eq('branch_id', branchId)
-  }
-
-  const { data: saleItems } = await salesQuery as any
+  const saleItems = await prisma.sales_items.findMany({
+    where: {
+      org_id: orgId,
+      created_at: {
+        gte: paretoStartDate,
+      },
+      ...(branchId ? { branch_id: branchId } : {}),
+    },
+    select: {
+      quantity: true,
+      total_amount: true,
+      products: {
+        select: {
+          id: true,
+          name: true,
+          average_cost: true,
+        },
+      },
+    },
+  })
 
   const productStats: Record<string, { name: string; revenue: number; profit: number; qty: number }> = {}
   let totalRevenue = 0
   let totalProfit = 0
 
-  if (saleItems) {
-    saleItems.forEach((item: any) => {
-      const p = item.product
-      if (!p) return
-      if (!productStats[p.id]) productStats[p.id] = { name: p.name, revenue: 0, profit: 0, qty: 0 }
-      
-      const rev = Number(item.total_amount || 0)
-      const cost = Number(p.average_cost || 0) * Number(item.quantity || 0)
-      const prof = rev - cost
-      
-      productStats[p.id].revenue += rev
-      productStats[p.id].profit += prof
-      productStats[p.id].qty += Number(item.quantity || 0)
-      totalRevenue += rev
-      totalProfit += prof
-    })
-  }
+  saleItems.forEach((item) => {
+    const product = item.products
+    if (!product) return
+    if (!productStats[product.id]) {
+      productStats[product.id] = { name: product.name, revenue: 0, profit: 0, qty: 0 }
+    }
+
+    const rev = Number(item.total_amount || 0)
+    const quantity = Number(item.quantity || 0)
+    const cost = Number(product.average_cost || 0) * quantity
+    const prof = rev - cost
+
+    productStats[product.id].revenue += rev
+    productStats[product.id].profit += prof
+    productStats[product.id].qty += quantity
+    totalRevenue += rev
+    totalProfit += prof
+  })
 
   const sortedProducts = Object.values(productStats)
     .sort((a: any, b: any) => b.revenue - a.revenue)
-
-  // Top 10 Products
-  const topProducts = sortedProducts.slice(0, 10)
 
   // Pareto Logic: Top 20% of products that generate 80% of revenue
   let runningRevenue = 0
@@ -125,48 +187,58 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
   })
 
   // 3. Customer Pareto Analytics (Pelanggan Penyumbang Untung Terbesar)
-  // Join sales items to get profit per customer
-  let customerSalesQuery = (supabase as any)
-    .from('sales_items')
-    .select(`
-      total_amount,
-      quantity,
-      sales!inner(customer_id, sale_date, contacts(id, name)),
-      product:products(average_cost)
-    `)
-    .eq('org_id', orgId)
-    .gte('sales.sale_date', paretoStartDate)
-
-  if (branchId) {
-    customerSalesQuery = customerSalesQuery.eq('branch_id', branchId)
-  }
-
-  const { data: customerData } = await customerSalesQuery as any
+  const recentSales = await prisma.sales.findMany({
+    where: {
+      org_id: orgId,
+      sale_date: {
+        gte: paretoStartDate,
+      },
+      ...(branchId ? { branch_id: branchId } : {}),
+    },
+    select: {
+      contacts: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      sales_items: {
+        select: {
+          total_amount: true,
+          quantity: true,
+          products: {
+            select: {
+              average_cost: true,
+            },
+          },
+        },
+      },
+    },
+  })
 
   const customerStats: Record<string, { id: string; name: string; revenue: number; profit: number }> = {}
   let totalCustomerRevenue = 0
   let totalCustomerProfit = 0
 
-  if (customerData) {
-    customerData.forEach((item: any) => {
-      const sale = item.sales
-      const contact = sale?.contacts
-      if (!contact) return
-      
-      if (!customerStats[contact.id]) {
-        customerStats[contact.id] = { id: contact.id, name: contact.name, revenue: 0, profit: 0 }
-      }
-      
-      const rev = Number(item.total_amount || 0)
-      const cost = Number(item.product?.average_cost || 0) * Number(item.quantity || 0)
-      const prof = rev - cost
-      
-      customerStats[contact.id].revenue += rev
+  recentSales.forEach((sale) => {
+    const contact = sale.contacts
+    if (!contact) return
+
+    if (!customerStats[contact.id]) {
+      customerStats[contact.id] = { id: contact.id, name: contact.name, revenue: 0, profit: 0 }
+    }
+
+    sale.sales_items.forEach((item) => {
+      const revenue = Number(item.total_amount || 0)
+      const cost = Number(item.products?.average_cost || 0) * Number(item.quantity || 0)
+      const prof = revenue - cost
+
+      customerStats[contact.id].revenue += revenue
       customerStats[contact.id].profit += prof
-      totalCustomerRevenue += rev
+      totalCustomerRevenue += revenue
       totalCustomerProfit += prof
     })
-  }
+  })
 
   const sortedCustomers = Object.values(customerStats)
     .sort((a: any, b: any) => b.revenue - a.revenue)

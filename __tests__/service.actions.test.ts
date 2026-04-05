@@ -1,14 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createSupabaseMock, success } from './helpers/supabase-mock'
 
 const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
+  prisma: {
+    service_orders: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
+  },
   revalidatePath: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: mocks.createClient,
+vi.mock('@/lib/prisma', () => ({
+  prisma: mocks.prisma,
 }))
 
 vi.mock('next/cache', () => ({
@@ -36,29 +42,13 @@ function buildServiceOrderForm(overrides: Record<string, string> = {}) {
   return formData
 }
 
-function getFirstOperationArg(callTable: string, method: string, calls: Array<{ table: string; operations: Array<{ method: string; args: unknown[] }> }>) {
-  const call = calls.find((entry) =>
-    entry.table === callTable && entry.operations.some((operation) => operation.method === method)
-  )
-  return call?.operations.find((operation) => operation.method === method)?.args[0]
-}
-
 describe('Service Order Actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('filters service orders by resolved branch selection', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        service_orders: [
-          {
-            result: success([]),
-          },
-        ],
-      },
-    })
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.service_orders.findMany.mockResolvedValue([])
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-1'] },
       branchId: 'branch-1',
@@ -66,30 +56,19 @@ describe('Service Order Actions', () => {
 
     await getServiceOrders('org-1')
 
-    const branchFilter = supabase.calls[0]?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
-    )
-    expect(branchFilter?.args[1]).toBe('branch-1')
+    const findManyArgs = mocks.prisma.service_orders.findMany.mock.calls[0]?.[0]
+    expect(findManyArgs.where.branch_id).toBe('branch-1')
   })
 
   it('stamps branch_id when creating a service order', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        service_orders: [
-          {
-            result: success([]),
-          },
-        ],
-      },
-    })
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.service_orders.create.mockResolvedValue({ id: 'service-1' })
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-1'] },
       branchId: 'branch-1',
     })
 
     const result = await createServiceOrder('org-1', buildServiceOrderForm())
-    const payload = getFirstOperationArg('service_orders', 'insert', supabase.calls) as Record<string, string>
+    const payload = mocks.prisma.service_orders.create.mock.calls[0]?.[0]?.data as Record<string, string>
 
     expect(result).toEqual({ success: true })
     expect(payload.branch_id).toBe('branch-1')
@@ -97,33 +76,22 @@ describe('Service Order Actions', () => {
   })
 
   it('updates service status only inside the document branch', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        service_orders: [
-          {
-            maybeSingleResult: success({
-              id: 'service-1',
-              branch_id: 'branch-1',
-            }),
-          },
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.prisma.service_orders.findFirst.mockResolvedValue({
+      id: 'service-1',
+      branch_id: 'branch-1',
     })
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.service_orders.update.mockResolvedValue({ id: 'service-1' })
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-1'] },
       branchId: 'branch-1',
     })
 
     const result = await updateServiceStatus('org-1', 'service-1', 'COMPLETED')
-    const branchFilter = supabase.calls[1]?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
-    )
+    const resolveArgs = mocks.resolveAccessibleBranchSelection.mock.calls[0]
+    const updateArgs = mocks.prisma.service_orders.update.mock.calls[0]?.[0]
 
     expect(result).toEqual({ success: true })
-    expect(branchFilter?.args[1]).toBe('branch-1')
+    expect(resolveArgs).toEqual(['org-1', 'branch-1'])
+    expect(updateArgs.where.id).toBe('service-1')
   })
 })

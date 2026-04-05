@@ -1,103 +1,137 @@
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import { CashClient } from './CashClient'
 import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
+import type { Account, NormalBalance, AccountType } from '@/types/database.types'
 import { getRecentBankTransactions } from '@/modules/cash/actions/bank.actions'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 async function getPostedEntryIds(orgId: string, branchId?: string | null) {
-  const supabase = await createClient()
-  let query = supabase
-    .from('journal_entries')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('status', 'POSTED')
+  const data = await prisma.journal_entries.findMany({
+    where: {
+      org_id: orgId,
+      status: 'POSTED',
+      ...(branchId ? { branch_id: branchId } : {}),
+    },
+    select: {
+      id: true,
+    },
+  })
 
-  if (branchId) {
-    query = query.eq('branch_id', branchId)
+  return data.map((entry) => entry.id)
+}
+
+function normalizeAccountForCash(account: {
+  id: string
+  org_id: string
+  code: string
+  name: string
+  type: string
+  normal_balance: string
+  parent_id: string | null
+  description: string | null
+  is_system: boolean
+  is_active: boolean
+  created_at: Date
+  updated_at: Date
+}): Account {
+  return {
+    id: account.id,
+    org_id: account.org_id,
+    code: account.code,
+    name: account.name,
+    type: account.type as AccountType,
+    normal_balance: account.normal_balance as NormalBalance,
+    parent_id: account.parent_id,
+    description: account.description,
+    is_system: account.is_system,
+    is_active: account.is_active,
+    created_at: account.created_at.toISOString(),
+    updated_at: account.updated_at.toISOString(),
   }
-
-  const { data, error } = await query
-  if (error || !Array.isArray(data)) return []
-  return data.map((entry: any) => entry.id)
 }
 
 export async function getBankAccountsWithBalance(orgId: string, branchId?: string | null) {
-  const supabase = await createClient()
+  const accounts = await prisma.bank_accounts.findMany({
+    where: {
+      org_id: orgId,
+      ...(branchId ? { branch_id: branchId } : {}),
+    },
+    include: {
+      accounts: true,
+    },
+    orderBy: {
+      bank_name: 'asc',
+    },
+  })
 
-  // Fetch bank accounts joined with their base GL account
-  let accountsQuery = supabase
-    .from('bank_accounts')
-    .select(`
-      *,
-      account:accounts(*)
-    `)
-    .eq('org_id', orgId)
+  if (accounts.length === 0) return []
 
-  if (branchId) {
-    accountsQuery = accountsQuery.eq('branch_id', branchId)
-  }
-
-  const { data: accounts, error: accError } = await accountsQuery.order('bank_name', { ascending: true })
-
-  if (accError || !accounts) return []
-  const accountsTyped = accounts as any[]
-  if (accountsTyped.length === 0) return []
-
-  const accountIds = accountsTyped.map(a => a.account_id)
+  const accountIds = accounts.map((account) => account.account_id)
+  const balanceMap = new Map<string, number>()
 
   if (!branchId) {
-    const { data: balances, error: balError } = await supabase
-      .from('account_balances')
-      .select('account_id, balance')
-      .in('account_id', accountIds)
+    const balances = await prisma.$queryRaw<Array<{ account_id: string; balance: number }>>`
+      SELECT
+        account_id::text AS account_id,
+        COALESCE(balance, 0)::double precision AS balance
+      FROM public.account_balances
+      WHERE org_id = CAST(${orgId} AS uuid)
+    `
 
-    if (balError) return accountsTyped.map(a => ({ ...a, balances: { balance: 0 } }))
-
-    return accountsTyped.map((acc: any) => {
-      const balData = (balances as any[])?.find(b => b.account_id === acc.account_id)
-      return {
-        ...acc,
-        balances: balData || { balance: 0 }
+    balances.forEach((balance) => {
+      if (accountIds.includes(balance.account_id)) {
+        balanceMap.set(balance.account_id, Number(balance.balance || 0))
       }
     })
+  } else {
+    const entryIds = await getPostedEntryIds(orgId, branchId)
+    if (entryIds.length > 0) {
+      const lines = await prisma.journal_lines.findMany({
+        where: {
+          entry_id: {
+            in: entryIds,
+          },
+          account_id: {
+            in: accountIds,
+          },
+        },
+        select: {
+          account_id: true,
+          debit: true,
+          credit: true,
+        },
+      })
+
+      for (const line of lines) {
+        const current = balanceMap.get(line.account_id) || 0
+        balanceMap.set(line.account_id, current + Number(line.debit || 0) - Number(line.credit || 0))
+      }
+    }
   }
 
-  const entryIds = await getPostedEntryIds(orgId, branchId)
-  if (entryIds.length === 0) {
-    return accountsTyped.map((acc: any) => ({
-      ...acc,
-      balances: { balance: 0 },
-    }))
-  }
-
-  const { data: lines, error: linesError } = await supabase
-    .from('journal_lines')
-    .select('account_id, debit, credit')
-    .in('entry_id', entryIds)
-    .in('account_id', accountIds)
-
-  if (linesError || !Array.isArray(lines)) {
-    return accountsTyped.map((acc: any) => ({ ...acc, balances: { balance: 0 } }))
-  }
-
-  const balanceMap = new Map<string, number>()
-  for (const line of lines as any[]) {
-    const current = balanceMap.get(line.account_id) || 0
-    balanceMap.set(line.account_id, current + Number(line.debit || 0) - Number(line.credit || 0))
-  }
-
-  return accountsTyped.map((acc: any) => ({
-    ...acc,
-    balances: { balance: balanceMap.get(acc.account_id) || 0 },
+  return accounts.map((account) => ({
+    id: account.id,
+    org_id: account.org_id,
+    branch_id: account.branch_id,
+    account_id: account.account_id,
+    account_name: account.accounts.name,
+    bank_name: account.bank_name,
+    account_number: account.account_number,
+    currency: account.currency,
+    current_balance: balanceMap.get(account.account_id) || 0,
+    is_active: account.is_active,
+    created_at: account.created_at.toISOString(),
+    updated_at: account.updated_at.toISOString(),
+    account: normalizeAccountForCash(account.accounts),
+    balances: { balance: balanceMap.get(account.account_id) || 0 },
   }))
 }
 
 export default async function CashPage() {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
 
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')

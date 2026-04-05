@@ -1,24 +1,24 @@
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { redirect } from 'next/navigation'
 import { getQuotations } from '@/modules/sales/actions/sales.actions'
+import { getContacts } from '@/modules/contacts/actions/contact.actions'
 import { getProducts } from '@/modules/inventory/actions/inventory.actions'
 import QuotationClient from './QuotationClient'
 
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 export default async function QuotationsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
 
   const orgData = await getActiveOrg()
-  if (!orgData) return null
+  if (!orgData) redirect('/onboarding')
 
   const orgId = orgData.org.id
   const activeBranch = await getActiveBranch(orgId)
   const quotations = await getQuotations(orgId, activeBranch?.id)
-  
-  const { data: customers } = await supabase.from('contacts').select('id, name').eq('org_id', orgId).eq('type', 'CUSTOMER')
+  const customers = await getContacts(orgId, 'CUSTOMER')
   const products = await getProducts(orgId, activeBranch?.id)
 
-  return <QuotationClient orgId={orgId} quotations={quotations} customers={customers || []} products={products || []} />
+  return <QuotationClient orgId={orgId} quotations={quotations} customers={customers} products={products || []} />
 }

@@ -1,29 +1,22 @@
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { redirect } from 'next/navigation'
 import PipelineClient from './PipelineClient'
+import { getSales } from '@/modules/sales/actions/sales.actions'
 
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 export default async function PipelinePage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return null
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
 
   const orgData = await getActiveOrg()
-  if (!orgData) return null
+  if (!orgData) redirect('/onboarding')
 
   const orgId = orgData.org.id
   const activeBranch = await getActiveBranch(orgId)
-
-  let query = supabase.from('sales').select('*, contacts(name, phone, email)')
-    .eq('org_id', orgId)
-    .in('status', ['QUOTATION', 'DRAFT', 'ORDERED', 'FINISHED'])
-
-  if (activeBranch?.id) {
-    query = query.eq('branch_id', activeBranch.id)
-  }
-
-  const { data: sales } = await query.order('created_at', { ascending: false })
+  const sales = (await getSales(orgId, activeBranch?.id)).filter((sale: any) =>
+    ['QUOTATION', 'DRAFT', 'ORDERED', 'FINISHED'].includes(String(sale.status || ''))
+  )
   
-  return <PipelineClient orgId={orgId} sales={sales || []} />
+  return <PipelineClient orgId={orgId} sales={sales} />
 }

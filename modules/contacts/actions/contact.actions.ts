@@ -1,6 +1,7 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/permissions'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 
 type ContactType = 'CUSTOMER' | 'SUPPLIER'
@@ -20,10 +21,46 @@ type DeleteContactResult =
   | { success: true; error?: undefined }
   | { success?: false; error: string }
 
+const contactSelect = {
+  id: true,
+  org_id: true,
+  name: true,
+  type: true,
+  email: true,
+  phone: true,
+  address: true,
+  phone_wa: true,
+  instagram: true,
+  is_active: true,
+  created_at: true,
+  updated_at: true,
+} as const
+
 function normalizeOptionalField(value: FormDataEntryValue | null) {
   if (typeof value !== 'string') return null
   const normalized = value.trim()
   return normalized.length > 0 ? normalized : null
+}
+
+function normalizeContact(contact: {
+  id: string
+  org_id: string
+  name: string
+  type: string
+  email: string | null
+  phone: string | null
+  address: string | null
+  phone_wa: string | null
+  instagram: string | null
+  is_active: boolean
+  created_at: Date
+  updated_at: Date
+}) {
+  return {
+    ...contact,
+    created_at: contact.created_at.toISOString(),
+    updated_at: contact.updated_at.toISOString(),
+  }
 }
 
 function parseContactFormData(formData: FormData): ContactMutationPayload | { error: string } {
@@ -54,84 +91,100 @@ function revalidateContactPages() {
 }
 
 export async function getContacts(orgId: string, type?: 'CUSTOMER' | 'SUPPLIER') {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
+  const user = await getAuthUser()
   if (!user) return []
 
-  let query = supabase.from('contacts' as any).select('*').eq('org_id', orgId).eq('is_active', true)
-  if (type) query = query.eq('type', type)
+  const data = await prisma.contacts.findMany({
+    where: {
+      org_id: orgId,
+      is_active: true,
+      ...(type ? { type } : {}),
+    },
+    select: contactSelect,
+    orderBy: {
+      name: 'asc',
+    },
+  })
 
-  const { data, error } = await (query.order('name', { ascending: true }) as any)
-  if (error) return []
-  return data
+  return data.map(normalizeContact)
 }
 
 export async function createContact(orgId: string, formData: FormData): Promise<ContactMutationResult> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
+  const user = await getAuthUser()
   if (!user) return { error: 'Unauthorized' }
 
   const payload = parseContactFormData(formData)
   if ('error' in payload) return payload
 
-  const { data, error } = await (supabase as any).from('contacts').insert({
-    org_id: orgId,
-    ...payload,
-    is_active: true
-  }).select().single()
+  try {
+    const data = await prisma.contacts.create({
+      data: {
+        org_id: orgId,
+        ...payload,
+        is_active: true,
+      },
+      select: contactSelect,
+    })
 
-  if (error) return { error: 'Gagal membuat kontak: ' + error.message }
-
-  revalidateContactPages()
-  return { success: true, data }
+    revalidateContactPages()
+    return { success: true, data: normalizeContact(data) }
+  } catch (error) {
+    return { error: `Gagal membuat kontak: ${error instanceof Error ? error.message : 'Unknown error'}` }
+  }
 }
 
 export async function updateContact(orgId: string, contactId: string, formData: FormData): Promise<ContactMutationResult> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
+  const user = await getAuthUser()
   if (!user) return { error: 'Unauthorized' }
 
   const payload = parseContactFormData(formData)
   if ('error' in payload) return payload
 
-  const { data, error } = await (supabase as any)
-    .from('contacts')
-    .update({
-      ...payload,
-      updated_at: new Date().toISOString(),
+  const existing = await prisma.contacts.findFirst({
+    where: {
+      id: contactId,
+      org_id: orgId,
+      is_active: true,
+    },
+    select: { id: true },
+  })
+
+  if (!existing) return { error: 'Kontak tidak ditemukan.' }
+
+  try {
+    const data = await prisma.contacts.update({
+      where: { id: contactId },
+      data: {
+        ...payload,
+        updated_at: new Date(),
+      },
+      select: contactSelect,
     })
-    .eq('id', contactId)
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .select()
-    .single()
 
-  if (error) return { error: 'Gagal memperbarui kontak: ' + error.message }
-
-  revalidateContactPages()
-  return { success: true, data }
+    revalidateContactPages()
+    return { success: true, data: normalizeContact(data) }
+  } catch (error) {
+    return { error: `Gagal memperbarui kontak: ${error instanceof Error ? error.message : 'Unknown error'}` }
+  }
 }
 
 export async function deleteContact(orgId: string, contactId: string): Promise<DeleteContactResult> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
+  const user = await getAuthUser()
   if (!user) return { error: 'Unauthorized' }
 
-  const { error } = await (supabase as any)
-    .from('contacts')
-    .update({
+  const result = await prisma.contacts.updateMany({
+    where: {
+      id: contactId,
+      org_id: orgId,
+      is_active: true,
+    },
+    data: {
       is_active: false,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', contactId)
-    .eq('org_id', orgId)
-    .eq('is_active', true)
+      updated_at: new Date(),
+    },
+  })
 
-  if (error) return { error: 'Gagal menghapus kontak: ' + error.message }
+  if (result.count === 0) return { error: 'Gagal menghapus kontak: data tidak ditemukan.' }
 
   revalidateContactPages()
   return { success: true }

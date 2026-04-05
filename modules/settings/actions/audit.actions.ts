@@ -3,7 +3,6 @@
 import { auth } from '@/auth'
 import { getMembership } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
-import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 export type ResetOrganizationMode = 'transactions' | 'all_data'
@@ -12,8 +11,6 @@ type ResetOrganizationOptions = {
   mode?: ResetOrganizationMode
   confirmationText?: string
 }
-
-type AdminDbClient = Awaited<ReturnType<typeof createAdminClient>>
 
 const TRANSACTION_RESET_TABLES = [
   'approval_requests',
@@ -78,40 +75,32 @@ function getExpectedConfirmationText(orgName: string, mode: ResetOrganizationMod
   return 'RESET TRANSAKSI'
 }
 
-async function clearTablesByOrg(db: AdminDbClient, orgId: string, tables: readonly string[]) {
-  const isSkippableMissingObjectError = (error: { code?: string; message?: string } | null | undefined) => {
-    if (!error) return false
+function isSkippableMissingObjectError(error: unknown) {
+  const message = String((error as { message?: string } | null | undefined)?.message || '').toLowerCase()
 
-    const code = String(error.code || '').toUpperCase()
-    const message = String(error.message || '').toLowerCase()
+  return (
+    message.includes('relation') && message.includes('does not exist')
+  ) || (
+    message.includes('column') && message.includes('does not exist')
+  ) || (
+    message.includes('could not find the table')
+  ) || (
+    message.includes('schema cache')
+  )
+}
 
-    // postgres
-    if (code === '42P01' || code === '42703') return true
-
-    // postgrest schema-cache misses
-    if (code === 'PGRST205' || code === 'PGRST204') return true
-
-    // fallback by message (in case code differs across env)
-    if (
-      message.includes('could not find the table') ||
-      message.includes('schema cache') ||
-      message.includes('does not exist') ||
-      message.includes('could not find the') && message.includes('column')
-    ) {
-      return true
-    }
-
-    return false
-  }
-
+async function clearTablesByOrg(orgId: string, tables: readonly string[]) {
   for (const table of tables) {
-    const { error } = await db
-      .from(table)
-      .delete()
-      .eq('org_id', orgId)
-
-    if (error && !isSkippableMissingObjectError(error)) {
-      return { success: false, error: `Error di tabel ${table}: ${error.message}` }
+    try {
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM public."${table}" WHERE org_id = $1`,
+        orgId
+      )
+    } catch (error) {
+      if (!isSkippableMissingObjectError(error)) {
+        const message = error instanceof Error ? error.message : 'Unknown reset error'
+        return { success: false, error: `Error di tabel ${table}: ${message}` }
+      }
     }
   }
 
@@ -233,7 +222,6 @@ export async function createAuditLog(
 }
 
 export async function resetOrganizationData(orgId: string, options: ResetOrganizationOptions = {}) {
-  const adminClient = await createAdminClient()
   const mode = options.mode || 'transactions'
 
   try {
@@ -270,13 +258,13 @@ export async function resetOrganizationData(orgId: string, options: ResetOrganiz
       return { success: false, error: `Konfirmasi tidak cocok. Ketik "${expectedConfirmation}" untuk melanjutkan.` }
     }
 
-    const transactionReset = await clearTablesByOrg(adminClient, trimmedOrgId, TRANSACTION_RESET_TABLES)
+    const transactionReset = await clearTablesByOrg(trimmedOrgId, TRANSACTION_RESET_TABLES)
     if (!transactionReset.success) {
       return transactionReset
     }
 
     if (mode === 'all_data') {
-      const masterReset = await clearTablesByOrg(adminClient, trimmedOrgId, FULL_RESET_MASTER_TABLES)
+      const masterReset = await clearTablesByOrg(trimmedOrgId, FULL_RESET_MASTER_TABLES)
       if (!masterReset.success) {
         return masterReset
       }

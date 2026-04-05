@@ -31,9 +31,7 @@ import {
   LogIn
 } from 'lucide-react'
 import { PageHeader, SectionCard, SectionHeader, SafeButton, StatusBadge, ConfirmDialog } from '@/components/ui/NizamUI'
-import { createClient } from '@/lib/supabase/client'
 import { signInAsTenantOwner } from '@/modules/auth/actions/auth.actions'
-import { Organization } from '@/types/database.types'
 import Link from 'next/link'
 import {
   calculateAiHppPerGeneration,
@@ -41,8 +39,22 @@ import {
   calculateAiRecommendedSellPerGeneration,
   normalizeAiTokenPolicy,
 } from '@/modules/ai/lib/ai-token'
-
-const supabase = createClient()
+import {
+  approveSaasInvoice,
+  cancelSaasInvoice,
+  deleteAiTopupPackage,
+  deleteSaasInvoice,
+  deleteSaasOrganization,
+  deleteSaasPackage,
+  getSaasAdminSnapshot,
+  saveAiTokenConfig as saveAiTokenConfigAction,
+  saveAiTopupPackage,
+  saveSaasOrganization,
+  saveSaasPackage,
+  saveSaasSettings,
+  toggleAiTopupPackageStatus,
+  toggleSaasPackageStatus,
+} from '@/modules/saas/actions/admin.actions'
 
 const CORE_MODULES = [
   'Dashboard', 'Audit Integritas',
@@ -59,10 +71,14 @@ const ADDON_MODULES = [
 ]
 
 type Tab = 'users' | 'packages' | 'invoices' | 'settings' | 'ai_tokens'
+type AdminSnapshot = Awaited<ReturnType<typeof getSaasAdminSnapshot>>
+type AdminInvoice = AdminSnapshot['invoices'][number]
+type AdminOrganization = AdminSnapshot['orgs'][number]
+type AdminPackage = AdminSnapshot['packages'][number]
+type AdminTopupPackage = AdminSnapshot['aiTopupPackages'][number]
 
 export default function SaaSAdminPage() {
-  const db = supabase as any
-  const [invoices, setInvoices] = useState<any[]>([])
+  const [invoices, setInvoices] = useState<AdminInvoice[]>([])
   const [activeTab, setActiveTab] = useState<Tab>('users')
   const [searchTxt, setSearchTxt] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'demo' | 'official'>('all')
@@ -70,13 +86,13 @@ export default function SaaSAdminPage() {
   const [saasSettings, setSaasSettings] = useState<any>({ bank_info: {}, support_info: {} })
   const [aiTokenPolicyRaw, setAiTokenPolicyRaw] = useState<any>({})
   const [aiTokenInventory, setAiTokenInventory] = useState<any>({ total_stock_tokens: 0 })
-  const [aiTopupPackages, setAiTopupPackages] = useState<any[]>([])
+  const [aiTopupPackages, setAiTopupPackages] = useState<AdminTopupPackage[]>([])
   const [aiWalletSummary, setAiWalletSummary] = useState({
     totalBalance: 0,
     totalPurchased: 0,
     totalUsed: 0,
   })
-  const [aiTopupModal, setAiTopupModal] = useState<{ open: boolean; editData: any | null }>({ open: false, editData: null })
+  const [aiTopupModal, setAiTopupModal] = useState<{ open: boolean; editData: AdminTopupPackage | null }>({ open: false, editData: null })
 
   const aiPolicy = normalizeAiTokenPolicy(aiTokenPolicyRaw)
   const aiHppPerGenerate = calculateAiHppPerGeneration(aiPolicy)
@@ -84,54 +100,46 @@ export default function SaaSAdminPage() {
   const aiRecommendedPer1kToken = calculateAiRecommendedSellPer1kTokens(aiPolicy)
   const aiAvailableStock = Math.max(0, Number(aiTokenInventory?.total_stock_tokens || 0) - aiWalletSummary.totalBalance)
 
-  useEffect(() => {
-    async function fetchConfig() {
-      const { data } = await db.from('saas_config').select('*')
-      if (data) {
-        const config: any = {}
-        data.forEach((item: any) => config[item.key] = item.value)
-        setSaasSettings(config)
-      }
-    }
-    fetchConfig()
-  }, [])
-
   const saveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
     const fd = new FormData(e.currentTarget as HTMLFormElement)
     const bank = { 
-      bank: fd.get('bank_name'), 
-      account: fd.get('bank_acc'), 
-      name: fd.get('bank_user') 
+      bank: String(fd.get('bank_name') || '').trim(),
+      account: String(fd.get('bank_acc') || '').trim(),
+      name: String(fd.get('bank_user') || '').trim(),
     }
     const support = { 
-      wa: fd.get('wa_num'), 
-      label: fd.get('wa_label') 
+      wa: String(fd.get('wa_num') || '').trim(),
+      label: String(fd.get('wa_label') || '').trim(),
     }
-    
-    const { error } = await db.from('saas_config').upsert([
-      { key: 'bank_info', value: bank }, 
-      { key: 'support_info', value: support }
-    ])
-    
-    if (!error) {
+
+    try {
+      const result = await saveSaasSettings({
+        bankInfo: bank,
+        supportInfo: support,
+      })
+
+      if ('error' in result && result.error) {
+        alert('❌ Gagal: ' + result.error)
+        return
+      }
+
       alert('✅ Pengaturan Global Berhasil Disimpan!')
-      setSaasSettings({ bank_info: bank, support_info: support })
-    } else {
-      alert('❌ Gagal: ' + error.message)
+      await refreshAdminSnapshot()
+    } catch (err: any) {
+      alert('❌ Gagal: ' + (err?.message || 'Unknown error'))
     }
   }
   
-  const [packages, setPackages] = useState<any[]>([])
-  const [loadingPackages, setLoadingPackages] = useState(true)
+  const [packages, setPackages] = useState<AdminPackage[]>([])
 
-  const [orgs, setOrgs] = useState<Organization[]>([])
+  const [orgs, setOrgs] = useState<AdminOrganization[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   // ======== MODALS STATE ========
-  const [pkgModal, setPkgModal] = useState<{ open: boolean; editData: any | null }>({ open: false, editData: null })
-  const [orgModal, setOrgModal] = useState<{ open: boolean; editData: any | null }>({ open: false, editData: null })
+  const [pkgModal, setPkgModal] = useState<{ open: boolean; editData: AdminPackage | null }>({ open: false, editData: null })
+  const [orgModal, setOrgModal] = useState<{ open: boolean; editData: AdminOrganization | null }>({ open: false, editData: null })
   
   const [confirmState, setConfirmState] = useState<{ open: boolean, title: string, message: string, action: () => Promise<void> }>({
     open: false, title: '', message: '', action: async () => {}
@@ -141,86 +149,32 @@ export default function SaaSAdminPage() {
 
   // State local untuk helper set date di modal org
   const [modalExpireDate, setModalExpireDate] = useState('')
-  
 
-  const fetchOrganizations = async () => {
+  const applySnapshot = (snapshot: AdminSnapshot) => {
+    setSaasSettings(snapshot.saasSettings || { bank_info: {}, support_info: {} })
+    setOrgs(snapshot.orgs || [])
+    setPackages(snapshot.packages || [])
+    setInvoices(snapshot.invoices || [])
+    setAiTokenPolicyRaw(snapshot.aiTokenPolicyRaw || {})
+    setAiTokenInventory(snapshot.aiTokenInventory || { total_stock_tokens: 0 })
+    setAiTopupPackages(snapshot.aiTopupPackages || [])
+    setAiWalletSummary(snapshot.aiWalletSummary || { totalBalance: 0, totalPurchased: 0, totalUsed: 0 })
+    return snapshot
+  }
+
+  const refreshAdminSnapshot = async () => {
     try {
       setLoading(true)
-      const { data, error } = await db.from('organizations').select('*').order('created_at', { ascending: false })
-      if (error) throw error
-      setOrgs(data || [])
+      const snapshot = await getSaasAdminSnapshot()
+      setError(null)
+      return applySnapshot(snapshot)
     } catch (err: any) {
-      setError(err.message)
+      const message = err?.message || 'Gagal memuat data admin SaaS.'
+      setError(message)
+      throw err
     } finally {
       setLoading(false)
     }
-  }
-
-  const fetchPackages = async () => {
-    try {
-      setLoadingPackages(true)
-      const { data, error } = await db.from('saas_packages').select('*').order('price', { ascending: true })
-      
-      if (error) throw error
-
-      const formatted = (data || []).map((p: any) => ({
-        ...p,
-        active: p.is_active, 
-        modules: Array.isArray(p.modules) ? p.modules : JSON.parse(p.modules || '[]'),
-        addons: Array.isArray(p.addons) ? p.addons : JSON.parse(p.addons || '[]')
-      }))
-      setPackages(formatted)
-    } catch (err: any) {
-    } finally {
-      setLoadingPackages(false)
-    }
-  }
-
-  const fetchInvoices = async () => {
-    const { data } = await db.from('saas_invoices').select(`
-      *,
-      organization:organizations(name),
-      package:saas_packages(name, modules, duration_days, max_orgs, max_warehouses)
-    `).order('created_at', { ascending: false })
-    if (data) setInvoices(data)
-  }
-
-  const fetchAiTokenData = async () => {
-    const { data: configRows } = await db
-      .from('saas_config')
-      .select('*')
-      .in('key', ['ai_token_policy', 'ai_token_inventory'])
-
-    const config: any = {}
-    ;(configRows || []).forEach((row: any) => {
-      config[row.key] = row.value
-    })
-    setAiTokenPolicyRaw(config.ai_token_policy || {})
-    setAiTokenInventory(config.ai_token_inventory || { total_stock_tokens: 0 })
-
-    const { data: topupRows } = await db
-      .from('ai_token_topup_packages')
-      .select('*')
-      .order('sort_order', { ascending: true })
-      .order('tokens', { ascending: true })
-
-    setAiTopupPackages(topupRows || [])
-
-    const { data: walletRows } = await db
-      .from('ai_token_wallets')
-      .select('balance_tokens, total_purchased_tokens, total_used_tokens')
-
-    const summary = (walletRows || []).reduce(
-      (acc: { totalBalance: number; totalPurchased: number; totalUsed: number }, wallet: any) => {
-        acc.totalBalance += Number(wallet.balance_tokens || 0)
-        acc.totalPurchased += Number(wallet.total_purchased_tokens || 0)
-        acc.totalUsed += Number(wallet.total_used_tokens || 0)
-        return acc
-      },
-      { totalBalance: 0, totalPurchased: 0, totalUsed: 0 },
-    )
-
-    setAiWalletSummary(summary)
   }
 
   const saveAiTokenConfig = async () => {
@@ -239,18 +193,22 @@ export default function SaaSAdminPage() {
       total_stock_tokens: Number(aiTokenInventory?.total_stock_tokens || 0),
     }
 
-    const { error } = await db.from('saas_config').upsert([
-      { key: 'ai_token_policy', value: policyValue },
-      { key: 'ai_token_inventory', value: inventoryValue },
-    ])
+    try {
+      const result = await saveAiTokenConfigAction({
+        policyValue,
+        inventoryValue,
+      })
 
-    if (error) {
-      alert('❌ Gagal menyimpan pengaturan token AI: ' + error.message)
-      return
+      if ('error' in result && result.error) {
+        alert('❌ Gagal menyimpan pengaturan token AI: ' + result.error)
+        return
+      }
+
+      alert('✅ Konfigurasi token AI berhasil disimpan.')
+      await refreshAdminSnapshot()
+    } catch (err: any) {
+      alert('❌ Gagal menyimpan pengaturan token AI: ' + (err?.message || 'Unknown error'))
     }
-
-    alert('✅ Konfigurasi token AI berhasil disimpan.')
-    await fetchAiTokenData()
   }
 
   const saveAiTopupPackageForm = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -271,32 +229,36 @@ export default function SaaSAdminPage() {
       return
     }
 
-    const { error } = aiTopupModal.editData?.id
-      ? await db.from('ai_token_topup_packages').update(payload).eq('id', aiTopupModal.editData.id)
-      : await db.from('ai_token_topup_packages').insert(payload)
+    try {
+      const result = await saveAiTopupPackage({
+        id: aiTopupModal.editData?.id || null,
+        ...payload,
+      })
 
-    if (error) {
-      alert('❌ Gagal menyimpan paket topup: ' + error.message)
-      return
+      if ('error' in result && result.error) {
+        alert('❌ Gagal menyimpan paket topup: ' + result.error)
+        return
+      }
+
+      alert('✅ Paket topup token berhasil disimpan.')
+      setAiTopupModal({ open: false, editData: null })
+      await refreshAdminSnapshot()
+    } catch (err: any) {
+      alert('❌ Gagal menyimpan paket topup: ' + (err?.message || 'Unknown error'))
     }
-
-    alert('✅ Paket topup token berhasil disimpan.')
-    setAiTopupModal({ open: false, editData: null })
-    await fetchAiTokenData()
   }
 
   const toggleAiTopupStatus = async (id: string, currentStatus: boolean) => {
-    const { error } = await db
-      .from('ai_token_topup_packages')
-      .update({ is_active: !currentStatus })
-      .eq('id', id)
-
-    if (error) {
-      alert('❌ Gagal mengubah status paket topup: ' + error.message)
-      return
+    try {
+      const result = await toggleAiTopupPackageStatus(id, currentStatus)
+      if ('error' in result && result.error) {
+        alert('❌ Gagal mengubah status paket topup: ' + result.error)
+        return
+      }
+      await refreshAdminSnapshot()
+    } catch (err: any) {
+      alert('❌ Gagal mengubah status paket topup: ' + (err?.message || 'Unknown error'))
     }
-
-    await fetchAiTokenData()
   }
 
   const handleDeleteAiTopupPackage = (id: string, name: string) => {
@@ -305,141 +267,46 @@ export default function SaaSAdminPage() {
       title: 'Hapus Paket Topup?',
       message: `Paket token "${name}" akan dihapus permanen. Lanjutkan?`,
       action: async () => {
-        const { error } = await db.from('ai_token_topup_packages').delete().eq('id', id)
-        if (error) {
-          alert(error.message)
-        } else {
-          await fetchAiTokenData()
+        try {
+          const result = await deleteAiTopupPackage(id)
+          if ('error' in result && result.error) {
+            alert(result.error)
+          } else {
+            await refreshAdminSnapshot()
+          }
+        } catch (err: any) {
+          alert(err?.message || 'Gagal menghapus paket token.')
         }
         setConfirmState(prev => ({ ...prev, open: false }))
       },
     })
   }
 
-  const approveInvoice = async (invoice: any) => {
-    const pkg = invoice.package
-    const isAddon = !invoice.package_id
-    
-    // 1. Update status invoice jadi PAID
-    const { error: invErr } = await db.from('saas_invoices').update({ status: 'PAID' }).eq('id', invoice.id)
-    if (invErr) return alert('Gagal update invoice: ' + invErr.message)
-
-    // 1.1 Jika ini invoice topup token AI, lakukan kredit token ke wallet org
-    const { data: tokenOrder } = await db
-      .from('ai_token_topup_orders')
-      .select('*')
-      .eq('invoice_id', invoice.id)
-      .maybeSingle()
-
-    if (tokenOrder) {
-      const tokenAmount = Number(tokenOrder.tokens || 0)
-      const { data: wallet } = await db
-        .from('ai_token_wallets')
-        .select('*')
-        .eq('org_id', invoice.org_id)
-        .maybeSingle()
-
-      if (wallet?.org_id) {
-        const { error: walletUpdateError } = await db
-          .from('ai_token_wallets')
-          .update({
-            balance_tokens: Number(wallet.balance_tokens || 0) + tokenAmount,
-            total_purchased_tokens: Number(wallet.total_purchased_tokens || 0) + tokenAmount,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('org_id', invoice.org_id)
-
-        if (walletUpdateError) {
-          return alert('Gagal update saldo token AI: ' + walletUpdateError.message)
-        }
-      } else {
-        const { error: walletCreateError } = await db
-          .from('ai_token_wallets')
-          .insert({
-            org_id: invoice.org_id,
-            balance_tokens: tokenAmount,
-            total_purchased_tokens: tokenAmount,
-            total_used_tokens: 0,
-            low_balance_threshold: aiPolicy.lowBalanceThreshold,
-          })
-
-        if (walletCreateError) {
-          return alert('Gagal membuat wallet token AI: ' + walletCreateError.message)
-        }
+  const approveInvoice = async (invoiceId: string) => {
+    try {
+      const result = await approveSaasInvoice(invoiceId)
+      if ('error' in result && result.error) {
+        alert('Gagal update invoice: ' + result.error)
+        return
       }
-
-      await db.from('ai_token_usage_logs').insert({
-        org_id: invoice.org_id,
-        source: 'topup',
-        direction: 'CREDIT',
-        tokens: tokenAmount,
-        related_invoice_id: invoice.id,
-        note: `Topup AI token dari paket ${tokenOrder.package_id}`,
-        meta: {
-          topup_order_id: tokenOrder.id,
-          package_id: tokenOrder.package_id,
-        },
-      })
-
-      await db
-        .from('ai_token_topup_orders')
-        .update({
-          status: 'PAID',
-          paid_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', tokenOrder.id)
-
-      alert('✅ Topup token AI berhasil dikonfirmasi dan saldo tenant sudah ditambahkan.')
-      fetchInvoices()
-      fetchAiTokenData()
-      return
+      alert('✅ Pembayaran Berhasil Dikonfirmasi & Item Aktif!')
+      await refreshAdminSnapshot()
+    } catch (err: any) {
+      alert('Gagal update invoice: ' + (err?.message || 'Unknown error'))
     }
-
-    if (isAddon) {
-      // HANDLE ADDON ACTIVATION
-      const { data: org } = await db.from('organizations').select('active_addons').eq('id', invoice.org_id).single()
-      const currentAddons = Array.isArray(org?.active_addons) ? org.active_addons : []
-      const newAddon = {
-        id: invoice.id, // linked to invoice
-        name: invoice.item_name,
-        activated_at: new Date().toISOString()
-      }
-      
-      const { error: addonErr } = await db.from('organizations').update({
-        active_addons: [...currentAddons, newAddon]
-      }).eq('id', invoice.org_id)
-      
-      if (addonErr) return alert('Gagal aktivasi add-on: ' + addonErr.message)
-    } else {
-      // HANDLE PLAN UPGRADE
-      const expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + (pkg?.duration_days || 30))
-
-      const { error: orgErr } = await db.from('organizations').update({
-        settings: {
-          plan: pkg?.name || 'Pro',
-          expires_at: expiresAt.toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        package_limit: {
-          max_orgs: pkg?.max_orgs || 1,
-          max_warehouses: pkg?.max_warehouses || 1
-        }
-      }).eq('id', invoice.org_id)
-
-      if (orgErr) return alert('Gagal update plan organisasi: ' + orgErr.message)
-    }
-
-    alert('✅ Pembayaran Berhasil Dikonfirmasi & Item Aktif!')
-    fetchInvoices()
-    fetchAiTokenData()
   }
 
   const cancelInvoice = async (id: string) => {
-    const { error } = await db.from('saas_invoices').update({ status: 'CANCELLED' }).eq('id', id)
-    if (error) alert('Gagal membatalkan: ' + error.message)
-    else fetchInvoices()
+    try {
+      const result = await cancelSaasInvoice(id)
+      if ('error' in result && result.error) {
+        alert('Gagal membatalkan: ' + result.error)
+        return
+      }
+      await refreshAdminSnapshot()
+    } catch (err: any) {
+      alert('Gagal membatalkan: ' + (err?.message || 'Unknown error'))
+    }
   }
 
   const deleteInvoice = async (id: string) => {
@@ -448,26 +315,36 @@ export default function SaaSAdminPage() {
       title: "Hapus Tagihan?",
       message: "Data tagihan akan dihapus permanen dari sistem (Soft-delete not applied). Lanjutkan?",
       action: async () => {
-        const { error } = await db.from('saas_invoices').delete().eq('id', id)
-        if (error) alert(error.message)
-        else fetchInvoices()
+        try {
+          const result = await deleteSaasInvoice(id)
+          if ('error' in result && result.error) {
+            alert(result.error)
+          } else {
+            await refreshAdminSnapshot()
+          }
+        } catch (err: any) {
+          alert(err?.message || 'Gagal menghapus invoice.')
+        }
         setConfirmState(prev => ({ ...prev, open: false }))
       }
     })
   }
 
   useEffect(() => {
-    fetchOrganizations()
-    fetchPackages()
-    fetchInvoices()
-    fetchAiTokenData()
+    refreshAdminSnapshot().catch(() => {})
   }, [])
 
   const togglePackageStatus = async (pkgId: string, currentStatus: boolean) => {
-    setPackages(packages.map(p => p.id === pkgId ? { ...p, active: !p.active } : p))
     try {
-       await db.from('saas_packages').update({ is_active: !currentStatus }).eq('id', pkgId)
-    } catch (err) {}
+      const result = await toggleSaasPackageStatus(pkgId, currentStatus)
+      if ('error' in result && result.error) {
+        alert(result.error)
+        return
+      }
+      await refreshAdminSnapshot()
+    } catch (err: any) {
+      alert(err?.message || 'Gagal mengubah status paket.')
+    }
   }
 
   const handleDeletePackage = (id: string) => {
@@ -476,11 +353,16 @@ export default function SaaSAdminPage() {
       title: "Hapus Paket?",
       message: "Tindakan ini tidak dapat dibatalkan. Konfirmasi penghapusan paket SaaS?",
       action: async () => {
-         const { error } = await db.from('saas_packages').delete().eq('id', id)
-        if (error) {
-           alert("Gagal menghapus paket: " + error.message)
+        try {
+          const result = await deleteSaasPackage(id)
+          if ('error' in result && result.error) {
+            alert("Gagal menghapus paket: " + result.error)
+          } else {
+            await refreshAdminSnapshot()
+          }
+        } catch (err: any) {
+          alert("Gagal menghapus paket: " + (err?.message || 'Unknown error'))
         }
-        await fetchPackages()
         setConfirmState(prev => ({ ...prev, open: false }))
       }
     })
@@ -492,24 +374,21 @@ export default function SaaSAdminPage() {
       const fd = new FormData(e.currentTarget)
       const modules = fd.getAll('modules') as string[]
       const payload = {
-        name: fd.get('name') as string,
+        id: pkgModal.editData?.id || null,
+        name: String(fd.get('name') || ''),
         price: Number(fd.get('price')),
-        billing: fd.get('billing') as string,
-        is_active: true,
+        billing: String(fd.get('billing') || 'Bulan'),
         modules: modules,
         duration_days: Number(fd.get('duration_days') || 30),
         max_orgs: Number(fd.get('max_orgs') || 1),
         max_warehouses: Number(fd.get('max_warehouses') || 1)
       }
 
-      const { error } = pkgModal.editData?.id
-        ? await (db.from('saas_packages').update(payload).eq('id', pkgModal.editData.id) as any)
-        : await (db.from('saas_packages').upsert([payload], { onConflict: 'name' }) as any)
-
-      if (error) throw error
+      const result = await saveSaasPackage(payload)
+      if ('error' in result && result.error) throw new Error(result.error)
       alert('✅ Paket Berhasil Disimpan!')
       setPkgModal({ open: false, editData: null })
-      fetchPackages()
+      await refreshAdminSnapshot()
     } catch (err: any) {
       alert('❌ Gagal: ' + err.message)
     }
@@ -522,27 +401,21 @@ export default function SaaSAdminPage() {
       const expiresVal = fd.get('expires_at') as string
       
       const payload = {
-         name: fd.get('name'),
+         id: orgModal.editData?.id || null,
+         name: String(fd.get('name') || ''),
          is_active: fd.get('is_active') === 'on',
          is_demo: fd.get('is_demo') === 'on',
-         owner_email: fd.get('owner_email'),
-         settings: {
-            ...orgModal.editData?.settings,
-            plan: fd.get('plan'),
-            expires_at: expiresVal ? new Date(expiresVal).toISOString() : (orgModal.editData?.settings?.expires_at || null)
-         }
+         owner_email: String(fd.get('owner_email') || ''),
+         plan: String(fd.get('plan') || 'Demo'),
+         expires_at: expiresVal ? new Date(expiresVal).toISOString() : (orgModal.editData?.settings?.expires_at as string | null) || null,
       }
 
-      if (orgModal.editData?.id) {
-         await db.from('organizations').update(payload).eq('id', orgModal.editData.id)
-      } else {
-         const slug = (fd.get('name') as string).toLowerCase().replace(/ /g, '-') + '-' + Math.random().toString(36).substring(2,5)
-         await db.from('organizations').insert([{ ...payload, slug }])
-      }
+      const result = await saveSaasOrganization(payload)
+      if ('error' in result && result.error) throw new Error(result.error)
 
       setOrgModal({ open: false, editData: null })
       setModalExpireDate('') // Reset local state
-      fetchOrganizations()
+      await refreshAdminSnapshot()
     } catch (err: any) {
        alert(err.message)
     }
@@ -554,23 +427,31 @@ export default function SaaSAdminPage() {
         title: "Hapus Tenant?",
         message: `PERINGATAN: Menghapus organisasi "${name}" akan menghapus seluruh data yang terkait di dalamnya. Lanjutkan?`,
         action: async () => {
-           const { error } = await db.from('organizations').delete().eq('id', id)
-           if (error) alert(error.message)
-           else fetchOrganizations()
+           try {
+             const result = await deleteSaasOrganization(id)
+             if ('error' in result && result.error) {
+               alert(result.error)
+             } else {
+               await refreshAdminSnapshot()
+             }
+           } catch (err: any) {
+             alert(err?.message || 'Gagal menghapus tenant.')
+           }
            setConfirmState(prev => ({ ...prev, open: false }))
         }
      })
   }
 
   const filteredOrgs = orgs.filter(o => {
-     const matchesSearch = o.name.toLowerCase().includes(searchTxt.toLowerCase()) || (o as any).owner_email?.toLowerCase().includes(searchTxt.toLowerCase())
-     const matchesType = typeFilter === 'all' ? true : (typeFilter === 'demo' ? (o as any).is_demo : !(o as any).is_demo)
-     const matchesPkg = packageFilter === 'all' ? true : (o.settings as any)?.plan === packageFilter
+     const ownerEmail = String(o.owner_email || '').toLowerCase()
+     const matchesSearch = o.name.toLowerCase().includes(searchTxt.toLowerCase()) || ownerEmail.includes(searchTxt.toLowerCase())
+     const matchesType = typeFilter === 'all' ? true : (typeFilter === 'demo' ? o.is_demo : !o.is_demo)
+     const matchesPkg = packageFilter === 'all' ? true : o.settings?.plan === packageFilter
      return matchesSearch && matchesType && matchesPkg
   })
 
-  const handleLoginAsTenant = (org: Organization) => {
-    const ownerEmail = String((org as any).owner_email || '').trim()
+  const handleLoginAsTenant = (org: AdminOrganization) => {
+    const ownerEmail = String(org.owner_email || '').trim()
     const confirmText = ownerEmail
       ? `Sesi admin saat ini akan diganti dengan sesi tenant ${org.name} (${ownerEmail}). Lanjutkan login as owner?`
       : `Sesi admin saat ini akan diganti dengan sesi tenant ${org.name}. Lanjutkan login as owner?`
@@ -590,6 +471,13 @@ export default function SaaSAdminPage() {
     })
   }
 
+  const orgModalPlan = typeof orgModal.editData?.settings?.plan === 'string'
+    ? orgModal.editData.settings.plan
+    : 'Demo'
+  const orgModalExpiresAt = typeof orgModal.editData?.settings?.expires_at === 'string'
+    ? orgModal.editData.settings.expires_at
+    : ''
+
   return (
     <div className="p-8 pb-32 max-w-[1600px] mx-auto space-y-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -607,6 +495,12 @@ export default function SaaSAdminPage() {
 	            <button onClick={() => setActiveTab('settings')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Settings</button>
 	         </div>
       </div>
+
+      {error && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+          {error}
+        </div>
+      )}
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -892,7 +786,7 @@ export default function SaaSAdminPage() {
 
               <div className="flex flex-wrap gap-3">
                  <SafeButton variant="primary" onClick={() => setOrgModal({ open: true, editData: null })} icon={<Plus size={18} />}>Registrasi Tenant Baru</SafeButton>
-                 <button onClick={fetchOrganizations} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors shadow-sm"><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></button>
+                 <button onClick={() => refreshAdminSnapshot().catch(() => {})} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors shadow-sm"><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></button>
               </div>
 
               <SectionCard>
@@ -915,12 +809,12 @@ export default function SaaSAdminPage() {
                             <div>
                                <p className="font-bold text-slate-900">{org.name}</p>
                                <p className="text-[10px] text-blue-600 font-black flex items-center gap-1.5 mt-0.5">
-                                  <Mail size={12} /> {(org as any).owner_email || 'No Email'}
+                                  <Mail size={12} /> {org.owner_email || 'No Email'}
                                </p>
                             </div>
                           </td>
                           <td className="py-4 px-6">
-                            {(org as any).is_demo ? 
+                            {org.is_demo ? 
                               <span className="px-2.5 py-1 bg-orange-50 text-orange-600 text-[10px] font-black uppercase rounded-lg border border-orange-100 flex items-center gap-1 w-fit"><Settings2 size={10} /> Demo</span> : 
                               <span className="px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-black uppercase rounded-lg border border-blue-100 flex items-center gap-1 w-fit"><CheckCircle2 size={10} /> Official</span>
                             }
@@ -1063,7 +957,9 @@ export default function SaaSAdminPage() {
                      {invoices.map((inv) => (
                         <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group">
                            <td className="px-8 py-5 text-xs font-bold text-slate-500">
-                              {new Date(inv.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              {inv.created_at
+                                ? new Date(inv.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+                                : '-'}
                            </td>
                            <td className="px-8 py-5">
                               <p className="text-sm font-black text-slate-900">{inv.organization?.name || 'Unknown'}</p>
@@ -1091,7 +987,7 @@ export default function SaaSAdminPage() {
                               <div className="flex items-center justify-end gap-2">
                                  {inv.status !== 'PAID' && inv.status !== 'CANCELLED' && (
                                     <button 
-                                       onClick={() => approveInvoice(inv)} 
+                                       onClick={() => approveInvoice(inv.id)} 
                                        className="px-4 py-2 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all active:scale-95"
                                     >
                                        Konfirmasi
@@ -1142,12 +1038,12 @@ export default function SaaSAdminPage() {
                     </div>
                     <div className="space-y-2">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Pemilik (Login Akun)</label>
-                       <input name="owner_email" required type="email" defaultValue={orgModal.editData?.owner_email} placeholder="email@perusahaan.com" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+                       <input name="owner_email" required type="email" defaultValue={orgModal.editData?.owner_email ?? ''} placeholder="email@perusahaan.com" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Paket SaaS</label>
-                           <select name="plan" defaultValue={orgModal.editData?.settings?.plan || 'Demo'} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold">
+                           <select name="plan" defaultValue={orgModalPlan} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold">
                               <option value="Demo">Demo</option>
                               {packages.map(p => (
                                  <option key={p.id} value={p.name}>{p.name}</option>
@@ -1177,7 +1073,7 @@ export default function SaaSAdminPage() {
                            <input 
                               name="expires_at" 
                               type="date" 
-                              value={modalExpireDate || (orgModal.editData?.settings?.expires_at ? new Date(orgModal.editData.settings.expires_at).toISOString().split('T')[0] : '')} 
+                              value={modalExpireDate || (orgModalExpiresAt ? new Date(orgModalExpiresAt).toISOString().split('T')[0] : '')} 
                               onChange={(e) => setModalExpireDate(e.target.value)}
                               className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" 
                            />
@@ -1343,10 +1239,10 @@ export default function SaaSAdminPage() {
 	                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Nama Paket</label>
 	                  <input name="name" required defaultValue={aiTopupModal.editData?.name} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
 	                </div>
-	                <div>
-	                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Deskripsi</label>
-	                  <textarea name="description" rows={3} defaultValue={aiTopupModal.editData?.description} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
-	                </div>
+		                <div>
+		                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Deskripsi</label>
+		                  <textarea name="description" rows={3} defaultValue={aiTopupModal.editData?.description ?? ''} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
+		                </div>
 	                <div className="grid grid-cols-2 gap-4">
 	                  <div>
 	                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Jumlah Token</label>

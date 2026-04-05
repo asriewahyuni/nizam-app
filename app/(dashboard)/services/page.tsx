@@ -1,21 +1,22 @@
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getContacts } from '@/modules/contacts/actions/contact.actions'
 import { getServiceOrders } from '@/modules/services/actions/service.actions'
 import { ServiceOrderClient } from './ServiceOrderClient'
 
 export const revalidate = 0
 
 export default async function ServiceOrdersPage() {
+  const session = await auth()
+  if (!session?.user?.id) return redirect('/login')
+
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
 
-  const supabase = await createClient()
-
-  // Fetch all necessary data
-  const [orders, { data: contacts }] = await Promise.all([
+  const [orders, contacts] = await Promise.all([
     getServiceOrders(orgData.org.id),
-    supabase.from('contacts').select('id, name').eq('org_id', orgData.org.id)
+    getContacts(orgData.org.id),
   ])
 
   return (
@@ -23,7 +24,7 @@ export default async function ServiceOrdersPage() {
       <ServiceOrderClient 
         orgId={orgData.org.id}
         orders={orders}
-        contacts={contacts || []}
+        contacts={contacts}
       />
     </div>
   )

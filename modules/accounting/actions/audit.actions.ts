@@ -1,53 +1,92 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser, getMembership } from '@/lib/auth/permissions'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 
+function createEmptyAuditOverview() {
+  return {
+    unbalanced: [],
+    overdueAssets: [],
+    inventory: [],
+    inventoryVariance: 0,
+    onHandValue: 0,
+    glInventoryBalance: 0,
+    stats: {
+      unbalancedCount: 0,
+      overdueAssetCount: 0,
+      inventoryVariance: 0,
+    },
+  }
+}
+
 export async function getAuditOverview(orgId: string) {
-  const supabase = await createClient()
-  const db = supabase as any
+  const user = await getAuthUser()
+  if (!user) return createEmptyAuditOverview()
+
+  const membership = await getMembership(user.userId, orgId)
+  if (!membership || !membership.isOwnerOrAdmin) {
+    return createEmptyAuditOverview()
+  }
 
   // ======================================================
   // 1. Unbalanced Journals (POSTED)
   // ======================================================
-  const { data: postedEntries } = await db
-    .from('journal_entries')
-    .select('id, entry_date, description, reference_type')
-    .eq('org_id', orgId)
-    .eq('status', 'POSTED')
+  const postedEntries = await prisma.journal_entries.findMany({
+    where: {
+      org_id: orgId,
+      status: 'POSTED',
+    },
+    select: {
+      id: true,
+      entry_date: true,
+      description: true,
+      reference_type: true,
+    },
+  })
 
-  const entryIds = (postedEntries || []).map((e: any) => e.id)
+  const entryIds = postedEntries.map((entry) => entry.id)
   let unbalanced: any[] = []
 
   if (entryIds.length > 0) {
-    const { data: lines } = await db
-      .from('journal_lines')
-      .select('entry_id, debit, credit')
-      .in('entry_id', entryIds)
+    const lines = await prisma.journal_lines.findMany({
+      where: {
+        entry_id: {
+          in: entryIds,
+        },
+      },
+      select: {
+        entry_id: true,
+        debit: true,
+        credit: true,
+      },
+    })
 
     const entryTotals: Record<string, { debit: number; credit: number }> = {}
-    for (const l of lines || []) {
-      if (!entryTotals[l.entry_id]) entryTotals[l.entry_id] = { debit: 0, credit: 0 }
-      entryTotals[l.entry_id].debit += Number(l.debit)
-      entryTotals[l.entry_id].credit += Number(l.credit)
+    for (const line of lines) {
+      const debit = Number(line.debit || 0)
+      const credit = Number(line.credit || 0)
+      if (!entryTotals[line.entry_id]) entryTotals[line.entry_id] = { debit: 0, credit: 0 }
+      entryTotals[line.entry_id].debit += debit
+      entryTotals[line.entry_id].credit += credit
     }
 
-    unbalanced = (postedEntries || [])
-      .filter((e: any) => {
-        const t = entryTotals[e.id]
-        if (!t) return true
-        return Math.abs(t.debit - t.credit) > 0.01
+    unbalanced = postedEntries
+      .filter((entry) => {
+        const totals = entryTotals[entry.id]
+        if (!totals) return true
+        return Math.abs(totals.debit - totals.credit) > 0.01
       })
-      .map((e: any) => {
-        const t = entryTotals[e.id] || { debit: 0, credit: 0 }
+      .map((entry) => {
+        const totals = entryTotals[entry.id] || { debit: 0, credit: 0 }
         return {
-          entry_id: e.id,
-          entry_date: e.entry_date,
-          description: e.description,
-          reference_type: e.reference_type,
-          total_debit: t.debit,
-          total_credit: t.credit,
-          diff: Math.abs(t.debit - t.credit)
+          entry_id: entry.id,
+          entry_date: entry.entry_date.toISOString(),
+          description: entry.description,
+          reference_type: entry.reference_type,
+          total_debit: totals.debit,
+          total_credit: totals.credit,
+          diff: Math.abs(totals.debit - totals.credit),
         }
       })
   }
@@ -55,83 +94,124 @@ export async function getAuditOverview(orgId: string) {
   // ======================================================
   // 2. Overdue Depreciation
   // ======================================================
-  const lastMonthEnd = new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().split('T')[0]
+  const now = new Date()
+  const lastMonthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0))
 
-  const { data: assets } = await db
-    .from('fixed_assets')
-    .select('id, code, name, purchase_date, last_depreciation_date, current_book_value, current_value')
-    .eq('org_id', orgId)
-    .eq('status', 'ACTIVE')
+  const assets = await prisma.fixed_assets.findMany({
+    where: {
+      org_id: orgId,
+      status: 'ACTIVE',
+    },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      purchase_date: true,
+      last_depreciation_date: true,
+      current_book_value: true,
+    },
+  })
 
-  const overdueAssets = ((assets as any[]) || []).filter((a: any) => {
-    if (!a.last_depreciation_date) return true
-    return a.last_depreciation_date < lastMonthEnd
-  }).map((a: any) => ({
-    ...a,
-    current_book_value: a.current_book_value ?? a.current_value ?? 0
-  }))
+  const overdueAssets = assets
+    .filter((asset) => {
+      if (!asset.last_depreciation_date) return true
+      return asset.last_depreciation_date.getTime() < lastMonthEnd.getTime()
+    })
+    .map((asset) => ({
+      id: asset.id,
+      code: asset.code,
+      name: asset.name,
+      purchase_date: asset.purchase_date?.toISOString() ?? null,
+      last_depreciation_date: asset.last_depreciation_date?.toISOString() ?? null,
+      current_book_value: Number(asset.current_book_value ?? 0),
+    }))
 
   // ======================================================
   // 3. Inventory Sub-Ledger (Movements) vs General Ledger (1301)
   // ======================================================
-  const { data: products } = await db
-    .from('products')
-    .select('id, name, average_cost')
-    .eq('org_id', orgId)
+  const products = await prisma.products.findMany({
+    where: { org_id: orgId },
+    select: {
+      id: true,
+      name: true,
+      average_cost: true,
+    },
+  })
 
-  const productIds = (products || []).map((p: any) => p.id)
+  const productIds = products.map((product) => product.id)
 
   // Sub-Ledger Truth: Stock Movements
-  const { data: movements } = await db
-    .from('stock_movements')
-    .select('product_id, quantity')
-    .in('product_id', productIds)
+  const movements = productIds.length > 0
+    ? await prisma.stock_movements.findMany({
+        where: {
+          product_id: {
+            in: productIds,
+          },
+        },
+        select: {
+          product_id: true,
+          quantity: true,
+        },
+      })
+    : []
 
   const stockByProduct: Record<string, number> = {}
-  for (const m of movements || []) {
-    stockByProduct[m.product_id] = (stockByProduct[m.product_id] || 0) + Number(m.quantity)
+  for (const movement of movements) {
+    stockByProduct[movement.product_id] =
+      (stockByProduct[movement.product_id] || 0) + Number(movement.quantity || 0)
   }
 
   // GL Inventory balance (account 1301)
-  const { data: invAcc } = await db
-    .from('accounts')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('code', '1301')
-    .maybeSingle()
+  const invAcc = await prisma.accounts.findFirst({
+    where: {
+      org_id: orgId,
+      code: '1301',
+    },
+    select: {
+      id: true,
+    },
+  })
 
   let glInventoryBalance = 0
   if (invAcc && entryIds.length > 0) {
-    const { data: invLines } = await db
-      .from('journal_lines')
-      .select('debit, credit')
-      .eq('account_id', invAcc.id)
-      .in('entry_id', entryIds)
+    const invLines = await prisma.journal_lines.findMany({
+      where: {
+        account_id: invAcc.id,
+        entry_id: {
+          in: entryIds,
+        },
+      },
+      select: {
+        debit: true,
+        credit: true,
+      },
+    })
 
-    for (const l of invLines || []) {
-      glInventoryBalance += Number(l.debit) - Number(l.credit)
+    for (const line of invLines) {
+      glInventoryBalance += Number(line.debit || 0) - Number(line.credit || 0)
     }
   }
 
-  const totalSubLedgerValue = (products || []).reduce((sum: any, p: any) => {
-    return sum + ((stockByProduct[p.id] || 0) * Number(p.average_cost || 0))
+  const totalSubLedgerValue = products.reduce((sum, product) => {
+    return sum + ((stockByProduct[product.id] || 0) * Number(product.average_cost || 0))
   }, 0)
 
   // Distributed GL value per product
-  const inventory = (products || []).map((p: any) => {
-    const qty = stockByProduct[p.id] || 0
-    const subLedgerValue = qty * Number(p.average_cost || 0)
+  const inventory = products.map((product) => {
+    const qty = stockByProduct[product.id] || 0
+    const avgCost = Number(product.average_cost || 0)
+    const subLedgerValue = qty * avgCost
     const proportion = totalSubLedgerValue > 0 ? subLedgerValue / totalSubLedgerValue : 0
     const ledgerValue = glInventoryBalance * proportion
-    
+
     return {
-      product_id: p.id,
-      product_name: p.name,
+      product_id: product.id,
+      product_name: product.name,
       stock_qty: qty,
-      avg_cost: Number(p.average_cost || 0),
+      avg_cost: avgCost,
       on_hand_value: subLedgerValue,
       ledger_value: ledgerValue,
-      variance: subLedgerValue - ledgerValue
+      variance: subLedgerValue - ledgerValue,
     }
   })
 

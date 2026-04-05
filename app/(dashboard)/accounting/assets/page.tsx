@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
 import { getFixedAssets } from '@/modules/accounting/actions/assets.actions'
-import { createClient } from '@/lib/supabase/server'
 import { AssetClient } from './AssetClient'
 
 export const dynamic = 'force-dynamic'
@@ -15,12 +15,11 @@ export default async function AssetsPage() {
     redirect('/dashboard')
   }
 
-  const supabase = await createClient()
   const activeBranch = await getActiveBranch(orgData.org.id)
 
   const [assets, coaRes] = await Promise.all([
     getFixedAssets(orgData.org.id, activeBranch?.id),
-    supabase.from('accounts').select('*').eq('org_id', orgData.org.id).eq('is_active', true).order('code')
+    getChartOfAccounts(orgData.org.id),
   ])
 
   return (
@@ -31,7 +30,7 @@ export default async function AssetsPage() {
         activeBranchId={activeBranch?.id ?? null}
         activeBranchName={activeBranch?.name ?? null}
         initialAssets={assets} 
-        coa={coaRes.data || []} 
+        coa={coaRes.filter((account) => account.is_active)} 
       />
     </div>
   )

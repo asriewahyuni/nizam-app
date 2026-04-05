@@ -1,17 +1,18 @@
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { redirect } from 'next/navigation'
 import POSClient from './POSClient'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
+import { getContacts } from '@/modules/contacts/actions/contact.actions'
 import { getProducts } from '@/modules/inventory/actions/inventory.actions'
 import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 
 export default async function POSPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return null
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
 
   const orgData = await getActiveOrg()
-  if (!orgData) return null
+  if (!orgData) redirect('/onboarding')
 
   const orgId = orgData.org.id
   const activeBranch = await getActiveBranch(orgId)
@@ -24,23 +25,27 @@ export default async function POSPage() {
       stock: Number(product.stock_available || 0),
     }))
 
-  // Fetch customers
-  const { data: customers } = await supabase.from('contacts').select('id, name, phone')
-    .eq('org_id', orgId).eq('type', 'CUSTOMER')
-
-  // Fetch cash accounts for payment
-  const { data: accounts } = await supabase.from('accounts').select('id, name, code')
-    .eq('org_id', orgId).eq('is_active', true)
+  const [customers, allAccounts] = await Promise.all([
+    getContacts(orgId, 'CUSTOMER'),
+    getChartOfAccounts(orgId),
+  ])
+  const accounts = allAccounts
+    .filter((account) => account.is_active)
+    .map((account) => ({
+      id: account.id,
+      name: account.name,
+      code: account.code,
+    }))
     
   return (
     <POSClient
       orgId={orgId}
       org={orgData.org}
       products={productsWithStock}
-      customers={customers || []}
-      accounts={accounts || []}
+      customers={customers}
+      accounts={accounts}
       warehouses={warehouses || []}
-      currentUser={user}
+      currentUser={session.user}
       activeBranchId={activeBranch?.id || null}
       activeBranchName={activeBranch?.name || null}
     />

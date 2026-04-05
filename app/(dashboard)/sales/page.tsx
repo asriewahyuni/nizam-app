@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import { getSales } from '@/modules/sales/actions/sales.actions'
 import { getContacts } from '@/modules/contacts/actions/contact.actions'
@@ -11,10 +11,8 @@ import SalesClient from './SalesClient'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 export default async function SalesPage() {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
 
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')

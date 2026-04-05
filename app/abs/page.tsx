@@ -1,9 +1,9 @@
 import React from 'react'
-import { createClient } from '@/lib/supabase/server'
 import AbsClient from './AbsClient'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/modules/auth/actions/auth.actions'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { prisma } from '@/lib/prisma'
 
 export type VoucherStatus = {
   isValid: boolean
@@ -14,7 +14,6 @@ export type VoucherStatus = {
 }
 
 export default async function AbsLandingPage() {
-  const supabase = await createClient()
   const session = await getSession()
   const activeOrg = await getActiveOrg()
 
@@ -24,18 +23,24 @@ export default async function AbsLandingPage() {
   }
 
   // 2. Cek Status Voucher ABS2024
-  const { data: voucher } = await (supabase as any)
-    .from('saas_vouchers')
-    .select('*')
-    .eq('code', 'ABS2024')
-    .maybeSingle()
+  const voucher = await prisma.saas_vouchers.findFirst({
+    where: {
+      code: 'ABS2024',
+    },
+    select: {
+      is_active: true,
+      expires_at: true,
+      uses_count: true,
+      max_uses: true,
+    },
+  })
 
   const status: VoucherStatus = {
     code: 'ABS2024',
-    isValid: !!voucher && (voucher as any).is_active,
-    isExpired: voucher ? new Date((voucher as any).expires_at) < new Date() : true,
-    isLimitReached: voucher ? (voucher as any).uses_count >= (voucher as any).max_uses : true,
-    expiresAt: voucher ? (voucher as any).expires_at : null
+    isValid: Boolean(voucher?.is_active),
+    isExpired: voucher?.expires_at ? voucher.expires_at < new Date() : true,
+    isLimitReached: voucher ? Number(voucher.uses_count || 0) >= Number(voucher.max_uses || 0) : true,
+    expiresAt: voucher?.expires_at ? voucher.expires_at.toISOString() : null,
   }
 
   return <AbsClient status={status} />

@@ -1,11 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { redirect } from 'next/navigation'
 import PromoClient from './PromoClient'
 
 export default async function PromosPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
 
-  if (!user) return null
-  
   return <PromoClient />
 }
