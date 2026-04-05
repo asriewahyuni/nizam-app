@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
 import { cookies } from 'next/headers'
 import { getCurrentAccessibleBranch } from '@/modules/organization/lib/branch-access.server'
 import { resolveActiveMembership } from '@/modules/organization/lib/active-context.server'
@@ -11,13 +11,22 @@ import { resolveActiveMembership } from '@/modules/organization/lib/active-conte
  * Used by useActiveOrgId() client hook to ensure client-server consistency.
  */
 export async function getActiveOrgIdAction(): Promise<string | null> {
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+  const session = await auth()
+  const user = session?.user
+  if (!user?.id) return null
 
   const cookieStore = await cookies()
-  const membership = await resolveActiveMembership(db, user, cookieStore, 'org_id')
+  const membership = await resolveActiveMembership(
+    {
+      id: user.id,
+      email: user.email ?? null,
+      user_metadata: {
+        full_name: user.name ?? null,
+      },
+    },
+    cookieStore,
+    'org_id'
+  )
   return membership?.org_id ? String(membership.org_id) : null
 }
 

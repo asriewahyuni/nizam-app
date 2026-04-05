@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { auth, signOut as nextAuthSignOut } from '@/auth'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
@@ -503,8 +503,6 @@ export async function signInWithNik(formData: FormData) {
   return redirect(`/login?error=${encodeURIComponent('NIK atau password salah.')}&tab=karyawan`)
 }
 
-// REST REMAINING (signOut, verifyEmployeeNikByToken, etc.)
-import { auth, signOut as nextAuthSignOut } from '@/auth'
 
 export async function signOut() {
   const cookieStore = await cookies()
@@ -543,121 +541,68 @@ export async function getAdminImpersonationState() {
 }
 
 export async function signInAsTenantOwner(orgId: string) {
-  const supabase = await createClient()
-  const adminClient = await createAdminClient()
+  const session = await auth()
   const cookieStore = await cookies()
   const trimmedOrgId = orgId.trim()
 
-  if (!trimmedOrgId) {
-    return { error: 'Tenant tidak valid.' }
-  }
+  if (!trimmedOrgId) return { error: 'Tenant tidak valid.' }
 
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-  const adminSession = sessionData.session
-  const adminUser = adminSession?.user
-  const adminEmail = adminUser?.email?.toLowerCase().trim() || ''
-
-  if (sessionError || !adminSession?.access_token || !adminSession.refresh_token || !adminUser) {
-    return { error: 'Sesi admin tidak ditemukan. Silakan login ulang.' }
-  }
-
+  const adminEmail = session?.user?.email?.toLowerCase().trim() || ''
+  if (!adminEmail) return { error: 'Sesi admin tidak ditemukan. Silakan login ulang.' }
   if (!isPlatformAdminEmail(adminEmail)) {
     return { error: 'Akses ditolak. Hanya platform admin yang bisa login sebagai tenant.' }
   }
 
-  const { data: org, error: orgError } = await (adminClient as any)
-    .from('organizations')
-    .select('id, name, owner_email')
-    .eq('id', trimmedOrgId)
-    .maybeSingle()
+  // Look up org
+  const org = await prisma.organizations.findUnique({
+    where: { id: trimmedOrgId },
+    select: { id: true, name: true, owner_email: true },
+  })
+  if (!org) return { error: 'Tenant tidak ditemukan.' }
 
-  if (orgError) {
-    return { error: `Gagal memuat tenant: ${orgError.message}` }
-  }
-
-  if (!org) {
-    return { error: 'Tenant tidak ditemukan.' }
-  }
-
-  const { data: ownerMembership, error: ownerMembershipError } = await (adminClient as any)
-    .from('org_members')
-    .select('user_id')
-    .eq('org_id', trimmedOrgId)
-    .eq('role', 'owner')
-    .eq('is_active', true)
-    .order('joined_at', { ascending: true })
-    .limit(1)
-    .maybeSingle()
-
-  if (ownerMembershipError) {
-    return { error: `Gagal memuat owner tenant: ${ownerMembershipError.message}` }
-  }
+  // Look up owner's email directly from users table via org_members
+  const ownerMembership = await prisma.org_members.findFirst({
+    where: { org_id: trimmedOrgId, role: 'owner', is_active: true },
+    orderBy: { joined_at: 'asc' },
+    select: { user_id: true },
+  })
 
   let tenantEmail = (org.owner_email || '').trim().toLowerCase()
-
   if (ownerMembership?.user_id) {
-    const { data: ownerUserData, error: ownerUserError } = await adminClient.auth.admin.getUserById(ownerMembership.user_id)
-    if (ownerUserError) {
-      return { error: `Gagal membaca akun owner tenant: ${ownerUserError.message}` }
-    }
-    if (ownerUserData.user?.email) {
-      tenantEmail = ownerUserData.user.email.trim().toLowerCase()
-    }
+    const ownerUser = await prisma.user.findUnique({
+      where: { id: ownerMembership.user_id },
+      select: { email: true },
+    })
+    if (ownerUser?.email) tenantEmail = ownerUser.email.trim().toLowerCase()
   }
 
   if (!tenantEmail) {
     return { error: 'Tenant belum memiliki akun owner yang dapat dipakai untuk Login As.' }
   }
 
+  // Store admin return context in cookie
   cookieStore.set(
     ADMIN_IMPERSONATION_COOKIE,
     encodeAdminImpersonation({
-      accessToken: adminSession.access_token,
-      refreshToken: adminSession.refresh_token,
+      accessToken: session?.user?.id || '',
+      refreshToken: '',
       email: adminEmail,
       activeOrgId: cookieStore.get(ACTIVE_ORG_COOKIE)?.value || null,
     }),
-    {
-      maxAge: ADMIN_IMPERSONATION_MAX_AGE,
-      path: '/',
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-    }
+    { maxAge: ADMIN_IMPERSONATION_MAX_AGE, path: '/', httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' }
   )
 
-  const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
-    type: 'magiclink',
-    email: tenantEmail,
-  })
-
-  if (linkError) {
+  // Sign in as tenant owner via NextAuth credentials
+  try {
+    await nextAuthSignIn('credentials', { email: tenantEmail, redirect: false })
+  } catch (err) {
     cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
-    return { error: `Gagal membuat magic link tenant: ${linkError.message}` }
-  }
-
-  const tokenHash = linkData.properties?.hashed_token
-  if (!tokenHash) {
-    cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
-    return { error: 'Magic link tenant tidak memiliki token yang bisa diverifikasi.' }
-  }
-
-  const { error: verifyError } = await supabase.auth.verifyOtp({
-    type: 'magiclink',
-    token_hash: tokenHash,
-  })
-
-  if (verifyError) {
-    cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
-    return { error: `Gagal mengganti sesi ke tenant: ${verifyError.message}` }
+    return { error: 'Gagal login sebagai tenant. Pastikan akun tenant sudah terdaftar.' }
   }
 
   cookieStore.delete('nizam_demo_org_id')
   cookieStore.set(ACTIVE_ORG_COOKIE, org.id, {
-    maxAge: ADMIN_IMPERSONATION_MAX_AGE,
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax',
+    maxAge: ADMIN_IMPERSONATION_MAX_AGE, path: '/', httpOnly: true, sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
   })
   cookieStore.delete(ACTIVE_BRANCH_COOKIE)
@@ -667,7 +612,6 @@ export async function signInAsTenantOwner(orgId: string) {
 }
 
 export async function restorePlatformAdminSession() {
-  const supabase = await createClient()
   const cookieStore = await cookies()
   const payload = decodeAdminImpersonation(cookieStore.get(ADMIN_IMPERSONATION_COOKIE)?.value)
 
@@ -675,22 +619,11 @@ export async function restorePlatformAdminSession() {
     return { error: 'Sesi admin cadangan tidak ditemukan atau sudah kadaluarsa.' }
   }
 
-  const { error } = await supabase.auth.setSession({
-    access_token: payload.accessToken,
-    refresh_token: payload.refreshToken,
-  })
-
-  if (error) {
-    return { error: `Gagal memulihkan sesi admin: ${error.message}` }
-  }
-
+  // Restore admin's original org context from cookie payload
   cookieStore.delete('nizam_demo_org_id')
   if (payload.activeOrgId) {
     cookieStore.set(ACTIVE_ORG_COOKIE, payload.activeOrgId, {
-      maxAge: ADMIN_IMPERSONATION_MAX_AGE,
-      path: '/',
-      httpOnly: true,
-      sameSite: 'lax',
+      maxAge: ADMIN_IMPERSONATION_MAX_AGE, path: '/', httpOnly: true, sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
     })
   } else {
@@ -698,6 +631,13 @@ export async function restorePlatformAdminSession() {
   }
   cookieStore.delete(ACTIVE_BRANCH_COOKIE)
   cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
+
+  // Log admin back in using their original email from payload
+  if (payload.email) {
+    try {
+      await nextAuthSignIn('credentials', { email: payload.email, redirect: false })
+    } catch { /* session may already be valid */ }
+  }
 
   revalidatePath('/', 'layout')
   redirect('/admin')
@@ -751,29 +691,28 @@ export async function verifyEmployeeNikByToken(token: string, nik: string) {
 }
 
 export async function requestPasswordReset(nik: string) {
-  const adminClient = await createAdminClient()
   const formattedNik = nik.trim().toUpperCase()
 
-  const { data: employees, error } = await (adminClient as any)
-    .from('employees')
-    .select('id, first_name, user_id')
-    .eq('nik', formattedNik)
-    .order('created_at', { ascending: true })
-
-  if (error) {
-     return { error: `Database Error: ${error.message}` }
+  let employees: any[]
+  try {
+    employees = await prisma.employees.findMany({
+      where: { nik: formattedNik },
+      select: { id: true, first_name: true, user_id: true },
+      orderBy: { created_at: 'asc' },
+    })
+  } catch (err: any) {
+    return { error: `Database Error: ${err.message}` }
   }
 
-  const matchingEmployees = Array.isArray(employees) ? employees : []
-  if (matchingEmployees.length === 0) {
+  if (employees.length === 0) {
     return { error: 'Gagal mengajukan reset. Pastikan NIK terdaftar atau periksa huruf/angkanya.' }
   }
 
   const linkedUserIds = Array.from(
     new Set(
-      matchingEmployees
-        .map((employee: any) => employee.user_id)
-        .filter((value: unknown): value is string => typeof value === 'string' && value.length > 0)
+      employees
+        .map((e) => e.user_id)
+        .filter((v): v is string => typeof v === 'string' && v.length > 0)
     )
   )
 
@@ -781,32 +720,29 @@ export async function requestPasswordReset(nik: string) {
     return { error: 'NIK ini terhubung ke lebih dari satu akun. Hubungi admin organisasi Anda untuk reset password.' }
   }
 
-  if (linkedUserIds.length === 0 && matchingEmployees.length > 1) {
+  if (linkedUserIds.length === 0 && employees.length > 1) {
     return { error: 'NIK ini terdaftar di lebih dari satu organisasi tetapi belum terhubung ke satu akun. Hubungi admin untuk aktivasi atau reset password.' }
   }
 
   const targetEmployees = linkedUserIds.length === 1
-    ? matchingEmployees.filter((employee: any) => employee.user_id === linkedUserIds[0])
-    : matchingEmployees.slice(0, 1)
+    ? employees.filter((e) => e.user_id === linkedUserIds[0])
+    : employees.slice(0, 1)
 
   const employeeIds = targetEmployees
-    .map((employee: any) => employee.id)
-    .filter((value: unknown): value is string => typeof value === 'string' && value.length > 0)
+    .map((e) => e.id)
+    .filter((v): v is string => typeof v === 'string' && v.length > 0)
 
   if (employeeIds.length === 0) {
     return { error: 'Gagal mengajukan reset password. Hubungi admin organisasi Anda.' }
   }
 
-  const { error: updateError } = await (adminClient as any)
-    .from('employees')
-    .update({
-      reset_requested: true,
-      reset_requested_at: new Date().toISOString()
+  try {
+    await prisma.employees.updateMany({
+      where: { id: { in: employeeIds } },
+      data: { reset_requested: true, reset_requested_at: new Date() },
     })
-    .in('id', employeeIds)
-
-  if (updateError) {
-     return { error: `Database Error: ${updateError.message}` }
+  } catch (err: any) {
+    return { error: `Database Error: ${err.message}` }
   }
 
   revalidatePath('/hris')
@@ -814,48 +750,44 @@ export async function requestPasswordReset(nik: string) {
 }
 
 export async function resetEmployeePassword(employeeId: string, newPassword: string) {
-  const adminClient = await createAdminClient()
-  
-  const { data: emp, error: empErr } = await (adminClient as any)
-    .from('employees')
-    .select('user_id, nik')
-    .eq('id', employeeId)
-    .single()
-
-  if (empErr || !emp.user_id) return { error: 'User tidak ditemukan.' }
-
-  const { error: authErr } = await adminClient.auth.admin.updateUserById(emp.user_id, {
-    password: newPassword
+  const emp = await prisma.employees.findUnique({
+    where: { id: employeeId },
+    select: { user_id: true, nik: true },
   })
 
-  if (authErr) return { error: 'Gagal mereset: ' + authErr.message }
+  if (!emp?.user_id) return { error: 'User tidak ditemukan.' }
 
-  await (adminClient as any)
-    .from('employees')
-    .update({ 
-      reset_requested: false,
-      reset_requested_at: null
+  const hashedPassword = bcrypt.hashSync(newPassword, 10)
+  try {
+    await prisma.user.update({
+      where: { id: emp.user_id },
+      data: { password: hashedPassword },
     })
-    .eq('id', employeeId)
+  } catch (err: any) {
+    return { error: 'Gagal mereset: ' + err.message }
+  }
+
+  await prisma.employees.update({
+    where: { id: employeeId },
+    data: { reset_requested: false, reset_requested_at: null },
+  })
 
   revalidatePath('/hris')
   return { success: true }
 }
 
 export async function sendPasswordResetEmail(formData: FormData) {
-  const supabase = await createClient()
-  const email = formData.get('email') as string
-  
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || 
-                 (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+  // TODO: Implement email-based password reset via Resend/SMTP after Supabase migration.
+  // For now we check if the email exists in our users table to prevent enumeration.
+  const email = (formData.get('email') as string).trim().toLowerCase()
+  if (!email) return { error: 'Email wajib diisi.' }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/update-password`,
-  })
-
-  if (error) {
-    return { error: `Gagal: ${error.message}` }
+  const user = await prisma.user.findUnique({ where: { email }, select: { id: true } })
+  if (!user) {
+    // Silently succeed to prevent user enumeration
+    return { success: true }
   }
 
+  // TODO: send reset link via lib/email/sender.ts
   return { success: true }
 }

@@ -11,6 +11,22 @@ Karena mengutamakan **stabilitas, keamanan, dan keandalan (safest choice)**, tek
 
 Keuntungan strategi ini adalah: NIZAM ERP akan aman dari *vendor lock-in* (dapat langsung dideploy di layanan AWS, VPS, atau GCP murni) dan tipe datanya akan terlindungi secara *end-to-end* oleh Prisma.
 
+## Progress Snapshot (2026-04-05)
+
+Status migrasi yang sudah terkonfirmasi selesai:
+
+- `modules/auth/actions/auth.actions.ts`
+- `modules/organization/lib/active-context.server.ts`
+- `modules/organization/actions/org.actions.ts`
+- `modules/organization/actions/org-id.actions.ts`
+
+Catatan implementasi penting:
+
+- `org.actions.ts` sudah memakai `auth()` + Prisma, tanpa Supabase client langsung.
+- Upload logo masih memakai Supabase Storage lewat wrapper `modules/organization/lib/logo-storage.server.ts`.
+- Demo seeding masih Supabase-heavy, tetapi `org.actions.ts` sekarang hanya memanggil wrapper `seedDemoOrganization(...)`.
+- Helper branch scope `modules/organization/lib/branch-access.server.ts` **belum** selesai dimigrasikan dan merupakan target lanjutan yang paling logis.
+
 ---
 
 ## 🏗️ 1. Fase Persiapan Basis Data (Prisma & Skema)

@@ -446,3 +446,11 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
 
   return branchId
 }
+
+export async function seedDemoOrganization(
+  orgId: string,
+  demoType: DemoBusinessType
+) {
+  const adminClient = await createAdminClient()
+  return seedDemoData(adminClient as any, orgId, demoType)
+}

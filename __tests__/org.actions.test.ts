@@ -1,21 +1,70 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createSupabaseMock, success } from './helpers/supabase-mock'
 
 const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  createAdminClient: vi.fn(),
+  auth: vi.fn(),
+  getMembership: vi.fn(),
   cookies: vi.fn(),
   revalidatePath: vi.fn(),
-  redirect: vi.fn(),
-  seedDemoData: vi.fn(),
+  redirect: vi.fn((path: string) => path),
+  seedDemoOrganization: vi.fn(),
   applyVoucher: vi.fn(),
   getBranchAccessScope: vi.fn(),
   getCurrentAccessibleBranch: vi.fn(),
+  canAccessAllBranchesForOrg: vi.fn(),
+  persistMembershipActiveContext: vi.fn(),
+  resolveActiveMembership: vi.fn(),
+  uploadOrganizationLogoAsset: vi.fn(),
+  prisma: {
+    $transaction: vi.fn(),
+    organizations: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    org_members: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+    },
+    branches: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    saas_packages: {
+      findFirst: vi.fn(),
+    },
+    employees: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+    },
+    user: {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+    },
+    org_invitations: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+      findUnique: vi.fn(),
+      delete: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    roles: {
+      findFirst: vi.fn(),
+    },
+  },
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: mocks.createClient,
-  createAdminClient: mocks.createAdminClient,
+vi.mock('@/auth', () => ({
+  auth: mocks.auth,
+}))
+
+vi.mock('@/lib/auth/permissions', () => ({
+  getMembership: mocks.getMembership,
+}))
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: mocks.prisma,
 }))
 
 vi.mock('next/headers', () => ({
@@ -31,7 +80,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/modules/demo/actions/demo.actions', () => ({
-  seedDemoData: mocks.seedDemoData,
+  seedDemoOrganization: mocks.seedDemoOrganization,
 }))
 
 vi.mock('@/modules/organization/actions/billing.actions', () => ({
@@ -41,7 +90,16 @@ vi.mock('@/modules/organization/actions/billing.actions', () => ({
 vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   getBranchAccessScope: mocks.getBranchAccessScope,
   getCurrentAccessibleBranch: mocks.getCurrentAccessibleBranch,
-  canAccessAllBranchesForOrg: vi.fn(),
+  canAccessAllBranchesForOrg: mocks.canAccessAllBranchesForOrg,
+}))
+
+vi.mock('@/modules/organization/lib/active-context.server', () => ({
+  persistMembershipActiveContext: mocks.persistMembershipActiveContext,
+  resolveActiveMembership: mocks.resolveActiveMembership,
+}))
+
+vi.mock('@/modules/organization/lib/logo-storage.server', () => ({
+  uploadOrganizationLogoAsset: mocks.uploadOrganizationLogoAsset,
 }))
 
 import {
@@ -52,7 +110,10 @@ import {
   setActiveBranch,
   setActiveOrg,
 } from '@/modules/organization/actions/org.actions'
-import { getActiveBranchIdAction, getActiveOrgIdAction } from '@/modules/organization/actions/org-id.actions'
+import {
+  getActiveBranchIdAction,
+  getActiveOrgIdAction,
+} from '@/modules/organization/actions/org-id.actions'
 
 function createCookieStore(initial: Record<string, string> = {}) {
   const values = new Map(Object.entries(initial))
@@ -72,10 +133,46 @@ function createCookieStore(initial: Record<string, string> = {}) {
   }
 }
 
+function makeMembership(overrides: Record<string, unknown> = {}) {
+  return {
+    memberId: 'member-1',
+    userId: 'user-1',
+    orgId: 'org-1',
+    role: 'owner',
+    roleId: null,
+    permissions: [],
+    isOwner: true,
+    isAdmin: false,
+    isOwnerOrAdmin: true,
+    ...overrides,
+  }
+}
+
 describe('Organization Branch Bootstrap', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+
     mocks.cookies.mockResolvedValue(createCookieStore())
+    mocks.auth.mockResolvedValue({
+      user: { id: 'user-1', email: 'owner@example.com', name: 'Owner' },
+    })
+    mocks.getMembership.mockResolvedValue(makeMembership())
+    mocks.persistMembershipActiveContext.mockResolvedValue({ success: true })
+    mocks.resolveActiveMembership.mockResolvedValue(null)
+    mocks.getCurrentAccessibleBranch.mockResolvedValue(null)
+    mocks.getBranchAccessScope.mockResolvedValue({
+      membershipId: 'member-1',
+      role: 'owner',
+      accessibleBranches: [],
+      accessibleBranchIds: [],
+      canAccessAllBranches: true,
+      hasPersistedSelection: false,
+      storedBranchId: null,
+    })
+    mocks.prisma.$transaction.mockReset()
+    mocks.prisma.org_members.findFirst.mockReset()
+    mocks.prisma.branches.findFirst.mockReset()
+    mocks.prisma.branches.create.mockReset()
   })
 
   it('falls back to the sole active branch when no branch cookie is set', async () => {
@@ -119,65 +216,61 @@ describe('Organization Branch Bootstrap', () => {
     const cookieStore = createCookieStore()
     mocks.cookies.mockResolvedValue(cookieStore)
 
-    const orgInsert = vi.fn().mockResolvedValue({ error: null })
-    const memberInsert = vi.fn().mockResolvedValue({ error: null })
-    const branchInsert = vi.fn().mockResolvedValue({ error: null })
-    const memberUpdateBuilder = {
-      update: vi.fn(() => memberUpdateBuilder),
-      eq: vi.fn(() => memberUpdateBuilder),
-    }
+    const orgCreate = vi.fn().mockResolvedValue({})
+    const memberCreate = vi.fn().mockResolvedValue({})
+    const branchCreate = vi.fn().mockResolvedValue({})
+
+    mocks.prisma.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        organizations: { create: orgCreate },
+        org_members: { create: memberCreate },
+        branches: { create: branchCreate },
+      })
+    )
 
     const randomUuidMock = vi.spyOn(globalThis.crypto, 'randomUUID')
     randomUuidMock
       .mockReturnValueOnce('org-1')
       .mockReturnValueOnce('branch-1')
 
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1', email: 'owner@example.com' } },
-        }),
-      },
-      from: vi.fn((table: string) => {
-        if (table === 'organizations') return { insert: orgInsert }
-        throw new Error(`Unexpected table ${table}`)
-      }),
-    })
-    mocks.createAdminClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table === 'org_members') {
-          return {
-            insert: memberInsert,
-            update: memberUpdateBuilder.update,
-            eq: memberUpdateBuilder.eq,
-          }
-        }
-        if (table === 'branches') return { insert: branchInsert }
-        if (table === 'organizations') return { delete: vi.fn(() => ({ eq: vi.fn() })) }
-        throw new Error(`Unexpected admin table ${table}`)
-      }),
-    })
-
     const formData = new FormData()
     formData.set('name', 'PT Contoh Jaya')
 
     await createOrganization(formData)
 
-    expect(orgInsert).toHaveBeenCalledWith(
+    expect(orgCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: 'org-1',
-        name: 'PT Contoh Jaya',
+        data: expect.objectContaining({
+          id: 'org-1',
+          name: 'PT Contoh Jaya',
+        }),
       })
     )
-    expect(branchInsert).toHaveBeenCalledWith(
+    expect(memberCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: 'branch-1',
-        org_id: 'org-1',
-        name: 'Unit Utama',
-        code: 'MAIN',
-        is_active: true,
+        data: expect.objectContaining({
+          org_id: 'org-1',
+          user_id: 'user-1',
+          role: 'owner',
+        }),
       })
     )
+    expect(branchCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          id: 'branch-1',
+          org_id: 'org-1',
+          name: 'Unit Utama',
+          code: 'MAIN',
+          is_active: true,
+        }),
+      })
+    )
+    expect(mocks.persistMembershipActiveContext).toHaveBeenCalledWith({
+      userId: 'user-1',
+      orgId: 'org-1',
+      branchId: 'branch-1',
+    })
     expect(cookieStore.set).toHaveBeenCalledWith(
       'nizam_active_org_id',
       'org-1',
@@ -203,44 +296,18 @@ describe('Organization Branch Bootstrap', () => {
     const cookieStore = createCookieStore()
     mocks.cookies.mockResolvedValue(cookieStore)
 
-    const orgInsert = vi.fn().mockResolvedValue({ error: null })
-    const memberInsert = vi.fn().mockResolvedValue({ error: null })
-    const branchInsert = vi.fn().mockResolvedValue({ error: null })
-    const memberUpdateBuilder = {
-      update: vi.fn(() => memberUpdateBuilder),
-      eq: vi.fn(() => memberUpdateBuilder),
-    }
+    mocks.prisma.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        organizations: { create: vi.fn().mockResolvedValue({}) },
+        org_members: { create: vi.fn().mockResolvedValue({}) },
+        branches: { create: vi.fn().mockResolvedValue({}) },
+      })
+    )
 
     const randomUuidMock = vi.spyOn(globalThis.crypto, 'randomUUID')
     randomUuidMock
       .mockReturnValueOnce('org-2')
       .mockReturnValueOnce('branch-2')
-
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1', email: 'owner@example.com' } },
-        }),
-      },
-      from: vi.fn((table: string) => {
-        if (table === 'organizations') return { insert: orgInsert }
-        throw new Error(`Unexpected table ${table}`)
-      }),
-    })
-    mocks.createAdminClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table === 'org_members') {
-          return {
-            insert: memberInsert,
-            update: memberUpdateBuilder.update,
-            eq: memberUpdateBuilder.eq,
-          }
-        }
-        if (table === 'branches') return { insert: branchInsert }
-        if (table === 'organizations') return { delete: vi.fn(() => ({ eq: vi.fn() })) }
-        throw new Error(`Unexpected admin table ${table}`)
-      }),
-    })
 
     const formData = new FormData()
     formData.set('name', 'PT Header Baru')
@@ -286,76 +353,10 @@ describe('Organization Branch Bootstrap', () => {
       is_active: true,
     }
 
-    const orgMembersBuilder = {
-      select: vi.fn(() => orgMembersBuilder),
-      eq: vi.fn(() => orgMembersBuilder),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { role: 'owner' },
-        error: null,
-      }),
-    }
-
-    const duplicateNameBuilder = {
-      select: vi.fn(() => duplicateNameBuilder),
-      eq: vi.fn(() => duplicateNameBuilder),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: null,
-        error: null,
-      }),
-    }
-
-    const duplicateCodeBuilder = {
-      select: vi.fn(() => duplicateCodeBuilder),
-      eq: vi.fn(() => duplicateCodeBuilder),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: null,
-        error: null,
-      }),
-    }
-
-    const branchInsertBuilder = {
-      insert: vi.fn(() => branchInsertBuilder),
-      select: vi.fn(() => branchInsertBuilder),
-      single: vi.fn().mockResolvedValue({
-        data: insertedBranch,
-        error: null,
-      }),
-    }
-
-    let branchReadCount = 0
-    const memberUpdateBuilder = {
-      update: vi.fn(() => memberUpdateBuilder),
-      eq: vi.fn(() => memberUpdateBuilder),
-    }
-
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1', email: 'owner@example.com' } },
-        }),
-      },
-      from: vi.fn((table: string) => {
-        if (table === 'org_members') return orgMembersBuilder
-        if (table === 'branches') {
-          branchReadCount += 1
-          if (branchReadCount === 1) return duplicateNameBuilder
-          if (branchReadCount === 2) return duplicateCodeBuilder
-          return branchInsertBuilder
-        }
-        throw new Error(`Unexpected table ${table}`)
-      }),
-    })
-    mocks.createAdminClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table === 'org_members') {
-          return {
-            update: memberUpdateBuilder.update,
-            eq: memberUpdateBuilder.eq,
-          }
-        }
-        throw new Error(`Unexpected admin table ${table}`)
-      }),
-    })
+    mocks.prisma.branches.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+    mocks.prisma.branches.create.mockResolvedValue(insertedBranch)
 
     const formData = new FormData()
     formData.set('name', 'Cabang Bandung')
@@ -364,19 +365,20 @@ describe('Organization Branch Bootstrap', () => {
 
     const result = await createBranch('org-1', formData)
 
-    expect(result).toEqual(
+    expect(result).toEqual({
+      success: true,
+      branch: insertedBranch,
+      branchId: 'branch-2',
+    })
+    expect(mocks.prisma.branches.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        success: true,
-        branchId: 'branch-2',
-      })
-    )
-    expect(branchInsertBuilder.insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        org_id: 'org-1',
-        name: 'Cabang Bandung',
-        code: 'BDG',
-        address: 'Jl. Merdeka',
-        is_active: true,
+        data: expect.objectContaining({
+          org_id: 'org-1',
+          name: 'Cabang Bandung',
+          code: 'BDG',
+          address: 'Jl. Merdeka',
+          is_active: true,
+        }),
       })
     )
     expect(cookieStore.set).toHaveBeenCalledWith(
@@ -387,11 +389,11 @@ describe('Organization Branch Bootstrap', () => {
         httpOnly: true,
       })
     )
-    expect(memberUpdateBuilder.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        last_active_branch_id: 'branch-2',
-      })
-    )
+    expect(mocks.persistMembershipActiveContext).toHaveBeenCalledWith({
+      userId: 'user-1',
+      orgId: 'org-1',
+      branchId: 'branch-2',
+    })
   })
 
   it('persists the active org and resolved branch when switching organization', async () => {
@@ -401,49 +403,21 @@ describe('Organization Branch Bootstrap', () => {
       membershipId: 'member-2',
       role: 'owner',
       accessibleBranches: [
-        { id: 'branch-2', org_id: 'org-2', name: 'Unit Bandung', code: 'BDG', address: null, is_active: true },
+        {
+          id: 'branch-2',
+          org_id: 'org-2',
+          name: 'Unit Bandung',
+          code: 'BDG',
+          address: null,
+          is_active: true,
+        },
       ],
       accessibleBranchIds: ['branch-2'],
       canAccessAllBranches: true,
       hasPersistedSelection: false,
       storedBranchId: null,
     })
-
-    const membershipQuery = {
-      select: vi.fn(() => membershipQuery),
-      eq: vi.fn(() => membershipQuery),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { org_id: 'org-2' },
-        error: null,
-      }),
-    }
-    const memberUpdateBuilder = {
-      update: vi.fn(() => memberUpdateBuilder),
-      eq: vi.fn(() => memberUpdateBuilder),
-    }
-
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1', email: 'owner@example.com' } },
-        }),
-      },
-      from: vi.fn((table: string) => {
-        if (table === 'org_members') return membershipQuery
-        throw new Error(`Unexpected table ${table}`)
-      }),
-    })
-    mocks.createAdminClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table === 'org_members') {
-          return {
-            update: memberUpdateBuilder.update,
-            eq: memberUpdateBuilder.eq,
-          }
-        }
-        throw new Error(`Unexpected admin table ${table}`)
-      }),
-    })
+    mocks.prisma.org_members.findFirst.mockResolvedValue({ org_id: 'org-2' })
 
     const result = await setActiveOrg('org-2')
 
@@ -468,11 +442,11 @@ describe('Organization Branch Bootstrap', () => {
         httpOnly: true,
       })
     )
-    expect(memberUpdateBuilder.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        last_active_branch_id: 'branch-2',
-      })
-    )
+    expect(mocks.persistMembershipActiveContext).toHaveBeenCalledWith({
+      userId: 'user-1',
+      orgId: 'org-2',
+      branchId: 'branch-2',
+    })
   })
 
   it('persists the active branch when switching unit context', async () => {
@@ -482,37 +456,27 @@ describe('Organization Branch Bootstrap', () => {
       membershipId: 'member-1',
       role: 'owner',
       accessibleBranches: [
-        { id: 'branch-1', org_id: 'org-1', name: 'Unit A', code: 'UA', address: null, is_active: true },
-        { id: 'branch-2', org_id: 'org-1', name: 'Unit B', code: 'UB', address: null, is_active: true },
+        {
+          id: 'branch-1',
+          org_id: 'org-1',
+          name: 'Unit A',
+          code: 'UA',
+          address: null,
+          is_active: true,
+        },
+        {
+          id: 'branch-2',
+          org_id: 'org-1',
+          name: 'Unit B',
+          code: 'UB',
+          address: null,
+          is_active: true,
+        },
       ],
       accessibleBranchIds: ['branch-1', 'branch-2'],
       canAccessAllBranches: true,
       hasPersistedSelection: false,
       storedBranchId: null,
-    })
-
-    const memberUpdateBuilder = {
-      update: vi.fn(() => memberUpdateBuilder),
-      eq: vi.fn(() => memberUpdateBuilder),
-    }
-
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1', email: 'owner@example.com' } },
-        }),
-      },
-    })
-    mocks.createAdminClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table === 'org_members') {
-          return {
-            update: memberUpdateBuilder.update,
-            eq: memberUpdateBuilder.eq,
-          }
-        }
-        throw new Error(`Unexpected admin table ${table}`)
-      }),
     })
 
     const result = await setActiveBranch('org-1', 'branch-2')
@@ -529,79 +493,42 @@ describe('Organization Branch Bootstrap', () => {
         httpOnly: true,
       })
     )
-    expect(memberUpdateBuilder.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        last_active_branch_id: 'branch-2',
-      })
-    )
+    expect(mocks.persistMembershipActiveContext).toHaveBeenCalledWith({
+      userId: 'user-1',
+      orgId: 'org-1',
+      branchId: 'branch-2',
+    })
   })
 
   it('returns the persisted active org when login starts without an active-org cookie', async () => {
     const cookieStore = createCookieStore()
     mocks.cookies.mockResolvedValue(cookieStore)
-
-    const supabase = createSupabaseMock({
-      tables: {
-        org_members: [
-          {
-            maybeSingleResult: success({
-              org_id: 'org-2',
-              last_active_at: '2026-04-04T10:00:00.000Z',
-              joined_at: '2026-01-01T00:00:00.000Z',
-            }),
-          },
-          {
-            maybeSingleResult: success({
-              org_id: 'org-2',
-            }),
-          },
-        ],
-      },
-    })
-
-    mocks.createClient.mockResolvedValue({
-      ...supabase.client,
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1', email: 'owner@example.com' } },
-        }),
-      },
+    mocks.resolveActiveMembership.mockResolvedValue({
+      org_id: 'org-2',
     })
 
     const result = await getActiveOrgIdAction()
 
     expect(result).toBe('org-2')
-    expect(supabase.calls[0]?.operations).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          method: 'order',
-          args: ['last_active_at', expect.objectContaining({ ascending: false })],
-        }),
-      ])
+    expect(mocks.resolveActiveMembership).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'user-1',
+        email: 'owner@example.com',
+      }),
+      cookieStore,
+      'org_id'
     )
   })
 
   it('rejects managers from creating a new branch from the app layer', async () => {
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1', email: 'manager@example.com' } },
-        }),
-      },
-      from: vi.fn((table: string) => {
-        if (table === 'org_members') {
-          return {
-            select: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockReturnThis(),
-            maybeSingle: vi.fn().mockResolvedValue({
-              data: { role: 'manager' },
-              error: null,
-            }),
-          }
-        }
-        throw new Error(`Unexpected table ${table}`)
-      }),
-    })
+    mocks.getMembership.mockResolvedValue(
+      makeMembership({
+        role: 'manager',
+        isOwner: false,
+        isAdmin: false,
+        isOwnerOrAdmin: false,
+      })
+    )
 
     const formData = new FormData()
     formData.set('name', 'Cabang Surabaya')

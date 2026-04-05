@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
-import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
 import { ACTIVE_BRANCH_COOKIE, type BranchSummary } from './org-context'
 
 const FULL_BRANCH_ACCESS_ROLES = new Set(['owner', 'admin'])
@@ -84,101 +85,82 @@ function pickPersistedBranch(scope: BranchAccessScope): BranchSummary | null | u
   return undefined
 }
 
-async function fetchActiveBranches(admin: any, orgId: string): Promise<BranchSummary[] | null> {
-  const { data: activeBranches, error } = await admin
-    .from('branches')
-    .select('id, org_id, name, code, address, is_active')
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .order('name', { ascending: true })
-
-  if (error || !Array.isArray(activeBranches)) {
+async function fetchActiveBranches(orgId: string): Promise<BranchSummary[] | null> {
+  try {
+    const activeBranches = await prisma.branches.findMany({
+      where: { org_id: orgId, is_active: true },
+      select: { id: true, org_id: true, name: true, code: true, address: true, is_active: true },
+      orderBy: { name: 'asc' },
+    })
+    return normalizeBranchRows(activeBranches)
+  } catch {
     return null
   }
-
-  return normalizeBranchRows(activeBranches)
 }
 
-async function ensureUsableBranchesForPrivilegedMember(admin: any, orgId: string): Promise<BranchSummary[]> {
-  const { data: earliestBranch, error: earliestBranchError } = await admin
-    .from('branches')
-    .select('id, org_id, name, code, address, is_active')
-    .eq('org_id', orgId)
-    .order('created_at', { ascending: true })
-    .order('id', { ascending: true })
-    .limit(1)
-    .maybeSingle()
+async function ensureUsableBranchesForPrivilegedMember(orgId: string): Promise<BranchSummary[]> {
+  // Try to find the earliest branch (active or not)
+  const earliestBranch = await prisma.branches.findFirst({
+    where: { org_id: orgId },
+    orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
+  })
 
-  if (!earliestBranchError && earliestBranch?.id) {
+  if (earliestBranch?.id) {
     if (earliestBranch.is_active) {
       return normalizeBranchRows([earliestBranch])
     }
 
-    const { data: activatedBranch, error: activateError } = await admin
-      .from('branches')
-      .update({
-        is_active: true,
-        updated_at: new Date().toISOString(),
+    // Reactivate the earliest branch
+    try {
+      const activated = await prisma.branches.update({
+        where: { id: earliestBranch.id },
+        data: { is_active: true },
       })
-      .eq('id', earliestBranch.id)
-      .eq('org_id', orgId)
-      .select('id, org_id, name, code, address, is_active')
-      .single()
-
-    if (!activateError && activatedBranch?.id) {
-      return normalizeBranchRows([activatedBranch])
+      return normalizeBranchRows([activated])
+    } catch {
+      // fall through to create new
     }
   }
 
-  const { data: insertedBranch, error: insertError } = await admin
-    .from('branches')
-    .insert({
-      org_id: orgId,
-      name: DEFAULT_BRANCH_NAME,
-      code: DEFAULT_BRANCH_CODE,
-      address: null,
-      is_active: true,
+  // No branches exist — create the default unit
+  try {
+    const inserted = await prisma.branches.create({
+      data: {
+        org_id: orgId,
+        name: DEFAULT_BRANCH_NAME,
+        code: DEFAULT_BRANCH_CODE,
+        address: null,
+        is_active: true,
+      },
     })
-    .select('id, org_id, name, code, address, is_active')
-    .single()
-
-  if (insertError || !insertedBranch?.id) {
+    return normalizeBranchRows([inserted])
+  } catch {
     return []
   }
-
-  return normalizeBranchRows([insertedBranch])
 }
 
 export async function getBranchAccessScope(orgId: string): Promise<BranchAccessScope> {
   const trimmedOrgId = orgId.trim()
   if (!trimmedOrgId) return emptyScope()
 
-  const supabase = await createClient()
-  const db = supabase as any
-  const adminClient = await createAdminClient()
-  const admin = adminClient as any
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await auth()
+  if (!session?.user?.id) return emptyScope()
 
-  if (!user) return emptyScope()
+  const userId = session.user.id
 
-  const { data: membership } = await db
-    .from('org_members')
-    .select('id, role, last_active_at, last_active_branch_id')
-    .eq('org_id', trimmedOrgId)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
+  const membership = await prisma.org_members.findFirst({
+    where: { org_id: trimmedOrgId, user_id: userId, is_active: true },
+    select: { id: true, role: true, last_active_at: true, last_active_branch_id: true },
+  })
 
   if (!membership?.id) return emptyScope()
 
   const role = String(membership.role || 'staff')
 
-  let normalizedBranches = await fetchActiveBranches(admin, trimmedOrgId)
+  let normalizedBranches = await fetchActiveBranches(trimmedOrgId)
 
   if ((!normalizedBranches || normalizedBranches.length === 0) && FULL_BRANCH_ACCESS_ROLES.has(role)) {
-    normalizedBranches = await ensureUsableBranchesForPrivilegedMember(admin, trimmedOrgId)
+    normalizedBranches = await ensureUsableBranchesForPrivilegedMember(trimmedOrgId)
   }
 
   if (!normalizedBranches || normalizedBranches.length === 0) {
@@ -205,25 +187,15 @@ export async function getBranchAccessScope(orgId: string): Promise<BranchAccessS
     }
   }
 
-  const { data: assignments, error: assignmentsError } = await admin
-    .from('org_member_units')
-    .select('branch_id')
-    .eq('org_id', trimmedOrgId)
-    .eq('org_member_id', membership.id)
-
-  if (assignmentsError || !Array.isArray(assignments)) {
-    return {
-      membershipId: String(membership.id),
-      role,
-      accessibleBranches: [],
-      accessibleBranchIds: [],
-      canAccessAllBranches: false,
-    }
-  }
+  // Staff: fetch only explicitly assigned branches
+  const assignments = await prisma.org_member_units.findMany({
+    where: { org_id: trimmedOrgId, org_member_id: membership.id },
+    select: { branch_id: true },
+  })
 
   const assignedBranchIds = new Set(
     assignments
-      .map((assignment) => String(assignment.branch_id || '').trim())
+      .map((a) => String(a.branch_id || '').trim())
       .filter(Boolean)
   )
   const accessibleBranches = normalizedBranches.filter((branch) => assignedBranchIds.has(branch.id))
