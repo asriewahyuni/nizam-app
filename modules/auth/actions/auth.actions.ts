@@ -384,6 +384,8 @@ export async function signUp(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const fullName = formData.get('fullName') as string
+  const planParam = String(formData.get('plan') || '').trim().toLowerCase()
+  const isDemoSignup = planParam === 'demo'
 
   // Use regular signUp for owners so they get logged in automatically
   // and are prompted for email confirmation if enabled in dashboard.
@@ -394,7 +396,7 @@ export async function signUp(formData: FormData) {
       data: { 
         full_name: fullName,
         login_type: 'owner',
-        is_demo: formData.get('plan') === 'demo'
+        is_demo: isDemoSignup
       },
     },
   })

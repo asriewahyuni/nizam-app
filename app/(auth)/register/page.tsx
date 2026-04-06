@@ -40,8 +40,15 @@ function RegisterPageContent() {
   const [success, setSuccess] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const [formData, setFormData] = useState({ fullName: '', email: '', password: '' })
-  
-  const plan = searchParams.get('plan')
+  const source = (searchParams.get('source') || '').trim().toLowerCase()
+  const requestedPlan = (searchParams.get('plan') || '').trim().toLowerCase()
+  const isDemoFlow = source === 'demo'
+  const plan = isDemoFlow ? 'demo' : (requestedPlan === 'abs' ? 'abs' : 'trial')
+  const onboardingParams = new URLSearchParams(searchParams.toString())
+  onboardingParams.set('plan', plan)
+  if (isDemoFlow) onboardingParams.set('source', 'demo')
+  else onboardingParams.delete('source')
+  const onboardingHref = `/onboarding?${onboardingParams.toString()}`
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -52,6 +59,7 @@ function RegisterPageContent() {
       fd.append('fullName', formData.fullName)
       fd.append('email', formData.email)
       fd.append('password', formData.password)
+      fd.append('plan', plan)
       
       const res: SignUpResult = await signUp(fd)
       if ('error' in res && res.error) {
@@ -86,7 +94,7 @@ function RegisterPageContent() {
            </div>
 
            <Link 
-              href={`/onboarding?${searchParams.toString()}`}
+              href={onboardingHref}
               className="w-full py-4 rounded-3xl bg-slate-900 text-white text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl shadow-slate-200"
            >
               Lanjutkan ke Onboarding

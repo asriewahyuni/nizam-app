@@ -1,6 +1,6 @@
 # NIZAM ERP — Comprehensive Codebase Documentation
 
-> **Last updated:** 6 April 2026 (rev 8) — updated to include HRIS multi-PIC assignment (employee can manage multiple child orgs and branches), plus inter-organization capital transfer guardrail hardening.
+> **Last updated:** 6 April 2026 (rev 9) — updated with organization onboarding bootstrap hardening (CoA/main-branch race fix), plus migration timeline up to `1150`.
 
 ---
 
@@ -15,7 +15,7 @@ NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **
 | Page routes (`page.tsx`) | **65** |
 | Client components (`*Client.tsx`) | **46** |
 | Server action files | **47** |
-| Migration SQL files | **188** (latest: `1147`) |
+| Migration SQL files | **191** (latest: `1150`) |
 | Test files | **33** |
 | API route handlers | **2** (`/api/export`, `/api/sales-pages/lead`) |
 | Proxy (middleware) | `proxy.ts` |
@@ -92,7 +92,7 @@ nizam-app/
 │   └── database.types.ts # Auto-generated Supabase types
 ├── __tests__/           # Vitest test suites (33 files)
 ├── supabase/
-│   └── migrations/      # 184 SQL migration files
+│   └── migrations/      # 191 SQL migration files
 ├── scripts/             # Data migration scripts
 └── public/              # PWA manifest, logo, static assets
 ```
@@ -622,9 +622,9 @@ Core reusable components:
 
 ### 9.1 Overview
 
-- **184 migration files** in `supabase/migrations/`
+- **191 migration files** in `supabase/migrations/`
 - `master_init.sql` — legacy bootstrap SQL (foundation reference)
-- Latest migration: `1143_interorg_capital_transfer.sql`
+- Latest migration: `1150_rebind_accounts_governance_with_branch_ensure.sql`
 
 ### 9.2 Core Entities
 
@@ -743,6 +743,13 @@ Core reusable components:
 | `1141` | Repair fungsi konsolidasi yang hilang (`get_consolidated_org_ids`, `is_org_in_consolidation_tree`, `get_consolidated_org_hierarchy`). |
 | `1142` | Perbaikan cast tipe pada approval CoA request agar stabil pada berbagai environment schema. |
 | `1143` | **Inter-org capital transfer RPC** — parent dapat posting transfer modal lintas entitas secara atomik (`OUT` sumber + `IN` tujuan) dengan validasi tree konsolidasi dan validasi akun lawan per entitas. |
+| `1144` | Repair sinkronisasi report `bank_transactions` agar konsisten dengan jurnal/cash-bank references. |
+| `1145` | Guardrail tambahan untuk inter-org capital transfer (validasi entitas sumber/tujuan dan batasan posting). |
+| `1146` | Backfill `reference_type` legacy untuk transfer modal antar organisasi agar histori konsisten. |
+| `1147` | Enforce source-counter cash/bank untuk inter-org transfer agar pasangan jurnal sisi lawan selalu valid. |
+| `1148` | Fix CoA bootstrap race: governance accounts dapat memastikan `Unit Utama` tersedia saat seed awal akun. |
+| `1149` | Tambah trigger bootstrap `MAIN branch` pada saat org dibuat untuk memastikan branch tersedia sebelum trigger seed akun lain berjalan. |
+| `1150` | Rebind trigger `trg_accounts_governance` ke `enforce_accounts_governance_v2()` + helper `ensure_main_branch_for_org()` agar race bootstrap lintas environment tertangani. |
 
 ### 9.5 Storage Buckets
 
@@ -1194,6 +1201,20 @@ When adding new modules to the SaaS system, update:
 ---
 
 ## 16. Changelog (Recent Updates)
+
+### Organization Onboarding Bootstrap Hardening (April 2026)
+
+- **Issue:** pembuatan organisasi gagal dengan pesan `Unit Utama organisasi <id> belum tersedia.` ketika trigger seed akun berjalan sebelum branch default tersedia.
+- **DB fixes shipped:**
+  - `1148_fix_coa_seed_requires_default_branch.sql`
+  - `1149_bootstrap_main_branch_before_org_account_seeds.sql`
+  - `1150_rebind_accounts_governance_with_branch_ensure.sql`
+- **App-layer hardening (`modules/organization/actions/org.actions.ts`):**
+  - Create org payload menandai `skip_coa_seed: true`, lalu melakukan seed CoA ulang setelah branch default siap.
+  - Fallback branch bootstrap: jika insert `MAIN` branch duplicate (`23505`), action re-use branch existing dan lanjutkan flow.
+  - Fallback admin client: jika `createAdminClient()` unavailable (mis. env `SUPABASE_SERVICE_ROLE_KEY` belum lengkap), flow tetap lanjut via session client.
+  - Error mapping onboarding diperjelas untuk mempercepat diagnosis migration/schema mismatch.
+- **Operational note:** Pastikan SQL dijalankan pada project Supabase yang sama dengan `NEXT_PUBLIC_SUPABASE_URL`; mismatch project dapat menghasilkan false diagnosis seperti `relation public.accounts does not exist`.
 
 ### Finance Governance + Cash/Bank Consolidation Updates (April 2026)
 

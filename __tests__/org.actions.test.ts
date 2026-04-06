@@ -167,6 +167,11 @@ describe('Organization Branch Bootstrap', () => {
       expect.objectContaining({
         id: 'org-1',
         name: 'PT Contoh Jaya',
+        is_demo: false,
+        settings: expect.objectContaining({
+          plan: 'Trial',
+          is_demo: false,
+        }),
       })
     )
     expect(branchInsert).toHaveBeenCalledWith(
@@ -196,6 +201,75 @@ describe('Organization Branch Bootstrap', () => {
     )
     expect(mocks.redirect).toHaveBeenCalledWith('/dashboard')
 
+    randomUuidMock.mockRestore()
+  })
+
+  it('marks organization as demo when onboarding comes from demo flow', async () => {
+    const cookieStore = createCookieStore()
+    mocks.cookies.mockResolvedValue(cookieStore)
+
+    const orgInsert = vi.fn().mockResolvedValue({ error: null })
+    const memberInsert = vi.fn().mockResolvedValue({ error: null })
+    const branchInsert = vi.fn().mockResolvedValue({ error: null })
+    const memberUpdateBuilder = {
+      update: vi.fn(() => memberUpdateBuilder),
+      eq: vi.fn(() => memberUpdateBuilder),
+    }
+
+    const randomUuidMock = vi.spyOn(globalThis.crypto, 'randomUUID')
+    randomUuidMock
+      .mockReturnValueOnce('org-demo-1')
+      .mockReturnValueOnce('branch-demo-1')
+
+    const sessionClient = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1', email: 'owner@example.com' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'organizations') return { insert: orgInsert }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    }
+
+    mocks.createClient.mockResolvedValue(sessionClient)
+    mocks.createAdminClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'org_members') {
+          return {
+            insert: memberInsert,
+            update: memberUpdateBuilder.update,
+            eq: memberUpdateBuilder.eq,
+          }
+        }
+        if (table === 'branches') return { insert: branchInsert }
+        if (table === 'organizations') return { delete: vi.fn(() => ({ eq: vi.fn() })) }
+        throw new Error(`Unexpected admin table ${table}`)
+      }),
+    })
+
+    const formData = new FormData()
+    formData.set('name', 'PT Demo Flow')
+    formData.set('plan', 'demo')
+    formData.set('type', 'CATERING')
+
+    await createOrganization(formData)
+
+    expect(orgInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'org-demo-1',
+        name: 'PT Demo Flow',
+        is_demo: true,
+        settings: expect.objectContaining({
+          plan: 'Demo',
+          is_demo: true,
+          business_type: 'CATERING',
+        }),
+      })
+    )
+    expect(mocks.seedDemoData).toHaveBeenCalledWith(sessionClient, 'org-demo-1', 'CATERING')
+    expect(mocks.redirect).toHaveBeenCalledWith('/dashboard')
     randomUuidMock.mockRestore()
   })
 

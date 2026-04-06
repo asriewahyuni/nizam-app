@@ -81,7 +81,7 @@ type HoldingContextOptions = {
   ownerOnly?: boolean
 }
 
-const OPTIONAL_ORGANIZATION_COLUMNS = new Set(['owner_email', 'parent_org_id'])
+const OPTIONAL_ORGANIZATION_COLUMNS = new Set(['owner_email', 'parent_org_id', 'is_demo'])
 
 function extractErrorMessage(error: unknown): string {
   if (!error) return ''
@@ -258,10 +258,11 @@ async function createOrganizationRecord(
 
     // POPULATE OWNER EMAIL FROM SESSION
     const ownerEmail = user.email
-    const planParam = formData.get('plan') as string
+    const planParam = String(formData.get('plan') || '').trim().toLowerCase()
     const businessType = (formData.get('type') || 'BLANK') as DemoBusinessType
     const isDemo = planParam === 'demo'
     const isAbs = planParam === 'abs'
+    const selectedPlan = isDemo ? 'Demo' : 'Trial'
     const parentOrgIdRaw = String(formData.get('parent_org_id') || '').trim()
     const parentOrgId = parentOrgIdRaw || null
 
@@ -282,11 +283,12 @@ async function createOrganizationRecord(
       id: orgId,
       name,
       slug,
+      is_demo: isDemo,
       settings: {
         currency: 'IDR',
         timezone: 'Asia/Jakarta',
         fiscal_year_start_month: 1,
-        plan: isDemo ? 'Demo' : 'Trial', // Default plan for new orgs
+        plan: selectedPlan, // Default plan for new orgs
         is_demo: isDemo,
         business_type: businessType,
         // Delay CoA trigger seeding until Unit Utama exists to satisfy governance checks.
