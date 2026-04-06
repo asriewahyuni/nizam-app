@@ -490,13 +490,23 @@ async function assertPlatformAdmin() {
 }
 
 function buildQuoteNumber() {
-  const rand = Math.random().toString(36).slice(2, 8).toUpperCase()
-  return `QTN-SAAS-${Date.now()}-${rand}`
+  const stamp = buildDocumentStamp()
+  return `QTN-${stamp}`
 }
 
 function buildSalesNumber() {
-  const rand = Math.random().toString(36).slice(2, 8).toUpperCase()
-  return `INV-SAAS-${Date.now()}-${rand}`
+  const stamp = buildDocumentStamp()
+  return `INV-${stamp}`
+}
+
+function buildDocumentStamp() {
+  const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, '')
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase()
+  return `${datePart}-${rand}`
+}
+
+function isQuotationNumber(invoiceNumber: string | null | undefined) {
+  return String(invoiceNumber || '').toUpperCase().startsWith('QTN-')
 }
 
 export async function getOperatorSaasSnapshot(): Promise<OperatorSnapshot> {
@@ -618,8 +628,8 @@ export async function getOperatorSaasSnapshot(): Promise<OperatorSnapshot> {
     package: inv.package,
   }))
 
-  const quotations = invoices.filter((inv) => String(inv.invoice_number || '').startsWith('QTN-SAAS-'))
-  const sales = invoices.filter((inv) => !String(inv.invoice_number || '').startsWith('QTN-SAAS-'))
+  const quotations = invoices.filter((inv) => isQuotationNumber(inv.invoice_number))
+  const sales = invoices.filter((inv) => !isQuotationNumber(inv.invoice_number))
 
   const summary = {
     totalQuotes: quotations.length,
@@ -648,6 +658,7 @@ export async function createOperatorQuotation(formData: FormData) {
   const extraBranchQtyRaw = String(formData.get('extra_branch_qty') || '0').trim()
   const extraEntityUnitPriceRaw = String(formData.get('extra_entity_unit_price') || '').trim()
   const extraBranchUnitPriceRaw = String(formData.get('extra_branch_unit_price') || '').trim()
+  const durationMonthsRaw = String(formData.get('duration_months') || '1').trim()
   const addonPriceOverrides = parseNumericRecordJson(String(formData.get('addon_price_overrides_json') || ''))
   const addonAnchorOverrides = parseNumericRecordJson(String(formData.get('addon_anchor_overrides_json') || ''))
   const discountPercentRaw = String(formData.get('discount_percent') || '0').trim()
@@ -682,6 +693,7 @@ export async function createOperatorQuotation(formData: FormData) {
 
   const extraEntityQty = Math.max(0, Math.floor(parseNumber(extraEntityQtyRaw, 0)))
   const extraBranchQty = Math.max(0, Math.floor(parseNumber(extraBranchQtyRaw, 0)))
+  const durationMonths = Math.max(1, Math.floor(parseNumber(durationMonthsRaw, 1)))
   const extraEntityUnitPrice = Math.max(0, parseNumber(extraEntityUnitPriceRaw, EXTRA_ENTITY_UNIT_PRICE))
   const extraBranchUnitPrice = Math.max(0, parseNumber(extraBranchUnitPriceRaw, EXTRA_BRANCH_UNIT_PRICE))
 
@@ -695,16 +707,25 @@ export async function createOperatorQuotation(formData: FormData) {
     const addon = getOperatorAddonById(addonId)
     const promoPrice = Math.max(0, parseNumber(String(addonPriceOverrides[addonId] ?? addon?.price ?? 0), Number(addon?.price || 0)))
     const anchorPrice = Math.max(promoPrice, parseNumber(String(addonAnchorOverrides[addonId] ?? addon?.anchorPrice ?? promoPrice), promoPrice))
+    const billing = String(addon?.billing || 'Bulan').trim()
+    const isSingleBill = billing.toLowerCase().includes('single')
 
     return {
       id: addonId,
       name: addon?.name || addonId,
       promoPrice,
       anchorPrice,
+      billing,
+      isSingleBill,
     }
   })
 
-  const addonTotal = selectedAddonBreakdown.reduce((acc, addon) => acc + addon.promoPrice, 0)
+  const monthlyAddonTotal = selectedAddonBreakdown
+    .filter((addon) => !addon.isSingleBill)
+    .reduce((acc, addon) => acc + addon.promoPrice, 0)
+  const singleBillAddonTotal = selectedAddonBreakdown
+    .filter((addon) => addon.isSingleBill)
+    .reduce((acc, addon) => acc + addon.promoPrice, 0)
 
   let aiTokenTotal = 0
   let aiTokenLabel = ''
@@ -725,7 +746,10 @@ export async function createOperatorQuotation(formData: FormData) {
 
   const extraEntityTotal = extraEntityQty * extraEntityUnitPrice
   const extraBranchTotal = extraBranchQty * extraBranchUnitPrice
-  const subtotalAmount = baseAmount + addonTotal + aiTokenTotal + extraEntityTotal + extraBranchTotal
+  const monthlySubtotalAmount = baseAmount + monthlyAddonTotal + extraEntityTotal + extraBranchTotal
+  const oneTimeSubtotalAmount = singleBillAddonTotal + aiTokenTotal
+  const durationSubtotalAmount = monthlySubtotalAmount * durationMonths
+  const subtotalAmount = durationSubtotalAmount + oneTimeSubtotalAmount
   const discountAmount = (subtotalAmount * discountPercent) / 100
   const taxableAmount = Math.max(0, subtotalAmount - discountAmount)
   const taxAmount = (taxableAmount * taxPercent) / 100
@@ -740,16 +764,20 @@ export async function createOperatorQuotation(formData: FormData) {
 
   const detailLines = [
     `Paket dasar: ${formatCurrencyId(baseAmount)}`,
+    `Durasi: ${durationMonths} bulan`,
     ...selectedAddonBreakdown.map((addon) => (
       addon.anchorPrice > addon.promoPrice
-        ? `Add-on ${addon.name}: ${formatCurrencyId(addon.anchorPrice)} -> ${formatCurrencyId(addon.promoPrice)}`
-        : `Add-on ${addon.name}: ${formatCurrencyId(addon.promoPrice)}`
+        ? `${addon.isSingleBill ? 'Add-on Single Bill' : 'Add-on'} ${addon.name}: ${formatCurrencyId(addon.anchorPrice)} -> ${formatCurrencyId(addon.promoPrice)}`
+        : `${addon.isSingleBill ? 'Add-on Single Bill' : 'Add-on'} ${addon.name}: ${formatCurrencyId(addon.promoPrice)}`
     )),
     ...(aiTokenPackageId && aiTokenLabel ? [`Token AI: ${aiTokenLabel} (${formatCurrencyId(aiTokenTotal)})`] : []),
     ...(extraEntityQty > 0 ? [`Entitas tambahan: ${extraEntityQty} x ${formatCurrencyId(extraEntityUnitPrice)} = ${formatCurrencyId(extraEntityTotal)}`] : []),
     ...(extraBranchQty > 0 ? [`Cabang tambahan: ${extraBranchQty} x ${formatCurrencyId(extraBranchUnitPrice)} = ${formatCurrencyId(extraBranchTotal)}`] : []),
+    `Subtotal / bulan: ${formatCurrencyId(monthlySubtotalAmount)}`,
+    `Subtotal durasi (${durationMonths} bulan): ${formatCurrencyId(durationSubtotalAmount)}`,
+    ...(oneTimeSubtotalAmount > 0 ? [`Subtotal one-time: ${formatCurrencyId(oneTimeSubtotalAmount)}`] : []),
     `Subtotal: ${formatCurrencyId(subtotalAmount)}`,
-    ...(discountAmount > 0 || discountPercent > 0 ? [`Diskon: ${discountPercent}% (${formatCurrencyId(discountAmount)})`] : []),
+    ...(discountAmount > 0 || discountPercent > 0 ? [`Diskon setelah durasi: ${discountPercent}% (${formatCurrencyId(discountAmount)})`] : []),
     ...(taxAmount > 0 || taxPercent > 0 ? [`Pajak: ${taxPercent}% (${formatCurrencyId(taxAmount)})`] : []),
     `Grand total: ${formatCurrencyId(finalAmount)}`,
     ...(modulesForQuote.length > 0 ? [`Modul dipilih: ${modulesForQuote.join(', ')}`] : []),
@@ -821,7 +849,7 @@ export async function convertQuotationToSale(invoiceId: string) {
   const invoice = invoiceData as Pick<InvoiceRecord, 'id' | 'org_id' | 'invoice_number' | 'amount' | 'tax_amount' | 'created_at'> | null
 
   if (!invoice) return { error: 'Data penawaran tidak ditemukan.' }
-  if (!String(invoice.invoice_number).startsWith('QTN-SAAS-')) {
+  if (!isQuotationNumber(invoice.invoice_number)) {
     return { error: 'Data ini bukan penawaran yang bisa dikonversi.' }
   }
 

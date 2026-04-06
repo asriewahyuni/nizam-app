@@ -35,6 +35,10 @@ function formatDate(dateLike: string | null | undefined) {
   }).format(date)
 }
 
+function isQuotationNumber(invoiceNumber: string | null | undefined) {
+  return String(invoiceNumber || '').toUpperCase().startsWith('QTN-')
+}
+
 function normalizeBankInfo(raw: unknown) {
   if (!raw) return null
 
@@ -79,12 +83,15 @@ function parsePercentValue(raw: string) {
 
 type QuoteAddon = {
   name: string
+  isSingleBill: boolean
   promoPrice: number
   anchorPrice: number | null
 }
 
 type QuoteBreakdown = {
   baseAmount: number | null
+  durationMonths: number
+  monthlySubtotal: number | null
   addons: QuoteAddon[]
   aiTokenLabel: string | null
   aiTokenTotal: number
@@ -107,6 +114,8 @@ type QuoteBreakdown = {
 function createEmptyBreakdown(): QuoteBreakdown {
   return {
     baseAmount: null,
+    durationMonths: 1,
+    monthlySubtotal: null,
     addons: [],
     aiTokenLabel: null,
     aiTokenTotal: 0,
@@ -140,10 +149,39 @@ function parseQuoteBreakdown(rawDescription: string | null | undefined): QuoteBr
       return
     }
 
+    const durationMatch = line.match(/^Durasi:\s+(\d+)\s+bulan$/i)
+    if (durationMatch) {
+      breakdown.durationMonths = Math.max(1, Number(durationMatch[1] || 1))
+      return
+    }
+
+    const singleBillAddonWithAnchor = line.match(/^Add-on Single Bill\s+(.+):\s+(.+)\s+->\s+(.+)$/i)
+    if (singleBillAddonWithAnchor) {
+      breakdown.addons.push({
+        name: singleBillAddonWithAnchor[1].trim(),
+        isSingleBill: true,
+        anchorPrice: parseCurrencyValue(singleBillAddonWithAnchor[2]),
+        promoPrice: parseCurrencyValue(singleBillAddonWithAnchor[3]),
+      })
+      return
+    }
+
+    const singleBillAddonSimple = line.match(/^Add-on Single Bill\s+(.+):\s+(.+)$/i)
+    if (singleBillAddonSimple) {
+      breakdown.addons.push({
+        name: singleBillAddonSimple[1].trim(),
+        isSingleBill: true,
+        anchorPrice: null,
+        promoPrice: parseCurrencyValue(singleBillAddonSimple[2]),
+      })
+      return
+    }
+
     const addonWithAnchor = line.match(/^Add-on\s+(.+):\s+(.+)\s+->\s+(.+)$/i)
     if (addonWithAnchor) {
       breakdown.addons.push({
         name: addonWithAnchor[1].trim(),
+        isSingleBill: false,
         anchorPrice: parseCurrencyValue(addonWithAnchor[2]),
         promoPrice: parseCurrencyValue(addonWithAnchor[3]),
       })
@@ -154,6 +192,7 @@ function parseQuoteBreakdown(rawDescription: string | null | undefined): QuoteBr
     if (addonSimple) {
       breakdown.addons.push({
         name: addonSimple[1].trim(),
+        isSingleBill: false,
         anchorPrice: null,
         promoPrice: parseCurrencyValue(addonSimple[2]),
       })
@@ -191,12 +230,17 @@ function parseQuoteBreakdown(rawDescription: string | null | undefined): QuoteBr
       return
     }
 
+    if (line.startsWith('Subtotal / bulan:')) {
+      breakdown.monthlySubtotal = parseCurrencyValue(line.slice('Subtotal / bulan:'.length))
+      return
+    }
+
     if (line.startsWith('Subtotal:')) {
       breakdown.subtotal = parseCurrencyValue(line.slice('Subtotal:'.length))
       return
     }
 
-    const discountMatch = line.match(/^Diskon:\s+([\d.,]+)%\s+\((.+)\)$/i)
+    const discountMatch = line.match(/^Diskon(?: setelah durasi)?:\s+([\d.,]+)%\s+\((.+)\)$/i)
     if (discountMatch) {
       breakdown.discountPercent = parsePercentValue(discountMatch[1])
       breakdown.discountAmount = parseCurrencyValue(discountMatch[2])
@@ -272,7 +316,7 @@ export default function SaasDocumentView({
   const router = useRouter()
   const { invoice, saasConfig, packageModules } = snapshot
 
-  const isQuotation = String(invoice.invoice_number || '').startsWith('QTN-SAAS-')
+  const isQuotation = isQuotationNumber(invoice.invoice_number)
   const documentLabel = isQuotation ? 'Surat Penawaran' : 'Invoice'
   const documentFilePrefix = isQuotation ? 'penawaran' : 'invoice'
   const itemName = invoice.item_name || `${isQuotation ? 'Penawaran SaaS' : 'Invoice SaaS'}${invoice.package?.name ? `: ${invoice.package.name}` : ''}`
@@ -285,26 +329,29 @@ export default function SaasDocumentView({
 
   const pricingRows = useMemo<PricingRow[]>(() => {
     const rows: PricingRow[] = []
+    const durationMultiplier = Math.max(1, breakdown.durationMonths || 1)
 
     if (breakdown.baseAmount && breakdown.baseAmount > 0) {
       rows.push({
         label: itemName,
-        qty: 1,
-        total: breakdown.baseAmount,
-        note: invoice.package?.billing ? `Skema billing: ${invoice.package.billing}` : null,
+        qty: durationMultiplier,
+        total: breakdown.baseAmount * durationMultiplier,
+        note: invoice.package?.billing ? `Skema billing: ${invoice.package.billing} • ${durationMultiplier} bulan` : `${durationMultiplier} bulan`,
       })
     }
 
     breakdown.addons.forEach((addon) => {
+      const qty = addon.isSingleBill ? 1 : durationMultiplier
+      const total = addon.promoPrice * qty
       rows.push({
         label: `Add-on ${addon.name}`,
-        qty: 1,
-        total: addon.promoPrice,
+        qty,
+        total,
         note: addon.anchorPrice && addon.anchorPrice > addon.promoPrice
-          ? `Harga normal ${formatIdr(addon.anchorPrice)}`
+          ? `Harga normal ${formatIdr(addon.anchorPrice)}${addon.isSingleBill ? ' • single bill' : ` • ${durationMultiplier} bulan`}`
           : addon.anchorPrice
-            ? `Harga add-on ${formatIdr(addon.anchorPrice)}`
-            : null,
+            ? `Harga add-on ${formatIdr(addon.anchorPrice)}${addon.isSingleBill ? ' • single bill' : ` • ${durationMultiplier} bulan`}`
+            : addon.isSingleBill ? 'Single bill' : `${durationMultiplier} bulan`,
       })
     })
 
@@ -313,25 +360,25 @@ export default function SaasDocumentView({
         label: breakdown.aiTokenLabel || 'Paket Token AI',
         qty: 1,
         total: breakdown.aiTokenTotal,
-        note: 'Top-up token AI',
+        note: 'Top-up token AI • one-time',
       })
     }
 
     if (breakdown.extraEntityQty > 0 && breakdown.extraEntityTotal > 0) {
       rows.push({
         label: 'Entitas tambahan',
-        qty: breakdown.extraEntityQty,
-        total: breakdown.extraEntityTotal,
-        note: `${formatIdr(breakdown.extraEntityUnitPrice)} per entitas`,
+        qty: breakdown.extraEntityQty * durationMultiplier,
+        total: breakdown.extraEntityTotal * durationMultiplier,
+        note: `${formatIdr(breakdown.extraEntityUnitPrice)} per entitas • ${durationMultiplier} bulan`,
       })
     }
 
     if (breakdown.extraBranchQty > 0 && breakdown.extraBranchTotal > 0) {
       rows.push({
         label: 'Cabang tambahan',
-        qty: breakdown.extraBranchQty,
-        total: breakdown.extraBranchTotal,
-        note: `${formatIdr(breakdown.extraBranchUnitPrice)} per cabang`,
+        qty: breakdown.extraBranchQty * durationMultiplier,
+        total: breakdown.extraBranchTotal * durationMultiplier,
+        note: `${formatIdr(breakdown.extraBranchUnitPrice)} per cabang • ${durationMultiplier} bulan`,
       })
     }
 
@@ -486,6 +533,10 @@ export default function SaasDocumentView({
                     <span className="text-right font-black text-slate-900">{invoice.package.billing}</span>
                   </div>
                 )}
+                <div className="flex items-center justify-between gap-4">
+                  <span>Durasi</span>
+                  <span className="text-right font-black text-slate-900">{Math.max(1, breakdown.durationMonths || 1)} bulan</span>
+                </div>
               </div>
             </div>
           </section>

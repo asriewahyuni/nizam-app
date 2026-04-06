@@ -84,6 +84,7 @@ export default function SaasOperatorClient({
     Object.fromEntries(OPERATOR_ADDON_OPTIONS.map((addon) => [addon.id, String(addon.anchorPrice || addon.price)]))
   ))
   const [overrideAmount, setOverrideAmount] = useState('')
+  const [durationMonths, setDurationMonths] = useState('1')
   const [discountPercent, setDiscountPercent] = useState('0')
   const [taxPercent, setTaxPercent] = useState('0')
 
@@ -120,22 +121,34 @@ export default function SaasOperatorClient({
     ))
   }
 
-  const selectedAddonTotal = useMemo(
+  const selectedAddonMonthlyTotal = useMemo(
     () => selectedAddonIds.reduce((acc, addonId) => {
-      const addonPrice = parseSafeNumber(addonPromoPrices[addonId], 0)
-      return acc + Math.max(0, addonPrice)
+      const addonPrice = Math.max(0, parseSafeNumber(addonPromoPrices[addonId], 0))
+      const addonBilling = String(OPERATOR_ADDON_OPTIONS.find((addon) => addon.id === addonId)?.billing || '').toLowerCase()
+      return addonBilling.includes('single') ? acc : acc + addonPrice
+    }, 0),
+    [selectedAddonIds, addonPromoPrices]
+  )
+  const selectedAddonSingleBillTotal = useMemo(
+    () => selectedAddonIds.reduce((acc, addonId) => {
+      const addonPrice = Math.max(0, parseSafeNumber(addonPromoPrices[addonId], 0))
+      const addonBilling = String(OPERATOR_ADDON_OPTIONS.find((addon) => addon.id === addonId)?.billing || '').toLowerCase()
+      return addonBilling.includes('single') ? acc + addonPrice : acc
     }, 0),
     [selectedAddonIds, addonPromoPrices]
   )
   const selectedAiTokenTotal = Number(selectedAiTokenPackage?.price || 0)
   const baseAmount = Number(overrideAmount || selectedPackage?.price || 0)
+  const safeDurationMonths = Math.max(1, Math.floor(parseSafeNumber(durationMonths, 1)))
   const safeDiscountPercent = Math.min(100, Math.max(0, Number(discountPercent || 0)))
   const safeTaxPercent = Math.min(100, Math.max(0, Number(taxPercent || 0)))
   const extraEntityUnitPriceValue = Math.max(0, parseSafeNumber(extraEntityUnitPrice, EXTRA_ENTITY_UNIT_PRICE))
   const extraBranchUnitPriceValue = Math.max(0, parseSafeNumber(extraBranchUnitPrice, EXTRA_BRANCH_UNIT_PRICE))
   const extraEntityTotal = extraEntityQty * extraEntityUnitPriceValue
   const extraBranchTotal = extraBranchQty * extraBranchUnitPriceValue
-  const estimateSubtotal = baseAmount + selectedAddonTotal + selectedAiTokenTotal + extraEntityTotal + extraBranchTotal
+  const estimateMonthlySubtotal = baseAmount + selectedAddonMonthlyTotal + extraEntityTotal + extraBranchTotal
+  const estimateOneTimeSubtotal = selectedAddonSingleBillTotal + selectedAiTokenTotal
+  const estimateSubtotal = (estimateMonthlySubtotal * safeDurationMonths) + estimateOneTimeSubtotal
   const estimateDiscountAmount = (estimateSubtotal * safeDiscountPercent) / 100
   const estimateTaxAmount = ((estimateSubtotal - estimateDiscountAmount) * safeTaxPercent) / 100
   const estimateGrandTotal = Math.max(0, estimateSubtotal - estimateDiscountAmount + estimateTaxAmount)
@@ -292,11 +305,24 @@ export default function SaasOperatorClient({
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="mb-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">2. Penyesuaian Harga</p>
-                <p className="mt-1 text-sm font-semibold text-slate-600">Atur diskon, pajak, dan catatan penawaran dalam satu blok.</p>
+                <p className="mt-1 text-sm font-semibold text-slate-600">Atur durasi, diskon setelah durasi, pajak, dan catatan penawaran dalam satu blok.</p>
               </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Diskon (%)</span>
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Durasi (Bulan)</span>
+                  <input
+                    name="duration_months"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={durationMonths}
+                    onChange={(event) => setDurationMonths(event.target.value)}
+                    placeholder="1"
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Diskon Setelah Durasi (%)</span>
                   <input
                     name="discount_percent"
                     type="number"
@@ -435,6 +461,9 @@ export default function SaasOperatorClient({
                               className="h-3.5 w-3.5 rounded border-slate-300 text-[#003366]"
                             />
                             {addon.name}
+                            <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-500">
+                              {addon.billing}
+                            </span>
                           </span>
                           <span className="font-black text-indigo-700">{formatIdr(parseSafeNumber(addonPromoPrices[addon.id], addon.price))}</span>
                         </label>
@@ -500,7 +529,7 @@ export default function SaasOperatorClient({
               <div className="text-xs font-bold text-slate-600">
                 Estimasi Total: <span className="text-base font-black text-indigo-700">{formatIdr(estimateGrandTotal)}</span>
                 <div className="text-[10px] text-slate-500">
-                  Subtotal {formatIdr(estimateSubtotal)} • Diskon {formatIdr(estimateDiscountAmount)} • Pajak {formatIdr(estimateTaxAmount)}
+                  Subtotal bulanan {formatIdr(estimateMonthlySubtotal)} x {safeDurationMonths} bulan + one-time {formatIdr(estimateOneTimeSubtotal)} = {formatIdr(estimateSubtotal)} • Diskon {formatIdr(estimateDiscountAmount)} • Pajak {formatIdr(estimateTaxAmount)}
                 </div>
               </div>
               <button

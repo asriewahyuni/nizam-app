@@ -53,6 +53,14 @@ export const OPERATOR_ADDON_OPTIONS: OperatorAddonOption[] = [
     billing: 'Bulan',
     description: 'Landing page builder siap iklan dengan capture lead terintegrasi.',
   },
+  {
+    id: 'addon_quick_bill',
+    name: 'Quick Bill',
+    price: 99000,
+    anchorPrice: 149000,
+    billing: 'Single Bill',
+    description: 'Add-on single bill untuk penerbitan tagihan cepat (Quick Bill).',
+  },
 ]
 
 export const EXTRA_ENTITY_UNIT_PRICE = 249000
