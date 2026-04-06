@@ -1,8 +1,10 @@
 'use server'
 
-import { createAdminClient, createClient } from '@/lib/supabase/server'
+import bcrypt from 'bcrypt'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { auth, signIn as nextAuthSignIn, signOut as nextAuthSignOut } from '@/auth'
+import { prisma } from '@/lib/prisma'
 
 // ═══════════════════════════════════════════════════════════
 // DEMO ACCOUNT SYSTEM
@@ -24,65 +26,51 @@ const DEMO_PASSWORD = 'demo-nizam-2026!'
 export type DemoBusinessType = 'COMPUTER' | 'CATERING' | 'RESTAURANT' | 'SUPPLIER_MBG' | 'BLANK'
 
 export async function startDemoSession(businessName?: string, demoType: DemoBusinessType = 'COMPUTER') {
-  const supabase = await createClient()
-  const adminClient = await createAdminClient()
-
-  // 1. Sign up or sign in the demo user
-  const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-    email: DEMO_EMAIL,
-    password: DEMO_PASSWORD,
+  let demoUser = await prisma.user.findUnique({
+    where: { email: DEMO_EMAIL },
+    select: { id: true },
   })
 
-  let userId: string
-  let token: string
-
-  if (signInErr) {
-    // Demo user doesn't exist yet — create it
-    const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-      email: DEMO_EMAIL,
-      password: DEMO_PASSWORD,
-      options: {
-        data: { full_name: 'Demo User', is_demo: true }
-      }
-    })
-
-    if (signUpErr || !signUpData.user) {
-      (console as any).error('Demo signup failed:', signUpErr)
+  if (!demoUser?.id) {
+    try {
+      demoUser = await prisma.user.create({
+        data: {
+          email: DEMO_EMAIL,
+          password: bcrypt.hashSync(DEMO_PASSWORD, 10),
+          name: 'Demo User',
+        },
+        select: { id: true },
+      })
+    } catch (error) {
+      console.error('Demo signup failed:', error)
       redirect('/login?error=' + encodeURIComponent('Gagal membuat akun demo. Coba lagi.'))
     }
-    userId = signUpData.user.id
-    token = signUpData.session?.access_token || ''
-  } else {
-    userId = signInData.user!.id
-    token = signInData.session?.access_token || ''
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  // CRITICAL FIX: Next.js Server Actions race condition.
-  // The token is written to cookies, but it doesn't immediately propagate 
-  // to RLS `auth.uid()` on the current server client instance.
-  // We explicitly instantiate a client with the new Bearer token:
-  const { createClient: createBrowserClient } = await import('@supabase/supabase-js')
-  const authedClient = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: `Bearer ${token}` } } }
-  )
-  // ─────────────────────────────────────────────────────────────────
+  const userId = demoUser.id
 
-  // 2. Delete ALL previous demo orgs for this user — always start fresh
-  const { data: existingMemberships } = await authedClient
-    .from('org_members')
-    .select('org_id')
-    .eq('user_id', userId)
-
-  if (existingMemberships && existingMemberships.length > 0) {
-    for (const m of existingMemberships) {
-      await authedClient.from('organizations').delete().eq('id', m.org_id)
-    }
+  try {
+    await nextAuthSignIn('credentials', {
+      email: DEMO_EMAIL,
+      password: DEMO_PASSWORD,
+      redirect: false,
+    })
+  } catch (error) {
+    console.error('Demo sign-in failed:', error)
+    redirect('/login?error=' + encodeURIComponent('Gagal masuk ke akun demo.'))
   }
 
-  // 3. Create fresh demo organization
+  const existingMemberships = await prisma.org_members.findMany({
+    where: { user_id: userId },
+    select: { org_id: true },
+  })
+
+  if (existingMemberships.length > 0) {
+    await prisma.organizations.deleteMany({
+      where: { id: { in: existingMemberships.map((membership) => membership.org_id) } },
+    })
+  }
+
   const orgId = crypto.randomUUID()
   const defaultNames = {
     'COMPUTER': 'NIZAM Computer Assembly',
@@ -93,43 +81,44 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
   }
   const orgName = businessName || defaultNames[demoType]
 
-  const { error: orgErr } = await authedClient
-    .from('organizations')
-    .insert({
-      id: orgId,
-      name: orgName,
-      slug: 'demo-' + demoType.toLowerCase() + '-' + Date.now(),
-      settings: {
-        currency: 'IDR',
-        timezone: 'Asia/Jakarta',
-        fiscal_year_start_month: 1,
-        plan: 'Demo', // Paket Demo: Full Access + Auto-Destroy saat logout
+  try {
+    await prisma.organizations.create({
+      data: {
+        id: orgId,
+        name: orgName,
+        slug: 'demo-' + demoType.toLowerCase() + '-' + Date.now(),
         is_demo: true,
-        business_type: demoType,
-        skip_coa_seed: demoType === 'BLANK' // For BLANK demo, we want to show the "Manual Seed" button
+        settings: {
+          currency: 'IDR',
+          timezone: 'Asia/Jakarta',
+          fiscal_year_start_month: 1,
+          plan: 'Demo',
+          is_demo: true,
+          business_type: demoType,
+          skip_coa_seed: demoType === 'BLANK'
+        },
       },
     })
-
-  if (orgErr) {
-    (console as any).error('Demo org creation failed:', orgErr)
+  } catch (error) {
+    console.error('Demo org creation failed:', error)
     redirect('/login?error=' + encodeURIComponent('Gagal membuat organisasi demo.'))
   }
 
-  // 4. Make demo user the owner (Include is_active explicitly to be safe)
-  const { error: memberErr } = await (adminClient as any).from('org_members').insert({
-    org_id: orgId,
-    user_id: userId,
-    role: 'owner',
-    is_active: true
-  })
-
-  if (memberErr) {
-    (console as any).error('Demo member creation failed:', memberErr)
+  try {
+    await prisma.org_members.create({
+      data: {
+        org_id: orgId,
+        user_id: userId,
+        role: 'owner',
+        is_active: true,
+      },
+    })
+  } catch (error) {
+    console.error('Demo member creation failed:', error)
     redirect('/login?error=' + encodeURIComponent('Gagal mendaftarkan anggota demo.'))
   }
 
-  // 5. Seed sample data for demo using authed client (so RLS doesn't block inserts)
-  const demoBranchId = await seedDemoData(authedClient, orgId, demoType)
+  const demoBranchId = await seedDemoData(orgId, demoType)
 
   // 6. Set Demo Org ID in Cookie for session-specific tracking
   const cookieStore = await cookies()
@@ -158,38 +147,33 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
  * End demo session — delete everything and logout
  */
 export async function signOutDemo() {
-  const supabase = await createClient()
   const cookieStore = await cookies()
   const demoOrgId = cookieStore.get('nizam_demo_org_id')?.value
 
-  const { data: { session } } = await supabase.auth.getSession()
+  const session = await auth()
   const user = session?.user
 
-  if (user && (user.email === DEMO_EMAIL || user.user_metadata?.is_demo)) {
-    // Use authed client with Bearer token to bypass RLS for deletes
-    const { createClient: createBrowserClient } = await import('@supabase/supabase-js')
-    const authedClient = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { global: { headers: { Authorization: `Bearer ${session!.access_token}` } } }
-    )
-
+  if (user?.id && user.email === DEMO_EMAIL) {
     if (demoOrgId) {
-      // Delete specifically THE session org (cascade delete removes all related data)
-      const { error: delErr } = await authedClient.from('organizations').delete().eq('id', demoOrgId)
-      if (delErr) (console as any).error('SignOutDemo: Failed to delete org:', delErr)
+      try {
+        await prisma.organizations.delete({ where: { id: demoOrgId } })
+      } catch (error) {
+        console.error('SignOutDemo: Failed to delete org:', error)
+      }
     }
 
-    // Also clean up ANY remaining demo orgs for this user (belt + suspenders)
-    const { data: remainingMemberships } = await authedClient
-      .from('org_members')
-      .select('org_id')
-      .eq('user_id', user.id)
+    const remainingMemberships = await prisma.org_members.findMany({
+      where: { user_id: user.id },
+      select: { org_id: true },
+    })
 
-    if (remainingMemberships) {
-      for (const m of remainingMemberships as any[]) {
-        const { error: delErr } = await authedClient.from('organizations').delete().eq('id', m.org_id)
-        if (delErr) (console as any).error('SignOutDemo: Cleanup delete failed for org', m.org_id, delErr)
+    if (remainingMemberships.length > 0) {
+      try {
+        await prisma.organizations.deleteMany({
+          where: { id: { in: remainingMemberships.map((membership) => membership.org_id) } },
+        })
+      } catch (error) {
+        console.error('SignOutDemo: Cleanup delete failed:', error)
       }
     }
   }
@@ -199,7 +183,7 @@ export async function signOutDemo() {
   cookieStore.delete('nizam_active_org_id')
   cookieStore.delete('nizam_active_branch_id')
 
-  await supabase.auth.signOut()
+  await nextAuthSignOut({ redirect: false })
   revalidatePath('/', 'layout')
   redirect('/login')
 }
@@ -208,44 +192,40 @@ export async function signOutDemo() {
  * Check if current session is a demo account
  */
 export async function isDemoSession(): Promise<boolean> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const session = await auth()
+  const user = session?.user
   if (!user) return false
-  return user.email === DEMO_EMAIL || !!user.user_metadata?.is_demo
+  return user.email === DEMO_EMAIL
 }
 
 // ═══════════════════════════════════════════════════════════
 // SEED DEMO DATA — Products, Warehouses, Contacts, etc.
 // ═══════════════════════════════════════════════════════════
-async function ensureDemoBranch(supabase: any, orgId: string) {
-  const { data: existingBranch } = await supabase
-    .from('branches')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle()
+async function ensureDemoBranch(orgId: string) {
+  const existingBranch = await prisma.branches.findFirst({
+    where: { org_id: orgId, is_active: true },
+    orderBy: { created_at: 'asc' },
+    select: { id: true },
+  })
 
-  if (existingBranch?.id) return existingBranch.id as string
+  if (existingBranch?.id) return existingBranch.id
 
-  const { data: branch } = await supabase
-    .from('branches')
-    .insert({
+  const branch = await prisma.branches.create({
+    data: {
       id: crypto.randomUUID(),
       org_id: orgId,
       name: 'Unit Utama',
       code: 'MAIN',
       is_active: true,
-    })
-    .select('id')
-    .single()
+    },
+    select: { id: true },
+  })
 
-  return branch?.id ? String(branch.id) : null
+  return branch.id
 }
 
-export async function seedDemoData(supabase: any, orgId: string, demoType: DemoBusinessType) {
-  const branchId = await ensureDemoBranch(supabase, orgId)
+export async function seedDemoData(orgId: string, demoType: DemoBusinessType) {
+  const branchId = await ensureDemoBranch(orgId)
   if (!branchId) return null
 
   // 🔴 AUTHENTIC BLANK DEMO: No products, no warehouses, no contacts.
@@ -333,8 +313,11 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
   // wait for accounts to be generated by trigger (retry up to 5 times)
   let accounts: any[] = []
   for (let i = 0; i < 5; i++) {
-    const { data } = await supabase.from('accounts').select('id, code').eq('org_id', orgId)
-    if (data && data.length > 20) {
+    const data = await prisma.accounts.findMany({
+      where: { org_id: orgId },
+      select: { id: true, code: true },
+    })
+    if (data.length > 20) {
       accounts = data
       break
     }
@@ -354,12 +337,12 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
     asset_account_id: p.type === 'INVENTORY' ? invAccId : null,
     income_account_id: incomeAccId,
     expense_account_id: expenseAccId,
-    average_cost: p.purchase_price // Ensure average_cost is set for audit consistency
+    average_cost: p.purchase_price
   }))
 
-  await supabase.from('warehouses').insert(warehousesData)
-  await supabase.from('contacts').insert(contactsData)
-  await supabase.from('products').insert(finalProducts)
+  await prisma.warehouses.createMany({ data: warehousesData })
+  await prisma.contacts.createMany({ data: contactsData })
+  await prisma.products.createMany({ data: finalProducts })
 
   const wh1Id = warehousesData[0].id
   
@@ -372,35 +355,36 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
   }))
 
   if (stockItems.length > 0 && invAccId && capitalAccId) {
-    // 1. Physical Stocks
-    await supabase.from('inventory_stocks').insert(stockItems)
+    await prisma.inventory_stocks.createMany({ data: stockItems })
 
-    // 2. Journal Entry (Ledger) for Financial Visibility
     const totalValue = stockItems.reduce((sum: any, s: any) => {
       const p = finalProducts.find((prod: any) => prod.id === s.product_id)
       return sum + (s.quantity * (p?.purchase_price || 0))
     }, 0)
 
-    const { data: entry, error: entErr } = await supabase.from('journal_entries').insert({
-      org_id: orgId,
-      branch_id: branchId,
-      entry_date: new Date().toISOString().split('T')[0],
-      description: 'Saldo Awal Persediaan (Demo Seed)',
-      status: 'DRAFT', // MUST START AS DRAFT TO ALLOW LINE INSERTION
-      is_auto: true
-    }).select().single()
+    const entry = await prisma.journal_entries.create({
+      data: {
+        org_id: orgId,
+        branch_id: branchId,
+        entry_number: '',
+        entry_date: new Date(`${new Date().toISOString().split('T')[0]}T00:00:00.000Z`),
+        description: 'Saldo Awal Persediaan (Demo Seed)',
+        status: 'DRAFT',
+        is_auto: true,
+      },
+      select: { id: true },
+    })
 
-    if (entry && !entErr) {
-      // Create Journal Lines
-      await supabase.from('journal_lines').insert([
-        { entry_id: entry.id, account_id: invAccId, debit: totalValue, credit: 0, memo: 'Persediaan Awal' },
-        { entry_id: entry.id, account_id: capitalAccId, debit: 0, credit: totalValue, memo: 'Modal Awal (Inventory)' }
-      ])
+    if (entry?.id) {
+      await prisma.journal_lines.createMany({
+        data: [
+          { entry_id: entry.id, account_id: invAccId, debit: totalValue, credit: 0, memo: 'Persediaan Awal' },
+          { entry_id: entry.id, account_id: capitalAccId, debit: 0, credit: totalValue, memo: 'Modal Awal (Inventory)' }
+        ]
+      })
 
-      // NOW POST THE ENTRY
-      await supabase.from('journal_entries').update({ status: 'POSTED' }).eq('id', entry.id)
+      await prisma.journal_entries.update({ where: { id: entry.id }, data: { status: 'POSTED' } })
 
-      // 3. Stock Movements (Sub-Ledger) - Link to Journal Entry
       const movements = stockItems.map((s: any) => ({
         org_id: orgId,
         product_id: s.product_id,
@@ -413,34 +397,38 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
         branch_id: branchId,
       }))
 
-      await supabase.from('stock_movements').insert(movements)
+      await prisma.stock_movements.createMany({ data: movements })
     }
   }
 
-  // --- INITIAL CASH & BANK INJECTION (For Balanced Balance Sheet) ---
   if (cashAccId && bankAccId && capitalAccId) {
-    const cashInject = 500000000 // 500jt Kas
-    const bankInject = 1500000000 // 1.5M Bank
+    const cashInject = 500000000
+    const bankInject = 1500000000
     const totalCapital = cashInject + bankInject
 
-    const { data: cashEntry, error: cashEntErr } = await supabase.from('journal_entries').insert({
-      org_id: orgId,
-      branch_id: branchId,
-      entry_date: new Date().toISOString().split('T')[0],
-      description: 'Setoran Modal Awal (Cash & Bank Injection)',
-      status: 'DRAFT', // MUST START AS DRAFT
-      is_auto: true
-    }).select().single()
+    const cashEntry = await prisma.journal_entries.create({
+      data: {
+        org_id: orgId,
+        branch_id: branchId,
+        entry_number: '',
+        entry_date: new Date(`${new Date().toISOString().split('T')[0]}T00:00:00.000Z`),
+        description: 'Setoran Modal Awal (Cash & Bank Injection)',
+        status: 'DRAFT',
+        is_auto: true,
+      },
+      select: { id: true },
+    })
 
-    if (cashEntry && !cashEntErr) {
-      await supabase.from('journal_lines').insert([
-        { entry_id: cashEntry.id, account_id: cashAccId, debit: cashInject, credit: 0, memo: 'Setoran Modal (Kas Utama)' },
-        { entry_id: cashEntry.id, account_id: bankAccId, debit: bankInject, credit: 0, memo: 'Setoran Modal (Bank)' },
-        { entry_id: cashEntry.id, account_id: capitalAccId, debit: 0, credit: totalCapital, memo: 'Modal Disetor' }
-      ])
+    if (cashEntry?.id) {
+      await prisma.journal_lines.createMany({
+        data: [
+          { entry_id: cashEntry.id, account_id: cashAccId, debit: cashInject, credit: 0, memo: 'Setoran Modal (Kas Utama)' },
+          { entry_id: cashEntry.id, account_id: bankAccId, debit: bankInject, credit: 0, memo: 'Setoran Modal (Bank)' },
+          { entry_id: cashEntry.id, account_id: capitalAccId, debit: 0, credit: totalCapital, memo: 'Modal Disetor' }
+        ]
+      })
 
-      // NOW POST THE ENTRY
-      await supabase.from('journal_entries').update({ status: 'POSTED' }).eq('id', cashEntry.id)
+      await prisma.journal_entries.update({ where: { id: cashEntry.id }, data: { status: 'POSTED' } })
     }
   }
 
@@ -451,6 +439,5 @@ export async function seedDemoOrganization(
   orgId: string,
   demoType: DemoBusinessType
 ) {
-  const adminClient = await createAdminClient()
-  return seedDemoData(adminClient as any, orgId, demoType)
+  return seedDemoData(orgId, demoType)
 }

@@ -1,4 +1,3 @@
-import 'server-only'
 import { Resend } from 'resend';
 
 function getResendClient() {
@@ -69,5 +68,30 @@ export async function sendPromoBroadcast(toEmail: string, promoTitle: string) {
     return { success: true, data };
   } catch (error) {
     return { error: getErrorMessage(error) };
+  }
+}
+
+export async function sendPasswordResetLinkEmail(toEmail: string, resetUrl: string) {
+  try {
+    const resend = getResendClient()
+    const data = await resend.emails.send({
+      from: 'Nizam SaaS <team-noreply@nizam.xales.id>',
+      to: [toEmail],
+      subject: 'Reset Password NIZAM',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #004AB8;">Reset password akun Anda</h2>
+          <p>Kami menerima permintaan untuk mengganti password akun NIZAM Anda.</p>
+          <p>Klik tombol di bawah ini untuk membuat password baru:</p>
+          <p style="margin: 24px 0;">
+            <a href="${resetUrl}" style="display: inline-block; padding: 12px 24px; background-color: #004AB8; color: #fff; text-decoration: none; border-radius: 8px; font-weight: bold;">Buat Password Baru</a>
+          </p>
+          <p>Jika Anda tidak meminta reset password, abaikan email ini.</p>
+        </div>
+      `,
+    })
+    return { success: true, data }
+  } catch (error) {
+    return { error: getErrorMessage(error) }
   }
 }

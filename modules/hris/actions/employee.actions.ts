@@ -1,11 +1,11 @@
 'use server'
 
-import { createAdminClient } from '@/lib/supabase/server'
 import bcrypt from 'bcrypt'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { sanitizeUploadSegment, uploadPublicFile } from '@/lib/storage/public-upload'
 
 type BranchSelectionResult =
   | { branchId: string | null }
@@ -154,16 +154,16 @@ export async function updateEmployee(id: string, orgId: string, formData: FormDa
   return { success: true }
 }
 
-export async function uploadEmployeeAvatar(file: File, empId: string) {
-  const supabase = await createAdminClient()
-  const ext = file.name.split('.').pop()
-  const path = `emp-${empId}.${ext}`
-  const { error: upErr } = await supabase.storage
-    .from('avatars')
-    .upload(path, file, { upsert: true, contentType: file.type })
-  if (upErr) return { error: upErr.message }
-  const { data } = supabase.storage.from('avatars').getPublicUrl(path)
-  return { url: data.publicUrl }
+export async function uploadEmployeeAvatar(file: File, empId: string): Promise<{ url?: string; error?: string }> {
+  try {
+    return await uploadPublicFile({
+      folder: 'avatars',
+      file,
+      fileName: `emp-${sanitizeUploadSegment(empId) || Date.now().toString()}`,
+    })
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal mengunggah avatar.' }
+  }
 }
 
 export async function updateEmployeePasswordSelf(empId: string, newPassword: string) {

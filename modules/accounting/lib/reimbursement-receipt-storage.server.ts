@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/server'
+import { sanitizeUploadSegment, uploadPublicFile } from '@/lib/storage/public-upload'
 
 const MAX_RECEIPT_SIZE_BYTES = 5 * 1024 * 1024
 const ALLOWED_RECEIPT_TYPES = new Set([
@@ -13,20 +13,7 @@ function sanitizeSegment(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
 }
 
-function buildReceiptPath(userId: string, file: File) {
-  const safeUserId = sanitizeSegment(String(userId || '').trim()) || 'user'
-  const extFromName = file.name.includes('.')
-    ? `.${file.name.split('.').pop()?.toLowerCase() || ''}`.replace(/\.+$/, '')
-    : ''
-  const extFromType = file.type.includes('/')
-    ? `.${file.type.split('/').pop()?.toLowerCase() || ''}`.replace(/\.+$/, '')
-    : ''
-  const extension = extFromName || extFromType || '.bin'
-
-  return `${safeUserId}/reimbursements/${Date.now()}-${Math.random().toString(36).slice(2, 8)}${extension}`
-}
-
-export async function uploadReimbursementReceipt(userId: string, file: File) {
+export async function uploadReimbursementReceipt(userId: string, file: File): Promise<{ url?: string; error?: string }> {
   if (file.size <= 0) {
     return { error: 'File tidak valid.' }
   }
@@ -39,20 +26,13 @@ export async function uploadReimbursementReceipt(userId: string, file: File) {
     return { error: 'Format file harus JPG, PNG, WEBP, GIF, atau PDF.' }
   }
 
-  const supabase = await createAdminClient()
-  const filePath = buildReceiptPath(userId, file)
-
-  const { error: uploadError } = await supabase.storage
-    .from('receipts')
-    .upload(filePath, file, {
-      upsert: false,
-      contentType: file.type || undefined,
+  try {
+    return await uploadPublicFile({
+      folder: `receipts/${sanitizeUploadSegment(userId) || 'user'}/reimbursements`,
+      file,
+      fileName: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     })
-
-  if (uploadError) {
-    return { error: uploadError.message }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal mengunggah bukti reimbursement.' }
   }
-
-  const { data } = supabase.storage.from('receipts').getPublicUrl(filePath)
-  return { url: data.publicUrl }
 }

@@ -13,7 +13,9 @@ import {
 import { signIn as nextAuthSignIn } from '@/auth'
 import { AuthError } from 'next-auth'
 import bcrypt from 'bcrypt'
+import { createHash, randomBytes } from 'node:crypto'
 import { prisma } from '@/lib/prisma'
+import { sendPasswordResetLinkEmail } from '@/lib/email/sender'
 
 const ADMIN_IMPERSONATION_COOKIE = 'nizam_admin_impersonation'
 const ADMIN_IMPERSONATION_MAX_AGE = 60 * 60 * 4
@@ -390,7 +392,7 @@ export async function registerEmployeeAccount(formData: FormData) {
   const internalEmail = buildInternalStaffEmail(emp.org_id, nik)
   const hashedPassword = bcrypt.hashSync(password, 10)
 
-  let authData;
+  let authData: { id: string }
   try {
     authData = await prisma.user.create({
       data: {
@@ -777,17 +779,75 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
 }
 
 export async function sendPasswordResetEmail(formData: FormData) {
-  // TODO: Implement email-based password reset via Resend/SMTP after Supabase migration.
-  // For now we check if the email exists in our users table to prevent enumeration.
   const email = (formData.get('email') as string).trim().toLowerCase()
   if (!email) return { error: 'Email wajib diisi.' }
 
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true } })
   if (!user) {
-    // Silently succeed to prevent user enumeration
     return { success: true }
   }
 
-  // TODO: send reset link via lib/email/sender.ts
+  const rawToken = randomBytes(32).toString('hex')
+  const hashedToken = createHash('sha256').update(rawToken).digest('hex')
+  const expires = new Date(Date.now() + 1000 * 60 * 60)
+
+  await prisma.verificationToken.deleteMany({ where: { identifier: email } })
+  await prisma.verificationToken.create({
+    data: {
+      identifier: email,
+      token: hashedToken,
+      expires,
+    },
+  })
+
+  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const resetUrl = new URL(`/update-password?token=${rawToken}&email=${encodeURIComponent(email)}`, appUrl).toString()
+  const emailResult = await sendPasswordResetLinkEmail(email, resetUrl)
+
+  if ('error' in emailResult && process.env.RESEND_API_KEY) {
+    return { error: `Gagal mengirim email reset password: ${emailResult.error}` }
+  }
+
+  return { success: true }
+}
+
+export async function completePasswordReset(formData: FormData) {
+  const email = (formData.get('email') as string).trim().toLowerCase()
+  const rawToken = (formData.get('token') as string).trim()
+  const password = formData.get('password') as string
+
+  if (!email || !rawToken || !password) {
+    return { error: 'Tautan reset password tidak valid.' }
+  }
+
+  if (password.length < 6) {
+    return { error: 'Password minimal 6 karakter.' }
+  }
+
+  const hashedToken = createHash('sha256').update(rawToken).digest('hex')
+  const verificationToken = await prisma.verificationToken.findUnique({
+    where: { token: hashedToken },
+  })
+
+  if (!verificationToken || verificationToken.identifier !== email || verificationToken.expires.getTime() <= Date.now()) {
+    return { error: 'Tautan reset password tidak valid atau sudah kedaluwarsa.' }
+  }
+
+  const user = await prisma.user.findUnique({ where: { email }, select: { id: true } })
+  if (!user?.id) {
+    await prisma.verificationToken.delete({ where: { token: hashedToken } })
+    return { error: 'Akun tidak ditemukan.' }
+  }
+
+  const hashedPassword = bcrypt.hashSync(password, 10)
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    }),
+    prisma.verificationToken.delete({ where: { token: hashedToken } }),
+  ])
+
   return { success: true }
 }

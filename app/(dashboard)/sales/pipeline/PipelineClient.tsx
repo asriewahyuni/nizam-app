@@ -1,12 +1,11 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Activity, PlayCircle, CircleDashed, CheckCircle2, TrendingUp, DollarSign, Maximize2, Minimize2, Plus, Phone, Mail, ExternalLink, Bell, Edit2, Trash2 } from 'lucide-react'
 import { PageHeader, SafeButton } from '@/components/ui/NizamUI'
 import { formatRupiah } from '@/lib/utils'
 import { updateSaleStatus, createQuickKanbanCard, deleteSalesCard, updateSalesCard } from '@/modules/sales/actions/sales.actions'
 import { motion, AnimatePresence } from 'framer-motion'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 const PIPELINE_STAGES = [
@@ -26,29 +25,30 @@ export default function PipelineClient({ orgId, sales }: any) {
   // Toast State
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' } | null>(null)
   
-  const showToast = (message: string, type: 'info' | 'success' = 'info') => {
+  const showToast = useCallback((message: string, type: 'info' | 'success' = 'info') => {
     setToast({ message, type })
     setTimeout(() => setToast(null), 4000)
-  }
+  }, [])
 
-  // Realtime notification for new leads entering pipeline
+  const previousSalesCount = useRef(sales.length)
+
   useEffect(() => {
-    const supabase = createClient()
-    const channel = supabase.channel('realtime_sales_pipeline')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'sales', filter: `org_id=eq.${orgId}` },
-        (payload) => {
-           showToast('Lead Baru / Penawaran masuk ke Pipeline!', 'success')
-           // User must manually refresh to see it to avoid Next.js dev loops
-        }
-      )
-      .subscribe()
+    if (sales.length > previousSalesCount.current) {
+      showToast('Lead Baru / Penawaran masuk ke Pipeline!', 'success')
+    }
+
+    previousSalesCount.current = sales.length
+  }, [sales.length, showToast])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      router.refresh()
+    }, 30000)
 
     return () => {
-      supabase.removeChannel(channel)
+      window.clearInterval(intervalId)
     }
-  }, [orgId])
+  }, [router])
 
   // Add / Edit Card Form State
   const [formState, setFormState] = useState({ id: '', name: '', phone: '', email: '', amount: 0, notes: '', status: 'QUOTATION' })
@@ -82,7 +82,7 @@ export default function PipelineClient({ orgId, sales }: any) {
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsUpdating(true)
-    let res;
+    let res: { error?: string } | undefined
     if (formState.id) {
       res = await updateSalesCard(orgId, formState.id, formState)
     } else {
@@ -166,6 +166,8 @@ export default function PipelineClient({ orgId, sales }: any) {
            return (
              <div 
                key={stage.id} 
+               role="listbox"
+               aria-label={`Kolom pipeline ${stage.title}`}
                onDragOver={handleDragOver}
                onDragLeave={handleDragLeave}
                onDrop={(e) => handleDrop(stage.id, e)}
@@ -210,10 +212,10 @@ export default function PipelineClient({ orgId, sales }: any) {
                             ) : (
                               <span className="bg-blue-100 text-blue-700 text-[8px] px-2 py-0.5 rounded-full font-bold">Quotation</span>
                             )}
-                            <button onClick={() => handleEditClick(item)} className="p-1 text-slate-300 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100">
+                            <button type="button" onClick={() => handleEditClick(item)} className="p-1 text-slate-300 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100">
                               <Edit2 size={12} />
                             </button>
-                            <button onClick={() => handleDeleteCard(item.id)} className="p-1 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">
+                            <button type="button" onClick={() => handleDeleteCard(item.id)} className="p-1 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">
                               <Trash2 size={12} />
                             </button>
                           </div>
@@ -265,41 +267,41 @@ export default function PipelineClient({ orgId, sales }: any) {
 
       {showAddModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
+          <button type="button" aria-label="Tutup modal" className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
           <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
             <div className="p-6 border-b">
               <h3 className="text-xl font-black text-slate-900">Tambah Card Cepat</h3>
             </div>
             <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-500">Nama Pelanggan/Lead *</label>
-                <input required type="text" className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.name} onChange={e => setFormState({...formState, name: e.target.value})} />
+                <label htmlFor="pipeline-name" className="text-xs font-bold text-slate-500">Nama Pelanggan/Lead *</label>
+                <input id="pipeline-name" required type="text" className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.name} onChange={e => setFormState({...formState, name: e.target.value})} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-500">Grup / Status</label>
-                  <select className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500 bg-white" value={formState.status} onChange={e => setFormState({...formState, status: e.target.value})}>
+                  <label htmlFor="pipeline-status" className="text-xs font-bold text-slate-500">Grup / Status</label>
+                  <select id="pipeline-status" className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500 bg-white" value={formState.status} onChange={e => setFormState({...formState, status: e.target.value})}>
                     {PIPELINE_STAGES.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500">Nilai Prospek (Rp)</label>
-                  <input type="number" className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.amount} onChange={e => setFormState({...formState, amount: Number(e.target.value)})} />
+                  <label htmlFor="pipeline-amount" className="text-xs font-bold text-slate-500">Nilai Prospek (Rp)</label>
+                  <input id="pipeline-amount" type="number" className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.amount} onChange={e => setFormState({...formState, amount: Number(e.target.value)})} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-500">Nomor WA</label>
-                  <input type="text" placeholder="0812..." className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.phone} onChange={e => setFormState({...formState, phone: e.target.value})} />
+                  <label htmlFor="pipeline-phone" className="text-xs font-bold text-slate-500">Nomor WA</label>
+                  <input id="pipeline-phone" type="text" placeholder="0812..." className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.phone} onChange={e => setFormState({...formState, phone: e.target.value})} />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500">Email</label>
-                  <input type="email" placeholder="nama@email.com" className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.email} onChange={e => setFormState({...formState, email: e.target.value})} />
+                  <label htmlFor="pipeline-email" className="text-xs font-bold text-slate-500">Email</label>
+                  <input id="pipeline-email" type="email" placeholder="nama@email.com" className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.email} onChange={e => setFormState({...formState, email: e.target.value})} />
                 </div>
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-500">Catatan / Sumber</label>
-                <input type="text" placeholder="Misal: Dari Web, IG, atau Salespage" className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.notes} onChange={e => setFormState({...formState, notes: e.target.value})} />
+                <label htmlFor="pipeline-notes" className="text-xs font-bold text-slate-500">Catatan / Sumber</label>
+                <input id="pipeline-notes" type="text" placeholder="Misal: Dari Web, IG, atau Salespage" className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500" value={formState.notes} onChange={e => setFormState({...formState, notes: e.target.value})} />
               </div>
               
               <div className="pt-4 flex justify-end gap-2">

@@ -176,13 +176,11 @@ export async function createFixedAsset(orgId: string, assetData: any) {
         ...finalAssetData,
         org_id: orgId,
         branch_id: activeBranchResult.branchId,
-        acquisition_method,
-        source_account_id: (acquisition_method !== 'SPLIT' && source_account_id) ? source_account_id : null,
         asset_account_id: finalAssetData.asset_account_id || null,
         accum_dep_account_id: finalAssetData.accum_dep_account_id || null,
         dep_expense_account_id: finalAssetData.dep_expense_account_id || null,
         purchase_date: new Date(`${finalAssetData.purchase_date}T00:00:00.000Z`),
-      } as any,
+      },
       include: {
         branches: {
           select: {
@@ -341,7 +339,7 @@ export async function runOrganizationDepreciation(orgId: string, branchId?: stri
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  let assets
+  let assets: Awaited<ReturnType<typeof prisma.fixed_assets.findMany>> = []
   try {
     assets = await prisma.fixed_assets.findMany({
       where: {

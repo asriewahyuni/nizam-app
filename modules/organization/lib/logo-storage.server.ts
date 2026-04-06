@@ -1,32 +1,13 @@
-import { createAdminClient } from '@/lib/supabase/server'
+import { sanitizeUploadSegment, uploadPublicFile } from '@/lib/storage/public-upload'
 
-function buildLogoFilePath(orgId: string, file: File) {
-  const safeOrgId = String(orgId || '').trim()
-  const extFromName = file.name.includes('.')
-    ? `.${file.name.split('.').pop()?.toLowerCase() || ''}`.replace(/\.+$/, '')
-    : ''
-  const extFromType = file.type.includes('/')
-    ? `.${file.type.split('/').pop()?.toLowerCase() || ''}`.replace(/\.+$/, '')
-    : ''
-  const extension = extFromName || extFromType
-  return `${safeOrgId}/logo-${Date.now()}${extension}`
-}
-
-export async function uploadOrganizationLogoAsset(orgId: string, file: File) {
-  const supabase = await createAdminClient()
-  const filePath = buildLogoFilePath(orgId, file)
-
-  const { error: uploadError } = await supabase.storage
-    .from('brand_assets')
-    .upload(filePath, file, {
-      upsert: true,
-      contentType: file.type || undefined,
+export async function uploadOrganizationLogoAsset(orgId: string, file: File): Promise<{ url?: string; error?: string }> {
+  try {
+    return await uploadPublicFile({
+      folder: `brand_assets/${sanitizeUploadSegment(orgId) || 'org'}`,
+      file,
+      fileName: `logo-${Date.now()}`,
     })
-
-  if (uploadError) {
-    return { error: uploadError.message }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal mengunggah logo.' }
   }
-
-  const { data } = supabase.storage.from('brand_assets').getPublicUrl(filePath)
-  return { url: data.publicUrl }
 }

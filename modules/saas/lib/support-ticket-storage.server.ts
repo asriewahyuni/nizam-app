@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/server'
+import { sanitizeUploadSegment, uploadPublicFile } from '@/lib/storage/public-upload'
 
 const MAX_SCREENSHOT_SIZE_BYTES = 5 * 1024 * 1024
 const ALLOWED_SCREENSHOT_TYPES = new Set([
@@ -13,21 +13,7 @@ function sanitizeSegment(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
 }
 
-function buildScreenshotPath(userId: string, orgId: string, file: File) {
-  const safeUserId = sanitizeSegment(String(userId || '').trim()) || 'user'
-  const safeOrgId = sanitizeSegment(String(orgId || '').trim()) || 'org'
-  const extFromName = file.name.includes('.')
-    ? `.${file.name.split('.').pop()?.toLowerCase() || ''}`.replace(/\.+$/, '')
-    : ''
-  const extFromType = file.type.includes('/')
-    ? `.${file.type.split('/').pop()?.toLowerCase() || ''}`.replace(/\.+$/, '')
-    : ''
-  const extension = extFromName || extFromType || '.bin'
-
-  return `${safeUserId}/support-tickets/${safeOrgId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}${extension}`
-}
-
-export async function uploadSupportTicketScreenshot(userId: string, orgId: string, file: File) {
+export async function uploadSupportTicketScreenshot(userId: string, orgId: string, file: File): Promise<{ url?: string; error?: string }> {
   if (file.size <= 0) {
     return { error: 'File screenshot kosong.' }
   }
@@ -40,20 +26,13 @@ export async function uploadSupportTicketScreenshot(userId: string, orgId: strin
     return { error: 'Format screenshot tidak didukung. Gunakan JPG, PNG, WEBP, GIF, atau HEIC.' }
   }
 
-  const supabase = await createAdminClient()
-  const filePath = buildScreenshotPath(userId, orgId, file)
-
-  const { error: uploadError } = await supabase.storage
-    .from('receipts')
-    .upload(filePath, file, {
-      upsert: false,
-      contentType: file.type || undefined,
+  try {
+    return await uploadPublicFile({
+      folder: `receipts/${sanitizeUploadSegment(userId) || 'user'}/support-tickets/${sanitizeUploadSegment(orgId) || 'org'}`,
+      file,
+      fileName: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     })
-
-  if (uploadError) {
-    return { error: uploadError.message }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal mengunggah screenshot.' }
   }
-
-  const { data } = supabase.storage.from('receipts').getPublicUrl(filePath)
-  return { url: data.publicUrl }
 }

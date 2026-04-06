@@ -359,7 +359,7 @@ export async function createSupportTicket(formData: FormData): Promise<TicketMut
   const screenshot = formData.get('screenshot')
   if (screenshot instanceof File && screenshot.size > 0) {
     const uploadResult = await uploadSupportTicketScreenshot(actor.userId, orgData.org.id, screenshot)
-    if ('error' in uploadResult) {
+    if (!uploadResult.url) {
       return { error: `Gagal upload screenshot: ${uploadResult.error}` }
     }
 

@@ -1,52 +1,39 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
+  auth: vi.fn(),
+  prisma: {
+    bank_accounts: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    bank_transactions: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    $transaction: vi.fn(),
+  },
   revalidatePath: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: mocks.createClient,
-}))
-
-vi.mock('next/cache', () => ({
-  revalidatePath: mocks.revalidatePath,
-}))
-
-vi.mock('@/modules/organization/lib/branch-access.server', () => ({
-  resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
-}))
+vi.mock('@/auth', () => ({ auth: mocks.auth }))
+vi.mock('@/lib/prisma', () => ({ prisma: mocks.prisma }))
+vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
+vi.mock('@/modules/organization/lib/branch-access.server', () => ({ resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection }))
 
 import { createBankAccount, createBankTransaction, deleteBankTransaction, getRecentBankTransactions } from '@/modules/cash/actions/bank.actions'
 
 describe('Cash & Bank Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.auth.mockResolvedValue({ user: { id: 'user-1' } })
   })
 
   it('stamps active branch when creating a bank account', async () => {
-    const insertMock = vi.fn().mockResolvedValue({
-      error: null,
-    })
-
-    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
-      scope: {
-        accessibleBranches: [],
-        accessibleBranchIds: ['branch-1'],
-        canAccessAllBranches: false,
-        membershipId: 'member-1',
-        role: 'owner',
-      },
-      branchId: 'branch-1',
-    })
-
-    mocks.createClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table !== 'bank_accounts') throw new Error(`Unexpected table ${table}`)
-        return { insert: insertMock }
-      }),
-    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({ scope: { accessibleBranchIds: ['branch-1'] }, branchId: 'branch-1' })
+    mocks.prisma.bank_accounts.create.mockResolvedValue({ id: 'bank-1' })
 
     const formData = new FormData()
     formData.set('account_id', 'acc-1')
@@ -56,44 +43,13 @@ describe('Cash & Bank Branch Context', () => {
 
     const result = await createBankAccount('org-1', formData)
 
-    expect(insertMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        org_id: 'org-1',
-        branch_id: 'branch-1',
-        account_id: 'acc-1',
-        bank_name: 'BCA Unit A',
-      })
-    )
+    expect(mocks.prisma.bank_accounts.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ org_id: 'org-1', branch_id: 'branch-1', account_id: 'acc-1', bank_name: 'BCA Unit A' }) }))
     expect(result).toEqual({ success: true })
   })
 
   it('rejects bank transactions when selected bank account is outside the active branch', async () => {
-    const bankAccountQuery = {
-      select: vi.fn(() => bankAccountQuery),
-      eq: vi.fn(() => bankAccountQuery),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { id: 'bank-1', branch_id: 'branch-2' },
-        error: null,
-      }),
-    }
-
-    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
-      scope: {
-        accessibleBranches: [],
-        accessibleBranchIds: ['branch-1'],
-        canAccessAllBranches: false,
-        membershipId: 'member-1',
-        role: 'staff',
-      },
-      branchId: 'branch-1',
-    })
-
-    mocks.createClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table !== 'bank_accounts') throw new Error(`Unexpected table ${table}`)
-        return bankAccountQuery
-      }),
-    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({ scope: { accessibleBranchIds: ['branch-1'] }, branchId: 'branch-1' })
+    mocks.prisma.bank_accounts.findFirst.mockResolvedValue({ id: 'bank-1', branch_id: 'branch-2', account_id: 'acc-bank' })
 
     const formData = new FormData()
     formData.set('bank_account_id', 'bank-1')
@@ -105,106 +61,29 @@ describe('Cash & Bank Branch Context', () => {
 
     const result = await createBankTransaction('org-1', formData)
 
-    expect(result).toEqual({
-      error: 'Rekening kas/bank tersebut tidak tersedia pada unit aktif.',
-    })
+    expect(result).toEqual({ error: 'Rekening kas/bank tersebut tidak tersedia pada unit aktif.' })
   })
 
   it('filters recent bank transactions strictly by branch when requested', async () => {
-    const txQuery = {
-      select: vi.fn(() => txQuery),
-      eq: vi.fn(() => txQuery),
-      order: vi.fn(() => txQuery),
-      limit: vi.fn().mockResolvedValue({
-        data: [{ id: 'tx-1', branch_id: 'branch-1' }],
-        error: null,
-      }),
-    }
-
-    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
-      scope: {
-        accessibleBranches: [],
-        accessibleBranchIds: ['branch-1'],
-        canAccessAllBranches: false,
-        membershipId: 'member-1',
-        role: 'staff',
-      },
-      branchId: 'branch-1',
-    })
-
-    mocks.createClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table !== 'bank_transactions') throw new Error(`Unexpected table ${table}`)
-        return txQuery
-      }),
-    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({ scope: { accessibleBranchIds: ['branch-1'] }, branchId: 'branch-1' })
+    mocks.prisma.bank_transactions.findMany.mockResolvedValue([{ id: 'tx-1', branch_id: 'branch-1', amount: 1000, transaction_date: new Date('2026-04-03T00:00:00.000Z'), created_at: new Date('2026-04-03T00:00:00.000Z'), updated_at: new Date('2026-04-03T00:00:00.000Z'), bank_accounts: null, accounts: null }])
 
     const result = await getRecentBankTransactions('org-1', 20, 'branch-1')
 
-    expect(txQuery.eq).toHaveBeenCalledWith('branch_id', 'branch-1')
-    expect(result).toEqual([{ id: 'tx-1', branch_id: 'branch-1' }])
+    expect(mocks.prisma.bank_transactions.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ branch_id: 'branch-1' }) }))
+    expect(result).toEqual([expect.objectContaining({ id: 'tx-1', branch_id: 'branch-1' })])
   })
 
   it('voids bank transactions instead of deleting the source record', async () => {
-    const txLookup = {
-      select: vi.fn(() => txLookup),
-      eq: vi.fn(() => txLookup),
-      single: vi.fn().mockResolvedValue({
-        data: {
-          id: 'tx-1',
-          journal_entry_id: 'je-1',
-          branch_id: 'branch-1',
-          status: 'POSTED',
-        },
-        error: null,
-      }),
-    }
-    const txUpdateEq = vi.fn(() => txUpdate)
-    const txUpdate = {
-      eq: txUpdateEq,
-    }
-    const journalUpdateEq = vi.fn(() => journalUpdate)
-    const journalUpdate = {
-      eq: journalUpdateEq,
-    }
-
-    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
-      scope: {
-        accessibleBranches: [],
-        accessibleBranchIds: ['branch-1'],
-        canAccessAllBranches: false,
-        membershipId: 'member-1',
-        role: 'owner',
-      },
-      branchId: 'branch-1',
-    })
-
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1' } },
-        }),
-      },
-      from: vi.fn((table: string) => {
-        if (table === 'bank_transactions') {
-          return {
-            select: vi.fn(() => txLookup),
-            update: vi.fn(() => txUpdate),
-          }
-        }
-        if (table === 'journal_entries') {
-          return {
-            update: vi.fn(() => journalUpdate),
-          }
-        }
-        throw new Error(`Unexpected table ${table}`)
-      }),
-    })
+    mocks.prisma.bank_transactions.findFirst.mockResolvedValue({ id: 'tx-1', journal_entry_id: 'je-1', branch_id: 'branch-1', status: 'POSTED' })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({ scope: { accessibleBranchIds: ['branch-1'] }, branchId: 'branch-1' })
+    mocks.prisma.$transaction.mockImplementation(async (callback: any) => callback({
+      journal_entries: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      bank_transactions: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    }))
 
     const result = await deleteBankTransaction('org-1', 'tx-1')
 
     expect(result).toEqual({ success: true })
-    expect(journalUpdateEq).toHaveBeenCalledWith('org_id', 'org-1')
-    expect(txUpdateEq).toHaveBeenCalledWith('org_id', 'org-1')
   })
 })

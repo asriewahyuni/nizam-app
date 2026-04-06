@@ -5,23 +5,28 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ShieldCheck, Lock, AlertCircle, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { completePasswordReset } from '@/modules/auth/actions/auth.actions'
 
 export default function UpdatePasswordPage() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [token, setToken] = useState('')
+  const [email, setEmail] = useState('')
   const router = useRouter()
-  const supabase = createClient()
 
-  // Ensure they only see this page if they have a session (handled by the magic link)
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        setErrorMsg('Sesi tidak valid atau telah kedaluwarsa. Silakan ajukan Lupa Password kembali.')
-      }
-    })
-  }, [supabase.auth])
+    const params = new URLSearchParams(window.location.search)
+    const nextToken = params.get('token') || ''
+    const nextEmail = params.get('email') || ''
+
+    setToken(nextToken)
+    setEmail(nextEmail)
+
+    if (!nextToken || !nextEmail) {
+      setErrorMsg('Tautan reset password tidak valid atau telah kedaluwarsa. Silakan ajukan Lupa Password kembali.')
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -38,18 +43,29 @@ export default function UpdatePasswordPage() {
       return
     }
 
+    if (!token || !email) {
+      setErrorMsg('Tautan reset password tidak valid atau telah kedaluwarsa.')
+      setLoading(false)
+      return
+    }
+
     try {
-      const { error } = await supabase.auth.updateUser({ password })
-      
-      if (error) {
-        setErrorMsg(error.message)
+      const payload = new FormData()
+      payload.set('token', token)
+      payload.set('email', email)
+      payload.set('password', password)
+
+      const result = await completePasswordReset(payload)
+
+      if (result.error) {
+        setErrorMsg(result.error)
       } else {
         setSuccess(true)
         setTimeout(() => {
-          router.push('/dashboard')
+          router.push('/login')
         }, 3000)
       }
-    } catch (err: any) {
+    } catch {
       setErrorMsg("Gagal menghubungi server.")
     } finally {
       setLoading(false)
@@ -103,11 +119,12 @@ export default function UpdatePasswordPage() {
 
               <form className="space-y-6" onSubmit={handleSubmit}>
                 <div className="space-y-2">
-                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">PASSWORD BARU</label>
+                  <label htmlFor="password" className="block text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">PASSWORD BARU</label>
                   <div className="relative group">
                     <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#004AB8] transition-colors" />
                     <input
                       name="password"
+                      id="password"
                       type="password"
                       required
                       placeholder="••••••••"
@@ -117,11 +134,12 @@ export default function UpdatePasswordPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">KONFIRMASI PASSWORD</label>
+                  <label htmlFor="confirm_password" className="block text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">KONFIRMASI PASSWORD</label>
                   <div className="relative group">
                     <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#004AB8] transition-colors" />
                     <input
                       name="confirm_password"
+                      id="confirm_password"
                       type="password"
                       required
                       placeholder="••••••••"

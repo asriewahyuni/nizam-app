@@ -336,7 +336,7 @@ export async function uploadBillingPaymentProof(
   }
 
   const uploadResult = await uploadBillingProofAsset(access.orgId, invoice.invoice_number, fileEntry)
-  if ('error' in uploadResult) {
+  if (!uploadResult.url) {
     return { error: uploadResult.error }
   }
 

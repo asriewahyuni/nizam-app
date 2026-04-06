@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/server'
+import { sanitizeUploadSegment, uploadPublicFile } from '@/lib/storage/public-upload'
 
 const MAX_PROOF_SIZE_BYTES = 5 * 1024 * 1024
 const ALLOWED_PROOF_TYPES = new Set([
@@ -12,21 +12,7 @@ function sanitizeSegment(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
 }
 
-function buildProofFilePath(orgId: string, invoiceNumber: string, file: File) {
-  const safeOrgId = sanitizeSegment(String(orgId || '').trim()) || 'org'
-  const safeInvoiceNumber = sanitizeSegment(String(invoiceNumber || '').trim()) || 'invoice'
-  const extFromName = file.name.includes('.')
-    ? `.${file.name.split('.').pop()?.toLowerCase() || ''}`.replace(/\.+$/, '')
-    : ''
-  const extFromType = file.type.includes('/')
-    ? `.${file.type.split('/').pop()?.toLowerCase() || ''}`.replace(/\.+$/, '')
-    : ''
-  const extension = extFromName || extFromType || '.bin'
-
-  return `${safeOrgId}/${safeInvoiceNumber}-${Date.now()}${extension}`
-}
-
-export async function uploadBillingProofAsset(orgId: string, invoiceNumber: string, file: File) {
+export async function uploadBillingProofAsset(orgId: string, invoiceNumber: string, file: File): Promise<{ url?: string; error?: string }> {
   if (file.size <= 0) {
     return { error: 'File bukti transfer kosong.' }
   }
@@ -39,20 +25,13 @@ export async function uploadBillingProofAsset(orgId: string, invoiceNumber: stri
     return { error: 'Format file harus JPG, PNG, WEBP, atau PDF.' }
   }
 
-  const supabase = await createAdminClient()
-  const filePath = buildProofFilePath(orgId, invoiceNumber, file)
-
-  const { error: uploadError } = await supabase.storage
-    .from('billing-proofs')
-    .upload(filePath, file, {
-      upsert: true,
-      contentType: file.type || undefined,
+  try {
+    return await uploadPublicFile({
+      folder: `billing-proofs/${sanitizeUploadSegment(orgId) || 'org'}`,
+      file,
+      fileName: `${sanitizeSegment(invoiceNumber) || 'invoice'}-${Date.now()}`,
     })
-
-  if (uploadError) {
-    return { error: uploadError.message }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal mengunggah bukti transfer.' }
   }
-
-  const { data } = supabase.storage.from('billing-proofs').getPublicUrl(filePath)
-  return { url: data.publicUrl }
 }
