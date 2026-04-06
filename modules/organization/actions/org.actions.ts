@@ -27,6 +27,7 @@ import { syncParentCoAToChildOrg } from '@/modules/accounting/actions/coa.action
 const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 const DEFAULT_BRANCH_NAME = 'Unit Utama'
 const DEFAULT_BRANCH_CODE = 'MAIN'
+const DEMO_ACCOUNT_EMAIL = 'demo@nizam.app'
 
 function getActiveContextCookieOptions() {
   return {
@@ -81,6 +82,13 @@ type HoldingContextOptions = {
   ownerOnly?: boolean
 }
 
+type RpcClient = {
+  rpc: (
+    fn: string,
+    params?: Record<string, unknown>
+  ) => Promise<{ error: { message?: string | null } | null }>
+}
+
 const OPTIONAL_ORGANIZATION_COLUMNS = new Set(['owner_email', 'parent_org_id', 'is_demo'])
 
 function extractErrorMessage(error: unknown): string {
@@ -105,6 +113,124 @@ function extractMissingColumnName(error: unknown): string | null {
   if (postgresMatch?.[1]) return postgresMatch[1]
 
   return null
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isDemoPlanName(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().toLowerCase() === 'demo'
+}
+
+function isDemoOrganizationState(org: unknown): boolean {
+  if (!isPlainObject(org)) return false
+  if (Boolean(org.is_demo)) return true
+
+  const settings = isPlainObject(org.settings) ? org.settings : null
+  if (!settings) return false
+
+  return Boolean(settings.is_demo) || isDemoPlanName(settings.plan)
+}
+
+function isDemoAccountUser(user: { email?: string | null; user_metadata?: Record<string, unknown> | null } | null | undefined): boolean {
+  if (!user) return false
+  const normalizedEmail = String(user.email || '').trim().toLowerCase()
+  if (normalizedEmail === DEMO_ACCOUNT_EMAIL) return true
+  return Boolean(user.user_metadata && (user.user_metadata as Record<string, unknown>).is_demo)
+}
+
+async function isOrganizationDemo(db: any, orgId: string): Promise<boolean> {
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) return false
+
+  const { data: orgRow, error } = await db
+    .from('organizations')
+    .select('is_demo, settings')
+    .eq('id', trimmedOrgId)
+    .maybeSingle()
+
+  if (error || !orgRow) return false
+  return isDemoOrganizationState(orgRow)
+}
+
+async function enforceOrganizationAsDemo(
+  db: any,
+  orgId: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) {
+    return { success: false, error: 'Organisasi target demo tidak valid.' }
+  }
+
+  const { data: orgRow, error: orgError } = await db
+    .from('organizations')
+    .select('id, is_demo, settings')
+    .eq('id', trimmedOrgId)
+    .maybeSingle()
+
+  if (orgError || !orgRow) {
+    return { success: false, error: orgError?.message || 'Organisasi target demo tidak ditemukan.' }
+  }
+
+  const currentSettings = isPlainObject(orgRow.settings) ? orgRow.settings : {}
+  const nextSettings = {
+    ...currentSettings,
+    plan: 'Demo',
+    is_demo: true,
+  }
+
+  const updatePayload: Record<string, unknown> = {
+    settings: nextSettings,
+    is_demo: true,
+    updated_at: new Date().toISOString(),
+  }
+
+  let { error: updateError } = await db
+    .from('organizations')
+    .update(updatePayload)
+    .eq('id', trimmedOrgId)
+
+  const missingColumn = extractMissingColumnName(updateError)
+  if (missingColumn === 'is_demo') {
+    delete updatePayload.is_demo
+    ;({ error: updateError } = await db
+      .from('organizations')
+      .update(updatePayload)
+      .eq('id', trimmedOrgId))
+  }
+
+  if (updateError) {
+    return { success: false, error: updateError.message || 'Gagal menyinkronkan paket demo organisasi.' }
+  }
+
+  return { success: true }
+}
+
+async function syncParentRolesToChildOrg(
+  db: RpcClient,
+  parentOrgId: string,
+  childOrgId: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  const trimmedParentOrgId = String(parentOrgId || '').trim()
+  const trimmedChildOrgId = String(childOrgId || '').trim()
+  if (!trimmedParentOrgId || !trimmedChildOrgId) {
+    return { success: false, error: 'Parameter sinkronisasi role parent-child tidak valid.' }
+  }
+  if (trimmedParentOrgId === trimmedChildOrgId) {
+    return { success: false, error: 'Sinkronisasi role parent-child tidak bisa dilakukan pada org yang sama.' }
+  }
+
+  const { error } = await db.rpc('sync_parent_roles_to_child_org', {
+    p_parent_org_id: trimmedParentOrgId,
+    p_child_org_id: trimmedChildOrgId,
+  })
+
+  if (error) {
+    return { success: false, error: error.message || 'Sinkronisasi role parent-child gagal.' }
+  }
+
+  return { success: true }
 }
 
 function mapCreateOrganizationError(
@@ -228,11 +354,11 @@ async function createOrganizationRecord(
     const ownerEmail = user.email
     const planParam = String(formData.get('plan') || '').trim().toLowerCase()
     const businessType = (formData.get('type') || 'BLANK') as DemoBusinessType
-    const isDemo = planParam === 'demo'
-    const isAbs = planParam === 'abs'
-    const selectedPlan = isDemo ? 'Demo' : 'Trial'
+    const requestedDemoPlan = planParam === 'demo'
     const parentOrgIdRaw = String(formData.get('parent_org_id') || '').trim()
     const parentOrgId = parentOrgIdRaw || null
+    const accountIsDemo = isDemoAccountUser(user as { email?: string | null; user_metadata?: Record<string, unknown> | null })
+    let parentOrgIsDemo = false
 
     if (parentOrgId) {
       const holdingContext = await getHoldingManagementContext(parentOrgId, { ownerOnly: true })
@@ -245,7 +371,13 @@ async function createOrganizationRecord(
           error: `Batas anak perusahaan tercapai (${limits.currentChildOrgs}/${limits.maxChildOrgs}). Upgrade paket SaaS Anda untuk menambah lebih banyak entitas.`,
         }
       }
+
+      parentOrgIsDemo = await isOrganizationDemo(db, parentOrgId)
     }
+
+    const isDemo = accountIsDemo || requestedDemoPlan || parentOrgIsDemo
+    const isAbs = !isDemo && planParam === 'abs'
+    const selectedPlan = isDemo ? 'Demo' : 'Trial'
 
     const orgInsertPayload: Record<string, unknown> = {
       id: orgId,
@@ -342,6 +474,12 @@ async function createOrganizationRecord(
       const coaSync = await syncParentCoAToChildOrg(parentOrgId, orgId)
       if (!coaSync.success) {
         ;(console as any).warn('CreateOrganization: CoA parent sync warning', coaSync.error)
+      }
+
+      const roleSync = await syncParentRolesToChildOrg(privilegedDb, parentOrgId, orgId)
+      if (!roleSync.success) {
+        const roleSyncError = 'error' in roleSync ? roleSync.error : 'Unknown role sync error.'
+        ;(console as any).warn('CreateOrganization: role parent sync warning', roleSyncError)
       }
     }
 
@@ -521,9 +659,24 @@ export async function linkSubOrganization(parentOrgId: string, childOrgId: strin
 
   if (error) return { error: error.message }
 
+  const parentIsDemo = await isOrganizationDemo(db, activeOrgId)
+  if (parentIsDemo) {
+    const demoSync = await enforceOrganizationAsDemo(db, trimmedChildOrgId)
+    if (!demoSync.success) {
+      const demoSyncError = 'error' in demoSync ? demoSync.error : 'Unknown demo sync error.'
+      ;(console as any).warn('Demo sync warning (linkSubOrganization):', demoSyncError)
+    }
+  }
+
   const coaSync = await syncParentCoAToChildOrg(activeOrgId, trimmedChildOrgId)
   if (!coaSync.success) {
     ;(console as any).warn('CoA sync warning (linkSubOrganization):', coaSync.error)
+  }
+
+  const roleSync = await syncParentRolesToChildOrg(db, activeOrgId, trimmedChildOrgId)
+  if (!roleSync.success) {
+    const roleSyncError = 'error' in roleSync ? roleSync.error : 'Unknown role sync error.'
+    ;(console as any).warn('Role sync warning (linkSubOrganization):', roleSyncError)
   }
 
   revalidatePath('/settings/sub-orgs')
@@ -784,9 +937,24 @@ export async function setOrganizationParent(childOrgId: string, parentOrgId: str
   if (updateError) return { error: updateError.message }
 
   if (trimmedParentOrgId) {
+    const parentIsDemo = await isOrganizationDemo(db, trimmedParentOrgId)
+    if (parentIsDemo) {
+      const demoSync = await enforceOrganizationAsDemo(db, trimmedChildOrgId)
+      if (!demoSync.success) {
+        const demoSyncError = 'error' in demoSync ? demoSync.error : 'Unknown demo sync error.'
+        ;(console as any).warn('Demo sync warning (setOrganizationParent):', demoSyncError)
+      }
+    }
+
     const coaSync = await syncParentCoAToChildOrg(trimmedParentOrgId, trimmedChildOrgId)
     if (!coaSync.success) {
       ;(console as any).warn('CoA sync warning (setOrganizationParent):', coaSync.error)
+    }
+
+    const roleSync = await syncParentRolesToChildOrg(db, trimmedParentOrgId, trimmedChildOrgId)
+    if (!roleSync.success) {
+      const roleSyncError = 'error' in roleSync ? roleSync.error : 'Unknown role sync error.'
+      ;(console as any).warn('Role sync warning (setOrganizationParent):', roleSyncError)
     }
   }
 

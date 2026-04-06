@@ -83,6 +83,7 @@ export default async function DashboardLayout({
   const isDemo = resolveDashboardDependency('demo session state', dependencyResults[7], false)
   const aiTokens = resolveDashboardDependency('AI token summary', dependencyResults[8], null)
   const pendingCoaRequests = resolveDashboardDependency('pending coa requests', dependencyResults[9], 0)
+  const effectivePlanName = isDemo ? 'Demo' : (orgData.org.settings?.plan || 'Trial')
 
   // ─────────────────────────────────────────────────────────────
   // 3. SAAS MODULE & RBAC GUARD (Protect direct URL access)
@@ -174,7 +175,7 @@ export default async function DashboardLayout({
         hrisNotifications={resetRequests}
         pendingCoaRequests={pendingCoaRequests}
         isDemo={isDemo}
-        planName={orgData.org.settings?.plan}
+        planName={effectivePlanName}
         canManageSubOrganizations={canManageSubOrganizations}
       />
 
@@ -227,7 +228,7 @@ export default async function DashboardLayout({
           </div>
         </main>
         <MobileBottomNav />
-        <FloatingPlanBadge planName={orgData.org.settings?.plan} />
+        <FloatingPlanBadge planName={effectivePlanName} />
       </div>
     </div>
   )

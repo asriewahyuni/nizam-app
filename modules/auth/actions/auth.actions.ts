@@ -14,6 +14,7 @@ import {
 const ADMIN_IMPERSONATION_COOKIE = 'nizam_admin_impersonation'
 const ADMIN_IMPERSONATION_MAX_AGE = 60 * 60 * 4
 const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
+const DEMO_ACCOUNT_EMAIL = 'demo@nizam.app'
 
 type AdminImpersonationPayload = {
   accessToken: string
@@ -89,6 +90,59 @@ function isDuplicateAuthRegistrationError(message: unknown) {
     lowered.includes('email address has already been registered') ||
     (/already.*registered/.test(lowered))
   )
+}
+
+function isDemoAccountUser(user: { email?: string | null; user_metadata?: Record<string, unknown> | null } | null | undefined) {
+  if (!user) return false
+  const normalizedEmail = String(user.email || '').trim().toLowerCase()
+  if (normalizedEmail === DEMO_ACCOUNT_EMAIL) return true
+  return Boolean(user.user_metadata && (user.user_metadata as Record<string, unknown>).is_demo)
+}
+
+async function deleteOwnedOrganizationsForDemoUser(
+  userId: string,
+  fallbackDb: any
+) {
+  const trimmedUserId = String(userId || '').trim()
+  if (!trimmedUserId) return
+
+  let db = fallbackDb
+  try {
+    db = (await createAdminClient()) as any
+  } catch (adminError) {
+    ;(console as any).warn('signOut cleanup: admin client unavailable, fallback to session client', adminError)
+  }
+
+  const { data: memberships, error: membershipError } = await db
+    .from('org_members')
+    .select('org_id')
+    .eq('user_id', trimmedUserId)
+    .eq('role', 'owner')
+    .eq('is_active', true)
+
+  if (membershipError) {
+    ;(console as any).error('signOut cleanup: failed to load demo org memberships', membershipError)
+    return
+  }
+
+  const orgIds = Array.from(
+    new Set(
+      (Array.isArray(memberships) ? memberships : [])
+        .map((row: any) => String(row?.org_id || '').trim())
+        .filter(Boolean)
+    )
+  )
+
+  for (const orgId of orgIds) {
+    const { error: deleteError } = await db
+      .from('organizations')
+      .delete()
+      .eq('id', orgId)
+
+    if (deleteError) {
+      ;(console as any).error('signOut cleanup: failed to delete demo org', orgId, deleteError)
+    }
+  }
 }
 
 async function findAuthUserByEmail(
@@ -711,6 +765,13 @@ export async function signInWithNik(formData: FormData) {
 export async function signOut() {
   const supabase = await createClient()
   const cookieStore = await cookies()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (isDemoAccountUser(user)) {
+    await deleteOwnedOrganizationsForDemoUser(String(user?.id || ''), supabase as any)
+  }
+
+  cookieStore.delete('nizam_demo_org_id')
   cookieStore.delete(ACTIVE_ORG_COOKIE)
   cookieStore.delete(ACTIVE_BRANCH_COOKIE)
   cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)

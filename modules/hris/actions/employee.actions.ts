@@ -455,12 +455,65 @@ export async function transferEmployeeToChildOrg(orgId: string, payload: Employe
   // Pastikan user terdaftar di entitas tujuan bila karyawan ini sudah punya akun.
   const targetLoginUserId = targetEmployee.user_id || sourceEmployee.user_id || null
   if (targetLoginUserId) {
-    const { data: targetRoleMatch } = await db
-      .from('roles')
-      .select('id, name')
-      .eq('org_id', targetOrgId)
-      .ilike('name', String(sourceEmployee.job_title || '').trim())
+    const { data: sourceMembershipForTransferUser } = await db
+      .from('org_members')
+      .select('role_id')
+      .eq('org_id', sourceOrgId)
+      .eq('user_id', targetLoginUserId)
+      .eq('is_active', true)
       .maybeSingle()
+
+    const sourceRoleId = String(sourceMembershipForTransferUser?.role_id || '').trim() || null
+    let targetRoleMatch: { id: string; name: string } | null = null
+
+    if (sourceRoleId) {
+      const { data: mappedRoleBySourceId } = await db
+        .from('roles')
+        .select('id, name')
+        .eq('org_id', targetOrgId)
+        .eq('source_role_id', sourceRoleId)
+        .maybeSingle()
+
+      if (mappedRoleBySourceId?.id) {
+        targetRoleMatch = mappedRoleBySourceId
+      } else {
+        const { data: sourceRoleRecord } = await db
+          .from('roles')
+          .select('name')
+          .eq('id', sourceRoleId)
+          .maybeSingle()
+
+        const sourceRoleName = String(sourceRoleRecord?.name || '').trim()
+        if (sourceRoleName) {
+          const { data: targetRoleBySourceName } = await db
+            .from('roles')
+            .select('id, name')
+            .eq('org_id', targetOrgId)
+            .ilike('name', sourceRoleName)
+            .maybeSingle()
+
+          if (targetRoleBySourceName?.id) {
+            targetRoleMatch = targetRoleBySourceName
+          }
+        }
+      }
+    }
+
+    if (!targetRoleMatch) {
+      const fallbackRoleName = String(sourceEmployee.job_title || '').trim()
+      if (fallbackRoleName) {
+        const { data: targetRoleByJobTitle } = await db
+          .from('roles')
+          .select('id, name')
+          .eq('org_id', targetOrgId)
+          .ilike('name', fallbackRoleName)
+          .maybeSingle()
+
+        if (targetRoleByJobTitle?.id) {
+          targetRoleMatch = targetRoleByJobTitle
+        }
+      }
+    }
 
     const { error: memberUpsertError } = await db
       .from('org_members')

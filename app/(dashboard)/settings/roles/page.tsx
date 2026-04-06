@@ -24,7 +24,7 @@ const MODULE_CATEGORIES = [
     val: 'INSIGHT',
     modules: [
       { id: 'reports', name: 'Laporan Finansial', perms: ['reports:read'] },
-      { id: 'strategy', name: 'Strategi & BSC', perms: ['strategy:read'] },
+      { id: 'strategy', name: 'Strategi & BSC', perms: ['strategy:read', 'strategy:write'] },
       { id: 'forecast', name: 'Proyeksi Arus Kas', perms: ['forecast:read'] },
     ]
   },

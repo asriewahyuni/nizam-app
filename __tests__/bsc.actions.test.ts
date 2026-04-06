@@ -4,10 +4,20 @@ import { createSupabaseMock } from './helpers/supabase-mock'
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
+  revalidatePath: vi.fn(),
+  resolveAccessibleBranchSelection: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: mocks.createClient,
+}))
+
+vi.mock('next/cache', () => ({
+  revalidatePath: mocks.revalidatePath,
+}))
+
+vi.mock('@/modules/organization/lib/branch-access.server', () => ({
+  resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
 }))
 
 import { getBSCMetrics } from '@/modules/accounting/actions/bsc.actions'
@@ -15,6 +25,16 @@ import { getBSCMetrics } from '@/modules/accounting/actions/bsc.actions'
 describe('BSC Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: {
+        accessibleBranches: [],
+        accessibleBranchIds: ['branch-1'],
+        canAccessAllBranches: false,
+        membershipId: 'member-1',
+        role: 'manager',
+      },
+      branchId: 'branch-1',
+    })
   })
 
   it('scopes BSC metrics to the active branch across all underlying modules', async () => {
@@ -64,30 +84,30 @@ describe('BSC Branch Context', () => {
             result: { data: [{ id: 'sale-1', grand_total: 250000, status: 'FINISHED', customer_id: 'cust-1' }], error: null },
           },
           {
-            result: { data: null, error: null, count: 2 } as any,
+            result: { data: null, error: null, count: 2 } as unknown as { data: null; error: null },
           },
         ],
         purchases: [
           {
-            result: { data: null, error: null, count: 1 } as any,
+            result: { data: null, error: null, count: 1 } as unknown as { data: null; error: null },
           },
         ],
         fixed_assets: [
           {
-            result: { data: null, error: null, count: 3 } as any,
+            result: { data: null, error: null, count: 3 } as unknown as { data: null; error: null },
           },
           {
-            result: { data: null, error: null, count: 1 } as any,
+            result: { data: null, error: null, count: 1 } as unknown as { data: null; error: null },
           },
         ],
         employees: [
           {
-            result: { data: null, error: null, count: 5 } as any,
+            result: { data: null, error: null, count: 5 } as unknown as { data: null; error: null },
           },
         ],
         payroll_runs: [
           {
-            result: { data: null, error: null, count: 1 } as any,
+            result: { data: null, error: null, count: 1 } as unknown as { data: null; error: null },
           },
         ],
       },
