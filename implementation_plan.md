@@ -1,7 +1,7 @@
 # AI Handover Document: Supabase -> Prisma/Auth Migration Status
 
-**Updated:** 2026-04-06 (sesi ke-23, Factory migration)  
-**Status:** `IN PROGRESS` — Prioritas Cash, Journal, Reimbursement, Fixed Assets, dan Factory sudah selesai. Estimasi progres migrasi keseluruhan saat ini sekitar `98%`. Target berikutnya adalah slice Supabase-heavy residual seperti fleet, sales-page, dan accounting/reporting residual.
+**Updated:** 2026-04-06 (sesi ke-25, Fleet migration)  
+**Status:** `IN PROGRESS` — Prioritas Cash, Journal, Reimbursement, Fixed Assets, Factory, Sales Page, dan Fleet sudah selesai. Estimasi progres migrasi keseluruhan saat ini sekitar `99%`. Target berikutnya adalah accounting/reporting residual dan demo tooling yang masih Supabase-heavy.
 
 Dokumen ini adalah rencana eksekusi dan handover aktif untuk agen. Sesi-sesi sebelumnya telah menyelesaikan migrasi pada domain auth, org, HRIS, audit, billing, accounting, contacts, services, sales, sales-write, POS.
 
@@ -9,15 +9,17 @@ Dokumen ini adalah rencana eksekusi dan handover aktif untuk agen. Sesi-sesi seb
 
 ## 0. Snapshot Repo Saat Ini
 
-- Estimasi progres migrasi keseluruhan: `98%`
-- Estimasi sisa pekerjaan utama: `2%`
+- Estimasi progres migrasi keseluruhan: `99%`
+- Estimasi sisa pekerjaan utama: `1%`
   - Ticketing sudah selesai dipindah dari Supabase data client ke Prisma/Auth raw SQL
   - Slice cash inti sekarang sudah selesai: `modules/cash/actions/bank.actions.ts` dan `modules/cash/actions/reconcile.actions.ts` sudah memakai Prisma/Auth
   - Slice journal inti sekarang juga sudah selesai: `modules/accounting/actions/journal.actions.ts` sudah memakai Prisma/Auth
   - Slice reimbursement sekarang juga sudah selesai: `modules/accounting/actions/reimburse.actions.ts` sudah memakai Prisma/Auth + storage wrapper server-side
   - Slice fixed assets sekarang juga sudah selesai: `modules/accounting/actions/assets.actions.ts` sudah memakai Prisma/Auth, dengan RPC disposal tetap lewat DB context Prisma
   - Slice factory sekarang juga sudah selesai: `modules/factory/actions/factory.actions.ts` sudah memakai Prisma/Auth, dengan RPC completion work order tetap lewat DB context Prisma
-  - Sisa terbesar sekarang bergeser ke domain yang masih Supabase-heavy seperti `fleet`, `sales-page`, beberapa reporting/accounting residual, dan demo tooling
+  - Slice sales page sekarang juga sudah selesai: `modules/sales/lib/sales-page.server.ts` sudah memakai Prisma/Auth, termasuk public lead capture dan AI token billing flow
+  - Slice fleet sekarang juga sudah selesai: `modules/fleet/actions/fleet.actions.ts` sudah memakai Prisma/Auth, dengan RPC maintenance tetap lewat DB context Prisma dan fallback insert manual saat fungsi DB belum tersedia
+  - Sisa terbesar sekarang bergeser ke accounting/reporting residual dan demo tooling
 
 - Sesi sebelumnya telah membersihkan semua penggunaan klien Supabase pada domain operasional `sales` dan `pos`. 
 - Sesi ini (Sesi 15) akan fokus pada eksekusi Prioritas 1: **Core Sales / Purchasing Backbone**.
@@ -110,6 +112,8 @@ File-file berikut **sudah tidak lagi memakai Supabase data client**:
 - `modules/accounting/actions/reimburse.actions.ts` ✅ (sesi 21)
 - `modules/accounting/actions/assets.actions.ts` ✅ (sesi 22)
 - `modules/factory/actions/factory.actions.ts` ✅ (sesi 23)
+- `modules/sales/lib/sales-page.server.ts` ✅ (sesi 24)
+- `modules/fleet/actions/fleet.actions.ts` ✅ (sesi 25)
 
 ---
 
@@ -278,6 +282,24 @@ Factory migration yang selesai pada sesi ini:
   - access guard untuk BoM, SPK, dan gudang sekarang memakai helper branch scope + Prisma lookup, tanpa `createClient()`
   - `updateWorkOrderStatus` untuk status biasa sekarang memakai Prisma mutator
   - completion SPK tetap memakai RPC Postgres `process_work_order_completion_v2` / fallback `process_work_order_completion`, tetapi sekarang dieksekusi lewat `withDbUserContext()` agar session Supabase hilang sementara logic produksi existing tetap berjalan
+
+Sales Page migration yang selesai pada sesi ini:
+
+- `modules/sales/lib/sales-page.server.ts`
+  - seluruh auth sekarang memakai `auth()` + Prisma, tanpa `createClient()/createAdminClient()`
+  - loader dan mutasi internal `sales_pages` / `sales_page_leads` sekarang memakai Prisma `findMany/create/update/delete`
+  - public resolver org/page sekarang memakai Prisma langsung untuk lookup organization + published page
+  - lead capture public sekarang insert lead, upsert contact sederhana, dan create placeholder quotation via Prisma
+  - flow AI draft dan billing token AI sekarang memakai helper Prisma lokal di file ini, sehingga tidak lagi bergantung pada `LooseDb` Supabase
+
+Fleet migration yang selesai pada sesi ini:
+
+- `modules/fleet/actions/fleet.actions.ts`
+  - seluruh loader `getAssets`, `getBookings`, `getRoutes`, `getSchedules`, `getAllMedicalRecords`, `getFleetCrew`, `getTerminals`, dan `getFleetAttendanceToday` sekarang memakai Prisma `findMany/findFirst`, tanpa `createClient()`
+  - mutasi `createAsset`, `createBooking`, `updateBookingStatus`, `createRoute`, `createSchedule`, `createTicket`, `createCrew`, dan `recordCrewAttendance` sekarang memakai Prisma mutator dengan guard branch access yang sama seperti sebelumnya
+  - data shape untuk UI fleet tetap dinormalisasi agar nested relation `asset`, `contact`, `route`, `driver`, `helper`, `tickets`, `employee`, dan `asset` pada medical record tetap kompatibel dengan caller lama
+  - `createMedicalRecord` sekarang mencoba RPC Postgres `create_fleet_medical_record` lewat `withDbUserContext()`; jika fungsi DB belum tersedia, action fallback ke update status armada + insert maintenance manual dengan rollback status saat insert gagal
+  - coverage `__tests__/fleet.actions.test.ts` sudah dipindah dari mock Supabase query builder ke mock Prisma/Auth/DB-context
 
 Shared module migration yang selesai pada sesi ini:
 
@@ -491,9 +513,6 @@ Berikut file yang **masih memakai Supabase** dan relevan untuk lanjutan migrasi:
 - `modules/accounting/actions/tax.actions.ts`
 - `modules/accounting/actions/zakat.actions.ts`
   - cluster accounting lain masih besar, tetapi sekarang page shell utamanya sudah tidak langsung pakai Supabase
-- `modules/fleet/actions/fleet.actions.ts`
-- `modules/factory/actions/factory.actions.ts`
-  - page shell sudah lebih bersih, tetapi action layer domain ini masih Supabase
 - `modules/organization/lib/billing-proof-storage.server.ts`
   - billing proof sudah pindah ke server wrapper, tetapi storage backend masih Supabase
 - `modules/organization/lib/logo-storage.server.ts`
@@ -534,18 +553,21 @@ Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file 
 - `modules/saas/actions/operator-sales.actions.ts` ✅
 - `/saas/penawaran`, `/saas/penjualan`, dan `/saas/dokumen/[id]` sekarang sudah mengambil data operator melalui action Prisma/Auth ini
 
-### PRIORITAS 3 (SEBAGIAN SELESAI): Ticketing + Cash
+### PRIORITAS 3 ✅ SELESAI: Ticketing + Cash + Fleet
 - `modules/saas/actions/ticketing.actions.ts` ✅
-- `modules/cash/actions/bank.actions.ts`
-- `modules/cash/actions/reconcile.actions.ts`
-- domain masih dekat dengan slice yang sudah dibersihkan (admin, billing, cash page shell)
+- `modules/cash/actions/bank.actions.ts` ✅
+- `modules/cash/actions/reconcile.actions.ts` ✅
+- `modules/fleet/actions/fleet.actions.ts` ✅
 
-### PRIORITAS 3 (AKTIF): Cash
-- `modules/cash/actions/bank.actions.ts`
-- `modules/cash/actions/reconcile.actions.ts`
-- setelah ticketing selesai, dua file ini sekarang jadi blocker data-layer terbesar berikutnya
+### PRIORITAS 4 (AKTIF): Accounting Residual
+- `modules/accounting/actions/reports.actions.ts`
+- `modules/accounting/actions/budget.actions.ts`
+- `modules/accounting/actions/forecast.actions.ts`
+- `modules/accounting/actions/aging.actions.ts`
+- `modules/accounting/actions/zakat.actions.ts`
+- cluster ini sekarang jadi kumpulan file Supabase-heavy terbesar yang masih menyentuh page shell accounting yang sudah bersih
 
-### PRIORITAS 4: Storage Wrappers
+### PRIORITAS 5: Storage Wrappers
 - `modules/organization/lib/billing-proof-storage.server.ts`
 - `modules/organization/lib/logo-storage.server.ts`
 - `modules/hris/actions/employee.actions.ts`
@@ -553,7 +575,6 @@ Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file 
 
 ### DEPRIORITIZE
 - `app/(auth)/update-password/page.tsx` — jangan disentuh tanpa keputusan reset-password flow pengganti
-- `modules/accounting/` yang tersisa di luar `journal/reimburse/assets` — besar, tetapi sekarang tidak lagi menahan cleanup page shell
 - `modules/demo/actions/demo.actions.ts` — masih wajar dibiarkan sebagai wrapper seeding terisolasi
 
 ---

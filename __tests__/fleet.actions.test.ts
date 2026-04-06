@@ -1,14 +1,63 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createSupabaseMock, failure, success } from './helpers/supabase-mock'
 
 const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
+  prisma: {
+    fleet_assets: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    fleet_bookings: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    fleet_routes: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+    },
+    fleet_schedules: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+    },
+    fleet_tickets: {
+      create: vi.fn(),
+    },
+    fleet_maintenance_labs: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+    },
+    employees: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+    },
+    attendance: {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    fleet_terminals: {
+      findMany: vi.fn(),
+    },
+  },
+  auth: vi.fn(),
   revalidatePath: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
+  withDbUserContext: vi.fn(),
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: mocks.createClient,
+vi.mock('@/lib/prisma', () => ({
+  prisma: mocks.prisma,
+}))
+
+vi.mock('@/auth', () => ({
+  auth: mocks.auth,
 }))
 
 vi.mock('next/cache', () => ({
@@ -17,6 +66,10 @@ vi.mock('next/cache', () => ({
 
 vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
+}))
+
+vi.mock('@/modules/sales/lib/sales-write.server', () => ({
+  withDbUserContext: mocks.withDbUserContext,
 }))
 
 import {
@@ -49,16 +102,10 @@ function buildScheduleForm(overrides: Record<string, string> = {}) {
   return formData
 }
 
-function getFirstOperationArg(callTable: string, method: string, calls: Array<{ table: string; operations: Array<{ method: string; args: unknown[] }> }>) {
-  const call = calls.find((entry) =>
-    entry.table === callTable && entry.operations.some((operation) => operation.method === method)
-  )
-  return call?.operations.find((operation) => operation.method === method)?.args[0]
-}
-
 describe('Fleet Server Actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.auth.mockResolvedValue(null)
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-1'] },
       branchId: 'branch-1',
@@ -66,8 +113,6 @@ describe('Fleet Server Actions', () => {
   })
 
   it('rejects bookings when date range is invalid', async () => {
-    mocks.createClient.mockResolvedValue(createSupabaseMock().client)
-
     const result = await createBooking('org-1', buildBookingForm({
       start_date: '2026-04-02T08:00:00.000Z',
       end_date: '2026-04-01T08:00:00.000Z',
@@ -78,20 +123,11 @@ describe('Fleet Server Actions', () => {
   })
 
   it('rejects bookings when an asset is not available', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        fleet_assets: [
-          {
-            maybeSingleResult: success({
-              id: 'asset-1',
-              status: 'MAINTENANCE',
-              branch_id: 'branch-1',
-            }),
-          },
-        ],
-      },
+    mocks.prisma.fleet_assets.findFirst.mockResolvedValue({
+      id: 'asset-1',
+      status: 'MAINTENANCE',
+      branch_id: 'branch-1',
     })
-    mocks.createClient.mockResolvedValue(supabase.client)
 
     const result = await createBooking('org-1', buildBookingForm())
 
@@ -99,140 +135,78 @@ describe('Fleet Server Actions', () => {
   })
 
   it('rejects overlapping bookings before insert', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        fleet_assets: [
-          {
-            maybeSingleResult: success({
-              id: 'asset-1',
-              status: 'AVAILABLE',
-              branch_id: 'branch-1',
-            }),
-          },
-        ],
-        fleet_bookings: [
-          {
-            result: success([{ id: 'existing-booking' }]),
-          },
-        ],
-      },
+    mocks.prisma.fleet_assets.findFirst.mockResolvedValue({
+      id: 'asset-1',
+      status: 'AVAILABLE',
+      branch_id: 'branch-1',
     })
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.fleet_bookings.findFirst.mockResolvedValue({
+      id: 'existing-booking',
+    })
 
     const result = await createBooking('org-1', buildBookingForm())
 
     expect(result).toEqual({ error: 'Armada sudah memiliki booking aktif di periode tersebut.' })
-    expect(supabase.calls.filter((call) => call.table === 'fleet_bookings')).toHaveLength(1)
+    expect(mocks.prisma.fleet_bookings.create).not.toHaveBeenCalled()
   })
 
   it('creates a reserved booking and revalidates the fleet page', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        fleet_assets: [
-          {
-            maybeSingleResult: success({
-              id: 'asset-1',
-              status: 'AVAILABLE',
-              branch_id: 'branch-1',
-            }),
-          },
-        ],
-        fleet_bookings: [
-          {
-            result: success([]),
-          },
-          {
-            singleResult: success({
-              id: 'booking-1',
-            }),
-          },
-        ],
-      },
+    mocks.prisma.fleet_assets.findFirst.mockResolvedValue({
+      id: 'asset-1',
+      status: 'AVAILABLE',
+      branch_id: 'branch-1',
     })
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.fleet_bookings.findFirst.mockResolvedValue(null)
+    mocks.prisma.fleet_bookings.create.mockResolvedValue({
+      id: 'booking-1',
+    })
 
     const result = await createBooking('org-1', buildBookingForm())
-    const insertedPayload = getFirstOperationArg('fleet_bookings', 'insert', supabase.calls) as Record<string, string>
+    const insertPayload = mocks.prisma.fleet_bookings.create.mock.calls[0]?.[0]?.data as Record<string, any>
 
     expect(result).toEqual({ success: true, bookingId: 'booking-1' })
-    expect(insertedPayload.branch_id).toBe('branch-1')
-    expect(insertedPayload.status).toBe('RESERVED')
+    expect(insertPayload.branch_id).toBe('branch-1')
+    expect(insertPayload.status).toBe('RESERVED')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/fleet')
   })
 
   it('marks assets as rented when a booking becomes active', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        fleet_bookings: [
-          {
-            maybeSingleResult: success({
-              id: 'booking-1',
-              branch_id: 'branch-1',
-              asset_id: 'asset-1',
-              status: 'RESERVED',
-            }),
-          },
-        ],
-        fleet_assets: [
-          {
-            result: success([]),
-          },
-        ],
-      },
+    mocks.prisma.fleet_bookings.findFirst.mockResolvedValue({
+      id: 'booking-1',
+      branch_id: 'branch-1',
+      asset_id: 'asset-1',
+      status: 'RESERVED',
     })
-    mocks.createClient.mockResolvedValue(supabase.client)
 
     const result = await updateBookingStatus('org-1', 'booking-1', 'asset-1', 'ACTIVE')
-    const assetUpdate = getFirstOperationArg('fleet_assets', 'update', supabase.calls) as Record<string, string>
+    const assetUpdate = mocks.prisma.fleet_assets.updateMany.mock.calls[0]?.[0]
 
     expect(result).toEqual({ success: true })
-    expect(assetUpdate.status).toBe('RENTED')
+    expect(assetUpdate.data.status).toBe('RENTED')
   })
 
   it('creates schedules with SCHEDULED status', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        fleet_schedules: [
-          {
-            result: success([]),
-          },
-        ],
-        fleet_assets: [
-          {
-            maybeSingleResult: success({
-              id: 'asset-1',
-              branch_id: 'branch-1',
-            }),
-          },
-        ],
-        fleet_routes: [
-          {
-            maybeSingleResult: success({
-              id: 'route-1',
-              branch_id: 'branch-1',
-            }),
-          },
-        ],
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'driver-1',
-              branch_id: 'branch-1',
-            }),
-          },
-          {
-            maybeSingleResult: success({
-              id: 'helper-1',
-              branch_id: 'branch-1',
-            }),
-          },
-        ],
-      },
+    mocks.prisma.fleet_assets.findFirst.mockResolvedValue({
+      id: 'asset-1',
+      branch_id: 'branch-1',
+      status: 'AVAILABLE',
     })
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.fleet_routes.findFirst.mockResolvedValue({
+      id: 'route-1',
+      branch_id: 'branch-1',
+    })
+    mocks.prisma.employees.findFirst
+      .mockResolvedValueOnce({
+        id: 'driver-1',
+        branch_id: 'branch-1',
+      })
+      .mockResolvedValueOnce({
+        id: 'helper-1',
+        branch_id: 'branch-1',
+      })
 
     const result = await createSchedule('org-1', buildScheduleForm())
-    const payload = getFirstOperationArg('fleet_schedules', 'insert', supabase.calls) as Record<string, string>
+    const payload = mocks.prisma.fleet_schedules.create.mock.calls[0]?.[0]?.data as Record<string, any>
 
     expect(result).toEqual({ success: true })
     expect(payload.branch_id).toBe('branch-1')
@@ -240,25 +214,19 @@ describe('Fleet Server Actions', () => {
   })
 
   it('stores medical records through the atomic RPC path when available', async () => {
-    const supabase = createSupabaseMock({
-      rpc: {
-        create_fleet_medical_record: [
-          success('medical-1'),
-        ],
-      },
-      tables: {
-        fleet_assets: [
-          {
-            maybeSingleResult: success({
-              id: 'asset-1',
-              status: 'AVAILABLE',
-              branch_id: 'branch-1',
-            }),
-          },
-        ],
-      },
+    mocks.auth.mockResolvedValue({
+      user: { id: 'user-1' },
     })
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.fleet_assets.findFirst.mockResolvedValue({
+      id: 'asset-1',
+      status: 'AVAILABLE',
+      branch_id: 'branch-1',
+    })
+    mocks.withDbUserContext.mockImplementation(async (_userId: string, action: (tx: any) => Promise<any>) => {
+      return action({
+        $queryRaw: vi.fn().mockResolvedValue([{ id: 'medical-1' }]),
+      })
+    })
 
     const result = await createMedicalRecord('org-1', {
       asset_id: 'asset-1',
@@ -271,50 +239,25 @@ describe('Fleet Server Actions', () => {
     })
 
     expect(result).toEqual({ success: true })
-    expect(supabase.rpcCalls[0]).toMatchObject({
-      fn: 'create_fleet_medical_record',
-    })
+    expect(mocks.withDbUserContext).toHaveBeenCalled()
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/fleet')
   })
 
   it('falls back safely when the maintenance RPC is not available', async () => {
-    const supabase = createSupabaseMock({
-      rpc: {
-        create_fleet_medical_record: [
-          failure('Function not found', 'PGRST202'),
-        ],
-      },
-      tables: {
-        fleet_assets: [
-          {
-            maybeSingleResult: success({
-              id: 'asset-1',
-              status: 'AVAILABLE',
-              branch_id: 'branch-1',
-            }),
-          },
-          {
-            maybeSingleResult: success({
-              id: 'asset-1',
-              status: 'AVAILABLE',
-              branch_id: 'branch-1',
-            }),
-          },
-          {
-            result: success([]),
-          },
-          {
-            result: success([]),
-          },
-        ],
-        fleet_maintenance_labs: [
-          {
-            result: failure('Insert maintenance failed'),
-          },
-        ],
-      },
+    mocks.auth.mockResolvedValue({
+      user: { id: 'user-1' },
     })
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.fleet_assets.findFirst
+      .mockResolvedValueOnce({
+        id: 'asset-1',
+        status: 'AVAILABLE',
+        branch_id: 'branch-1',
+      })
+      .mockResolvedValueOnce({
+        status: 'AVAILABLE',
+      })
+    mocks.withDbUserContext.mockRejectedValue(Object.assign(new Error('Function not found'), { code: '42883' }))
+    mocks.prisma.fleet_maintenance_labs.create.mockRejectedValue(new Error('Insert maintenance failed'))
 
     const result = await createMedicalRecord('org-1', {
       asset_id: 'asset-1',
@@ -325,10 +268,7 @@ describe('Fleet Server Actions', () => {
       odometer_at: 200000,
     })
 
-    const assetUpdates = supabase.calls
-      .filter((call) => call.table === 'fleet_assets')
-      .map((call) => call.operations.find((operation) => operation.method === 'update')?.args[0])
-      .filter(Boolean) as Array<Record<string, string>>
+    const assetUpdates = mocks.prisma.fleet_assets.updateMany.mock.calls.map((call) => call[0]?.data)
 
     expect(result).toEqual({ error: 'Insert maintenance failed' })
     expect(assetUpdates).toEqual([
@@ -338,16 +278,9 @@ describe('Fleet Server Actions', () => {
   })
 
   it('checks asset availability using the same overlap rule as bookings', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        fleet_bookings: [
-          {
-            result: success([{ id: 'booking-1' }]),
-          },
-        ],
-      },
+    mocks.prisma.fleet_bookings.findFirst.mockResolvedValue({
+      id: 'booking-1',
     })
-    mocks.createClient.mockResolvedValue(supabase.client)
 
     const result = await checkAssetAvailability('asset-1', '2026-04-01T08:00:00.000Z', '2026-04-02T08:00:00.000Z')
 
@@ -355,38 +288,22 @@ describe('Fleet Server Actions', () => {
   })
 
   it('updates clock-out attendance and appends notes', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        attendance: [
-          {
-            singleResult: success({
-              id: 'attendance-1',
-              check_out: null,
-              notes: 'Berangkat pool',
-            }),
-          },
-          {
-            result: success([]),
-          },
-        ],
-        employees: [
-          {
-            maybeSingleResult: success({
-              id: 'employee-1',
-              branch_id: 'branch-1',
-            }),
-          },
-        ],
-      },
+    mocks.prisma.employees.findFirst.mockResolvedValue({
+      id: 'employee-1',
+      branch_id: 'branch-1',
     })
-    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.prisma.attendance.findUnique.mockResolvedValue({
+      id: 'attendance-1',
+      check_out: null,
+      notes: 'Berangkat pool',
+    })
 
     const result = await recordCrewAttendance('org-1', {
       employee_id: 'employee-1',
       type: 'OUT',
       notes: 'Selesai shift',
     })
-    const payload = getFirstOperationArg('attendance', 'update', supabase.calls) as Record<string, string>
+    const payload = mocks.prisma.attendance.updateMany.mock.calls[0]?.[0]?.data as Record<string, string>
 
     expect(result).toEqual({ success: true })
     expect(payload.notes).toBe('Berangkat pool | Selesai shift')

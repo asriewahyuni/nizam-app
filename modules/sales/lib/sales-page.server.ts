@@ -1,12 +1,11 @@
 import { cache } from 'react'
-import type { LooseDb } from '@/lib/supabase/loose'
-import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
 import {
-  consumeAiTokensForGeneration,
-  ensureAiTokenWallet,
-  estimateCostFromUsageTokens,
-  getAiTokenPolicyFromDb,
-} from '@/modules/ai/lib/ai-token.server'
+  DEFAULT_AI_TOKEN_POLICY,
+  normalizeAiTokenPolicy,
+  type AiTokenPolicy,
+} from '@/modules/ai/lib/ai-token'
 import {
   buildSalesPagePayload,
   mapSalesPageLead,
@@ -35,6 +34,14 @@ type OrgSummary = {
   logo_url: string | null
 }
 
+type AiTokenWalletRow = {
+  org_id: string
+  balance_tokens: number
+  total_purchased_tokens: number
+  total_used_tokens: number
+  low_balance_threshold: number
+}
+
 function normalizePublicOrgIdentifier(value: string) {
   return value.trim().toLowerCase()
 }
@@ -43,23 +50,159 @@ function looksLikeUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value)
 }
 
-async function resolvePublicOrg(admin: LooseDb, orgIdentifier: string): Promise<OrgSummary | null> {
+function toNumber(value: unknown, fallback = 0) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function normalizeSalesPageRow(row: any): SalesPageRecord {
+  return {
+    ...row,
+    published_at: row.published_at instanceof Date ? row.published_at.toISOString() : row.published_at,
+    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+    updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
+  }
+}
+
+function normalizeSalesPageLeadRow(row: any): SalesPageLeadRecord {
+  return {
+    ...row,
+    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+  }
+}
+
+async function getAiTokenPolicyFromPrisma(): Promise<AiTokenPolicy> {
+  const data = await prisma.saas_config.findUnique({
+    where: { key: 'ai_token_policy' },
+    select: { value: true },
+  })
+
+  return normalizeAiTokenPolicy(data?.value || DEFAULT_AI_TOKEN_POLICY)
+}
+
+async function ensureAiTokenWallet(orgId: string, lowBalanceThreshold: number): Promise<AiTokenWalletRow> {
+  const existing = await prisma.ai_token_wallets.findUnique({
+    where: { org_id: orgId },
+  })
+
+  if (existing?.org_id) {
+    return {
+      org_id: existing.org_id,
+      balance_tokens: toNumber(existing.balance_tokens, 0),
+      total_purchased_tokens: toNumber(existing.total_purchased_tokens, 0),
+      total_used_tokens: toNumber(existing.total_used_tokens, 0),
+      low_balance_threshold: toNumber(existing.low_balance_threshold, lowBalanceThreshold),
+    }
+  }
+
+  const created = await prisma.ai_token_wallets.create({
+    data: {
+      org_id: orgId,
+      balance_tokens: 0,
+      total_purchased_tokens: 0,
+      total_used_tokens: 0,
+      low_balance_threshold: lowBalanceThreshold,
+    },
+  })
+
+  return {
+    org_id: created.org_id,
+    balance_tokens: toNumber(created.balance_tokens, 0),
+    total_purchased_tokens: toNumber(created.total_purchased_tokens, 0),
+    total_used_tokens: toNumber(created.total_used_tokens, 0),
+    low_balance_threshold: toNumber(created.low_balance_threshold, lowBalanceThreshold),
+  }
+}
+
+async function estimateCostFromUsageTokens(
+  usage: { promptTokens: number; outputTokens: number },
+): Promise<{ policy: AiTokenPolicy; estimatedCostIdr: number; billedTokens: number }> {
+  const policy = await getAiTokenPolicyFromPrisma()
+  const promptTokens = Math.max(0, Math.round(usage.promptTokens || 0))
+  const outputTokens = Math.max(0, Math.round(usage.outputTokens || 0))
+  const billedTokens = Math.max(1, promptTokens + outputTokens)
+
+  const inputCost = (promptTokens / 1000) * policy.costPer1kInputIdr
+  const outputCost = (outputTokens / 1000) * policy.costPer1kOutputIdr
+  const estimatedCostIdr = inputCost + outputCost
+
+  return { policy, estimatedCostIdr, billedTokens }
+}
+
+async function consumeAiTokensForGeneration(params: {
+  orgId: string
+  userId: string
+  requestedTokens: number
+  source: 'sales_page_generate'
+  note: string
+  estimatedCostIdr?: number
+  meta?: Record<string, unknown>
+}) {
+  const policy = await getAiTokenPolicyFromPrisma()
+  const wallet = await ensureAiTokenWallet(params.orgId, policy.lowBalanceThreshold)
+  const requested = Math.max(1, Math.round(params.requestedTokens))
+
+  if (wallet.balance_tokens < requested) {
+    throw new Error(
+      `Token AI tidak cukup. Sisa ${wallet.balance_tokens.toLocaleString('id-ID')} token, butuh ${requested.toLocaleString('id-ID')} token. Silakan topup token AI terlebih dahulu.`,
+    )
+  }
+
+  const nextBalance = wallet.balance_tokens - requested
+  const nextUsed = wallet.total_used_tokens + requested
+
+  await prisma.ai_token_wallets.update({
+    where: { org_id: params.orgId },
+    data: {
+      balance_tokens: nextBalance,
+      total_used_tokens: nextUsed,
+      updated_at: new Date(),
+    },
+  })
+
+  await prisma.ai_token_usage_logs.create({
+    data: {
+      org_id: params.orgId,
+      user_id: params.userId,
+      source: params.source,
+      direction: 'DEBIT',
+      tokens: requested,
+      estimated_cost_idr: Math.max(0, toNumber(params.estimatedCostIdr, 0)),
+      note: params.note,
+      meta: (params.meta || {}) as any,
+    },
+  })
+
+  return {
+    consumedTokens: requested,
+    balanceTokens: nextBalance,
+    policy,
+  }
+}
+
+async function resolvePublicOrg(orgIdentifier: string): Promise<OrgSummary | null> {
   const normalizedIdentifier = normalizePublicOrgIdentifier(orgIdentifier)
   if (!normalizedIdentifier) return null
 
-  const { data: slugOrg, error: slugError } = await admin
-    .from('organizations')
-    .select('id, name, slug, logo_url, is_active')
-    .eq('slug', normalizedIdentifier)
-    .eq('is_active', true)
-    .maybeSingle()
+  const slugOrg = await prisma.organizations.findFirst({
+    where: {
+      slug: normalizedIdentifier,
+      is_active: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      logo_url: true,
+    },
+  })
 
-  if (!slugError && slugOrg?.id) {
+  if (slugOrg?.id) {
     return {
       id: String(slugOrg.id),
-      name: String((slugOrg as { name?: unknown }).name || ''),
-      slug: String((slugOrg as { slug?: unknown }).slug || slugOrg.id),
-      logo_url: (slugOrg as { logo_url?: unknown }).logo_url as string | null,
+      name: String(slugOrg.name || ''),
+      slug: String(slugOrg.slug || slugOrg.id),
+      logo_url: slugOrg.logo_url,
     }
   }
 
@@ -67,76 +210,88 @@ async function resolvePublicOrg(admin: LooseDb, orgIdentifier: string): Promise<
     return null
   }
 
-  const { data: idOrg, error: idError } = await admin
-    .from('organizations')
-    .select('id, name, slug, logo_url, is_active')
-    .eq('id', normalizedIdentifier)
-    .eq('is_active', true)
-    .maybeSingle()
+  const idOrg = await prisma.organizations.findFirst({
+    where: {
+      id: normalizedIdentifier,
+      is_active: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      logo_url: true,
+    },
+  })
 
-  if (idError || !idOrg?.id) {
+  if (!idOrg?.id) {
     return null
   }
 
   return {
     id: String(idOrg.id),
-    name: String((idOrg as { name?: unknown }).name || ''),
-    slug: String((idOrg as { slug?: unknown }).slug || idOrg.id),
-    logo_url: (idOrg as { logo_url?: unknown }).logo_url as string | null,
+    name: String(idOrg.name || ''),
+    slug: String(idOrg.slug || idOrg.id),
+    logo_url: idOrg.logo_url,
   }
 }
 
 async function getAuthedContext() {
-  const supabase = await createClient()
-  const db = supabase as unknown as LooseDb
+  const session = await auth()
+  const user = session?.user
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!user?.id) {
     throw new Error('Tidak terautentikasi')
   }
 
-  return { supabase, db, user }
+  return { user }
 }
 
 async function getMemberOrg(orgId: string) {
-  const { db, user } = await getAuthedContext()
-  const { data: member, error } = await db
-    .from('org_members')
-    .select('role, organizations(id, name, slug, logo_url)')
-    .eq('org_id', orgId)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
+  const { user } = await getAuthedContext()
+  const member = await prisma.org_members.findFirst({
+    where: {
+      org_id: orgId,
+      user_id: user.id,
+      is_active: true,
+    },
+    include: {
+      organizations: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logo_url: true,
+        },
+      },
+    },
+  })
 
-  if (error || !member?.organizations) {
+  if (!member?.organizations) {
     throw new Error('Akses organisasi tidak ditemukan')
   }
 
   return {
-    userId: user.id,
+    userId: String(user.id),
     role: String(member.role || 'staff'),
     org: member.organizations as OrgSummary,
   }
 }
 
-async function ensureUniqueSlug(db: LooseDb, orgId: string, baseSlug: string, ignoreId?: string) {
+async function ensureUniqueSlug(orgId: string, baseSlug: string, ignoreId?: string) {
   const normalizedBase = normalizeSalesPageSlug(baseSlug) || `sales-page-${Date.now()}`
   let candidate = normalizedBase
   let counter = 1
 
   while (true) {
-    let query = db
-      .from('sales_pages')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('slug', candidate)
+    const data = await prisma.sales_pages.findFirst({
+      where: {
+        org_id: orgId,
+        slug: candidate,
+        ...(ignoreId ? { id: { not: ignoreId } } : {}),
+      },
+      select: { id: true },
+    })
 
-    if (ignoreId) query = query.neq('id', ignoreId)
-
-    const { data } = await query.maybeSingle()
     if (!data) return candidate
     counter += 1
     candidate = `${normalizedBase}-${counter}`
@@ -209,7 +364,6 @@ function extractJsonObject(raw: string): Record<string, unknown> | null {
 }
 
 async function generateSalesPageAiDraft(
-  db: LooseDb,
   orgId: string,
   userId: string,
   input: SalesPageGeneratorInput,
@@ -222,8 +376,8 @@ async function generateSalesPageAiDraft(
   if (!aiStudioKey) return null
 
   try {
-    const tokenPolicy = await getAiTokenPolicyFromDb(db)
-    const wallet = await ensureAiTokenWallet(db, orgId, tokenPolicy.lowBalanceThreshold)
+    const tokenPolicy = await getAiTokenPolicyFromPrisma()
+    const wallet = await ensureAiTokenWallet(orgId, tokenPolicy.lowBalanceThreshold)
     const minimumRequiredTokens = Math.max(1, tokenPolicy.tokensPerGeneration)
 
     if (wallet.balance_tokens < minimumRequiredTokens) {
@@ -297,7 +451,7 @@ ${brief}`
     )
     const totalTokens = Number((usageMetadata as { totalTokenCount?: unknown } | undefined)?.totalTokenCount || 0)
 
-    const usageCost = await estimateCostFromUsageTokens(db, {
+    const usageCost = await estimateCostFromUsageTokens({
       promptTokens,
       outputTokens,
     })
@@ -314,7 +468,6 @@ ${brief}`
     }
 
     await consumeAiTokensForGeneration({
-      db,
       orgId,
       userId,
       requestedTokens: billedTokens,
@@ -408,96 +561,81 @@ function mergeGeneratedPayload(base: SalesPagePayload, patch: Partial<SalesPageP
 }
 
 export async function getSalesPagesForOrg(orgId: string): Promise<SalesPageView[]> {
-  const { db } = await getAuthedContext()
-  const { data, error } = await db
-    .from('sales_pages')
-    .select('*')
-    .eq('org_id', orgId)
-    .order('updated_at', { ascending: false })
+  await getMemberOrg(orgId)
+  const data = await prisma.sales_pages.findMany({
+    where: { org_id: orgId },
+    orderBy: { updated_at: 'desc' },
+  })
 
-  if (error) throw new Error(error.message)
-  return (data || []).map((row: SalesPageRecord) => mapSalesPageRecord(row))
+  return (data || []).map((row) => mapSalesPageRecord(normalizeSalesPageRow(row)))
 }
 
 export async function getSalesPageLeadsForOrg(orgId: string, salesPageId?: string): Promise<SalesPageLead[]> {
-  const { db } = await getAuthedContext()
-  let query = db
-    .from('sales_page_leads')
-    .select('*')
-    .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
-    .limit(100)
+  await getMemberOrg(orgId)
+  const data = await prisma.sales_page_leads.findMany({
+    where: {
+      org_id: orgId,
+      ...(salesPageId ? { sales_page_id: salesPageId } : {}),
+    },
+    orderBy: { created_at: 'desc' },
+    take: 100,
+  })
 
-  if (salesPageId) query = query.eq('sales_page_id', salesPageId)
-
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
-  return (data || []).map((row: SalesPageLeadRecord) => mapSalesPageLead(row))
+  return (data || []).map((row) => mapSalesPageLead(normalizeSalesPageLeadRow(row)))
 }
 
 export async function createGeneratedSalesPage(orgId: string, input: SalesPageGeneratorInput): Promise<SalesPageView> {
-  const { db } = await getAuthedContext()
   const { userId, org } = await getMemberOrg(orgId)
   const initialPayload = buildSalesPagePayload(input, org.name)
-  const aiPatch = await generateSalesPageAiDraft(db, orgId, userId, input, org.name)
+  const aiPatch = await generateSalesPageAiDraft(orgId, userId, input, org.name)
   const payload = mergeGeneratedPayload(initialPayload, aiPatch)
-  const slug = await ensureUniqueSlug(db, orgId, payload.slug)
+  const slug = await ensureUniqueSlug(orgId, payload.slug)
 
-  const { data, error } = await db
-    .from('sales_pages')
-    .insert({
+  const data = await prisma.sales_pages.create({
+    data: {
       org_id: orgId,
       created_by: userId,
       updated_by: userId,
       ...toInsertPayload({ ...payload, slug }),
-    })
-    .select('*')
-    .single()
+    } as any,
+  })
 
-  if (error) throw new Error(error.message)
-  return mapSalesPageRecord(data as SalesPageRecord)
+  return mapSalesPageRecord(normalizeSalesPageRow(data))
 }
 
 export async function updateSalesPageContent(orgId: string, salesPageId: string, payload: SalesPagePayload): Promise<SalesPageView> {
-  const { db } = await getAuthedContext()
   const { userId } = await getMemberOrg(orgId)
   const status = normalizeStatus(payload.status)
-  const slug = await ensureUniqueSlug(db, orgId, payload.slug || payload.title, salesPageId)
+  const slug = await ensureUniqueSlug(orgId, payload.slug || payload.title, salesPageId)
 
-  const { data, error } = await db
-    .from('sales_pages')
-    .update({
+  const data = await prisma.sales_pages.update({
+    where: { id: salesPageId },
+    data: {
       updated_by: userId,
-      published_at: status === 'PUBLISHED' ? new Date().toISOString() : null,
+      published_at: status === 'PUBLISHED' ? new Date() : null,
       ...toInsertPayload({ ...payload, status, slug }),
-    })
-    .eq('org_id', orgId)
-    .eq('id', salesPageId)
-    .select('*')
-    .single()
+    } as any,
+  })
 
-  if (error) throw new Error(error.message)
-  return mapSalesPageRecord(data as SalesPageRecord)
+  return mapSalesPageRecord(normalizeSalesPageRow(data))
 }
 
 export async function duplicateSalesPage(orgId: string, salesPageId: string): Promise<SalesPageView> {
-  const { db } = await getAuthedContext()
   const { userId } = await getMemberOrg(orgId)
-  const { data: existing, error: existingError } = await db
-    .from('sales_pages')
-    .select('*')
-    .eq('org_id', orgId)
-    .eq('id', salesPageId)
-    .single()
+  const existing = await prisma.sales_pages.findFirst({
+    where: {
+      org_id: orgId,
+      id: salesPageId,
+    },
+  })
 
-  if (existingError || !existing) throw new Error(existingError?.message || 'Sales page tidak ditemukan')
+  if (!existing) throw new Error('Sales page tidak ditemukan')
 
-  const source = mapSalesPageRecord(existing as SalesPageRecord)
-  const slug = await ensureUniqueSlug(db, orgId, `${source.slug}-copy`)
+  const source = mapSalesPageRecord(normalizeSalesPageRow(existing))
+  const slug = await ensureUniqueSlug(orgId, `${source.slug}-copy`)
 
-  const { data, error } = await db
-    .from('sales_pages')
-    .insert({
+  const data = await prisma.sales_pages.create({
+    data: {
       org_id: orgId,
       created_by: userId,
       updated_by: userId,
@@ -509,45 +647,40 @@ export async function duplicateSalesPage(orgId: string, salesPageId: string): Pr
         metaTitle: `${source.metaTitle} Copy`,
         metaPixelId: '',
       }),
-    })
-    .select('*')
-    .single()
+    } as any,
+  })
 
-  if (error) throw new Error(error.message)
-  return mapSalesPageRecord(data as SalesPageRecord)
+  return mapSalesPageRecord(normalizeSalesPageRow(data))
 }
 
 export async function removeSalesPage(orgId: string, salesPageId: string) {
-  const { db } = await getAuthedContext()
   await getMemberOrg(orgId)
-  const { error } = await db
-    .from('sales_pages')
-    .delete()
-    .eq('org_id', orgId)
-    .eq('id', salesPageId)
-
-  if (error) throw new Error(error.message)
+  await prisma.sales_pages.deleteMany({
+    where: {
+      org_id: orgId,
+      id: salesPageId,
+    },
+  })
 }
 
 export async function getPublicSalesPageByPath(orgSlug: string, pageSlug: string) {
-  const admin = (await createAdminClient()) as unknown as LooseDb
-  const org = await resolvePublicOrg(admin, orgSlug)
+  const org = await resolvePublicOrg(orgSlug)
   if (!org?.id) return null
   const normalizedPageSlug = normalizeSalesPageSlug(pageSlug) || pageSlug.trim().toLowerCase()
 
-  const { data: page, error: pageError } = await admin
-    .from('sales_pages')
-    .select('*')
-    .eq('org_id', org.id)
-    .eq('slug', normalizedPageSlug)
-    .eq('status', 'PUBLISHED')
-    .maybeSingle()
+  const page = await prisma.sales_pages.findFirst({
+    where: {
+      org_id: org.id,
+      slug: normalizedPageSlug,
+      status: 'PUBLISHED',
+    },
+  })
 
-  if (pageError || !page) return null
+  if (!page) return null
 
   return {
     org: org as OrgSummary,
-    page: mapSalesPageRecord(page as SalesPageRecord),
+    page: mapSalesPageRecord(normalizeSalesPageRow(page)),
   }
 }
 
@@ -568,11 +701,8 @@ export async function createPublicSalesPageLead(input: {
   const publicPage = await getPublicSalesPageByPath(input.orgSlug, input.pageSlug)
   if (!publicPage) throw new Error('Sales page tidak ditemukan atau belum dipublikasikan')
 
-  const admin = (await createAdminClient()) as unknown as LooseDb
-
-  const { data, error } = await admin
-    .from('sales_page_leads')
-    .insert({
+  const data = await prisma.sales_page_leads.create({
+    data: {
       org_id: publicPage.org.id,
       sales_page_id: publicPage.page.id,
       full_name: input.fullName.trim(),
@@ -583,67 +713,68 @@ export async function createPublicSalesPageLead(input: {
       source_url: input.sourceUrl?.trim() || null,
       utm_params: input.utmParams || {},
       meta: input.meta || {},
-    })
-    .select('*')
-    .single()
+    },
+  })
 
-  if (error) throw new Error(error.message)
-
-  let contactId = null
+  let contactId: string | null = null
   if (input.phone) {
-    const { data: existing } = await admin
-      .from('contacts')
-      .select('id')
-      .eq('org_id', publicPage.org.id)
-      .eq('phone', input.phone.trim())
-      .maybeSingle()
+    const existing = await prisma.contacts.findFirst({
+      where: {
+        org_id: publicPage.org.id,
+        phone: input.phone.trim(),
+      },
+      select: { id: true },
+    })
     if (existing) contactId = existing.id
   }
 
   if (!contactId && input.email) {
-    const { data: existing } = await admin
-      .from('contacts')
-      .select('id')
-      .eq('org_id', publicPage.org.id)
-      .eq('email', input.email.trim())
-      .maybeSingle()
+    const existing = await prisma.contacts.findFirst({
+      where: {
+        org_id: publicPage.org.id,
+        email: input.email.trim(),
+      },
+      select: { id: true },
+    })
     if (existing) contactId = existing.id
   }
 
   if (!contactId) {
-    const { data: contact } = await admin
-      .from('contacts')
-      .insert({
+    const contact = await prisma.contacts.create({
+      data: {
         org_id: publicPage.org.id,
         name: input.fullName.trim(),
-        type: 'CUSTOMER',
+        type: 'CUSTOMER' as any,
         phone: input.phone?.trim() || null,
         email: input.email?.trim() || null,
-      })
-      .select('id')
-      .maybeSingle()
+      },
+      select: { id: true },
+    })
     if (contact) contactId = contact.id
   }
 
   if (contactId) {
-    await admin.from('sales').insert({
-      org_id: publicPage.org.id,
-      customer_id: contactId,
-      sale_date: new Date().toISOString().split('T')[0],
-      total_amount: 0,
-      tax_amount: 0,
-      discount_amount: 0,
-      grand_total: 0,
-      status: 'QUOTATION',
-      shariah_mode: 'CASH',
-      notes: `[SalesPage Lead] ${publicPage.page.title}\nMsg: ${input.message || '-'}`,
-      created_by: publicPage.page.createdBy || null,
+    await prisma.sales.create({
+      data: {
+        org_id: publicPage.org.id,
+        customer_id: contactId,
+        sale_number: '',
+        sale_date: new Date(new Date().toISOString().split('T')[0] + 'T00:00:00.000Z'),
+        total_amount: 0,
+        tax_amount: 0,
+        discount_amount: 0,
+        grand_total: 0,
+        status: 'QUOTATION',
+        shariah_mode: 'CASH',
+        notes: `[SalesPage Lead] ${publicPage.page.title}\nMsg: ${input.message || '-'}`,
+        created_by: publicPage.page.createdBy || null,
+      } as any,
     })
   }
 
   return {
     page: publicPage.page,
     org: publicPage.org,
-    lead: mapSalesPageLead(data as SalesPageLeadRecord),
+    lead: mapSalesPageLead(normalizeSalesPageLeadRow(data)),
   }
 }
