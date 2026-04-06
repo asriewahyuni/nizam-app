@@ -1,7 +1,7 @@
 # AI Handover Document: Supabase -> Prisma/Auth Migration Status
 
-**Updated:** 2026-04-06 (sesi ke-21, Reimbursement migration)  
-**Status:** `IN PROGRESS` — Prioritas Cash, Journal, dan Reimbursement sudah selesai. Estimasi progres migrasi keseluruhan saat ini sekitar `96%`. Target berikutnya adalah cleanup storage wrapper residual dan slice Supabase-heavy lain di luar core accounting.
+**Updated:** 2026-04-06 (sesi ke-23, Factory migration)  
+**Status:** `IN PROGRESS` — Prioritas Cash, Journal, Reimbursement, Fixed Assets, dan Factory sudah selesai. Estimasi progres migrasi keseluruhan saat ini sekitar `98%`. Target berikutnya adalah slice Supabase-heavy residual seperti fleet, sales-page, dan accounting/reporting residual.
 
 Dokumen ini adalah rencana eksekusi dan handover aktif untuk agen. Sesi-sesi sebelumnya telah menyelesaikan migrasi pada domain auth, org, HRIS, audit, billing, accounting, contacts, services, sales, sales-write, POS.
 
@@ -9,13 +9,15 @@ Dokumen ini adalah rencana eksekusi dan handover aktif untuk agen. Sesi-sesi seb
 
 ## 0. Snapshot Repo Saat Ini
 
-- Estimasi progres migrasi keseluruhan: `96%`
-- Estimasi sisa pekerjaan utama: `4%`
+- Estimasi progres migrasi keseluruhan: `98%`
+- Estimasi sisa pekerjaan utama: `2%`
   - Ticketing sudah selesai dipindah dari Supabase data client ke Prisma/Auth raw SQL
   - Slice cash inti sekarang sudah selesai: `modules/cash/actions/bank.actions.ts` dan `modules/cash/actions/reconcile.actions.ts` sudah memakai Prisma/Auth
   - Slice journal inti sekarang juga sudah selesai: `modules/accounting/actions/journal.actions.ts` sudah memakai Prisma/Auth
   - Slice reimbursement sekarang juga sudah selesai: `modules/accounting/actions/reimburse.actions.ts` sudah memakai Prisma/Auth + storage wrapper server-side
-  - Sisa terbesar sekarang bergeser ke cleanup storage wrapper dan domain lain yang masih Supabase-heavy seperti `factory`, `fleet`, beberapa slice accounting lanjutan, `sales-page`, dan demo tooling
+  - Slice fixed assets sekarang juga sudah selesai: `modules/accounting/actions/assets.actions.ts` sudah memakai Prisma/Auth, dengan RPC disposal tetap lewat DB context Prisma
+  - Slice factory sekarang juga sudah selesai: `modules/factory/actions/factory.actions.ts` sudah memakai Prisma/Auth, dengan RPC completion work order tetap lewat DB context Prisma
+  - Sisa terbesar sekarang bergeser ke domain yang masih Supabase-heavy seperti `fleet`, `sales-page`, beberapa reporting/accounting residual, dan demo tooling
 
 - Sesi sebelumnya telah membersihkan semua penggunaan klien Supabase pada domain operasional `sales` dan `pos`. 
 - Sesi ini (Sesi 15) akan fokus pada eksekusi Prioritas 1: **Core Sales / Purchasing Backbone**.
@@ -106,6 +108,8 @@ File-file berikut **sudah tidak lagi memakai Supabase data client**:
 - `modules/cash/actions/reconcile.actions.ts` ✅ (sesi 19)
 - `modules/accounting/actions/journal.actions.ts` ✅ (sesi 20)
 - `modules/accounting/actions/reimburse.actions.ts` ✅ (sesi 21)
+- `modules/accounting/actions/assets.actions.ts` ✅ (sesi 22)
+- `modules/factory/actions/factory.actions.ts` ✅ (sesi 23)
 
 ---
 
@@ -256,6 +260,24 @@ Reimbursement migration yang selesai pada sesi ini:
   - pembayaran reimbursement tetap reuse `createJournalEntry()` yang sudah dimigrasikan ke Prisma/Auth
 - `modules/accounting/lib/reimbursement-receipt-storage.server.ts`
   - wrapper server-side baru untuk upload bukti reimbursement ke bucket `receipts`
+
+Fixed Assets migration yang selesai pada sesi ini:
+
+- `modules/accounting/actions/assets.actions.ts`
+  - `getFixedAssets`, `createFixedAsset`, `updateFixedAsset`, `deleteFixedAsset`, `previewOrganizationDepreciation`, dan `runOrganizationDepreciation` sekarang memakai Prisma/Auth
+  - access guard aset per unit sekarang memakai helper branch scope + Prisma lookup, tanpa `createClient()`
+  - kapitalisasi aset dan auto-journal tetap reuse `createJournalEntry()` yang sudah dimigrasikan
+  - update state penyusutan + insert `asset_depreciation_logs` sekarang memakai Prisma mutator
+  - `disposeFixedAsset` tetap memakai RPC Postgres `process_asset_disposal`, tetapi sekarang dieksekusi lewat `withDbUserContext()` agar session Supabase hilang sementara logika DB lama tetap berjalan
+
+Factory migration yang selesai pada sesi ini:
+
+- `modules/factory/actions/factory.actions.ts`
+  - loader `getBoms`, `getBomItems`, `getWorkOrders`, `getWorkOrderCosts`, dan `getFGBins` sekarang memakai Prisma `findMany`
+  - mutasi `createBom`, `updateBom`, `createWorkOrder`, `addWorkOrderCost`, `deleteBom`, `deleteWorkOrder`, dan `createPurchaseRequests` sekarang memakai Prisma/Auth
+  - access guard untuk BoM, SPK, dan gudang sekarang memakai helper branch scope + Prisma lookup, tanpa `createClient()`
+  - `updateWorkOrderStatus` untuk status biasa sekarang memakai Prisma mutator
+  - completion SPK tetap memakai RPC Postgres `process_work_order_completion_v2` / fallback `process_work_order_completion`, tetapi sekarang dieksekusi lewat `withDbUserContext()` agar session Supabase hilang sementara logic produksi existing tetap berjalan
 
 Shared module migration yang selesai pada sesi ini:
 
