@@ -1,11 +1,15 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import type { BankAccount, BankTransaction } from '@/types/database.types'
 
 type ActiveBranchResult = { branchId: string } | { error: string }
+
+type BankAccountWithRelation = BankAccount & { account: any }
+type BankTransactionWithRelation = BankTransaction & { bank_account: any; category: any }
 
 async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
   const branchSelection = await resolveAccessibleBranchSelection(orgId)
@@ -14,41 +18,70 @@ async function requireActiveBranchId(orgId: string, errorMessage: string): Promi
   return { branchId: branchSelection.branchId }
 }
 
+function normalizeBankAccount(row: any): BankAccountWithRelation {
+  return {
+    ...row,
+    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+    updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
+    account: row.accounts ?? row.account ?? null,
+  } as BankAccountWithRelation
+}
+
+function normalizeBankTransaction(row: any): BankTransactionWithRelation {
+  return {
+    ...row,
+    transaction_date: row.transaction_date instanceof Date ? row.transaction_date.toISOString().slice(0, 10) : row.transaction_date,
+    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+    updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
+    amount: Number(row.amount || 0),
+    bank_account: row.bank_accounts ?? row.bank_account ?? null,
+    category: row.accounts ?? row.category ?? null,
+  } as BankTransactionWithRelation
+}
+
 // ─────────────────────────────────────────────────────────────
 // getBankAccounts — fetch all bank accounts for an org
 // ─────────────────────────────────────────────────────────────
 export async function getBankAccounts(orgId: string, branchId?: string | null) {
-  const supabase = await createClient()
-
-  let query = (supabase as any)
-    .from('bank_accounts')
-    .select('*, account:accounts(*)')
-    .eq('org_id', orgId)
+  let effectiveBranchId: string | undefined
 
   if (branchId) {
     const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
     if ('error' in branchSelection || !branchSelection.branchId) return []
-    query = query.eq('branch_id', branchSelection.branchId)
+    effectiveBranchId = branchSelection.branchId
   }
 
-  const { data, error } = await query.order('bank_name', { ascending: true })
+  try {
+    const data = await prisma.bank_accounts.findMany({
+      where: {
+        org_id: orgId,
+        ...(effectiveBranchId ? { branch_id: effectiveBranchId } : {}),
+      },
+      include: {
+        accounts: true,
+      },
+      orderBy: {
+        bank_name: 'asc',
+      },
+    })
 
-  if (error) return []
-  return data as (BankAccount & { account: any })[]
+    return data.map(normalizeBankAccount)
+  } catch {
+    return []
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
 // createBankAccount — Add a new bank account
 // ─────────────────────────────────────────────────────────────
 export async function createBankAccount(orgId: string, formData: FormData) {
-  const supabase = await createClient()
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk membuat rekening kas/bank.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  const accountId = formData.get('account_id') as string // The GL Account ID
+  const accountId = formData.get('account_id') as string
   const bankName = String(formData.get('bank_name') || '').trim()
   const accountNumber = String(formData.get('account_number') || '').trim() || null
   const accountHolder = String(formData.get('account_holder') || '').trim() || null
@@ -58,19 +91,21 @@ export async function createBankAccount(orgId: string, formData: FormData) {
     return { error: 'Akun GL dan Nama Bank wajib diisi.' }
   }
 
-  const { error } = await (supabase as any).from('bank_accounts').insert({
-    org_id: orgId,
-    branch_id: activeBranchResult.branchId,
-    account_id: accountId,
-    bank_name: bankName,
-    account_number: accountNumber,
-    account_holder: accountHolder,
-    currency,
-    is_active: true
-  })
-
-  if (error) {
-    if (error.code === '23505') {
+  try {
+    await prisma.bank_accounts.create({
+      data: {
+        org_id: orgId,
+        branch_id: activeBranchResult.branchId,
+        account_id: accountId,
+        bank_name: bankName,
+        account_number: accountNumber,
+        account_holder: accountHolder,
+        currency,
+        is_active: true,
+      },
+    })
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
       return { error: `Nomor rekening ${accountNumber} sudah terdaftar.` }
     }
     return { error: 'Gagal menyimpan rekening bank.' }
@@ -84,7 +119,10 @@ export async function createBankAccount(orgId: string, formData: FormData) {
 // createBankTransaction — Record cash movement
 // ─────────────────────────────────────────────────────────────
 export async function createBankTransaction(orgId: string, formData: FormData) {
-  const supabase = await createClient()
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Tidak terautentikasi.' }
+
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk mencatat transaksi kas/bank.'
@@ -93,25 +131,30 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
 
   const bankAccountId = formData.get('bank_account_id') as string
   const transDate = formData.get('transaction_date') as string
-  const description = (formData.get('description') as string).trim()
-  const amount = parseFloat(formData.get('amount') as string)
+  const description = String(formData.get('description') || '').trim()
+  const amount = Number(formData.get('amount') as string)
   const type = formData.get('type') as 'IN' | 'OUT' | 'TRANSFER'
-  const categoryId = formData.get('category_id') as string // Opposite Ledger Account for IN/OUT
-  const targetBankAccountId = (formData.get('target_bank_account_id') as string | null)?.trim() || null
-  const referenceNumber = (formData.get('reference_number') as string | null)?.trim() || null
+  const categoryId = formData.get('category_id') as string
+  const targetBankAccountId = String(formData.get('target_bank_account_id') || '').trim() || null
+  const referenceNumber = String(formData.get('reference_number') || '').trim() || null
 
-  if (!bankAccountId || !transDate || !description || isNaN(amount) || amount <= 0 || !type) {
+  if (!bankAccountId || !transDate || !description || !Number.isFinite(amount) || amount <= 0 || !type) {
     return { error: 'Semua field wajib diisi.' }
   }
 
-  const { data: bankAccount, error: bankAccountError } = await (supabase as any)
-    .from('bank_accounts')
-    .select('id, branch_id, account_id')
-    .eq('id', bankAccountId)
-    .eq('org_id', orgId)
-    .maybeSingle()
+  const bankAccount = await prisma.bank_accounts.findFirst({
+    where: {
+      id: bankAccountId,
+      org_id: orgId,
+    },
+    select: {
+      id: true,
+      branch_id: true,
+      account_id: true,
+    },
+  })
 
-  if (bankAccountError || !bankAccount?.id) {
+  if (!bankAccount?.id) {
     return { error: 'Rekening kas/bank tidak ditemukan.' }
   }
 
@@ -122,22 +165,22 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
   let oppositeAccountId = categoryId
 
   if (type === 'TRANSFER') {
-    const targetLookup = targetBankAccountId
-      ? (supabase as any)
-          .from('bank_accounts')
-          .select('id, branch_id, account_id')
-          .eq('id', targetBankAccountId)
-          .eq('org_id', orgId)
-      : (supabase as any)
-          .from('bank_accounts')
-          .select('id, branch_id, account_id')
-          .eq('account_id', categoryId)
-          .eq('org_id', orgId)
-          .eq('branch_id', activeBranchResult.branchId)
+    const targetBankAccount = await prisma.bank_accounts.findFirst({
+      where: {
+        org_id: orgId,
+        branch_id: activeBranchResult.branchId,
+        ...(targetBankAccountId
+          ? { id: targetBankAccountId }
+          : { account_id: categoryId }),
+      },
+      select: {
+        id: true,
+        branch_id: true,
+        account_id: true,
+      },
+    })
 
-    const { data: targetBankAccount, error: targetBankAccountError } = await targetLookup.maybeSingle()
-
-    if (targetBankAccountError || !targetBankAccount?.id) {
+    if (!targetBankAccount?.id) {
       return { error: 'Rekening tujuan transfer tidak ditemukan.' }
     }
 
@@ -154,21 +197,24 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
     return { error: 'Akun lawan transaksi wajib dipilih.' }
   }
 
-  const { error } = await (supabase as any).from('bank_transactions').insert({
-    org_id: orgId,
-    branch_id: activeBranchResult.branchId,
-    bank_account_id: bankAccountId,
-    transaction_date: transDate,
-    description,
-    amount,
-    type,
-    category_id: oppositeAccountId,
-    reference_number: referenceNumber,
-    status: 'POSTED' // Automatically post to GL via trigger
-  })
-
-  if (error) {
-    return { error: 'Gagal menyimpan transaksi: ' + error.message }
+  try {
+    await prisma.bank_transactions.create({
+      data: {
+        org_id: orgId,
+        branch_id: activeBranchResult.branchId,
+        bank_account_id: bankAccountId,
+        transaction_date: new Date(`${transDate}T00:00:00.000Z`),
+        description,
+        amount,
+        type,
+        category_id: oppositeAccountId,
+        reference_number: referenceNumber,
+        status: 'POSTED',
+        created_by: userId,
+      },
+    })
+  } catch (error: any) {
+    return { error: 'Gagal menyimpan transaksi: ' + (error?.message || 'Unknown error') }
   }
 
   revalidatePath('/cash')
@@ -180,42 +226,63 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
 // getRecentBankTransactions — fetch recent ones
 // ─────────────────────────────────────────────────────────────
 export async function getRecentBankTransactions(orgId: string, limit = 10, branchId?: string | null) {
-  const supabase = await createClient()
-
-  let query = (supabase as any)
-    .from('bank_transactions')
-    .select('*, bank_account:bank_accounts(bank_name, account_number), category:accounts(name, code)')
-    .eq('org_id', orgId)
+  let effectiveBranchId: string | undefined
 
   if (branchId) {
     const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
     if ('error' in branchSelection || !branchSelection.branchId) return []
-    query = query.eq('branch_id', branchSelection.branchId)
+    effectiveBranchId = branchSelection.branchId
   }
 
-  const { data, error } = await query
-    .order('transaction_date', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(limit)
+  try {
+    const data = await prisma.bank_transactions.findMany({
+      where: {
+        org_id: orgId,
+        ...(effectiveBranchId ? { branch_id: effectiveBranchId } : {}),
+      },
+      include: {
+        bank_accounts: {
+          select: {
+            bank_name: true,
+            account_number: true,
+          },
+        },
+        accounts: {
+          select: {
+            name: true,
+            code: true,
+          },
+        },
+      },
+      orderBy: [
+        { transaction_date: 'desc' },
+        { created_at: 'desc' },
+      ],
+      take: limit,
+    })
 
-  if (error) return []
-  return data as (BankTransaction & { bank_account: any; category: any })[]
+    return data.map(normalizeBankTransaction)
+  } catch {
+    return []
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
 // deleteBankAccount — Delete a bank account
 // ─────────────────────────────────────────────────────────────
 export async function deleteBankAccount(orgId: string, accountId: string) {
-  const supabase = await createClient()
+  const bankAccount = await prisma.bank_accounts.findFirst({
+    where: {
+      id: accountId,
+      org_id: orgId,
+    },
+    select: {
+      id: true,
+      branch_id: true,
+    },
+  })
 
-  const { data: bankAccount, error: bankAccountError } = await (supabase as any)
-    .from('bank_accounts')
-    .select('id, branch_id')
-    .eq('id', accountId)
-    .eq('org_id', orgId)
-    .maybeSingle()
-
-  if (bankAccountError || !bankAccount?.id) {
+  if (!bankAccount?.id) {
     return { error: 'Rekening kas/bank tidak ditemukan.' }
   }
 
@@ -224,18 +291,17 @@ export async function deleteBankAccount(orgId: string, accountId: string) {
     if ('error' in branchSelection) return { error: branchSelection.error }
   }
 
-  // Note: This will fail if there are existing transactions (CASCADE protection is usually OFF by default for financial safety)
-  const { error } = await (supabase as any)
-    .from('bank_accounts')
-    .delete()
-    .eq('id', accountId)
-    .eq('org_id', orgId)
-
-  if (error) {
-    if (error.code === '23503') {
+  try {
+    await prisma.bank_accounts.delete({
+      where: {
+        id: accountId,
+      },
+    })
+  } catch (error: any) {
+    if (error?.code === 'P2003') {
       return { error: 'Tidak bisa menghapus rekening yang sudah memiliki riwayat transaksi. Harap hapus transaksinya terlebih dahulu.' }
     }
-    return { error: 'Gagal menghapus rekening: ' + error.message }
+    return { error: 'Gagal menghapus rekening: ' + (error?.message || 'Unknown error') }
   }
 
   revalidatePath('/cash')
@@ -246,23 +312,28 @@ export async function deleteBankAccount(orgId: string, accountId: string) {
 // deleteBankTransaction — Void a cash movement while preserving audit trail
 // ─────────────────────────────────────────────────────────────
 export async function deleteBankTransaction(orgId: string, transactionId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await (supabase as any).auth.getUser()
-  if (!user) return { error: 'Tidak terautentikasi.' }
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Tidak terautentikasi.' }
 
-  // 1. Fetch the linked journal entry and current status first
-  const { data: tx, error: txError } = await (supabase as any)
-    .from('bank_transactions')
-    .select('id, journal_entry_id, branch_id, status')
-    .eq('id', transactionId)
-    .eq('org_id', orgId)
-    .single()
+  const tx = await prisma.bank_transactions.findFirst({
+    where: {
+      id: transactionId,
+      org_id: orgId,
+    },
+    select: {
+      id: true,
+      journal_entry_id: true,
+      branch_id: true,
+      status: true,
+    },
+  })
 
-  if (txError || !tx?.id) {
+  if (!tx?.id) {
     return { error: 'Transaksi kas/bank tidak ditemukan.' }
   }
 
-  if (tx?.branch_id) {
+  if (tx.branch_id) {
     const branchSelection = await resolveAccessibleBranchSelection(orgId, tx.branch_id)
     if ('error' in branchSelection) return { error: branchSelection.error }
   }
@@ -271,35 +342,35 @@ export async function deleteBankTransaction(orgId: string, transactionId: string
     return { success: true }
   }
 
-  // 2. Void the linked journal entry so GL stays balanced
-  if (tx?.journal_entry_id) {
-    const { error: journalError } = await (supabase as any)
-      .from('journal_entries')
-      .update({
-        status: 'VOIDED',
-        void_reason: 'Transaksi Kas/Bank di-void manual',
-        voided_by: user.id,
-        voided_at: new Date().toISOString()
+  try {
+    await prisma.$transaction(async (db) => {
+      if (tx.journal_entry_id) {
+        await db.journal_entries.updateMany({
+          where: {
+            id: tx.journal_entry_id,
+            org_id: orgId,
+          },
+          data: {
+            status: 'VOIDED',
+            void_reason: 'Transaksi Kas/Bank di-void manual',
+            voided_by: userId,
+            voided_at: new Date(),
+          },
+        })
+      }
+
+      await db.bank_transactions.updateMany({
+        where: {
+          id: transactionId,
+          org_id: orgId,
+        },
+        data: {
+          status: 'VOIDED',
+        },
       })
-      .eq('id', tx.journal_entry_id)
-      .eq('org_id', orgId)
-
-    if (journalError) {
-      return { error: 'Gagal me-void jurnal transaksi kas/bank.' }
-    }
-  }
-
-  // 3. Soft-void the source transaction for auditability
-  const { error } = await (supabase as any)
-    .from('bank_transactions')
-    .update({
-      status: 'VOIDED',
     })
-    .eq('id', transactionId)
-    .eq('org_id', orgId)
-
-  if (error) {
-    return { error: 'Gagal me-void mutasi: ' + error.message }
+  } catch (error: any) {
+    return { error: 'Gagal me-void mutasi: ' + (error?.message || 'Unknown error') }
   }
 
   revalidatePath('/cash')

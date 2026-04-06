@@ -1,10 +1,12 @@
 'use server'
 
+import { auth } from '@/auth'
 import { getDateInTimeZone } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { createJournalEntry } from './journal.actions'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { uploadReimbursementReceipt } from '@/modules/accounting/lib/reimbursement-receipt-storage.server'
 
 type ActiveBranchResult =
   | { branchId: string }
@@ -29,7 +31,6 @@ async function resolveActiveBranchId(orgId: string, branchId?: string | null) {
 }
 
 async function syncReimbursementApprovalRequest(params: {
-  supabase: any
   orgId: string
   reimbursementId: string
   branchId: string
@@ -37,78 +38,98 @@ async function syncReimbursementApprovalRequest(params: {
   approverId: string
   notes?: string
 }) {
-  const { supabase, orgId, reimbursementId, branchId, status, approverId, notes } = params
+  const { orgId, reimbursementId, branchId, status, approverId, notes } = params
 
-  const { error } = await (supabase as any)
-    .from('approval_requests')
-    .update({
-      status,
-      approver_id: approverId,
-      notes: notes || null,
-      decided_at: new Date().toISOString(),
+  try {
+    await prisma.approval_requests.updateMany({
+      where: {
+        org_id: orgId,
+        branch_id: branchId,
+        source_type: 'REIMBURSEMENT',
+        source_id: reimbursementId,
+        status: 'PENDING',
+      },
+      data: {
+        status: status as any,
+        approver_id: approverId,
+        notes: notes || null,
+        decided_at: new Date(),
+      },
     })
-    .eq('org_id', orgId)
-    .eq('branch_id', branchId)
-    .eq('source_type', 'REIMBURSEMENT')
-    .eq('source_id', reimbursementId)
-    .eq('status', 'PENDING')
+  } catch (error) {
+    console.error('Failed to sync reimbursement approval request:', error)
+  }
+}
 
-  if (error) {
-    (console as any).error('Failed to sync reimbursement approval request:', error)
+function normalizeReimbursement(row: any) {
+  const items = Array.isArray(row.reimbursement_items ?? row.items)
+    ? (row.reimbursement_items ?? row.items).map((item: any) => ({
+        ...item,
+        expense_date: item.expense_date instanceof Date ? item.expense_date.toISOString().slice(0, 10) : item.expense_date,
+        amount: Number(item.amount || 0),
+        account: item.accounts ?? item.account ?? null,
+      }))
+    : []
+
+  return {
+    ...row,
+    claim_date: row.claim_date instanceof Date ? row.claim_date.toISOString().slice(0, 10) : row.claim_date,
+    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+    updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
+    total_amount: Number(row.total_amount || 0),
+    items,
   }
 }
 
 export async function uploadReceipt(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'Tidak terautentikasi.' }
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { success: false, error: 'Tidak terautentikasi.' }
 
   const file = formData.get('file') as File
   if (!file || file.size === 0) return { success: false, error: 'File tidak valid.' }
 
-  const ext = file.name.split('.').pop() || 'jpg'
-  const filePath = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`
+  const upload = await uploadReimbursementReceipt(userId, file)
+  if ('error' in upload) {
+    return { success: false, error: upload.error }
+  }
 
-  const { error } = await supabase.storage
-    .from('receipts')
-    .upload(filePath, file, { contentType: file.type, upsert: false })
-
-  if (error) return { success: false, error: `Upload gagal: ${error.message}` }
-
-  const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(filePath)
-
-  return { success: true, url: publicUrl }
+  return { success: true, url: upload.url }
 }
 
 export async function getReimbursements(orgId: string, branchId?: string | null) {
-  const supabase = await createClient()
   const branchSelection = await resolveActiveBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
   const effectiveBranchId = branchSelection.branchId
 
-  let query = (supabase as any)
-    .from('reimbursements')
-    .select(`
-      *,
-      items:reimbursement_items(
-        *,
-        account:accounts(code, name)
-      )
-    `)
-    .eq('org_id', orgId)
+  try {
+    const data = await prisma.reimbursements.findMany({
+      where: {
+        org_id: orgId,
+        ...(effectiveBranchId ? { branch_id: effectiveBranchId } : {}),
+      },
+      include: {
+        reimbursement_items: {
+          include: {
+            accounts: {
+              select: {
+                code: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    })
 
-  if (effectiveBranchId) {
-    query = query.eq('branch_id', effectiveBranchId)
-  }
-
-  const { data, error } = await query.order('created_at', { ascending: false })
-
-  if (error) {
-    (console as any).error('getReimbursements error:', error)
+    return data.map(normalizeReimbursement)
+  } catch (error) {
+    console.error('getReimbursements error:', error)
     return []
   }
-  console.log(`Fetched ${data?.length || 0} reimbursements for org ${orgId}`)
-  return data
 }
 
 export async function submitReimbursement(orgId: string, input: {
@@ -121,9 +142,10 @@ export async function submitReimbursement(orgId: string, input: {
     receipt_url?: string
   }[]
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Tidak terautentikasi.' }
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Tidak terautentikasi.' }
+
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk mengajukan reimbursement.'
@@ -131,134 +153,147 @@ export async function submitReimbursement(orgId: string, input: {
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
   const activeBranchId = activeBranchResult.branchId
 
-  const totalAmount = input.items.reduce((sum: any, item: any) => sum + item.amount, 0)
-  
-  // 1. Generate claim number
+  const totalAmount = input.items.reduce((sum, item) => sum + Number(item.amount || 0), 0)
   const claimNumber = `REIMB-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`
 
-  // 2. Insert Header
-  const { data: reimbursement, error: rError } = await (supabase as any)
-    .from('reimbursements')
-    .insert({
-      org_id: orgId,
-      branch_id: activeBranchId,
-      user_id: user.id,
-      claim_number: claimNumber,
-      description: input.description,
-      total_amount: totalAmount,
-      status: 'PENDING'
-    })
-    .select()
-    .single()
+  try {
+    const reimbursement = await prisma.$transaction(async (tx) => {
+      const created = await tx.reimbursements.create({
+        data: {
+          org_id: orgId,
+          branch_id: activeBranchId,
+          user_id: userId,
+          claim_number: claimNumber,
+          description: input.description,
+          total_amount: totalAmount,
+          status: 'PENDING',
+        },
+        select: {
+          id: true,
+        },
+      })
 
-  if (rError || !reimbursement) {
-    (console as any).error('Insert reimbursement error:', rError)
-    return { error: `Gagal membuat pengajuan reimburse. ${rError?.message || ''}` }
-  }
+      await tx.reimbursement_items.createMany({
+        data: input.items.map((item) => ({
+          reimbursement_id: created.id,
+          expense_date: new Date(`${item.expense_date}T00:00:00.000Z`),
+          category_account_id: item.category_account_id,
+          description: item.description,
+          amount: Number(item.amount || 0),
+          receipt_url: item.receipt_url || null,
+        })),
+      })
 
-  // 3. Insert Items
-  const { error: iError } = await (supabase as any)
-    .from('reimbursement_items')
-    .insert(input.items.map((it: any) => ({
-      reimbursement_id: reimbursement.id,
-      ...it
-    })))
-
-  if (iError) {
-    (console as any).error('Insert reimbursement items error:', iError)
-    await (supabase as any).from('reimbursements').delete().eq('id', reimbursement.id)
-    return { error: `Gagal menyimpan detail biaya. ${iError.message}` }
-  }
-
-  // 4. Buat Permintaan Approval ke Approval Center
-  const { error: appErr } = await (supabase as any)
-    .from('approval_requests')
-    .insert({
-      org_id: orgId,
-      branch_id: activeBranchId,
-      requester_id: user.id,
-      source_type: 'REIMBURSEMENT', // Kita gunakan string ini agar Approval Center tahu sumbernya
-      source_id: reimbursement.id,
-      reason: `Reimbursement: ${input.description}`,
-      status: 'PENDING',
-      requested_at: new Date().toISOString()
+      return created
     })
 
-  if (appErr) {
-    (console as any).error('Failed to create approval request:', appErr)
-    // Kita tetap biarkan reimbursement terbuat walau approval center gagal (bisa manual nanti)
-  }
+    try {
+      await prisma.approval_requests.create({
+        data: {
+          org_id: orgId,
+          branch_id: activeBranchId,
+          requester_id: userId,
+          source_type: 'REIMBURSEMENT',
+          source_id: reimbursement.id,
+          reason: `Reimbursement: ${input.description}`,
+          status: 'PENDING',
+          requested_at: new Date(),
+        },
+      })
+    } catch (error) {
+      console.error('Failed to create approval request:', error)
+    }
 
-  revalidatePath('/accounting/reimburse')
-  revalidatePath('/accounting/approvals') // Refresh approval center juga
-  return { success: true, id: reimbursement.id }
+    revalidatePath('/accounting/reimburse')
+    revalidatePath('/accounting/approvals')
+    return { success: true, id: reimbursement.id }
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      return { error: 'Nomor klaim reimbursement bentrok. Silakan coba lagi.' }
+    }
+    return { error: `Gagal membuat pengajuan reimburse. ${error?.message || ''}` }
+  }
 }
 
 export async function approveReimbursement(id: string, orgId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Tidak terautentikasi.' }
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Tidak terautentikasi.' }
+
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk menyetujui reimbursement.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  const { error } = await (supabase as any)
-    .from('reimbursements')
-    .update({ status: 'APPROVED', updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchResult.branchId)
+  const result = await prisma.reimbursements.updateMany({
+    where: {
+      id,
+      org_id: orgId,
+      branch_id: activeBranchResult.branchId,
+    },
+    data: {
+      status: 'APPROVED',
+      updated_at: new Date(),
+    },
+  })
 
-  if (error) return { error: 'Gagal menyetujui reimbursement.' }
+  if (result.count === 0) return { error: 'Gagal menyetujui reimbursement.' }
+
   await syncReimbursementApprovalRequest({
-    supabase,
     orgId,
     reimbursementId: id,
     branchId: activeBranchResult.branchId,
     status: 'APPROVED',
-    approverId: user.id,
+    approverId: userId,
   })
+
   revalidatePath('/accounting/reimburse')
   revalidatePath('/accounting/approvals')
   return { success: true }
 }
 
 export async function rejectReimbursement(id: string, orgId: string, reason: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Tidak terautentikasi.' }
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return { error: 'Tidak terautentikasi.' }
+
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk menolak reimbursement.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  const { error } = await (supabase as any)
-    .from('reimbursements')
-    .update({ status: 'REJECTED', notes: reason, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchResult.branchId)
+  const result = await prisma.reimbursements.updateMany({
+    where: {
+      id,
+      org_id: orgId,
+      branch_id: activeBranchResult.branchId,
+    },
+    data: {
+      status: 'REJECTED',
+      notes: reason,
+      updated_at: new Date(),
+    },
+  })
 
-  if (error) return { error: 'Gagal menolak reimbursement.' }
+  if (result.count === 0) return { error: 'Gagal menolak reimbursement.' }
+
   await syncReimbursementApprovalRequest({
-    supabase,
     orgId,
     reimbursementId: id,
     branchId: activeBranchResult.branchId,
     status: 'REJECTED',
-    approverId: user.id,
+    approverId: userId,
     notes: reason,
   })
+
   revalidatePath('/accounting/reimburse')
   revalidatePath('/accounting/approvals')
   return { success: true }
 }
 
 export async function payReimbursement(id: string, orgId: string, bankAccountId: string) {
-  const supabase = await createClient()
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk membayar reimbursement.'
@@ -266,58 +301,55 @@ export async function payReimbursement(id: string, orgId: string, bankAccountId:
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
   const activeBranchId = activeBranchResult.branchId
 
-  // 1. Fetch reimbursement data
-  const { data: reim, error: rErr } = await (supabase as any)
-    .from('reimbursements')
-    .select(`
-      *,
-      items:reimbursement_items(*)
-    `)
-    .eq('id', id)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchId)
-    .single()
+  const reim = await prisma.reimbursements.findFirst({
+    where: {
+      id,
+      org_id: orgId,
+      branch_id: activeBranchId,
+    },
+    include: {
+      reimbursement_items: true,
+    },
+  })
 
-  if (rErr || !reim) return { error: 'Data reimbursement tidak ditemukan.' }
+  if (!reim?.id) return { error: 'Data reimbursement tidak ditemukan.' }
   if (reim.status !== 'APPROVED') return { error: 'Hanya reimbursement status APPROVED yang bisa dibayar.' }
 
-  // 2. Fetch Bank Account to get CoA Linked Account
-  const { data: bank, error: bErr } = await (supabase as any)
-    .from('bank_accounts')
-    .select('account_id')
-    .eq('id', bankAccountId)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchId)
-    .single()
+  const bank = await prisma.bank_accounts.findFirst({
+    where: {
+      id: bankAccountId,
+      org_id: orgId,
+      branch_id: activeBranchId,
+    },
+    select: {
+      account_id: true,
+    },
+  })
 
-  if (bErr || !bank) return { error: 'Akun Bank tidak ditemukan.' }
+  if (!bank?.account_id) return { error: 'Akun Bank tidak ditemukan.' }
 
-  // 3. Prepare Journal Entry Lines
-  // Group items by category_account_id
   const accountGroups: Record<string, number> = {}
-  reim.items.forEach((it: any) => {
-    accountGroups[it.category_account_id] = (accountGroups[it.category_account_id] || 0) + Number(it.amount)
+  reim.reimbursement_items.forEach((item: any) => {
+    accountGroups[item.category_account_id] = (accountGroups[item.category_account_id] || 0) + Number(item.amount)
   })
 
   const lines = []
-  // Debits: Expense accounts
   for (const [accId, amount] of Object.entries(accountGroups)) {
     lines.push({
       account_id: accId,
       debit: amount,
       credit: 0,
-      memo: `Reimburse ${reim.claim_number}: ${reim.description}`
+      memo: `Reimburse ${reim.claim_number}: ${reim.description}`,
     })
   }
-  // Credit: Bank/Cash account
+
   lines.push({
     account_id: bank.account_id,
     debit: 0,
-    credit: reim.total_amount,
-    memo: `Pembayaran Reimburse ${reim.claim_number}`
+    credit: Number(reim.total_amount),
+    memo: `Pembayaran Reimburse ${reim.claim_number}`,
   })
 
-  // 4. Create Journal Entry
   const journalResult = await createJournalEntry({
     org_id: orgId,
     branch_id: activeBranchId,
@@ -326,22 +358,23 @@ export async function payReimbursement(id: string, orgId: string, bankAccountId:
     reference_type: 'CASH_OUT',
     reference_id: reim.id,
     lines,
-    auto_post: true
+    auto_post: true,
   })
 
   if ((journalResult as any).error) return journalResult
 
-  // 5. Update Status to PAID
-  await (supabase as any)
-    .from('reimbursements')
-    .update({ 
-      status: 'PAID', 
+  await prisma.reimbursements.updateMany({
+    where: {
+      id,
+      org_id: orgId,
+      branch_id: activeBranchId,
+    },
+    data: {
+      status: 'PAID',
       journal_id: (journalResult as any).entryId,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', id)
-    .eq('org_id', orgId)
-    .eq('branch_id', activeBranchId)
+      updated_at: new Date(),
+    },
+  })
 
   revalidatePath('/accounting/reimburse')
   return { success: true }

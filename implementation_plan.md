@@ -1,7 +1,7 @@
 # AI Handover Document: Supabase -> Prisma/Auth Migration Status
 
-**Updated:** 2026-04-06 (sesi ke-18, Ticketing migration)  
-**Status:** `IN PROGRESS` — Prioritas 3 untuk domain Ticketing selesai. Estimasi progres migrasi keseluruhan saat ini sekitar `90%`. Target berikutnya adalah slice Cash dan cleanup storage wrapper.
+**Updated:** 2026-04-06 (sesi ke-21, Reimbursement migration)  
+**Status:** `IN PROGRESS` — Prioritas Cash, Journal, dan Reimbursement sudah selesai. Estimasi progres migrasi keseluruhan saat ini sekitar `96%`. Target berikutnya adalah cleanup storage wrapper residual dan slice Supabase-heavy lain di luar core accounting.
 
 Dokumen ini adalah rencana eksekusi dan handover aktif untuk agen. Sesi-sesi sebelumnya telah menyelesaikan migrasi pada domain auth, org, HRIS, audit, billing, accounting, contacts, services, sales, sales-write, POS.
 
@@ -9,11 +9,13 @@ Dokumen ini adalah rencana eksekusi dan handover aktif untuk agen. Sesi-sesi seb
 
 ## 0. Snapshot Repo Saat Ini
 
-- Estimasi progres migrasi keseluruhan: `90%`
-- Estimasi sisa pekerjaan utama: `10%`
+- Estimasi progres migrasi keseluruhan: `96%`
+- Estimasi sisa pekerjaan utama: `4%`
   - Ticketing sudah selesai dipindah dari Supabase data client ke Prisma/Auth raw SQL
-  - Sisa terbesar sekarang berada di `modules/cash/actions/bank.actions.ts` dan `modules/cash/actions/reconcile.actions.ts`
-  - Setelah cash selesai, sisa pekerjaan lebih banyak berupa cleanup storage wrapper dan edge-case flow yang masih Supabase-specific
+  - Slice cash inti sekarang sudah selesai: `modules/cash/actions/bank.actions.ts` dan `modules/cash/actions/reconcile.actions.ts` sudah memakai Prisma/Auth
+  - Slice journal inti sekarang juga sudah selesai: `modules/accounting/actions/journal.actions.ts` sudah memakai Prisma/Auth
+  - Slice reimbursement sekarang juga sudah selesai: `modules/accounting/actions/reimburse.actions.ts` sudah memakai Prisma/Auth + storage wrapper server-side
+  - Sisa terbesar sekarang bergeser ke cleanup storage wrapper dan domain lain yang masih Supabase-heavy seperti `factory`, `fleet`, beberapa slice accounting lanjutan, `sales-page`, dan demo tooling
 
 - Sesi sebelumnya telah membersihkan semua penggunaan klien Supabase pada domain operasional `sales` dan `pos`. 
 - Sesi ini (Sesi 15) akan fokus pada eksekusi Prioritas 1: **Core Sales / Purchasing Backbone**.
@@ -100,6 +102,10 @@ File-file berikut **sudah tidak lagi memakai Supabase data client**:
 - `modules/inventory/actions/warehouse.actions.ts` ✅ (sesi 16)
 - `modules/saas/actions/operator-sales.actions.ts` ✅ (sesi 17)
 - `modules/saas/actions/ticketing.actions.ts` ✅ (sesi 18)
+- `modules/cash/actions/bank.actions.ts` ✅ (sesi 19)
+- `modules/cash/actions/reconcile.actions.ts` ✅ (sesi 19)
+- `modules/accounting/actions/journal.actions.ts` ✅ (sesi 20)
+- `modules/accounting/actions/reimburse.actions.ts` ✅ (sesi 21)
 
 ---
 
@@ -218,6 +224,38 @@ Ticketing migration yang selesai pada sesi ini:
   - bucket screenshot tidak lagi diakses langsung dari action layer; upload dipindahkan ke wrapper server terpisah
 - `modules/saas/lib/support-ticket-storage.server.ts`
   - wrapper server-side baru untuk upload screenshot ticket ke bucket `receipts`
+
+Cash migration yang selesai pada sesi ini:
+
+- `modules/cash/actions/bank.actions.ts`
+  - `getBankAccounts`, `getRecentBankTransactions` sekarang memakai Prisma `findMany` + include relasi `accounts` / `bank_accounts`
+  - `createBankAccount` dan `deleteBankAccount` sekarang memakai Prisma mutator, tanpa `createClient()`
+  - `createBankTransaction` sekarang memakai `auth()` untuk `created_by` dan insert Prisma langsung ke `bank_transactions`; trigger DB existing tetap dipertahankan untuk posting jurnal
+  - `deleteBankTransaction` sekarang memakai Prisma transaction untuk void jurnal terkait dan soft-void transaksi bank
+- `modules/cash/actions/reconcile.actions.ts`
+  - `processBankCSV` sekarang insert mutasi via Prisma `createMany`
+  - `getUnmatchedMutations` sekarang loader Prisma `findMany`
+  - lookup rekening dan validasi branch access tidak lagi memakai Supabase data client
+
+Journal migration yang selesai pada sesi ini:
+
+- `modules/accounting/actions/journal.actions.ts`
+  - `getUnpostedJournalsCount` sekarang memakai Prisma `count` dengan branch scope validation
+  - `createJournalEntry` sekarang memakai `auth()` + Prisma transaction untuk header/lines, tanpa `createClient()`
+  - `postJournalEntry`, `deleteJournalEntry`, dan `hardDeleteDraftJournal` sekarang memakai Prisma mutator
+  - `voidJournalEntry` sekarang memakai Prisma untuk sync reversal ke `sales_returns`, `inventory_adjustments`, `stock_movements`, `fixed_assets`, `sales_payments`, dan `purchase_payments`
+  - `getJournalEntries` sekarang loader Prisma `findMany` + include `journal_lines.accounts`, dengan normalisasi Decimal/date agar tetap kompatibel dengan UI existing
+
+Reimbursement migration yang selesai pada sesi ini:
+
+- `modules/accounting/actions/reimburse.actions.ts`
+  - seluruh auth sekarang memakai `auth()`, tanpa `createClient()`
+  - `getReimbursements`, `submitReimbursement`, `approveReimbursement`, `rejectReimbursement`, dan `payReimbursement` sekarang memakai Prisma/Auth
+  - header reimbursement + item detail sekarang dibuat atomik via Prisma transaction
+  - sinkronisasi ke `approval_requests` sekarang memakai Prisma `create` / `updateMany`
+  - pembayaran reimbursement tetap reuse `createJournalEntry()` yang sudah dimigrasikan ke Prisma/Auth
+- `modules/accounting/lib/reimbursement-receipt-storage.server.ts`
+  - wrapper server-side baru untuk upload bukti reimbursement ke bucket `receipts`
 
 Shared module migration yang selesai pada sesi ini:
 

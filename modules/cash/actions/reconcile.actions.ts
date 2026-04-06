@@ -1,19 +1,22 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
 async function getAccessibleBankAccountBranch(orgId: string, bankAccountId: string) {
-  const supabase = await createClient()
-  const { data: bankAccount, error } = await (supabase as any)
-    .from('bank_accounts')
-    .select('id, branch_id')
-    .eq('id', bankAccountId)
-    .eq('org_id', orgId)
-    .maybeSingle()
+  const bankAccount = await prisma.bank_accounts.findFirst({
+    where: {
+      id: bankAccountId,
+      org_id: orgId,
+    },
+    select: {
+      id: true,
+      branch_id: true,
+    },
+  })
 
-  if (error || !bankAccount?.id) {
+  if (!bankAccount?.id) {
     return { error: 'Rekening kas/bank tidak ditemukan.' }
   }
 
@@ -92,13 +95,22 @@ function isHeaderRow(columns: string[]) {
   return firstColumn === 'date' || firstColumn === 'tanggal'
 }
 
+function normalizeMutation(row: any) {
+  return {
+    ...row,
+    mutation_date: row.mutation_date instanceof Date ? row.mutation_date.toISOString().slice(0, 10) : row.mutation_date,
+    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+    amount: Number(row.amount || 0),
+    balance: row.balance == null ? null : Number(row.balance),
+  }
+}
+
 /**
  * processBankCSV
  * Takes raw CSV string and parses it into bank_mutations.
  * Expected columns: [date, description, amount, type, balance]
  */
 export async function processBankCSV(orgId: string, bankAccountId: string, csvContent: string) {
-  const supabase = await createClient()
   const bankAccountBranch = await getAccessibleBankAccountBranch(orgId, bankAccountId)
   if ('error' in bankAccountBranch) return { error: bankAccountBranch.error }
 
@@ -157,12 +169,12 @@ export async function processBankCSV(orgId: string, bankAccountId: string, csvCo
       org_id: orgId,
       branch_id: bankAccountBranch.branchId,
       bank_account_id: bankAccountId,
-      mutation_date: mutationDate,
+      mutation_date: new Date(`${mutationDate}T00:00:00.000Z`),
       description,
       amount: Math.abs(parsedAmount),
       type,
       balance: parsedBalance,
-      is_matched: false
+      is_matched: false,
     })
   }
 
@@ -170,8 +182,13 @@ export async function processBankCSV(orgId: string, bankAccountId: string, csvCo
     return { error: 'CSV tidak berisi mutasi yang bisa diproses.' }
   }
 
-  const { error } = await (supabase as any).from('bank_mutations').insert(mutations)
-  if (error) return { error: 'Gagal mengunggah mutasi: ' + error.message }
+  try {
+    await prisma.bank_mutations.createMany({
+      data: mutations as any,
+    })
+  } catch (error: any) {
+    return { error: 'Gagal mengunggah mutasi: ' + (error?.message || 'Unknown error') }
+  }
 
   revalidatePath('/cash')
   return { success: true, count: mutations.length }
@@ -181,17 +198,29 @@ export async function processBankCSV(orgId: string, bankAccountId: string, csvCo
  * getUnmatchedMutations
  */
 export async function getUnmatchedMutations(orgId: string, bankAccountId?: string, branchId?: string | null) {
-  const supabase = await createClient()
+  let effectiveBranchId: string | undefined
 
-  let query = (supabase as any).from('bank_mutations').select('*').eq('org_id', orgId).eq('is_matched', false)
-  if (bankAccountId) query = query.eq('bank_account_id', bankAccountId)
   if (branchId) {
     const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
     if ('error' in branchSelection || !branchSelection.branchId) return []
-    query = query.eq('branch_id', branchSelection.branchId)
+    effectiveBranchId = branchSelection.branchId
   }
 
-  const { data, error } = await query.order('mutation_date', { ascending: false })
-  if (error) return []
-  return data
+  try {
+    const data = await prisma.bank_mutations.findMany({
+      where: {
+        org_id: orgId,
+        is_matched: false,
+        ...(bankAccountId ? { bank_account_id: bankAccountId } : {}),
+        ...(effectiveBranchId ? { branch_id: effectiveBranchId } : {}),
+      },
+      orderBy: {
+        mutation_date: 'desc',
+      },
+    })
+
+    return data.map(normalizeMutation)
+  } catch {
+    return []
+  }
 }
