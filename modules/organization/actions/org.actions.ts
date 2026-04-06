@@ -81,6 +81,111 @@ type HoldingContextOptions = {
   ownerOnly?: boolean
 }
 
+const OPTIONAL_ORGANIZATION_COLUMNS = new Set(['owner_email', 'parent_org_id'])
+
+function extractErrorMessage(error: unknown): string {
+  if (!error) return ''
+  if (typeof error === 'string') return error
+  if (error instanceof Error) return error.message
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === 'string') return message
+  }
+  return ''
+}
+
+function extractMissingColumnName(error: unknown): string | null {
+  const message = extractErrorMessage(error)
+  if (!message) return null
+
+  const postgrestMatch = message.match(/could not find the '([a-zA-Z0-9_]+)' column/i)
+  if (postgrestMatch?.[1]) return postgrestMatch[1]
+
+  const postgresMatch = message.match(/column "?([a-zA-Z0-9_]+)"? does not exist/i)
+  if (postgresMatch?.[1]) return postgresMatch[1]
+
+  return null
+}
+
+function mapCreateOrganizationError(
+  defaultMessage: string,
+  error: { code?: string | null; message?: string | null } | null | undefined
+): string {
+  if (!error) return defaultMessage
+
+  if (error.code === '23505') {
+    return 'Nama atau slug organisasi ini sudah digunakan.'
+  }
+
+  const message = String(error.message || '').trim()
+  const missingColumn = extractMissingColumnName(error)
+  if (missingColumn === 'parent_org_id') {
+    return 'Database belum update untuk fitur struktur organisasi. Jalankan migrasi terbaru lalu coba lagi.'
+  }
+  if (missingColumn === 'owner_email') {
+    return 'Database belum update untuk metadata owner organisasi. Jalankan migrasi terbaru lalu coba lagi.'
+  }
+
+  const relationMatch = message.match(/relation "([^"]+)" does not exist/i)
+  if (relationMatch?.[1]) {
+    return `Database belum lengkap. Tabel "${relationMatch[1]}" belum tersedia. Jalankan migrasi Supabase terbaru lalu coba lagi.`
+  }
+
+  if (/function .* does not exist/i.test(message)) {
+    return 'Database belum lengkap. Function yang dibutuhkan belum tersedia. Jalankan migrasi Supabase terbaru lalu coba lagi.'
+  }
+
+  if (/trigger .* does not exist/i.test(message)) {
+    return 'Database belum lengkap. Trigger organisasi belum sinkron. Jalankan migrasi Supabase terbaru lalu coba lagi.'
+  }
+
+  if (/Unit Utama organisasi .* belum tersedia/i.test(message)) {
+    return 'Setup CoA default gagal karena trigger governance akun di database belum sinkron. Jalankan SQL migrasi 1150 (rebind accounts governance + ensure MAIN branch), lalu coba lagi.'
+  }
+
+  if (/row-level security|permission denied/i.test(message)) {
+    return 'Akses database ditolak oleh kebijakan keamanan. Coba login ulang lalu ulangi proses.'
+  }
+
+  if (message && process.env.NODE_ENV !== 'production') {
+    return `${defaultMessage} (${message})`
+  }
+
+  return defaultMessage
+}
+
+async function seedDefaultCoAAfterBranchReady(db: any, orgId: string) {
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) return
+  if (!db || typeof db.rpc !== 'function') return
+
+  try {
+    // Avoid duplicate seeding for environments where trigger already seeded CoA.
+    try {
+      if (typeof db.from === 'function') {
+        const { data: existingAccounts } = await db
+          .from('accounts')
+          .select('id')
+          .eq('org_id', trimmedOrgId)
+          .limit(1)
+
+        if (Array.isArray(existingAccounts) && existingAccounts.length > 0) {
+          return
+        }
+      }
+    } catch (checkError) {
+      ;(console as any).warn('CreateOrganization: account pre-check skipped', checkError)
+    }
+
+    const { error } = await db.rpc('seed_default_coa', { p_org_id: trimmedOrgId })
+    if (error) {
+      ;(console as any).warn('CreateOrganization: post-branch CoA seed failed', error)
+    }
+  } catch (seedError) {
+    ;(console as any).warn('CreateOrganization: post-branch CoA seed threw error', seedError)
+  }
+}
+
 async function getHoldingManagementContext(
   expectedParentOrgId?: string,
   options?: HoldingContextOptions
@@ -131,120 +236,181 @@ async function getHoldingManagementContext(
 async function createOrganizationRecord(
   formData: FormData
 ): Promise<CreateOrganizationActionResult> {
-  const supabase = await createClient()
-  const db = supabase as any
-  const admin = (await createAdminClient()) as any
-  const cookieStore = await cookies()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Tidak terautentikasi' }
+  try {
+    const supabase = await createClient()
+    const db = supabase as any
+    let admin: any = null
+    try {
+      admin = (await createAdminClient()) as any
+    } catch (adminInitError) {
+      ;(console as any).warn('CreateOrganization: admin client unavailable, fallback to session client', adminInitError)
+    }
+    const privilegedDb = admin ?? db
+    const cookieStore = await cookies()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Tidak terautentikasi' }
 
-  const name = (formData.get('name') as string).trim()
-  if (!name) return { error: 'Nama organisasi wajib diisi' }
-  const slug = generateSlug(name)
-  const orgId = crypto.randomUUID()
-  const defaultBranchId = crypto.randomUUID()
+    const name = (formData.get('name') as string).trim()
+    if (!name) return { error: 'Nama organisasi wajib diisi' }
+    const slug = generateSlug(name)
+    const orgId = crypto.randomUUID()
+    let defaultBranchId = crypto.randomUUID()
 
-  // POPULATE OWNER EMAIL FROM SESSION
-  const ownerEmail = user.email
-  const planParam = formData.get('plan') as string
-  const businessType = (formData.get('type') || 'BLANK') as DemoBusinessType
-  const isDemo = planParam === 'demo'
-  const isAbs = planParam === 'abs'
-  const parentOrgIdRaw = String(formData.get('parent_org_id') || '').trim()
-  const parentOrgId = parentOrgIdRaw || null
+    // POPULATE OWNER EMAIL FROM SESSION
+    const ownerEmail = user.email
+    const planParam = formData.get('plan') as string
+    const businessType = (formData.get('type') || 'BLANK') as DemoBusinessType
+    const isDemo = planParam === 'demo'
+    const isAbs = planParam === 'abs'
+    const parentOrgIdRaw = String(formData.get('parent_org_id') || '').trim()
+    const parentOrgId = parentOrgIdRaw || null
 
-  if (parentOrgId) {
-    const holdingContext = await getHoldingManagementContext(parentOrgId, { ownerOnly: true })
-    if ('error' in holdingContext) return { error: holdingContext.error }
+    if (parentOrgId) {
+      const holdingContext = await getHoldingManagementContext(parentOrgId, { ownerOnly: true })
+      if ('error' in holdingContext) return { error: holdingContext.error }
 
-    // ── Enforce child org limit ───────────────────────────────────
-    const limits = await getOrgLimits(parentOrgId)
-    if (limits.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs) {
-      return {
-        error: `Batas anak perusahaan tercapai (${limits.currentChildOrgs}/${limits.maxChildOrgs}). Upgrade paket SaaS Anda untuk menambah lebih banyak entitas.`,
+      // ── Enforce child org limit ───────────────────────────────────
+      const limits = await getOrgLimits(parentOrgId)
+      if (limits.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs) {
+        return {
+          error: `Batas anak perusahaan tercapai (${limits.currentChildOrgs}/${limits.maxChildOrgs}). Upgrade paket SaaS Anda untuk menambah lebih banyak entitas.`,
+        }
       }
     }
-  }
 
-  const { error: orgError } = await db
-    .from('organizations')
-    .insert({
+    const orgInsertPayload: Record<string, unknown> = {
       id: orgId,
       name,
       slug,
-      owner_email: ownerEmail,
-      parent_org_id: parentOrgId || null,
       settings: {
         currency: 'IDR',
         timezone: 'Asia/Jakarta',
         fiscal_year_start_month: 1,
         plan: isDemo ? 'Demo' : 'Trial', // Default plan for new orgs
         is_demo: isDemo,
-        business_type: businessType
+        business_type: businessType,
+        // Delay CoA trigger seeding until Unit Utama exists to satisfy governance checks.
+        skip_coa_seed: true,
       },
-    })
-
-  if (orgError) {
-    if (orgError.code === '23505') return { error: 'Nama organisasi ini sudah digunakan.' }
-    return { error: 'Gagal membuat organisasi.' }
-  }
-
-  const { error: memberError } = await admin
-    .from('org_members')
-    .insert({ org_id: orgId, user_id: user.id, role: 'owner' })
-
-  if (memberError) {
-    await admin.from('organizations').delete().eq('id', orgId)
-    return { error: 'Gagal menambahkan anggota.' }
-  }
-
-  const { error: branchError } = await admin
-    .from('branches')
-    .insert({
-      id: defaultBranchId,
-      org_id: orgId,
-      name: DEFAULT_BRANCH_NAME,
-      code: DEFAULT_BRANCH_CODE,
-      address: null,
-      is_active: true,
-    })
-
-  if (branchError) {
-    await admin.from('organizations').delete().eq('id', orgId)
-    return { error: 'Gagal menyiapkan unit default organisasi.' }
-  }
-
-  await persistMembershipActiveContext(admin, {
-    userId: user.id,
-    orgId,
-    branchId: defaultBranchId,
-  })
-
-  // IF DEMO, SEED DATA
-  if (isDemo) {
-    try {
-      await seedDemoData(supabase, orgId, businessType)
-    } catch (seedErr) {
-      (console as any).error('Seed Data Error:', seedErr)
     }
-  }
+    if (ownerEmail) {
+      orgInsertPayload.owner_email = ownerEmail
+    }
+    if (parentOrgId) {
+      orgInsertPayload.parent_org_id = parentOrgId
+    }
 
-  // IF ABS, APPLY VOUCHER AUTOMATICALLY
-  if (isAbs) {
-     try {
-       await applyVoucher(orgId, 'ABS2024')
-     } catch (absErr) {
-       (console as any).error('ABS Activation Error:', absErr)
-     }
-  }
+    let { error: orgError } = await db.from('organizations').insert(orgInsertPayload)
+    while (orgError) {
+      const missingColumn = extractMissingColumnName(orgError)
+      if (!missingColumn || !OPTIONAL_ORGANIZATION_COLUMNS.has(missingColumn)) break
+      if (missingColumn === 'parent_org_id' && parentOrgId) break
+      if (!(missingColumn in orgInsertPayload)) break
 
-  cookieStore.set(ACTIVE_ORG_COOKIE, orgId, getActiveContextCookieOptions())
-  cookieStore.set(ACTIVE_BRANCH_COOKIE, defaultBranchId, getActiveContextCookieOptions())
+      delete orgInsertPayload[missingColumn]
+      ;({ error: orgError } = await db.from('organizations').insert(orgInsertPayload))
+    }
 
-  return {
-    success: true,
-    orgId,
-    branchId: defaultBranchId,
+    if (orgError) {
+      ;(console as any).error('CreateOrganization: organizations insert failed', orgError)
+      return {
+        error: mapCreateOrganizationError('Gagal membuat organisasi.', orgError),
+      }
+    }
+
+    const { error: memberError } = await privilegedDb
+      .from('org_members')
+      .insert({ org_id: orgId, user_id: user.id, role: 'owner' })
+
+    if (memberError) {
+      ;(console as any).error('CreateOrganization: org_members insert failed', memberError)
+      if (admin) {
+        await admin.from('organizations').delete().eq('id', orgId)
+      }
+      return {
+        error: mapCreateOrganizationError('Gagal menambahkan anggota.', memberError),
+      }
+    }
+
+    let { error: branchError } = await privilegedDb
+      .from('branches')
+      .insert({
+        id: defaultBranchId,
+        org_id: orgId,
+        name: DEFAULT_BRANCH_NAME,
+        code: DEFAULT_BRANCH_CODE,
+        address: null,
+        is_active: true,
+      })
+
+    if (branchError?.code === '23505') {
+      const { data: existingBranchByCode } = await privilegedDb
+        .from('branches')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('code', DEFAULT_BRANCH_CODE)
+        .maybeSingle()
+
+      const existingBranchId = String(existingBranchByCode?.id || '').trim()
+      if (existingBranchId) {
+        defaultBranchId = existingBranchId
+        branchError = null
+      }
+    }
+
+    if (branchError) {
+      ;(console as any).error('CreateOrganization: branches insert failed', branchError)
+      if (admin) {
+        await admin.from('organizations').delete().eq('id', orgId)
+      }
+      return {
+        error: mapCreateOrganizationError('Gagal menyiapkan unit default organisasi.', branchError),
+      }
+    }
+
+    await seedDefaultCoAAfterBranchReady(privilegedDb, orgId)
+
+    await persistMembershipActiveContext(privilegedDb, {
+      userId: user.id,
+      orgId,
+      branchId: defaultBranchId,
+    })
+
+    // IF DEMO, SEED DATA
+    if (isDemo) {
+      try {
+        await seedDemoData(supabase, orgId, businessType)
+      } catch (seedErr) {
+        (console as any).error('Seed Data Error:', seedErr)
+      }
+    }
+
+    // IF ABS, APPLY VOUCHER AUTOMATICALLY
+    if (isAbs) {
+      try {
+        await applyVoucher(orgId, 'ABS2024')
+      } catch (absErr) {
+        (console as any).error('ABS Activation Error:', absErr)
+      }
+    }
+
+    cookieStore.set(ACTIVE_ORG_COOKIE, orgId, getActiveContextCookieOptions())
+    cookieStore.set(ACTIVE_BRANCH_COOKIE, defaultBranchId, getActiveContextCookieOptions())
+
+    return {
+      success: true,
+      orgId,
+      branchId: defaultBranchId,
+    }
+  } catch (error) {
+    const message = extractErrorMessage(error)
+    if (/Missing SUPABASE_(LOCAL_)?SERVICE_ROLE_KEY/i.test(message)) {
+      return { error: 'Konfigurasi service role Supabase belum diisi. Lengkapi environment lalu coba lagi.' }
+    }
+    if (/Missing NEXT_PUBLIC_SUPABASE_(LOCAL_)?URL|Missing NEXT_PUBLIC_SUPABASE_(LOCAL_)?ANON_KEY/i.test(message)) {
+      return { error: 'Konfigurasi Supabase belum lengkap (URL/ANON key). Lengkapi environment lalu coba lagi.' }
+    }
+    return { error: 'Terjadi kesalahan sistem saat membuat organisasi.' }
   }
 }
 

@@ -273,6 +273,200 @@ describe('Organization Branch Bootstrap', () => {
     randomUuidMock.mockRestore()
   })
 
+  it('reuses existing MAIN branch when branch bootstrap already created it', async () => {
+    const cookieStore = createCookieStore()
+    mocks.cookies.mockResolvedValue(cookieStore)
+
+    const orgInsert = vi.fn().mockResolvedValue({ error: null })
+    const memberInsert = vi.fn().mockResolvedValue({ error: null })
+    const branchInsert = vi.fn().mockResolvedValue({
+      error: { code: '23505', message: 'duplicate key value violates unique constraint' },
+    })
+    const branchReadBuilder = {
+      select: vi.fn(() => branchReadBuilder),
+      eq: vi.fn(() => branchReadBuilder),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { id: 'existing-main-branch' },
+        error: null,
+      }),
+    }
+    const memberUpdateBuilder = {
+      update: vi.fn(() => memberUpdateBuilder),
+      eq: vi.fn(() => memberUpdateBuilder),
+    }
+
+    const randomUuidMock = vi.spyOn(globalThis.crypto, 'randomUUID')
+    randomUuidMock
+      .mockReturnValueOnce('org-4')
+      .mockReturnValueOnce('branch-4')
+
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1', email: 'owner@example.com' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'organizations') return { insert: orgInsert }
+        if (table === 'branches') return branchReadBuilder
+        throw new Error(`Unexpected table ${table}`)
+      }),
+      rpc: vi.fn().mockResolvedValue({ error: null }),
+    })
+    mocks.createAdminClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'org_members') {
+          return {
+            insert: memberInsert,
+            update: memberUpdateBuilder.update,
+            eq: memberUpdateBuilder.eq,
+          }
+        }
+        if (table === 'branches') {
+          return {
+            insert: branchInsert,
+            select: branchReadBuilder.select,
+            eq: branchReadBuilder.eq,
+            maybeSingle: branchReadBuilder.maybeSingle,
+          }
+        }
+        if (table === 'organizations') return { delete: vi.fn(() => ({ eq: vi.fn() })) }
+        if (table === 'accounts') return { select: vi.fn(() => ({ eq: vi.fn(() => ({ limit: vi.fn().mockResolvedValue({ data: [] }) })) })) }
+        throw new Error(`Unexpected admin table ${table}`)
+      }),
+      rpc: vi.fn().mockResolvedValue({ error: null }),
+    })
+
+    const formData = new FormData()
+    formData.set('name', 'PT Branch Sudah Ada')
+
+    await createOrganization(formData)
+
+    expect(branchInsert).toHaveBeenCalled()
+    expect(cookieStore.set).toHaveBeenCalledWith(
+      'nizam_active_branch_id',
+      'existing-main-branch',
+      expect.objectContaining({
+        path: '/',
+        httpOnly: true,
+      })
+    )
+    expect(memberUpdateBuilder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        last_active_branch_id: 'existing-main-branch',
+      })
+    )
+    expect(mocks.redirect).toHaveBeenCalledWith('/dashboard')
+    randomUuidMock.mockRestore()
+  })
+
+  it('falls back to session client when admin client is unavailable', async () => {
+    const cookieStore = createCookieStore()
+    mocks.cookies.mockResolvedValue(cookieStore)
+
+    const orgInsert = vi.fn().mockResolvedValue({ error: null })
+    const memberInsert = vi.fn().mockResolvedValue({ error: null })
+    const branchInsert = vi.fn().mockResolvedValue({ error: null })
+    const orgMemberUpdateBuilder = {
+      update: vi.fn(() => orgMemberUpdateBuilder),
+      eq: vi.fn(() => orgMemberUpdateBuilder),
+    }
+
+    const randomUuidMock = vi.spyOn(globalThis.crypto, 'randomUUID')
+    randomUuidMock
+      .mockReturnValueOnce('org-3')
+      .mockReturnValueOnce('branch-3')
+
+    mocks.createAdminClient.mockRejectedValue(new Error('Missing SUPABASE_SERVICE_ROLE_KEY'))
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1', email: 'owner@example.com' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'organizations') return { insert: orgInsert }
+        if (table === 'org_members') {
+          return {
+            insert: memberInsert,
+            update: orgMemberUpdateBuilder.update,
+            eq: orgMemberUpdateBuilder.eq,
+          }
+        }
+        if (table === 'branches') return { insert: branchInsert }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const formData = new FormData()
+    formData.set('name', 'PT Fallback Session')
+
+    await createOrganization(formData)
+
+    expect(orgInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'org-3',
+        name: 'PT Fallback Session',
+      })
+    )
+    expect(memberInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: 'org-3',
+        user_id: 'user-1',
+        role: 'owner',
+      })
+    )
+    expect(branchInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'branch-3',
+        org_id: 'org-3',
+        name: 'Unit Utama',
+        code: 'MAIN',
+      })
+    )
+    expect(mocks.redirect).toHaveBeenCalledWith('/dashboard')
+    randomUuidMock.mockRestore()
+  })
+
+  it('returns migration hint when organization trigger references a missing table', async () => {
+    const cookieStore = createCookieStore()
+    mocks.cookies.mockResolvedValue(cookieStore)
+
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1', email: 'owner@example.com' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'organizations') {
+          return {
+            insert: vi.fn().mockResolvedValue({
+              error: {
+                code: '42P01',
+                message: 'relation "accounts" does not exist',
+              },
+            }),
+          }
+        }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+    mocks.createAdminClient.mockResolvedValue({
+      from: vi.fn(),
+    })
+
+    const formData = new FormData()
+    formData.set('name', 'PT Migrasi Belum Lengkap')
+
+    const result = await createOrganization(formData)
+
+    expect(result).toEqual({
+      error: 'Database belum lengkap. Tabel "accounts" belum tersedia. Jalankan migrasi Supabase terbaru lalu coba lagi.',
+    })
+    expect(mocks.redirect).not.toHaveBeenCalled()
+  })
+
   it('creates a new branch and makes it the active unit immediately', async () => {
     const cookieStore = createCookieStore()
     mocks.cookies.mockResolvedValue(cookieStore)
@@ -296,7 +490,6 @@ describe('Organization Branch Bootstrap', () => {
     }
 
     const duplicateNameBuilder = {
-      select: vi.fn(() => duplicateNameBuilder),
       eq: vi.fn(() => duplicateNameBuilder),
       maybeSingle: vi.fn().mockResolvedValue({
         data: null,
@@ -305,7 +498,6 @@ describe('Organization Branch Bootstrap', () => {
     }
 
     const duplicateCodeBuilder = {
-      select: vi.fn(() => duplicateCodeBuilder),
       eq: vi.fn(() => duplicateCodeBuilder),
       maybeSingle: vi.fn().mockResolvedValue({
         data: null,
@@ -323,6 +515,48 @@ describe('Organization Branch Bootstrap', () => {
     }
 
     let branchReadCount = 0
+    const branchCountBuilder = {
+      count: 1,
+      eq: vi.fn(() => branchCountBuilder),
+    }
+    const childOrgCountBuilder = {
+      count: 0,
+      eq: vi.fn(() => childOrgCountBuilder),
+    }
+    const memberCountBuilder = {
+      count: 1,
+      eq: vi.fn(() => memberCountBuilder),
+    }
+    const orgSettingsBuilder = {
+      eq: vi.fn(() => orgSettingsBuilder),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { settings: {} },
+        error: null,
+      }),
+    }
+
+    const organizationsTableBuilder = {
+      select: vi.fn((_: string, options?: { count?: string; head?: boolean }) => {
+        if (options?.count === 'exact' && options?.head) return childOrgCountBuilder
+        return orgSettingsBuilder
+      }),
+    }
+    const orgMembersTableBuilder = {
+      select: vi.fn((_: string, options?: { count?: string; head?: boolean }) => {
+        if (options?.count === 'exact' && options?.head) return memberCountBuilder
+        return orgMembersBuilder
+      }),
+    }
+    const branchesTableBuilder = {
+      select: vi.fn((_: string, options?: { count?: string; head?: boolean }) => {
+        if (options?.count === 'exact' && options?.head) return branchCountBuilder
+        branchReadCount += 1
+        if (branchReadCount === 1) return duplicateNameBuilder
+        return duplicateCodeBuilder
+      }),
+      insert: branchInsertBuilder.insert,
+    }
+
     const memberUpdateBuilder = {
       update: vi.fn(() => memberUpdateBuilder),
       eq: vi.fn(() => memberUpdateBuilder),
@@ -335,13 +569,9 @@ describe('Organization Branch Bootstrap', () => {
         }),
       },
       from: vi.fn((table: string) => {
-        if (table === 'org_members') return orgMembersBuilder
-        if (table === 'branches') {
-          branchReadCount += 1
-          if (branchReadCount === 1) return duplicateNameBuilder
-          if (branchReadCount === 2) return duplicateCodeBuilder
-          return branchInsertBuilder
-        }
+        if (table === 'organizations') return organizationsTableBuilder
+        if (table === 'org_members') return orgMembersTableBuilder
+        if (table === 'branches') return branchesTableBuilder
         throw new Error(`Unexpected table ${table}`)
       }),
     })
