@@ -1,13 +1,12 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
-import { createAdminClient, createClient } from '@/lib/supabase/server'
-import type { LooseDb } from '@/lib/supabase/loose'
+import { Prisma } from '@prisma/client'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-
-const MAX_SCREENSHOT_SIZE_BYTES = 5 * 1024 * 1024
-const ALLOWED_SCREENSHOT_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic']
+import { uploadSupportTicketScreenshot } from '@/modules/saas/lib/support-ticket-storage.server'
+import { revalidatePath } from 'next/cache'
 
 export type SupportTicketRecord = {
   id: string
@@ -65,8 +64,49 @@ type TicketMutationResult = {
   error?: string
 }
 
+type SupportTicketRow = {
+  id: string
+  org_id: string
+  ticket_no: string
+  title: string
+  description: string
+  severity: string
+  status: string
+  found_in_menu: string
+  found_during: string | null
+  found_at: Date | string | null
+  screenshot_url: string | null
+  created_at: Date | string
+  organization_name?: string | null
+}
+
+type SupportTicketUpdateRow = {
+  id: string
+  ticket_id: string
+  org_id: string
+  update_title: string
+  update_body: string | null
+  status_after: string
+  is_public?: boolean | null
+  created_at: Date | string
+  updated_by_user_id?: string | null
+  ticket_no?: string | null
+  ticket_title?: string | null
+  ticket_severity?: string | null
+  ticket_found_in_menu?: string | null
+}
+
 function normalizeText(value: FormDataEntryValue | null) {
   return String(value || '').trim()
+}
+
+function toIsoString(value: Date | string | null | undefined) {
+  if (!value) return null
+  if (value instanceof Date) return value.toISOString()
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString()
 }
 
 function parseFoundAtIso(foundAtRaw: string) {
@@ -76,103 +116,231 @@ function parseFoundAtIso(foundAtRaw: string) {
   return parsed.toISOString()
 }
 
-function validateScreenshot(file: File) {
-  if (!ALLOWED_SCREENSHOT_MIME_TYPES.includes(file.type)) {
-    return 'Format screenshot tidak didukung. Gunakan JPG, PNG, WEBP, GIF, atau HEIC.'
+function normalizeTicketStatus(value: string | null | undefined): SupportTicketRecord['status'] {
+  const normalized = String(value || '').toUpperCase()
+  if (normalized === 'LOW' || normalized === 'MEDIUM' || normalized === 'HIGH' || normalized === 'CRITICAL') {
+    return 'OPEN'
   }
-  if (file.size > MAX_SCREENSHOT_SIZE_BYTES) {
-    return 'Ukuran screenshot maksimal 5MB.'
+
+  return (['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].includes(normalized)
+    ? normalized
+    : 'OPEN') as SupportTicketRecord['status']
+}
+
+function normalizeTicketSeverity(value: string | null | undefined): SupportTicketRecord['severity'] {
+  const normalized = String(value || '').toUpperCase()
+  return (['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(normalized)
+    ? normalized
+    : 'MEDIUM') as SupportTicketRecord['severity']
+}
+
+function normalizeSupportTicket(row: SupportTicketRow): SupportTicketRecord {
+  return {
+    id: row.id,
+    ticket_no: row.ticket_no,
+    title: row.title,
+    description: row.description,
+    severity: normalizeTicketSeverity(row.severity),
+    status: normalizeTicketStatus(row.status),
+    found_in_menu: row.found_in_menu,
+    found_during: row.found_during ?? null,
+    found_at: toIsoString(row.found_at),
+    screenshot_url: row.screenshot_url ?? null,
+    created_at: toIsoString(row.created_at) || new Date(0).toISOString(),
   }
-  return null
+}
+
+function normalizeSupportTicketDocUpdate(row: SupportTicketUpdateRow): SupportTicketDocUpdateRecord {
+  return {
+    id: row.id,
+    ticket_id: row.ticket_id,
+    update_title: row.update_title,
+    update_body: row.update_body ?? null,
+    status_after: normalizeTicketStatus(row.status_after),
+    created_at: toIsoString(row.created_at) || new Date(0).toISOString(),
+    ticket: row.ticket_no
+      ? {
+          ticket_no: row.ticket_no,
+          title: row.ticket_title || '',
+          severity: normalizeTicketSeverity(row.ticket_severity),
+          found_in_menu: row.ticket_found_in_menu || '',
+        }
+      : null,
+  }
+}
+
+function normalizeOperatorSupportTicket(row: SupportTicketRow): OperatorSupportTicketRecord {
+  return {
+    ...normalizeSupportTicket(row),
+    org_id: row.org_id,
+    organization: row.organization_name
+      ? { name: row.organization_name }
+      : null,
+  }
+}
+
+function normalizeOperatorSupportTicketUpdate(row: SupportTicketUpdateRow): OperatorSupportTicketUpdateRecord {
+  return {
+    id: row.id,
+    ticket_id: row.ticket_id,
+    org_id: row.org_id,
+    update_title: row.update_title,
+    update_body: row.update_body ?? null,
+    status_after: normalizeTicketStatus(row.status_after),
+    is_public: Boolean(row.is_public),
+    created_at: toIsoString(row.created_at) || new Date(0).toISOString(),
+    updated_by_user_id: String(row.updated_by_user_id || ''),
+  }
 }
 
 async function requirePlatformAdminActor() {
-  const supabase = await createClient()
-  const { data } = await supabase.auth.getUser()
-  const user = data.user
-  if (!user) return { error: 'Sesi login tidak ditemukan.' }
-  if (!isPlatformAdminEmail(user.email)) return { error: 'Akses ditolak. Khusus platform admin.' }
-  return { user }
+  const session = await auth()
+  const user = session?.user
+  const email = String(user?.email || '').trim()
+
+  if (!user?.id) return { error: 'Sesi login tidak ditemukan.' }
+  if (!email || !isPlatformAdminEmail(email)) return { error: 'Akses ditolak. Khusus platform admin.' }
+
+  return {
+    userId: user.id,
+    email,
+  }
+}
+
+async function getCurrentAuthenticatedUser() {
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) {
+    return { error: 'Sesi login tidak ditemukan. Silakan login ulang.' as const }
+  }
+
+  return { userId }
 }
 
 export async function getSupportTicketsForCurrentOrg(limit = 20): Promise<SupportTicketRecord[]> {
   const orgData = await getActiveOrg()
   if (!orgData?.org?.id) return []
 
-  const supabase = await createClient()
-  const db = supabase as unknown as LooseDb
-  const { data, error } = await db
-    .from('support_tickets')
-    .select('id, ticket_no, title, description, severity, status, found_in_menu, found_during, found_at, screenshot_url, created_at')
-    .eq('org_id', orgData.org.id)
-    .order('created_at', { ascending: false })
-    .limit(limit)
+  try {
+    const rows = await prisma.$queryRaw<SupportTicketRow[]>(Prisma.sql`
+      SELECT
+        id::text AS id,
+        org_id::text AS org_id,
+        ticket_no,
+        title,
+        description,
+        severity,
+        status,
+        found_in_menu,
+        found_during,
+        found_at,
+        screenshot_url,
+        created_at
+      FROM public.support_tickets
+      WHERE org_id = ${orgData.org.id}::uuid
+      ORDER BY created_at DESC
+      LIMIT ${Math.max(1, limit)}
+    `)
 
-  if (error) {
-    console.error('[ticketing] Failed to fetch support tickets:', error.message)
+    return rows.map(normalizeSupportTicket)
+  } catch (error) {
+    console.error('[ticketing] Failed to fetch support tickets:', error)
     return []
   }
-
-  return (data || []) as SupportTicketRecord[]
 }
 
 export async function getSupportDocUpdatesForCurrentOrg(limit = 100): Promise<SupportTicketDocUpdateRecord[]> {
   const orgData = await getActiveOrg()
   if (!orgData?.org?.id) return []
 
-  const supabase = await createClient()
-  const db = supabase as unknown as LooseDb
-  const { data, error } = await db
-    .from('support_ticket_updates')
-    .select('id, ticket_id, update_title, update_body, status_after, created_at, ticket:support_tickets(ticket_no, title, severity, found_in_menu)')
-    .eq('org_id', orgData.org.id)
-    .eq('is_public', true)
-    .order('created_at', { ascending: false })
-    .limit(limit)
+  try {
+    const rows = await prisma.$queryRaw<SupportTicketUpdateRow[]>(Prisma.sql`
+      SELECT
+        u.id::text AS id,
+        u.ticket_id::text AS ticket_id,
+        u.org_id::text AS org_id,
+        u.update_title,
+        u.update_body,
+        u.status_after,
+        u.created_at,
+        t.ticket_no,
+        t.title AS ticket_title,
+        t.severity AS ticket_severity,
+        t.found_in_menu AS ticket_found_in_menu
+      FROM public.support_ticket_updates u
+      JOIN public.support_tickets t ON t.id = u.ticket_id
+      WHERE u.org_id = ${orgData.org.id}::uuid
+        AND u.is_public = TRUE
+      ORDER BY u.created_at DESC
+      LIMIT ${Math.max(1, limit)}
+    `)
 
-  if (error) {
-    console.error('[ticketing] Failed to fetch doc updates:', error.message)
+    return rows.map(normalizeSupportTicketDocUpdate)
+  } catch (error) {
+    console.error('[ticketing] Failed to fetch doc updates:', error)
     return []
   }
-
-  return (data || []) as SupportTicketDocUpdateRecord[]
 }
 
 export async function getOperatorTicketingSnapshot(limit = 120): Promise<OperatorTicketingSnapshot> {
   const actor = await requirePlatformAdminActor()
   if ('error' in actor) return { tickets: [], updates: [] }
 
-  const admin = await createAdminClient()
-  const db = admin as unknown as LooseDb
+  try {
+    const [ticketRows, updateRows] = await Promise.all([
+      prisma.$queryRaw<SupportTicketRow[]>(Prisma.sql`
+        SELECT
+          t.id::text AS id,
+          t.org_id::text AS org_id,
+          t.ticket_no,
+          t.title,
+          t.description,
+          t.severity,
+          t.status,
+          t.found_in_menu,
+          t.found_during,
+          t.found_at,
+          t.screenshot_url,
+          t.created_at,
+          o.name AS organization_name
+        FROM public.support_tickets t
+        LEFT JOIN public.organizations o ON o.id = t.org_id
+        ORDER BY t.created_at DESC
+        LIMIT ${Math.max(1, limit)}
+      `),
+      prisma.$queryRaw<SupportTicketUpdateRow[]>(Prisma.sql`
+        SELECT
+          id::text AS id,
+          ticket_id::text AS ticket_id,
+          org_id::text AS org_id,
+          update_title,
+          update_body,
+          status_after,
+          is_public,
+          created_at,
+          updated_by_user_id::text AS updated_by_user_id
+        FROM public.support_ticket_updates
+        ORDER BY created_at DESC
+        LIMIT ${Math.max(1, limit * 2)}
+      `),
+    ])
 
-  const [ticketResult, updatesResult] = await Promise.all([
-    db
-      .from('support_tickets')
-      .select('id, org_id, ticket_no, title, description, severity, status, found_in_menu, found_during, found_at, screenshot_url, created_at, organization:organizations(name)')
-      .order('created_at', { ascending: false })
-      .limit(limit),
-    db
-      .from('support_ticket_updates')
-      .select('id, ticket_id, org_id, update_title, update_body, status_after, is_public, created_at, updated_by_user_id')
-      .order('created_at', { ascending: false })
-      .limit(limit * 2),
-  ])
-
-  const tickets = ticketResult.error ? [] : ((ticketResult.data || []) as OperatorSupportTicketRecord[])
-  const updates = updatesResult.error ? [] : ((updatesResult.data || []) as OperatorSupportTicketUpdateRecord[])
-
-  return { tickets, updates }
+    return {
+      tickets: ticketRows.map(normalizeOperatorSupportTicket),
+      updates: updateRows.map(normalizeOperatorSupportTicketUpdate),
+    }
+  } catch (error) {
+    console.error('[ticketing] Failed to fetch operator snapshot:', error)
+    return { tickets: [], updates: [] }
+  }
 }
 
 export async function createSupportTicket(formData: FormData): Promise<TicketMutationResult> {
   const orgData = await getActiveOrg()
   if (!orgData?.org?.id) return { error: 'Organisasi aktif tidak ditemukan.' }
 
-  const supabase = await createClient()
-  const db = supabase as unknown as LooseDb
-  const { data: authData } = await supabase.auth.getUser()
-  const user = authData.user
-  if (!user) return { error: 'Sesi login tidak ditemukan. Silakan login ulang.' }
+  const actor = await getCurrentAuthenticatedUser()
+  if ('error' in actor) return { error: actor.error }
 
   const title = normalizeText(formData.get('title'))
   const description = normalizeText(formData.get('description'))
@@ -181,7 +349,7 @@ export async function createSupportTicket(formData: FormData): Promise<TicketMut
   const foundAtRaw = normalizeText(formData.get('found_at'))
   const foundAtIso = parseFoundAtIso(foundAtRaw)
   const severityRaw = normalizeText(formData.get('severity')).toUpperCase()
-  const severity = (['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(severityRaw) ? severityRaw : 'MEDIUM') as SupportTicketRecord['severity']
+  const severity = normalizeTicketSeverity(severityRaw)
 
   if (!title) return { error: 'Judul bug wajib diisi.' }
   if (!description) return { error: 'Deskripsi bug wajib diisi.' }
@@ -190,44 +358,47 @@ export async function createSupportTicket(formData: FormData): Promise<TicketMut
   let screenshotUrl: string | null = null
   const screenshot = formData.get('screenshot')
   if (screenshot instanceof File && screenshot.size > 0) {
-    const screenshotError = validateScreenshot(screenshot)
-    if (screenshotError) return { error: screenshotError }
-
-    const extension = String(screenshot.name.split('.').pop() || 'png')
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '') || 'png'
-    const filePath = `${user.id}/support-tickets/${orgData.org.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('receipts')
-      .upload(filePath, screenshot, { contentType: screenshot.type, upsert: false })
-
-    if (uploadError) {
-      return { error: `Gagal upload screenshot: ${uploadError.message}` }
+    const uploadResult = await uploadSupportTicketScreenshot(actor.userId, orgData.org.id, screenshot)
+    if ('error' in uploadResult) {
+      return { error: `Gagal upload screenshot: ${uploadResult.error}` }
     }
 
-    const { data: publicData } = supabase.storage.from('receipts').getPublicUrl(filePath)
-    screenshotUrl = publicData.publicUrl
+    screenshotUrl = uploadResult.url
   }
 
-  const payload = {
-    org_id: orgData.org.id,
-    reporter_user_id: user.id,
-    title,
-    description,
-    severity,
-    status: 'OPEN',
-    found_in_menu: foundInMenu,
-    found_during: foundDuring || null,
-    found_at: foundAtIso,
-    screenshot_url: screenshotUrl,
+  try {
+    await prisma.$executeRaw(Prisma.sql`
+      INSERT INTO public.support_tickets (
+        org_id,
+        reporter_user_id,
+        title,
+        description,
+        severity,
+        status,
+        found_in_menu,
+        found_during,
+        found_at,
+        screenshot_url
+      ) VALUES (
+        ${orgData.org.id}::uuid,
+        ${actor.userId}::uuid,
+        ${title},
+        ${description},
+        ${severity},
+        ${'OPEN'},
+        ${foundInMenu},
+        ${foundDuring || null},
+        ${foundAtIso ? new Date(foundAtIso) : null},
+        ${screenshotUrl}
+      )
+    `)
+  } catch (error) {
+    return { error: `Gagal menyimpan tiket: ${error instanceof Error ? error.message : 'Unknown error'}` }
   }
-
-  const { error } = await db.from('support_tickets').insert(payload)
-  if (error) return { error: `Gagal menyimpan tiket: ${error.message}` }
 
   revalidatePath('/settings/ticketing')
   revalidatePath('/settings/ticketing/doc-update')
+  revalidatePath('/saas/ticketing')
   return { success: true }
 }
 
@@ -249,48 +420,61 @@ export async function postSupportTicketProgress(formData: FormData): Promise<Tic
     ? statusAfterRaw
     : 'IN_PROGRESS') as SupportTicketRecord['status']
 
-  const admin = await createAdminClient()
-  const db = admin as unknown as LooseDb
+  try {
+    await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<SupportTicketRow[]>(Prisma.sql`
+        SELECT
+          id::text AS id,
+          org_id::text AS org_id,
+          status
+        FROM public.support_tickets
+        WHERE id = ${ticketId}::uuid
+        LIMIT 1
+      `)
 
-  const { data: ticketRow, error: ticketError } = await db
-    .from('support_tickets')
-    .select('id, org_id, status')
-    .eq('id', ticketId)
-    .maybeSingle()
+      const ticketRow = rows[0]
+      if (!ticketRow) {
+        throw new Error('Tiket tidak ditemukan.')
+      }
 
-  if (ticketError) return { error: `Tiket tidak dapat dibaca: ${ticketError.message}` }
-  if (!ticketRow) return { error: 'Tiket tidak ditemukan.' }
+      const orgId = String(ticketRow.org_id || '')
+      if (!orgId) {
+        throw new Error('Org tiket tidak valid.')
+      }
 
-  const currentStatus = String((ticketRow as { status?: string }).status || 'OPEN').toUpperCase()
-  const orgId = String((ticketRow as { org_id?: string }).org_id || '')
-  if (!orgId) return { error: 'Org tiket tidak valid.' }
+      const normalizedCurrentStatus = normalizeTicketStatus(ticketRow.status)
 
-  const normalizedCurrentStatus = (['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].includes(currentStatus)
-    ? currentStatus
-    : 'OPEN') as SupportTicketRecord['status']
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE public.support_tickets
+        SET status = ${statusAfter}
+        WHERE id = ${ticketId}::uuid
+      `)
 
-  const { error: updateTicketError } = await db
-    .from('support_tickets')
-    .update({ status: statusAfter })
-    .eq('id', ticketId)
-
-  if (updateTicketError) {
-    return { error: `Gagal update status tiket: ${updateTicketError.message}` }
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO public.support_ticket_updates (
+          ticket_id,
+          org_id,
+          updated_by_user_id,
+          update_title,
+          update_body,
+          status_before,
+          status_after,
+          is_public
+        ) VALUES (
+          ${ticketId}::uuid,
+          ${orgId}::uuid,
+          ${actor.userId}::uuid,
+          ${updateTitle},
+          ${updateBody || null},
+          ${normalizedCurrentStatus},
+          ${statusAfter},
+          ${isPublic}
+        )
+      `)
+    })
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal simpan progress.' }
   }
-
-  const updatePayload = {
-    ticket_id: ticketId,
-    org_id: orgId,
-    updated_by_user_id: actor.user.id,
-    update_title: updateTitle,
-    update_body: updateBody || null,
-    status_before: normalizedCurrentStatus,
-    status_after: statusAfter,
-    is_public: isPublic,
-  }
-
-  const { error: progressError } = await db.from('support_ticket_updates').insert(updatePayload)
-  if (progressError) return { error: `Gagal simpan progress: ${progressError.message}` }
 
   revalidatePath('/saas/ticketing')
   revalidatePath('/settings/ticketing')

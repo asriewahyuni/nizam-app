@@ -1,13 +1,19 @@
 # AI Handover Document: Supabase -> Prisma/Auth Migration Status
 
-**Updated:** 2026-04-06 (sesi ke-17, Operator SaaS Backoffice migration)  
-**Status:** `IN PROGRESS` — Prioritas 2 (Billing/Operator Backoffice) untuk action layer operator SaaS selesai. Target berikutnya adalah Prioritas 3: Ticketing + Cash.
+**Updated:** 2026-04-06 (sesi ke-18, Ticketing migration)  
+**Status:** `IN PROGRESS` — Prioritas 3 untuk domain Ticketing selesai. Estimasi progres migrasi keseluruhan saat ini sekitar `90%`. Target berikutnya adalah slice Cash dan cleanup storage wrapper.
 
 Dokumen ini adalah rencana eksekusi dan handover aktif untuk agen. Sesi-sesi sebelumnya telah menyelesaikan migrasi pada domain auth, org, HRIS, audit, billing, accounting, contacts, services, sales, sales-write, POS.
 
 ---
 
 ## 0. Snapshot Repo Saat Ini
+
+- Estimasi progres migrasi keseluruhan: `90%`
+- Estimasi sisa pekerjaan utama: `10%`
+  - Ticketing sudah selesai dipindah dari Supabase data client ke Prisma/Auth raw SQL
+  - Sisa terbesar sekarang berada di `modules/cash/actions/bank.actions.ts` dan `modules/cash/actions/reconcile.actions.ts`
+  - Setelah cash selesai, sisa pekerjaan lebih banyak berupa cleanup storage wrapper dan edge-case flow yang masih Supabase-specific
 
 - Sesi sebelumnya telah membersihkan semua penggunaan klien Supabase pada domain operasional `sales` dan `pos`. 
 - Sesi ini (Sesi 15) akan fokus pada eksekusi Prioritas 1: **Core Sales / Purchasing Backbone**.
@@ -93,6 +99,7 @@ File-file berikut **sudah tidak lagi memakai Supabase data client**:
 - `modules/inventory/actions/inventory.actions.ts` ✅ (sesi 16)
 - `modules/inventory/actions/warehouse.actions.ts` ✅ (sesi 16)
 - `modules/saas/actions/operator-sales.actions.ts` ✅ (sesi 17)
+- `modules/saas/actions/ticketing.actions.ts` ✅ (sesi 18)
 
 ---
 
@@ -201,6 +208,16 @@ Operator SaaS backoffice migration yang selesai pada sesi ini:
   - `createOperatorQuotation`, `convertQuotationToSale`, dan `markOperatorSalePaid` sekarang berbasis Prisma; insert/update invoice tidak lagi lewat query builder Supabase
   - auto-journal untuk konversi sale dan receipt sekarang dibuat via Prisma transaction (`journal_entries` + `journal_lines`) sehingga rollback konsisten saat update invoice gagal
   - `getOperatorInvoiceDocument()` sekarang memuat invoice, paket, organisasi, config SaaS, dan paket topup AI dari Prisma
+
+Ticketing migration yang selesai pada sesi ini:
+
+- `modules/saas/actions/ticketing.actions.ts`
+  - auth guard operator sekarang memakai `auth()` + `isPlatformAdminEmail`, tanpa `createClient()/createAdminClient()`
+  - loader `getSupportTicketsForCurrentOrg`, `getSupportDocUpdatesForCurrentOrg`, dan `getOperatorTicketingSnapshot` sekarang memakai Prisma raw SQL ke tabel `support_tickets` dan `support_ticket_updates`
+  - mutasi `createSupportTicket` dan `postSupportTicketProgress` sekarang memakai Prisma raw SQL / transaction, bukan query builder Supabase
+  - bucket screenshot tidak lagi diakses langsung dari action layer; upload dipindahkan ke wrapper server terpisah
+- `modules/saas/lib/support-ticket-storage.server.ts`
+  - wrapper server-side baru untuk upload screenshot ticket ke bucket `receipts`
 
 Shared module migration yang selesai pada sesi ini:
 
@@ -457,11 +474,16 @@ Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file 
 - `modules/saas/actions/operator-sales.actions.ts` ✅
 - `/saas/penawaran`, `/saas/penjualan`, dan `/saas/dokumen/[id]` sekarang sudah mengambil data operator melalui action Prisma/Auth ini
 
-### PRIORITAS 3 (AKTIF): Ticketing + Cash
-- `modules/saas/actions/ticketing.actions.ts`
+### PRIORITAS 3 (SEBAGIAN SELESAI): Ticketing + Cash
+- `modules/saas/actions/ticketing.actions.ts` ✅
 - `modules/cash/actions/bank.actions.ts`
 - `modules/cash/actions/reconcile.actions.ts`
 - domain masih dekat dengan slice yang sudah dibersihkan (admin, billing, cash page shell)
+
+### PRIORITAS 3 (AKTIF): Cash
+- `modules/cash/actions/bank.actions.ts`
+- `modules/cash/actions/reconcile.actions.ts`
+- setelah ticketing selesai, dua file ini sekarang jadi blocker data-layer terbesar berikutnya
 
 ### PRIORITAS 4: Storage Wrappers
 - `modules/organization/lib/billing-proof-storage.server.ts`
@@ -564,5 +586,12 @@ Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file 
   - `modules/inventory/actions/inventory.actions.ts`
   - `modules/inventory/actions/warehouse.actions.ts`
   - `modules/sales/lib/sales-write.server.ts` (helper `withDbUserContext` reused)
+- Sesi 17 (Operator SaaS Backoffice):
+  - `modules/saas/actions/operator-sales.actions.ts`
+  - `__tests__/operator-sales.actions.test.ts`
+- Sesi 18 (Ticketing):
+  - `modules/saas/actions/ticketing.actions.ts`
+  - `modules/saas/lib/support-ticket-storage.server.ts`
+  - `__tests__/ticketing.actions.test.ts`
 
 Dokumen ini siap diberikan ke agent berikutnya sebagai status handover terbaru.
