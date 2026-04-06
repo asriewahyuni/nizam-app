@@ -13,6 +13,8 @@ export type AccessibleOrganization = {
     logo_url: string | null
     settings: unknown
     is_active: boolean
+    parent_org_id?: string | null
+    parent_org_name?: string | null
   }
 }
 

@@ -125,7 +125,8 @@ const NAV_GROUPS: NavGroup[] = [
     group: 'Config',
     items: [
       { label: 'Audit Trail', href: '/settings/audit', icon: ShieldCheck, permission_key: 'audit_trail', module_key: 'Audit' },
-      { label: 'Cabang & Divisi', href: '/settings/branches', icon: MapPin, permission_key: 'branch', module_key: 'Consolidation' },
+      { label: 'Anak Perusahaan', href: '/settings/sub-orgs', icon: Layers, permission_key: 'business', module_key: 'Consolidation' },
+      { label: 'Cabang', href: '/settings/branches', icon: MapPin, permission_key: 'branch' },
       { label: 'Pengaturan Bisnis', href: '/settings/business', icon: Settings, permission_key: 'business', module_key: 'Config' },
       { label: 'Ticketing', href: '/settings/ticketing', icon: LifeBuoy, permission_key: 'business', module_key: 'Config' },
       { label: 'Doc Update Ticketing', href: '/settings/ticketing/doc-update', icon: FileText, permission_key: 'business', module_key: 'Config' },
@@ -191,8 +192,10 @@ interface AppSidebarProps {
   unpostedJournals?: number
   pendingPurchaseRequests?: number
   hrisNotifications?: number
+  pendingCoaRequests?: number
   isDemo?: boolean
   planName?: string
+  canManageSubOrganizations?: boolean
 }
 
 export function AppSidebar({ 
@@ -205,8 +208,10 @@ export function AppSidebar({
   unpostedJournals = 0, 
   pendingPurchaseRequests = 0,
   hrisNotifications = 0,
+  pendingCoaRequests = 0,
   isDemo = false,
-  planName = 'Trial'
+  planName = 'Trial',
+  canManageSubOrganizations = true,
 }: AppSidebarProps) {
   const [isSigningOut, startSignOutTransition] = useTransition()
   const pathname = usePathname()
@@ -264,6 +269,17 @@ export function AppSidebar({
 
   const getFilteredItems = (group: NavGroup) => {
     return group.items.filter((item) => {
+      // Always show Sub-Org menu for eligible parent context (owner/admin on main org),
+      // regardless of paid-module mapping labels.
+      if (item.href === '/settings/sub-orgs') {
+        return canManageSubOrganizations
+      }
+
+      // Cabang adalah fitur core — selalu tampilkan untuk owner/admin
+      if (item.href === '/settings/branches') {
+        return isOwnerOrAdmin
+      }
+
       // Platform admin should always see SaaS operator shortcuts
       if (showSaasOperatorGroup && group.group === 'SaaS Operator') return true
 
@@ -392,6 +408,7 @@ export function AppSidebar({
                       if (item.href === '/accounting/journal') badgeCount = unpostedJournals
                       if (item.href === '/purchasing') badgeCount = pendingPurchaseRequests
                       if (item.href === '/hris') badgeCount = hrisNotifications
+                      if (item.href === '/cash') badgeCount = pendingCoaRequests
 
                       return (
                         <li key={item.href}>
@@ -456,6 +473,7 @@ export function AppSidebar({
                     if (item.href === '/accounting/journal') badgeCount = unpostedJournals
                     if (item.href === '/purchasing') badgeCount = pendingPurchaseRequests
                     if (item.href === '/hris') badgeCount = hrisNotifications
+                    if (item.href === '/cash') badgeCount = pendingCoaRequests
 
                     return (
                       <li key={item.href}>

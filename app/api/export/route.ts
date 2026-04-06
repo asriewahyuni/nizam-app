@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/auth'
+import { createClient } from '@/lib/supabase/server'
+import { getDateInTimeZone } from '@/lib/utils'
 import { getBranchAccessScope } from '@/modules/organization/lib/branch-access.server'
 import { getMembership } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
@@ -19,12 +20,15 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get('type') // pl | bs | gl | zakat
   const orgId = searchParams.get('orgId')
   const branchId = searchParams.get('branchId')
-  const startDate = searchParams.get('startDate') || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
-  const endDate = searchParams.get('endDate') || new Date().toISOString().split('T')[0]
+  const consolidated = searchParams.get('consolidated') === 'true'
+  const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
+  const currentMonthStart = `${todayInJakarta.slice(0, 7)}-01`
+  const startDate = searchParams.get('startDate') || currentMonthStart
+  const endDate = searchParams.get('endDate') || todayInJakarta
   const asOfDate = searchParams.get('asOfDate') || endDate
   const goldPerGram = parseFloat(searchParams.get('goldPerGram') || '1300000')
   const silverPerGram = parseFloat(searchParams.get('silverPerGram') || '15000')
-  const isOrgScopedExport = type === 'zakat'
+  const isOrgScopedExport = type === 'zakat' || consolidated
 
   if (!orgId) return NextResponse.json({ error: 'orgId diperlukan' }, { status: 400 })
 
@@ -57,20 +61,20 @@ export async function GET(request: NextRequest) {
 
     switch (type) {
       case 'pl':
-        buffer = await exportProfitLossXLSX(orgId, startDate, endDate, orgName, branchId)
+        buffer = await exportProfitLossXLSX(orgId, startDate, endDate, orgName, branchId, consolidated)
         filename = `Laba-Rugi_${orgName}_${startDate}_${endDate}.xlsx`
         break
       case 'bs':
-        buffer = await exportBalanceSheetXLSX(orgId, asOfDate, orgName, branchId)
+        buffer = await exportBalanceSheetXLSX(orgId, asOfDate, orgName, branchId, consolidated)
         filename = `Neraca_${orgName}_${asOfDate}.xlsx`
         break
       case 'gl':
-        buffer = await exportGeneralLedgerXLSX(orgId, orgName, branchId)
-        filename = `Buku-Besar_${orgName}_${new Date().toISOString().split('T')[0]}.xlsx`
+        buffer = await exportGeneralLedgerXLSX(orgId, orgName, branchId, consolidated)
+        filename = `Buku-Besar_${orgName}_${todayInJakarta}.xlsx`
         break
       case 'zakat':
         buffer = await exportZakatReportXLSX(orgId, goldPerGram, silverPerGram, orgName)
-        filename = `Zakat-Tijarah_${orgName}_${new Date().toISOString().split('T')[0]}.xlsx`
+        filename = `Zakat-Tijarah_${orgName}_${todayInJakarta}.xlsx`
         break
       default:
         return NextResponse.json({ error: 'Tipe export tidak valid. Gunakan: pl | bs | gl | zakat' }, { status: 400 })

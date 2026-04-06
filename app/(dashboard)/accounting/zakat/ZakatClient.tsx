@@ -131,7 +131,8 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
   const handleCheckHaul = async () => {
     setLoading(true)
     const res: any = await checkAndCancelHaul(orgId)
-    if (res.batal) setMsg({ type: 'err', text: `⚠️ HAUL BATAL. Aset (${formatRupiah(res.totalAssets)}) turun di bawah nishab. Haul baru dimulai saat aset kembali di atas nishab.` })
+    if (res.notApplicable) setMsg({ type: 'ok', text: res.reason || 'Zakat tijarah tidak berlaku untuk usaha layanan/jasa.' })
+    else if (res.batal) setMsg({ type: 'err', text: `⚠️ HAUL BATAL. Aset (${formatRupiah(res.totalAssets)}) turun di bawah nishab. Haul baru dimulai saat aset kembali di atas nishab.` })
     else if (res.active) setMsg({ type: 'ok', text: `Haul masih valid. Aset (${formatRupiah(res.totalAssets)}) tetap di atas nishab.` })
     else setMsg({ type: 'ok', text: 'Tidak ada haul aktif.' })
     router.refresh()
@@ -182,6 +183,14 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                 : 'Pemilihan unit aktif tidak mengubah hasil perhitungan modul ini.'}
             </p>
           </div>
+          {summary.isTradeZakatApplicable === false && (
+            <div className="max-w-3xl rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+              <p className="font-black uppercase tracking-widest text-[10px] text-amber-700 mb-1">Status Zakat Tijarah</p>
+              <p className="font-medium leading-relaxed">
+                {summary.tradeZakatIneligibilityReason || 'Usaha terdeteksi sebagai layanan/jasa, sehingga zakat tijarah tidak diterapkan.'}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Price Control */}
@@ -272,7 +281,9 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
           )}
           {(summary.haulStatus === 'NO_HAUL' || summary.haulStatus === 'BATAL') && !summary.isZakatObligated && (
             <div className="px-4 py-2 text-[10px] font-black text-slate-400 bg-slate-100 rounded-xl">
-              Aset belum mencapai nishab — haul belum dapat dimulai
+              {summary.isTradeZakatApplicable === false
+                ? (summary.tradeZakatIneligibilityReason || 'Zakat tijarah tidak berlaku untuk usaha layanan/jasa.')
+                : 'Aset belum mencapai nishab — haul belum dapat dimulai'}
             </div>
           )}
         </div>
@@ -292,7 +303,9 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                 {summary.isZakatObligated ? (
                   <span className="bg-white/20 backdrop-blur-md text-white px-5 py-2 rounded-full text-[10px] font-black border border-white/20">WAJIB ZAKAT</span>
                 ) : (
-                  <span className="bg-white/10 text-white/50 px-5 py-2 rounded-full text-[10px] font-black border border-white/10">DI BAWAH NISHAB</span>
+                  <span className="bg-white/10 text-white/50 px-5 py-2 rounded-full text-[10px] font-black border border-white/10">
+                    {summary.isTradeZakatApplicable === false ? 'TIDAK BERLAKU (LAYANAN)' : 'DI BAWAH NISHAB'}
+                  </span>
                 )}
                 
                 {summary.haulStatus === 'ACTIVE' && (

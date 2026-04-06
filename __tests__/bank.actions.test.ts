@@ -23,7 +23,13 @@ vi.mock('@/lib/prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
 vi.mock('@/modules/organization/lib/branch-access.server', () => ({ resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection }))
 
-import { createBankAccount, createBankTransaction, deleteBankTransaction, getRecentBankTransactions } from '@/modules/cash/actions/bank.actions'
+import {
+  createBankAccount,
+  createBankTransaction,
+  createInterOrgCapitalTransfer,
+  deleteBankTransaction,
+  getRecentBankTransactions,
+} from '@/modules/cash/actions/bank.actions'
 
 describe('Cash & Bank Branch Context', () => {
   beforeEach(() => {
@@ -85,5 +91,43 @@ describe('Cash & Bank Branch Context', () => {
     const result = await deleteBankTransaction('org-1', 'tx-1')
 
     expect(result).toEqual({ success: true })
+  })
+
+  it('creates inter-org capital transfer through RPC', async () => {
+    const rpcMock = vi.fn().mockResolvedValue({
+      data: [{ source_transaction_id: 'tx-out-1', target_transaction_id: 'tx-in-1' }],
+      error: null,
+    })
+
+    mocks.createClient.mockResolvedValue({
+      rpc: rpcMock,
+    })
+
+    const formData = new FormData()
+    formData.set('bank_account_id', 'bank-source')
+    formData.set('target_bank_account_id', 'bank-target')
+    formData.set('source_counter_account_id', 'acc-source-counter')
+    formData.set('target_counter_account_id', 'acc-target-counter')
+    formData.set('transaction_date', '2026-04-06')
+    formData.set('description', 'Transfer modal ke anak usaha')
+    formData.set('amount', '2500000')
+
+    const result = await createInterOrgCapitalTransfer('org-parent', formData)
+
+    expect(rpcMock).toHaveBeenCalledWith('create_interorg_capital_transfer', {
+      p_source_org_id: 'org-parent',
+      p_source_bank_account_id: 'bank-source',
+      p_source_counter_account_id: 'acc-source-counter',
+      p_target_bank_account_id: 'bank-target',
+      p_target_counter_account_id: 'acc-target-counter',
+      p_transaction_date: '2026-04-06',
+      p_amount: 2500000,
+      p_description: 'Transfer modal ke anak usaha',
+      p_reference_number: null,
+    })
+    expect(result).toEqual({
+      success: true,
+      data: [{ source_transaction_id: 'tx-out-1', target_transaction_id: 'tx-in-1' }],
+    })
   })
 })

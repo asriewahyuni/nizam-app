@@ -17,6 +17,7 @@ import {
   Link as LinkIcon,
   Eye,
   Printer,
+  ArrowRightLeft,
   Briefcase,
   Clock,
   ChevronRight,
@@ -35,7 +36,9 @@ import {
   MessageCircle
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { createEmployee, updateEmployee } from '@/modules/hris/actions/employee.actions'
+import { createClient } from '@/lib/supabase/client'
+import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
+import { createEmployee, deleteEmployee, resignEmployee, transferEmployeeToChildOrg, updateEmployee } from '@/modules/hris/actions/employee.actions'
 import { createPayrollComponent, deletePayrollComponent, generatePayrollRun, payPayrollRun, fixEmptyPayrollJournals, getPayrollRunDetails, deletePayrollRun, voidPayrollRun } from '@/modules/hris/actions/payroll.actions'
 import { upsertAttendanceRecord } from '@/modules/hris/actions/attendance.actions'
 import { approveLeaveRequest, createLeaveRequest, rejectLeaveRequest } from '@/modules/hris/actions/leave.actions'
@@ -66,6 +69,11 @@ export default function HrisClient({
   accounts = [],
   settings = {},
   roles = [],
+  branches: branchOptions = [],
+  childOrgOptions = [],
+  transferTargets = [],
+  transferDisabledReason = null,
+  initialTransferHistory = [],
   initialInvitations = [],
   defaultTab
 }: {
@@ -81,6 +89,11 @@ export default function HrisClient({
   accounts?: any[],
   settings?: any,
   roles?: any[],
+  branches?: any[],
+  childOrgOptions?: any[],
+  transferTargets?: any[],
+  transferDisabledReason?: string | null,
+  initialTransferHistory?: any[],
   initialInvitations?: any[],
   defaultTab?: string
 }) {
@@ -135,10 +148,16 @@ export default function HrisClient({
     setInvitations(initialInvitations || [])
   }, [initialInvitations])
 
-  useEffect(() => {
-    setRolesList(roles || [])
-  }, [roles])
   const [editingEmp, setEditingEmp] = useState<any>(null)
+  const [selectedManagedBranches, setSelectedManagedBranches] = useState<string[]>([])
+  const [selectedManagedChildOrgs, setSelectedManagedChildOrgs] = useState<string[]>([])
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
+  const [transferingEmp, setTransferingEmp] = useState<any>(null)
+  const [transferTargetOrgId, setTransferTargetOrgId] = useState('')
+  const [transferTargetBranchId, setTransferTargetBranchId] = useState('')
+  const [transferAsTargetPic, setTransferAsTargetPic] = useState(false)
+  const [transferNote, setTransferNote] = useState('')
+  const [transferHistory, setTransferHistory] = useState<any[]>(() => initialTransferHistory || [])
   const [viewingRun, setViewingRun] = useState<any>(null)
   const [viewingRunData, setViewingRunData] = useState<any[]>([])
   const [isPayrollModalOpen, setIsPayrollModalOpen] = useState(false)
@@ -222,6 +241,25 @@ export default function HrisClient({
     }
   }
 
+  const getManagedChildOrgIdsByEmployee = (emp: any) => {
+    if (!emp?.id) return []
+
+    const managedFromEmployeeRecord = Array.isArray(emp?.managed_child_orgs)
+      ? emp.managed_child_orgs
+          .map((org: any) => String(org?.id || '').trim())
+          .filter(Boolean)
+      : []
+
+    if (managedFromEmployeeRecord.length > 0) {
+      return managedFromEmployeeRecord
+    }
+
+    return (childOrgOptions || [])
+      .filter((org: any) => String(org?.manager_employee_id || '').trim() === String(emp.id))
+      .map((org: any) => String(org?.id || '').trim())
+      .filter(Boolean)
+  }
+
   const handleOpenNew = () => {
     if (!activeBranchId) {
       showToast('Pilih unit aktif terlebih dahulu untuk menambahkan karyawan baru.', 'info')
@@ -233,6 +271,8 @@ export default function HrisClient({
     setSelectedRole('')
     setAvatarFile(null)
     setAvatarPreview(null)
+    setSelectedManagedBranches([])
+    setSelectedManagedChildOrgs([])
     setIsAddModalOpen(true)
   }
 
@@ -242,6 +282,8 @@ export default function HrisClient({
     setSelectedRole(emp.job_title || '')
     setAvatarFile(null)
     setAvatarPreview(emp.avatar_url || null)
+    setSelectedManagedBranches(emp.managed_branches?.map((b: any) => b.id) || [])
+    setSelectedManagedChildOrgs(getManagedChildOrgIdsByEmployee(emp))
     setIsAddModalOpen(true)
   }
 
@@ -256,8 +298,10 @@ export default function HrisClient({
       const tempId = editingEmp?.id || `new-${Date.now()}`
       const res = await uploadEmployeeAvatar(avatarFile, tempId)
       if (res.url) formData.set('avatar_url', res.url)
-    } 
+    }
     formData.append('basic_salary', basicSalary.toString())
+    formData.append('managed_branches', JSON.stringify(selectedManagedBranches))
+    formData.append('managed_child_orgs', JSON.stringify(selectedManagedChildOrgs))
 
     const res = editingEmp
       ? await updateEmployee(editingEmp.id, orgId, formData)
@@ -271,6 +315,8 @@ export default function HrisClient({
         const formTarget = e.target as HTMLFormElement;
         formTarget.reset();
         setBasicSalary(0);
+        setSelectedManagedBranches([])
+        setSelectedManagedChildOrgs([])
         // Alert non-intrusif memberitahu berhasil
         showToast('Data Karyawan berhasil disimpan!', 'success')
       }
@@ -370,6 +416,66 @@ export default function HrisClient({
     setLoading(false)
   }
 
+  const handleDeleteEmployee = async (emp: any) => {
+    if (!confirm(`Yakin ingin menghapus karyawan ${emp.first_name} ${emp.last_name || ''}?`)) return
+    setLoading(true)
+    const res = await deleteEmployee(emp.id, orgId)
+    if (res.error) {
+      showToast(res.error, 'error')
+    } else {
+      setEmployees((current) => current.filter((row: any) => row.id !== emp.id))
+      showToast('Karyawan berhasil dihapus.', 'success')
+      refreshHrisPage()
+    }
+    setLoading(false)
+  }
+
+  const handleResignEmployee = async (emp: any) => {
+    const currentStatus = String(emp?.employment_status || '').toUpperCase()
+    if (currentStatus === 'RESIGNED') {
+      showToast('Karyawan ini sudah berstatus RESIGNED.', 'info')
+      return
+    }
+
+    if (!confirm(`Tandai ${emp.first_name} ${emp.last_name || ''} sebagai RESIGNED?`)) return
+
+    const reasonInput = window.prompt('Alasan resign (opsional):', '') || ''
+    const effectiveDateInput = window.prompt('Tanggal efektif resign (YYYY-MM-DD, kosongkan untuk hari ini):', '') || ''
+
+    setLoading(true)
+    const res = await resignEmployee(emp.id, orgId, {
+      reason: reasonInput,
+      effectiveDate: effectiveDateInput,
+    })
+
+    if (res.error) {
+      showToast(res.error, 'error')
+      setLoading(false)
+      return
+    }
+
+    const fallbackDate = new Date().toISOString().split('T')[0]
+    setEmployees((current: any[]) =>
+      current.map((row: any) =>
+        row.id === emp.id
+          ? {
+              ...row,
+              employment_status: 'RESIGNED',
+              end_date: res.effectiveDate || effectiveDateInput || fallbackDate,
+            }
+          : row
+      )
+    )
+    showToast(
+      res.warning
+        ? `Status resign tersimpan, dengan catatan: ${res.warning}`
+        : 'Status karyawan berhasil diubah ke RESIGNED.',
+      res.warning ? 'info' : 'success'
+    )
+    refreshHrisPage()
+    setLoading(false)
+  }
+
   const getNextNik = () => {
     const rawFormat = settings?.emp_format || 'EMP{MM}{YY}{0000}'
 
@@ -433,6 +539,64 @@ export default function HrisClient({
     startTransition(() => {
       router.refresh()
     })
+  }
+
+  const handleOpenTransfer = (emp: any) => {
+    if (!transferTargets || transferTargets.length === 0) {
+      showToast(transferDisabledReason || 'Belum ada entitas tujuan yang tersedia untuk mutasi.', 'info')
+      return
+    }
+
+    const firstTarget = transferTargets[0]
+    const firstBranch = firstTarget?.branches?.[0]
+
+    setTransferingEmp(emp)
+    setTransferTargetOrgId(firstTarget?.orgId || '')
+    setTransferTargetBranchId(firstBranch?.id || '')
+    setTransferAsTargetPic(false)
+    setTransferNote('')
+    setIsTransferModalOpen(true)
+  }
+
+  const handleChangeTransferTargetOrg = (nextOrgId: string) => {
+    setTransferTargetOrgId(nextOrgId)
+    const target = transferTargets.find((org: any) => org.orgId === nextOrgId)
+    const firstBranchId = target?.branches?.[0]?.id || ''
+    setTransferTargetBranchId(firstBranchId)
+  }
+
+  const handleSubmitTransfer = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!transferingEmp) return
+    if (!transferTargetOrgId || !transferTargetBranchId) {
+      showToast('Pilih entitas dan cabang tujuan terlebih dahulu.', 'error')
+      return
+    }
+
+    setLoading(true)
+    const res = await transferEmployeeToChildOrg(orgId, {
+      employeeId: transferingEmp.id,
+      targetOrgId: transferTargetOrgId,
+      targetBranchId: transferTargetBranchId,
+      assignPicToTargetBranch: transferAsTargetPic,
+      note: transferNote,
+    })
+
+    if (res.error) {
+      showToast(res.error, 'error')
+      setLoading(false)
+      return
+    }
+
+    setEmployees((current: any[]) => current.filter((row: any) => row.id !== transferingEmp.id))
+    if (res.transferLog) {
+      setTransferHistory((current: any[]) => [res.transferLog, ...current].slice(0, 20))
+    }
+    setIsTransferModalOpen(false)
+    setTransferingEmp(null)
+    showToast(res.warning ? `Mutasi selesai dengan catatan: ${res.warning}` : 'Mutasi karyawan berhasil diproses.', res.warning ? 'info' : 'success')
+    refreshHrisPage()
+    setLoading(false)
   }
 
   const handleSaveAttendance = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -514,6 +678,8 @@ export default function HrisClient({
   const pendingLeaveCount = leaveRequests.filter((request: any) => String(request.status || '').toUpperCase() === 'PENDING').length
   const defaultDateInput = new Date().toISOString().split('T')[0]
   const defaultDateTimeInput = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+  const selectedTransferOrg = transferTargets.find((org: any) => org.orgId === transferTargetOrgId)
+  const selectedTransferBranches = selectedTransferOrg?.branches || []
 
   return (
     <div className="space-y-10 pb-20">
@@ -667,6 +833,11 @@ export default function HrisClient({
                       Pilih satu unit dari header jika ingin mendaftarkan karyawan baru.
                     </div>
                   )}
+                  {transferTargets.length === 0 && transferDisabledReason && (
+                    <div className="text-[11px] font-bold text-indigo-600">
+                      Mutasi parent/child nonaktif: {transferDisabledReason}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -690,7 +861,16 @@ export default function HrisClient({
                             <div className="space-y-0.5">
                               <h4 className="font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors uppercase tracking-tight">{emp.first_name} {emp.last_name}</h4>
                               <div className="flex items-center gap-2">
-                                <StatusBadge label={emp.employment_status.replace('_', ' ')} variant={emp.employment_status === 'FULL_TIME' ? 'success' : 'warning'} />
+                                <StatusBadge
+                                  label={emp.employment_status.replace('_', ' ')}
+                                  variant={
+                                    ['RESIGNED', 'TERMINATED'].includes(String(emp.employment_status || '').toUpperCase())
+                                      ? 'error'
+                                      : emp.employment_status === 'FULL_TIME'
+                                        ? 'success'
+                                        : 'warning'
+                                  }
+                                />
                                 <span className="text-[10px] font-black font-mono text-slate-400 tracking-wider">#{emp.nik}</span>
                                 {emp.branch?.name && (
                                   <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-[0.18em] border border-blue-100">
@@ -706,6 +886,33 @@ export default function HrisClient({
                             className="p-3 bg-white text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition shadow-sm border border-slate-100"
                           >
                             <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={(e: any) => { e.stopPropagation(); handleOpenTransfer(emp); }}
+                            disabled={transferTargets.length === 0}
+                            className="p-3 bg-white text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition shadow-sm border border-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={transferTargets.length === 0 ? (transferDisabledReason || 'Belum ada entitas tujuan tersedia') : 'Mutasi ke parent/child lain'}
+                          >
+                            <ArrowRightLeft size={16} />
+                          </button>
+                          <button
+                            onClick={(e: any) => { e.stopPropagation(); handleResignEmployee(emp); }}
+                            disabled={String(emp.employment_status || '').toUpperCase() === 'RESIGNED'}
+                            className="p-3 bg-white text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-2xl transition shadow-sm border border-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={
+                              String(emp.employment_status || '').toUpperCase() === 'RESIGNED'
+                                ? 'Karyawan sudah RESIGNED'
+                                : 'Tandai sebagai RESIGNED'
+                            }
+                          >
+                            <AlertCircle size={16} />
+                          </button>
+                          <button
+                            onClick={(e: any) => { e.stopPropagation(); handleDeleteEmployee(emp); }}
+                            className="p-3 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition shadow-sm border border-slate-100"
+                            title="Hapus karyawan"
+                          >
+                            <Trash2 size={16} />
                           </button>
                           
                           {emp.reset_requested && (
@@ -758,6 +965,43 @@ export default function HrisClient({
                       </SafeButton>
                     }
                   />
+                )}
+
+                {transferHistory.length > 0 && (
+                  <div className="mt-10 rounded-[28px] border border-indigo-100 bg-indigo-50/50 p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-2xl bg-white border border-indigo-100 text-indigo-600 flex items-center justify-center">
+                        <ArrowRightLeft size={16} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-[0.16em]">Riwayat Mutasi Parent/Child</h4>
+                        <p className="text-[11px] font-bold text-slate-500">20 aktivitas terbaru perpindahan karyawan antar entitas holding.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      {transferHistory.map((item: any) => (
+                        <div key={item.id} className="rounded-2xl border border-indigo-100 bg-white px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                            <span>{new Date(item.created_at).toLocaleString('id-ID')}</span>
+                            <span>•</span>
+                            <span>By {item.actor_email || '-'}</span>
+                          </div>
+                          <p className="text-sm font-bold text-slate-800 mt-1">
+                            {item.employee_name} <span className="text-slate-400 font-mono text-xs">#{item.employee_nik || '-'}</span>
+                          </p>
+                          <p className="text-xs font-semibold text-slate-500 mt-1">
+                            {item.from_org_name} ({item.from_branch_name || '-'}) → {item.to_org_name} ({item.to_branch_name || '-'})
+                          </p>
+                          {item.target_assigned_as_pic && (
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-600 mt-1">Target branch ditetapkan sebagai PIC</p>
+                          )}
+                          {item.note && (
+                            <p className="text-xs text-slate-500 mt-1 italic">Catatan: {item.note}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             </SectionCard>
@@ -2068,6 +2312,68 @@ export default function HrisClient({
                       </select>
                     </div>
                   </div>
+
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-3">
+                      <div className="h-4 w-1 bg-emerald-600 rounded-full" />
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Penugasan PIC Cabang (Opsional)</h4>
+                    </div>
+                    <div className="space-y-2">
+                       <p className="text-xs font-semibold text-slate-500 mb-3">
+                          Pilih cabang/unit yang akan dikelola oleh karyawan ini sebagai Manager (PIC).
+                       </p>
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2 border border-slate-100 rounded-2xl p-3 bg-slate-50/50">
+                          {branchOptions?.map((b: any) => (
+                             <label key={b.id} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${selectedManagedBranches.includes(b.id) ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white hover:border-emerald-200'}`}>
+                                <input type="checkbox" checked={selectedManagedBranches.includes(b.id)} onChange={(e) => {
+                                   if(e.target.checked) setSelectedManagedBranches([...selectedManagedBranches, b.id])
+                                   else setSelectedManagedBranches(selectedManagedBranches.filter(id => id !== b.id))
+                                }} className="mt-0.5 h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 shrink-0" />
+                                <div className="flex flex-col">
+                                   <span className="text-sm font-bold text-slate-800 leading-none">{b.name}</span>
+                                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{b.code}</span>
+                                </div>
+                             </label>
+                          ))}
+                          {(!branchOptions || branchOptions.length === 0) && (
+                             <p className="text-xs text-slate-400 italic">Belum ada data cabang.</p>
+                          )}
+                       </div>
+                    </div>
+                  </div>
+
+                  {childOrgOptions?.length > 0 && (
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-3">
+                        <div className="h-4 w-1 bg-indigo-600 rounded-full" />
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Penugasan PIC Anak Perusahaan (Opsional)</h4>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-slate-500 mb-3">
+                          Pilih anak perusahaan yang akan dipimpin oleh karyawan ini sebagai PIC Direktur/Manager.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2 border border-slate-100 rounded-2xl p-3 bg-slate-50/50">
+                          {childOrgOptions.map((childOrg: any) => (
+                            <label key={childOrg.id} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${selectedManagedChildOrgs.includes(childOrg.id) ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 bg-white hover:border-indigo-200'}`}>
+                              <input
+                                type="checkbox"
+                                checked={selectedManagedChildOrgs.includes(childOrg.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedManagedChildOrgs([...selectedManagedChildOrgs, childOrg.id])
+                                  else setSelectedManagedChildOrgs(selectedManagedChildOrgs.filter((id) => id !== childOrg.id))
+                                }}
+                                className="mt-0.5 h-4 w-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 shrink-0"
+                              />
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold text-slate-800 leading-none">{childOrg.name}</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">ANAK PERUSAHAAN</span>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </form>
               </div>
 
@@ -2084,6 +2390,120 @@ export default function HrisClient({
                   SAVE PROFILE
                 </SafeButton>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isTransferModalOpen && transferingEmp && (
+          <div key="transfer-emp-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsTransferModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-xl bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white"
+            >
+              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50/70">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-100">
+                    <ArrowRightLeft size={22} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900 tracking-tight uppercase italic">Mutasi Parent/Child</h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{transferingEmp.first_name} {transferingEmp.last_name || ''}</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsTransferModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all border border-slate-100">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmitTransfer} className="p-8 space-y-6">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Asal</p>
+                  <p className="text-sm font-black text-slate-800 mt-1">
+                    {transferingEmp.branch?.name || '-'} • {transferingEmp.first_name} {transferingEmp.last_name || ''}
+                  </p>
+                  <p className="text-[11px] text-slate-500 font-semibold mt-1">NIK: {transferingEmp.nik || '-'}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Entitas Tujuan</label>
+                  <select
+                    required
+                    value={transferTargetOrgId}
+                    onChange={(e) => handleChangeTransferTargetOrg(e.target.value)}
+                    className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-sm font-black text-slate-700 outline-none focus:border-indigo-500"
+                  >
+                    <option value="">-- Pilih Entitas --</option>
+                    {transferTargets.map((target: any) => (
+                      <option key={target.orgId} value={target.orgId}>{target.orgName}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cabang Tujuan</label>
+                  <select
+                    required
+                    value={transferTargetBranchId}
+                    onChange={(e) => setTransferTargetBranchId(e.target.value)}
+                    className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-sm font-black text-slate-700 outline-none focus:border-indigo-500"
+                  >
+                    <option value="">-- Pilih Cabang --</option>
+                    {selectedTransferBranches.map((branch: any) => (
+                      <option key={branch.id} value={branch.id}>{branch.name} ({branch.code || '-'})</option>
+                    ))}
+                  </select>
+                  {transferTargetOrgId && selectedTransferBranches.length === 0 && (
+                    <p className="text-[11px] font-semibold text-amber-600">Entitas ini belum memiliki cabang aktif yang bisa dipilih.</p>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 flex items-start gap-3">
+                  <input
+                    id="transfer-pic-target"
+                    type="checkbox"
+                    checked={transferAsTargetPic}
+                    onChange={(e) => setTransferAsTargetPic(e.target.checked)}
+                    className="mt-1 h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                  />
+                  <label htmlFor="transfer-pic-target" className="text-xs font-bold text-emerald-700">
+                    Setelah mutasi, tetapkan karyawan ini sebagai PIC pada cabang tujuan.
+                  </label>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Catatan Mutasi (Opsional)</label>
+                  <textarea
+                    value={transferNote}
+                    onChange={(e) => setTransferNote(e.target.value)}
+                    rows={3}
+                    placeholder="Contoh: Mutasi operasional per 1 Mei 2026."
+                    className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 outline-none focus:border-indigo-500 resize-none"
+                  />
+                </div>
+
+                <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-[11px] font-semibold text-indigo-700">
+                  Mutasi akan: memindahkan profil ke entitas tujuan, menghapus profil asal (atau fallback RESIGNED jika terikat histori transaksi), melepas PIC cabang lama, dan menulis riwayat mutasi.
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button type="button" onClick={() => setIsTransferModalOpen(false)} className="px-6 py-3 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-widest">
+                    Batal
+                  </button>
+                  <SafeButton
+                    type="submit"
+                    variant="indigo"
+                    size="lg"
+                    icon={<ArrowRightLeft size={18} />}
+                    isLoading={loading}
+                    disabled={!transferTargetOrgId || !transferTargetBranchId}
+                  >
+                    Proses Mutasi
+                  </SafeButton>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

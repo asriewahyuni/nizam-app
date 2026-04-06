@@ -49,39 +49,45 @@ export async function injectShariahPack(orgId: string) {
   if (!membership) return { error: 'Unauthorized' }
 
   try {
-    const roots = await prisma.accounts.findMany({
-      where: {
-        org_id: orgId,
-        code: { in: ['2000', '3000', '6000'] },
-      },
-      select: {
-        id: true,
-        code: true,
-      },
-    })
+    // Get root parent IDs
+    const { data: roots } = await (supabase as any)
+      .from('accounts')
+      .select('id, code')
+      .eq('org_id', orgId)
+      .in('code', ['1000', '2000', '3000', '6000'])
 
-    const rootMap = roots.reduce<Record<string, string>>((map, root) => {
-      map[root.code] = root.id
-      return map
-    }, {})
+    const rootMap: Record<string, string> = {}
+    for (const r of (roots || [])) rootMap[r.code] = r.id
 
-    const ekuitasSyariahId = await upsertAccount(orgId, '3100', 'Ekuitas Syariah', 'EQUITY', 'CREDIT', rootMap['3000'] || null)
-    await upsertAccount(orgId, '3110', 'Modal Syirkah Mudharabah', 'EQUITY', 'CREDIT', ekuitasSyariahId)
-    await upsertAccount(orgId, '3120', 'Modal Syirkah Inan', 'EQUITY', 'CREDIT', ekuitasSyariahId)
+    // 1. EQUITY SYARIAH
+    const ekuitasSyariahId = await upsert('3100', 'Ekuitas Syariah', 'EQUITY', 'CREDIT', rootMap['3000'] ?? null)
+    await upsert('3110', 'Modal Syirkah Mudharabah', 'EQUITY', 'CREDIT', ekuitasSyariahId)
+    await upsert('3120', 'Modal Syirkah Inan', 'EQUITY', 'CREDIT', ekuitasSyariahId)
 
-    const kewajibanSyariahId = await upsertAccount(orgId, '2600', 'Kewajiban Syariah', 'LIABILITY', 'CREDIT', rootMap['2000'] || null)
-    await upsertAccount(orgId, '2601', 'Hutang Qard (Kebajikan)', 'LIABILITY', 'CREDIT', kewajibanSyariahId)
+    // 2. LIABILITIES (QARD)
+    const kewajSyariahId = await upsert('2600', 'Kewajiban Syariah', 'LIABILITY', 'CREDIT', rootMap['2000'] ?? null)
+    await upsert('2601', 'Hutang Qard (Kebajikan)', 'LIABILITY', 'CREDIT', kewajSyariahId)
+    await upsert('2602', 'Hutang Salam', 'LIABILITY', 'CREDIT', kewajSyariahId)
 
-    const ijarahId = await upsertAccount(orgId, '6100', 'Beban Ijarah & Ujrah', 'EXPENSE', 'DEBIT', rootMap['6000'] || null)
-    await upsertAccount(orgId, '6110', 'Beban Ujrah Gaji', 'EXPENSE', 'DEBIT', ijarahId)
-    await upsertAccount(orgId, '6120', 'Beban Ujrah Sewa & Lainnya', 'EXPENSE', 'DEBIT', ijarahId)
+    // 2b. SALAM RECEIVABLE (ASSET)
+    await upsert('1404', 'Piutang Salam Vendor', 'ASSET', 'DEBIT', rootMap['1000'] ?? null)
 
-    const zakatId = await upsertAccount(orgId, '6200', 'Beban Zakat & Sosial', 'EXPENSE', 'DEBIT', rootMap['6000'] || null)
-    await upsertAccount(orgId, '6210', 'Zakat Maal Pemilik', 'EXPENSE', 'DEBIT', zakatId)
-    await upsertAccount(orgId, '6220', 'Zakat Tijarah (Perdagangan)', 'EXPENSE', 'DEBIT', zakatId)
-    await upsertAccount(orgId, '6230', "Cukai Mu'ahidah", 'EXPENSE', 'DEBIT', zakatId)
-  } catch (error) {
-    return { error: error instanceof Error ? `Gagal menyuntikkan Akun Syariah: ${error.message}` : 'Gagal menyuntikkan Akun Syariah.' }
+    // 3. IJARAH (EXPENSES)
+    const ijarahId = await upsert('6100', 'Beban Ijarah & Ujrah', 'EXPENSE', 'DEBIT', rootMap['6000'] ?? null)
+    await upsert('6110', 'Beban Ujrah Gaji', 'EXPENSE', 'DEBIT', ijarahId)
+    await upsert('6120', 'Beban Ujrah Sewa & Lainnya', 'EXPENSE', 'DEBIT', ijarahId)
+
+    // 4. ZAKAT & CUKAI (EXPENSES)
+    const zakatId = await upsert('6200', 'Beban Zakat & Sosial', 'EXPENSE', 'DEBIT', rootMap['6000'] ?? null)
+    await upsert('6210', 'Zakat Maal Pemilik', 'EXPENSE', 'DEBIT', zakatId)
+    await upsert('6220', 'Zakat Tijarah (Perdagangan)', 'EXPENSE', 'DEBIT', zakatId)
+    await upsert('6230', "Cukai Mu'ahidah", 'EXPENSE', 'DEBIT', zakatId)
+
+    revalidatePath('/settings/accounts')
+    revalidatePath('/accounting/zakat')
+    return { success: true }
+  } catch (err: any) {
+    return { error: 'Gagal menyuntikkan Akun Syariah: ' + err.message }
   }
 
   revalidatePath('/settings/accounts')
@@ -93,7 +99,8 @@ export async function setShariahAccountsActive(orgId: string, active: boolean) {
   const membership = await ensureAccountingAccess(orgId)
   if (!membership) return { error: 'Unauthorized' }
 
-  const syariahCodes = ['2600', '2601', '3100', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
+  // Syariah codes from injectShariahPack
+  const syariahCodes = ['1404', '2600', '2601', '2602', '3100', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
 
   try {
     await prisma.accounts.updateMany({

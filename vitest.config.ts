@@ -1,7 +1,6 @@
-import { defineConfig } from 'vitest/config'
 import path from 'path'
 
-export default defineConfig({
+export default {
   test: {
     environment: 'node',
     globals: true,
@@ -18,9 +17,8 @@ export default defineConfig({
     noExternal: ['next-auth'],
   },
   resolve: {
-    alias: [
-      { find: '@', replacement: path.resolve(__dirname, './') },
-      { find: /^next\/server$/, replacement: 'next/server.js' },
-    ],
+    alias: {
+      '@': path.resolve(process.cwd(), './')
+    }
   }
-})
+}

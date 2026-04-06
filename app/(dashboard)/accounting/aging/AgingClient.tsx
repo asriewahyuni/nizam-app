@@ -45,6 +45,59 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
   }
 
   const netPosition = initialData.totalAR - initialData.totalAP
+  const arSalamReceivable = (initialData.ar || [])
+    .filter((row: any) => row.source_account_code === '1404' || row.source_type === 'SALAM_VENDOR_RECEIVABLE')
+    .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+  const arIstishnaReceivable = (initialData.ar || [])
+    .filter((row: any) => row.source_account_code === '1205' || row.source_type === 'ISTISHNA_VENDOR_RECEIVABLE')
+    .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+
+  const apSalamLiability = (initialData.ap || [])
+    .filter((row: any) => row.source_account_code === '2602' || row.source_type === 'SALAM_SALES_LIABILITY')
+    .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+  const apIstishnaLiability = (initialData.ap || [])
+    .filter((row: any) => row.source_account_code === '2603' || row.source_type === 'ISTISHNA_SALES_LIABILITY')
+    .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+
+  const openRowAction = (row: any) => {
+    if (row.source_type === 'TAX') {
+      router.push('/accounting/tax')
+      return
+    }
+
+    if (row.source_type === 'JOURNAL') {
+      if (!row.settlement_account_id) {
+        router.push('/accounting/journal')
+        return
+      }
+      const side = activeView === 'AR' ? 'IN' : 'OUT'
+      const params = new URLSearchParams({
+        pay: row.id,
+        type: side,
+        amount: String(Math.abs(row.outstanding)),
+        desc: `Pelunasan ${row.doc_number}`,
+        category_id: row.settlement_account_id,
+        lock_category: '1',
+      })
+      router.push(`/cash?${params.toString()}`)
+      return
+    }
+
+    if (row.doc_href) {
+      router.push(row.doc_href)
+      return
+    }
+
+    if (row.source_type === 'SALES') router.push(`/sales?pay=${row.id}`)
+    else if (row.source_type === 'PURCHASING') router.push(`/purchasing?pay=${row.id}`)
+    else router.push('/accounting/journal')
+  }
+
+  const actionLabel = (row: any) => {
+    if (row.source_type === 'TAX') return 'Buka Pajak'
+    if (row.source_type === 'JOURNAL') return activeView === 'AR' ? 'Terima Bayar' : 'Bayar Tagihan'
+    return 'Buka Dokumen'
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-12 pb-20 animate-in fade-in duration-700">
@@ -110,6 +163,14 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
                   <span className="text-sm text-slate-400 uppercase tracking-widest">Total Outstanding AR</span>
                   <span className="text-2xl text-slate-900">{formatRupiah(initialData.totalAR)}</span>
                </div>
+               <div className="pt-3 flex justify-between items-center">
+                  <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Piutang Salam (1404)</span>
+                  <span className="text-sm font-black text-indigo-600">{formatRupiah(arSalamReceivable)}</span>
+               </div>
+               <div className="pt-1 flex justify-between items-center opacity-80">
+                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Piutang Istishna (1205)</span>
+                  <span className="text-sm font-black text-indigo-500">{formatRupiah(arIstishnaReceivable)}</span>
+               </div>
             </div>
          </div>
 
@@ -143,6 +204,14 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
                   <span className="text-sm text-slate-400 uppercase tracking-widest">Total Outstanding AP</span>
                   <span className="text-2xl text-slate-900">{formatRupiah(initialData.totalAP)}</span>
                </div>
+               <div className="pt-3 flex justify-between items-center">
+                  <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Hutang Salam (2602)</span>
+                  <span className="text-sm font-black text-indigo-600">{formatRupiah(apSalamLiability)}</span>
+               </div>
+               <div className="pt-1 flex justify-between items-center opacity-80">
+                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Hutang Istishna (2603)</span>
+                  <span className="text-sm font-black text-indigo-500">{formatRupiah(apIstishnaLiability)}</span>
+               </div>
             </div>
          </div>
       </div>
@@ -166,6 +235,7 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
                   <tr>
                      <th className="px-10 py-5">{activeView === 'AR' ? 'Pelanggan' : 'Vendor'}</th>
                      <th className="px-6 py-5">No. Dokumen</th>
+                     <th className="px-6 py-5">Sumber AR/AP</th>
                      <th className="px-6 py-5 text-right">Terhutang</th>
                      <th className="px-6 py-5 text-right">Sudah Bayar</th>
                      <th className="px-6 py-5 text-right">Retur</th>
@@ -181,8 +251,22 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
                           {row.contact_name}
                        </td>
                        <td className="px-6 py-6 font-bold text-indigo-600 text-xs uppercase">
-                          {row.doc_number}
+                          {row.doc_href ? (
+                            <Link href={row.doc_href} className="hover:underline underline-offset-2">
+                              {row.doc_number}
+                            </Link>
+                          ) : (
+                            row.doc_number
+                          )}
                           <p className="text-[10px] text-slate-400 font-medium mt-1 uppercase italic">Due {formatDate(row.due_date)}</p>
+                       </td>
+                       <td className="px-6 py-6">
+                          <p className="text-[11px] font-black text-slate-700 uppercase">{row.source_label || row.source_type}</p>
+                          {row.source_account_code && (
+                            <span className="inline-flex mt-1 px-2 py-1 rounded-lg text-[10px] font-black bg-slate-100 text-slate-500">
+                              CoA {row.source_account_code}
+                            </span>
+                          )}
                        </td>
                        <td className="px-6 py-6 text-right font-bold text-slate-600 text-xs">{formatRupiah(row.grand_total)}</td>
                        <td className="px-6 py-6 text-right font-bold text-emerald-500 text-xs">{formatRupiah(row.paid_amount)}</td>
@@ -195,28 +279,7 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
                         </td>
                         <td className="px-10 py-6 text-right">
                            <button 
-                             onClick={() => {
-                               if (row.source_type === 'SALES') router.push(`/sales?pay=${row.id}`)
-                               else if (row.source_type === 'PURCHASING') router.push(`/purchasing?pay=${row.id}`)
-                               else if (row.source_type === 'TAX') router.push(`/accounting/tax`)
-                               else if (row.source_type === 'JOURNAL') {
-                                 if (!row.settlement_account_id) {
-                                   router.push(`/accounting/journal`)
-                                   return
-                                 }
-                                 const side = activeView === 'AR' ? 'IN' : 'OUT'
-                                 const params = new URLSearchParams({
-                                   pay: row.id,
-                                   type: side,
-                                   amount: String(Math.abs(row.outstanding)),
-                                   desc: `Pelunasan ${row.doc_number}`,
-                                   category_id: row.settlement_account_id,
-                                   lock_category: '1',
-                                 })
-                                 router.push(`/cash?${params.toString()}`)
-                               }
-                               else router.push(`/accounting/journal`)
-                             }}
+                             onClick={() => openRowAction(row)}
                              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm ${
                                activeView === 'AR' 
                                ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-100' 
@@ -225,7 +288,7 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
                                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
                              }`}
                            >
-                              {activeView === 'AR' ? 'Terima Bayar' : 'Bayar Tagihan'}
+                              {actionLabel(row)}
                               <ArrowRight size={14} />
                            </button>
                         </td>

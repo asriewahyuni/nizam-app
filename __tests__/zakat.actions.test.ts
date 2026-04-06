@@ -57,4 +57,65 @@ describe('Zakat Accounting Boundary', () => {
     expect(result.totalAssets).toBe(165000000)
     expect(result.isZakatObligated).toBe(true)
   })
+
+  it('disables trade zakat obligation for service/labour business', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        organizations: [
+          {
+            maybeSingleResult: success({
+              settings: {
+                business_type: 'LAYANAN_JASA',
+              },
+            }),
+          },
+        ],
+        zakat_haul: [
+          {
+            maybeSingleResult: success(null),
+          },
+          {
+            maybeSingleResult: success(null),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        zakat_asset_timeline: [
+          {
+            maybeSingleResult: success(null),
+          },
+          {
+            result: success([]),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        accounts: [
+          {
+            result: { data: null, error: null, count: 4 } as any,
+          },
+        ],
+      },
+    })
+
+    mocks.getAccountBalances.mockResolvedValue([
+      { code: '1101', name: 'Kas', balance: 300000000 },
+      { code: '1201', name: 'Piutang Usaha', balance: 100000000 },
+      { code: '1301', name: 'Persediaan', balance: 0 },
+      { code: '2101', name: 'Hutang Dagang', balance: -50000000 },
+    ])
+    mocks.createClient.mockResolvedValue(supabase.client)
+
+    const result = await getZakatSummary('org-jasa', {
+      goldPerGram: 1500000,
+      silverPerGram: 15000,
+    })
+
+    expect(result.isTradeZakatApplicable).toBe(false)
+    expect(result.tradeZakatIneligibilityReason).toContain('layanan')
+    expect(result.isZakatObligated).toBe(false)
+    expect(result.zakatAmount).toBe(0)
+  })
 })

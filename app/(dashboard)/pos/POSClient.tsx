@@ -24,10 +24,16 @@ export default function POSClient({
    activeBranchId,
    activeBranchName,
 }: any) {
-    const orgSettings = org?.settings || {}
+   const orgSettings = org?.settings || {}
     const logoUrl = org?.logo_url || ''
    const branchGuardMessage = 'Pilih satu unit aktif terlebih dahulu untuk memakai POS.'
    const isStockTrackedProduct = (item: any) => (item?.type || 'INVENTORY') === 'INVENTORY'
+   const formatStockQty = (value: number) => {
+      const parsed = Number(value || 0)
+      if (!Number.isFinite(parsed)) return '0'
+      const rounded = Math.round(parsed * 1_000_000) / 1_000_000
+      return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(6).replace(/\.?0+$/, '')
+   }
    const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
    const [loading, setLoading] = useState(false)
    const [successData, setSuccessData] = useState<any>(null)
@@ -155,7 +161,7 @@ export default function POSClient({
                         const existing = prev.find((item: any) => item.id === product.id)
                         if (existing) {
                            if (stockTracked && existing.qty + 1 > (product.stock || 0)) {
-                              alert(`Peringatan: Stok '${product.name}' tidak mencukupi (Tersedia: ${product.stock || 0}).`)
+                              alert(`Peringatan: Stok '${product.name}' tidak mencukupi (Tersedia: ${formatStockQty(product.stock || 0)}).`)
                               return prev
                            }
                            return prev.map((item: any) => item.id === product.id ? { ...item, qty: item.qty + 1 } : item)
@@ -266,7 +272,7 @@ export default function POSClient({
          if (item.id === id) {
             const newQty = Math.max(1, item.qty + delta)
             if (delta > 0 && isStockTrackedProduct(item) && newQty > (item.stock || 0)) {
-               alert(`Stok tidak mencukupi!`)
+               alert(`Stok '${item.name}' tidak mencukupi (Tersedia: ${formatStockQty(item.stock || 0)}).`)
                return item
             }
             return { ...item, qty: newQty }
@@ -449,7 +455,7 @@ export default function POSClient({
                               </div>
                               {isStockTrackedProduct(p) ? (
                                  <div className={`mt-2 text-[9px] font-bold px-2 py-0.5 rounded-md w-fit ${p.stock <= 5 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-400'}`}>
-                                    Stok: {p.stock || 0} {p.unit || 'Pcs'}
+                                    Stok: {formatStockQty(p.stock || 0)} {p.unit || 'Pcs'}
                                  </div>
                               ) : (
                                  <div className="mt-2 text-[9px] font-bold px-2 py-0.5 rounded-md w-fit bg-emerald-50 text-emerald-600">

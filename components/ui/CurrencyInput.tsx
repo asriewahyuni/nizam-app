@@ -11,6 +11,7 @@ interface CurrencyInputProps {
   labelClassName?: string
   placeholder?: string
   highlight?: boolean
+  disabled?: boolean
 }
 
 export function CurrencyInput({ 
@@ -21,7 +22,8 @@ export function CurrencyInput({
   className = "", 
   labelClassName = "",
   placeholder = "0",
-  highlight = false
+  highlight = false,
+  disabled = false,
 }: CurrencyInputProps) {
   const [displayValue, setDisplayValue] = useState('')
 
@@ -37,6 +39,7 @@ export function CurrencyInput({
   }, [value])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return
     const rawValue = e.target.value.replace(/\D/g, '')
     const numValue = parseInt(rawValue, 10) || 0
     
@@ -61,11 +64,12 @@ export function CurrencyInput({
           onChange={handleChange}
           placeholder={placeholder}
           autoComplete="off"
+          disabled={disabled}
           className={`w-full px-5 py-3 border rounded-2xl outline-none text-sm font-black transition-all ${
             highlight 
               ? 'border-emerald-200 bg-white text-emerald-600 focus:border-emerald-500 shadow-sm shadow-emerald-50' 
               : 'border-slate-200 bg-white text-slate-900 focus:border-indigo-500 shadow-sm shadow-slate-50'
-          } ${className}`}
+          } ${disabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''} ${className}`}
         />
         {value > 0 && (
           <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[8px] font-black text-slate-300 opacity-50 px-1">RP</span>

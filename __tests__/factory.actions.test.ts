@@ -55,10 +55,113 @@ describe('Factory Branch Context', () => {
       production_boms: { create: vi.fn().mockResolvedValue({ id: 'bom-1' }) },
       production_bom_items: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
     }))
+    const itemsInsert = vi.fn().mockResolvedValue({ error: null })
+    const productsQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockResolvedValue({
+        data: [{ id: 'prod-rm', name: 'Bahan A', unit: 'Pcs' }],
+        error: null,
+      }),
+    }
 
-    const result = await createBom('org-1', { productId: 'prod-1', code: 'BOM-1', description: 'Test', items: [{ productId: 'prod-2', quantity: 1 }] })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: {
+        accessibleBranches: [],
+        accessibleBranchIds: ['branch-1'],
+        canAccessAllBranches: false,
+        membershipId: 'member-1',
+        role: 'staff',
+      },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'production_boms') return { insert: bomInsert }
+        if (table === 'production_bom_items') return { insert: itemsInsert }
+        if (table === 'products') return productsQuery
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const result = await createBom('org-1', {
+      productId: 'prod-fg',
+      code: 'BOM-001',
+      description: 'BoM Branch A',
+      items: [{ productId: 'prod-rm', quantity: 2, unit: 'Pcs' }],
+    })
 
     expect(result).toEqual({ success: true })
+    expect(bomInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: 'org-1',
+        branch_id: 'branch-1',
+        product_id: 'prod-fg',
+      })
+    )
+    expect(itemsInsert).toHaveBeenCalledWith([
+      expect.objectContaining({
+        product_id: 'prod-rm',
+        quantity: 2,
+        unit: 'Pcs',
+      }),
+    ])
+  })
+
+  it('normalizes BoM quantity into product base unit before saving', async () => {
+    const bomSingle = vi.fn().mockResolvedValue({
+      data: { id: 'bom-2' },
+      error: null,
+    })
+    const bomInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: bomSingle,
+      })),
+    }))
+    const itemsInsert = vi.fn().mockResolvedValue({ error: null })
+    const productsQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockResolvedValue({
+        data: [{ id: 'prod-rm', name: 'Daging Sapi', unit: 'Kg' }],
+        error: null,
+      }),
+    }
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: {
+        accessibleBranches: [],
+        accessibleBranchIds: ['branch-1'],
+        canAccessAllBranches: false,
+        membershipId: 'member-1',
+        role: 'staff',
+      },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'production_boms') return { insert: bomInsert }
+        if (table === 'production_bom_items') return { insert: itemsInsert }
+        if (table === 'products') return productsQuery
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const result = await createBom('org-1', {
+      productId: 'prod-fg',
+      code: 'BOM-002',
+      description: 'Konversi satuan bahan',
+      items: [{ productId: 'prod-rm', quantity: 100, unit: 'Gram' }],
+    })
+
+    expect(result).toEqual({ success: true })
+    expect(itemsInsert).toHaveBeenCalledWith([
+      expect.objectContaining({
+        product_id: 'prod-rm',
+        quantity: 0.1,
+        unit: 'Kg',
+      }),
+    ])
   })
 
   it('rejects work order creation when the selected BoM belongs to another branch', async () => {

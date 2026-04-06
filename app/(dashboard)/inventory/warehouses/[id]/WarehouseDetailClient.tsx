@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { ArrowLeft, Plus, MapPin, Search, Maximize, CheckCircle2, Trash2 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createWarehouseBin, deleteWarehouseBin } from '@/modules/inventory/actions/warehouse.actions'
 
 interface WarehouseDetailClientProps {
@@ -22,10 +23,13 @@ export function WarehouseDetailClient({
   initialBins,
   userRole,
 }: WarehouseDetailClientProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [bins, setBins] = useState(initialBins)
   const [showModal, setShowModal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [search, setSearch] = useState('')
+  const [autoOpenHandled, setAutoOpenHandled] = useState(false)
 
   const [formData, setFormData] = useState({
     code: '',
@@ -46,6 +50,20 @@ export function WarehouseDetailClient({
     if (!binMutationGuardMessage) return
     setShowModal(false)
   }, [binMutationGuardMessage])
+
+  useEffect(() => {
+    if (autoOpenHandled) return
+
+    const shouldAutoOpenCreateBin = searchParams.get('createBin') === '1'
+    if (!shouldAutoOpenCreateBin) return
+
+    if (!binMutationGuardMessage && isAdmin) {
+      setShowModal(true)
+    }
+
+    setAutoOpenHandled(true)
+    router.replace(`/inventory/warehouses/${warehouse.id}`)
+  }, [autoOpenHandled, binMutationGuardMessage, isAdmin, router, searchParams, warehouse.id])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

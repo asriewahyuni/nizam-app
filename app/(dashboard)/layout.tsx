@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
+import { unstable_noStore as noStore } from 'next/cache'
 import { getAdminImpersonationState, getSession } from '@/modules/auth/actions/auth.actions'
 import { getActiveBranch, getActiveOrg, getBranches, getMyOrganizations } from '@/modules/organization/actions/org.actions'
 import { getPendingApprovalsCount } from '@/modules/organization/actions/approval.actions'
@@ -11,6 +12,7 @@ import { canAccessAllBranchesForOrg } from '@/modules/organization/lib/branch-ac
 import { isDemoSession } from '@/modules/demo/actions/demo.actions'
 import { getAiTokenHeaderSummary } from '@/modules/ai/lib/ai-token.server'
 import { saasModuleMatches } from '@/lib/saas/module-catalog'
+import { getPendingCoaRequestCount } from '@/modules/accounting/actions/coa-request.actions'
 import { AppSidebar } from '@/components/shared/AppSidebar'
 import { AppHeader } from '@/components/shared/AppHeader'
 import { AdminImpersonationBanner } from '@/components/shared/AdminImpersonationBanner'
@@ -18,6 +20,7 @@ import { DemoBanner } from '@/components/shared/DemoBanner'
 import { StartupWizard } from '@/components/shared/StartupWizard'
 import { FloatingPlanBadge } from '@/components/shared/FloatingPlanBadge'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
+import { MobilePullToRefresh } from '@/components/shared/MobilePullToRefresh'
 
 type RouteModuleEntry = {
   path: string
@@ -46,6 +49,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
+  noStore()
   const session = await getSession()
   if (!session) redirect('/login')
 
@@ -67,6 +71,7 @@ export default async function DashboardLayout({
     getMyOrganizations(),
     isDemoSession(),
     getAiTokenHeaderSummary(orgData.org.id),
+    getPendingCoaRequestCount(orgData.org.id),
   ])
   const pendingApprovals = resolveDashboardDependency('pending approvals', dependencyResults[0], 0)
   const unpostedJournals = resolveDashboardDependency('unposted journals', dependencyResults[1], 0)
@@ -77,11 +82,13 @@ export default async function DashboardLayout({
   const organizations = resolveDashboardDependency('accessible organizations', dependencyResults[6], [])
   const isDemo = resolveDashboardDependency('demo session state', dependencyResults[7], false)
   const aiTokens = resolveDashboardDependency('AI token summary', dependencyResults[8], null)
+  const pendingCoaRequests = resolveDashboardDependency('pending coa requests', dependencyResults[9], 0)
 
   // ─────────────────────────────────────────────────────────────
   // 3. SAAS MODULE & RBAC GUARD (Protect direct URL access)
   // ─────────────────────────────────────────────────────────────
   const isOwnerOrAdmin = orgData.role === 'owner' || orgData.role === 'admin'
+  const canManageSubOrganizations = isOwnerOrAdmin
   const pathname = (await headers()).get('x-pathname') || ''
 
   // Map paths to their required module names (matching saas_packages.modules)
@@ -165,8 +172,10 @@ export default async function DashboardLayout({
         unpostedJournals={unpostedJournals} 
         pendingPurchaseRequests={pendingPurchaseRequests}
         hrisNotifications={resetRequests}
+        pendingCoaRequests={pendingCoaRequests}
         isDemo={isDemo}
         planName={orgData.org.settings?.plan}
+        canManageSubOrganizations={canManageSubOrganizations}
       />
 
       {/* Main content */}
@@ -196,7 +205,8 @@ export default async function DashboardLayout({
           aiTokens={aiTokens}
         />
         <StartupWizard isDemo={isDemo} />
-        <main className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6 print:overflow-visible print:p-0 print:pb-0">
+        <MobilePullToRefresh scrollContainerId="dashboard-scroll-root" />
+        <main id="dashboard-scroll-root" className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6 print:overflow-visible print:p-0 print:pb-0">
           <div className="max-w-7xl mx-auto print:max-w-none">
             {allowAllBranchSelection && !activeBranch && branches.length > 1 && (
               <div className="mb-6 rounded-[28px] border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50 px-5 py-4 shadow-sm">

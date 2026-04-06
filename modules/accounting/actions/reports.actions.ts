@@ -1,218 +1,215 @@
-import { prisma } from '@/lib/prisma'
-import {
-  ensureAccountingAccess,
-  formatDateOnly,
-  getAggregatedAccountBalances,
-  getCashAccountCodes,
-  getPostedEntryIds,
-  resolveBranchFilter,
-  toNumber,
-  type BranchFilter,
-} from '@/modules/accounting/lib/reporting.server'
+import { createClient } from '@/lib/supabase/server'
+import { unstable_noStore as noStore } from 'next/cache'
+import { addDaysToDateString, getDateInTimeZone } from '@/lib/utils'
 
-type LedgerEntry = {
-  id: string
-  org_id: string
-  entry_number: string
-  entry_date: string
-  description: string
-  reference_type: string
-  reference_id: string | null
-  status: string
-  is_auto: boolean
-  notes: string | null
-  created_by: string | null
-  posted_at: string | null
-  voided_at: string | null
-  voided_by: string | null
-  void_reason: string | null
-  created_at: string
-  updated_at: string
-  branch_id: string | null
-  journal_lines: Array<{
-    id: string
-    entry_id: string
-    account_id: string
-    debit: number
-    credit: number
-    memo: string | null
-    accounts: {
-      code: string
-      name: string
-      type: string
+type BranchFilter = string | null | undefined
+
+async function resolveOrgIdsForReport(db: any, orgId: string, consolidated: boolean = false) {
+  if (!consolidated) return [orgId]
+
+  const { data: consolidatedOrgs, error: rpcError } = await db.rpc('get_consolidated_org_ids', { p_parent_org_id: orgId })
+  if (rpcError || !Array.isArray(consolidatedOrgs)) return [orgId]
+
+  const orgIds = consolidatedOrgs
+    .map((row: any) => String(row?.org_id || '').trim())
+    .filter((id: string) => id.length > 0)
+
+  if (!orgIds.includes(orgId)) orgIds.unshift(orgId)
+  return Array.from(new Set(orgIds))
+}
+
+async function getPostedEntryIds(
+  db: any,
+  orgId: string,
+  options: {
+    branchId?: BranchFilter
+    startDate?: string
+    endDate?: string
+    asOfDate?: string
+    consolidated?: boolean
+  } = {}
+) {
+  noStore()
+  const orgIdsToSearch = await resolveOrgIdsForReport(db, orgId, Boolean(options.consolidated))
+
+  let query = db
+    .from('journal_entries')
+    .select('id')
+    .in('org_id', orgIdsToSearch)
+    .eq('status', 'POSTED')
+
+  if (options.branchId && !options.consolidated) {
+    query = query.eq('branch_id', options.branchId)
+  }
+  if (options.startDate) {
+    query = query.gte('entry_date', options.startDate)
+  }
+  if (options.endDate) {
+    query = query.lte('entry_date', options.endDate)
+  }
+  if (options.asOfDate) {
+    query = query.lte('entry_date', options.asOfDate)
+  }
+
+  const { data, error } = await query
+  if (error || !Array.isArray(data)) return []
+  return data.map((entry: any) => entry.id)
+}
+
+async function getAccountBalancesFromEntries(
+  db: any,
+  entryIds: string[],
+  codeFilter?: string[]
+) {
+  if (entryIds.length === 0) return []
+
+  let query = db
+    .from('journal_lines')
+    .select('debit, credit, accounts!inner(id, code, name, type, normal_balance, parent_id, cash_flow_category)')
+    .in('entry_id', entryIds) as any
+
+  if (codeFilter && codeFilter.length > 0) {
+    query = query.in('accounts.code', codeFilter)
+  }
+
+  const { data, error } = await query
+  if (error || !Array.isArray(data)) return []
+
+  const accountMap: Record<string, any> = {}
+  data.forEach((line: any) => {
+    const account = line.accounts
+    if (!account || !account.code) return
+
+    if (!accountMap[account.code]) {
+      accountMap[account.code] = {
+        ...account,
+        total_debit: 0,
+        total_credit: 0,
+      }
     }
   }>
 }
 
-type LedgerEntryRecord = {
-  id: string
-  org_id: string
-  entry_number: string
-  entry_date: Date
-  description: string
-  reference_type: string
-  reference_id: string | null
-  status: string
-  is_auto: boolean
-  notes: string | null
-  created_by: string | null
-  posted_at: Date | null
-  voided_at: Date | null
-  voided_by: string | null
-  void_reason: string | null
-  created_at: Date
-  updated_at: Date
-  branch_id: string | null
-  journal_lines: Array<{
-    id: string
-    entry_id: string
-    account_id: string
-    debit: unknown
-    credit: unknown
-    memo: string | null
-    accounts: {
-      code: string
-      name: string
-      type: string
-    }
-  }>
-}
-
-function emptyProfitLoss() {
-  return { revenue: [], expenses: [], totalRevenue: 0, totalExpenses: 0, netProfit: 0 }
-}
+    accountMap[account.code].total_debit += Number(line.debit || 0)
+    accountMap[account.code].total_credit += Number(line.credit || 0)
+  })
 
 function emptyCashFlow() {
   return { ocf: 0, icf: 0, fcf: 0, netChange: 0, ocfItems: [], icfItems: [], fcfItems: [], netChangeTrend: 'UP' as 'UP' | 'DOWN', changePercent: 0 }
 }
 
-function normalizeLedgerEntry(entry: LedgerEntryRecord): LedgerEntry {
-  return {
-    id: entry.id,
-    org_id: entry.org_id,
-    entry_number: entry.entry_number,
-    entry_date: formatDateOnly(entry.entry_date) || '',
-    description: entry.description,
-    reference_type: String(entry.reference_type),
-    reference_id: entry.reference_id,
-    status: String(entry.status),
-    is_auto: entry.is_auto,
-    notes: entry.notes,
-    created_by: entry.created_by,
-    posted_at: entry.posted_at?.toISOString() || null,
-    voided_at: entry.voided_at?.toISOString() || null,
-    voided_by: entry.voided_by,
-    void_reason: entry.void_reason,
-    created_at: entry.created_at.toISOString(),
-    updated_at: entry.updated_at.toISOString(),
-    branch_id: entry.branch_id,
-    journal_lines: entry.journal_lines.map((line) => ({
-      id: line.id,
-      entry_id: line.entry_id,
-      account_id: line.account_id,
-      debit: toNumber(line.debit),
-      credit: toNumber(line.credit),
-      memo: line.memo,
-      accounts: {
-        code: line.accounts.code,
-        name: line.accounts.name,
-        type: String(line.accounts.type),
-      },
-    })),
-  }
-}
+export async function getGeneralLedger(orgId: string, branchId?: BranchFilter, consolidated: boolean = false) {
+  noStore()
+  const supabase = await createClient()
+  const db = supabase as any
 
-export async function getGeneralLedger(orgId: string, branchId?: BranchFilter) {
-  const membership = await ensureAccountingAccess(orgId)
-  if (!membership) return []
+  const entryIds = await getPostedEntryIds(db, orgId, { branchId, consolidated })
+  if (entryIds.length === 0) return []
 
-  const branchSelection = await resolveBranchFilter(orgId, branchId)
-  if ('error' in branchSelection) return []
-
-  const data = await prisma.journal_entries.findMany({
-    where: {
-      org_id: orgId,
-      status: 'POSTED',
-      ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
-    },
-    include: {
-      journal_lines: {
-        include: {
-          accounts: {
-            select: {
-              code: true,
-              name: true,
-              type: true,
-            },
-          },
-        },
-      },
-    },
-    orderBy: { entry_date: 'asc' },
-  })
+  const { data, error } = await db
+    .from('journal_entries')
+    .select(`
+      *,
+      journal_lines (
+        *,
+        accounts (code, name, type)
+      )
+    `)
+    .in('id', entryIds)
+    .order('entry_date', { ascending: true })
 
   return data.map(normalizeLedgerEntry)
 }
 
 export async function getBalanceSheet(
   orgId: string,
-  asOfDate: string = new Date().toISOString().split('T')[0],
-  branchId?: BranchFilter
+  asOfDate?: string,
+  branchId?: BranchFilter,
+  consolidated: boolean = false
 ) {
-  const membership = await ensureAccountingAccess(orgId)
-  if (!membership) return { assets: [], liabilities: [], equity: [] }
+  noStore()
+  const supabase = await createClient()
+  const db = supabase as any
+  const finalAsOfDate = asOfDate || getDateInTimeZone('Asia/Jakarta')
 
-  const branchSelection = await resolveBranchFilter(orgId, branchId)
-  if ('error' in branchSelection) return { assets: [], liabilities: [], equity: [] }
+  const orgIdsToSearch = await resolveOrgIdsForReport(db, orgId, consolidated)
 
-  const entryIds = await getPostedEntryIds(orgId, { branchId: branchSelection.branchId, asOfDate })
+  // 1. Fetch reference accounts from selected org scope
+  const { data: accountRows } = await db
+    .from('accounts')
+    .select('id, org_id, code, name, type, normal_balance, parent_id')
+    .in('org_id', orgIdsToSearch)
+    .eq('is_active', true)
+    .order('code', { ascending: true })
 
-  if (entryIds.length === 0) {
-    const pl = await getProfitLoss(orgId, '1970-01-01', asOfDate, branchSelection.branchId)
+  const dedupedByCode = new Map<string, any>()
+  const sortedRows = (Array.isArray(accountRows) ? accountRows : []).sort((a: any, b: any) => {
+    const byCode = String(a?.code || '').localeCompare(String(b?.code || ''))
+    if (byCode !== 0) return byCode
+    if (a?.org_id === orgId && b?.org_id !== orgId) return -1
+    if (a?.org_id !== orgId && b?.org_id === orgId) return 1
+    return String(a?.name || '').localeCompare(String(b?.name || ''))
+  })
+  for (const account of sortedRows) {
+    const code = String(account?.code || '').trim()
+    if (!code || dedupedByCode.has(code)) continue
+    dedupedByCode.set(code, account)
+  }
+  const accounts = Array.from(dedupedByCode.values())
+
+  const entryIds = await getPostedEntryIds(db, orgId, { branchId, asOfDate: finalAsOfDate, consolidated })
+
+  const balances = entryIds.length > 0 ? await getAccountBalancesFromEntries(db, entryIds) : []
+  const balancesByCode = new Map<string, any>(balances.map((b: any) => [b.code, b]))
+
+  const mapBalance = (account: any, positiveSide: 'DEBIT' | 'CREDIT') => {
+    const existing = balancesByCode.get(account.code)
+    const totalDebit = Number(existing?.total_debit || 0)
+    const totalCredit = Number(existing?.total_credit || 0)
+    const balance = positiveSide === 'DEBIT' ? totalDebit - totalCredit : totalCredit - totalDebit
     return {
-      assets: [],
-      liabilities: [],
-      equity: [{ code: '9999', name: 'Laba Ditahan / Periode Berjalan', balance: pl.netProfit, type: 'EQUITY' }],
+      ...account,
+      total_debit: totalDebit,
+      total_credit: totalCredit,
+      balance,
     }
   }
 
-  const balances = await getAggregatedAccountBalances(entryIds)
-  const assets = balances
-    .filter((account) => account.type === 'ASSET' || account.code.startsWith('1'))
-    .map((account) => ({ ...account, balance: account.total_debit - account.total_credit }))
-    .sort((left, right) => left.code.localeCompare(right.code))
+  const assets = accounts
+    .filter((a: any) => a.type === 'ASSET' || String(a.code || '').startsWith('1'))
+    .map((a: any) => mapBalance(a, 'DEBIT'))
+    .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
-  const liabilities = balances
-    .filter((account) => account.type === 'LIABILITY' || account.code.startsWith('2'))
-    .map((account) => ({ code: account.code, name: account.name, balance: account.total_credit - account.total_debit, type: account.type }))
-    .sort((left, right) => left.code.localeCompare(right.code))
+  const liabilities = accounts
+    .filter((a: any) => a.type === 'LIABILITY' || String(a.code || '').startsWith('2'))
+    .map((a: any) => mapBalance(a, 'CREDIT'))
+    .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
-  const equity = balances
-    .filter((account) => account.type === 'EQUITY' || account.code.startsWith('3'))
-    .map((account) => ({ code: account.code, name: account.name, balance: account.total_credit - account.total_debit, type: account.type }))
-    .sort((left, right) => left.code.localeCompare(right.code))
+  const equity = accounts
+    .filter((a: any) => a.type === 'EQUITY' || String(a.code || '').startsWith('3'))
+    .map((a: any) => mapBalance(a, 'CREDIT'))
+    .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
-  const pl = await getProfitLoss(orgId, '1970-01-01', asOfDate, branchSelection.branchId)
+  const pl = await getProfitLoss(orgId, '1970-01-01', finalAsOfDate, branchId, consolidated)
   equity.push({ code: '9999', name: 'Laba Ditahan / Periode Berjalan', balance: pl.netProfit, type: 'EQUITY' })
 
   return { assets, liabilities, equity }
 }
 
-export async function getProfitLoss(orgId: string, startDate?: string, endDate?: string, branchId?: BranchFilter) {
-  const membership = await ensureAccountingAccess(orgId)
-  if (!membership) return emptyProfitLoss()
+export async function getProfitLoss(orgId: string, startDate?: string, endDate?: string, branchId?: BranchFilter, consolidated: boolean = false) {
+  noStore()
+  const supabase = await createClient()
+  const db = supabase as any
 
-  const branchSelection = await resolveBranchFilter(orgId, branchId)
-  if ('error' in branchSelection) return emptyProfitLoss()
-
-  const now = new Date()
-  const sDate = startDate || new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-  const eDate = endDate || new Date().toISOString().split('T')[0]
+  const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
+  const sDate = startDate || `${todayInJakarta.slice(0, 7)}-01`
+  const eDate = endDate || todayInJakarta
 
   const entryIds = await getPostedEntryIds(orgId, {
     branchId: branchSelection.branchId,
     startDate: sDate,
     endDate: eDate,
+    consolidated,
   })
 
   const balances = await getAggregatedAccountBalances(entryIds)
@@ -239,27 +236,44 @@ export async function getProfitLoss(orgId: string, startDate?: string, endDate?:
   return { revenue, expenses, totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses }
 }
 
-export async function getCashFlow(orgId: string, branchId?: BranchFilter) {
-  const membership = await ensureAccountingAccess(orgId)
-  if (!membership) return emptyCashFlow()
+export async function getCashFlow(orgId: string, branchId?: BranchFilter, consolidated: boolean = false) {
+  noStore()
+  const supabase = await createClient()
+  const db = supabase as any
+  const orgIdsToSearch = await resolveOrgIdsForReport(db, orgId, consolidated)
 
-  const branchSelection = await resolveBranchFilter(orgId, branchId)
-  if ('error' in branchSelection) return emptyCashFlow()
+  const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
+  const currentMonthStart = `${todayInJakarta.slice(0, 7)}-01`
+  const lastMonthEnd = addDaysToDateString(currentMonthStart, -1)
+  const lastMonthStart = `${lastMonthEnd.slice(0, 7)}-01`
 
-  const now = new Date()
-  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0]
-  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0]
+  // Get all accounts linked to bank/cash module to treat them as cash accounts
+  let linkedAccountsQuery = (supabase as any)
+    .from('bank_accounts')
+    .select('account_id, accounts(code)')
+    .in('org_id', orgIdsToSearch)
 
-  const cashAccountCodes = await getCashAccountCodes(orgId, branchSelection.branchId)
-  const allEntryIds = await getPostedEntryIds(orgId, { branchId: branchSelection.branchId })
-  const accounts = await getAggregatedAccountBalances(allEntryIds)
+  if (branchId && !consolidated) {
+    linkedAccountsQuery = linkedAccountsQuery.eq('branch_id', branchId)
+  }
 
-  if (accounts.length === 0) return emptyCashFlow()
+  const { data: linkedAccounts } = await linkedAccountsQuery
+  const cashAccountCodes = (linkedAccounts || [])
+    .map((la: any) => la.accounts?.code)
+    .filter(Boolean)
+  
+  // Add defaults if still empty (fallback)
+  if (cashAccountCodes.length === 0) {
+    cashAccountCodes.push('1101', '1102', '1103', '1104', '1105')
+  }
+
+  const allEntryIds = await getPostedEntryIds(db, orgId, { branchId, consolidated })
+  const accounts = await getAccountBalancesFromEntries(db, allEntryIds)
 
   const currentEntryIds = await getPostedEntryIds(orgId, {
     branchId: branchSelection.branchId,
     startDate: currentMonthStart,
+    consolidated,
   })
   const currentMonthLines = currentEntryIds.length > 0
     ? await prisma.journal_lines.findMany({
@@ -275,6 +289,7 @@ export async function getCashFlow(orgId: string, branchId?: BranchFilter) {
     branchId: branchSelection.branchId,
     startDate: lastMonthStart,
     endDate: lastMonthEnd,
+    consolidated,
   })
   const lastMonthLines = lastEntryIds.length > 0
     ? await prisma.journal_lines.findMany({

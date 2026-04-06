@@ -127,7 +127,7 @@ export async function getAuditOverview(orgId: string) {
     }))
 
   // ======================================================
-  // 3. Inventory Sub-Ledger (Movements) vs General Ledger (1301)
+  // 3. Inventory Sub-Ledger (Movements) vs General Ledger (1301-1399)
   // ======================================================
   const products = await prisma.products.findMany({
     where: { org_id: orgId },
@@ -161,34 +161,25 @@ export async function getAuditOverview(orgId: string) {
       (stockByProduct[movement.product_id] || 0) + Number(movement.quantity || 0)
   }
 
-  // GL Inventory balance (account 1301)
-  const invAcc = await prisma.accounts.findFirst({
-    where: {
-      org_id: orgId,
-      code: '1301',
-    },
-    select: {
-      id: true,
-    },
-  })
+  // GL Inventory balance (inventory asset block 1301-1399)
+  const { data: inventoryAccounts } = await db
+    .from('accounts')
+    .select('id, code')
+    .eq('org_id', orgId)
+    .gte('code', '1301')
+    .lte('code', '1399')
 
   let glInventoryBalance = 0
-  if (invAcc && entryIds.length > 0) {
-    const invLines = await prisma.journal_lines.findMany({
-      where: {
-        account_id: invAcc.id,
-        entry_id: {
-          in: entryIds,
-        },
-      },
-      select: {
-        debit: true,
-        credit: true,
-      },
-    })
+  const inventoryAccountIds = (inventoryAccounts || []).map((acc: any) => acc.id)
+  if (inventoryAccountIds.length > 0 && entryIds.length > 0) {
+    const { data: invLines } = await db
+      .from('journal_lines')
+      .select('debit, credit')
+      .in('account_id', inventoryAccountIds)
+      .in('entry_id', entryIds)
 
-    for (const line of invLines) {
-      glInventoryBalance += Number(line.debit || 0) - Number(line.credit || 0)
+    for (const l of invLines || []) {
+      glInventoryBalance += Number(l.debit) - Number(l.credit)
     }
   }
 

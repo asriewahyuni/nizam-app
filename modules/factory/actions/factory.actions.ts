@@ -4,7 +4,7 @@ import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
-import { withDbUserContext } from '@/modules/sales/lib/sales-write.server'
+import { convertQuantityBetweenUnits } from '@/modules/factory/lib/unit-conversion'
 
 type ActiveBranchResult =
   | { branchId: string }
@@ -31,42 +31,16 @@ type FactoryWarehouseAccessRecord = {
   is_active: boolean
 }
 
-function normalizeBom(row: any) {
-  return {
-    ...row,
-    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
-    updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
-    branch: row.branches ?? row.branch ?? null,
-    product: row.products ?? row.product ?? null,
-    items: Array.isArray(row.production_bom_items ?? row.items)
-      ? (row.production_bom_items ?? row.items).map((item: any) => ({
-          ...item,
-          quantity: Number(item.quantity || 0),
-          product: item.products ?? item.product ?? null,
-        }))
-      : [],
-  }
+type BomPayloadItem = {
+  productId: string
+  quantity: number
+  unit?: string | null
 }
 
-function normalizeWorkOrder(row: any) {
-  return {
-    ...row,
-    quantity_planned: Number(row.quantity_planned || 0),
-    quantity_actual: Number(row.quantity_actual || 0),
-    released_at: row.released_at instanceof Date ? row.released_at.toISOString() : row.released_at,
-    completed_at: row.completed_at instanceof Date ? row.completed_at.toISOString() : row.completed_at,
-    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
-    updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
-    branch: row.branches ?? row.branch ?? null,
-    bom: row.production_boms
-      ? normalizeBom({
-          ...row.production_boms,
-          branch: row.production_boms.branches ?? row.production_boms.branch ?? null,
-          product: row.production_boms.products ?? row.production_boms.product ?? null,
-          items: row.production_boms.production_bom_items ?? row.production_boms.items ?? [],
-        })
-      : row.bom ?? null,
-  }
+type BomItemProductRecord = {
+  id: string
+  name: string
+  unit: string | null
 }
 
 async function resolveFactoryBranchId(orgId: string, branchId?: string | null) {
@@ -155,6 +129,65 @@ async function getAccessibleWarehouse(
   return (data as FactoryWarehouseAccessRecord | null) ?? null
 }
 
+async function normalizeBomItemsForPersistence(
+  supabase: any,
+  orgId: string,
+  items: BomPayloadItem[]
+): Promise<{ data: Array<{ product_id: string; quantity: number; unit: string | null }> } | { error: string }> {
+  if (!items.length) return { data: [] }
+
+  const productIds = [...new Set(items.map((item) => item.productId).filter(Boolean))]
+  if (productIds.length === 0) {
+    return { error: 'Item BoM tidak valid.' }
+  }
+
+  const { data: productRows, error: productError } = await (supabase as any)
+    .from('products')
+    .select('id, name, unit')
+    .eq('org_id', orgId)
+    .in('id', productIds)
+
+  if (productError) {
+    return { error: `Gagal membaca data produk BoM: ${productError.message}` }
+  }
+
+  const productMap = new Map<string, BomItemProductRecord>(
+    ((productRows as BomItemProductRecord[] | null) || []).map((row) => [row.id, row])
+  )
+
+  const normalizedItems: Array<{ product_id: string; quantity: number; unit: string | null }> = []
+
+  for (const item of items) {
+    const qty = Number(item.quantity)
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return { error: 'Qty bahan baku harus lebih besar dari nol.' }
+    }
+
+    const product = productMap.get(item.productId)
+    if (!product) {
+      return { error: `Produk bahan baku tidak ditemukan: ${item.productId}` }
+    }
+
+    const productUnit = product.unit || item.unit || null
+
+    let convertedQty = qty
+    try {
+      convertedQty = convertQuantityBetweenUnits(qty, item.unit || productUnit, productUnit)
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Konversi satuan gagal.'
+      return { error: `Bahan "${product.name}": ${reason}` }
+    }
+
+    normalizedItems.push({
+      product_id: item.productId,
+      quantity: convertedQty,
+      unit: productUnit,
+    })
+  }
+
+  return { data: normalizedItems }
+}
+
 export async function getBoms(orgId: string, branchId?: string | null) {
   const branchSelection = await resolveFactoryBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
@@ -229,32 +262,40 @@ export async function createBom(orgId: string, payload: { productId: string; cod
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  try {
-    await prisma.$transaction(async (tx) => {
-      const bom = await tx.production_boms.create({
-        data: {
-          org_id: orgId,
-          branch_id: activeBranchResult.branchId,
-          product_id: payload.productId,
-          code: payload.code,
-          description: payload.description,
-        },
-        select: { id: true },
-      })
-
-      if (payload.items.length > 0) {
-        await tx.production_bom_items.createMany({
-          data: payload.items.map((item) => ({
-            bom_id: bom.id,
-            product_id: item.productId,
-            quantity: item.quantity,
-            unit: item.unit || null,
-          })),
-        })
-      }
+  // Start Transaction (via manual check or RPC)
+  // For simplicity using sequential inserts (but in real production we use RPC)
+  const { data: bom, error: bomError } = await (supabase as any)
+    .from('production_boms')
+    .insert({
+      org_id: orgId,
+      branch_id: activeBranchResult.branchId,
+      product_id: payload.productId,
+      code: payload.code,
+      description: payload.description
     })
-  } catch (error: any) {
-    return { error: error.message }
+    .select()
+    .single()
+
+  if (bomError) return { error: bomError.message }
+
+  const normalizedItemsResult = await normalizeBomItemsForPersistence(
+    supabase as any,
+    orgId,
+    payload.items
+  )
+  if ('error' in normalizedItemsResult) return { error: normalizedItemsResult.error }
+
+  const bomItems = normalizedItemsResult.data.map((item) => ({
+    bom_id: bom.id,
+    ...item,
+  }))
+
+  if (bomItems.length > 0) {
+    const { error: itemsError } = await (supabase as any)
+      .from('production_bom_items')
+      .insert(bomItems)
+
+    if (itemsError) return { error: itemsError.message }
   }
 
   revalidatePath('/factory')
@@ -273,37 +314,46 @@ export async function updateBom(orgId: string, bomId: string, payload: { product
     return { error: 'Resep produksi tidak ditemukan pada unit aktif.' }
   }
 
-  try {
-    await prisma.$transaction(async (tx) => {
-      await tx.production_boms.update({
-        where: { id: accessibleBom.id },
-        data: {
-          product_id: payload.productId,
-          code: payload.code,
-          description: payload.description,
-          updated_at: new Date(),
-        },
-      })
-
-      await tx.production_bom_items.deleteMany({
-        where: {
-          bom_id: accessibleBom.id,
-        },
-      })
-
-      if (payload.items.length > 0) {
-        await tx.production_bom_items.createMany({
-          data: payload.items.map((item) => ({
-            bom_id: accessibleBom.id,
-            product_id: item.productId,
-            quantity: item.quantity,
-            unit: item.unit || null,
-          })),
-        })
-      }
+  // 1. Update BoM Header
+  const { error: bomError } = await (supabase as any)
+    .from('production_boms')
+    .update({
+      product_id: payload.productId,
+      code: payload.code,
+      description: payload.description,
+      updated_at: new Date().toISOString()
     })
-  } catch (error: any) {
-    return { error: error.message }
+    .eq('id', accessibleBom.id)
+    .eq('org_id', orgId)
+
+  if (bomError) return { error: bomError.message }
+
+  // 2. Refresh Items: Delete and Re-insert
+  const { error: deleteError } = await (supabase as any)
+    .from('production_bom_items')
+    .delete()
+    .eq('bom_id', accessibleBom.id)
+
+  if (deleteError) return { error: deleteError.message }
+
+  const normalizedItemsResult = await normalizeBomItemsForPersistence(
+    supabase as any,
+    orgId,
+    payload.items
+  )
+  if ('error' in normalizedItemsResult) return { error: normalizedItemsResult.error }
+
+  const bomItems = normalizedItemsResult.data.map((item) => ({
+    bom_id: accessibleBom.id,
+    ...item,
+  }))
+
+  if (bomItems.length > 0) {
+    const { error: itemsError } = await (supabase as any)
+      .from('production_bom_items')
+      .insert(bomItems)
+
+    if (itemsError) return { error: itemsError.message }
   }
 
   revalidatePath('/factory')
@@ -314,30 +364,30 @@ export async function getWorkOrders(orgId: string, branchId?: string | null) {
   const branchSelection = await resolveFactoryBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
 
-  try {
-    const data = await prisma.production_work_orders.findMany({
-      where: {
-        org_id: orgId,
-        ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
-      },
-      include: {
-        branches: { select: { id: true, name: true, code: true } },
-        production_boms: {
-          include: {
-            branches: { select: { id: true, name: true, code: true } },
-            products: { select: { id: true, name: true, sku: true } },
-            production_bom_items: {
-              select: {
-                product_id: true,
-                quantity: true,
-                products: { select: { id: true, name: true, average_cost: true, purchase_price: true, sku: true } },
-              },
-            },
-          },
-        },
-      },
-      orderBy: { created_at: 'desc' },
-    })
+  let query = (supabase as any)
+    .from('production_work_orders')
+    .select(`
+      *,
+      branch:branches(id, name, code),
+      bom:production_boms(
+        id, code, branch_id,
+        branch:branches(id, name, code),
+        product:products(id, name, sku),
+        items:production_bom_items(
+          product_id,
+          quantity,
+          unit,
+          product:products(id, name, average_cost, purchase_price, sku, unit)
+        )
+      )
+    `)
+    .eq('org_id', orgId)
+
+  if (branchSelection.branchId) {
+    query = query.eq('branch_id', branchSelection.branchId)
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
 
     return data.map(normalizeWorkOrder)
   } catch (error) {
@@ -357,23 +407,24 @@ export async function createWorkOrder(orgId: string, formData: FormData) {
   const wo_number = formData.get('wo_number') as string
   const quantity_planned = Number(formData.get('quantity_planned'))
   const notes = formData.get('notes') as string
+  const deadline_date = formData.get('deadline_date') as string
 
   const accessibleBom = await getAccessibleBom(orgId, bom_id, activeBranchResult.branchId)
   if (!accessibleBom) {
     return { error: 'Resep produksi tidak tersedia untuk unit aktif.' }
   }
 
-  try {
-    await prisma.production_work_orders.create({
-      data: {
-        org_id: orgId,
-        branch_id: activeBranchResult.branchId,
-        bom_id: accessibleBom.id,
-        wo_number,
-        quantity_planned,
-        status: 'DRAFT',
-        notes,
-      },
+  const { error } = await (supabase as any)
+    .from('production_work_orders')
+    .insert({
+      org_id: orgId,
+      branch_id: activeBranchResult.branchId,
+      bom_id: accessibleBom.id,
+      wo_number,
+      quantity_planned,
+      status: 'DRAFT',
+      notes,
+      deadline_date: deadline_date || null
     })
   } catch (error: any) {
     return { error: error.message }

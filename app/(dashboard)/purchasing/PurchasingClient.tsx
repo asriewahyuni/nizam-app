@@ -20,7 +20,8 @@ import {
   Wallet,
   FileText,
   Printer,
-  X
+  X,
+  Pencil
 } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createPurchaseEntry, receivePurchase, voidPurchase, createPurchasePayment, createPurchaseReturn } from '@/modules/purchasing/actions/purchasing.actions'
@@ -94,6 +95,23 @@ export default function PurchasingClient({
   const [payOverheadNow, setPayOverheadNow] = useState(false)
   const [overheadAccountId, setOverheadAccountId] = useState('')
   const [shariahMode, setShariahMode] = useState<'CASH' | 'SALAM' | 'ISTISHNA'>('CASH')
+
+  // Down Payment State
+  const [hasDp, setHasDp] = useState(false)
+  const [dpAmount, setDpAmount] = useState('0')
+  const [dpAccountId, setDpAccountId] = useState('')
+  const [dpMode, setDpMode] = useState<'NOMINAL' | 'PERCENT'>('NOMINAL')
+  const [dpPercent, setDpPercent] = useState('0')
+
+  useEffect(() => {
+    if (shariahMode !== 'SALAM') return
+    if (paymentTerm !== 'LUNAS') {
+      setPaymentTerm('LUNAS')
+    }
+    if (payOverheadNow) {
+      setPayOverheadNow(false)
+    }
+  }, [paymentTerm, payOverheadNow, shariahMode])
   
   // Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -112,7 +130,7 @@ export default function PurchasingClient({
   const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0])
   const [returnNotes, setReturnNotes] = useState('')
   const UNIT_OPTIONS = ['Pcs', 'Unit', 'Kg', 'Gram', 'Liter', 'Ml', 'Box', 'Pack', 'Roll', 'Lembar', 'Set', 'Lusin', 'Meter', 'Cm', 'Pasang', 'Rim', 'Karton', 'Botol', 'Galon', 'Lainnya']
-  const [lines, setLines] = useState([{
+  const createEmptyLine = () => ({
     id: Date.now(),
     product_name: '',
     product_id: '',
@@ -120,12 +138,14 @@ export default function PurchasingClient({
     unit: 'Pcs',
     custom_unit: '',
     unit_price: 0,
-    margin: 20, 
+    margin: 20,
     discount_amount: 0,
     category: 'Bahan',
     selling_price: 0,
     requestId: ''
-  }])
+  })
+  const [lines, setLines] = useState([createEmptyLine()])
+  const [editingDraftPurchaseId, setEditingDraftPurchaseId] = useState<string | null>(null)
 
   // Filter COA for payment accounts (Kas/Bank) if Lunas
   const paymentAccounts = coa?.filter((a: any) => a.type === 'ASSET' && (a.code.startsWith('11') || a.code.startsWith('12')))
@@ -142,21 +162,102 @@ export default function PurchasingClient({
   const calculatedTax = (taxableAmount * headerTaxPercent) / 100
   const grandTotal = taxableAmount + calculatedTax + (parseFloat(shippingAmount) || 0) + (parseFloat(insuranceAmount) || 0)
 
+  const resetPurchaseForm = () => {
+    setEditingDraftPurchaseId(null)
+    setLines([createEmptyLine()])
+    setVendorId('')
+    setPurchaseDate(new Date().toISOString().split('T')[0])
+    setNotes('')
+    setPaymentAccountId('')
+    setHasDp(false)
+    setDpAmount('0')
+    setDpAccountId('')
+    setDpMode('NOMINAL')
+    setDpPercent('0')
+    setPaymentTerm('TEMPO')
+    setDueDate('')
+    setCustomGlobalDiscount(null)
+    setHeaderTaxPercent(0)
+    setShippingAmount('0')
+    setInsuranceAmount('0')
+    setPayOverheadNow(false)
+    setOverheadAccountId('')
+    setShariahMode('CASH')
+    setError(null)
+  }
+
+  const stripPurchaseMetaFromNotes = (rawNotes: string) =>
+    rawNotes
+      .replace(/\[TERMIN:\s*(LUNAS|TEMPO)\]\s*/gi, '')
+      .replace(/\[ACC:\s*[a-f0-9-]+\]\s*/gi, '')
+      .replace(/\[OVERHEAD_ACC:\s*[a-f0-9-]+\]\s*/gi, '')
+      .trim()
+
+  const openDraftPurchaseEditor = (purchase: any) => {
+    const noteText = String(purchase?.notes || '')
+    const termMatch = noteText.match(/\[TERMIN:\s*(LUNAS|TEMPO)\]/i)
+    const paymentAccMatch = noteText.match(/\[ACC:\s*([a-f0-9-]+)\]/i)
+    const overheadAccMatch = noteText.match(/\[OVERHEAD_ACC:\s*([a-f0-9-]+)\]/i)
+    const parsedPaymentTerm = termMatch?.[1]?.toUpperCase() === 'LUNAS' ? 'LUNAS' : 'TEMPO'
+    const parsedShariahMode = String(purchase?.shariah_mode || 'CASH').toUpperCase()
+    const nextShariahMode: 'CASH' | 'SALAM' | 'ISTISHNA' =
+      parsedShariahMode === 'SALAM' || parsedShariahMode === 'ISTISHNA' ? parsedShariahMode : 'CASH'
+
+    const mappedLines = (purchase?.purchase_items || []).map((item: any) => {
+      const unit = item?.products?.unit || 'Pcs'
+      const sellingPrice = Number(item?.products?.selling_price || 0)
+      const unitPrice = Number(item?.unit_price || 0)
+      const margin = unitPrice > 0 && sellingPrice > 0
+        ? Math.max(0, Math.min(99, Math.round(100 - ((unitPrice / sellingPrice) * 100))))
+        : 20
+
+      return {
+        id: Date.now() + Math.floor(Math.random() * 10000),
+        product_name: String(item?.description || item?.products?.name || ''),
+        product_id: String(item?.product_id || ''),
+        quantity: Number(item?.quantity || 1),
+        unit: UNIT_OPTIONS.includes(unit) ? unit : 'Lainnya',
+        custom_unit: UNIT_OPTIONS.includes(unit) ? '' : unit,
+        unit_price: unitPrice,
+        margin,
+        discount_amount: Number(item?.discount_amount || 0),
+        category: item?.products?.category || 'Bahan',
+        selling_price: sellingPrice || 0,
+        requestId: '',
+      }
+    })
+
+    const safeSubTotal = mappedLines.reduce((sum: number, line: { quantity: number; unit_price: number }) => sum + (line.quantity * line.unit_price), 0)
+    const safeTaxableBase = Math.max(0, safeSubTotal - Number(purchase?.discount_amount || 0))
+    const safeTaxPercent = safeTaxableBase > 0
+      ? (Number(purchase?.tax_amount || 0) / safeTaxableBase) * 100
+      : 0
+
+    setEditingDraftPurchaseId(String(purchase.id))
+    setVendorId(String(purchase.vendor_id || ''))
+    setPurchaseDate(String(purchase.purchase_date || new Date().toISOString().split('T')[0]))
+    setDueDate(purchase?.due_date ? String(purchase.due_date) : '')
+    setPaymentTerm(parsedPaymentTerm)
+    setPaymentAccountId(paymentAccMatch?.[1] || '')
+    setPayOverheadNow(Boolean(overheadAccMatch?.[1]))
+    setOverheadAccountId(overheadAccMatch?.[1] || '')
+    setNotes(stripPurchaseMetaFromNotes(noteText))
+    setCustomGlobalDiscount(Number(purchase?.discount_amount || 0))
+    setHeaderTaxPercent(Number.isFinite(safeTaxPercent) ? Number(safeTaxPercent.toFixed(2)) : 0)
+    setShippingAmount(String(Number(purchase?.shipping_amount || 0)))
+    setInsuranceAmount(String(Number(purchase?.insurance_amount || 0)))
+    setShariahMode(nextShariahMode)
+    setHasDp(false)
+    setDpAmount('0')
+    setDpAccountId('')
+    setLines(mappedLines.length > 0 ? mappedLines : [createEmptyLine()])
+    setError(null)
+    setSuccess(null)
+    setShowModal(true)
+  }
+
   const handleAddLine = () => {
-    setLines([...lines, {
-      id: Date.now(),
-      product_name: '',
-      product_id: '',
-      quantity: 1,
-      unit: 'Pcs',
-      custom_unit: '',
-      unit_price: 0,
-      margin: 20,
-      discount_amount: 0,
-      category: 'Bahan',
-      selling_price: 0,
-      requestId: ''
-    }])
+    setLines([...lines, createEmptyLine()])
   }
 
   const handleRemoveLine = (id: number) => {
@@ -208,35 +309,48 @@ export default function PurchasingClient({
 
   const handleCreatePurchase = async (e: React.FormEvent) => {
     e.preventDefault()
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+    const requestedMode = String(submitter?.value || 'PUBLISH').toUpperCase()
+    const isDraftSave = requestedMode === 'DRAFT'
+    const resolvedPaymentTerm: 'TEMPO' | 'LUNAS' = shariahMode === 'SALAM' ? 'LUNAS' : paymentTerm
+
+    const usableLines = lines.filter((line) => String(line.product_name || '').trim().length > 0)
+
     if (!vendorId) return setError('Vendor harus dipilih!')
-    if (paymentTerm === 'LUNAS' && !paymentAccountId) return setError('Pilih akun pembayaran untuk transaksi Lunas!')
-    if (paymentTerm === 'TEMPO' && payOverheadNow && !overheadAccountId) return setError('Silakan pilih rekening Kas/Bank untuk membayar Ongkir/Asuransi yang dibayar terpisah secara tunai.')
-    
-    if (lines.some(l => !l.product_name || l.quantity <= 0 || l.unit_price < 0)) {
+    if (usableLines.length === 0) return setError('Tambahkan minimal 1 item untuk menyimpan dokumen.')
+
+    if (!isDraftSave && resolvedPaymentTerm === 'LUNAS' && !paymentAccountId) return setError('Pilih akun pembayaran untuk transaksi Lunas!')
+    if (!isDraftSave && shariahMode === 'SALAM' && !dueDate) return setError('Akad SALAM wajib mengisi tanggal barang disediakan.')
+    if (!isDraftSave && resolvedPaymentTerm === 'TEMPO' && payOverheadNow && !overheadAccountId) return setError('Silakan pilih rekening Kas/Bank untuk membayar Ongkir/Asuransi yang dibayar terpisah secara tunai.')
+
+    if (!isDraftSave && usableLines.some(l => !l.product_name || l.quantity <= 0 || l.unit_price < 0)) {
       return setError('Lengkapi detail barang, kuantitas, dan HPP untuk setiap baris.')
     }
 
     setLoading(true)
     
     // Inject overhead account into notes if separated
-    const finalNotes = (paymentTerm === 'TEMPO' && payOverheadNow && overheadAccountId) 
+    const finalNotes = (resolvedPaymentTerm === 'TEMPO' && payOverheadNow && overheadAccountId) 
       ? (notes ? notes + '\n' : '') + `[OVERHEAD_ACC: ${overheadAccountId}]` 
       : notes
 
+    const submitMode: 'DRAFT' | 'PUBLISH' = isDraftSave ? 'DRAFT' : 'PUBLISH'
     const payload = {
       vendor_id: vendorId,
       branch_id: activeBranchId || undefined,
       purchase_date: purchaseDate,
-      due_date: paymentTerm === 'TEMPO' ? dueDate : undefined,
+      due_date: (resolvedPaymentTerm === 'TEMPO' || shariahMode === 'SALAM') && dueDate ? dueDate : undefined,
       notes: finalNotes,
-      payment_term: paymentTerm,
+      payment_term: resolvedPaymentTerm,
       payment_account_id: paymentAccountId,
       discount_amount: appliedDiscount,
       tax_amount: calculatedTax,
       shipping_amount: parseFloat(shippingAmount) || 0,
       insurance_amount: parseFloat(insuranceAmount) || 0,
       shariah_mode: shariahMode,
-      lines: lines.map(line => {
+      mode: submitMode,
+      draft_id: editingDraftPurchaseId || undefined,
+      lines: usableLines.map(line => {
         const totalOverhead = (parseFloat(shippingAmount) || 0) + (parseFloat(insuranceAmount) || 0)
         const itemValue = (line.quantity * line.unit_price) - (line.discount_amount || 0)
         const allocatedOverheadPerUnit = grossSubTotal > 0 ? (itemValue / grossSubTotal * totalOverhead) / (line.quantity || 1) : 0
@@ -259,31 +373,56 @@ export default function PurchasingClient({
 
     if (res?.error) setError(res.error)
     else {
-      setSuccess('PO Baru berhasil disimpan!')
+      const dpFinalAmount = dpMode === 'PERCENT' ? (grandTotal * (parseFloat(dpPercent) || 0) / 100) : (parseFloat(dpAmount) || 0)
+      if (!isDraftSave && resolvedPaymentTerm === 'TEMPO' && hasDp && dpFinalAmount > 0 && dpAccountId && res.purchaseId) {
+         try {
+           const { createPurchasePayment } = await import('@/modules/purchasing/actions/purchasing.actions')
+           const dpRes = await createPurchasePayment(orgId, {
+             purchase_id: res.purchaseId,
+             account_id: dpAccountId,
+             amount: dpFinalAmount,
+             payment_date: purchaseDate,
+             notes: 'DP / Uang Muka',
+             discount: 0
+           })
+           if (dpRes?.error) {
+              setError(`Purchase Order berhasil dibuat, namun Uang Muka gagal diproses: ${dpRes.error}`)
+              setLoading(false)
+              return
+           }
+         } catch (e) {
+           console.error(e)
+         }
+      }
+
+      if (isDraftSave) {
+        setSuccess(editingDraftPurchaseId ? 'Draft PO berhasil diperbarui.' : 'Draft PO berhasil disimpan.')
+      } else {
+        setSuccess(editingDraftPurchaseId ? 'PO draft berhasil diterbitkan.' : 'PO baru berhasil diterbitkan.')
+      }
       setShowModal(false)
-      // Reset form
-      setLines([{ id: Date.now(), product_name: '', product_id: '', quantity: 1, unit: 'Pcs', custom_unit: '', unit_price: 0, margin: 20, discount_amount: 0, category: 'Bahan', selling_price: 0, requestId: '' }])
-      setVendorId('')
-      setNotes('')
-      setPaymentAccountId('')
-      setPaymentTerm('TEMPO')
-      setDueDate('')
-      setCustomGlobalDiscount(null)
-      setHeaderTaxPercent(0)
-      setShippingAmount('0')
-      setInsuranceAmount('0')
-      setShariahMode('CASH')
-      
-      // Update linked purchase requests to ORDERED
-      for (const line of lines) {
-        if ((line as any).requestId) {
-          await updatePurchaseRequestStatus(orgId, (line as any).requestId, 'ORDERED', activeBranchId || undefined)
+      resetPurchaseForm()
+
+      // Update linked purchase requests to ORDERED only after publish
+      if (!isDraftSave) {
+        for (const line of usableLines) {
+          if ((line as any).requestId) {
+            await updatePurchaseRequestStatus(orgId, (line as any).requestId, 'ORDERED', activeBranchId || undefined)
+          }
         }
       }
 
       setTimeout(() => setSuccess(null), 3500)
     }
     setLoading(false)
+  }
+
+  const isPurchaseSalam = (purchase: any) => String(purchase?.shariah_mode || '').trim().toUpperCase() === 'SALAM'
+
+  const getOutstandingAmount = (purchase: any) => {
+    const paid = (purchase?.purchase_payments || []).reduce((sum: number, pay: any) => sum + (Number(pay.amount) + Number(pay.discount_amount)), 0)
+    const returned = (purchase?.purchase_returns || []).reduce((sum: number, ret: any) => sum + Number(ret.total_amount), 0)
+    return Math.max(0, Number(purchase?.grand_total || 0) - paid - returned)
   }
 
   const handleCreateVendor = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -326,9 +465,7 @@ export default function PurchasingClient({
   }
 
   const handleOpenPayment = (p: any) => {
-    const paid = (p.purchase_payments || []).reduce((sum: number, pay: any) => sum + (Number(pay.amount) + Number(pay.discount_amount)), 0)
-    const returned = (p.purchase_returns || []).reduce((sum: number, ret: any) => sum + Number(ret.total_amount), 0)
-    const remaining = p.grand_total - paid - returned
+    const remaining = getOutstandingAmount(p)
     
     setSelectedPurchase(p)
     setDebtAmount(remaining)
@@ -341,6 +478,13 @@ export default function PurchasingClient({
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!payAccountId) return setError('Pilih akun pengeluaran!')
+    const salamPurchase = isPurchaseSalam(selectedPurchase)
+    if (salamPurchase) {
+      if (paymentDiscount > 0) return setError('Akad SALAM pembelian tidak mendukung potongan/cashback saat pelunasan.')
+      if (Math.abs((paymentAmount + paymentDiscount) - debtAmount) > 0.01) {
+        return setError(`Akad SALAM pembelian wajib lunas penuh. Nominal pembayaran: ${formatCurrency(debtAmount)}.`)
+      }
+    }
     setLoading(true)
     const res = await createPurchasePayment(orgId, {
       purchase_id: selectedPurchase.id,
@@ -455,7 +599,10 @@ export default function PurchasingClient({
             <SafeButton 
               variant="danger"
               icon={<Plus size={18} />}
-              onClick={() => setShowModal(true)}
+              onClick={() => {
+                resetPurchaseForm()
+                setShowModal(true)
+              }}
             >
               Buat PO (Belanja)
             </SafeButton>
@@ -595,8 +742,14 @@ export default function PurchasingClient({
                          <button onClick={() => handleOpenDetail(p)} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-500 hover:text-white transition-all border border-blue-100" title="Detail Dokumen PO">
                            <FileText size={16}/>
                          </button>
+
+                         {p.status === 'DRAFT' && (
+                           <button onClick={() => openDraftPurchaseEditor(p)} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-500 hover:text-white transition-all border border-indigo-100" title="Edit Draft PO">
+                             <Pencil size={16}/>
+                           </button>
+                         )}
                          
-                         {(p.status === 'DRAFT' || p.status === 'ORDERED') && (
+                         {p.status === 'ORDERED' && (
                            <button onClick={() => handleReceivePO(p.id)} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm border border-emerald-100 group/btn" title="Terima Barang">
                              <CheckSquare size={16}/>
                            </button>
@@ -608,7 +761,7 @@ export default function PurchasingClient({
                            </button>
                          )}
 
-                         {p.status === 'RECEIVED' && p.payment_status !== 'PAID' && (
+                         {(p.status === 'RECEIVED' || (isPurchaseSalam(p) && p.status === 'ORDERED')) && p.payment_status !== 'PAID' && (
                            <button onClick={() => handleOpenPayment(p)} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
                              <CreditCard size={14}/> Bayar
                            </button>
@@ -675,7 +828,7 @@ export default function PurchasingClient({
                             <>
                               <button 
                                 onClick={() => {
-                                  // Pre-fill PO form logic could be added here
+                                  resetPurchaseForm()
                                   setLines([{
                                     id: Date.now(),
                                     product_name: r.product_name,
@@ -726,10 +879,12 @@ export default function PurchasingClient({
         {/* MODAL BUAT PO BARU (DENGAN LINE ITEMS) */}
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setShowModal(false); resetPurchaseForm() }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl p-8 overflow-hidden max-h-[90vh] overflow-y-auto">
                 <div className="absolute top-0 left-0 w-2 h-full bg-rose-500" />
-                <h3 className="text-xl font-bold mb-6">Buat Purchase Order (PO) & Update Master Barang</h3>
+                <h3 className="text-xl font-bold mb-6">
+                  {editingDraftPurchaseId ? 'Edit Draft Purchase Order (PO)' : 'Buat Purchase Order (PO) & Update Master Barang'}
+                </h3>
                 
                 <form onSubmit={handleCreatePurchase} className="space-y-6">
                   {/* HEADER PO */}
@@ -759,8 +914,12 @@ export default function PurchasingClient({
                        <div className="flex p-1 bg-white border border-slate-200 rounded-2xl h-[52px]">
                           <button 
                              type="button" 
-                             onClick={() => setPaymentTerm('TEMPO')}
-                             className={`flex-1 rounded-xl text-[10px] font-black transition-all ${paymentTerm === 'TEMPO' ? 'bg-amber-500 text-white shadow-md' : 'text-slate-400'}`}
+                             onClick={() => {
+                               if (shariahMode === 'SALAM') return
+                               setPaymentTerm('TEMPO')
+                             }}
+                             disabled={shariahMode === 'SALAM'}
+                             className={`flex-1 rounded-xl text-[10px] font-black transition-all ${paymentTerm === 'TEMPO' ? 'bg-amber-500 text-white shadow-md' : 'text-slate-400'} ${shariahMode === 'SALAM' ? 'opacity-40 cursor-not-allowed' : ''}`}
                           >
                              TEMPO
                           </button>
@@ -772,6 +931,9 @@ export default function PurchasingClient({
                              LUNAS
                           </button>
                        </div>
+                       {shariahMode === 'SALAM' && (
+                         <p className="text-[9px] font-bold text-emerald-600 italic mt-1 leading-tight px-1">* Akad SALAM pembelian wajib lunas di awal. Opsi TEMPO dinonaktifkan.</p>
+                       )}
                     </div>
 
                     <div className="space-y-2">
@@ -779,10 +941,58 @@ export default function PurchasingClient({
                       <input type="date" required value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-rose-500 transition-all" />
                     </div>
 
-                    {paymentTerm === 'TEMPO' && (
+                    {(paymentTerm === 'TEMPO' || shariahMode === 'SALAM') && (
                       <div className="space-y-2 animate-in slide-in-from-right-2">
-                        <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block px-1">Jatuh Tempo</label>
-                        <input type="date" required={paymentTerm === 'TEMPO'} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-white font-bold text-amber-600 shadow-sm focus:border-amber-500 transition-all" />
+                        <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block px-1">{shariahMode === 'SALAM' ? 'Tanggal Barang Disediakan' : 'Jatuh Tempo'}</label>
+                        <input type="date" required={paymentTerm === 'TEMPO' || shariahMode === 'SALAM'} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-white font-bold text-amber-600 shadow-sm focus:border-amber-500 transition-all" />
+                      </div>
+                    )}
+
+                    {paymentTerm === 'TEMPO' && (
+                      <div className="md:col-span-4 mt-2 p-5 bg-indigo-50/50 rounded-3xl border border-indigo-100 flex flex-col gap-4">
+                        <div className="flex items-center gap-3">
+                           <input type="checkbox" id="dp_checkbox" checked={hasDp} onChange={(e) => setHasDp(e.target.checked)} className="w-5 h-5 rounded-md accent-indigo-600" />
+                           <label htmlFor="dp_checkbox" className="text-xs font-black text-indigo-900 cursor-pointer">{shariahMode === 'ISTISHNA' ? 'Proses DP Istishna / Titip Dana' : 'Bayar Down Payment (Uang Muka)'}</label>
+                        </div>
+                        {hasDp && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300 border-t border-indigo-100 pt-4">
+                             <div>
+                               <SearchableSelect 
+                                 label="Akun Sumber DP (Kas/Bank)"
+                                 options={paymentAccounts}
+                                 value={dpAccountId}
+                                 onChange={setDpAccountId}
+                                 placeholder="Pilih rekening Kas DP..."
+                               />
+                             </div>
+                             <div className="flex flex-col gap-1">
+                                <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block px-1">Nominal DP</label>
+                                <div className="flex bg-white rounded-2xl p-1 border border-indigo-200 shadow-sm">
+                                   <button type="button" onClick={() => setDpMode('NOMINAL')} className={`px-4 py-2 text-[10px] font-black rounded-xl transition flex-1 ${dpMode === 'NOMINAL' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Nominal (Rp)</button>
+                                   <button type="button" onClick={() => setDpMode('PERCENT')} className={`px-4 py-2 text-[10px] font-black rounded-xl transition flex-1 ${dpMode === 'PERCENT' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Persentase (%)</button>
+                                </div>
+                                {dpMode === 'NOMINAL' ? (
+                                   <CurrencyInput 
+                                      label="Nilai DP"
+                                      labelClassName="hidden"
+                                      value={parseFloat(dpAmount) || 0}
+                                      onChange={(val) => setDpAmount(val.toString())}
+                                      placeholder="Contoh: 500.000"
+                                      className="mt-2 h-[42px] px-4 py-2 rounded-xl text-sm border-indigo-200 font-bold"
+                                   />
+                                ) : (
+                                   <div className="relative mt-2">
+                                     <input 
+                                       type="number" min="0" max="100" 
+                                       value={dpPercent} onChange={(e) => setDpPercent(e.target.value)}
+                                       className="w-full h-[42px] px-4 py-2 border border-indigo-200 rounded-xl outline-none text-sm font-bold text-slate-900 pr-10"
+                                     />
+                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 font-black text-slate-400">%</span>
+                                   </div>
+                                )}
+                             </div>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -796,7 +1006,9 @@ export default function PurchasingClient({
                             placeholder="Pilih rekening untuk pelunasan langsung..."
                          />
                          <p className="text-[9px] font-bold text-emerald-600 mt-2 italic px-1">
-                               💡 Jurnal: (D) Persediaan vs (C) {paymentAccountId ? coa.find((a:any) => a.id === paymentAccountId)?.name : 'Kas/Bank'}. Tanpa melalui Hutang Usaha.
+                               {shariahMode === 'SALAM'
+                                 ? `💡 Akad SALAM: pembayaran ke vendor dicatat sebagai (D) Piutang Salam Vendor (1404) vs (C) ${paymentAccountId ? coa.find((a:any) => a.id === paymentAccountId)?.name : 'Kas/Bank'}.`
+                                 : `💡 Jurnal: (D) Persediaan vs (C) ${paymentAccountId ? coa.find((a:any) => a.id === paymentAccountId)?.name : 'Kas/Bank'}. Tanpa melalui Hutang Usaha.`}
                          </p>
                       </div>
                     )}
@@ -1038,8 +1250,13 @@ export default function PurchasingClient({
                   </div>
 
                   <div className="flex gap-3 pt-4 border-t border-slate-100">
-                    <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-2xl transition">Batal</button>
-                    <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-2xl shadow-lg transition">{loading ? 'Menyimpan...' : 'Simpan PO & Produk'}</button>
+                    <button type="button" onClick={() => { setShowModal(false); resetPurchaseForm() }} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-2xl transition">Batal</button>
+                    <button type="submit" value="DRAFT" disabled={loading} className="flex-1 py-4 px-6 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-2xl border border-indigo-200 transition">
+                      {loading ? 'Menyimpan...' : 'Save Draft'}
+                    </button>
+                    <button type="submit" value="PUBLISH" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-2xl shadow-lg transition">
+                      {loading ? 'Memproses...' : 'Terbitkan PO'}
+                    </button>
                   </div>
                 </form>
              </motion.div>
@@ -1121,6 +1338,11 @@ export default function PurchasingClient({
                         labelClassName="text-emerald-600"
                         value={paymentDiscount}
                         onChange={(val) => {
+                          if (isPurchaseSalam(selectedPurchase)) {
+                            setPaymentDiscount(0)
+                            setPaymentAmount(debtAmount)
+                            return
+                          }
                           setPaymentDiscount(val)
                           // If I have a discount, usually it reduces my cash payment
                           if (val > 0 && val <= debtAmount) {
@@ -1129,8 +1351,17 @@ export default function PurchasingClient({
                         }}
                         placeholder="0"
                         highlight={true}
+                        disabled={isPurchaseSalam(selectedPurchase)}
                       />
                     </div>
+
+                    {isPurchaseSalam(selectedPurchase) && (
+                      <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 mt-2">
+                        <p className="text-[10px] font-bold text-emerald-700">
+                          Akad SALAM pembelian: kas keluar dicatat sebagai Piutang Salam Vendor dan wajib lunas sebelum barang diterima.
+                        </p>
+                      </div>
+                    )}
 
                     <div className="pt-2 px-1">
                        <div className="flex justify-between items-center py-3 border-t border-slate-200">

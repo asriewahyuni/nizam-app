@@ -52,7 +52,7 @@ export default function DemoClient() {
   const handleStart = async () => {
     setLoading(true)
     // Redirect ke registrasi dengan parameter plan
-    const url = `/register?plan=demo&type=${selectedType}&businessName=${encodeURIComponent(businessName)}`
+    const url = `/register?source=demo&plan=demo&type=${selectedType}&businessName=${encodeURIComponent(businessName)}`
     window.location.href = url
   }
 
@@ -267,4 +267,3 @@ export default function DemoClient() {
     </div>
   )
 }
-

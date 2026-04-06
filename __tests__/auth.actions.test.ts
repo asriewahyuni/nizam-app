@@ -99,6 +99,43 @@ describe('Auth Actions', () => {
     })
   })
 
+  it('marks owner metadata as demo when sign-up plan is demo', async () => {
+    const signUpMock = vi.fn().mockResolvedValue({
+      data: { user: { id: 'user-1' } },
+      error: null,
+    })
+
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        signUp: signUpMock,
+      },
+    })
+
+    const formData = new FormData()
+    formData.set('email', 'demo.owner@example.com')
+    formData.set('password', 'secret123')
+    formData.set('fullName', 'Demo Owner')
+    formData.set('plan', 'demo')
+
+    const result = await signUp(formData)
+
+    expect(signUpMock).toHaveBeenCalledWith({
+      email: 'demo.owner@example.com',
+      password: 'secret123',
+      options: {
+        data: {
+          full_name: 'Demo Owner',
+          login_type: 'owner',
+          is_demo: true,
+        },
+      },
+    })
+    expect(result).toEqual({
+      success: true,
+      email: 'demo.owner@example.com',
+    })
+  })
+
   it('returns the active user session when available', async () => {
     mocks.auth.mockResolvedValue({
       user: { id: 'user-1', email: 'owner@example.com', name: 'Owner Example' },

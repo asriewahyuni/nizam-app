@@ -20,203 +20,157 @@ type DeliveryWarehouseResult =
   | { warehouseId: string }
   | { error: string }
 
-type SalesRpcResult = {
-  success?: boolean
-  error?: string
-  return_id?: string
-  payment_id?: string
+type InventoryRequirement = {
+  productId: string
+  productName: string
+  requiredQty: number
 }
 
-const saleSnapshotSelect = {
-  id: true,
-  org_id: true,
-  sale_number: true,
-  sale_date: true,
-  customer_id: true,
-  total_amount: true,
-  tax_amount: true,
-  discount_amount: true,
-  grand_total: true,
-  status: true,
-  payment_status: true,
-  due_date: true,
-  notes: true,
-  created_by: true,
-  created_at: true,
-  updated_at: true,
-  shariah_mode: true,
-  payment_term: true,
-  branch_id: true,
-  warehouse_id: true,
-  branches: {
-    select: {
-      name: true,
-      code: true,
-    },
-  },
-  contacts: {
-    select: {
-      name: true,
-      phone: true,
-      email: true,
-    },
-  },
-  sales_items: {
-    select: {
-      id: true,
-      org_id: true,
-      sale_id: true,
-      product_id: true,
-      description: true,
-      quantity: true,
-      unit_price: true,
-      discount_amount: true,
-      tax_amount: true,
-      total_amount: true,
-      created_at: true,
-      updated_at: true,
-      branch_id: true,
-      products: {
-        select: {
-          name: true,
-          sku: true,
-          unit: true,
-          type: true,
-        },
-      },
-    },
-  },
-  sales_returns: {
-    select: {
-      status: true,
-      grand_total: true,
-      return_number: true,
-    },
-  },
-  sales_payments: {
-    select: {
-      amount: true,
-      discount_amount: true,
-    },
-  },
-} as const satisfies Prisma.salesSelect
+const STOCK_EPSILON = 0.000001
 
-type SaleSnapshotRecord = Prisma.salesGetPayload<{ select: typeof saleSnapshotSelect }>
-
-function normalizeDateOnly(value: Date | null | undefined) {
-  if (!value) return null
-
-  const year = value.getUTCFullYear()
-  const month = String(value.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(value.getUTCDate()).padStart(2, '0')
-
-  return `${year}-${month}-${day}`
+function formatQuantity(value: number): string {
+  if (!Number.isFinite(value)) return '0'
+  const rounded = Math.round(value * 1_000_000) / 1_000_000
+  if (Math.abs(rounded) < STOCK_EPSILON) return '0'
+  return Number.isInteger(rounded)
+    ? String(rounded)
+    : rounded.toFixed(6).replace(/\.?0+$/, '')
 }
 
-function normalizeDateTime(value: Date | null | undefined) {
-  return value ? value.toISOString() : null
+function normalizeShariahMode(value?: string | null): string {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase()
+  if (normalized === 'SALAM' || normalized === 'ISTISHNA') return normalized
+  return 'CASH'
 }
 
-function formatRpcError(error: unknown) {
-  const detail = extractDatabaseError(error)
-  return detail.code
-    ? `[RPC ERROR]: ${detail.message} (Code: ${detail.code})`
-    : `[RPC ERROR]: ${detail.message}`
+function isSalamMode(value?: string | null): boolean {
+  return normalizeShariahMode(value) === 'SALAM'
 }
 
-function buildSaleTotals(lines: any[], taxAmountValue?: unknown, discountAmountValue?: unknown) {
-  const totalAmount = (lines || []).reduce(
-    (acc: number, line: any) => acc + (toNumber(line?.quantity) * toNumber(line?.unit_price)),
-    0
+async function ensureCreateSaleStockAvailability(
+  supabase: any,
+  orgId: string,
+  branchId: string,
+  lines: Array<{ product_id?: string | null; product_name?: string | null; quantity?: number }>
+): Promise<{ success: true } | { error: string }> {
+  const normalizedLines = (lines || []).map((line) => ({
+    productId: String(line?.product_id || ''),
+    productName: String(line?.product_name || ''),
+    quantity: Number(line?.quantity || 0),
+  }))
+
+  const productIds = [...new Set(normalizedLines.map((line) => line.productId).filter(Boolean))]
+  if (productIds.length === 0) return { success: true }
+
+  const { data: productRows, error: productError } = await (supabase as any)
+    .from('products')
+    .select('id, name, type')
+    .eq('org_id', orgId)
+    .in('id', productIds)
+
+  if (productError) {
+    return { error: 'Gagal memvalidasi stok saat membuat invoice: ' + productError.message }
+  }
+
+  const productById = new Map<string, { name: string; type: string }>()
+  for (const product of (productRows as any[]) || []) {
+    const id = String(product?.id || '')
+    if (!id) continue
+    productById.set(id, {
+      name: String(product?.name || id),
+      type: String(product?.type || 'INVENTORY').toUpperCase(),
+    })
+  }
+
+  const requirementByProduct = new Map<string, { name: string; requiredQty: number }>()
+  for (const line of normalizedLines) {
+    if (!line.productId || !Number.isFinite(line.quantity) || line.quantity <= 0) continue
+    const productMeta = productById.get(line.productId)
+    if (!productMeta || productMeta.type !== 'INVENTORY') continue
+
+    const current = requirementByProduct.get(line.productId)
+    if (current) {
+      current.requiredQty += line.quantity
+      continue
+    }
+
+    requirementByProduct.set(line.productId, {
+      name: productMeta.name || line.productName || line.productId,
+      requiredQty: line.quantity,
+    })
+  }
+
+  if (requirementByProduct.size === 0) return { success: true }
+
+  let stockQuery = (supabase as any)
+    .from('inventory_stocks')
+    .select('product_id, quantity, warehouses!inner(branch_id)')
+    .eq('org_id', orgId)
+
+  if (branchId) {
+    stockQuery = stockQuery.eq('warehouses.branch_id', branchId)
+  }
+
+  const { data: stockRows, error: stockError } = await stockQuery.in(
+    'product_id',
+    Array.from(requirementByProduct.keys())
   )
-  const taxAmount = toNumber(taxAmountValue)
-  const discountAmount = toNumber(discountAmountValue)
+  if (stockError) {
+    return { error: 'Gagal membaca stok saat membuat invoice: ' + stockError.message }
+  }
+
+  const availableByProduct: Record<string, number> = {}
+  for (const row of (stockRows as any[]) || []) {
+    const productId = String((row as any).product_id || '')
+    if (!productId) continue
+    availableByProduct[productId] = (availableByProduct[productId] || 0) + Number((row as any).quantity || 0)
+  }
+
+  const firstShortage = Array.from(requirementByProduct.entries())
+    .map(([productId, requirement]) => {
+      const available = Number(availableByProduct[productId] || 0)
+      return {
+        name: requirement.name,
+        required: requirement.requiredQty,
+        available,
+        shortage: requirement.requiredQty - available,
+      }
+    })
+    .find((entry) => entry.shortage > STOCK_EPSILON)
+
+  if (!firstShortage) return { success: true }
 
   return {
-    totalAmount,
-    taxAmount,
-    discountAmount,
-    grandTotal: totalAmount - discountAmount + taxAmount,
+    error: `Stok produk "${firstShortage.name}" tidak mencukupi untuk invoice biasa. Dibutuhkan ${formatQuantity(
+      firstShortage.required
+    )}, tersedia ${formatQuantity(Math.max(0, firstShortage.available))}. Ubah transaksi ke akad SALAM agar pesanan tetap bisa dicatat tanpa mengurangi stok saat ini.`,
   }
 }
 
-async function requireUser(errorMessage: string) {
-  const user = await getAuthUser()
-  if (!user) {
-    return { error: errorMessage } as const
-  }
-
-  return user
+function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return (value[0] as T | undefined) ?? null
+  return (value as T | null) ?? null
 }
 
-function normalizeSale(record: SaleSnapshotRecord) {
-  return {
-    id: record.id,
-    org_id: record.org_id,
-    sale_number: record.sale_number,
-    sale_date: normalizeDateOnly(record.sale_date),
-    customer_id: record.customer_id,
-    total_amount: toNumber(record.total_amount),
-    tax_amount: toNumber(record.tax_amount),
-    discount_amount: toNumber(record.discount_amount),
-    grand_total: toNumber(record.grand_total),
-    status: record.status,
-    payment_status: record.payment_status,
-    due_date: normalizeDateOnly(record.due_date),
-    notes: record.notes,
-    created_by: record.created_by,
-    created_at: record.created_at.toISOString(),
-    updated_at: record.updated_at.toISOString(),
-    shariah_mode: record.shariah_mode,
-    payment_term: record.payment_term,
-    branch_id: record.branch_id,
-    warehouse_id: record.warehouse_id,
-    branches: record.branches
-      ? {
-          name: record.branches.name,
-          code: record.branches.code,
-        }
-      : null,
-    contacts: record.contacts
-      ? {
-          name: record.contacts.name,
-          phone: record.contacts.phone,
-          email: record.contacts.email,
-        }
-      : null,
-    sales_items: record.sales_items.map((item) => ({
-      id: item.id,
-      org_id: item.org_id,
-      sale_id: item.sale_id,
-      product_id: item.product_id,
-      description: item.description,
-      quantity: toNumber(item.quantity),
-      unit_price: toNumber(item.unit_price),
-      discount_amount: toNumber(item.discount_amount),
-      tax_amount: toNumber(item.tax_amount),
-      total_amount: toNumber(item.total_amount),
-      created_at: normalizeDateTime(item.created_at),
-      updated_at: normalizeDateTime(item.updated_at),
-      branch_id: item.branch_id,
-      products: item.products
-        ? {
-            name: item.products.name,
-            sku: item.products.sku,
-            unit: item.products.unit,
-            type: item.products.type,
-          }
-        : null,
-    })),
-    sales_returns: record.sales_returns.map((saleReturn) => ({
-      status: saleReturn.status,
-      grand_total: toNumber(saleReturn.grand_total),
-      return_number: saleReturn.return_number,
-    })),
-    sales_payments: record.sales_payments.map((payment) => ({
-      amount: toNumber(payment.amount),
-      discount_amount: toNumber(payment.discount_amount),
-    })),
+function isRpcFunctionNotFound(
+  error: { code?: string | null; message?: string | null } | null | undefined,
+  functionName: string
+): boolean {
+  if (!error) return false
+  const code = String(error.code || '')
+  const message = String(error.message || '').toLowerCase()
+  const fn = functionName.toLowerCase()
+
+  if (code === 'PGRST202' || code === '42883') {
+    return message.includes(fn) || message.includes('schema cache') || message.includes('does not exist')
   }
+
+  return (
+    message.includes(fn) &&
+    (message.includes('schema cache') || message.includes('does not exist') || message.includes('undefined function'))
+  )
 }
 
 async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
@@ -288,6 +242,233 @@ async function resolveDeliveryWarehouseId(
   return { warehouseId: warehouses[0].id }
 }
 
+async function getSaleInventoryRequirements(
+  supabase: any,
+  orgId: string,
+  saleId: string
+): Promise<{ requirements: InventoryRequirement[] } | { error: string }> {
+  const { data: rows, error } = await (supabase as any)
+    .from('sales_items')
+    .select('product_id, quantity, products(name, type)')
+    .eq('org_id', orgId)
+    .eq('sale_id', saleId)
+
+  if (error) {
+    return { error: 'Gagal memvalidasi stok penjualan: ' + error.message }
+  }
+
+  const requirementMap = new Map<string, InventoryRequirement>()
+  for (const row of (rows as any[]) || []) {
+    const product = normalizeRelation<{ name?: string | null; type?: string | null }>((row as any).products)
+    const productType = String(product?.type || 'INVENTORY').toUpperCase()
+    if (productType !== 'INVENTORY') continue
+
+    const productId = String((row as any).product_id || '')
+    if (!productId) continue
+
+    const qty = Number((row as any).quantity || 0)
+    if (!Number.isFinite(qty) || qty <= 0) continue
+
+    const current = requirementMap.get(productId)
+    if (current) {
+      current.requiredQty += qty
+      continue
+    }
+
+    requirementMap.set(productId, {
+      productId,
+      productName: String(product?.name || productId),
+      requiredQty: qty,
+    })
+  }
+
+  return { requirements: Array.from(requirementMap.values()) }
+}
+
+async function ensureDeliveryStockAvailability(
+  supabase: any,
+  orgId: string,
+  warehouseId: string,
+  requirements: InventoryRequirement[]
+): Promise<{ success: true } | { error: string }> {
+  if (!requirements.length) return { success: true }
+
+  const productIds = requirements.map((item) => item.productId)
+  const { data: stockRows, error } = await (supabase as any)
+    .from('inventory_stocks')
+    .select('product_id, quantity')
+    .eq('org_id', orgId)
+    .eq('warehouse_id', warehouseId)
+    .in('product_id', productIds)
+
+  if (error) {
+    return { error: 'Gagal memvalidasi stok gudang: ' + error.message }
+  }
+
+  const availableByProduct: Record<string, number> = {}
+  for (const row of (stockRows as any[]) || []) {
+    const productId = String((row as any).product_id || '')
+    if (!productId) continue
+    availableByProduct[productId] = (availableByProduct[productId] || 0) + Number((row as any).quantity || 0)
+  }
+
+  const shortages = requirements
+    .map((item) => {
+      const availableQty = Number(availableByProduct[item.productId] || 0)
+      return {
+        ...item,
+        availableQty,
+        shortage: item.requiredQty - availableQty,
+      }
+    })
+    .filter((item) => item.shortage > STOCK_EPSILON)
+
+  if (!shortages.length) return { success: true }
+
+  const first = shortages[0]
+  return {
+    error: `Stok tidak cukup untuk produk "${first.productName}". Dibutuhkan ${formatQuantity(
+      first.requiredQty
+    )}, tersedia ${formatQuantity(Math.max(
+      0,
+      first.availableQty
+    ))}. Penjualan tidak boleh melebihi stok (kecuali akad SALAM).`,
+  }
+}
+
+async function adjustInventoryStockCompat(
+  supabase: any,
+  payload: { orgId: string; productId: string; warehouseId: string; diff: number }
+) {
+  const baseArgs = {
+    p_org_id: payload.orgId,
+    p_product_id: payload.productId,
+    p_warehouse_id: payload.warehouseId,
+    p_diff: payload.diff,
+  }
+
+  const { error: sixArgsError } = await (supabase as any).rpc('adjust_inventory_stock', {
+    ...baseArgs,
+    p_batch_number: null,
+    p_bin_id: null,
+  })
+  if (!sixArgsError) return { success: true as const }
+
+  if (!isRpcFunctionNotFound(sixArgsError, 'adjust_inventory_stock')) {
+    return { error: sixArgsError.message }
+  }
+
+  const { error: fourArgsError } = await (supabase as any).rpc('adjust_inventory_stock', baseArgs)
+  if (fourArgsError) {
+    return { error: fourArgsError.message }
+  }
+
+  return { success: true as const }
+}
+
+async function fallbackVoidSaleWithoutRpc(
+  supabase: any,
+  args: {
+    orgId: string
+    saleId: string
+    userId: string
+    branchId: string
+    saleWarehouseId?: string | null
+  }
+) {
+  const { data: stockMovements, error: movementError } = await (supabase as any)
+    .from('stock_movements')
+    .select('product_id, quantity')
+    .eq('org_id', args.orgId)
+    .eq('reference_type', 'SALE')
+    .eq('reference_id', args.saleId)
+
+  if (movementError) {
+    return { error: 'Gagal membaca pergerakan stok sales: ' + movementError.message }
+  }
+
+  const movementByProduct: Record<string, number> = {}
+  for (const row of (stockMovements as any[]) || []) {
+    const productId = String((row as any).product_id || '')
+    if (!productId) continue
+    movementByProduct[productId] = (movementByProduct[productId] || 0) + Number((row as any).quantity || 0)
+  }
+
+  const hasStockMovements = Object.keys(movementByProduct).length > 0
+  let resolvedWarehouseId = args.saleWarehouseId || null
+  if (hasStockMovements && !resolvedWarehouseId) {
+    const resolvedWarehouse = await resolveDeliveryWarehouseId(
+      supabase as any,
+      args.orgId,
+      args.branchId,
+      null
+    )
+    if ('error' in resolvedWarehouse) {
+      return { error: 'Gagal membatalkan sales order: gudang asal transaksi tidak dapat ditentukan.' }
+    }
+    resolvedWarehouseId = resolvedWarehouse.warehouseId
+  }
+
+  if (hasStockMovements && resolvedWarehouseId) {
+    for (const [productId, movedQty] of Object.entries(movementByProduct)) {
+      const reverseResult = await adjustInventoryStockCompat(supabase as any, {
+        orgId: args.orgId,
+        productId,
+        warehouseId: resolvedWarehouseId,
+        diff: -Number(movedQty || 0),
+      })
+      if ('error' in reverseResult) {
+        return { error: 'Gagal sinkronisasi stok saat membatalkan sales order: ' + reverseResult.error }
+      }
+    }
+  }
+
+  const { error: deleteMovementError } = await (supabase as any)
+    .from('stock_movements')
+    .delete()
+    .eq('org_id', args.orgId)
+    .eq('reference_type', 'SALE')
+    .eq('reference_id', args.saleId)
+
+  if (deleteMovementError) {
+    return { error: 'Gagal menghapus kartu stok sales: ' + deleteMovementError.message }
+  }
+
+  const { error: voidJournalError } = await (supabase as any)
+    .from('journal_entries')
+    .update({
+      status: 'VOIDED',
+      void_reason: 'Pembatalan Sales Order',
+      voided_by: args.userId,
+      voided_at: new Date().toISOString(),
+    })
+    .eq('reference_id', args.saleId)
+    .eq('reference_type', 'SALE')
+    .eq('org_id', args.orgId)
+    .eq('status', 'POSTED')
+
+  if (voidJournalError) {
+    return { error: 'Gagal void jurnal penjualan: ' + voidJournalError.message }
+  }
+
+  const { error: voidSaleError } = await (supabase as any)
+    .from('sales')
+    .update({
+      status: 'VOIDED',
+      warehouse_id: resolvedWarehouseId || args.saleWarehouseId || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', args.saleId)
+    .eq('org_id', args.orgId)
+    .eq('branch_id', args.branchId)
+
+  if (voidSaleError) {
+    return { error: 'Gagal memperbarui status sales order: ' + voidSaleError.message }
+  }
+
+  return { success: true as const }
+}
+
 export async function getSales(orgId: string, branchId?: string | null) {
   const branchSelection = await resolveActiveBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
@@ -322,66 +503,178 @@ export async function createSaleEntry(
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  const lines = Array.isArray(payload?.lines) ? payload.lines : []
-  const totals = buildSaleTotals(lines, payload?.tax_amount, payload?.discount_amount)
-  const reason = `Sales Order Baru (${payload?.shariah_mode || 'CASH'}) - Customer: ${payload?.customer_name || ''} - ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(totals.grandTotal)}`
+  const createMode: 'DRAFT' | 'PUBLISH' =
+    String(payload.mode || 'PUBLISH').toUpperCase() === 'DRAFT'
+      ? 'DRAFT'
+      : 'PUBLISH'
 
-  try {
-    const saleId = await withDbUserContext(user.userId, async (tx) => {
-      const createdSaleId = await insertSaleHeader(tx, {
-        orgId,
-        branchId: activeBranchResult.branchId,
-        customerId: payload?.customer_id || null,
-        saleDate: payload?.sale_date,
-        dueDate: payload?.due_date || null,
-        paymentTerm: payload?.payment_term || 'TEMPO',
-        totalAmount: totals.totalAmount,
-        taxAmount: totals.taxAmount,
-        discountAmount: totals.discountAmount,
-        grandTotal: totals.grandTotal,
-        shariahMode: payload?.shariah_mode || 'CASH',
-        notes: payload?.notes || null,
-        createdBy: user.userId,
-        status: 'DRAFT',
-        paymentStatus: 'UNPAID',
-      })
-
-      if (lines.length > 0) {
-        await tx.sales_items.createMany({
-          data: lines.map((line: any) => ({
-            org_id: orgId,
-            branch_id: activeBranchResult.branchId,
-            sale_id: createdSaleId,
-            product_id: line?.product_id || null,
-            description: line?.product_name || '',
-            quantity: toNumber(line?.quantity),
-            unit_price: toNumber(line?.unit_price),
-            discount_amount: toNumber(line?.discount_amount),
-            tax_amount: toNumber(line?.tax_amount),
-          })),
-        })
-      }
-
-      await tx.approval_requests.create({
-        data: {
-          org_id: orgId,
-          branch_id: activeBranchResult.branchId,
-          requester_id: user.userId,
-          source_type: 'SALES_ORDER',
-          source_id: createdSaleId,
-          status: 'PENDING',
-          reason,
-        },
-      })
-
-      return createdSaleId
-    })
-
-    revalidatePath('/sales')
-    return { success: true, saleId, error: undefined }
-  } catch (error) {
-    return { error: extractDatabaseError(error).message }
+  const normalizedLines = (payload.lines || []).filter((line: any) => String(line?.product_name || '').trim().length > 0)
+  if (!payload.customer_id || normalizedLines.length === 0) {
+    return { error: 'Customer dan minimal satu baris item wajib diisi.' }
   }
+
+  const shariahMode = normalizeShariahMode(payload.shariah_mode)
+  const salamMode = isSalamMode(shariahMode)
+  const paymentTerm = salamMode ? 'LUNAS' : (String(payload.payment_term || 'TEMPO').toUpperCase() === 'LUNAS' ? 'LUNAS' : 'TEMPO')
+  const dueDate = (paymentTerm === 'TEMPO' || salamMode) ? (payload.due_date || null) : null
+
+  if (createMode === 'PUBLISH' && (paymentTerm === 'TEMPO' || salamMode) && !dueDate) {
+    return { error: 'Tanggal jatuh tempo pengiriman wajib diisi.' }
+  }
+
+  if (createMode === 'PUBLISH' && salamMode && paymentTerm !== 'LUNAS') {
+    return { error: 'Akad SALAM wajib dibayar lunas (tunai) di awal.' }
+  }
+
+  if (createMode === 'PUBLISH' && !salamMode && shariahMode !== 'ISTISHNA') {
+    const createStockCheck = await ensureCreateSaleStockAvailability(
+      supabase as any,
+      orgId,
+      activeBranchId,
+      normalizedLines
+    )
+    if ('error' in createStockCheck) return { error: createStockCheck.error }
+  }
+
+  const totalAmount = normalizedLines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)
+  const computedTotal = totalAmount - (payload.discount_amount || 0) + (payload.tax_amount || 0)
+
+  const salePayload = {
+    customer_id: payload.customer_id,
+    sale_date: payload.sale_date,
+    due_date: dueDate,
+    payment_term: paymentTerm,
+    total_amount: totalAmount,
+    tax_amount: payload.tax_amount || 0,
+    discount_amount: payload.discount_amount || 0,
+    grand_total: computedTotal,
+    shariah_mode: shariahMode,
+    notes: payload.notes,
+    updated_at: new Date().toISOString(),
+  }
+
+  let saleId: string | null = null
+
+  if (payload.draft_id) {
+    const { data: existingSale, error: existingSaleError } = await (supabase as any)
+      .from('sales')
+      .select('id, status')
+      .eq('id', payload.draft_id)
+      .eq('org_id', orgId)
+      .eq('branch_id', activeBranchId)
+      .maybeSingle()
+
+    if (existingSaleError || !existingSale) {
+      return { error: 'Draft SO tidak ditemukan pada unit aktif.' }
+    }
+
+    if (existingSale.status !== 'DRAFT') {
+      return { error: 'Hanya dokumen SO berstatus DRAFT yang bisa diedit atau diterbitkan ulang.' }
+    }
+
+    const { error: updateSaleError } = await (supabase as any)
+      .from('sales')
+      .update({
+        ...salePayload,
+        status: 'DRAFT',
+      })
+      .eq('id', payload.draft_id)
+      .eq('org_id', orgId)
+      .eq('branch_id', activeBranchId)
+
+    if (updateSaleError) return { error: updateSaleError.message }
+    saleId = payload.draft_id
+
+    const { error: deleteLinesError } = await (supabase as any)
+      .from('sales_items')
+      .delete()
+      .eq('org_id', orgId)
+      .eq('branch_id', activeBranchId)
+      .eq('sale_id', saleId)
+
+    if (deleteLinesError) return { error: deleteLinesError.message }
+  } else {
+    const { data: sale, error: saleErr } = await (supabase as any)
+      .from('sales')
+      .insert({
+        org_id: orgId,
+        branch_id: activeBranchId,
+        ...salePayload,
+        created_by: user.id,
+        status: 'DRAFT'
+      })
+      .select('id')
+      .single()
+
+    if (saleErr || !sale?.id) return { error: saleErr?.message || 'Gagal membuat draft SO.' }
+    saleId = sale.id
+  }
+
+  const { error: linesErr } = await (supabase as any)
+    .from('sales_items')
+    .insert(normalizedLines.map((l: any) => ({
+      org_id: orgId,
+      branch_id: activeBranchId,
+      sale_id: saleId,
+      product_id: l.product_id,
+      description: l.product_name,
+      quantity: l.quantity,
+      unit_price: l.unit_price,
+      discount_amount: l.discount_amount || 0,
+      tax_amount: l.tax_amount || 0
+    })))
+
+  if (linesErr) {
+    // Cleanup if lines fail
+    if (!payload.draft_id && saleId) {
+      await (supabase as any).from('sales').delete().eq('id', saleId)
+    }
+    return { error: linesErr.message }
+  }
+
+  if (createMode === 'PUBLISH') {
+    const approvalTable = (supabase as any).from('approval_requests')
+    if (typeof approvalTable?.update === 'function') {
+      await approvalTable
+        .update({
+          status: 'VOIDED',
+          reason: 'Approval SO lama diganti oleh versi draft terbaru',
+          decided_at: new Date().toISOString(),
+        })
+        .eq('org_id', orgId)
+        .eq('source_type', 'SALES_ORDER')
+        .eq('source_id', saleId)
+        .eq('status', 'PENDING')
+    }
+
+    await (supabase as any).from('approval_requests' as any).insert({
+      org_id: orgId,
+      branch_id: activeBranchId,
+      requester_id: user.id,
+      source_type: 'SALES_ORDER',
+      source_id: saleId,
+      status: 'PENDING',
+      reason: `Sales Order Baru (${shariahMode}) - Customer: ${payload.customer_name || ''} - ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(computedTotal)}`
+    })
+  } else {
+    const approvalTable = (supabase as any).from('approval_requests')
+    if (typeof approvalTable?.update === 'function') {
+      await approvalTable
+        .update({
+          status: 'VOIDED',
+          reason: 'Draft SO diperbarui sebelum diterbitkan',
+          decided_at: new Date().toISOString(),
+        })
+        .eq('org_id', orgId)
+        .eq('branch_id', activeBranchId)
+        .eq('source_type', 'SALES_ORDER')
+        .eq('source_id', saleId)
+        .eq('status', 'PENDING')
+    }
+  }
+
+  revalidatePath('/sales')
+  return { success: true, saleId }
 }
 
 export async function deliverSale(orgId: string, saleId: string, warehouseId?: string | null) {
@@ -394,20 +687,19 @@ export async function deliverSale(orgId: string, saleId: string, warehouseId?: s
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  const sale = await prisma.sales.findFirst({
-    where: {
-      id: saleId,
-      org_id: orgId,
-      branch_id: activeBranchResult.branchId,
-    },
-    select: {
-      status: true,
-      warehouse_id: true,
-    },
-  })
-
+  const { data: sale } = await (supabase as any)
+    .from('sales' as any)
+    .select('status, warehouse_id, shariah_mode, payment_status')
+    .eq('id', saleId)
+    .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
+    .single()
   if (!sale) return { error: 'Order tidak ditemukan.' }
-  if (sale.status === 'FINISHED') return { success: true, error: undefined }
+  if (sale.status === 'FINISHED') return { success: true }
+  const isSalam = isSalamMode((sale as any).shariah_mode)
+  if (isSalam && (sale as any).payment_status !== 'PAID') {
+    return { error: 'Akad SALAM wajib lunas terlebih dahulu sebelum pengiriman barang.' }
+  }
 
   let resolvedWarehouseId: string | null = null
   if (warehouseId || sale.warehouse_id) {
@@ -424,19 +716,47 @@ export async function deliverSale(orgId: string, saleId: string, warehouseId?: s
     resolvedWarehouseId = resolvedWarehouse.warehouseId
   }
 
-  try {
-    await withDbUserContext(user.userId, async (tx) => {
-      await tx.$executeRaw`
-        SELECT public.process_sales_delivery_atomic(
-          CAST(${orgId} AS uuid),
-          CAST(${saleId} AS uuid),
-          CAST(${resolvedWarehouseId} AS uuid)
-        )
-      `
-    })
-  } catch (error) {
-    ;(console as any).error('Failed to deliver sale via atomic engine:', error)
-    return { error: formatRpcError(error) }
+  const inventoryRequirementResult = await getSaleInventoryRequirements(supabase as any, orgId, saleId)
+  if ('error' in inventoryRequirementResult) return { error: inventoryRequirementResult.error }
+
+  const hasInventoryItems = inventoryRequirementResult.requirements.length > 0
+  if (hasInventoryItems && !isSalam && !resolvedWarehouseId) {
+    const resolvedWarehouse = await resolveDeliveryWarehouseId(
+      supabase as any,
+      orgId,
+      activeBranchResult.branchId,
+      null
+    )
+
+    if ('error' in resolvedWarehouse) {
+      return { error: resolvedWarehouse.error }
+    }
+
+    resolvedWarehouseId = resolvedWarehouse.warehouseId
+  }
+
+  if (hasInventoryItems && !isSalam) {
+    if (!resolvedWarehouseId) {
+      return { error: 'Gudang pengiriman wajib dipilih untuk memvalidasi stok.' }
+    }
+    const stockCheck = await ensureDeliveryStockAvailability(
+      supabase as any,
+      orgId,
+      resolvedWarehouseId,
+      inventoryRequirementResult.requirements
+    )
+    if ('error' in stockCheck) return { error: stockCheck.error }
+  }
+
+  const { error } = await (supabase as any).rpc('process_sales_delivery_atomic', {
+    p_org_id: orgId,
+    p_sale_id: saleId,
+    p_warehouse_id: resolvedWarehouseId,
+  })
+
+  if (error) {
+    (console as any).error('Failed to deliver sale via atomic engine:', error)
+    return { error: `[RPC ERROR]: ${error.message} (Code: ${error.code})` }
   }
 
   revalidatePath('/sales')
@@ -454,81 +774,58 @@ export async function voidSale(orgId: string, saleId: string) {
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  const sale = await prisma.sales.findFirst({
-    where: {
-      id: saleId,
-      org_id: orgId,
-      branch_id: activeBranchResult.branchId,
-    },
-    select: {
-      status: true,
-    },
-  })
+  // 1. Check current status — only existing documents can be voided
+  const { data: sale } = await (supabase as any)
+    .from('sales')
+    .select('status, warehouse_id')
+    .eq('id', saleId)
+    .eq('org_id', orgId)
+    .eq('branch_id', activeBranchId)
+    .single()
 
   if (!sale) return { error: 'Order tidak ditemukan.' }
-  if (sale.status === 'VOIDED') return { success: true, error: undefined }
+  if (sale.status === 'VOIDED') return { success: true }
 
-  try {
-    await withDbUserContext(user.userId, async (tx) => {
-      const journalEntry = await tx.journal_entries.findFirst({
-        where: {
-          reference_id: saleId,
-          org_id: orgId,
-          status: 'POSTED',
-        },
-        select: {
-          id: true,
-        },
-      })
+  // 2. Atomic void to keep journal, stock_movements, and inventory_stocks in sync.
+  const { data: rpcRes, error: rpcErr } = await (supabase as any).rpc('void_sale_atomic', {
+    p_org_id: orgId,
+    p_sale_id: saleId,
+    p_user_id: user.id,
+    p_reason: 'Pembatalan Sales Order',
+  })
 
-      if (journalEntry?.id) {
-        await tx.journal_entries.update({
-          where: { id: journalEntry.id },
-          data: {
-            status: 'VOIDED',
-            void_reason: 'Pembatalan Sales Order',
-            voided_by: user.userId,
-            voided_at: new Date(),
-          },
-        })
-      }
+  if (rpcErr || !rpcRes?.success) {
+    const rpcErrorMessage = String(rpcRes?.error || rpcErr?.message || 'Unknown error')
+    const shouldUseFallback = isRpcFunctionNotFound(
+      { code: rpcErr?.code || null, message: rpcErrorMessage },
+      'void_sale_atomic'
+    )
 
-      await tx.stock_movements.deleteMany({
-        where: {
-          reference_id: saleId,
-          reference_type: 'SALE',
-        },
-      })
+    if (!shouldUseFallback) {
+      return { error: `Gagal membatalkan sales order secara atomik: ${rpcErrorMessage}` }
+    }
 
-      await tx.sales.updateMany({
-        where: {
-          id: saleId,
-          org_id: orgId,
-          branch_id: activeBranchResult.branchId,
-        },
-        data: {
-          status: 'VOIDED',
-          updated_at: new Date(),
-        },
-      })
-
-      await tx.approval_requests.updateMany({
-        where: {
-          source_type: 'SALES_ORDER',
-          source_id: saleId,
-          branch_id: activeBranchResult.branchId,
-          status: 'PENDING',
-        },
-        data: {
-          status: 'CANCELLED',
-          reason: 'Sales Order Dibatalkan',
-          decided_at: new Date(),
-        },
-      })
+    const fallbackResult = await fallbackVoidSaleWithoutRpc(supabase as any, {
+      orgId,
+      saleId,
+      userId: user.id,
+      branchId: activeBranchId,
+      saleWarehouseId: (sale as any).warehouse_id || null,
     })
-  } catch (error) {
-    return { error: extractDatabaseError(error).message }
+
+    if ('error' in fallbackResult) {
+      return { error: `Gagal membatalkan sales order secara atomik: ${fallbackResult.error}` }
+    }
   }
+
+  // 5. Cancel any pending approval requests for this order
+  await (supabase as any)
+    .from('approval_requests')
+    .update({ status: 'VOIDED', reason: 'Sales Order Dibatalkan', decided_at: new Date().toISOString() })
+    .eq('source_type', 'SALES_ORDER')
+    .eq('source_id', saleId)
+    .eq('branch_id', activeBranchId)
+    .eq('status', 'PENDING')
 
   revalidatePath('/sales')
   revalidatePath('/inventory')

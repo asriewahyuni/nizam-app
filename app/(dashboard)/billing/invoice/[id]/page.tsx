@@ -6,6 +6,13 @@ import { formatRupiah } from '@/lib/utils'
 import { useParams, useRouter } from 'next/navigation'
 import { getBillingInvoicePrintData } from '@/modules/organization/actions/billing.actions'
 
+function extractInvoiceNote(rawDescription: string | null | undefined) {
+  const normalizedDescription = String(rawDescription || '').replace(/\\n/g, '\n')
+  const blockMatch = normalizedDescription.match(/(?:^|\n)(Catatan(?:\s+tambahan|\s+penawaran|\s+invoice)?|Note)\s*[:\-]?\s*([\s\S]*)$/i)
+  if (blockMatch?.[2]) return blockMatch[2].trim()
+  return ''
+}
+
 export default function InvoicePrintPage() {
   const params = useParams()
   const router = useRouter()
@@ -38,6 +45,7 @@ export default function InvoicePrintPage() {
 
   const bank = saasConfig.bank_info || {}
   const support = saasConfig.support_info || {}
+  const invoiceNote = extractInvoiceNote(invoice.item_description)
   const orgSettings = invoice.organization?.settings || {}
   const companyProfile = {
     name: orgSettings.brand_name || invoice.organization?.name || bank.name || 'Perusahaan',
@@ -172,6 +180,12 @@ export default function InvoicePrintPage() {
                   <p className="text-xl font-black text-slate-900 font-mono">{bank.account || '-'}</p>
                   <p className="text-xs font-semibold text-slate-500">a.n {bank.name || companyProfile.name}</p>
                 </div>
+                {invoiceNote && (
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Catatan</p>
+                    <p className="mt-2 whitespace-pre-line text-xs font-semibold leading-relaxed text-slate-600">{invoiceNote}</p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2 self-end">

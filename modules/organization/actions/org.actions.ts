@@ -32,6 +32,7 @@ import {
 } from '@/modules/organization/lib/branch-access.server'
 import { uploadOrganizationLogoAsset } from '@/modules/organization/lib/logo-storage.server'
 import { applyVoucher } from './billing.actions'
+import { syncParentCoAToChildOrg } from '@/modules/accounting/actions/coa.actions'
 
 const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 const DEFAULT_BRANCH_NAME = 'Unit Utama'
@@ -266,107 +267,359 @@ type CreateOrganizationActionResult =
   | CreateOrganizationSuccess
   | CreateOrganizationFailure
 
+type HoldingContextSuccess = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any
+  userId: string
+  activeOrgId: string
+}
+
+type HoldingContextFailure = {
+  error: string
+}
+
+type HoldingContextResult = HoldingContextSuccess | HoldingContextFailure
+
+type HoldingContextOptions = {
+  ownerOnly?: boolean
+}
+
+const OPTIONAL_ORGANIZATION_COLUMNS = new Set(['owner_email', 'parent_org_id', 'is_demo'])
+
+function extractErrorMessage(error: unknown): string {
+  if (!error) return ''
+  if (typeof error === 'string') return error
+  if (error instanceof Error) return error.message
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === 'string') return message
+  }
+  return ''
+}
+
+function extractMissingColumnName(error: unknown): string | null {
+  const message = extractErrorMessage(error)
+  if (!message) return null
+
+  const postgrestMatch = message.match(/could not find the '([a-zA-Z0-9_]+)' column/i)
+  if (postgrestMatch?.[1]) return postgrestMatch[1]
+
+  const postgresMatch = message.match(/column "?([a-zA-Z0-9_]+)"? does not exist/i)
+  if (postgresMatch?.[1]) return postgresMatch[1]
+
+  return null
+}
+
+function mapCreateOrganizationError(
+  defaultMessage: string,
+  error: { code?: string | null; message?: string | null } | null | undefined
+): string {
+  if (!error) return defaultMessage
+
+  if (error.code === '23505') {
+    return 'Nama atau slug organisasi ini sudah digunakan.'
+  }
+
+  const message = String(error.message || '').trim()
+  const missingColumn = extractMissingColumnName(error)
+  if (missingColumn === 'parent_org_id') {
+    return 'Database belum update untuk fitur struktur organisasi. Jalankan migrasi terbaru lalu coba lagi.'
+  }
+  if (missingColumn === 'owner_email') {
+    return 'Database belum update untuk metadata owner organisasi. Jalankan migrasi terbaru lalu coba lagi.'
+  }
+
+  const relationMatch = message.match(/relation "([^"]+)" does not exist/i)
+  if (relationMatch?.[1]) {
+    return `Database belum lengkap. Tabel "${relationMatch[1]}" belum tersedia. Jalankan migrasi Supabase terbaru lalu coba lagi.`
+  }
+
+  if (/function .* does not exist/i.test(message)) {
+    return 'Database belum lengkap. Function yang dibutuhkan belum tersedia. Jalankan migrasi Supabase terbaru lalu coba lagi.'
+  }
+
+  if (/trigger .* does not exist/i.test(message)) {
+    return 'Database belum lengkap. Trigger organisasi belum sinkron. Jalankan migrasi Supabase terbaru lalu coba lagi.'
+  }
+
+  if (/Unit Utama organisasi .* belum tersedia/i.test(message)) {
+    return 'Setup CoA default gagal karena trigger governance akun di database belum sinkron. Jalankan SQL migrasi 1150 (rebind accounts governance + ensure MAIN branch), lalu coba lagi.'
+  }
+
+  if (/row-level security|permission denied/i.test(message)) {
+    return 'Akses database ditolak oleh kebijakan keamanan. Coba login ulang lalu ulangi proses.'
+  }
+
+  if (message && process.env.NODE_ENV !== 'production') {
+    return `${defaultMessage} (${message})`
+  }
+
+  return defaultMessage
+}
+
+async function seedDefaultCoAAfterBranchReady(db: any, orgId: string) {
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) return
+  if (!db || typeof db.rpc !== 'function') return
+
+  try {
+    // Avoid duplicate seeding for environments where trigger already seeded CoA.
+    try {
+      if (typeof db.from === 'function') {
+        const { data: existingAccounts } = await db
+          .from('accounts')
+          .select('id')
+          .eq('org_id', trimmedOrgId)
+          .limit(1)
+
+        if (Array.isArray(existingAccounts) && existingAccounts.length > 0) {
+          return
+        }
+      }
+    } catch (checkError) {
+      ;(console as any).warn('CreateOrganization: account pre-check skipped', checkError)
+    }
+
+    const { error } = await db.rpc('seed_default_coa', { p_org_id: trimmedOrgId })
+    if (error) {
+      ;(console as any).warn('CreateOrganization: post-branch CoA seed failed', error)
+    }
+  } catch (seedError) {
+    ;(console as any).warn('CreateOrganization: post-branch CoA seed threw error', seedError)
+  }
+}
+
+async function getHoldingManagementContext(
+  expectedParentOrgId?: string,
+  options?: HoldingContextOptions
+): Promise<HoldingContextResult> {
+  const supabase = await createClient()
+  const db = supabase
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Tidak terautentikasi.' }
+
+  const activeOrg = await getActiveOrg()
+  if (!activeOrg) return { error: 'Organisasi aktif tidak ditemukan.' }
+
+  const role = String(activeOrg.role || '').toLowerCase()
+  if (options?.ownerOnly) {
+    if (role !== 'owner') {
+      return { error: 'Perubahan data anak perusahaan hanya dapat dilakukan oleh OWNER organisasi induk.' }
+    }
+  } else if (role !== 'owner' && role !== 'admin') {
+    return { error: 'Hanya owner/admin organisasi induk yang dapat mengelola anak perusahaan.' }
+  }
+
+  const activeOrgId = String(activeOrg.org?.id || '').trim()
+  if (!activeOrgId) {
+    return { error: 'Organisasi aktif tidak valid.' }
+  }
+
+  const activeOrgEntity = activeOrg.org as typeof activeOrg.org & { parent_org_id?: string | null }
+  const parentOrgId = activeOrgEntity.parent_org_id
+  if (parentOrgId) {
+    return { error: 'Fitur ini hanya tersedia dari konteks Organisasi Induk (Holding).' }
+  }
+
+  const expected = String(expectedParentOrgId || '').trim()
+  if (expected && expected !== activeOrgId) {
+    return { error: 'Ganti Organisasi Aktif ke holding yang sesuai sebelum melanjutkan.' }
+  }
+
+  return {
+    db,
+    userId: user.id,
+    activeOrgId,
+  }
+}
+
 async function createOrganizationRecord(
   formData: FormData
 ): Promise<CreateOrganizationActionResult> {
-  const user = await getAuthenticatedUser()
-  if (!user) return { error: 'Tidak terautentikasi' }
-
-  const cookieStore = await cookies()
-  const name = String(formData.get('name') || '').trim()
-  if (!name) return { error: 'Nama organisasi wajib diisi' }
-
-  const slug = generateSlug(name)
-  const orgId = crypto.randomUUID()
-  const defaultBranchId = crypto.randomUUID()
-  const ownerEmail = user.email?.trim().toLowerCase() || null
-  const planParam = String(formData.get('plan') || '').trim().toLowerCase()
-  const businessType = (formData.get('type') || 'BLANK') as DemoBusinessType
-  const isDemo = planParam === 'demo'
-  const isAbs = planParam === 'abs'
-
   try {
-    await prisma.$transaction(async (tx) => {
-      await tx.organizations.create({
-        data: {
-          id: orgId,
-          name,
-          slug,
-          owner_email: ownerEmail,
-          is_demo: isDemo,
-          settings: {
-            currency: 'IDR',
-            timezone: 'Asia/Jakarta',
-            fiscal_year_start_month: 1,
-            plan: isDemo ? 'Demo' : 'Trial',
-            is_demo: isDemo,
-            business_type: businessType,
-          },
-        },
+    const supabase = await createClient()
+    const db = supabase as any
+    let admin: any = null
+    try {
+      admin = (await createAdminClient()) as any
+    } catch (adminInitError) {
+      ;(console as any).warn('CreateOrganization: admin client unavailable, fallback to session client', adminInitError)
+    }
+    const privilegedDb = admin ?? db
+    const cookieStore = await cookies()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Tidak terautentikasi' }
+
+    const name = (formData.get('name') as string).trim()
+    if (!name) return { error: 'Nama organisasi wajib diisi' }
+    const slug = generateSlug(name)
+    const orgId = crypto.randomUUID()
+    let defaultBranchId = crypto.randomUUID()
+
+    // POPULATE OWNER EMAIL FROM SESSION
+    const ownerEmail = user.email
+    const planParam = String(formData.get('plan') || '').trim().toLowerCase()
+    const businessType = (formData.get('type') || 'BLANK') as DemoBusinessType
+    const isDemo = planParam === 'demo'
+    const isAbs = planParam === 'abs'
+    const selectedPlan = isDemo ? 'Demo' : 'Trial'
+    const parentOrgIdRaw = String(formData.get('parent_org_id') || '').trim()
+    const parentOrgId = parentOrgIdRaw || null
+
+    if (parentOrgId) {
+      const holdingContext = await getHoldingManagementContext(parentOrgId, { ownerOnly: true })
+      if ('error' in holdingContext) return { error: holdingContext.error }
+
+      // ── Enforce child org limit ───────────────────────────────────
+      const limits = await getOrgLimits(parentOrgId)
+      if (limits.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs) {
+        return {
+          error: `Batas anak perusahaan tercapai (${limits.currentChildOrgs}/${limits.maxChildOrgs}). Upgrade paket SaaS Anda untuk menambah lebih banyak entitas.`,
+        }
+      }
+    }
+
+    const orgInsertPayload: Record<string, unknown> = {
+      id: orgId,
+      name,
+      slug,
+      is_demo: isDemo,
+      settings: {
+        currency: 'IDR',
+        timezone: 'Asia/Jakarta',
+        fiscal_year_start_month: 1,
+        plan: selectedPlan, // Default plan for new orgs
+        is_demo: isDemo,
+        business_type: businessType,
+        // Delay CoA trigger seeding until Unit Utama exists to satisfy governance checks.
+        skip_coa_seed: true,
+      },
+    }
+    if (ownerEmail) {
+      orgInsertPayload.owner_email = ownerEmail
+    }
+    if (parentOrgId) {
+      orgInsertPayload.parent_org_id = parentOrgId
+    }
+
+    let { error: orgError } = await db.from('organizations').insert(orgInsertPayload)
+    while (orgError) {
+      const missingColumn = extractMissingColumnName(orgError)
+      if (!missingColumn || !OPTIONAL_ORGANIZATION_COLUMNS.has(missingColumn)) break
+      if (missingColumn === 'parent_org_id' && parentOrgId) break
+      if (!(missingColumn in orgInsertPayload)) break
+
+      delete orgInsertPayload[missingColumn]
+      ;({ error: orgError } = await db.from('organizations').insert(orgInsertPayload))
+    }
+
+    if (orgError) {
+      ;(console as any).error('CreateOrganization: organizations insert failed', orgError)
+      return {
+        error: mapCreateOrganizationError('Gagal membuat organisasi.', orgError),
+      }
+    }
+
+    const { error: memberError } = await privilegedDb
+      .from('org_members')
+      .insert({ org_id: orgId, user_id: user.id, role: 'owner' })
+
+    if (memberError) {
+      ;(console as any).error('CreateOrganization: org_members insert failed', memberError)
+      if (admin) {
+        await admin.from('organizations').delete().eq('id', orgId)
+      }
+      return {
+        error: mapCreateOrganizationError('Gagal menambahkan anggota.', memberError),
+      }
+    }
+
+    let { error: branchError } = await privilegedDb
+      .from('branches')
+      .insert({
+        id: defaultBranchId,
+        org_id: orgId,
+        name: DEFAULT_BRANCH_NAME,
+        code: DEFAULT_BRANCH_CODE,
+        address: null,
+        is_active: true,
       })
 
-      await tx.org_members.create({
-        data: {
-          org_id: orgId,
-          user_id: user.id,
-          role: 'owner',
-          is_active: true,
-        },
-      })
+    if (branchError?.code === '23505') {
+      const { data: existingBranchByCode } = await privilegedDb
+        .from('branches')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('code', DEFAULT_BRANCH_CODE)
+        .maybeSingle()
 
-      await tx.branches.create({
-        data: {
-          id: defaultBranchId,
-          org_id: orgId,
-          name: DEFAULT_BRANCH_NAME,
-          code: DEFAULT_BRANCH_CODE,
-          address: null,
-          is_active: true,
-        },
-      })
+      const existingBranchId = String(existingBranchByCode?.id || '').trim()
+      if (existingBranchId) {
+        defaultBranchId = existingBranchId
+        branchError = null
+      }
+    }
+
+    if (branchError) {
+      ;(console as any).error('CreateOrganization: branches insert failed', branchError)
+      if (admin) {
+        await admin.from('organizations').delete().eq('id', orgId)
+      }
+      return {
+        error: mapCreateOrganizationError('Gagal menyiapkan unit default organisasi.', branchError),
+      }
+    }
+
+    await seedDefaultCoAAfterBranchReady(privilegedDb, orgId)
+
+    await persistMembershipActiveContext(privilegedDb, {
+      userId: user.id,
+      orgId,
+      branchId: defaultBranchId,
     })
   } catch (error) {
     if (isUniqueConstraintError(error, ['slug'])) {
       return { error: 'Nama organisasi ini sudah digunakan.' }
     }
 
-    console.error('createOrganizationRecord Error:', error)
-    return { error: 'Gagal membuat organisasi.' }
-  }
-
-  await persistMembershipActiveContext({
-    userId: user.id,
-    orgId,
-    branchId: defaultBranchId,
-  })
-
-  if (isDemo) {
-    try {
-      await seedDemoOrganization(orgId, businessType)
-    } catch (seedError) {
-      console.error('Seed Data Error:', seedError)
+    // IF DEMO, SEED DATA
+    if (isDemo) {
+      try {
+        await seedDemoData(supabase, orgId, businessType)
+      } catch (seedErr) {
+        (console as any).error('Seed Data Error:', seedErr)
+      }
     }
-  }
 
-  if (isAbs) {
-    try {
-      await applyVoucher(orgId, 'ABS2024')
-    } catch (absError) {
-      console.error('ABS Activation Error:', absError)
+    // IF ABS, APPLY VOUCHER AUTOMATICALLY
+    if (isAbs) {
+      try {
+        await applyVoucher(orgId, 'ABS2024')
+      } catch (absErr) {
+        (console as any).error('ABS Activation Error:', absErr)
+      }
     }
-  }
 
-  cookieStore.set(ACTIVE_ORG_COOKIE, orgId, getActiveContextCookieOptions())
-  cookieStore.set(
-    ACTIVE_BRANCH_COOKIE,
-    defaultBranchId,
-    getActiveContextCookieOptions()
-  )
+    cookieStore.set(ACTIVE_ORG_COOKIE, orgId, getActiveContextCookieOptions())
+    cookieStore.set(ACTIVE_BRANCH_COOKIE, defaultBranchId, getActiveContextCookieOptions())
 
-  return {
-    success: true,
-    orgId,
-    branchId: defaultBranchId,
+    return {
+      success: true,
+      orgId,
+      branchId: defaultBranchId,
+    }
+  } catch (error) {
+    const message = extractErrorMessage(error)
+    if (/Missing SUPABASE_(LOCAL_)?SERVICE_ROLE_KEY/i.test(message)) {
+      return { error: 'Konfigurasi service role Supabase belum diisi. Lengkapi environment lalu coba lagi.' }
+    }
+    if (/Missing NEXT_PUBLIC_SUPABASE_(LOCAL_)?URL|Missing NEXT_PUBLIC_SUPABASE_(LOCAL_)?ANON_KEY/i.test(message)) {
+      return { error: 'Konfigurasi Supabase belum lengkap (URL/ANON key). Lengkapi environment lalu coba lagi.' }
+    }
+    return { error: 'Terjadi kesalahan sistem saat membuat organisasi.' }
   }
 }
 
@@ -376,6 +629,405 @@ export async function createOrganization(formData: FormData) {
 
   revalidatePath('/dashboard')
   return redirect('/dashboard')
+}
+
+export async function getOrgLimits(orgId: string): Promise<{
+  maxBranches: number | null
+  maxChildOrgs: number | null
+  maxUsers: number | null
+  currentBranches: number
+  currentChildOrgs: number
+  currentUsers: number
+}> {
+  const supabase = await createClient()
+  const db = supabase as any
+
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) {
+    return { maxBranches: null, maxChildOrgs: null, maxUsers: null, currentBranches: 0, currentChildOrgs: 0, currentUsers: 0 }
+  }
+
+  // Ambil plan dari settings organisasi
+  const { data: org } = await db
+    .from('organizations')
+    .select('settings')
+    .eq('id', trimmedOrgId)
+    .maybeSingle()
+
+  const planName = org?.settings?.plan
+
+  // Ambil limits dari saas_packages
+  let maxBranches: number | null = null
+  let maxChildOrgs: number | null = null
+  let maxUsers: number | null = null
+
+  if (planName) {
+    const { data: pkg } = await db
+      .from('saas_packages')
+      .select('max_branches, max_child_orgs, max_users')
+      .eq('name', planName)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (pkg) {
+      maxBranches   = pkg.max_branches   ?? null
+      maxChildOrgs  = pkg.max_child_orgs ?? null
+      maxUsers      = pkg.max_users      ?? null
+    }
+  }
+
+  // Hitung usage saat ini
+  const [{ count: branchCount }, { count: childOrgCount }, { count: userCount }] = await Promise.all([
+    db.from('branches').select('id', { count: 'exact', head: true }).eq('org_id', trimmedOrgId).eq('is_active', true),
+    db.from('organizations').select('id', { count: 'exact', head: true }).eq('parent_org_id', trimmedOrgId),
+    db.from('org_members').select('id', { count: 'exact', head: true }).eq('org_id', trimmedOrgId).eq('is_active', true),
+  ])
+
+  return {
+    maxBranches,
+    maxChildOrgs,
+    maxUsers,
+    currentBranches:  branchCount   ?? 0,
+    currentChildOrgs: childOrgCount ?? 0,
+    currentUsers:     userCount     ?? 0,
+  }
+}
+
+export async function linkSubOrganization(parentOrgId: string, childOrgId: string) {
+  const trimmedParentOrgId = String(parentOrgId || '').trim()
+  const trimmedChildOrgId = String(childOrgId || '').trim()
+
+  if (!trimmedParentOrgId || !trimmedChildOrgId) {
+    return { error: 'Data organisasi tidak valid.' }
+  }
+
+  if (trimmedParentOrgId === trimmedChildOrgId) {
+    return { error: 'Organisasi induk dan anak tidak boleh sama.' }
+  }
+
+  const holdingContext = await getHoldingManagementContext(trimmedParentOrgId, { ownerOnly: true })
+  if ('error' in holdingContext) return { error: holdingContext.error }
+  const { db, userId, activeOrgId } = holdingContext
+
+  // ── Enforce child org limit ────────────────────────────────────────────
+  const limits = await getOrgLimits(trimmedParentOrgId)
+  if (limits.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs) {
+    return {
+      error: `Batas anak perusahaan tercapai (${limits.currentChildOrgs}/${limits.maxChildOrgs}). Upgrade paket SaaS Anda untuk menambah lebih banyak entitas.`,
+    }
+  }
+
+  const { data: childOrgMembership } = await db
+    .from('org_members')
+    .select('org_id')
+    .eq('org_id', trimmedChildOrgId)
+    .eq('user_id', userId)
+    .eq('role', 'owner')
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!childOrgMembership) {
+    return { error: 'Hanya OWNER organisasi target yang dapat menautkan entitas sebagai anak perusahaan.' }
+  }
+
+  const { data: childOrg, error: childOrgError } = await db
+    .from('organizations')
+    .select('id, parent_org_id')
+    .eq('id', trimmedChildOrgId)
+    .maybeSingle()
+
+  if (childOrgError || !childOrg) {
+    return { error: 'Organisasi yang akan ditautkan tidak ditemukan.' }
+  }
+
+  if (childOrg.parent_org_id && childOrg.parent_org_id !== activeOrgId) {
+    return { error: 'Organisasi tersebut sudah terhubung ke holding lain.' }
+  }
+
+  if (childOrg.parent_org_id === activeOrgId) {
+    return { success: true }
+  }
+
+  const { error } = await db
+    .from('organizations')
+    .update({ parent_org_id: activeOrgId, updated_at: new Date().toISOString() })
+    .eq('id', trimmedChildOrgId)
+
+  if (error) return { error: error.message }
+
+  const coaSync = await syncParentCoAToChildOrg(activeOrgId, trimmedChildOrgId)
+  if (!coaSync.success) {
+    ;(console as any).warn('CoA sync warning (linkSubOrganization):', coaSync.error)
+  }
+
+  revalidatePath('/settings/sub-orgs')
+  revalidatePath('/reports')
+  return { success: true }
+}
+
+export async function assignSubOrgManager(childOrgId: string, employeeId: string | null) {
+  const trimmedChildOrgId = String(childOrgId || '').trim()
+  if (!trimmedChildOrgId) return { error: 'Anak perusahaan tidak valid.' }
+  const managerFeatureEnabled = await isSubOrgManagerFeatureEnabled()
+  if (!managerFeatureEnabled) {
+    return { error: 'Fitur PIC anak perusahaan belum aktif. Jalankan migrasi 1128 dan reload schema Supabase.' }
+  }
+
+  const normalizedEmployeeId = String(employeeId || '').trim() || null
+
+  const holdingContext = await getHoldingManagementContext(undefined, { ownerOnly: true })
+  if ('error' in holdingContext) return { error: holdingContext.error }
+  const { db, activeOrgId } = holdingContext
+
+  const { data: childOrg } = await db
+    .from('organizations')
+    .select('id')
+    .eq('id', trimmedChildOrgId)
+    .eq('parent_org_id', activeOrgId)
+    .maybeSingle()
+
+  if (!childOrg) {
+    return { error: 'Organisasi tersebut tidak terdaftar sebagai anak dari holding aktif.' }
+  }
+
+  if (normalizedEmployeeId) {
+    const { data: employee } = await db
+      .from('employees')
+      .select('id')
+      .eq('id', normalizedEmployeeId)
+      .eq('org_id', activeOrgId)
+      .maybeSingle()
+
+    if (!employee) {
+      return { error: 'PIC harus berasal dari organisasi induk yang sedang aktif.' }
+    }
+  }
+
+  const { error } = await db
+    .from('organizations')
+    .update({ manager_employee_id: normalizedEmployeeId, updated_at: new Date().toISOString() })
+    .eq('id', trimmedChildOrgId)
+    .eq('parent_org_id', activeOrgId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/settings/sub-orgs')
+  return { success: true }
+}
+
+export async function updateChildOrganization(childOrgId: string, name: string) {
+  const trimmedChildOrgId = String(childOrgId || '').trim()
+  const trimmedName = String(name || '').trim()
+
+  if (!trimmedChildOrgId) return { error: 'Anak perusahaan tidak valid.' }
+  if (!trimmedName) return { error: 'Nama organisasi wajib diisi.' }
+
+  const slug = generateSlug(trimmedName)
+  if (!slug) return { error: 'Nama organisasi tidak valid untuk dibuatkan slug.' }
+
+  const holdingContext = await getHoldingManagementContext(undefined, { ownerOnly: true })
+  if ('error' in holdingContext) return { error: holdingContext.error }
+  const { db, activeOrgId } = holdingContext
+
+  const { data: childOrg, error: childOrgError } = await db
+    .from('organizations')
+    .select('id, parent_org_id')
+    .eq('id', trimmedChildOrgId)
+    .maybeSingle()
+
+  if (childOrgError || !childOrg) {
+    return { error: 'Organisasi anak tidak ditemukan.' }
+  }
+
+  if (childOrg.parent_org_id !== activeOrgId) {
+    return { error: 'Organisasi tersebut tidak terdaftar sebagai anak dari holding aktif.' }
+  }
+
+  const { error: updateError } = await db
+    .from('organizations')
+    .update({
+      name: trimmedName,
+      slug,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', trimmedChildOrgId)
+    .eq('parent_org_id', activeOrgId)
+
+  if (updateError) {
+    if (updateError.code === '23505') {
+      return { error: 'Nama organisasi ini sudah digunakan.' }
+    }
+    return { error: updateError.message || 'Gagal memperbarui organisasi anak.' }
+  }
+
+  revalidatePath('/', 'layout')
+  revalidatePath('/settings/sub-orgs')
+  revalidatePath('/reports')
+  return { success: true }
+}
+
+export async function deleteChildOrganization(childOrgId: string) {
+  const trimmedChildOrgId = String(childOrgId || '').trim()
+  if (!trimmedChildOrgId) return { error: 'Anak perusahaan tidak valid.' }
+
+  const holdingContext = await getHoldingManagementContext(undefined, { ownerOnly: true })
+  if ('error' in holdingContext) return { error: holdingContext.error }
+  const { db, userId, activeOrgId } = holdingContext
+
+  const { data: childOrg, error: childOrgError } = await db
+    .from('organizations')
+    .select('id, parent_org_id')
+    .eq('id', trimmedChildOrgId)
+    .maybeSingle()
+
+  if (childOrgError || !childOrg) {
+    return { error: 'Organisasi anak tidak ditemukan.' }
+  }
+
+  if (childOrg.parent_org_id !== activeOrgId) {
+    return { error: 'Organisasi tersebut tidak terdaftar sebagai anak dari holding aktif.' }
+  }
+
+  const { data: childMembership } = await db
+    .from('org_members')
+    .select('role')
+    .eq('org_id', trimmedChildOrgId)
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (String(childMembership?.role || '').toLowerCase() !== 'owner') {
+    return { error: 'Untuk menghapus anak perusahaan, akun Anda harus OWNER pada organisasi anak tersebut.' }
+  }
+
+  const { error: deleteError } = await db
+    .from('organizations')
+    .delete()
+    .eq('id', trimmedChildOrgId)
+    .eq('parent_org_id', activeOrgId)
+
+  if (deleteError) {
+    return { error: deleteError.message || 'Gagal menghapus organisasi anak.' }
+  }
+
+  revalidatePath('/', 'layout')
+  revalidatePath('/settings/sub-orgs')
+  revalidatePath('/reports')
+  return { success: true }
+}
+
+export async function setOrganizationParent(childOrgId: string, parentOrgId: string | null) {
+  const supabase = await createClient()
+  const db = supabase as any
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Tidak terautentikasi.' }
+
+  const trimmedChildOrgId = String(childOrgId || '').trim()
+  const trimmedParentOrgId = String(parentOrgId || '').trim() || null
+
+  if (!trimmedChildOrgId) {
+    return { error: 'Organisasi anak tidak valid.' }
+  }
+
+  if (trimmedParentOrgId && trimmedChildOrgId === trimmedParentOrgId) {
+    return { error: 'Organisasi tidak bisa menjadi induk untuk dirinya sendiri.' }
+  }
+
+  const { data: childMembership } = await db
+    .from('org_members')
+    .select('role')
+    .eq('org_id', trimmedChildOrgId)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!childMembership || String(childMembership.role || '').toLowerCase() !== 'owner') {
+    return { error: 'Hanya OWNER organisasi anak yang dapat mengubah hierarki.' }
+  }
+
+  if (trimmedParentOrgId) {
+    const { data: parentMembership } = await db
+      .from('org_members')
+      .select('role')
+      .eq('org_id', trimmedParentOrgId)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    const parentRole = String(parentMembership?.role || '').toLowerCase()
+    if (!parentMembership || parentRole !== 'owner') {
+      return { error: 'Anda harus OWNER di organisasi induk tujuan.' }
+    }
+  }
+
+  const { data: childOrg, error: childOrgError } = await db
+    .from('organizations')
+    .select('id, parent_org_id')
+    .eq('id', trimmedChildOrgId)
+    .maybeSingle()
+
+  if (childOrgError || !childOrg) {
+    return { error: 'Organisasi anak tidak ditemukan.' }
+  }
+
+  if ((childOrg.parent_org_id || null) === trimmedParentOrgId) {
+    return { success: true }
+  }
+
+  if (trimmedParentOrgId) {
+    const { data: parentOrg, error: parentOrgError } = await db
+      .from('organizations')
+      .select('id, parent_org_id')
+      .eq('id', trimmedParentOrgId)
+      .maybeSingle()
+
+    if (parentOrgError || !parentOrg) {
+      return { error: 'Organisasi induk tujuan tidak ditemukan.' }
+    }
+
+    // Anti-cycle guard: walk upward from parent candidate and ensure child is never encountered.
+    let cursor: string | null = trimmedParentOrgId
+    let depth = 0
+    while (cursor && depth < 50) {
+      if (cursor === trimmedChildOrgId) {
+        return { error: 'Relasi induk-anak tidak valid karena membentuk siklus.' }
+      }
+
+      const { data: currentOrg, error: currentOrgError }: { data: { parent_org_id: string | null } | null; error: unknown } = await db
+        .from('organizations')
+        .select('parent_org_id')
+        .eq('id', cursor)
+        .maybeSingle()
+
+      if (currentOrgError || !currentOrg) break
+      cursor = currentOrg.parent_org_id || null
+      depth += 1
+    }
+  }
+
+  const { error: updateError } = await db
+    .from('organizations')
+    .update({
+      parent_org_id: trimmedParentOrgId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', trimmedChildOrgId)
+
+  if (updateError) return { error: updateError.message }
+
+  if (trimmedParentOrgId) {
+    const coaSync = await syncParentCoAToChildOrg(trimmedParentOrgId, trimmedChildOrgId)
+    if (!coaSync.success) {
+      ;(console as any).warn('CoA sync warning (setOrganizationParent):', coaSync.error)
+    }
+  }
+
+  revalidatePath('/', 'layout')
+  revalidatePath('/settings/sub-orgs')
+  revalidatePath('/reports')
+  return { success: true }
 }
 
 export async function createOrganizationQuick(formData: FormData) {
@@ -479,61 +1131,65 @@ export async function getMyOrganizations(): Promise<AccessibleOrganization[]> {
   const user = await getAuthenticatedUser()
   if (!user) return []
 
-  try {
-    const memberships = await prisma.org_members.findMany({
-      where: {
-        user_id: user.id,
-        is_active: true,
-      },
-      include: {
-        organizations: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            logo_url: true,
-            settings: true,
-            is_active: true,
-          },
-        },
-      },
-      orderBy: {
-        joined_at: 'asc',
-      },
-    })
+  const { data, error } = await db
+    .from('org_members')
+    .select('org_id, role, role_id, joined_at, organizations(id, name, slug, logo_url, settings, is_active, parent_org_id)')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .order('joined_at', { ascending: true })
 
     const results: AccessibleOrganization[] = []
 
-    for (const membership of memberships) {
-      const org = membership.organizations
-      if (!org) continue
+  const parentOrgIds = Array.from(
+    new Set(
+      (data || [])
+        .map((membership: any) => {
+          const parentOrgId = membership?.organizations?.parent_org_id
+          return typeof parentOrgId === 'string' && parentOrgId.trim() ? parentOrgId.trim() : null
+        })
+        .filter((orgId): orgId is string => Boolean(orgId))
+    )
+  )
 
-      results.push({
-        orgId: membership.org_id,
-        role: String(membership.role || 'staff'),
-        roleId: membership.role_id || null,
-        joinedAt: membership.joined_at.toISOString(),
-        org: {
-          id: org.id,
-          name: org.name,
-          slug: org.slug,
-          logo_url: org.logo_url ?? null,
-          settings:
-            org.settings &&
-            typeof org.settings === 'object' &&
-            !Array.isArray(org.settings)
-              ? (org.settings as Record<string, any>)
-              : {},
-          is_active: Boolean(org.is_active),
-        },
-      })
+  let parentOrgNameById = new Map<string, string>()
+  if (parentOrgIds.length > 0) {
+    const { data: parentRows, error: parentRowsError } = await db
+      .from('organizations')
+      .select('id, name')
+      .in('id', parentOrgIds)
+
+    if (!parentRowsError && Array.isArray(parentRows)) {
+      parentOrgNameById = new Map(
+        parentRows
+          .filter((row: any) => row?.id && row?.name)
+          .map((row: any) => [String(row.id), String(row.name)])
+      )
     }
-
-    return results
-  } catch (error) {
-    console.error('getMyOrganizations Error:', error)
-    return []
   }
+
+  const mapped: (AccessibleOrganization | null)[] = data.map((membership: any) => {
+    const org = membership.organizations
+    if (!org || typeof org !== 'object') return null
+    const parentOrgId = typeof org.parent_org_id === 'string' ? org.parent_org_id : null
+
+    return {
+      orgId: membership.org_id,
+      role: membership.role || 'staff',
+      roleId: membership.role_id || null,
+      joinedAt: membership.joined_at || new Date(0).toISOString(),
+      org: {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        logo_url: org.logo_url ?? null,
+        settings: org.settings ?? {},
+        is_active: Boolean(org.is_active),
+        parent_org_id: parentOrgId,
+        parent_org_name: parentOrgId ? parentOrgNameById.get(parentOrgId) ?? null : null,
+      },
+    } satisfies AccessibleOrganization
+  })
+  return mapped.filter((m): m is AccessibleOrganization => m !== null)
 }
 
 export async function setActiveOrg(orgId: string) {
@@ -820,6 +1476,84 @@ export async function getOrgMembers(orgId: string) {
   }))
 }
 
+export async function isSubOrgManagerFeatureEnabled() {
+  const admin = (await createAdminClient()) as any
+  const { error } = await admin
+    .from('organizations')
+    .select('manager_employee_id')
+    .limit(1)
+
+  if (!error) return true
+
+  const message = String(error?.message || '').toLowerCase()
+  if (message.includes('manager_employee_id') && (message.includes('schema cache') || message.includes('column'))) {
+    return false
+  }
+
+  return false
+}
+
+/**
+ * Ambil semua karyawan di org holding untuk keperluan PIC assignment.
+ * Menggunakan admin client agar tidak terpotong oleh RLS branch aktif user.
+ */
+export async function getHoldingEmployees(orgId: string) {
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) return []
+
+  const admin = (await createAdminClient()) as any
+  const { data, error } = await admin
+    .from('employees')
+    .select('id, first_name, last_name, job_title, branch_id')
+    .eq('org_id', trimmedOrgId)
+    .order('first_name')
+
+  if (error) {
+    ;(console as any).error('getHoldingEmployees Error:', error)
+    return []
+  }
+
+  return data || []
+}
+
+export async function getChildOrgs(parentOrgId: string) {
+  const trimmedParentOrgId = String(parentOrgId || '').trim()
+  if (!trimmedParentOrgId) return []
+
+  const holdingContext = await getHoldingManagementContext(trimmedParentOrgId)
+  if ('error' in holdingContext) return []
+  const { db } = holdingContext
+  const managerFeatureEnabled = await isSubOrgManagerFeatureEnabled()
+  const selectFields = managerFeatureEnabled
+    ? 'id, name, slug, logo_url, settings, is_active, created_at, manager_employee_id'
+    : 'id, name, slug, logo_url, settings, is_active, created_at'
+
+  const admin = (await createAdminClient()) as any
+  const { data: adminData, error: adminError } = await admin
+    .from('organizations')
+    .select(selectFields)
+    .eq('parent_org_id', trimmedParentOrgId)
+    .order('created_at', { ascending: false })
+
+  if (!adminError) {
+    if (managerFeatureEnabled) return adminData || []
+    return (adminData || []).map((row: any) => ({ ...row, manager_employee_id: null }))
+  }
+
+  const { data: userData, error: userError } = await db
+    .from('organizations')
+    .select(selectFields)
+    .eq('parent_org_id', trimmedParentOrgId)
+    .order('created_at', { ascending: false })
+
+  if (!userError) {
+    if (managerFeatureEnabled) return userData || []
+    return (userData || []).map((row: any) => ({ ...row, manager_employee_id: null }))
+  }
+
+  return []
+}
+
 export async function destroyOrganization(orgId: string) {
   const user = await getAuthenticatedUser()
   if (!user) return { error: 'Unauthorized' }
@@ -934,22 +1668,20 @@ export async function createBranch(
     return { error: 'Hanya owner atau admin yang dapat menambahkan unit.' }
   }
 
-  const [duplicateNameBranch, duplicateCodeBranch] = await Promise.all([
-    prisma.branches.findFirst({
-      where: {
-        org_id: trimmedOrgId,
-        name,
-      },
-      select: { id: true },
-    }),
-    prisma.branches.findFirst({
-      where: {
-        org_id: trimmedOrgId,
-        code,
-      },
-      select: { id: true },
-    }),
-  ])
+  // ── Enforce branch limit dari SaaS plan ───────────────────────────────
+  const limits = await getOrgLimits(trimmedOrgId)
+  if (limits.maxBranches !== null && limits.currentBranches >= limits.maxBranches) {
+    return {
+      error: `Batas cabang tercapai (${limits.currentBranches}/${limits.maxBranches}). Upgrade paket SaaS Anda untuk menambah lebih banyak cabang.`,
+    }
+  }
+
+  const { data: duplicateNameBranch } = await db
+    .from('branches')
+    .select('id')
+    .eq('org_id', trimmedOrgId)
+    .eq('name', name)
+    .maybeSingle()
 
   if (duplicateNameBranch?.id) {
     return { error: 'Nama unit sudah digunakan pada organisasi ini.' }
@@ -1023,12 +1755,215 @@ export async function createBranch(
   }
 }
 
-export async function updateMemberUnitAccess(
-  orgId: string,
-  memberId: string,
-  branchIds: string[]
-) {
-  const user = await getAuthenticatedUser()
+export async function updateBranch(orgId: string, branchId: string, formData: FormData) {
+  const supabase = await createClient()
+  const db = supabase as any
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Tidak terautentikasi.' }
+
+  const trimmedOrgId = String(orgId || '').trim()
+  const trimmedBranchId = String(branchId || '').trim()
+  const name = String(formData.get('name') || '').trim()
+  const code = String(formData.get('code') || '').trim().toUpperCase()
+  const addressRaw = String(formData.get('address') || '').trim()
+  const address = addressRaw || null
+
+  if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
+  if (!trimmedBranchId) return { error: 'Cabang tidak valid.' }
+  if (!name) return { error: 'Nama cabang wajib diisi.' }
+  if (!code) return { error: 'Kode cabang wajib diisi.' }
+
+  // Check actor permissions
+  const { data: actorMembership } = await db
+    .from('org_members')
+    .select('role')
+    .eq('org_id', trimmedOrgId)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!actorMembership || !['owner', 'admin'].includes(String(actorMembership.role || ''))) {
+    return { error: 'Hanya owner atau admin yang dapat mengubah cabang.' }
+  }
+
+  // Duplicate check (ignore self)
+  const { data: dupName } = await db
+    .from('branches')
+    .select('id')
+    .eq('org_id', trimmedOrgId)
+    .eq('name', name)
+    .neq('id', trimmedBranchId)
+    .maybeSingle()
+  if (dupName?.id) return { error: 'Nama cabang sudah digunakan.' }
+
+  const { data: dupCode } = await db
+    .from('branches')
+    .select('id')
+    .eq('org_id', trimmedOrgId)
+    .eq('code', code)
+    .neq('id', trimmedBranchId)
+    .maybeSingle()
+  if (dupCode?.id) return { error: 'Kode cabang sudah digunakan.' }
+
+  const { error: updateError } = await db
+    .from('branches')
+    .update({ name, code, address, updated_at: new Date().toISOString() })
+    .eq('id', trimmedBranchId)
+    .eq('org_id', trimmedOrgId)
+
+  if (updateError) return { error: updateError.message || 'Gagal memperbarui cabang.' }
+
+  revalidatePath('/settings/branches')
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+export async function deleteBranch(orgId: string, branchId: string) {
+  const supabase = await createClient()
+  const db = supabase as any
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Tidak terautentikasi.' }
+
+  const trimmedOrgId = String(orgId || '').trim()
+  const trimmedBranchId = String(branchId || '').trim()
+  if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
+  if (!trimmedBranchId) return { error: 'Cabang tidak valid.' }
+
+  const { data: actorMembership } = await db
+    .from('org_members')
+    .select('role')
+    .eq('org_id', trimmedOrgId)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!actorMembership || String(actorMembership.role || '') !== 'owner') {
+    return { error: 'Hanya owner yang dapat menghapus cabang.' }
+  }
+
+  // Prevent deleting the only branch
+  const { count: branchCount } = await db
+    .from('branches')
+    .select('id', { count: 'exact', head: true })
+    .eq('org_id', trimmedOrgId)
+    .eq('is_active', true)
+
+  if ((branchCount ?? 0) <= 1) {
+    return { error: 'Tidak dapat menghapus satu-satunya cabang yang aktif.' }
+  }
+
+  // ── Pre-flight: cek semua tabel yang punya FK NOT NULL ke branches ──
+  // Tabel-tabel ini tidak bisa pakai ON DELETE SET NULL karena kolomnya NOT NULL,
+  // sehingga harus dicek manual sebelum delete.
+  const blockerTables: { table: string; label: string }[] = [
+    { table: 'bank_accounts',          label: 'Akun Bank'          },
+    { table: 'bank_transactions',      label: 'Transaksi Bank'     },
+    { table: 'bank_mutations',         label: 'Mutasi Bank'        },
+    { table: 'service_orders',         label: 'Order Jasa'         },
+    { table: 'fleet_assets',           label: 'Armada'             },
+    { table: 'fleet_bookings',         label: 'Booking Armada'     },
+    { table: 'fleet_routes',           label: 'Rute Armada'        },
+    { table: 'fleet_schedules',        label: 'Jadwal Armada'      },
+    { table: 'fleet_tickets',          label: 'Tiket Armada'       },
+    { table: 'fleet_maintenance_labs', label: 'Perawatan Armada'   },
+    { table: 'fleet_terminals',        label: 'Terminal Armada'    },
+  ]
+
+  const blockers: string[] = []
+  for (const { table, label } of blockerTables) {
+    try {
+      const { count } = await db
+        .from(table)
+        .select('id', { count: 'exact', head: true })
+        .eq('branch_id', trimmedBranchId)
+      if ((count ?? 0) > 0) {
+        blockers.push(`${label} (${count} data)`)
+      }
+    } catch {
+      // Tabel mungkin belum ada di schema ini — skip
+    }
+  }
+
+  if (blockers.length > 0) {
+    return {
+      error: `Cabang ini tidak dapat dihapus karena masih memiliki data terkait:\n• ${blockers.join('\n• ')}\n\nPindahkan atau hapus data tersebut terlebih dahulu sebelum menghapus cabang.`,
+    }
+  }
+
+  const { error: deleteError } = await db
+    .from('branches')
+    .delete()
+    .eq('id', trimmedBranchId)
+    .eq('org_id', trimmedOrgId)
+
+  if (deleteError) {
+    // Tangkap FK violation yang mungkin masih lolos dari pre-flight check
+    if (deleteError.code === '23503') {
+      return { error: 'Cabang masih memiliki data terkait dan tidak dapat dihapus. Hapus semua data yang menggunakan cabang ini terlebih dahulu.' }
+    }
+    return { error: deleteError.message || 'Gagal menghapus cabang.' }
+  }
+
+  revalidatePath('/settings/branches')
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+
+export async function assignBranchPIC(orgId: string, branchId: string, employeeId: string | null) {
+  const supabase = await createClient()
+  const db = supabase as any
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Tidak terautentikasi.' }
+
+  const trimmedOrgId = String(orgId || '').trim()
+  const trimmedBranchId = String(branchId || '').trim()
+  const normalizedEmployeeId = String(employeeId || '').trim() || null
+
+  if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
+  if (!trimmedBranchId) return { error: 'Cabang tidak valid.' }
+
+  const { data: actorMembership } = await db
+    .from('org_members')
+    .select('role')
+    .eq('org_id', trimmedOrgId)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!actorMembership || !['owner', 'admin'].includes(String(actorMembership.role || ''))) {
+    return { error: 'Hanya owner atau admin yang dapat mengubah PIC cabang.' }
+  }
+
+  if (normalizedEmployeeId) {
+    const { data: employee } = await db
+      .from('employees')
+      .select('id')
+      .eq('id', normalizedEmployeeId)
+      .eq('org_id', trimmedOrgId)
+      .maybeSingle()
+    if (!employee) return { error: 'PIC harus berasal dari organisasi aktif.' }
+  }
+
+  const { error: updateError } = await db
+    .from('branches')
+    .update({ pic_employee_id: normalizedEmployeeId, updated_at: new Date().toISOString() })
+    .eq('id', trimmedBranchId)
+    .eq('org_id', trimmedOrgId)
+
+  if (updateError) return { error: updateError.message || 'Gagal menyimpan PIC cabang.' }
+
+  revalidatePath('/settings/branches')
+  return { success: true }
+}
+
+export async function updateMemberUnitAccess(orgId: string, memberId: string, branchIds: string[]) {
+  const supabase = await createClient()
+  const db = supabase as any
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   if (!user) return { error: 'Tidak terautentikasi.' }
 
   const trimmedOrgId = String(orgId || '').trim()

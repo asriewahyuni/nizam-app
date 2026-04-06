@@ -120,9 +120,10 @@ export async function exportProfitLossXLSX(
   startDate: string, 
   endDate: string,
   orgName: string = 'Organisasi',
-  branchId?: string | null
+  branchId?: string | null,
+  consolidated: boolean = false
 ): Promise<Buffer> {
-  const data = await getProfitLoss(orgId, startDate, endDate, branchId)
+  const data = await getProfitLoss(orgId, startDate, endDate, branchId, consolidated)
   
   const wb = new ExcelJS.Workbook()
   addWorkbookMetadata(wb, orgName)
@@ -195,9 +196,10 @@ export async function exportBalanceSheetXLSX(
   orgId: string, 
   asOfDate: string,
   orgName: string = 'Organisasi',
-  branchId?: string | null
+  branchId?: string | null,
+  consolidated: boolean = false
 ): Promise<Buffer> {
-  const data = await getBalanceSheet(orgId, asOfDate, branchId)
+  const data = await getBalanceSheet(orgId, asOfDate, branchId, consolidated)
 
   const wb = new ExcelJS.Workbook()
   addWorkbookMetadata(wb, orgName)
@@ -259,9 +261,10 @@ export async function exportBalanceSheetXLSX(
 export async function exportGeneralLedgerXLSX(
   orgId: string,
   orgName: string = 'Organisasi',
-  branchId?: string | null
+  branchId?: string | null,
+  consolidated: boolean = false
 ): Promise<Buffer> {
-  const entries = await getGeneralLedger(orgId, branchId)
+  const entries = await getGeneralLedger(orgId, branchId, consolidated)
 
   const wb = new ExcelJS.Workbook()
   addWorkbookMetadata(wb, orgName)
