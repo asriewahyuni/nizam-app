@@ -1,6 +1,6 @@
 # NIZAM ERP — Comprehensive Codebase Documentation
 
-> **Last updated:** 6 April 2026 (rev 9) — updated with organization onboarding bootstrap hardening (CoA/main-branch race fix), plus migration timeline up to `1150`.
+> **Last updated:** 7 April 2026 (rev 10) — updated with shariah CoA cleanup (`1151`) and BSC configuration + KPI scoring engine (`1152`), plus migration timeline up to `1152`.
 
 ---
 
@@ -15,7 +15,7 @@ NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **
 | Page routes (`page.tsx`) | **65** |
 | Client components (`*Client.tsx`) | **46** |
 | Server action files | **47** |
-| Migration SQL files | **191** (latest: `1150`) |
+| Migration SQL files | **193** (latest: `1152`) |
 | Test files | **33** |
 | API route handlers | **2** (`/api/export`, `/api/sales-pages/lead`) |
 | Proxy (middleware) | `proxy.ts` |
@@ -92,7 +92,7 @@ nizam-app/
 │   └── database.types.ts # Auto-generated Supabase types
 ├── __tests__/           # Vitest test suites (33 files)
 ├── supabase/
-│   └── migrations/      # 191 SQL migration files
+│   └── migrations/      # 193 SQL migration files
 ├── scripts/             # Data migration scripts
 └── public/              # PWA manifest, logo, static assets
 ```
@@ -426,7 +426,7 @@ Guards both `/admin` and `/saas/*` routes.
 - Reimbursement with receipt upload + approval
 - Shariah account activation/injection
 - Price management
-- BSC metrics
+- BSC metrics with configurable cycle/scope, perspective weights, KPI definitions, and automatic hybrid score calculation (0..100 and 0..4)
 
 ### 7.3 Cash & Bank
 
@@ -457,6 +457,9 @@ Guards both `/admin` and `/saas/*` routes.
 
 - PO creation with landed cost allocation
 - Auto-create/update products from PO lines
+- PO draft lifecycle: save as `DRAFT`, edit existing draft, then publish to `ORDERED`
+- Publish from draft recreates approval request using the latest draft content; stale pending approval for the same PO is voided
+- Draft PO remains editable from UI; receiving flow is only available after status `ORDERED`
 - Receive purchase with stock + GL sync (atomic RPC)
 - Idempotency guard on PO receiving to avoid duplicate stock posting when prior run partially succeeded
 - Fallback stock sync path when `adjust_inventory_stock` signature/schema/index is not yet compatible (`1118`/`1119`)
@@ -478,6 +481,9 @@ Guards both `/admin` and `/saas/*` routes.
 **Actions:** `modules/sales/actions/` (3 files) + `modules/sales/lib/` (2 files)
 
 - Sales orders with approval workflow
+- Sales order draft lifecycle: save as `DRAFT`, reopen/edit draft, then publish when ready
+- Approval request is created only on publish; updating draft will void stale pending approval for the same SO
+- Draft mode allows iterative data entry, while publish mode enforces full validation (due date, payment term, and stock guard for non-SALAM)
 - Delivery via atomic RPC with inventory-account resolution per product (`1120`)
 - Non-SALAM stock guard: delivery/POS now blocks overselling when physical stock is insufficient
 - Non-SALAM invoice creation guard: order creation is blocked when branch stock is insufficient, with explicit suggestion to switch to akad SALAM
@@ -642,9 +648,9 @@ Core reusable components:
 
 ### 9.1 Overview
 
-- **191 migration files** in `supabase/migrations/`
+- **193 migration files** in `supabase/migrations/`
 - `master_init.sql` — legacy bootstrap SQL (foundation reference)
-- Latest migration: `1150_rebind_accounts_governance_with_branch_ensure.sql`
+- Latest migration: `1152_bsc_configuration_and_scoring.sql`
 
 ### 9.2 Core Entities
 
@@ -665,6 +671,7 @@ Core reusable components:
 | Services | `service_orders` |
 | SaaS | `saas_packages`, `saas_invoices`, `saas_vouchers`, `saas_config` |
 | Zakat | `zakat_haul`, `zakat_haul_events`, `zakat_asset_timeline` |
+| BSC / Strategy | `bsc_cycles`, `bsc_perspective_weights`, `bsc_kpis`, `bsc_kpi_measurements`, `v_bsc_latest_kpi_measurements` |
 | AI Tokens | `ai_token_wallets`, `ai_token_usage_logs`, `ai_token_topup_packages`, `ai_token_topup_orders` |
 
 ### 9.3 Key Stored Procedures / RPC
@@ -702,6 +709,10 @@ Core reusable components:
 | `get_consolidated_org_hierarchy` | Displays parent + direct children org list with hierarchy label for UI display |
 | `is_main_organization` | Returns TRUE if org has no `parent_org_id` (i.e. is Holding/Root) |
 | `can_manage_finance_master` | Returns TRUE if current user may create/edit CoA or bank accounts directly on an org (must be Main Org + Main Branch context) |
+| `bsc_calculate_achievement_percent` | Hitung persentase pencapaian KPI berbasis arah (`HIGHER_BETTER` / `LOWER_BETTER`) |
+| `bsc_score_100_from_achievement` | Clamp achievement menjadi skor internal 0..100 |
+| `bsc_score_4_from_score_100` | Konversi skor internal 0..100 menjadi skor display 0..4 |
+| `fill_bsc_measurement_scores` | Trigger function untuk auto-isi `achievement_percent`, `score_100`, dan `score_4` saat measurement disimpan |
 | `submit_coa_request` | Child/Branch submits a CoA account request to Parent for approval |
 | `approve_coa_request` | Parent approves request and auto-creates the account in CoA |
 | `reject_coa_request` | Parent rejects request with mandatory reason notes |
@@ -770,6 +781,8 @@ Core reusable components:
 | `1148` | Fix CoA bootstrap race: governance accounts dapat memastikan `Unit Utama` tersedia saat seed awal akun. |
 | `1149` | Tambah trigger bootstrap `MAIN branch` pada saat org dibuat untuk memastikan branch tersedia sebelum trigger seed akun lain berjalan. |
 | `1150` | Rebind trigger `trg_accounts_governance` ke `enforce_accounts_governance_v2()` + helper `ensure_main_branch_for_org()` agar race bootstrap lintas environment tertangani. |
+| `1151` | **Shariah CoA cleanup** — `inject_shariah_coa` tidak lagi membuat/mengaktifkan akun legacy `3100 Ekuitas Syariah`; menjaga akun Syirkah `3110`/`3120` tetap aktif di bawah parent `3000`; backfill menghapus/menonaktifkan `3100` lama secara aman. |
+| `1152` | **BSC configuration + KPI scoring engine** — tabel siklus/weight/KPI/measurement, helper function scoring (achievement %, score 100, score 4), trigger auto-fill score, view latest measurement per KPI, serta RLS berbasis permission `strategy:*`/`reports:read`. |
 
 ### 9.5 Storage Buckets
 
@@ -1221,6 +1234,26 @@ When adding new modules to the SaaS system, update:
 ---
 
 ## 16. Changelog (Recent Updates)
+
+### BSC Configuration + Shariah CoA Cleanup (April 2026)
+
+- **Migration `1151_remove_shariah_equity_from_coas.sql`:**
+  - `inject_shariah_coa` tidak lagi create/activate akun `3100 Ekuitas Syariah`.
+  - Akun Syirkah `3110` dan `3120` dipertahankan aktif di bawah parent `3000`.
+  - Backfill membersihkan akun `3100` legacy: delete jika tidak direferensikan, fallback deactivate jika masih terikat FK.
+- **Migration `1152_bsc_configuration_and_scoring.sql`:**
+  - Added BSC configuration model per org + scope branch + cycle:
+    - `bsc_cycles`
+    - `bsc_perspective_weights`
+    - `bsc_kpis`
+    - `bsc_kpi_measurements`
+  - Added scoring helper functions:
+    - `bsc_calculate_achievement_percent(...)`
+    - `bsc_score_100_from_achievement(...)`
+    - `bsc_score_4_from_score_100(...)`
+  - Added trigger `trg_fill_bsc_measurement_scores` (`fill_bsc_measurement_scores`) for automatic score computation.
+  - Added view `v_bsc_latest_kpi_measurements` to fetch latest measurement per KPI.
+  - Added RLS policies for strategy/report readers and strategy writers.
 
 ### Organization Onboarding Bootstrap Hardening (April 2026)
 
