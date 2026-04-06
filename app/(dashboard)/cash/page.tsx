@@ -54,8 +54,8 @@ function normalizeAccountForCash(account: {
     org_id: account.org_id,
     code: account.code,
     name: account.name,
-    type: account.type as AccountType,
-    normal_balance: account.normal_balance as NormalBalance,
+    type: account.type as Account['type'],
+    normal_balance: account.normal_balance as Account['normal_balance'],
     parent_id: account.parent_id,
     description: account.description,
     is_system: account.is_system,
@@ -143,37 +143,45 @@ export async function getBankAccountsWithBalance(orgId: string, branchId?: strin
 }
 
 async function getConsolidatedOrgIds(parentOrgId: string): Promise<string[]> {
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data, error } = await db.rpc('get_consolidated_org_ids', { p_parent_org_id: parentOrgId })
+  const discovered = new Set<string>([parentOrgId])
+  let frontier = [parentOrgId]
 
-  if (error || !Array.isArray(data)) return [parentOrgId]
+  while (frontier.length > 0) {
+    const children = await prisma.organizations.findMany({
+      where: {
+        parent_org_id: { in: frontier },
+        is_active: true,
+      },
+      select: { id: true },
+    })
 
-  const ids = data
-    .map((row: any) => String(row?.org_id || '').trim())
-    .filter((id: string) => id.length > 0)
+    const nextFrontier = children
+      .map((org) => String(org.id || '').trim())
+      .filter((id) => id.length > 0 && !discovered.has(id))
 
-  if (!ids.includes(parentOrgId)) ids.unshift(parentOrgId)
-  return Array.from(new Set(ids))
+    nextFrontier.forEach((id) => {
+      discovered.add(id)
+    })
+    frontier = nextFrontier
+  }
+
+  return Array.from(discovered)
 }
 
 async function getManagedBankAccountsForParent(parentOrgId: string) {
-  const supabase = await createClient()
-  const db = supabase as any
   const orgIds = await getConsolidatedOrgIds(parentOrgId)
 
-  const { data: accounts, error: accountError } = await db
-    .from('bank_accounts')
-    .select(`
-      *,
-      account:accounts(*),
-      organization:organizations(name),
-      branch:branches(name)
-    `)
-    .in('org_id', orgIds)
-    .order('bank_name', { ascending: true })
+  const accounts = await prisma.bank_accounts.findMany({
+    where: { org_id: { in: orgIds } },
+    include: {
+      accounts: true,
+      organizations: { select: { name: true } },
+      branches: { select: { name: true } },
+    },
+    orderBy: { bank_name: 'asc' },
+  })
 
-  if (accountError || !Array.isArray(accounts) || accounts.length === 0) return []
+  if (accounts.length === 0) return []
 
   const accountIds = Array.from(
     new Set(
@@ -185,23 +193,22 @@ async function getManagedBankAccountsForParent(parentOrgId: string) {
 
   let balanceByAccountId = new Map<string, number>()
   if (accountIds.length > 0) {
-    const { data: balances, error: balanceError } = await db
-      .from('account_balances')
-      .select('account_id, balance')
-      .in('account_id', accountIds)
+    const balances = await prisma.$queryRaw<Array<{ account_id: string; balance: number }>>`
+      SELECT account_id::text AS account_id, COALESCE(balance, 0)::double precision AS balance
+      FROM public.account_balances
+      WHERE account_id = ANY(${accountIds}::uuid[])
+    `
 
-    if (!balanceError && Array.isArray(balances)) {
-      balanceByAccountId = new Map(
-        balances.map((row: any) => [String(row.account_id), Number(row.balance || 0)])
-      )
-    }
+    balanceByAccountId = new Map(
+      balances.map((row) => [String(row.account_id), Number(row.balance || 0)])
+    )
   }
 
   return accounts.map((account: any) => ({
     ...account,
     balances: { balance: balanceByAccountId.get(String(account.account_id)) || 0 },
-    org_name: readRelationName(account.organization),
-    branch_name: readRelationName(account.branch),
+    org_name: readRelationName(account.organizations),
+    branch_name: readRelationName(account.branches),
   }))
 }
 
@@ -250,7 +257,7 @@ export default async function CashPage() {
       orgId: orgId,
       orgName: orgName + ' (Pusat)',
       branches: branches,
-      accounts: allAccounts.filter(a => a.type === 'ASSET' && (a.code.startsWith('11') || a.name.toLowerCase().includes('kas') || a.name.toLowerCase().includes('bank'))),
+      accounts: allAccounts.filter((a: Account) => a.type === 'ASSET' && (a.code.startsWith('11') || a.name.toLowerCase().includes('kas') || a.name.toLowerCase().includes('bank'))),
     });
     transferCategoryNodes.push({
       orgId: orgId,
@@ -291,12 +298,12 @@ export default async function CashPage() {
 
   // Filter accounts that are suitable for "Category" in cash transactions (Revenue, Expense, etc.)
   // and also Asset/Liability for transfers/payments.
-  const categoryAccounts = allAccounts.filter(a => 
+  const categoryAccounts = allAccounts.filter((a: Account) => 
     ['REVENUE', 'EXPENSE', 'ASSET', 'LIABILITY', 'EQUITY'].includes(a.type)
   )
 
   // Default GL Accounts for the current org
-  const bankGlAccounts = allAccounts.filter(a => 
+  const bankGlAccounts = allAccounts.filter((a: Account) => 
     a.type === 'ASSET' && (a.code.startsWith('11') || a.name.toLowerCase().includes('kas') || a.name.toLowerCase().includes('bank'))
   )
 

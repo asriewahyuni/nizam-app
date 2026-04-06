@@ -85,52 +85,6 @@ function normalizeEmail(value: unknown) {
   return normalized || null
 }
 
-function isDuplicateAuthRegistrationError(message: unknown) {
-  if (typeof message !== 'string') return false
-  const lowered = message.toLowerCase()
-  return (
-    lowered.includes('duplicate key value') ||
-    lowered.includes('already registered') ||
-    lowered.includes('already been registered') ||
-    lowered.includes('email address has already been registered') ||
-    (/already.*registered/.test(lowered))
-  )
-}
-
-async function findAuthUserByEmail(
-  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
-  email: string,
-) {
-  const normalizedTargetEmail = normalizeEmail(email)
-  if (!normalizedTargetEmail) {
-    return { user: null as { id?: string; email?: string | null } | null, error: null as string | null }
-  }
-
-  const perPage = 100
-  let page = 1
-
-  while (true) {
-    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage })
-    if (error) {
-      return {
-        user: null as { id?: string; email?: string | null } | null,
-        error: `Gagal membaca akun autentikasi: ${error.message}`,
-      }
-    }
-
-    const users = Array.isArray(data?.users) ? data.users : []
-    const matchedUser = users.find((user) => normalizeEmail(user?.email) === normalizedTargetEmail)
-    if (matchedUser) {
-      return { user: matchedUser, error: null }
-    }
-
-    if (users.length < perPage) break
-    page += 1
-  }
-
-  return { user: null as { id?: string; email?: string | null } | null, error: null }
-}
-
 type StaffLoginCandidate = {
   userId: string
   orgIds: string[]
@@ -141,52 +95,6 @@ type StaffLoginCandidate = {
 function isEmployeeEmploymentActive(status: unknown) {
   const normalized = String(status || '').trim().toUpperCase()
   return normalized !== 'RESIGNED' && normalized !== 'TERMINATED'
-}
-
-async function deactivateStaleStaffMemberships(
-  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
-  userId: string,
-  activeOrgIds: string[],
-) {
-  const normalizedUserId = String(userId || '').trim()
-  if (!normalizedUserId) return
-
-  const normalizedActiveOrgIds = Array.from(
-    new Set(
-      activeOrgIds
-        .map((orgId) => String(orgId || '').trim())
-        .filter(Boolean)
-    )
-  )
-
-  try {
-    const { data: activeStaffMemberships, error: membershipReadError } = await (adminClient as any)
-      .from('org_members')
-      .select('org_id')
-      .eq('user_id', normalizedUserId)
-      .eq('role', 'staff')
-      .eq('is_active', true)
-
-    if (membershipReadError || !Array.isArray(activeStaffMemberships) || activeStaffMemberships.length === 0) {
-      return
-    }
-
-    const staleOrgIds = activeStaffMemberships
-      .map((membership: { org_id?: string | null }) => String(membership?.org_id || '').trim())
-      .filter((orgId) => orgId && !normalizedActiveOrgIds.includes(orgId))
-
-    if (staleOrgIds.length === 0) return
-
-    await (adminClient as any)
-      .from('org_members')
-      .update({ is_active: false })
-      .eq('user_id', normalizedUserId)
-      .eq('role', 'staff')
-      .eq('is_active', true)
-      .in('org_id', staleOrgIds)
-  } catch {
-    return
-  }
 }
 
 async function resolveRoleIdForEmployee(inviteRoleId: string | null | undefined, emp: any) {
@@ -326,7 +234,6 @@ async function resolvePreferredOrgIdForStaffLogin(
 
 async function resolveExistingStaffIdentity(
   emp: any,
-  nik: string,
   password: string,
 ) {
   const session = await auth()
@@ -380,22 +287,7 @@ export async function signUp(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const fullName = formData.get('fullName') as string
-  const planParam = String(formData.get('plan') || '').trim().toLowerCase()
-  const isDemoSignup = planParam === 'demo'
-
-  // Use regular signUp for owners so they get logged in automatically
-  // and are prompted for email confirmation if enabled in dashboard.
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { 
-        full_name: fullName,
-        login_type: 'owner',
-        is_demo: isDemoSignup
-      },
-    },
-  })
+  const hashedPassword = bcrypt.hashSync(password, 10)
 
   try {
     await prisma.user.create({
@@ -403,7 +295,7 @@ export async function signUp(formData: FormData) {
         email,
         password: hashedPassword,
         name: fullName,
-      }
+      },
     })
   } catch (err: any) {
     if (err.code === 'P2002') return { error: 'Gagal: Email ini sudah pernah didaftarkan. Silakan Login atau gunakan email lain.' }
@@ -480,7 +372,7 @@ export async function registerEmployeeAccount(formData: FormData) {
 
   const roleId = await resolveRoleIdForEmployee(invite?.role_id, emp)
 
-  const existingIdentity = await resolveExistingStaffIdentity(emp, nik, password)
+  const existingIdentity = await resolveExistingStaffIdentity(emp, password)
   if (existingIdentity && 'error' in existingIdentity) {
     return { error: existingIdentity.error }
   }
@@ -502,64 +394,18 @@ export async function registerEmployeeAccount(formData: FormData) {
   }
 
   const internalEmail = buildInternalStaffEmail(emp.org_id, nik)
-  const employeeMetadata = {
-    full_name: `${emp.first_name} ${emp.last_name}`,
-    nik,
-    login_type: 'employee',
-    employee_email: normalizeEmail(emp.email),
-  }
+  const hashedPassword = bcrypt.hashSync(password, 10)
 
-  const { data: authData, error: authErr } = await adminClient.auth.admin.createUser({
-    email: internalEmail,
-    password,
-    email_confirm: true,
-    user_metadata: employeeMetadata,
-  })
-
-  if (authErr && isDuplicateAuthRegistrationError(authErr.message)) {
-    const lookupResult = await findAuthUserByEmail(adminClient, internalEmail)
-    if (lookupResult.error) return { error: lookupResult.error }
-
-    const existingUserId = lookupResult.user?.id
-    if (!existingUserId) {
-      return { error: 'Akun login sudah terdaftar, tetapi gagal dipetakan ke data karyawan. Hubungi admin.' }
-    }
-
-    const { error: syncErr } = await adminClient.auth.admin.updateUserById(existingUserId, {
-      password,
-      email_confirm: true,
-      user_metadata: employeeMetadata,
+  let authData: { id: string }
+  try {
+    authData = await prisma.user.create({
+      data: {
+        email: internalEmail,
+        password: hashedPassword,
+        name: `${emp.first_name} ${emp.last_name}`,
+      },
     })
-
-    if (syncErr) {
-      return { error: `Akun login lama ditemukan, tetapi gagal disinkronkan: ${syncErr.message}` }
-    }
-
-    const relinkResult = await linkEmployeeToUser(adminClient, emp, existingUserId, roleId)
-    if ('error' in relinkResult) return relinkResult
-
-    await trackInvitationUsage(adminClient, invite)
-
-    const { error: reloginErr } = await publicClient.auth.signInWithPassword({
-      email: internalEmail,
-      password,
-    })
-
-    if (reloginErr) {
-      return { error: 'Akun lama berhasil ditautkan ulang, tapi login otomatis gagal. Silakan login manual pakai NIK & password baru.' }
-    }
-
-    await persistMembershipActiveContext(adminClient as any, {
-      userId: existingUserId,
-      orgId: emp.org_id,
-      branchId: emp.branch_id ? String(emp.branch_id) : null,
-    })
-    setActiveOrganizationCookie(cookieStore, emp.org_id)
-    revalidatePath('/', 'layout')
-    return { success: true, redirectTo: '/dashboard' }
-  }
-
-  if (authErr) {
+  } catch (authErr: any) {
     return { error: authErr.message || 'Gagal membuat akun autentikasi.' }
   }
 
@@ -611,47 +457,22 @@ export async function signInWithNik(formData: FormData) {
   nik = nik.toUpperCase()
   const activeOrgIdPreference = cookieStore.get(ACTIVE_ORG_COOKIE)?.value?.trim() || null
 
-  const { data: employees, error: empErr } = await (adminClient as any)
-    .from('employees')
-    .select('id, org_id, user_id, created_at, employment_status')
-    .eq('nik', nik)
-    .order('created_at', { ascending: true })
-
-  if (empErr) {
-     return redirect(`/login?error=${encodeURIComponent(`Database Error: ${empErr.message}`)}&tab=karyawan`)
-  }
+  const employees = await prisma.employees.findMany({
+    where: { nik: nik },
+    select: { id: true, org_id: true, user_id: true, created_at: true, employment_status: true },
+    orderBy: { created_at: 'asc' },
+  })
 
   if (employees.length === 0) {
     return redirect(`/login?error=${encodeURIComponent('NIK tidak ditemukan.')}&tab=karyawan`)
   }
 
-  const activeEmployeeRows = matchingEmployees.filter((employee: { employment_status?: unknown }) =>
+  const activeEmployeeRows = employees.filter((employee: { employment_status?: unknown }) =>
     isEmployeeEmploymentActive(employee?.employment_status)
   )
 
   if (activeEmployeeRows.length === 0) {
     return redirect(`/login?error=${encodeURIComponent('Akun karyawan sudah tidak aktif. Hubungi admin HRIS.')}&tab=karyawan`)
-  }
-
-  const linkedUserIds = Array.from(
-    new Set(
-      activeEmployeeRows
-        .map((employee: { user_id?: string | null }) => String(employee?.user_id || '').trim())
-        .filter(Boolean)
-    )
-  )
-
-  for (const userId of linkedUserIds) {
-    const activeOrgIds = Array.from(
-      new Set(
-        activeEmployeeRows
-          .filter((employee: { user_id?: string | null }) => String(employee?.user_id || '').trim() === userId)
-          .map((employee: { org_id?: string | null }) => String(employee?.org_id || '').trim())
-          .filter(Boolean)
-      )
-    )
-
-    await deactivateStaleStaffMemberships(adminClient, userId, activeOrgIds)
   }
 
   const loginCandidates = buildStaffLoginCandidates(activeEmployeeRows, nik, activeOrgIdPreference)
@@ -660,40 +481,36 @@ export async function signInWithNik(formData: FormData) {
   }
 
   for (const candidate of loginCandidates) {
-    const authEmailFromAdmin = await getAuthEmailByUserId(
-      adminClient,
-      candidate.userId,
-      candidate.authEmailFallbacks[0] || null
-    )
+    const authEmail = await getAuthEmailByUserId(candidate.userId, candidate.authEmailFallbacks[0] || null)
+    if (!authEmail) continue
 
-    const emailAttempts = Array.from(
-      new Set(
-        [authEmailFromAdmin, ...candidate.authEmailFallbacks]
-          .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-          .map((value) => value.trim().toLowerCase())
-      )
-    )
-
-    for (const email of emailAttempts) {
-      const { error } = await publicClient.auth.signInWithPassword({
-        email,
+    let loginError = false
+    try {
+      await nextAuthSignIn('credentials', {
+        email: authEmail,
         password,
+        redirect: false,
       })
-
-      if (!error) {
-        const preferredOrgId = activeOrgIdPreference && candidate.orgIds.includes(activeOrgIdPreference)
-          ? activeOrgIdPreference
-          : await resolvePreferredOrgIdForStaffLogin(
-              adminClient,
-              candidate.userId,
-              candidate.orgIds,
-              candidate.preferredOrgId
-            )
-
-        setActiveOrganizationCookie(cookieStore, preferredOrgId)
-        revalidatePath('/', 'layout')
-        return redirect(redirectTo || '/dashboard')
+    } catch (error) {
+      if (error instanceof AuthError) {
+        loginError = true
+      } else {
+        throw error
       }
+    }
+
+    if (!loginError) {
+      const preferredOrgId = activeOrgIdPreference && candidate.orgIds.includes(activeOrgIdPreference)
+        ? activeOrgIdPreference
+        : await resolvePreferredOrgIdForStaffLogin(
+            candidate.userId,
+            candidate.orgIds,
+            candidate.preferredOrgId
+          )
+
+      setActiveOrganizationCookie(cookieStore, preferredOrgId)
+      revalidatePath('/', 'layout')
+      return redirect(redirectTo || '/dashboard')
     }
   }
 
@@ -713,8 +530,6 @@ export async function getSession() {
   const session = await auth()
   if (!session?.user) return null
 
-  // Transform NextAuth user to be somewhat compatible with Supabase's user shape if needed,
-  // or just return the NextAuth user directly.
   return {
     id: session.user.id,
     email: session.user.email,

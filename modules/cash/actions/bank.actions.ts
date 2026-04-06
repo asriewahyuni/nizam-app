@@ -78,8 +78,6 @@ export async function getBankAccounts(orgId: string, branchId?: string | null) {
 // → /accounting/coa-requests untuk mengajukan rekening baru
 // ─────────────────────────────────────────────────────────────
 export async function createBankAccount(orgId: string, formData: FormData) {
-  const supabase = await createClient()
-
   // ── Guard 1: Branch aktif wajib ada ──
   const activeBranchResult = await requireActiveBranchId(
     orgId,
@@ -124,19 +122,21 @@ export async function createBankAccount(orgId: string, formData: FormData) {
     return { error: 'Akun GL dan Nama Bank wajib diisi.' }
   }
 
-  const { error } = await (supabase as any).from('bank_accounts').insert({
-    org_id: finalOrgId,
-    branch_id: finalBranchId as string,
-    account_id: accountId,
-    bank_name: bankName,
-    account_number: accountNumber,
-    account_holder: accountHolder,
-    currency,
-    is_active: true
-  })
-
-  if (error) {
-    if (error.code === '23505') {
+  try {
+    await prisma.bank_accounts.create({
+      data: {
+        org_id: finalOrgId,
+        branch_id: finalBranchId as string,
+        account_id: accountId,
+        bank_name: bankName,
+        account_number: accountNumber,
+        account_holder: accountHolder,
+        currency,
+        is_active: true,
+      },
+    })
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
       return { error: `Nomor rekening ${accountNumber} sudah terdaftar.` }
     }
     return { error: 'Gagal menyimpan rekening bank.' }
@@ -232,21 +232,23 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
     return { error: 'Akun lawan tidak boleh sama dengan akun kas/bank sumber karena jurnal akan bernilai nol.' }
   }
 
-  const { error } = await (supabase as any).from('bank_transactions').insert({
-    org_id: orgId,
-    branch_id: activeBranchResult.branchId,
-    bank_account_id: bankAccountId,
-    transaction_date: transDate,
-    description,
-    amount,
-    type,
-    category_id: oppositeAccountId,
-    reference_number: referenceNumber,
-    status: 'POSTED' // Automatically post to GL via trigger
-  })
-
-  if (error) {
-    return { error: 'Gagal menyimpan transaksi: ' + error.message }
+  try {
+    await prisma.bank_transactions.create({
+      data: {
+        org_id: orgId,
+        branch_id: activeBranchResult.branchId,
+        bank_account_id: bankAccountId,
+        transaction_date: new Date(transDate),
+        description,
+        amount,
+        type,
+        category_id: oppositeAccountId,
+        reference_number: referenceNumber,
+        status: 'POSTED',
+      },
+    })
+  } catch (error: any) {
+    return { error: 'Gagal menyimpan transaksi: ' + (error?.message || 'Unknown error') }
   }
 
   revalidatePath('/cash')
@@ -263,8 +265,6 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
 // 2) IN  di org tujuan (child/cabang)
 // ─────────────────────────────────────────────────────────────
 export async function createInterOrgCapitalTransfer(orgId: string, formData: FormData) {
-  const supabase = await createClient()
-
   const sourceBankAccountId = String(formData.get('bank_account_id') || '').trim()
   const targetBankAccountId = String(formData.get('target_bank_account_id') || '').trim()
   const sourceCounterAccountId = String(formData.get('source_counter_account_id') || '').trim()
@@ -287,14 +287,12 @@ export async function createInterOrgCapitalTransfer(orgId: string, formData: For
     return { error: 'Field transfer modal antar entitas belum lengkap.' }
   }
 
-  const { data: sourceCounterAccount, error: sourceCounterError } = await (supabase as any)
-    .from('accounts')
-    .select('id, code, name, type')
-    .eq('id', sourceCounterAccountId)
-    .eq('org_id', orgId)
-    .maybeSingle()
+  const sourceCounterAccount = await prisma.accounts.findFirst({
+    where: { id: sourceCounterAccountId, org_id: orgId },
+    select: { id: true, code: true, name: true, type: true },
+  })
 
-  if (sourceCounterError || !sourceCounterAccount?.id) {
+  if (!sourceCounterAccount?.id) {
     return { error: 'Akun lawan parent (sumber) tidak ditemukan.' }
   }
 
@@ -312,27 +310,29 @@ export async function createInterOrgCapitalTransfer(orgId: string, formData: For
     }
   }
 
-  const { data, error } = await (supabase as any).rpc('create_interorg_capital_transfer', {
-    p_source_org_id: orgId,
-    p_source_bank_account_id: sourceBankAccountId,
-    p_source_counter_account_id: sourceCounterAccountId,
-    p_target_bank_account_id: targetBankAccountId,
-    p_target_counter_account_id: targetCounterAccountId,
-    p_transaction_date: transactionDate,
-    p_amount: amount,
-    p_description: description,
-    p_reference_number: referenceNumber,
-  })
+  try {
+    const data = await prisma.$queryRaw<Array<{ result: unknown }>>`
+      SELECT public.create_interorg_capital_transfer(
+        CAST(${orgId} AS uuid),
+        CAST(${sourceBankAccountId} AS uuid),
+        CAST(${sourceCounterAccountId} AS uuid),
+        CAST(${targetBankAccountId} AS uuid),
+        CAST(${targetCounterAccountId} AS uuid),
+        CAST(${transactionDate} AS date),
+        ${amount},
+        ${description},
+        ${referenceNumber}
+      ) AS result
+    `
 
-  if (error) {
-    return { error: `Gagal mencatat transfer modal antar entitas: ${error.message}` }
+    revalidatePath('/cash')
+    revalidatePath('/accounting/journal')
+    revalidatePath('/reports')
+    revalidatePath('/dashboard')
+    return { success: true, data }
+  } catch (error: any) {
+    return { error: `Gagal mencatat transfer modal antar entitas: ${error?.message || 'Unknown error'}` }
   }
-
-  revalidatePath('/cash')
-  revalidatePath('/accounting/journal')
-  revalidatePath('/reports')
-  revalidatePath('/dashboard')
-  return { success: true, data }
 }
 
 // ─────────────────────────────────────────────────────────────

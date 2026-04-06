@@ -10,8 +10,10 @@
  */
 
 import { revalidatePath } from 'next/cache'
+import { Prisma } from '@prisma/client'
 import type { Account, AccountType, NormalBalance, AccountBalance } from '@/types/database.types'
-import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
+import { getAuthUser, getMembership } from '@/lib/auth/permissions'
 
 type MirrorableAccount = Pick<
   Account,
@@ -35,17 +37,15 @@ function buildMirrorPayload(
   }
 }
 
-async function getDescendantOrganizationIds(admin: any, parentOrgId: string): Promise<string[]> {
-  const { data, error } = await admin
-    .from('organizations')
-    .select('id, parent_org_id')
-
-  if (error || !Array.isArray(data)) return []
+async function getDescendantOrganizationIds(parentOrgId: string): Promise<string[]> {
+  const rows = await prisma.organizations.findMany({
+    select: { id: true, parent_org_id: true },
+  })
 
   const childrenByParent = new Map<string, string[]>()
-  for (const row of data as any[]) {
-    const id = String(row?.id || '').trim()
-    const parentId = String(row?.parent_org_id || '').trim()
+  for (const row of rows) {
+    const id = String(row.id || '').trim()
+    const parentId = String(row.parent_org_id || '').trim()
     if (!id || !parentId) continue
     const bucket = childrenByParent.get(parentId) || []
     bucket.push(id)
@@ -72,18 +72,87 @@ async function getDescendantOrganizationIds(admin: any, parentOrgId: string): Pr
 }
 
 async function resolveParentAccountCode(
-  admin: any,
   parentOrgId: string,
   parentAccountId: string | null
 ): Promise<string | null> {
   if (!parentAccountId) return null
-  const { data } = await admin
-    .from('accounts')
-    .select('code')
-    .eq('org_id', parentOrgId)
-    .eq('id', parentAccountId)
-    .maybeSingle()
+
+  const data = await prisma.accounts.findFirst({
+    where: { org_id: parentOrgId, id: parentAccountId },
+    select: { code: true },
+  })
+
   return data?.code ? String(data.code) : null
+}
+
+async function getDefaultBranchId(orgId: string): Promise<string | null> {
+  const branches = await prisma.branches.findMany({
+    where: { org_id: orgId },
+    select: { id: true, code: true, name: true, is_active: true, created_at: true },
+  })
+
+  if (branches.length === 0) return null
+
+  const sortedBranches = [...branches].sort((left, right) => {
+    const leftRank = left.is_active && (left.code === 'MAIN' || left.name === 'Unit Utama')
+      ? 0
+      : left.is_active
+        ? 1
+        : left.code === 'MAIN' || left.name === 'Unit Utama'
+          ? 2
+          : 3
+    const rightRank = right.is_active && (right.code === 'MAIN' || right.name === 'Unit Utama')
+      ? 0
+      : right.is_active
+        ? 1
+        : right.code === 'MAIN' || right.name === 'Unit Utama'
+          ? 2
+          : 3
+
+    if (leftRank !== rightRank) return leftRank - rightRank
+    if (left.created_at.getTime() !== right.created_at.getTime()) {
+      return left.created_at.getTime() - right.created_at.getTime()
+    }
+    return left.id.localeCompare(right.id)
+  })
+
+  return sortedBranches[0]?.id ?? null
+}
+
+async function canManageFinanceMaster(orgId: string): Promise<boolean> {
+  const user = await getAuthUser()
+  if (!user) return false
+
+  const [organization, membership, defaultBranchId] = await Promise.all([
+    prisma.organizations.findUnique({
+      where: { id: orgId },
+      select: { id: true, parent_org_id: true },
+    }),
+    prisma.org_members.findFirst({
+      where: { org_id: orgId, user_id: user.userId, is_active: true },
+      select: {
+        role: true,
+        last_active_branch_id: true,
+        roles: { select: { permissions: true } },
+      },
+    }),
+    getDefaultBranchId(orgId),
+  ])
+
+  if (!organization || organization.parent_org_id) return false
+  if (!membership || !defaultBranchId) return false
+  if (membership.last_active_branch_id && membership.last_active_branch_id !== defaultBranchId) return false
+
+  if (membership.role === 'owner' || membership.role === 'admin') return true
+
+  const permissions = Array.isArray(membership.roles?.permissions)
+    ? membership.roles.permissions.filter((permission): permission is string => typeof permission === 'string')
+    : []
+
+  return permissions.some((permission) => {
+    const normalized = permission.toLowerCase()
+    return normalized.includes('coa:write') || normalized.includes('accounting:write')
+  })
 }
 
 export async function syncParentAccountToDescendants(
@@ -91,17 +160,12 @@ export async function syncParentAccountToDescendants(
   sourceAccount: MirrorableAccount,
   options?: { previousCode?: string | null }
 ) {
-  const admin = await createAdminClient()
-  const descendants = await getDescendantOrganizationIds(admin as any, parentOrgId)
+  const descendants = await getDescendantOrganizationIds(parentOrgId)
   if (descendants.length === 0) return { success: true, syncedOrgCount: 0, errors: [] as string[] }
 
   const errors: string[] = []
   const previousCode = String(options?.previousCode || '').trim() || null
-  const parentAccountParentCode = await resolveParentAccountCode(
-    admin as any,
-    parentOrgId,
-    sourceAccount.parent_id || null
-  )
+  const parentAccountParentCode = await resolveParentAccountCode(parentOrgId, sourceAccount.parent_id || null)
 
   for (const childOrgId of descendants) {
     const candidateCodes = Array.from(
@@ -112,26 +176,17 @@ export async function syncParentAccountToDescendants(
       )
     )
 
-    let childRows: any[] = []
-    if (candidateCodes.length > 1) {
-      const { data } = await (admin as any)
-        .from('accounts')
-        .select('id, code')
-        .eq('org_id', childOrgId)
-        .in('code', candidateCodes)
-      childRows = Array.isArray(data) ? data : []
-    } else {
-      const { data } = await (admin as any)
-        .from('accounts')
-        .select('id, code')
-        .eq('org_id', childOrgId)
-        .eq('code', sourceAccount.code)
-      childRows = Array.isArray(data) ? data : []
-    }
+    const childRows = await prisma.accounts.findMany({
+      where: {
+        org_id: childOrgId,
+        ...(candidateCodes.length > 0 ? { code: { in: candidateCodes } } : { code: sourceAccount.code }),
+      },
+      select: { id: true, code: true },
+    })
 
-    const rowByCode = new Map<string, any>()
+    const rowByCode = new Map<string, { id: string; code: string }>()
     for (const row of childRows) {
-      const code = String(row?.code || '').trim()
+      const code = String(row.code || '').trim()
       if (code) rowByCode.set(code, row)
     }
 
@@ -141,49 +196,51 @@ export async function syncParentAccountToDescendants(
 
     let childParentId: string | null = null
     if (parentAccountParentCode) {
-      const { data: childParent } = await (admin as any)
-        .from('accounts')
-        .select('id')
-        .eq('org_id', childOrgId)
-        .eq('code', parentAccountParentCode)
-        .maybeSingle()
+      const childParent = await prisma.accounts.findFirst({
+        where: { org_id: childOrgId, code: parentAccountParentCode },
+        select: { id: true },
+      })
       childParentId = childParent?.id ? String(childParent.id) : null
     }
 
     if (byOldCode && byNewCode && byOldCode.id !== byNewCode.id) {
       targetRow = byNewCode
-      const { error: deactivateStaleError } = await (admin as any)
-        .from('accounts')
-        .update({ is_active: false })
-        .eq('org_id', childOrgId)
-        .eq('id', byOldCode.id)
-      if (deactivateStaleError) {
-        errors.push(`Org ${childOrgId}: gagal menonaktifkan akun duplikat lama (${deactivateStaleError.message}).`)
+      try {
+        await prisma.accounts.updateMany({
+          where: { org_id: childOrgId, id: byOldCode.id },
+          data: { is_active: false },
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        errors.push(`Org ${childOrgId}: gagal menonaktifkan akun duplikat lama (${message}).`)
       }
     }
 
     const payload = buildMirrorPayload(sourceAccount, childParentId, targetRow?.id ? String(targetRow.id) : undefined)
 
     if (targetRow?.id) {
-      const { error: updateError } = await (admin as any)
-        .from('accounts')
-        .update(payload)
-        .eq('org_id', childOrgId)
-        .eq('id', targetRow.id)
-      if (updateError) {
-        errors.push(`Org ${childOrgId}: gagal sinkron update akun ${sourceAccount.code} (${updateError.message}).`)
+      try {
+        await prisma.accounts.updateMany({
+          where: { org_id: childOrgId, id: targetRow.id },
+          data: payload,
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        errors.push(`Org ${childOrgId}: gagal sinkron update akun ${sourceAccount.code} (${message}).`)
       }
       continue
     }
 
-    const { error: insertError } = await (admin as any)
-      .from('accounts')
-      .insert({
-        org_id: childOrgId,
-        ...payload,
+    try {
+      await prisma.accounts.create({
+        data: {
+          org_id: childOrgId,
+          ...payload,
+        },
       })
-    if (insertError) {
-      errors.push(`Org ${childOrgId}: gagal sinkron create akun ${sourceAccount.code} (${insertError.message}).`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      errors.push(`Org ${childOrgId}: gagal sinkron create akun ${sourceAccount.code} (${message}).`)
     }
   }
 
@@ -195,38 +252,37 @@ export async function syncParentAccountToDescendants(
 }
 
 export async function syncParentCoAToChildOrg(parentOrgId: string, childOrgId: string) {
-  const admin = await createAdminClient()
+  const parentRows = await prisma.accounts.findMany({
+    where: { org_id: parentOrgId },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      type: true,
+      normal_balance: true,
+      parent_id: true,
+      description: true,
+      is_system: true,
+      is_active: true,
+    },
+    orderBy: { code: 'asc' },
+  }) as MirrorableAccount[]
 
-  const { data: parentAccounts, error: parentAccountsError } = await (admin as any)
-    .from('accounts')
-    .select('id, code, name, type, normal_balance, parent_id, description, is_system, is_active')
-    .eq('org_id', parentOrgId)
-    .order('code', { ascending: true })
-
-  if (parentAccountsError) {
-    return { success: false, error: parentAccountsError.message || 'Gagal membaca CoA parent.' }
-  }
-
-  const parentRows = (parentAccounts || []) as MirrorableAccount[]
   if (parentRows.length === 0) return { success: true, syncedCount: 0 }
 
   const parentIdToCode = new Map<string, string>(
     parentRows.map((row) => [row.id, row.code])
   )
 
-  const { data: childAccounts, error: childAccountsError } = await (admin as any)
-    .from('accounts')
-    .select('id, code')
-    .eq('org_id', childOrgId)
-
-  if (childAccountsError) {
-    return { success: false, error: childAccountsError.message || 'Gagal membaca CoA child.' }
-  }
+  const childAccounts = await prisma.accounts.findMany({
+    where: { org_id: childOrgId },
+    select: { id: true, code: true },
+  })
 
   const childByCode = new Map<string, { id: string; code: string }>()
-  for (const row of (childAccounts || []) as any[]) {
-    const code = String(row?.code || '').trim()
-    const id = String(row?.id || '').trim()
+  for (const row of childAccounts) {
+    const code = String(row.code || '').trim()
+    const id = String(row.id || '').trim()
     if (!code || !id) continue
     childByCode.set(code, { id, code })
   }
@@ -239,68 +295,64 @@ export async function syncParentCoAToChildOrg(parentOrgId: string, childOrgId: s
     const payload = buildMirrorPayload(source, childParentId, existing?.id)
 
     if (existing?.id) {
-      const { error: updateError } = await (admin as any)
-        .from('accounts')
-        .update(payload)
-        .eq('org_id', childOrgId)
-        .eq('id', existing.id)
-      if (!updateError) syncedCount += 1
+      try {
+        await prisma.accounts.updateMany({
+          where: { org_id: childOrgId, id: existing.id },
+          data: payload,
+        })
+        syncedCount += 1
+      } catch {}
       continue
     }
 
-    const { data: inserted, error: insertError } = await (admin as any)
-      .from('accounts')
-      .insert({
-        org_id: childOrgId,
-        ...payload,
+    try {
+      const inserted = await prisma.accounts.create({
+        data: {
+          org_id: childOrgId,
+          ...payload,
+        },
+        select: { id: true, code: true },
       })
-      .select('id, code')
-      .single()
 
-    if (!insertError && inserted?.id && inserted?.code) {
       childByCode.set(String(inserted.code), {
         id: String(inserted.id),
         code: String(inserted.code),
       })
       syncedCount += 1
-    }
+    } catch {}
   }
 
   return { success: true, syncedCount }
 }
 
 async function propagateDeletedParentAccountToDescendants(parentOrgId: string, deletedCode: string) {
-  const admin = await createAdminClient()
-  const descendants = await getDescendantOrganizationIds(admin as any, parentOrgId)
+  const descendants = await getDescendantOrganizationIds(parentOrgId)
   if (descendants.length === 0) return { success: true, syncedOrgCount: 0, errors: [] as string[] }
 
   const errors: string[] = []
   for (const childOrgId of descendants) {
-    const { data: childAccount } = await (admin as any)
-      .from('accounts')
-      .select('id')
-      .eq('org_id', childOrgId)
-      .eq('code', deletedCode)
-      .maybeSingle()
+    const childAccount = await prisma.accounts.findFirst({
+      where: { org_id: childOrgId, code: deletedCode },
+      select: { id: true },
+    })
 
     if (!childAccount?.id) continue
 
-    const { error: deleteError } = await (admin as any)
-      .from('accounts')
-      .delete()
-      .eq('org_id', childOrgId)
-      .eq('id', childAccount.id)
-
-    if (!deleteError) continue
-
-    const { error: deactivateError } = await (admin as any)
-      .from('accounts')
-      .update({ is_active: false })
-      .eq('org_id', childOrgId)
-      .eq('id', childAccount.id)
-
-    if (deactivateError) {
-      errors.push(`Org ${childOrgId}: gagal sinkron hapus akun ${deletedCode} (${deactivateError.message}).`)
+    try {
+      await prisma.accounts.deleteMany({
+        where: { org_id: childOrgId, id: childAccount.id },
+      })
+      continue
+    } catch {
+      try {
+        await prisma.accounts.updateMany({
+          where: { org_id: childOrgId, id: childAccount.id },
+          data: { is_active: false },
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        errors.push(`Org ${childOrgId}: gagal sinkron hapus akun ${deletedCode} (${message}).`)
+      }
     }
   }
 
@@ -370,21 +422,17 @@ export async function checkCanManageCoA(orgId: string): Promise<{
   canManageDirect: boolean
   isParentOrg: boolean
 }> {
-  const supabase = await createClient()
-  const rpc = (supabase as any)?.rpc
-
-  if (typeof rpc !== 'function') {
-    return { canManageDirect: true, isParentOrg: true }
-  }
-
-  const [manageResult, parentResult] = await Promise.all([
-    (supabase as any).rpc('can_manage_finance_master', { p_org_id: orgId }),
-    (supabase as any).rpc('is_main_organization', { p_org_id: orgId }),
+  const [organization, canManageDirect] = await Promise.all([
+    prisma.organizations.findUnique({
+      where: { id: orgId },
+      select: { parent_org_id: true },
+    }),
+    canManageFinanceMaster(orgId),
   ])
 
   return {
-    canManageDirect: manageResult.data === true,
-    isParentOrg: parentResult.data === true,
+    canManageDirect,
+    isParentOrg: !organization?.parent_org_id,
   }
 }
 
@@ -398,10 +446,8 @@ export async function createAccount(orgId: string, formData: FormData) {
   if (!membership) return { error: 'Unauthorized' }
 
   // ── Validasi Hierarki: Hanya Parent yang boleh buat akun langsung ──
-  const { data: canManage, error: permError } = await (supabase as any)
-    .rpc('can_manage_finance_master', { p_org_id: orgId })
-
-  if (permError || !canManage) {
+  const canManage = await canManageFinanceMaster(orgId)
+  if (!canManage) {
     return {
       error:
         'Hanya Organisasi Utama (Parent/Holding) pada konteks Unit Utama yang dapat membuat rekening CoA secara langsung. ' +
@@ -421,9 +467,9 @@ export async function createAccount(orgId: string, formData: FormData) {
     return { error: 'Kode, nama, tipe, dan saldo normal wajib diisi.' }
   }
 
-  const { data: insertedAccount, error } = await (supabase as any)
-    .from('accounts')
-    .insert({
+  try {
+    const insertedAccount = await prisma.accounts.create({
+      data: {
       org_id: orgId,
       code,
       name,
@@ -432,29 +478,37 @@ export async function createAccount(orgId: string, formData: FormData) {
       parent_id: parentId || null,
       description: description || null,
       is_system: false,
+      },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        type: true,
+        normal_balance: true,
+        parent_id: true,
+        description: true,
+        is_system: true,
+        is_active: true,
+      },
     })
-    .select('id, code, name, type, normal_balance, parent_id, description, is_system, is_active')
-    .single()
 
-  if (error || !insertedAccount) {
-    if (error?.code === '23505') {
+    const syncResult = await syncParentAccountToDescendants(orgId, insertedAccount as MirrorableAccount)
+    if (!syncResult.success) {
+      ;(console as any).warn('CoA sync warning (createAccount):', syncResult.errors)
+    }
+
+    revalidatePath('/settings/accounts')
+    return {
+      success: true,
+      warning: syncResult.success
+        ? null
+        : 'Akun parent berhasil disimpan, tetapi sinkronisasi ke sebagian cabang/anak belum sempurna.',
+    }
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return { error: `Kode akun ${code} sudah digunakan.` }
     }
-    // Tangkap pesan dari trigger enforce_accounts_governance
-    return { error: error?.message ?? 'Gagal menyimpan akun.' }
-  }
-
-  const syncResult = await syncParentAccountToDescendants(orgId, insertedAccount as MirrorableAccount)
-  if (!syncResult.success) {
-    ;(console as any).warn('CoA sync warning (createAccount):', syncResult.errors)
-  }
-
-  revalidatePath('/settings/accounts')
-  return {
-    success: true,
-    warning: syncResult.success
-      ? null
-      : 'Akun parent berhasil disimpan, tetapi sinkronisasi ke sebagian cabang/anak belum sempurna.',
+    return { error: error instanceof Error ? error.message : 'Gagal menyimpan akun.' }
   }
 }
 
@@ -476,14 +530,25 @@ export async function updateAccount(
 ) {
   const membership = await ensureOrgAccess(orgId)
   if (!membership) return { error: 'Unauthorized' }
+  if (!(await canManageFinanceMaster(orgId))) {
+    return { error: 'Hanya Organisasi Utama pada konteks Unit Utama yang dapat mengubah rekening CoA.' }
+  }
 
   // Prevent editing system accounts' critical fields
-  const { data: existing } = await (supabase as any)
-    .from('accounts')
-    .select('id, code, name, type, normal_balance, parent_id, description, is_system, is_active')
-    .eq('id', accountId)
-    .eq('org_id', orgId)
-    .single()
+  const existing = await prisma.accounts.findFirst({
+    where: { id: accountId, org_id: orgId },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      type: true,
+      normal_balance: true,
+      parent_id: true,
+      description: true,
+      is_system: true,
+      is_active: true,
+    },
+  })
 
   if (!existing) return { error: 'Akun tidak ditemukan.' }
 
@@ -496,16 +561,24 @@ export async function updateAccount(
     return { error: 'Gagal memperbarui akun.' }
   }
 
-  const { data: updatedAccount } = await (supabase as any)
-    .from('accounts')
-    .select('id, code, name, type, normal_balance, parent_id, description, is_system, is_active')
-    .eq('id', accountId)
-    .eq('org_id', orgId)
-    .maybeSingle()
+  const updatedAccount = await prisma.accounts.findFirst({
+    where: { id: accountId, org_id: orgId },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      type: true,
+      normal_balance: true,
+      parent_id: true,
+      description: true,
+      is_system: true,
+      is_active: true,
+    },
+  })
 
   if (updatedAccount) {
     const syncResult = await syncParentAccountToDescendants(orgId, updatedAccount as MirrorableAccount, {
-      previousCode: (existing as any)?.code || null,
+      previousCode: existing.code || null,
     })
     if (!syncResult.success) {
       ;(console as any).warn('CoA sync warning (updateAccount):', syncResult.errors)
@@ -520,14 +593,16 @@ export async function updateAccount(
 // deleteAccount — Only non-system, no journal lines
 // ─────────────────────────────────────────────────────────────
 export async function deleteAccount(accountId: string, orgId: string) {
-  const supabase = await createClient()
+  const membership = await ensureOrgAccess(orgId)
+  if (!membership) return { error: 'Unauthorized' }
+  if (!(await canManageFinanceMaster(orgId))) {
+    return { error: 'Hanya Organisasi Utama pada konteks Unit Utama yang dapat menghapus rekening CoA.' }
+  }
 
-  const { data: existing } = await (supabase as any)
-    .from('accounts')
-    .select('id, code, is_system')
-    .eq('id', accountId)
-    .eq('org_id', orgId)
-    .single()
+  const existing = await prisma.accounts.findFirst({
+    where: { id: accountId, org_id: orgId },
+    select: { id: true, code: true, is_system: true },
+  })
 
   if (!existing) return { error: 'Akun tidak ditemukan.' }
   if (existing.is_system) return { error: 'Akun sistem tidak dapat dihapus.' }
@@ -553,7 +628,7 @@ export async function deleteAccount(accountId: string, orgId: string) {
 
   const syncDeleteResult = await propagateDeletedParentAccountToDescendants(
     orgId,
-    String((existing as any).code || '')
+    String(existing.code || '')
   )
   if (!syncDeleteResult.success) {
     ;(console as any).warn('CoA sync warning (deleteAccount):', syncDeleteResult.errors)

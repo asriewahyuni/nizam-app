@@ -1,7 +1,8 @@
 'use server'
 
 import bcrypt from 'bcrypt'
-import { auth } from '@/auth'
+import { Prisma, employment_status, nizam_department } from '@prisma/client'
+import { getAuthUser, getMembership } from '@/lib/auth/permissions'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
@@ -9,9 +10,7 @@ import { sanitizeUploadSegment, uploadPublicFile } from '@/lib/storage/public-up
 
 const EMPLOYEE_CHILD_TRANSFER_AUDIT_TABLE = 'EMPLOYEE_CHILD_TRANSFER'
 
-type BranchSelectionResult =
-  | { branchId: string | null }
-  | { error: string }
+type BranchSelectionResult = { branchId: string | null } | { error: string }
 
 type EmployeeChildTransferPayload = {
   employeeId: string
@@ -31,19 +30,23 @@ function isEmployeeStatusActive(status: unknown) {
   return normalizedStatus !== 'RESIGNED' && normalizedStatus !== 'TERMINATED'
 }
 
-function isMissingDepartmentIdColumnError(error: any) {
-  const msg = String(error?.message || '').toLowerCase()
-  return msg.includes('department_id') && (msg.includes('schema cache') || msg.includes('column'))
+function normalizeEmploymentStatus(value: unknown): employment_status {
+  const normalized = String(value || 'FULL_TIME').trim().toUpperCase()
+  return normalized === 'RESIGNED' || normalized === 'TERMINATED' || normalized === 'CONTRACT' || normalized === 'INTERN' || normalized === 'PROBATION'
+    ? (normalized as employment_status)
+    : employment_status.FULL_TIME
 }
 
-function isMissingManagerEmployeeIdColumnError(error: any) {
-  const msg = String(error?.message || '').toLowerCase()
-  return msg.includes('manager_employee_id') && (msg.includes('schema cache') || msg.includes('column'))
+function normalizeDepartment(value: unknown): nizam_department | null {
+  const normalized = String(value || '').trim().toUpperCase()
+  if (!normalized) return null
+  const allowed = new Set<string>(['DASHBOARD_AUDIT', 'INSIGHT', 'CONFIG', 'FINANCE', 'OPERASIONAL', 'MARKETING_SALES', 'HRIS'])
+  return allowed.has(normalized) ? (normalized as nizam_department) : null
 }
 
 function parseManagedIdList(rawValue: FormDataEntryValue | null, label: string) {
   const raw = String(rawValue || '').trim()
-  if (!raw) return []
+  if (!raw) return [] as string[]
   try {
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -54,553 +57,289 @@ function parseManagedIdList(rawValue: FormDataEntryValue | null, label: string) 
   }
 }
 
-async function syncEmployeeManagedChildOrgs(
-  db: any,
-  orgId: string,
-  employeeId: string,
-  managedChildOrgIds: string[]
-) {
-  const trimmedOrgId = String(orgId || '').trim()
-  const trimmedEmployeeId = String(employeeId || '').trim()
-  if (!trimmedOrgId || !trimmedEmployeeId) return { warning: null as string | null }
-
-  // PIC anak perusahaan dikelola dari organisasi holding (main org) saja.
-  const { data: activeOrg, error: activeOrgError } = await db
-    .from('organizations')
-    .select('id, parent_org_id')
-    .eq('id', trimmedOrgId)
-    .maybeSingle()
-
-  if (activeOrgError || !activeOrg?.id) {
-    return { warning: 'Sinkronisasi PIC anak perusahaan gagal: organisasi aktif tidak ditemukan.' }
-  }
-  if (activeOrg.parent_org_id) {
-    return { warning: null as string | null }
-  }
-
-  const { data: childOrgs, error: childOrgsError } = await db
-    .from('organizations')
-    .select('id')
-    .eq('parent_org_id', trimmedOrgId)
-
-  if (childOrgsError) {
-    return { warning: 'Sinkronisasi PIC anak perusahaan gagal membaca daftar entitas anak.' }
-  }
-
-  const allowedChildOrgIds = new Set(
-    (Array.isArray(childOrgs) ? childOrgs : [])
-      .map((row: any) => String(row?.id || '').trim())
-      .filter(Boolean)
-  )
-  const scopedChildOrgIds = managedChildOrgIds.filter((id) => allowedChildOrgIds.has(id))
-  const nowIso = new Date().toISOString()
-
-  if (scopedChildOrgIds.length === 0) {
-    const { error: clearError } = await db
-      .from('organizations')
-      .update({ manager_employee_id: null, updated_at: nowIso })
-      .eq('parent_org_id', trimmedOrgId)
-      .eq('manager_employee_id', trimmedEmployeeId)
-
-    if (clearError && !isMissingManagerEmployeeIdColumnError(clearError)) {
-      return { warning: 'Penugasan PIC anak perusahaan belum sepenuhnya terlepas otomatis.' }
-    }
-
-    return { warning: null as string | null }
-  }
-
-  const idListStr = `(${scopedChildOrgIds.join(',')})`
-  const { error: clearError } = await db
-    .from('organizations')
-    .update({ manager_employee_id: null, updated_at: nowIso })
-    .eq('parent_org_id', trimmedOrgId)
-    .eq('manager_employee_id', trimmedEmployeeId)
-    .not('id', 'in', idListStr)
-
-  if (clearError && !isMissingManagerEmployeeIdColumnError(clearError)) {
-    return { warning: 'Penugasan PIC anak perusahaan belum sepenuhnya terlepas otomatis.' }
-  }
-
-  const { error: setError } = await db
-    .from('organizations')
-    .update({ manager_employee_id: trimmedEmployeeId, updated_at: nowIso })
-    .eq('parent_org_id', trimmedOrgId)
-    .in('id', scopedChildOrgIds)
-
-  if (setError && !isMissingManagerEmployeeIdColumnError(setError)) {
-    return { warning: 'Gagal menyimpan sebagian penugasan PIC anak perusahaan.' }
-  }
-
-  return { warning: null as string | null }
-}
-
-async function clearManagedChildOrgAssignmentsForEmployee(db: any, employeeId: string) {
-  const trimmedEmployeeId = String(employeeId || '').trim()
-  if (!trimmedEmployeeId) return { warning: null as string | null }
-
-  const { error } = await db
-    .from('organizations')
-    .update({ manager_employee_id: null, updated_at: new Date().toISOString() })
-    .eq('manager_employee_id', trimmedEmployeeId)
-
-  if (error && !isMissingManagerEmployeeIdColumnError(error)) {
-    return { warning: 'Penugasan PIC anak perusahaan belum sepenuhnya terlepas otomatis.' }
-  }
-
-  return { warning: null as string | null }
-}
-
 async function resolveEmployeeBranchSelection(orgId: string, branchId?: string | null): Promise<BranchSelectionResult> {
   const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
-  if ('error' in branchSelection) {
-    return { error: branchSelection.error || 'Akses unit tidak valid.' }
-  }
-
+  if ('error' in branchSelection) return { error: branchSelection.error || 'Akses unit tidak valid.' }
   return { branchId: branchSelection.branchId }
 }
 
 async function requireEmployeeCreateBranchId(orgId: string): Promise<{ branchId: string } | { error: string }> {
   const branchSelection = await resolveEmployeeBranchSelection(orgId)
-  if ('error' in branchSelection || !branchSelection.branchId) {
-    return { error: 'Pilih unit aktif terlebih dahulu untuk menambahkan karyawan.' }
-  }
-
-  return { branchId: branchSelection.branchId as string }
+  if ('error' in branchSelection || !branchSelection.branchId) return { error: 'Pilih unit aktif terlebih dahulu untuk menambahkan karyawan.' }
+  return { branchId: branchSelection.branchId }
 }
 
 async function ensureEmployeeBranchAccess(orgId: string, branchId: string | null, notFoundMessage: string) {
   const trimmedBranchId = String(branchId || '').trim()
-  if (!trimmedBranchId) {
-    return { error: notFoundMessage }
-  }
-
+  if (!trimmedBranchId) return { error: notFoundMessage }
   const branchSelection = await resolveEmployeeBranchSelection(orgId, trimmedBranchId)
-  if ('error' in branchSelection) {
-    return { error: branchSelection.error }
-  }
-
+  if ('error' in branchSelection) return { error: branchSelection.error }
   return { branchId: trimmedBranchId }
+}
+
+async function updateBranchPicAssignments(orgId: string, employeeId: string, managedBranchIds: string[]) {
+  await prisma.$executeRaw`
+    UPDATE public.branches
+    SET pic_employee_id = NULL,
+        updated_at = NOW()
+    WHERE org_id = ${orgId}::uuid
+      AND pic_employee_id = ${employeeId}::uuid
+  `
+
+  if (managedBranchIds.length > 0) {
+    await prisma.$executeRaw`
+      UPDATE public.branches
+      SET pic_employee_id = ${employeeId}::uuid,
+          updated_at = NOW()
+      WHERE org_id = ${orgId}::uuid
+        AND id = ANY(${managedBranchIds}::uuid[])
+    `
+  }
+}
+
+async function syncEmployeeManagedChildOrgs(orgId: string, employeeId: string, managedChildOrgIds: string[]) {
+  const childOrgs = await prisma.organizations.findMany({
+    where: { parent_org_id: orgId },
+    select: { id: true },
+  })
+  const allowedIds = new Set(childOrgs.map((org) => org.id))
+  const scopedIds = managedChildOrgIds.filter((id) => allowedIds.has(id))
+
+  await prisma.$executeRaw`
+    UPDATE public.organizations
+    SET manager_employee_id = NULL,
+        updated_at = NOW()
+    WHERE parent_org_id = ${orgId}::uuid
+      AND manager_employee_id = ${employeeId}::uuid
+  `
+
+  if (scopedIds.length > 0) {
+    await prisma.$executeRaw`
+      UPDATE public.organizations
+      SET manager_employee_id = ${employeeId}::uuid,
+          updated_at = NOW()
+      WHERE parent_org_id = ${orgId}::uuid
+        AND id = ANY(${scopedIds}::uuid[])
+    `
+  }
+}
+
+async function clearManagedChildOrgAssignmentsForEmployee(employeeId: string) {
+  await prisma.$executeRaw`
+    UPDATE public.organizations
+    SET manager_employee_id = NULL,
+        updated_at = NOW()
+    WHERE manager_employee_id = ${employeeId}::uuid
+  `
+}
+
+async function getAuthenticatedUser() {
+  const user = await getAuthUser()
+  if (!user?.userId) return null
+
+  return {
+    id: user.userId,
+    email: user.email,
+    name: user.name,
+  }
 }
 
 export async function getEmployees(orgId: string, branchId?: string | null) {
   const branchSelection = await resolveEmployeeBranchSelection(orgId, branchId)
-  if ('error' in branchSelection) {
-    throw new Error('Branch Selection Error: ' + branchSelection.error)
-  }
+  if ('error' in branchSelection) throw new Error('Branch Selection Error: ' + branchSelection.error)
 
-  let query = db
-    .from('employees')
-    .select('*, branch:branches!employees_branch_id_fkey(id, name, code), managed_branches:branches!branches_pic_employee_id_fkey(id)')
-    .eq('org_id', orgId)
-    .order('first_name')
+  const employees = await prisma.employees.findMany({
+    where: {
+      org_id: orgId,
+      ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+    },
+    include: {
+      branches: { select: { id: true, name: true, code: true } },
+    },
+    orderBy: { first_name: 'asc' },
+  })
 
-  if (branchSelection.branchId) {
-    query = query.eq('branch_id', branchSelection.branchId)
-  }
+  const employeeIds = employees.map((employee) => employee.id)
+  const managedBranches = employeeIds.length > 0
+    ? await prisma.$queryRaw<Array<{ id: string; pic_employee_id: string | null }>>`
+        SELECT id::text AS id, pic_employee_id::text AS pic_employee_id
+        FROM public.branches
+        WHERE org_id = ${orgId}::uuid
+          AND pic_employee_id = ANY(${employeeIds}::uuid[])
+      `
+    : []
 
-  const { data, error } = await query
+  const childOrgs = await prisma.$queryRaw<Array<{ id: string; name: string; manager_employee_id: string | null }>>`
+    SELECT id::text AS id, name, manager_employee_id::text AS manager_employee_id
+    FROM public.organizations
+    WHERE parent_org_id = ${orgId}::uuid
+  `
 
   return employees.map((employee) => ({
     ...employee,
     branch: employee.branches,
-    branches: undefined,
+    managed_branches: managedBranches.filter((branch) => branch.pic_employee_id === employee.id).map((branch) => ({ id: branch.id })),
+    managed_child_orgs: childOrgs.filter((org) => org.manager_employee_id === employee.id).map((org) => ({ id: org.id, name: org.name })),
   }))
 }
 
-/**
- * Mengambil riwayat mutasi antar entitas (parent/child) dalam satu holding.
- */
 export async function getEmployeeTransferHistory(orgId: string) {
   const trimmedOrgId = String(orgId || '').trim()
   if (!trimmedOrgId) return []
 
-  const supabase = await createClient()
-  const db = supabase as any
+  const data = await prisma.audit_logs.findMany({
+    where: { org_id: trimmedOrgId, table_name: EMPLOYEE_CHILD_TRANSFER_AUDIT_TABLE },
+    select: { id: true, created_at: true, action: true, new_data: true },
+    orderBy: { created_at: 'desc' },
+    take: 20,
+  })
 
-  const { data, error } = await db
-    .from('audit_logs')
-    .select('id, created_at, action, new_data')
-    .eq('org_id', trimmedOrgId)
-    .eq('table_name', EMPLOYEE_CHILD_TRANSFER_AUDIT_TABLE)
-    .order('created_at', { ascending: false })
-    .limit(20)
-
-  if (error || !Array.isArray(data)) return []
-
-  return data.map((row: any) => {
-    const payload = row?.new_data || {}
+  return data.map((row) => {
+    const payload = (row.new_data && typeof row.new_data === 'object' ? row.new_data : {}) as Record<string, unknown>
     return {
-      id: String(row?.id || crypto.randomUUID()),
-      created_at: String(row?.created_at || new Date().toISOString()),
-      action: String(row?.action || 'UPDATE'),
-      employee_name: String(payload?.employee_name || '-'),
-      employee_nik: String(payload?.employee_nik || '-'),
-      from_org_name: String(payload?.from_org_name || '-'),
-      from_branch_name: String(payload?.from_branch_name || '-'),
-      to_org_name: String(payload?.to_org_name || '-'),
-      to_branch_name: String(payload?.to_branch_name || '-'),
-      actor_email: String(payload?.actor_email || '-'),
-      note: payload?.note ? String(payload.note) : null,
-      target_assigned_as_pic: Boolean(payload?.target_assigned_as_pic),
+      id: row.id,
+      created_at: row.created_at.toISOString(),
+      action: row.action,
+      employee_name: String(payload.employee_name || '-'),
+      employee_nik: String(payload.employee_nik || '-'),
+      from_org_name: String(payload.from_org_name || '-'),
+      from_branch_name: String(payload.from_branch_name || '-'),
+      to_org_name: String(payload.to_org_name || '-'),
+      to_branch_name: String(payload.to_branch_name || '-'),
+      actor_email: String(payload.actor_email || '-'),
+      note: payload.note ? String(payload.note) : null,
+      target_assigned_as_pic: Boolean(payload.target_assigned_as_pic),
     }
   })
 }
 
-/**
- * Mutasi karyawan antar entitas (parent/child) dalam satu holding:
- * - buat data karyawan baru di entitas tujuan
- * - pindahkan profil asal (hapus jika memungkinkan, fallback RESIGNED jika terikat histori transaksi)
- * - lepas assignment PIC cabang lama
- * - opsional assign sebagai PIC di cabang tujuan
- * - simpan audit trail mutasi
- */
 export async function transferEmployeeToChildOrg(orgId: string, payload: EmployeeChildTransferPayload) {
+  const user = await getAuthenticatedUser()
+  if (!user?.id) return { error: 'Tidak terautentikasi.' }
+
   const sourceOrgId = String(orgId || '').trim()
-  const employeeId = String(payload?.employeeId || '').trim()
-  const targetOrgId = String(payload?.targetOrgId || '').trim()
-  const targetBranchId = String(payload?.targetBranchId || '').trim()
-  const assignPicToTargetBranch = Boolean(payload?.assignPicToTargetBranch)
-  const transferNote = String(payload?.note || '').trim() || null
+  const employeeId = String(payload.employeeId || '').trim()
+  const targetOrgId = String(payload.targetOrgId || '').trim()
+  const targetBranchId = String(payload.targetBranchId || '').trim()
+  const assignPicToTargetBranch = Boolean(payload.assignPicToTargetBranch)
+  const transferNote = String(payload.note || '').trim() || null
 
-  if (!sourceOrgId) return { error: 'Organisasi asal tidak valid.' }
-  if (!employeeId) return { error: 'Karyawan yang akan dimutasi tidak valid.' }
-  if (!targetOrgId) return { error: 'Entitas tujuan belum dipilih.' }
-  if (!targetBranchId) return { error: 'Cabang tujuan belum dipilih.' }
-  if (targetOrgId === sourceOrgId) return { error: 'Mutasi harus menuju entitas yang berbeda.' }
+  if (!sourceOrgId || !employeeId || !targetOrgId || !targetBranchId) return { error: 'Data mutasi belum lengkap.' }
+  if (sourceOrgId === targetOrgId) return { error: 'Mutasi harus menuju entitas yang berbeda.' }
 
-  const supabase = await createClient()
-  const admin = await createAdminClient()
-  const db = admin as any
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Tidak terautentikasi.' }
-
-  const [sourceMembershipResult, sourceOrgResult, targetOrgResult, sourceEmployeeResult] = await Promise.all([
-    db
-      .from('org_members')
-      .select('role')
-      .eq('org_id', sourceOrgId)
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .maybeSingle(),
-    db
-      .from('organizations')
-      .select('id, name, parent_org_id')
-      .eq('id', sourceOrgId)
-      .maybeSingle(),
-    db
-      .from('organizations')
-      .select('id, name, parent_org_id, is_active')
-      .eq('id', targetOrgId)
-      .maybeSingle(),
-    db
-      .from('employees')
-      .select('*')
-      .eq('id', employeeId)
-      .eq('org_id', sourceOrgId)
-      .maybeSingle(),
+  const [sourceMembership, sourceOrg, targetOrg, sourceEmployee, targetBranch] = await Promise.all([
+    getMembership(user.id, sourceOrgId),
+    prisma.organizations.findUnique({ where: { id: sourceOrgId }, select: { id: true, name: true, parent_org_id: true } }),
+    prisma.organizations.findUnique({ where: { id: targetOrgId }, select: { id: true, name: true, parent_org_id: true, is_active: true } }),
+    prisma.employees.findFirst({ where: { id: employeeId, org_id: sourceOrgId } }),
+    prisma.branches.findFirst({ where: { id: targetBranchId, org_id: targetOrgId, is_active: true }, select: { id: true, name: true, code: true } }),
   ])
 
-  const sourceMembership = sourceMembershipResult?.data
-  const sourceRole = String(sourceMembership?.role || '')
-  if (!['owner', 'admin'].includes(sourceRole)) {
-    return { error: 'Hanya owner/admin organisasi asal yang dapat memindahkan karyawan.' }
-  }
-
-  const sourceOrg = sourceOrgResult?.data
+  if (!sourceMembership?.isOwnerOrAdmin) return { error: 'Hanya owner/admin organisasi asal yang dapat memindahkan karyawan.' }
   if (!sourceOrg?.id) return { error: 'Organisasi asal tidak ditemukan.' }
+  if (!targetOrg?.id || !targetOrg.is_active) return { error: 'Organisasi tujuan tidak ditemukan atau sedang nonaktif.' }
+  if (!sourceEmployee?.id) return { error: 'Data karyawan asal tidak ditemukan.' }
+  if (!targetBranch?.id) return { error: 'Cabang tujuan tidak valid atau tidak aktif.' }
 
-  const targetOrg = targetOrgResult?.data
-  if (!targetOrg?.id) return { error: 'Organisasi tujuan tidak ditemukan.' }
-  if (!targetOrg.is_active) return { error: 'Organisasi tujuan sedang nonaktif.' }
+  const sourceHoldingOrgId = String(sourceOrg.parent_org_id || sourceOrg.id)
+  const targetHoldingOrgId = String(targetOrg.parent_org_id || targetOrg.id)
+  if (sourceHoldingOrgId !== targetHoldingOrgId) return { error: 'Mutasi hanya bisa dilakukan antar entitas dalam holding yang sama.' }
 
-  const sourceHoldingOrgId = String(sourceOrg.parent_org_id || sourceOrg.id || '')
-  const targetHoldingOrgId = String(targetOrg.parent_org_id || targetOrg.id || '')
-  if (!sourceHoldingOrgId || !targetHoldingOrgId || sourceHoldingOrgId !== targetHoldingOrgId) {
-    return { error: 'Mutasi hanya bisa dilakukan antar entitas dalam holding yang sama.' }
-  }
-
-  const holdingMembershipResult = await db
-    .from('org_members')
-    .select('role')
-    .eq('org_id', sourceHoldingOrgId)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
-
-  const holdingRole = String(holdingMembershipResult?.data?.role || '')
-  if (!['owner', 'admin'].includes(holdingRole)) {
+  const holdingMembership = await getMembership(user.id, sourceHoldingOrgId)
+  if (!holdingMembership?.isOwnerOrAdmin) {
     return { error: 'Mutasi parent/child memerlukan akses owner/admin pada organisasi holding.' }
   }
 
-  const sourceEmployee = sourceEmployeeResult?.data
-  if (!sourceEmployee?.id) return { error: 'Data karyawan asal tidak ditemukan.' }
+  const existingTargetEmployee = await prisma.employees.findFirst({
+    where: { org_id: targetOrgId, nik: sourceEmployee.nik },
+    select: { id: true, employment_status: true, user_id: true },
+  })
 
-  const [targetBranchResult, duplicateNikResult, sourceBranchResult] = await Promise.all([
-    db
-      .from('branches')
-      .select('id, name, code, org_id, is_active')
-      .eq('id', targetBranchId)
-      .eq('org_id', targetOrgId)
-      .maybeSingle(),
-    db
-      .from('employees')
-      .select('id, employment_status, user_id')
-      .eq('org_id', targetOrgId)
-      .eq('nik', sourceEmployee.nik)
-      .maybeSingle(),
-    sourceEmployee.branch_id
-      ? db.from('branches').select('id, name, code').eq('id', sourceEmployee.branch_id).maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-  ])
-
-  const targetBranch = targetBranchResult?.data
-  if (!targetBranch?.id || !targetBranch?.is_active) {
-    return { error: 'Cabang tujuan tidak valid atau tidak aktif.' }
+  const baseEmployeeData = {
+    nik: sourceEmployee.nik,
+    first_name: sourceEmployee.first_name,
+    last_name: sourceEmployee.last_name,
+    job_title: sourceEmployee.job_title,
+    employment_status: normalizeEmploymentStatus(sourceEmployee.employment_status),
+    basic_salary: sourceEmployee.basic_salary,
+    join_date: sourceEmployee.join_date,
+    department_id: sourceEmployee.department_id,
+    email: sourceEmployee.email,
+    gender: sourceEmployee.gender,
+    whatsapp: sourceEmployee.whatsapp,
+    avatar_url: sourceEmployee.avatar_url,
+    bank_name: sourceEmployee.bank_name,
+    bank_account_number: sourceEmployee.bank_account_number,
+    tax_status: sourceEmployee.tax_status,
+    user_id: sourceEmployee.user_id,
+    registration_status: sourceEmployee.registration_status,
   }
 
-  const baseEmployeeData = { ...sourceEmployee }
-  delete baseEmployeeData.id
-  delete baseEmployeeData.org_id
-  delete baseEmployeeData.branch_id
-  delete baseEmployeeData.created_at
-  delete baseEmployeeData.updated_at
-
-  const transferJoinDate = String(sourceEmployee.join_date || new Date().toISOString().split('T')[0])
-  const transferEmploymentStatus = ['TERMINATED', 'RESIGNED'].includes(String(sourceEmployee.employment_status || '').toUpperCase())
-    ? 'FULL_TIME'
-    : sourceEmployee.employment_status
-
-  const insertPayload = {
-    ...baseEmployeeData,
-    org_id: targetOrgId,
-    branch_id: targetBranchId,
-    employment_status: transferEmploymentStatus,
-    join_date: transferJoinDate,
-    end_date: null,
-    updated_at: new Date().toISOString(),
-  }
-
-  const warnings: string[] = []
-  const existingTargetEmployee = duplicateNikResult?.data || null
-  let targetEmployee: {
-    id: string
-    first_name: string
-    last_name: string | null
-    nik: string
-    user_id: string | null
-    job_title: string | null
-  } | null = null
-  let targetEmployeeWasReactivated = false
-
-  if (existingTargetEmployee?.id) {
-    const existingStatus = String(existingTargetEmployee.employment_status || '').toUpperCase()
-    const canReactivate = ['RESIGNED', 'TERMINATED'].includes(existingStatus)
-    if (!canReactivate) {
-      return { error: `NIK ${sourceEmployee.nik} sudah digunakan pada organisasi tujuan.` }
-    }
-
-    if (
-      existingTargetEmployee.user_id &&
-      sourceEmployee.user_id &&
-      existingTargetEmployee.user_id !== sourceEmployee.user_id
-    ) {
-      return { error: 'NIK tujuan terkait akun user lain. Hubungi admin untuk konsolidasi akun sebelum mutasi.' }
-    }
-
-    const resolvedTargetUserId = existingTargetEmployee.user_id || sourceEmployee.user_id || null
-    const updatePayload = {
-      ...baseEmployeeData,
-      branch_id: targetBranchId,
-      employment_status: transferEmploymentStatus,
-      join_date: transferJoinDate,
-      end_date: null,
-      updated_at: new Date().toISOString(),
-      user_id: resolvedTargetUserId,
-      registration_status: resolvedTargetUserId ? 'REGISTERED' : baseEmployeeData.registration_status || null,
-    }
-
-    const { data: reactivatedEmployee, error: reactivateError } = await db
-      .from('employees')
-      .update(updatePayload)
-      .eq('id', existingTargetEmployee.id)
-      .eq('org_id', targetOrgId)
-      .select('id, first_name, last_name, nik, user_id, job_title')
-      .single()
-
-    if (reactivateError || !reactivatedEmployee?.id) {
-      return { error: reactivateError?.message || 'Gagal mengaktifkan ulang profil karyawan pada organisasi tujuan.' }
-    }
-
-    targetEmployee = reactivatedEmployee
-    targetEmployeeWasReactivated = true
-    warnings.push('Profil lama di organisasi tujuan diaktifkan ulang menggunakan NIK yang sama.')
+  let targetEmployeeId = ''
+  if (existingTargetEmployee?.id && ['RESIGNED', 'TERMINATED'].includes(String(existingTargetEmployee.employment_status || '').toUpperCase())) {
+    const updated = await prisma.employees.update({
+      where: { id: existingTargetEmployee.id },
+      data: { ...baseEmployeeData, org_id: targetOrgId, branch_id: targetBranchId, end_date: null, updated_at: new Date() },
+      select: { id: true },
+    })
+    targetEmployeeId = updated.id
+  } else if (existingTargetEmployee?.id) {
+    return { error: `NIK ${sourceEmployee.nik} sudah digunakan pada organisasi tujuan.` }
   } else {
-    const { data: createdEmployee, error: createError } = await db
-      .from('employees')
-      .insert(insertPayload)
-      .select('id, first_name, last_name, nik, user_id, job_title')
-      .single()
-
-    if (createError || !createdEmployee?.id) {
-      if (String(createError?.code || '') === '23505') {
-        return { error: `Gagal mutasi: NIK ${sourceEmployee.nik} sudah terdaftar di organisasi tujuan.` }
-      }
-      return { error: createError?.message || 'Gagal membuat data karyawan pada organisasi tujuan.' }
-    }
-
-    targetEmployee = createdEmployee
+    const created = await prisma.employees.create({
+      data: { ...baseEmployeeData, org_id: targetOrgId, branch_id: targetBranchId, end_date: null },
+      select: { id: true },
+    })
+    targetEmployeeId = created.id
   }
 
-  if (!targetEmployee?.id) {
-    return { error: 'Mutasi gagal karena profil tujuan tidak berhasil dipersiapkan.' }
+  if (sourceEmployee.user_id) {
+    const targetRole = await prisma.roles.findFirst({
+      where: { org_id: targetOrgId, name: { equals: String(sourceEmployee.job_title || '').trim(), mode: 'insensitive' } },
+      select: { id: true },
+    })
+    await prisma.org_members.upsert({
+      where: { org_id_user_id: { org_id: targetOrgId, user_id: sourceEmployee.user_id } },
+      update: { role: 'staff', role_id: targetRole?.id || null, is_active: true },
+      create: { org_id: targetOrgId, user_id: sourceEmployee.user_id, role: 'staff', role_id: targetRole?.id || null, is_active: true },
+    })
   }
 
-  // Pastikan user terdaftar di entitas tujuan bila karyawan ini sudah punya akun.
-  const targetLoginUserId = targetEmployee.user_id || sourceEmployee.user_id || null
-  if (targetLoginUserId) {
-    const { data: targetRoleMatch } = await db
-      .from('roles')
-      .select('id, name')
-      .eq('org_id', targetOrgId)
-      .ilike('name', String(sourceEmployee.job_title || '').trim())
-      .maybeSingle()
-
-    const { error: memberUpsertError } = await db
-      .from('org_members')
-      .upsert({
-        org_id: targetOrgId,
-        user_id: targetLoginUserId,
-        role: 'staff',
-        role_id: targetRoleMatch?.id || null,
-        is_active: true,
-      }, { onConflict: 'org_id,user_id' })
-
-    if (memberUpsertError) {
-      warnings.push('Keanggotaan user di organisasi tujuan belum otomatis tersinkron. Cek Settings > Users.')
-    }
-  }
-
-  const { error: clearSourcePicError } = await db
-    .from('branches')
-    .update({ pic_employee_id: null, updated_at: new Date().toISOString() })
-    .eq('org_id', sourceOrgId)
-    .eq('pic_employee_id', employeeId)
-
-  if (clearSourcePicError) {
-    warnings.push('PIC cabang lama belum sepenuhnya terlepas otomatis. Mohon cek menu Cabang.')
-  }
-
-  const clearSourceManagerAssignmentResult = await clearManagedChildOrgAssignmentsForEmployee(db, employeeId)
-  if (clearSourceManagerAssignmentResult.warning) {
-    warnings.push(clearSourceManagerAssignmentResult.warning)
-  }
+  await prisma.$executeRaw`UPDATE public.branches SET pic_employee_id = NULL, updated_at = NOW() WHERE org_id = ${sourceOrgId}::uuid AND pic_employee_id = ${employeeId}::uuid`
+  await clearManagedChildOrgAssignmentsForEmployee(employeeId)
 
   let sourceCleanupMode: 'DELETED' | 'RESIGNED' = 'DELETED'
-  const { error: sourceDeleteError } = await db
-    .from('employees')
-    .delete()
-    .eq('id', employeeId)
-    .eq('org_id', sourceOrgId)
-
-  if (sourceDeleteError) {
-    if (String(sourceDeleteError.code || '') === '23503') {
-      const { error: sourceResignError } = await db
-        .from('employees')
-        .update({
-          employment_status: 'RESIGNED',
-          end_date: new Date().toISOString().split('T')[0],
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', employeeId)
-        .eq('org_id', sourceOrgId)
-
-      if (sourceResignError) {
-        if (!targetEmployeeWasReactivated) {
-          await db.from('employees').delete().eq('id', targetEmployee.id).eq('org_id', targetOrgId)
-        }
-        return {
-          error: sourceResignError.message ||
-            (targetEmployeeWasReactivated
-              ? 'Mutasi dibatalkan karena gagal memindahkan profil asal. Profil tujuan yang aktif ulang perlu ditinjau manual.'
-              : 'Mutasi dibatalkan karena gagal memindahkan profil asal.'),
-        }
-      }
-
-      sourceCleanupMode = 'RESIGNED'
-      warnings.push('Profil asal tidak dapat dihapus karena memiliki histori transaksi; status otomatis diubah menjadi RESIGNED.')
-    } else {
-      if (!targetEmployeeWasReactivated) {
-        await db.from('employees').delete().eq('id', targetEmployee.id).eq('org_id', targetOrgId)
-      }
-      return {
-        error: sourceDeleteError.message ||
-          (targetEmployeeWasReactivated
-            ? 'Mutasi dibatalkan karena gagal membersihkan profil asal. Profil tujuan yang aktif ulang perlu ditinjau manual.'
-            : 'Mutasi dibatalkan karena gagal membersihkan profil asal.'),
-      }
-    }
+  try {
+    await prisma.employees.delete({ where: { id: employeeId } })
+  } catch {
+    await prisma.employees.update({
+      where: { id: employeeId },
+      data: { employment_status: 'RESIGNED', end_date: new Date().toISOString().split('T')[0], updated_at: new Date() },
+    })
+    sourceCleanupMode = 'RESIGNED'
   }
 
   if (assignPicToTargetBranch) {
-    const { error: setTargetPicError } = await db
-      .from('branches')
-      .update({ pic_employee_id: targetEmployee.id, updated_at: new Date().toISOString() })
-      .eq('id', targetBranchId)
-      .eq('org_id', targetOrgId)
+    await prisma.$executeRaw`UPDATE public.branches SET pic_employee_id = ${targetEmployeeId}::uuid, updated_at = NOW() WHERE id = ${targetBranchId}::uuid AND org_id = ${targetOrgId}::uuid`
+  }
 
-    if (setTargetPicError) {
-      warnings.push('Gagal menetapkan karyawan sebagai PIC di cabang tujuan.')
+  if (sourceEmployee.user_id) {
+    const remainingSourceEmployees = await prisma.employees.findMany({ where: { org_id: sourceOrgId, user_id: sourceEmployee.user_id }, select: { employment_status: true } })
+    if (!remainingSourceEmployees.some((employee) => isEmployeeStatusActive(employee.employment_status))) {
+      await prisma.org_members.updateMany({ where: { org_id: sourceOrgId, user_id: sourceEmployee.user_id, role: 'staff', is_active: true }, data: { is_active: false } })
     }
   }
 
-  if (targetLoginUserId) {
-    const { data: sourceMembership } = await db
-      .from('org_members')
-      .select('role, is_active')
-      .eq('org_id', sourceOrgId)
-      .eq('user_id', targetLoginUserId)
-      .eq('is_active', true)
-      .maybeSingle()
+  const sourceBranch = sourceEmployee.branch_id
+    ? await prisma.branches.findUnique({ where: { id: sourceEmployee.branch_id }, select: { name: true } })
+    : null
 
-    const sourceRoleForTransferredUser = String(sourceMembership?.role || '').toLowerCase()
-    if (sourceRoleForTransferredUser === 'staff') {
-      const { data: sourceEmployeeRows, error: sourceEmployeeRowsError } = await db
-        .from('employees')
-        .select('id, employment_status')
-        .eq('org_id', sourceOrgId)
-        .eq('user_id', targetLoginUserId)
-
-      if (sourceEmployeeRowsError) {
-        warnings.push('Gagal memverifikasi sisa data karyawan di organisasi asal untuk sinkronisasi akses user.')
-      } else {
-        const hasActiveEmployeeInSource = Array.isArray(sourceEmployeeRows)
-          ? sourceEmployeeRows.some((row: { employment_status?: unknown }) => isEmployeeStatusActive(row?.employment_status))
-          : false
-
-        if (!hasActiveEmployeeInSource) {
-          const { error: deactivateSourceMembershipError } = await db
-            .from('org_members')
-            .update({ is_active: false })
-            .eq('org_id', sourceOrgId)
-            .eq('user_id', targetLoginUserId)
-            .eq('role', 'staff')
-            .eq('is_active', true)
-
-          if (deactivateSourceMembershipError) {
-            warnings.push('Mutasi berhasil, tetapi akses user ke organisasi asal belum otomatis dinonaktifkan.')
-          }
-        }
-      }
-    }
-  }
-
-  const sourceBranch = sourceBranchResult?.data
   const transferLogPayload = {
     transfer_type: 'HOLDING_ENTITY_MUTATION',
     employee_name: `${sourceEmployee.first_name || ''} ${sourceEmployee.last_name || ''}`.trim(),
     employee_nik: sourceEmployee.nik || null,
     source_employee_id: employeeId,
-    target_employee_id: targetEmployee.id,
+    target_employee_id: targetEmployeeId,
     from_org_id: sourceOrgId,
     from_org_name: sourceOrg.name || null,
     from_branch_id: sourceEmployee.branch_id || null,
@@ -616,37 +355,12 @@ export async function transferEmployeeToChildOrg(orgId: string, payload: Employe
     source_cleanup_mode: sourceCleanupMode,
   }
 
-  const sourceAuditPayload = {
-    org_id: sourceOrgId,
-    user_id: user.id,
-    action: 'UPDATE',
-    table_name: EMPLOYEE_CHILD_TRANSFER_AUDIT_TABLE,
-    record_id: employeeId,
-    old_data: {
-      employee_id: employeeId,
-      employee_status: sourceEmployee.employment_status,
-      branch_id: sourceEmployee.branch_id || null,
-    },
-    new_data: transferLogPayload,
-    user_agent: 'NIZAM ERP System',
-  }
-
-  const targetAuditPayload = {
-    org_id: targetOrgId,
-    user_id: user.id,
-    action: 'CREATE',
-    table_name: EMPLOYEE_CHILD_TRANSFER_AUDIT_TABLE,
-    record_id: targetEmployee.id,
-    old_data: null,
-    new_data: transferLogPayload,
-    user_agent: 'NIZAM ERP System',
-  }
-
-  const { error: sourceAuditError } = await db.from('audit_logs').insert(sourceAuditPayload)
-  if (sourceAuditError) warnings.push('Audit trail pada entitas asal gagal disimpan.')
-
-  const { error: targetAuditError } = await db.from('audit_logs').insert(targetAuditPayload)
-  if (targetAuditError) warnings.push('Audit trail pada entitas tujuan gagal disimpan.')
+  await prisma.audit_logs.createMany({
+    data: [
+      { org_id: sourceOrgId, user_id: user.id, action: 'UPDATE', table_name: EMPLOYEE_CHILD_TRANSFER_AUDIT_TABLE, record_id: employeeId, old_data: { employee_id: employeeId }, new_data: transferLogPayload, user_agent: 'NIZAM ERP System' },
+      { org_id: targetOrgId, user_id: user.id, action: 'CREATE', table_name: EMPLOYEE_CHILD_TRANSFER_AUDIT_TABLE, record_id: targetEmployeeId, old_data: Prisma.JsonNull, new_data: transferLogPayload, user_agent: 'NIZAM ERP System' },
+    ],
+  })
 
   revalidatePath('/hris')
   revalidatePath('/settings/sub-orgs')
@@ -655,7 +369,7 @@ export async function transferEmployeeToChildOrg(orgId: string, payload: Employe
 
   return {
     success: true,
-    transferredEmployeeId: targetEmployee.id,
+    transferredEmployeeId: targetEmployeeId,
     transferLog: {
       id: crypto.randomUUID(),
       created_at: new Date().toISOString(),
@@ -670,296 +384,130 @@ export async function transferEmployeeToChildOrg(orgId: string, payload: Employe
       note: transferLogPayload.note,
       target_assigned_as_pic: transferLogPayload.target_assigned_as_pic,
     },
-    warning: warnings.length > 0 ? warnings.join(' ') : null,
+    warning: sourceCleanupMode === 'RESIGNED' ? 'Profil asal tidak dapat dihapus karena memiliki histori transaksi; status otomatis diubah menjadi RESIGNED.' : null,
   }
 }
 
-/**
- * Tandai karyawan sebagai RESIGNED dan tulis rekam jejak ke audit log.
- * Jika memungkinkan, PIC cabang yang menunjuk karyawan ini juga dilepas otomatis.
- */
 export async function resignEmployee(id: string, orgId: string, payload?: EmployeeResignPayload) {
-  const supabase = await createClient()
-  const admin = await createAdminClient()
-  const db = supabase as any
-  const adminDb = admin as any
+  const user = await getAuthenticatedUser()
+  if (!user?.id) return { error: 'Tidak terautentikasi.' }
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Tidak terautentikasi.' }
-
-  const trimmedEmpId = String(id || '').trim()
-  const trimmedOrgId = String(orgId || '').trim()
-  if (!trimmedEmpId || !trimmedOrgId) return { error: 'Data karyawan tidak valid.' }
-
-  const { data: existingEmployee, error: existingEmployeeError } = await db
-    .from('employees')
-    .select('id, org_id, branch_id, nik, first_name, last_name, employment_status, end_date')
-    .eq('id', trimmedEmpId)
-    .eq('org_id', trimmedOrgId)
-    .maybeSingle()
-
-  if (existingEmployeeError) return { error: existingEmployeeError.message }
+  const existingEmployee = await prisma.employees.findFirst({
+    where: { id, org_id: orgId },
+    select: { id: true, org_id: true, branch_id: true, nik: true, first_name: true, last_name: true, employment_status: true, end_date: true },
+  })
   if (!existingEmployee?.id) return { error: 'Data karyawan tidak ditemukan.' }
 
-  const accessibleEmployee = await ensureEmployeeBranchAccess(
-    trimmedOrgId,
-    existingEmployee.branch_id ?? null,
-    'Data karyawan tidak ditemukan.'
-  )
+  const accessibleEmployee = await ensureEmployeeBranchAccess(orgId, existingEmployee.branch_id ?? null, 'Data karyawan tidak ditemukan.')
   if ('error' in accessibleEmployee) return { error: accessibleEmployee.error }
 
-  const currentStatus = String(existingEmployee.employment_status || '').toUpperCase()
-  const trimmedReason = String(payload?.reason || '').trim()
-  const trimmedEffectiveDate = String(payload?.effectiveDate || '').trim()
-  const effectiveDate = trimmedEffectiveDate || new Date().toISOString().split('T')[0]
-  const note = trimmedReason || 'Resign diproses dari HRIS'
-
-  if (currentStatus === 'RESIGNED') {
-    return { success: true, alreadyResigned: true, effectiveDate }
-  }
-
-  const { error: updateError } = await db
-    .from('employees')
-    .update({
-      employment_status: 'RESIGNED',
-      end_date: effectiveDate,
-      updated_at: new Date().toISOString(),
+  const effectiveDate = String(payload?.effectiveDate || '').trim() || new Date().toISOString().split('T')[0]
+  if (String(existingEmployee.employment_status || '').toUpperCase() !== 'RESIGNED') {
+    await prisma.employees.update({
+      where: { id },
+      data: { employment_status: 'RESIGNED', end_date: effectiveDate, updated_at: new Date() },
     })
-    .eq('id', trimmedEmpId)
-    .eq('org_id', trimmedOrgId)
-    .eq('branch_id', accessibleEmployee.branchId)
-
-  if (updateError) return { error: updateError.message || 'Gagal menyimpan status resign.' }
-
-  const warnings: string[] = []
-  const { error: clearSourcePicError } = await db
-    .from('branches')
-    .update({ pic_employee_id: null, updated_at: new Date().toISOString() })
-    .eq('org_id', trimmedOrgId)
-    .eq('pic_employee_id', trimmedEmpId)
-
-  if (clearSourcePicError) {
-    warnings.push('Penugasan PIC cabang belum sepenuhnya terlepas otomatis.')
   }
 
-  const clearManagedChildOrgResult = await clearManagedChildOrgAssignmentsForEmployee(db, trimmedEmpId)
-  if (clearManagedChildOrgResult.warning) {
-    warnings.push(clearManagedChildOrgResult.warning)
-  }
-
-  const { error: auditError } = await adminDb
-    .from('audit_logs')
-    .insert({
-      org_id: trimmedOrgId,
+  await prisma.$executeRaw`UPDATE public.branches SET pic_employee_id = NULL, updated_at = NOW() WHERE org_id = ${orgId}::uuid AND pic_employee_id = ${id}::uuid`
+  await clearManagedChildOrgAssignmentsForEmployee(id)
+  await prisma.audit_logs.create({
+    data: {
+      org_id: orgId,
       user_id: user.id,
       action: 'UPDATE',
       table_name: 'EMPLOYEE_STATUS_HISTORY',
-      record_id: trimmedEmpId,
-      old_data: {
-        employment_status: existingEmployee.employment_status,
-        end_date: existingEmployee.end_date || null,
-      },
-      new_data: {
-        employment_status: 'RESIGNED',
-        effective_date: effectiveDate,
-        reason: note,
-        employee_name: `${existingEmployee.first_name || ''} ${existingEmployee.last_name || ''}`.trim(),
-        employee_nik: existingEmployee.nik || null,
-      },
+      record_id: id,
+      old_data: { employment_status: existingEmployee.employment_status, end_date: existingEmployee.end_date || null },
+      new_data: { employment_status: 'RESIGNED', effective_date: effectiveDate, reason: String(payload?.reason || '').trim() || 'Resign diproses dari HRIS' },
       user_agent: 'NIZAM ERP System',
-    })
-
-  if (auditError) {
-    warnings.push('Rekam jejak resign gagal ditulis ke audit log.')
-  }
+    },
+  })
 
   revalidatePath('/hris')
   revalidatePath('/settings/branches')
-  return {
-    success: true,
-    effectiveDate,
-    warning: warnings.length > 0 ? warnings.join(' ') : null,
-  }
+  return { success: true, effectiveDate }
 }
 
 export async function createEmployee(orgId: string, formData: FormData) {
   const activeBranch = await requireEmployeeCreateBranchId(orgId)
   if ('error' in activeBranch) return { error: activeBranch.error }
 
-  // Extract basics
-  const nik = formData.get('nik') as string
-  const firstName = formData.get('first_name') as string
-  const lastName = formData.get('last_name') as string
-  const jobTitle = formData.get('job_title') as string
-  const status = formData.get('employment_status') as string || 'FULL_TIME'
-  const basicSalary = Number(formData.get('basic_salary') || 0)
-  const joinDate = formData.get('join_date') as string || new Date().toISOString().split('T')[0]
+  const employee = await prisma.employees.create({
+    data: {
+      org_id: orgId,
+      branch_id: activeBranch.branchId,
+      nik: String(formData.get('nik') || ''),
+      first_name: String(formData.get('first_name') || ''),
+      last_name: String(formData.get('last_name') || ''),
+      job_title: String(formData.get('job_title') || ''),
+      employment_status: normalizeEmploymentStatus(formData.get('employment_status')) as employment_status,
+      basic_salary: Number(formData.get('basic_salary') || 0),
+      join_date: String(formData.get('join_date') || '') || new Date().toISOString().split('T')[0],
+      department_id: normalizeDepartment(formData.get('department_id')),
+      email: String(formData.get('email') || '') || null,
+      gender: String(formData.get('gender') || '') || null,
+      whatsapp: String(formData.get('whatsapp') || '') || null,
+      avatar_url: String(formData.get('avatar_url') || '') || null,
+      bank_name: String(formData.get('bank_name') || '') || null,
+      bank_account_number: String(formData.get('bank_account_number') || '') || null,
+      tax_status: String(formData.get('tax_status') || '') || null,
+    },
+    select: { id: true },
+  })
 
-  const payload = {
-    org_id: orgId,
-    branch_id: activeBranch.branchId,
-    nik,
-    first_name: firstName,
-    last_name: lastName,
-    job_title: jobTitle,
-    employment_status: status,
-    basic_salary: basicSalary,
-    join_date: joinDate,
-    department: formData.get('department') || null,
-    department_id: formData.get('department_id') || null,
-    email: formData.get('email') || null,
-    gender: formData.get('gender') || null,
-    whatsapp: formData.get('whatsapp') || null,
-    avatar_url: formData.get('avatar_url') || null,
-    bank_name: formData.get('bank_name') || null,
-    bank_account_number: formData.get('bank_account_number') || null,
-    tax_status: formData.get('tax_status') || null
-  }
-
-  let { data: newEmp, error } = await db.from('employees').insert(payload).select('id').single()
-  if (error && isMissingDepartmentIdColumnError(error)) {
-    const { department_id: _ignoredDepartmentId, ...legacyPayload } = payload
-    const retry = await db.from('employees').insert(legacyPayload).select('id').single()
-    error = retry.error
-    newEmp = retry.data
-  }
-
-  if (error) return { error: error.message }
-
-  if (newEmp) {
-    const managedBranchIds = parseManagedIdList(formData.get('managed_branches'), 'managed_branches')
-    if (managedBranchIds.length > 0) {
-      await db.from('branches').update({ pic_employee_id: newEmp.id }).eq('org_id', orgId).in('id', managedBranchIds)
-    }
-
-    const managedChildOrgStr = String(formData.get('managed_child_orgs') || '').trim()
-    if (managedChildOrgStr) {
-      const managedChildOrgIds = parseManagedIdList(formData.get('managed_child_orgs'), 'managed_child_orgs')
-      await syncEmployeeManagedChildOrgs(db, orgId, newEmp.id, managedChildOrgIds)
-      revalidatePath('/settings/sub-orgs')
-    }
-  }
+  await updateBranchPicAssignments(orgId, employee.id, parseManagedIdList(formData.get('managed_branches'), 'managed_branches'))
+  await syncEmployeeManagedChildOrgs(orgId, employee.id, parseManagedIdList(formData.get('managed_child_orgs'), 'managed_child_orgs'))
 
   revalidatePath('/hris')
+  revalidatePath('/settings/sub-orgs')
   return { success: true }
 }
 
 export async function updateEmployee(id: string, orgId: string, formData: FormData) {
-  const existingEmployee = await prisma.employees.findFirst({
-    where: { id, org_id: orgId },
-    select: { id: true, branch_id: true },
-  })
-
-  const accessibleEmployee = await ensureEmployeeBranchAccess(
-    orgId,
-    existingEmployee?.branch_id ?? null,
-    'Data karyawan tidak ditemukan.'
-  )
+  const existingEmployee = await prisma.employees.findFirst({ where: { id, org_id: orgId }, select: { branch_id: true } })
+  const accessibleEmployee = await ensureEmployeeBranchAccess(orgId, existingEmployee?.branch_id ?? null, 'Data karyawan tidak ditemukan.')
   if ('error' in accessibleEmployee) return { error: accessibleEmployee.error }
 
-  const nik = formData.get('nik') as string
-  const firstName = formData.get('first_name') as string
-  const lastName = formData.get('last_name') as string
-  const jobTitle = formData.get('job_title') as string
-  const status = formData.get('employment_status') as string || 'FULL_TIME'
-  const basicSalary = Number(formData.get('basic_salary') || 0)
-  const joinDate = formData.get('join_date') as string
+  await prisma.employees.update({
+    where: { id },
+    data: {
+      nik: String(formData.get('nik') || ''),
+      first_name: String(formData.get('first_name') || ''),
+      last_name: String(formData.get('last_name') || ''),
+      job_title: String(formData.get('job_title') || ''),
+      employment_status: normalizeEmploymentStatus(formData.get('employment_status')) as employment_status,
+      basic_salary: Number(formData.get('basic_salary') || 0),
+      join_date: String(formData.get('join_date') || '') || new Date().toISOString().split('T')[0],
+      department_id: normalizeDepartment(formData.get('department_id')),
+      email: String(formData.get('email') || '') || null,
+      gender: String(formData.get('gender') || '') || null,
+      whatsapp: String(formData.get('whatsapp') || '') || null,
+      avatar_url: String(formData.get('avatar_url') || '') || null,
+      bank_name: String(formData.get('bank_name') || '') || null,
+      bank_account_number: String(formData.get('bank_account_number') || '') || null,
+      tax_status: String(formData.get('tax_status') || '') || null,
+      updated_at: new Date(),
+    },
+  })
 
-  const updatePayload = {
-    nik,
-    first_name: firstName,
-    last_name: lastName,
-    job_title: jobTitle,
-    employment_status: status,
-    basic_salary: basicSalary,
-    join_date: joinDate,
-    department: formData.get('department') || null,
-    department_id: formData.get('department_id') || null,
-    email: formData.get('email') || null,
-    gender: formData.get('gender') || null,
-    whatsapp: formData.get('whatsapp') || null,
-    avatar_url: formData.get('avatar_url') || null,
-    bank_name: formData.get('bank_name') || null,
-    bank_account_number: formData.get('bank_account_number') || null,
-    tax_status: formData.get('tax_status') || null,
-    updated_at: new Date().toISOString()
-  }
-
-  let { error } = await db
-    .from('employees')
-    .update(updatePayload)
-    .eq('id', id)
-    .eq('org_id', orgId)
-    .eq('branch_id', accessibleEmployee.branchId)
-
-  if (error && isMissingDepartmentIdColumnError(error)) {
-    const { department_id: _ignoredDepartmentId, ...legacyPayload } = updatePayload
-    const retry = await db
-      .from('employees')
-      .update(legacyPayload)
-      .eq('id', id)
-      .eq('org_id', orgId)
-      .eq('branch_id', accessibleEmployee.branchId)
-    error = retry.error
-  }
-
-  if (error) return { error: error.message }
-
-  const managedBranchesStr = String(formData.get('managed_branches') || '').trim()
-  if (managedBranchesStr) {
-    const managedBranchIds = parseManagedIdList(formData.get('managed_branches'), 'managed_branches')
-    if (managedBranchIds.length === 0) {
-      await db.from('branches').update({ pic_employee_id: null }).eq('pic_employee_id', id).eq('org_id', orgId)
-    } else {
-      const idListStr = `(${managedBranchIds.join(',')})`
-      await db.from('branches').update({ pic_employee_id: null }).eq('pic_employee_id', id).eq('org_id', orgId).not('id', 'in', idListStr)
-      await db.from('branches').update({ pic_employee_id: id }).eq('org_id', orgId).in('id', managedBranchIds)
-    }
-  }
-
-  const managedChildOrgStr = String(formData.get('managed_child_orgs') || '').trim()
-  if (managedChildOrgStr) {
-    const managedChildOrgIds = parseManagedIdList(formData.get('managed_child_orgs'), 'managed_child_orgs')
-    await syncEmployeeManagedChildOrgs(db, orgId, id, managedChildOrgIds)
-    revalidatePath('/settings/sub-orgs')
-  }
+  await updateBranchPicAssignments(orgId, id, parseManagedIdList(formData.get('managed_branches'), 'managed_branches'))
+  await syncEmployeeManagedChildOrgs(orgId, id, parseManagedIdList(formData.get('managed_child_orgs'), 'managed_child_orgs'))
 
   revalidatePath('/hris')
+  revalidatePath('/settings/sub-orgs')
   return { success: true }
 }
 
 export async function deleteEmployee(id: string, orgId: string) {
-  const supabase = await createClient()
-  const db = supabase as any
-
-  const { data: existingEmployee, error: existingEmployeeError } = await db
-    .from('employees')
-    .select('id, branch_id')
-    .eq('id', id)
-    .eq('org_id', orgId)
-    .maybeSingle()
-
-  if (existingEmployeeError) return { error: existingEmployeeError.message }
-
-  const accessibleEmployee = await ensureEmployeeBranchAccess(
-    orgId,
-    existingEmployee?.branch_id ?? null,
-    'Data karyawan tidak ditemukan.'
-  )
+  const existingEmployee = await prisma.employees.findFirst({ where: { id, org_id: orgId }, select: { branch_id: true } })
+  const accessibleEmployee = await ensureEmployeeBranchAccess(orgId, existingEmployee?.branch_id ?? null, 'Data karyawan tidak ditemukan.')
   if ('error' in accessibleEmployee) return { error: accessibleEmployee.error }
 
-  const { error } = await db
-    .from('employees')
-    .delete()
-    .eq('id', id)
-    .eq('org_id', orgId)
-    .eq('branch_id', accessibleEmployee.branchId)
-
-  if (error) {
-    if (error.code === '23503') {
-      return { error: 'Karyawan tidak bisa dihapus karena masih dipakai di data transaksi (absensi/payroll/cuti/dokumen terkait).' }
-    }
-    return { error: error.message }
+  try {
+    await prisma.employees.delete({ where: { id } })
+  } catch {
+    return { error: 'Karyawan tidak bisa dihapus karena masih dipakai di data transaksi (absensi/payroll/cuti/dokumen terkait).' }
   }
 
   revalidatePath('/hris')
@@ -979,34 +527,23 @@ export async function uploadEmployeeAvatar(file: File, empId: string): Promise<{
 }
 
 export async function updateEmployeePasswordSelf(empId: string, newPassword: string) {
-  const session = await auth()
-  const userId = session?.user?.id
+  const user = await getAuthUser()
+  const userId = user?.userId
   if (!userId) return { error: 'Unauthorized' }
 
-  const employee = await prisma.employees.findFirst({
-    where: { id: empId, user_id: userId },
-    select: { user_id: true },
-  })
-
+  const employee = await prisma.employees.findFirst({ where: { id: empId, user_id: userId }, select: { user_id: true } })
   if (!employee?.user_id) return { error: 'User auth tidak ditemukan.' }
 
-  const passwordHash = bcrypt.hashSync(newPassword, 10)
-  await prisma.user.update({
-    where: { id: employee.user_id },
-    data: { password: passwordHash },
-  })
+  await prisma.user.update({ where: { id: employee.user_id }, data: { password: bcrypt.hashSync(newPassword, 10) } })
   return { success: true }
 }
 
 export async function updateEmployeeProfile(empId: string, payload: { avatar_url?: string; whatsapp?: string }) {
-  const session = await auth()
-  const userId = session?.user?.id
+  const user = await getAuthUser()
+  const userId = user?.userId
   if (!userId) return { error: 'Unauthorized' }
 
-  const updated = await prisma.employees.updateMany({
-    where: { id: empId, user_id: userId },
-    data: { ...payload, updated_at: new Date() },
-  })
+  const updated = await prisma.employees.updateMany({ where: { id: empId, user_id: userId }, data: { ...payload, updated_at: new Date() } })
   if (updated.count === 0) return { error: 'Data karyawan tidak ditemukan.' }
   revalidatePath('/profil-saya')
   return { success: true }

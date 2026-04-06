@@ -18,8 +18,11 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
+import type { AccountType, NormalBalance } from '@/types/database.types'
+import { prisma } from '@/lib/prisma'
+import { getAuthUser, getMembership } from '@/lib/auth/permissions'
 import { syncParentAccountToDescendants } from './coa.actions'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -74,6 +77,148 @@ export type SubmitCoaRequestInput = {
   businessReason: string
 }
 
+type CoaRequestListRow = {
+  id: string
+  org_id: string
+  requester_org_id: string
+  requester_org_name: string | null
+  requester_branch_id: string | null
+  requester_branch_name: string | null
+  requested_by: string
+  proposed_code: string
+  proposed_name: string
+  proposed_type: string
+  proposed_normal_balance: string
+  proposed_description: string | null
+  business_reason: string
+  status: CoaRequestStatus
+  reviewed_by: string | null
+  reviewed_at: Date | string | null
+  review_notes: string | null
+  created_account_id: string | null
+  created_account_code: string | null
+  created_account_name: string | null
+  created_at: Date | string
+  updated_at: Date | string
+}
+
+type CoaRequestDetailRow = {
+  id: string
+  org_id: string
+  requester_org_id: string
+  requester_branch_id: string | null
+  requested_by: string
+  proposed_code: string
+  proposed_name: string
+  proposed_type: string
+  proposed_normal_balance: string
+  proposed_parent_id: string | null
+  proposed_description: string | null
+  business_reason: string
+  status: CoaRequestStatus
+  created_account_id: string | null
+}
+
+function toIsoString(value: Date | string | null | undefined): string | null {
+  if (!value) return null
+  return value instanceof Date ? value.toISOString() : String(value)
+}
+
+async function getDefaultBranchId(orgId: string): Promise<string | null> {
+  const branches = await prisma.branches.findMany({
+    where: { org_id: orgId },
+    select: { id: true, code: true, name: true, is_active: true, created_at: true },
+  })
+
+  if (branches.length === 0) return null
+
+  const sortedBranches = [...branches].sort((left, right) => {
+    const leftRank = left.is_active && (left.code === 'MAIN' || left.name === 'Unit Utama')
+      ? 0
+      : left.is_active
+        ? 1
+        : left.code === 'MAIN' || left.name === 'Unit Utama'
+          ? 2
+          : 3
+    const rightRank = right.is_active && (right.code === 'MAIN' || right.name === 'Unit Utama')
+      ? 0
+      : right.is_active
+        ? 1
+        : right.code === 'MAIN' || right.name === 'Unit Utama'
+          ? 2
+          : 3
+
+    if (leftRank !== rightRank) return leftRank - rightRank
+    if (left.created_at.getTime() !== right.created_at.getTime()) {
+      return left.created_at.getTime() - right.created_at.getTime()
+    }
+    return left.id.localeCompare(right.id)
+  })
+
+  return sortedBranches[0]?.id ?? null
+}
+
+async function canManageFinanceMaster(orgId: string): Promise<boolean> {
+  const user = await getAuthUser()
+  if (!user) return false
+
+  const [organization, membership, defaultBranchId] = await Promise.all([
+    prisma.organizations.findUnique({
+      where: { id: orgId },
+      select: { id: true, parent_org_id: true },
+    }),
+    prisma.org_members.findFirst({
+      where: { org_id: orgId, user_id: user.userId, is_active: true },
+      select: {
+        role: true,
+        last_active_branch_id: true,
+        roles: { select: { permissions: true } },
+      },
+    }),
+    getDefaultBranchId(orgId),
+  ])
+
+  if (!organization || organization.parent_org_id) return false
+  if (!membership || !defaultBranchId) return false
+  if (membership.last_active_branch_id && membership.last_active_branch_id !== defaultBranchId) return false
+
+  if (membership.role === 'owner' || membership.role === 'admin') return true
+
+  const permissions = Array.isArray(membership.roles?.permissions)
+    ? membership.roles.permissions.filter((permission): permission is string => typeof permission === 'string')
+    : []
+
+  return permissions.some((permission) => {
+    const normalized = permission.toLowerCase()
+    return normalized.includes('coa:write') || normalized.includes('accounting:write')
+  })
+}
+
+async function getCoaRequestById(requestId: string): Promise<CoaRequestDetailRow | null> {
+  const rows = await prisma.$queryRaw<CoaRequestDetailRow[]>(Prisma.sql`
+    SELECT
+      r.id::text,
+      r.org_id::text,
+      r.requester_org_id::text,
+      r.requester_branch_id::text,
+      r.requested_by::text,
+      r.proposed_code,
+      r.proposed_name,
+      r.proposed_type,
+      r.proposed_normal_balance,
+      r.proposed_parent_id::text,
+      r.proposed_description,
+      r.business_reason,
+      r.status::text AS status,
+      r.created_account_id::text
+    FROM public.coa_account_requests r
+    WHERE r.id = ${requestId}::uuid
+    LIMIT 1
+  `)
+
+  return rows[0] ?? null
+}
+
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
 /**
@@ -83,27 +228,51 @@ export type SubmitCoaRequestInput = {
  * Request masuk ke antrian Parent untuk disetujui.
  */
 export async function submitCoaRequest(input: SubmitCoaRequestInput) {
-  const supabase = await createClient()
+  const user = await getAuthUser()
+  if (!user) return { error: 'Autentikasi diperlukan.' }
 
-  const { data, error } = await (supabase as any).rpc('submit_coa_request', {
-    p_parent_org_id:           input.parentOrgId,
-    p_requester_org_id:        input.requesterOrgId,
-    p_requester_branch_id:     input.requesterBranchId ?? null,
-    p_proposed_code:           input.proposedCode,
-    p_proposed_name:           input.proposedName,
-    p_proposed_type:           input.proposedType,
-    p_proposed_normal_balance: input.proposedNormalBalance,
-    p_proposed_parent_id:      input.proposedParentId ?? null,
-    p_proposed_description:    input.proposedDescription ?? null,
-    p_business_reason:         input.businessReason,
-  })
+  const membership = await getMembership(user.userId, input.requesterOrgId)
+  if (!membership) return { error: 'Unauthorized' }
 
-  if (error) {
-    return { error: error.message ?? 'Gagal mengajukan request rekening CoA.' }
+  if (!input.businessReason?.trim()) {
+    return { error: 'Alasan bisnis wajib diisi saat mengajukan request rekening CoA.' }
   }
 
-  revalidatePath('/accounting/coa-requests')
-  return { success: true, requestId: data as string }
+  try {
+    const rows = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+      INSERT INTO public.coa_account_requests (
+        org_id,
+        requester_org_id,
+        requester_branch_id,
+        requested_by,
+        proposed_code,
+        proposed_name,
+        proposed_type,
+        proposed_normal_balance,
+        proposed_parent_id,
+        proposed_description,
+        business_reason
+      ) VALUES (
+        ${input.parentOrgId}::uuid,
+        ${input.requesterOrgId}::uuid,
+        ${input.requesterBranchId ?? null}::uuid,
+        ${user.userId}::uuid,
+        ${input.proposedCode.trim()},
+        ${input.proposedName.trim()},
+        ${input.proposedType},
+        ${input.proposedNormalBalance},
+        ${input.proposedParentId ?? null}::uuid,
+        ${input.proposedDescription ?? null},
+        ${input.businessReason.trim()}
+      )
+      RETURNING id::text AS id
+    `)
+
+    revalidatePath('/accounting/coa-requests')
+    return { success: true, requestId: rows[0]?.id ?? null }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal mengajukan request rekening CoA.' }
+  }
 }
 
 /**
@@ -113,43 +282,69 @@ export async function submitCoaRequest(input: SubmitCoaRequestInput) {
  * Sekaligus membuat rekening baru di CoA secara otomatis.
  */
 export async function approveCoaRequest(requestId: string, reviewNotes?: string) {
-  const supabase = await createClient()
+  const user = await getAuthUser()
+  if (!user) return { error: 'Autentikasi diperlukan.' }
 
-  const { data, error } = await (supabase as any).rpc('approve_coa_request', {
-    p_request_id:   requestId,
-    p_review_notes: reviewNotes ?? null,
-  })
-
-  if (error) {
-    return { error: error.message ?? 'Gagal menyetujui request CoA.' }
+  const request = await getCoaRequestById(requestId)
+  if (!request) return { error: 'Request CoA tidak ditemukan.' }
+  if (request.status !== 'pending') {
+    return { error: `Hanya request berstatus pending yang dapat disetujui. Status saat ini: ${request.status}` }
+  }
+  if (!(await canManageFinanceMaster(request.org_id))) {
+    return { error: 'Hanya Organisasi Utama (Parent) pada konteks Unit Utama yang dapat menyetujui request CoA.' }
   }
 
-  const admin = await createAdminClient()
-  const { data: reqRow } = await (admin as any)
-    .from('coa_account_requests')
-    .select('org_id, created_account_id')
-    .eq('id', requestId)
-    .maybeSingle()
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const createdAccount = await tx.accounts.create({
+        data: {
+          org_id: request.org_id,
+          code: request.proposed_code,
+          name: request.proposed_name,
+          type: request.proposed_type as AccountType,
+          normal_balance: request.proposed_normal_balance as NormalBalance,
+          parent_id: request.proposed_parent_id,
+          description: request.proposed_description,
+          is_system: false,
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          type: true,
+          normal_balance: true,
+          parent_id: true,
+          description: true,
+          is_system: true,
+          is_active: true,
+        },
+      })
 
-  if (reqRow?.org_id && reqRow?.created_account_id) {
-    const { data: createdAccount } = await (admin as any)
-      .from('accounts')
-      .select('id, code, name, type, normal_balance, parent_id, description, is_system, is_active')
-      .eq('org_id', reqRow.org_id)
-      .eq('id', reqRow.created_account_id)
-      .maybeSingle()
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE public.coa_account_requests
+        SET
+          status = 'approved',
+          reviewed_by = ${user.userId}::uuid,
+          reviewed_at = now(),
+          review_notes = ${reviewNotes ?? null},
+          created_account_id = ${createdAccount.id}::uuid
+        WHERE id = ${requestId}::uuid
+      `)
 
-    if (createdAccount) {
-      const syncResult = await syncParentAccountToDescendants(String(reqRow.org_id), createdAccount)
-      if (!syncResult.success) {
-        ;(console as any).warn('CoA sync warning (approveCoaRequest):', syncResult.errors)
-      }
+      return createdAccount
+    })
+
+    const syncResult = await syncParentAccountToDescendants(request.org_id, result)
+    if (!syncResult.success) {
+      ;(console as any).warn('CoA sync warning (approveCoaRequest):', syncResult.errors)
     }
-  }
 
-  revalidatePath('/accounting/coa-requests')
-  revalidatePath('/settings/accounts')
-  return { success: true, newAccountId: data as string }
+    revalidatePath('/accounting/coa-requests')
+    revalidatePath('/settings/accounts')
+    return { success: true, newAccountId: result.id }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal menyetujui request CoA.' }
+  }
 }
 
 /**
@@ -163,15 +358,30 @@ export async function rejectCoaRequest(requestId: string, reviewNotes: string) {
     return { error: 'Catatan alasan penolakan wajib diisi.' }
   }
 
-  const supabase = await createClient()
+  const user = await getAuthUser()
+  if (!user) return { error: 'Autentikasi diperlukan.' }
 
-  const { error } = await (supabase as any).rpc('reject_coa_request', {
-    p_request_id:   requestId,
-    p_review_notes: reviewNotes.trim(),
-  })
+  const request = await getCoaRequestById(requestId)
+  if (!request) return { error: 'Request CoA tidak ditemukan.' }
+  if (request.status !== 'pending') {
+    return { error: `Hanya request berstatus pending yang dapat ditolak. Status saat ini: ${request.status}` }
+  }
+  if (!(await canManageFinanceMaster(request.org_id))) {
+    return { error: 'Hanya Organisasi Utama (Parent) yang dapat menolak request CoA.' }
+  }
 
-  if (error) {
-    return { error: error.message ?? 'Gagal menolak request CoA.' }
+  try {
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE public.coa_account_requests
+      SET
+        status = 'rejected',
+        reviewed_by = ${user.userId}::uuid,
+        reviewed_at = now(),
+        review_notes = ${reviewNotes.trim()}
+      WHERE id = ${requestId}::uuid
+    `)
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal menolak request CoA.' }
   }
 
   revalidatePath('/accounting/coa-requests')
@@ -185,14 +395,26 @@ export async function rejectCoaRequest(requestId: string, reviewNotes: string) {
  * Hanya bisa jika masih berstatus pending.
  */
 export async function cancelCoaRequest(requestId: string) {
-  const supabase = await createClient()
+  const user = await getAuthUser()
+  if (!user) return { error: 'Autentikasi diperlukan.' }
 
-  const { error } = await (supabase as any).rpc('cancel_coa_request', {
-    p_request_id: requestId,
-  })
+  const request = await getCoaRequestById(requestId)
+  if (!request) return { error: 'Request CoA tidak ditemukan.' }
+  if (request.status !== 'pending') {
+    return { error: 'Hanya request berstatus pending yang dapat dibatalkan.' }
+  }
+  if (request.requested_by !== user.userId) {
+    return { error: 'Anda tidak memiliki izin membatalkan request ini.' }
+  }
 
-  if (error) {
-    return { error: error.message ?? 'Gagal membatalkan request CoA.' }
+  try {
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE public.coa_account_requests
+      SET status = 'cancelled'
+      WHERE id = ${requestId}::uuid
+    `)
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Gagal membatalkan request CoA.' }
   }
 
   revalidatePath('/accounting/coa-requests')
@@ -211,9 +433,9 @@ function mapRowToSummary(row: any): CoaRequestSummary {
     id: row.id,
     org_id: row.org_id,
     requester_org_id: row.requester_org_id,
-    requester_org_name: row.requester_org?.name ?? null,
+    requester_org_name: row.requester_org_name ?? null,
     requester_branch_id: row.requester_branch_id,
-    requester_branch_name: row.requester_branch?.name ?? null,
+    requester_branch_name: row.requester_branch_name ?? null,
     requested_by: row.requested_by,
     proposed_code: row.proposed_code,
     proposed_name: row.proposed_name,
@@ -223,23 +445,49 @@ function mapRowToSummary(row: any): CoaRequestSummary {
     business_reason: row.business_reason,
     status: row.status,
     reviewed_by: row.reviewed_by,
-    reviewed_at: row.reviewed_at,
+    reviewed_at: toIsoString(row.reviewed_at),
     review_notes: row.review_notes,
     created_account_id: row.created_account_id,
-    created_account_code: row.created_account?.code ?? null,
-    created_account_name: row.created_account?.name ?? null,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
+    created_account_code: row.created_account_code ?? null,
+    created_account_name: row.created_account_name ?? null,
+    created_at: toIsoString(row.created_at) ?? '',
+    updated_at: toIsoString(row.updated_at) ?? '',
   }
 }
 
-/** Shared select string — joins requester org, branch, and created account */
-const COA_REQUEST_SELECT = `
-  *,
-  requester_org:organizations!coa_account_requests_requester_org_id_fkey(name),
-  requester_branch:branches!coa_account_requests_requester_branch_id_fkey(name),
-  created_account:accounts!coa_account_requests_created_account_id_fkey(code, name)
-`
+function buildCoaRequestListQuery(whereClause: Prisma.Sql) {
+  return Prisma.sql`
+    SELECT
+      r.id::text,
+      r.org_id::text,
+      r.requester_org_id::text,
+      o.name AS requester_org_name,
+      r.requester_branch_id::text,
+      b.name AS requester_branch_name,
+      r.requested_by::text,
+      r.proposed_code,
+      r.proposed_name,
+      r.proposed_type,
+      r.proposed_normal_balance,
+      r.proposed_description,
+      r.business_reason,
+      r.status::text AS status,
+      r.reviewed_by::text,
+      r.reviewed_at,
+      r.review_notes,
+      r.created_account_id::text,
+      a.code AS created_account_code,
+      a.name AS created_account_name,
+      r.created_at,
+      r.updated_at
+    FROM public.coa_account_requests r
+    LEFT JOIN public.organizations o ON o.id = r.requester_org_id
+    LEFT JOIN public.branches b ON b.id = r.requester_branch_id
+    LEFT JOIN public.accounts a ON a.id = r.created_account_id
+    WHERE ${whereClause}
+    ORDER BY r.created_at DESC
+  `
+}
 
 /**
  * getCoaRequestsByParent
@@ -251,27 +499,21 @@ export async function getCoaRequestsByParent(
   parentOrgId: string,
   statusFilter?: CoaRequestStatus | 'all'
 ): Promise<CoaRequestSummary[]> {
-  // Admin client bypasses PostgREST schema cache for new tables
-  const supabase = await createAdminClient()
+  try {
+    const statusClause = statusFilter && statusFilter !== 'all'
+      ? Prisma.sql` AND r.status = ${statusFilter}::public.coa_request_status`
+      : Prisma.empty
 
-  let query = (supabase as any)
-    .from('coa_account_requests')
-    .select(COA_REQUEST_SELECT)
-    .eq('org_id', parentOrgId)
-    .order('created_at', { ascending: false })
+    const data = await prisma.$queryRaw<CoaRequestListRow[]>(buildCoaRequestListQuery(Prisma.sql`
+      r.org_id = ${parentOrgId}::uuid
+      ${statusClause}
+    `))
 
-  if (statusFilter && statusFilter !== 'all') {
-    query = query.eq('status', statusFilter)
-  }
-
-  const { data, error } = await query
-
-  if (error) {
-    console.error('getCoaRequestsByParent error:', error.message, error.code, error.details)
+    return data.map(mapRowToSummary)
+  } catch (error) {
+    console.error('getCoaRequestsByParent error:', error)
     return []
   }
-
-  return ((data as any[]) ?? []).map(mapRowToSummary)
 }
 
 /**
@@ -283,27 +525,21 @@ export async function getCoaRequestsByRequester(
   requesterOrgId: string,
   statusFilter?: CoaRequestStatus | 'all'
 ): Promise<CoaRequestSummary[]> {
-  // Admin client bypasses PostgREST schema cache for new tables
-  const supabase = await createAdminClient()
+  try {
+    const statusClause = statusFilter && statusFilter !== 'all'
+      ? Prisma.sql` AND r.status = ${statusFilter}::public.coa_request_status`
+      : Prisma.empty
 
-  let query = (supabase as any)
-    .from('coa_account_requests')
-    .select(COA_REQUEST_SELECT)
-    .eq('requester_org_id', requesterOrgId)
-    .order('created_at', { ascending: false })
+    const data = await prisma.$queryRaw<CoaRequestListRow[]>(buildCoaRequestListQuery(Prisma.sql`
+      r.requester_org_id = ${requesterOrgId}::uuid
+      ${statusClause}
+    `))
 
-  if (statusFilter && statusFilter !== 'all') {
-    query = query.eq('status', statusFilter)
-  }
-
-  const { data, error } = await query
-
-  if (error) {
-    console.error('getCoaRequestsByRequester error:', error.message, error.code, error.details)
+    return data.map(mapRowToSummary)
+  } catch (error) {
+    console.error('getCoaRequestsByRequester error:', error)
     return []
   }
-
-  return ((data as any[]) ?? []).map(mapRowToSummary)
 }
 
 /**
@@ -312,14 +548,16 @@ export async function getCoaRequestsByRequester(
  * Untuk notifikasi badge di Parent dashboard — berapa request pending?
  */
 export async function getPendingCoaRequestCount(parentOrgId: string): Promise<number> {
-  const supabase = await createAdminClient()
+  try {
+    const rows = await prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS count
+      FROM public.coa_account_requests
+      WHERE org_id = ${parentOrgId}::uuid
+        AND status = 'pending'::public.coa_request_status
+    `)
 
-  const { count, error } = await (supabase as any)
-    .from('coa_account_requests')
-    .select('*', { count: 'exact', head: true })
-    .eq('org_id', parentOrgId)
-    .eq('status', 'pending')
-
-  if (error) return 0
-  return count ?? 0
+    return Number(rows[0]?.count ?? 0)
+  } catch {
+    return 0
+  }
 }

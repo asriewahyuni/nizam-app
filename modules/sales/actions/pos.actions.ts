@@ -90,7 +90,6 @@ async function resolvePosWarehouseId(
 }
 
 async function ensurePosStockAvailability(
-  supabase: any,
   orgId: string,
   warehouseId: string,
   requirements: PosStockRequirement[]
@@ -98,15 +97,21 @@ async function ensurePosStockAvailability(
   if (!requirements.length) return { success: true as const }
 
   const productIds = requirements.map((item) => item.productId)
-  const { data: stockRows, error } = await (supabase as any)
-    .from('inventory_stocks')
-    .select('product_id, quantity')
-    .eq('org_id', orgId)
-    .eq('warehouse_id', warehouseId)
-    .in('product_id', productIds)
-
-  if (error) {
-    return { error: 'Gagal memvalidasi stok POS: ' + error.message }
+  let stockRows: Array<{ product_id: string; quantity: number | string | null }> = []
+  try {
+    stockRows = await prisma.inventory_stocks.findMany({
+      where: {
+        org_id: orgId,
+        warehouse_id: warehouseId,
+        product_id: { in: productIds },
+      },
+      select: {
+        product_id: true,
+        quantity: true,
+      },
+    })
+  } catch (error: any) {
+    return { error: 'Gagal memvalidasi stok POS: ' + (error?.message || 'Unknown error') }
   }
 
   const availableByProduct: Record<string, number> = {}
@@ -141,8 +146,7 @@ async function ensurePosStockAvailability(
 }
 
 export async function processPosTransaction(orgId: string, payload: any) {
-  const supabase = await createClient()
-  const { data: { user } } = await (supabase as any).auth.getUser()
+  const user = await getAuthUser()
   if (!user) return { error: 'Not authenticated' }
 
   const activeBranch = await getActiveBranch(orgId)
@@ -173,14 +177,21 @@ export async function processPosTransaction(orgId: string, payload: any) {
   let inventoryRequirements: PosStockRequirement[] = []
 
   if (productIds.length > 0) {
-    const { data: productRows, error: productError } = await (supabase as any)
-      .from('products')
-      .select('id, type, name')
-      .eq('org_id', orgId)
-      .in('id', productIds)
-
-    if (productError) {
-      return { error: 'Gagal memvalidasi produk POS: ' + productError.message }
+    let productRows: Array<{ id: string; type: string | null; name: string | null }> = []
+    try {
+      productRows = await prisma.products.findMany({
+        where: {
+          org_id: orgId,
+          id: { in: productIds },
+        },
+        select: {
+          id: true,
+          type: true,
+          name: true,
+        },
+      })
+    } catch (error: any) {
+      return { error: 'Gagal memvalidasi produk POS: ' + (error?.message || 'Unknown error') }
     }
 
     const productById = new Map<string, { type: string; name: string }>()
@@ -233,7 +244,6 @@ export async function processPosTransaction(orgId: string, payload: any) {
     resolvedWarehouseId = resolvedWarehouse.warehouseId
 
     const stockCheck = await ensurePosStockAvailability(
-      supabase as any,
       orgId,
       resolvedWarehouseId as string,
       inventoryRequirements

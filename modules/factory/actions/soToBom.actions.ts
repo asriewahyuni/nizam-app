@@ -1,25 +1,23 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { revalidatePath } from 'next/cache'
 
 export async function generateProductionFromSO(orgId: string, saleId: string) {
-  const supabase = await createClient()
   const branchSelection = await resolveAccessibleBranchSelection(orgId)
   if ('error' in branchSelection || !branchSelection.branchId) {
     return { error: 'Pilih unit aktif terlebih dahulu untuk memproses produksi.' }
   }
 
   // Fetch the sale
-  const { data: sale, error: saleErr } = await (supabase as any)
-    .from('sales')
-    .select('*, sales_items(*)')
-    .eq('id', saleId)
-    .eq('org_id', orgId)
-    .single()
+  const sale = await prisma.sales.findFirst({
+    where: { id: saleId, org_id: orgId },
+    include: { sales_items: true },
+  })
 
-  if (saleErr || !sale) return { error: 'Pesanan tidak ditemukan.' }
+  if (!sale) return { error: 'Pesanan tidak ditemukan.' }
   
   const items = sale.sales_items || []
   if (items.length === 0) return { error: 'Pesanan tidak memiliki barang.' }
@@ -33,43 +31,40 @@ export async function generateProductionFromSO(orgId: string, saleId: string) {
     const code = `BOM-ISO-${sale.sale_number}-${String(item.id).substring(0, 4).toUpperCase()}`
     
     // Check if BoM already exists
-    const { data: existingBom } = await (supabase as any)
-      .from('production_boms')
-      .select('id')
-      .eq('code', code)
-      .eq('org_id', orgId)
-      .maybeSingle()
+    const existingBom = await prisma.production_boms.findFirst({
+      where: { code, org_id: orgId },
+      select: { id: true },
+    })
       
     let bomId = existingBom?.id
 
     if (!bomId) {
-      const { data: bom, error: bomErr } = await (supabase as any)
-        .from('production_boms')
-        .insert({
+      try {
+        const bom = await prisma.production_boms.create({
+          data: {
           org_id: orgId,
           branch_id: branchSelection.branchId,
           product_id: item.product_id,
-          code: code,
+          code,
           description: `BOM Otomatis SO: ${sale.sale_number} - ${item.description}`,
-          is_active: true
+          is_active: true,
+          },
+          select: { id: true },
         })
-        .select('id')
-        .single()
-
-      if (bomErr) return { error: 'Gagal membuat BoM: ' + bomErr.message }
-      bomId = bom.id
+        bomId = bom.id
+      } catch (error) {
+        return { error: 'Gagal membuat BoM: ' + (error instanceof Error ? error.message : 'Unknown error') }
+      }
     }
 
     // Determine target SPK number
     let wo_number = `SPK-${sale.sale_number}-${count + 1}`
     
     // Check if SPK exists
-    const { data: existingWo } = await (supabase as any)
-      .from('production_work_orders')
-      .select('id')
-      .eq('wo_number', wo_number)
-      .eq('org_id', orgId)
-      .maybeSingle()
+    const existingWo = await prisma.production_work_orders.findFirst({
+      where: { wo_number, org_id: orgId },
+      select: { id: true },
+    })
 
     if (existingWo) {
       // SPK already exists => Append random to wo_number or skip
@@ -77,20 +72,31 @@ export async function generateProductionFromSO(orgId: string, saleId: string) {
     }
 
     // Create Work Order
-    const { error: woErr } = await (supabase as any)
-      .from('production_work_orders')
-      .insert({
-        org_id: orgId,
-        branch_id: branchSelection.branchId,
-        bom_id: bomId,
-        wo_number: wo_number,
-        quantity_planned: item.quantity,
-        status: 'DRAFT',
-        notes: `Diproses otomatis dari SO: ${sale.sale_number}\nItem: ${item.description}`,
-        deadline_date: sale.due_date || null
-      })
-
-    if (woErr) return { error: 'Gagal membuat SPK: ' + woErr.message }
+    try {
+      await prisma.$executeRaw(Prisma.sql`
+        INSERT INTO public.production_work_orders (
+          org_id,
+          branch_id,
+          bom_id,
+          wo_number,
+          quantity_planned,
+          status,
+          notes,
+          deadline_date
+        ) VALUES (
+          CAST(${orgId} AS uuid),
+          CAST(${branchSelection.branchId} AS uuid),
+          CAST(${bomId} AS uuid),
+          ${wo_number},
+          ${Number(item.quantity || 0)},
+          'DRAFT',
+          ${`Diproses otomatis dari SO: ${sale.sale_number}\nItem: ${item.description}`},
+          CAST(${sale.due_date ? new Date(sale.due_date).toISOString().slice(0, 10) : null} AS date)
+        )
+      `)
+    } catch (error) {
+      return { error: 'Gagal membuat SPK: ' + (error instanceof Error ? error.message : 'Unknown error') }
+    }
     count++
   }
 

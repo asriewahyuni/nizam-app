@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
 import { getDateInTimeZone } from '@/lib/utils'
 import { getBranchAccessScope } from '@/modules/organization/lib/branch-access.server'
 import { getMembership } from '@/lib/auth/permissions'

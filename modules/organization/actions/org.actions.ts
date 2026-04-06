@@ -1,7 +1,6 @@
 'use server'
 
 import { Prisma } from '@prisma/client'
-import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
 import { generateSlug } from '@/lib/utils'
@@ -9,6 +8,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import {
+  getAuthUser,
   getMembership,
   type MembershipContext,
 } from '@/lib/auth/permissions'
@@ -236,12 +236,10 @@ function normalizeOrganization(org: {
 }
 
 async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {
-  const session = await auth()
-  const user = session?.user
-
-  if (!user?.id) return null
+  const user = await getAuthUser()
+  if (!user?.userId) return null
   return {
-    id: user.id,
+    id: user.userId,
     email: user.email ?? undefined,
     name: user.name ?? undefined,
   }
@@ -268,8 +266,6 @@ type CreateOrganizationActionResult =
   | CreateOrganizationFailure
 
 type HoldingContextSuccess = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db: any
   userId: string
   activeOrgId: string
 }
@@ -283,8 +279,6 @@ type HoldingContextResult = HoldingContextSuccess | HoldingContextFailure
 type HoldingContextOptions = {
   ownerOnly?: boolean
 }
-
-const OPTIONAL_ORGANIZATION_COLUMNS = new Set(['owner_email', 'parent_org_id', 'is_demo'])
 
 function extractErrorMessage(error: unknown): string {
   if (!error) return ''
@@ -357,35 +351,28 @@ function mapCreateOrganizationError(
   return defaultMessage
 }
 
-async function seedDefaultCoAAfterBranchReady(db: any, orgId: string) {
+async function seedDefaultCoAAfterBranchReady(orgId: string) {
   const trimmedOrgId = String(orgId || '').trim()
   if (!trimmedOrgId) return
-  if (!db || typeof db.rpc !== 'function') return
 
   try {
     // Avoid duplicate seeding for environments where trigger already seeded CoA.
     try {
-      if (typeof db.from === 'function') {
-        const { data: existingAccounts } = await db
-          .from('accounts')
-          .select('id')
-          .eq('org_id', trimmedOrgId)
-          .limit(1)
+      const existingAccount = await prisma.accounts.findFirst({
+        where: { org_id: trimmedOrgId },
+        select: { id: true },
+      })
 
-        if (Array.isArray(existingAccounts) && existingAccounts.length > 0) {
-          return
-        }
+      if (existingAccount?.id) {
+        return
       }
     } catch (checkError) {
-      ;(console as any).warn('CreateOrganization: account pre-check skipped', checkError)
+      console.warn('CreateOrganization: account pre-check skipped', checkError)
     }
 
-    const { error } = await db.rpc('seed_default_coa', { p_org_id: trimmedOrgId })
-    if (error) {
-      ;(console as any).warn('CreateOrganization: post-branch CoA seed failed', error)
-    }
+    await prisma.$queryRaw`SELECT public.seed_default_coa(CAST(${trimmedOrgId} AS uuid))`
   } catch (seedError) {
-    ;(console as any).warn('CreateOrganization: post-branch CoA seed threw error', seedError)
+    console.warn('CreateOrganization: post-branch CoA seed threw error', seedError)
   }
 }
 
@@ -393,12 +380,7 @@ async function getHoldingManagementContext(
   expectedParentOrgId?: string,
   options?: HoldingContextOptions
 ): Promise<HoldingContextResult> {
-  const supabase = await createClient()
-  const db = supabase
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
+  const user = await getAuthenticatedUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
 
   const activeOrg = await getActiveOrg()
@@ -430,7 +412,6 @@ async function getHoldingManagementContext(
   }
 
   return {
-    db,
     userId: user.id,
     activeOrgId,
   }
@@ -440,17 +421,8 @@ async function createOrganizationRecord(
   formData: FormData
 ): Promise<CreateOrganizationActionResult> {
   try {
-    const supabase = await createClient()
-    const db = supabase as any
-    let admin: any = null
-    try {
-      admin = (await createAdminClient()) as any
-    } catch (adminInitError) {
-      ;(console as any).warn('CreateOrganization: admin client unavailable, fallback to session client', adminInitError)
-    }
-    const privilegedDb = admin ?? db
+    const user = await getAuthenticatedUser()
     const cookieStore = await cookies()
-    const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Tidak terautentikasi' }
 
     const name = (formData.get('name') as string).trim()
@@ -505,103 +477,55 @@ async function createOrganizationRecord(
       orgInsertPayload.parent_org_id = parentOrgId
     }
 
-    let { error: orgError } = await db.from('organizations').insert(orgInsertPayload)
-    while (orgError) {
-      const missingColumn = extractMissingColumnName(orgError)
-      if (!missingColumn || !OPTIONAL_ORGANIZATION_COLUMNS.has(missingColumn)) break
-      if (missingColumn === 'parent_org_id' && parentOrgId) break
-      if (!(missingColumn in orgInsertPayload)) break
-
-      delete orgInsertPayload[missingColumn]
-      ;({ error: orgError } = await db.from('organizations').insert(orgInsertPayload))
-    }
-
-    if (orgError) {
-      ;(console as any).error('CreateOrganization: organizations insert failed', orgError)
-      return {
-        error: mapCreateOrganizationError('Gagal membuat organisasi.', orgError),
-      }
-    }
-
-    const { error: memberError } = await privilegedDb
-      .from('org_members')
-      .insert({ org_id: orgId, user_id: user.id, role: 'owner' })
-
-    if (memberError) {
-      ;(console as any).error('CreateOrganization: org_members insert failed', memberError)
-      if (admin) {
-        await admin.from('organizations').delete().eq('id', orgId)
-      }
-      return {
-        error: mapCreateOrganizationError('Gagal menambahkan anggota.', memberError),
-      }
-    }
-
-    let { error: branchError } = await privilegedDb
-      .from('branches')
-      .insert({
-        id: defaultBranchId,
-        org_id: orgId,
-        name: DEFAULT_BRANCH_NAME,
-        code: DEFAULT_BRANCH_CODE,
-        address: null,
-        is_active: true,
+    try {
+      await prisma.organizations.create({
+        data: orgInsertPayload as any,
       })
-
-    if (branchError?.code === '23505') {
-      const { data: existingBranchByCode } = await privilegedDb
-        .from('branches')
-        .select('id')
-        .eq('org_id', orgId)
-        .eq('code', DEFAULT_BRANCH_CODE)
-        .maybeSingle()
-
-      const existingBranchId = String(existingBranchByCode?.id || '').trim()
-      if (existingBranchId) {
-        defaultBranchId = existingBranchId
-        branchError = null
-      }
-    }
-
-    if (branchError) {
-      ;(console as any).error('CreateOrganization: branches insert failed', branchError)
-      if (admin) {
-        await admin.from('organizations').delete().eq('id', orgId)
+      await prisma.org_members.create({
+        data: { org_id: orgId, user_id: user.id, role: 'owner', is_active: true },
+      })
+      await prisma.branches.create({
+        data: {
+          id: defaultBranchId,
+          org_id: orgId,
+          name: DEFAULT_BRANCH_NAME,
+          code: DEFAULT_BRANCH_CODE,
+          address: null,
+          is_active: true,
+        },
+      })
+    } catch (error) {
+      if (isUniqueConstraintError(error, ['slug'])) {
+        return { error: 'Nama organisasi ini sudah digunakan.' }
       }
       return {
-        error: mapCreateOrganizationError('Gagal menyiapkan unit default organisasi.', branchError),
+        error: mapCreateOrganizationError('Gagal membuat organisasi.', error as any),
       }
     }
 
-    await seedDefaultCoAAfterBranchReady(privilegedDb, orgId)
+    await seedDefaultCoAAfterBranchReady(orgId)
 
-    await persistMembershipActiveContext(privilegedDb, {
-      userId: user.id,
-      orgId,
-      branchId: defaultBranchId,
-    })
-  } catch (error) {
-    if (isUniqueConstraintError(error, ['slug'])) {
-      return { error: 'Nama organisasi ini sudah digunakan.' }
-    }
-
-    // IF DEMO, SEED DATA
     if (isDemo) {
       try {
-        await seedDemoData(supabase, orgId, businessType)
+        await seedDemoOrganization(orgId, businessType)
       } catch (seedErr) {
-        (console as any).error('Seed Data Error:', seedErr)
+        console.error('Seed Data Error:', seedErr)
       }
     }
 
-    // IF ABS, APPLY VOUCHER AUTOMATICALLY
     if (isAbs) {
       try {
         await applyVoucher(orgId, 'ABS2024')
       } catch (absErr) {
-        (console as any).error('ABS Activation Error:', absErr)
+        console.error('ABS Activation Error:', absErr)
       }
     }
+
+    await persistMembershipActiveContext({
+      userId: user.id,
+      orgId,
+      branchId: defaultBranchId,
+    })
 
     cookieStore.set(ACTIVE_ORG_COOKIE, orgId, getActiveContextCookieOptions())
     cookieStore.set(ACTIVE_BRANCH_COOKIE, defaultBranchId, getActiveContextCookieOptions())
@@ -612,13 +536,6 @@ async function createOrganizationRecord(
       branchId: defaultBranchId,
     }
   } catch (error) {
-    const message = extractErrorMessage(error)
-    if (/Missing SUPABASE_(LOCAL_)?SERVICE_ROLE_KEY/i.test(message)) {
-      return { error: 'Konfigurasi service role Supabase belum diisi. Lengkapi environment lalu coba lagi.' }
-    }
-    if (/Missing NEXT_PUBLIC_SUPABASE_(LOCAL_)?URL|Missing NEXT_PUBLIC_SUPABASE_(LOCAL_)?ANON_KEY/i.test(message)) {
-      return { error: 'Konfigurasi Supabase belum lengkap (URL/ANON key). Lengkapi environment lalu coba lagi.' }
-    }
     return { error: 'Terjadi kesalahan sistem saat membuat organisasi.' }
   }
 }
@@ -639,22 +556,20 @@ export async function getOrgLimits(orgId: string): Promise<{
   currentChildOrgs: number
   currentUsers: number
 }> {
-  const supabase = await createClient()
-  const db = supabase as any
-
   const trimmedOrgId = String(orgId || '').trim()
   if (!trimmedOrgId) {
     return { maxBranches: null, maxChildOrgs: null, maxUsers: null, currentBranches: 0, currentChildOrgs: 0, currentUsers: 0 }
   }
 
-  // Ambil plan dari settings organisasi
-  const { data: org } = await db
-    .from('organizations')
-    .select('settings')
-    .eq('id', trimmedOrgId)
-    .maybeSingle()
+  const org = await prisma.organizations.findUnique({
+    where: { id: trimmedOrgId },
+    select: { settings: true },
+  })
 
-  const planName = org?.settings?.plan
+  const planName =
+    org?.settings && typeof org.settings === 'object' && !Array.isArray(org.settings)
+      ? (org.settings as Record<string, any>).plan
+      : null
 
   // Ambil limits dari saas_packages
   let maxBranches: number | null = null
@@ -662,12 +577,21 @@ export async function getOrgLimits(orgId: string): Promise<{
   let maxUsers: number | null = null
 
   if (planName) {
-    const { data: pkg } = await db
-      .from('saas_packages')
-      .select('max_branches, max_child_orgs, max_users')
-      .eq('name', planName)
-      .eq('is_active', true)
-      .maybeSingle()
+    const packages = await prisma.$queryRaw<Array<{
+      max_branches: number | null
+      max_child_orgs: number | null
+      max_users: number | null
+    }>>`
+      SELECT
+        max_branches,
+        max_child_orgs,
+        max_users
+      FROM public.saas_packages
+      WHERE name = ${String(planName)}
+        AND is_active = true
+      LIMIT 1
+    `
+    const pkg = packages[0]
 
     if (pkg) {
       maxBranches   = pkg.max_branches   ?? null
@@ -677,10 +601,10 @@ export async function getOrgLimits(orgId: string): Promise<{
   }
 
   // Hitung usage saat ini
-  const [{ count: branchCount }, { count: childOrgCount }, { count: userCount }] = await Promise.all([
-    db.from('branches').select('id', { count: 'exact', head: true }).eq('org_id', trimmedOrgId).eq('is_active', true),
-    db.from('organizations').select('id', { count: 'exact', head: true }).eq('parent_org_id', trimmedOrgId),
-    db.from('org_members').select('id', { count: 'exact', head: true }).eq('org_id', trimmedOrgId).eq('is_active', true),
+  const [branchCount, childOrgCount, userCount] = await Promise.all([
+    prisma.branches.count({ where: { org_id: trimmedOrgId, is_active: true } }),
+    prisma.organizations.count({ where: { parent_org_id: trimmedOrgId } }),
+    prisma.org_members.count({ where: { org_id: trimmedOrgId, is_active: true } }),
   ])
 
   return {
@@ -707,7 +631,7 @@ export async function linkSubOrganization(parentOrgId: string, childOrgId: strin
 
   const holdingContext = await getHoldingManagementContext(trimmedParentOrgId, { ownerOnly: true })
   if ('error' in holdingContext) return { error: holdingContext.error }
-  const { db, userId, activeOrgId } = holdingContext
+  const { userId, activeOrgId } = holdingContext
 
   // ── Enforce child org limit ────────────────────────────────────────────
   const limits = await getOrgLimits(trimmedParentOrgId)
@@ -717,26 +641,21 @@ export async function linkSubOrganization(parentOrgId: string, childOrgId: strin
     }
   }
 
-  const { data: childOrgMembership } = await db
-    .from('org_members')
-    .select('org_id')
-    .eq('org_id', trimmedChildOrgId)
-    .eq('user_id', userId)
-    .eq('role', 'owner')
-    .eq('is_active', true)
-    .maybeSingle()
+  const childOrgMembership = await prisma.org_members.findFirst({
+    where: { org_id: trimmedChildOrgId, user_id: userId, role: 'owner', is_active: true },
+    select: { org_id: true },
+  })
 
   if (!childOrgMembership) {
     return { error: 'Hanya OWNER organisasi target yang dapat menautkan entitas sebagai anak perusahaan.' }
   }
 
-  const { data: childOrg, error: childOrgError } = await db
-    .from('organizations')
-    .select('id, parent_org_id')
-    .eq('id', trimmedChildOrgId)
-    .maybeSingle()
+  const childOrg = await prisma.organizations.findUnique({
+    where: { id: trimmedChildOrgId },
+    select: { id: true, parent_org_id: true },
+  })
 
-  if (childOrgError || !childOrg) {
+  if (!childOrg) {
     return { error: 'Organisasi yang akan ditautkan tidak ditemukan.' }
   }
 
@@ -748,16 +667,14 @@ export async function linkSubOrganization(parentOrgId: string, childOrgId: strin
     return { success: true }
   }
 
-  const { error } = await db
-    .from('organizations')
-    .update({ parent_org_id: activeOrgId, updated_at: new Date().toISOString() })
-    .eq('id', trimmedChildOrgId)
-
-  if (error) return { error: error.message }
+  await prisma.organizations.update({
+    where: { id: trimmedChildOrgId },
+    data: { parent_org_id: activeOrgId, updated_at: new Date() },
+  })
 
   const coaSync = await syncParentCoAToChildOrg(activeOrgId, trimmedChildOrgId)
   if (!coaSync.success) {
-    ;(console as any).warn('CoA sync warning (linkSubOrganization):', coaSync.error)
+    console.warn('CoA sync warning (linkSubOrganization):', coaSync.error)
   }
 
   revalidatePath('/settings/sub-orgs')
@@ -777,39 +694,35 @@ export async function assignSubOrgManager(childOrgId: string, employeeId: string
 
   const holdingContext = await getHoldingManagementContext(undefined, { ownerOnly: true })
   if ('error' in holdingContext) return { error: holdingContext.error }
-  const { db, activeOrgId } = holdingContext
+  const { activeOrgId } = holdingContext
 
-  const { data: childOrg } = await db
-    .from('organizations')
-    .select('id')
-    .eq('id', trimmedChildOrgId)
-    .eq('parent_org_id', activeOrgId)
-    .maybeSingle()
+  const childOrg = await prisma.organizations.findFirst({
+    where: { id: trimmedChildOrgId, parent_org_id: activeOrgId },
+    select: { id: true },
+  })
 
   if (!childOrg) {
     return { error: 'Organisasi tersebut tidak terdaftar sebagai anak dari holding aktif.' }
   }
 
   if (normalizedEmployeeId) {
-    const { data: employee } = await db
-      .from('employees')
-      .select('id')
-      .eq('id', normalizedEmployeeId)
-      .eq('org_id', activeOrgId)
-      .maybeSingle()
+    const employee = await prisma.employees.findFirst({
+      where: { id: normalizedEmployeeId, org_id: activeOrgId },
+      select: { id: true },
+    })
 
     if (!employee) {
       return { error: 'PIC harus berasal dari organisasi induk yang sedang aktif.' }
     }
   }
 
-  const { error } = await db
-    .from('organizations')
-    .update({ manager_employee_id: normalizedEmployeeId, updated_at: new Date().toISOString() })
-    .eq('id', trimmedChildOrgId)
-    .eq('parent_org_id', activeOrgId)
-
-  if (error) return { error: error.message }
+  await prisma.$executeRaw`
+    UPDATE public.organizations
+    SET manager_employee_id = ${normalizedEmployeeId}::uuid,
+        updated_at = NOW()
+    WHERE id = ${trimmedChildOrgId}::uuid
+      AND parent_org_id = ${activeOrgId}::uuid
+  `
   revalidatePath('/settings/sub-orgs')
   return { success: true }
 }
@@ -826,15 +739,14 @@ export async function updateChildOrganization(childOrgId: string, name: string) 
 
   const holdingContext = await getHoldingManagementContext(undefined, { ownerOnly: true })
   if ('error' in holdingContext) return { error: holdingContext.error }
-  const { db, activeOrgId } = holdingContext
+  const { activeOrgId } = holdingContext
 
-  const { data: childOrg, error: childOrgError } = await db
-    .from('organizations')
-    .select('id, parent_org_id')
-    .eq('id', trimmedChildOrgId)
-    .maybeSingle()
+  const childOrg = await prisma.organizations.findUnique({
+    where: { id: trimmedChildOrgId },
+    select: { id: true, parent_org_id: true },
+  })
 
-  if (childOrgError || !childOrg) {
+  if (!childOrg) {
     return { error: 'Organisasi anak tidak ditemukan.' }
   }
 
@@ -842,21 +754,20 @@ export async function updateChildOrganization(childOrgId: string, name: string) 
     return { error: 'Organisasi tersebut tidak terdaftar sebagai anak dari holding aktif.' }
   }
 
-  const { error: updateError } = await db
-    .from('organizations')
-    .update({
-      name: trimmedName,
-      slug,
-      updated_at: new Date().toISOString(),
+  try {
+    await prisma.organizations.updateMany({
+      where: { id: trimmedChildOrgId, parent_org_id: activeOrgId },
+      data: {
+        name: trimmedName,
+        slug,
+        updated_at: new Date(),
+      },
     })
-    .eq('id', trimmedChildOrgId)
-    .eq('parent_org_id', activeOrgId)
-
-  if (updateError) {
-    if (updateError.code === '23505') {
+  } catch (updateError: any) {
+    if (updateError?.code === 'P2002') {
       return { error: 'Nama organisasi ini sudah digunakan.' }
     }
-    return { error: updateError.message || 'Gagal memperbarui organisasi anak.' }
+    return { error: updateError?.message || 'Gagal memperbarui organisasi anak.' }
   }
 
   revalidatePath('/', 'layout')
@@ -871,15 +782,14 @@ export async function deleteChildOrganization(childOrgId: string) {
 
   const holdingContext = await getHoldingManagementContext(undefined, { ownerOnly: true })
   if ('error' in holdingContext) return { error: holdingContext.error }
-  const { db, userId, activeOrgId } = holdingContext
+  const { userId, activeOrgId } = holdingContext
 
-  const { data: childOrg, error: childOrgError } = await db
-    .from('organizations')
-    .select('id, parent_org_id')
-    .eq('id', trimmedChildOrgId)
-    .maybeSingle()
+  const childOrg = await prisma.organizations.findUnique({
+    where: { id: trimmedChildOrgId },
+    select: { id: true, parent_org_id: true },
+  })
 
-  if (childOrgError || !childOrg) {
+  if (!childOrg) {
     return { error: 'Organisasi anak tidak ditemukan.' }
   }
 
@@ -887,27 +797,16 @@ export async function deleteChildOrganization(childOrgId: string) {
     return { error: 'Organisasi tersebut tidak terdaftar sebagai anak dari holding aktif.' }
   }
 
-  const { data: childMembership } = await db
-    .from('org_members')
-    .select('role')
-    .eq('org_id', trimmedChildOrgId)
-    .eq('user_id', userId)
-    .eq('is_active', true)
-    .maybeSingle()
+  const childMembership = await prisma.org_members.findFirst({
+    where: { org_id: trimmedChildOrgId, user_id: userId, is_active: true },
+    select: { role: true },
+  })
 
   if (String(childMembership?.role || '').toLowerCase() !== 'owner') {
     return { error: 'Untuk menghapus anak perusahaan, akun Anda harus OWNER pada organisasi anak tersebut.' }
   }
 
-  const { error: deleteError } = await db
-    .from('organizations')
-    .delete()
-    .eq('id', trimmedChildOrgId)
-    .eq('parent_org_id', activeOrgId)
-
-  if (deleteError) {
-    return { error: deleteError.message || 'Gagal menghapus organisasi anak.' }
-  }
+  await prisma.organizations.deleteMany({ where: { id: trimmedChildOrgId, parent_org_id: activeOrgId } })
 
   revalidatePath('/', 'layout')
   revalidatePath('/settings/sub-orgs')
@@ -916,11 +815,7 @@ export async function deleteChildOrganization(childOrgId: string) {
 }
 
 export async function setOrganizationParent(childOrgId: string, parentOrgId: string | null) {
-  const supabase = await createClient()
-  const db = supabase as any
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUser()
 
   if (!user) return { error: 'Tidak terautentikasi.' }
 
@@ -935,26 +830,20 @@ export async function setOrganizationParent(childOrgId: string, parentOrgId: str
     return { error: 'Organisasi tidak bisa menjadi induk untuk dirinya sendiri.' }
   }
 
-  const { data: childMembership } = await db
-    .from('org_members')
-    .select('role')
-    .eq('org_id', trimmedChildOrgId)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
+  const childMembership = await prisma.org_members.findFirst({
+    where: { org_id: trimmedChildOrgId, user_id: user.id, is_active: true },
+    select: { role: true },
+  })
 
   if (!childMembership || String(childMembership.role || '').toLowerCase() !== 'owner') {
     return { error: 'Hanya OWNER organisasi anak yang dapat mengubah hierarki.' }
   }
 
   if (trimmedParentOrgId) {
-    const { data: parentMembership } = await db
-      .from('org_members')
-      .select('role')
-      .eq('org_id', trimmedParentOrgId)
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .maybeSingle()
+    const parentMembership = await prisma.org_members.findFirst({
+      where: { org_id: trimmedParentOrgId, user_id: user.id, is_active: true },
+      select: { role: true },
+    })
 
     const parentRole = String(parentMembership?.role || '').toLowerCase()
     if (!parentMembership || parentRole !== 'owner') {
@@ -962,13 +851,12 @@ export async function setOrganizationParent(childOrgId: string, parentOrgId: str
     }
   }
 
-  const { data: childOrg, error: childOrgError } = await db
-    .from('organizations')
-    .select('id, parent_org_id')
-    .eq('id', trimmedChildOrgId)
-    .maybeSingle()
+  const childOrg = await prisma.organizations.findUnique({
+    where: { id: trimmedChildOrgId },
+    select: { id: true, parent_org_id: true },
+  })
 
-  if (childOrgError || !childOrg) {
+  if (!childOrg) {
     return { error: 'Organisasi anak tidak ditemukan.' }
   }
 
@@ -977,13 +865,12 @@ export async function setOrganizationParent(childOrgId: string, parentOrgId: str
   }
 
   if (trimmedParentOrgId) {
-    const { data: parentOrg, error: parentOrgError } = await db
-      .from('organizations')
-      .select('id, parent_org_id')
-      .eq('id', trimmedParentOrgId)
-      .maybeSingle()
+    const parentOrg = await prisma.organizations.findUnique({
+      where: { id: trimmedParentOrgId },
+      select: { id: true, parent_org_id: true },
+    })
 
-    if (parentOrgError || !parentOrg) {
+    if (!parentOrg) {
       return { error: 'Organisasi induk tujuan tidak ditemukan.' }
     }
 
@@ -995,27 +882,24 @@ export async function setOrganizationParent(childOrgId: string, parentOrgId: str
         return { error: 'Relasi induk-anak tidak valid karena membentuk siklus.' }
       }
 
-      const { data: currentOrg, error: currentOrgError }: { data: { parent_org_id: string | null } | null; error: unknown } = await db
-        .from('organizations')
-        .select('parent_org_id')
-        .eq('id', cursor)
-        .maybeSingle()
+      const currentOrg: { parent_org_id: string | null } | null = await prisma.organizations.findUnique({
+        where: { id: cursor },
+        select: { parent_org_id: true },
+      })
 
-      if (currentOrgError || !currentOrg) break
+      if (!currentOrg) break
       cursor = currentOrg.parent_org_id || null
       depth += 1
     }
   }
 
-  const { error: updateError } = await db
-    .from('organizations')
-    .update({
+  await prisma.organizations.update({
+    where: { id: trimmedChildOrgId },
+    data: {
       parent_org_id: trimmedParentOrgId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', trimmedChildOrgId)
-
-  if (updateError) return { error: updateError.message }
+      updated_at: new Date(),
+    },
+  })
 
   if (trimmedParentOrgId) {
     const coaSync = await syncParentCoAToChildOrg(trimmedParentOrgId, trimmedChildOrgId)
@@ -1131,14 +1015,23 @@ export async function getMyOrganizations(): Promise<AccessibleOrganization[]> {
   const user = await getAuthenticatedUser()
   if (!user) return []
 
-  const { data, error } = await db
-    .from('org_members')
-    .select('org_id, role, role_id, joined_at, organizations(id, name, slug, logo_url, settings, is_active, parent_org_id)')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .order('joined_at', { ascending: true })
-
-    const results: AccessibleOrganization[] = []
+  const data = await prisma.org_members.findMany({
+    where: { user_id: user.id, is_active: true },
+    include: {
+      organizations: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logo_url: true,
+          settings: true,
+          is_active: true,
+          parent_org_id: true,
+        },
+      },
+    },
+    orderBy: { joined_at: 'asc' },
+  })
 
   const parentOrgIds = Array.from(
     new Set(
@@ -1147,24 +1040,21 @@ export async function getMyOrganizations(): Promise<AccessibleOrganization[]> {
           const parentOrgId = membership?.organizations?.parent_org_id
           return typeof parentOrgId === 'string' && parentOrgId.trim() ? parentOrgId.trim() : null
         })
-        .filter((orgId): orgId is string => Boolean(orgId))
+        .filter((orgId: string | null): orgId is string => Boolean(orgId))
     )
   )
 
   let parentOrgNameById = new Map<string, string>()
   if (parentOrgIds.length > 0) {
-    const { data: parentRows, error: parentRowsError } = await db
-      .from('organizations')
-      .select('id, name')
-      .in('id', parentOrgIds)
-
-    if (!parentRowsError && Array.isArray(parentRows)) {
-      parentOrgNameById = new Map(
-        parentRows
-          .filter((row: any) => row?.id && row?.name)
-          .map((row: any) => [String(row.id), String(row.name)])
-      )
-    }
+    const parentRows = await prisma.organizations.findMany({
+      where: { id: { in: parentOrgIds } },
+      select: { id: true, name: true },
+    })
+    parentOrgNameById = new Map(
+      parentRows
+        .filter((row) => row?.id && row?.name)
+        .map((row) => [String(row.id), String(row.name)])
+    )
   }
 
   const mapped: (AccessibleOrganization | null)[] = data.map((membership: any) => {
@@ -1477,20 +1367,20 @@ export async function getOrgMembers(orgId: string) {
 }
 
 export async function isSubOrgManagerFeatureEnabled() {
-  const admin = (await createAdminClient()) as any
-  const { error } = await admin
-    .from('organizations')
-    .select('manager_employee_id')
-    .limit(1)
-
-  if (!error) return true
-
-  const message = String(error?.message || '').toLowerCase()
-  if (message.includes('manager_employee_id') && (message.includes('schema cache') || message.includes('column'))) {
+  try {
+    const result = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'organizations'
+          AND column_name = 'manager_employee_id'
+      ) AS exists
+    `
+    return Boolean(result[0]?.exists)
+  } catch {
     return false
   }
-
-  return false
 }
 
 /**
@@ -1501,19 +1391,16 @@ export async function getHoldingEmployees(orgId: string) {
   const trimmedOrgId = String(orgId || '').trim()
   if (!trimmedOrgId) return []
 
-  const admin = (await createAdminClient()) as any
-  const { data, error } = await admin
-    .from('employees')
-    .select('id, first_name, last_name, job_title, branch_id')
-    .eq('org_id', trimmedOrgId)
-    .order('first_name')
-
-  if (error) {
+  try {
+    return await prisma.employees.findMany({
+      where: { org_id: trimmedOrgId },
+      select: { id: true, first_name: true, last_name: true, job_title: true, branch_id: true },
+      orderBy: { first_name: 'asc' },
+    })
+  } catch (error) {
     ;(console as any).error('getHoldingEmployees Error:', error)
     return []
   }
-
-  return data || []
 }
 
 export async function getChildOrgs(parentOrgId: string) {
@@ -1522,36 +1409,33 @@ export async function getChildOrgs(parentOrgId: string) {
 
   const holdingContext = await getHoldingManagementContext(trimmedParentOrgId)
   if ('error' in holdingContext) return []
-  const { db } = holdingContext
   const managerFeatureEnabled = await isSubOrgManagerFeatureEnabled()
-  const selectFields = managerFeatureEnabled
-    ? 'id, name, slug, logo_url, settings, is_active, created_at, manager_employee_id'
-    : 'id, name, slug, logo_url, settings, is_active, created_at'
+  const rows = await prisma.$queryRaw<Array<{
+    id: string
+    name: string
+    slug: string
+    logo_url: string | null
+    settings: unknown
+    is_active: boolean | null
+    created_at: Date
+    manager_employee_id: string | null
+  }>>`
+    SELECT
+      id::text AS id,
+      name,
+      slug,
+      logo_url,
+      settings,
+      is_active,
+      created_at,
+      manager_employee_id::text AS manager_employee_id
+    FROM public.organizations
+    WHERE parent_org_id = ${trimmedParentOrgId}::uuid
+    ORDER BY created_at DESC
+  `
 
-  const admin = (await createAdminClient()) as any
-  const { data: adminData, error: adminError } = await admin
-    .from('organizations')
-    .select(selectFields)
-    .eq('parent_org_id', trimmedParentOrgId)
-    .order('created_at', { ascending: false })
-
-  if (!adminError) {
-    if (managerFeatureEnabled) return adminData || []
-    return (adminData || []).map((row: any) => ({ ...row, manager_employee_id: null }))
-  }
-
-  const { data: userData, error: userError } = await db
-    .from('organizations')
-    .select(selectFields)
-    .eq('parent_org_id', trimmedParentOrgId)
-    .order('created_at', { ascending: false })
-
-  if (!userError) {
-    if (managerFeatureEnabled) return userData || []
-    return (userData || []).map((row: any) => ({ ...row, manager_employee_id: null }))
-  }
-
-  return []
+  if (managerFeatureEnabled) return rows
+  return rows.map((row) => ({ ...row, manager_employee_id: null }))
 }
 
 export async function destroyOrganization(orgId: string) {
@@ -1676,16 +1560,19 @@ export async function createBranch(
     }
   }
 
-  const { data: duplicateNameBranch } = await db
-    .from('branches')
-    .select('id')
-    .eq('org_id', trimmedOrgId)
-    .eq('name', name)
-    .maybeSingle()
+  const duplicateNameBranch = await prisma.branches.findFirst({
+    where: { org_id: trimmedOrgId, name },
+    select: { id: true },
+  })
 
   if (duplicateNameBranch?.id) {
     return { error: 'Nama unit sudah digunakan pada organisasi ini.' }
   }
+
+  const duplicateCodeBranch = await prisma.branches.findFirst({
+    where: { org_id: trimmedOrgId, code },
+    select: { id: true },
+  })
 
   if (duplicateCodeBranch?.id) {
     return { error: 'Kode unit sudah digunakan pada organisasi ini.' }
@@ -1756,9 +1643,7 @@ export async function createBranch(
 }
 
 export async function updateBranch(orgId: string, branchId: string, formData: FormData) {
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
 
   const trimmedOrgId = String(orgId || '').trim()
@@ -1774,44 +1659,32 @@ export async function updateBranch(orgId: string, branchId: string, formData: Fo
   if (!code) return { error: 'Kode cabang wajib diisi.' }
 
   // Check actor permissions
-  const { data: actorMembership } = await db
-    .from('org_members')
-    .select('role')
-    .eq('org_id', trimmedOrgId)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
+  const actorMembership = await prisma.org_members.findFirst({
+    where: { org_id: trimmedOrgId, user_id: user.id, is_active: true },
+    select: { role: true },
+  })
 
   if (!actorMembership || !['owner', 'admin'].includes(String(actorMembership.role || ''))) {
     return { error: 'Hanya owner atau admin yang dapat mengubah cabang.' }
   }
 
   // Duplicate check (ignore self)
-  const { data: dupName } = await db
-    .from('branches')
-    .select('id')
-    .eq('org_id', trimmedOrgId)
-    .eq('name', name)
-    .neq('id', trimmedBranchId)
-    .maybeSingle()
+  const dupName = await prisma.branches.findFirst({
+    where: { org_id: trimmedOrgId, name, NOT: { id: trimmedBranchId } },
+    select: { id: true },
+  })
   if (dupName?.id) return { error: 'Nama cabang sudah digunakan.' }
 
-  const { data: dupCode } = await db
-    .from('branches')
-    .select('id')
-    .eq('org_id', trimmedOrgId)
-    .eq('code', code)
-    .neq('id', trimmedBranchId)
-    .maybeSingle()
+  const dupCode = await prisma.branches.findFirst({
+    where: { org_id: trimmedOrgId, code, NOT: { id: trimmedBranchId } },
+    select: { id: true },
+  })
   if (dupCode?.id) return { error: 'Kode cabang sudah digunakan.' }
 
-  const { error: updateError } = await db
-    .from('branches')
-    .update({ name, code, address, updated_at: new Date().toISOString() })
-    .eq('id', trimmedBranchId)
-    .eq('org_id', trimmedOrgId)
-
-  if (updateError) return { error: updateError.message || 'Gagal memperbarui cabang.' }
+  await prisma.branches.update({
+    where: { id: trimmedBranchId },
+    data: { name, code, address, updated_at: new Date() },
+  })
 
   revalidatePath('/settings/branches')
   revalidatePath('/', 'layout')
@@ -1819,9 +1692,7 @@ export async function updateBranch(orgId: string, branchId: string, formData: Fo
 }
 
 export async function deleteBranch(orgId: string, branchId: string) {
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
 
   const trimmedOrgId = String(orgId || '').trim()
@@ -1829,24 +1700,19 @@ export async function deleteBranch(orgId: string, branchId: string) {
   if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
   if (!trimmedBranchId) return { error: 'Cabang tidak valid.' }
 
-  const { data: actorMembership } = await db
-    .from('org_members')
-    .select('role')
-    .eq('org_id', trimmedOrgId)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
+  const actorMembership = await prisma.org_members.findFirst({
+    where: { org_id: trimmedOrgId, user_id: user.id, is_active: true },
+    select: { role: true },
+  })
 
   if (!actorMembership || String(actorMembership.role || '') !== 'owner') {
     return { error: 'Hanya owner yang dapat menghapus cabang.' }
   }
 
   // Prevent deleting the only branch
-  const { count: branchCount } = await db
-    .from('branches')
-    .select('id', { count: 'exact', head: true })
-    .eq('org_id', trimmedOrgId)
-    .eq('is_active', true)
+  const branchCount = await prisma.branches.count({
+    where: { org_id: trimmedOrgId, is_active: true },
+  })
 
   if ((branchCount ?? 0) <= 1) {
     return { error: 'Tidak dapat menghapus satu-satunya cabang yang aktif.' }
@@ -1872,10 +1738,12 @@ export async function deleteBranch(orgId: string, branchId: string) {
   const blockers: string[] = []
   for (const { table, label } of blockerTables) {
     try {
-      const { count } = await db
-        .from(table)
-        .select('id', { count: 'exact', head: true })
-        .eq('branch_id', trimmedBranchId)
+      const result = await prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*)::bigint AS count
+        FROM ${Prisma.raw(`public.${table}`)}
+        WHERE branch_id = CAST(${trimmedBranchId} AS uuid)
+      `
+      const count = Number(result[0]?.count || 0)
       if ((count ?? 0) > 0) {
         blockers.push(`${label} (${count} data)`)
       }
@@ -1890,18 +1758,13 @@ export async function deleteBranch(orgId: string, branchId: string) {
     }
   }
 
-  const { error: deleteError } = await db
-    .from('branches')
-    .delete()
-    .eq('id', trimmedBranchId)
-    .eq('org_id', trimmedOrgId)
-
-  if (deleteError) {
-    // Tangkap FK violation yang mungkin masih lolos dari pre-flight check
-    if (deleteError.code === '23503') {
+  try {
+    await prisma.branches.delete({ where: { id: trimmedBranchId } })
+  } catch (deleteError: any) {
+    if (deleteError?.code === 'P2003') {
       return { error: 'Cabang masih memiliki data terkait dan tidak dapat dihapus. Hapus semua data yang menggunakan cabang ini terlebih dahulu.' }
     }
-    return { error: deleteError.message || 'Gagal menghapus cabang.' }
+    return { error: deleteError?.message || 'Gagal menghapus cabang.' }
   }
 
   revalidatePath('/settings/branches')
@@ -1911,9 +1774,7 @@ export async function deleteBranch(orgId: string, branchId: string) {
 
 
 export async function assignBranchPIC(orgId: string, branchId: string, employeeId: string | null) {
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
 
   const trimmedOrgId = String(orgId || '').trim()
@@ -1923,46 +1784,37 @@ export async function assignBranchPIC(orgId: string, branchId: string, employeeI
   if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
   if (!trimmedBranchId) return { error: 'Cabang tidak valid.' }
 
-  const { data: actorMembership } = await db
-    .from('org_members')
-    .select('role')
-    .eq('org_id', trimmedOrgId)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
+  const actorMembership = await prisma.org_members.findFirst({
+    where: { org_id: trimmedOrgId, user_id: user.id, is_active: true },
+    select: { role: true },
+  })
 
   if (!actorMembership || !['owner', 'admin'].includes(String(actorMembership.role || ''))) {
     return { error: 'Hanya owner atau admin yang dapat mengubah PIC cabang.' }
   }
 
   if (normalizedEmployeeId) {
-    const { data: employee } = await db
-      .from('employees')
-      .select('id')
-      .eq('id', normalizedEmployeeId)
-      .eq('org_id', trimmedOrgId)
-      .maybeSingle()
+    const employee = await prisma.employees.findFirst({
+      where: { id: normalizedEmployeeId, org_id: trimmedOrgId },
+      select: { id: true },
+    })
     if (!employee) return { error: 'PIC harus berasal dari organisasi aktif.' }
   }
 
-  const { error: updateError } = await db
-    .from('branches')
-    .update({ pic_employee_id: normalizedEmployeeId, updated_at: new Date().toISOString() })
-    .eq('id', trimmedBranchId)
-    .eq('org_id', trimmedOrgId)
-
-  if (updateError) return { error: updateError.message || 'Gagal menyimpan PIC cabang.' }
+  await prisma.$executeRaw`
+    UPDATE public.branches
+    SET pic_employee_id = ${normalizedEmployeeId}::uuid,
+        updated_at = NOW()
+    WHERE id = ${trimmedBranchId}::uuid
+      AND org_id = ${trimmedOrgId}::uuid
+  `
 
   revalidatePath('/settings/branches')
   return { success: true }
 }
 
 export async function updateMemberUnitAccess(orgId: string, memberId: string, branchIds: string[]) {
-  const supabase = await createClient()
-  const db = supabase as any
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUser()
 
   if (!user) return { error: 'Tidak terautentikasi.' }
 

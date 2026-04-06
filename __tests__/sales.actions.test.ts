@@ -490,8 +490,8 @@ describe('Sales Branch Context', () => {
       where: {
         org_id: 'org-1',
         branch_id: 'branch-1',
-      }),
-    ])
+      },
+    })
     expect(rpcMock).toHaveBeenCalledWith('process_sales_delivery_atomic', {
       p_org_id: 'org-1',
       p_sale_id: 'sale-1',
