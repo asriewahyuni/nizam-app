@@ -1,7 +1,7 @@
 # AI Handover Document: Supabase -> Prisma/Auth Migration Status
 
-**Updated:** 2026-04-06 (sesi ke-16, Purchasing + Inventory + Warehouse migration)  
-**Status:** `IN PROGRESS` — Sesi 15 (Purchasing Backbone) selesai. Target berikutnya adalah Prioritas 2: Billing/Operator Backoffice dan Ticketing/Cash.
+**Updated:** 2026-04-06 (sesi ke-17, Operator SaaS Backoffice migration)  
+**Status:** `IN PROGRESS` — Prioritas 2 (Billing/Operator Backoffice) untuk action layer operator SaaS selesai. Target berikutnya adalah Prioritas 3: Ticketing + Cash.
 
 Dokumen ini adalah rencana eksekusi dan handover aktif untuk agen. Sesi-sesi sebelumnya telah menyelesaikan migrasi pada domain auth, org, HRIS, audit, billing, accounting, contacts, services, sales, sales-write, POS.
 
@@ -92,6 +92,7 @@ File-file berikut **sudah tidak lagi memakai Supabase data client**:
 - `modules/purchasing/actions/purchasing.actions.ts` ✅ (sesi 16)
 - `modules/inventory/actions/inventory.actions.ts` ✅ (sesi 16)
 - `modules/inventory/actions/warehouse.actions.ts` ✅ (sesi 16)
+- `modules/saas/actions/operator-sales.actions.ts` ✅ (sesi 17)
 
 ---
 
@@ -191,6 +192,15 @@ Billing UI migration yang selesai:
 - wrapper storage baru:
   - `modules/organization/lib/billing-proof-storage.server.ts`
   - upload `billing-proofs` sekarang lewat Supabase admin storage wrapper di server, bukan browser
+
+Operator SaaS backoffice migration yang selesai pada sesi ini:
+
+- `modules/saas/actions/operator-sales.actions.ts`
+  - seluruh auth guard operator sekarang memakai `auth()` + `isPlatformAdminEmail`, tanpa `createClient()/createAdminClient()`
+  - snapshot `/saas/penawaran` dan `/saas/penjualan` sekarang diambil via Prisma (`organizations`, `saas_packages`, `saas_invoices`, `ai_token_topup_packages`)
+  - `createOperatorQuotation`, `convertQuotationToSale`, dan `markOperatorSalePaid` sekarang berbasis Prisma; insert/update invoice tidak lagi lewat query builder Supabase
+  - auto-journal untuk konversi sale dan receipt sekarang dibuat via Prisma transaction (`journal_entries` + `journal_lines`) sehingga rollback konsisten saat update invoice gagal
+  - `getOperatorInvoiceDocument()` sekarang memuat invoice, paket, organisasi, config SaaS, dan paket topup AI dari Prisma
 
 Shared module migration yang selesai pada sesi ini:
 
@@ -443,11 +453,11 @@ Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file 
 - `modules/inventory/actions/inventory.actions.ts` ✅
 - `modules/inventory/actions/warehouse.actions.ts` ✅
 
-### PRIORITAS 2 (AKTIF): Billing / Operator Backoffice
-- `modules/saas/actions/operator-sales.actions.ts`
-- lanjutkan ke `/saas/penawaran`, `/saas/penjualan`, dan `/saas/dokumen/[id]` supaya domain operator SaaS benar-benar keluar dari Supabase
+### PRIORITAS 2 ✅ SELESAI: Billing / Operator Backoffice
+- `modules/saas/actions/operator-sales.actions.ts` ✅
+- `/saas/penawaran`, `/saas/penjualan`, dan `/saas/dokumen/[id]` sekarang sudah mengambil data operator melalui action Prisma/Auth ini
 
-### PRIORITAS 3: Ticketing + Cash
+### PRIORITAS 3 (AKTIF): Ticketing + Cash
 - `modules/saas/actions/ticketing.actions.ts`
 - `modules/cash/actions/bank.actions.ts`
 - `modules/cash/actions/reconcile.actions.ts`

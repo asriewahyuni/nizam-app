@@ -1,6 +1,7 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { Product } from '@/types/database.types'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
@@ -27,7 +28,6 @@ async function requireActiveBranchId(orgId: string, errorMessage: string): Promi
   if ('error' in branchSelection || !branchSelection.branchId) {
     return { error: errorMessage }
   }
-
   return { branchId: branchSelection.branchId }
 }
 
@@ -36,12 +36,10 @@ async function resolveActiveBranchId(orgId: string, branchId?: string | null) {
   if ('error' in branchSelection) {
     return branchSelection
   }
-
   return { branchId: branchSelection.branchId }
 }
 
 async function getScopedWarehouses(
-  supabase: any,
   orgId: string,
   warehouseIds: string[],
   branchId: string | null
@@ -49,50 +47,53 @@ async function getScopedWarehouses(
   const uniqueIds = [...new Set(warehouseIds.filter(Boolean))]
   if (uniqueIds.length === 0) return []
 
-  let query = supabase
-    .from('warehouses')
-    .select('id, branch_id, is_active')
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .in('id', uniqueIds)
-
-  if (branchId) {
-    query = query.eq('branch_id', branchId)
+  const whereInfo: any = {
+    org_id: orgId,
+    is_active: true,
+    id: { in: uniqueIds }
   }
 
-  const { data, error } = await query
-  if (error) return []
-  return (data as WarehouseScopeRecord[]) || []
+  if (branchId) {
+    whereInfo.branch_id = branchId
+  }
+
+  const data = await prisma.warehouses.findMany({
+    where: whereInfo,
+    select: { id: true, branch_id: true, is_active: true }
+  })
+  
+  return data as unknown as WarehouseScopeRecord[]
 }
 
 export async function getProducts(orgId: string, branchId?: string | null): Promise<ProductWithStock[]> {
-  const supabase = await createClient()
   const branchSelection = await resolveActiveBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
   const effectiveBranchId = branchSelection.branchId
 
-  const { data: productsData } = await supabase.from('products').select('*').eq('org_id', orgId).order('name', { ascending: true })
-  let movementsQuery = supabase
-    .from('stock_movements')
-    .select('product_id, quantity, unit_price')
-    .eq('org_id', orgId)
+  const productsData = await prisma.products.findMany({
+    where: { org_id: orgId },
+    orderBy: { name: 'asc' }
+  })
 
+  const movementsWhere: any = { org_id: orgId }
   if (effectiveBranchId) {
-    movementsQuery = movementsQuery.eq('branch_id', effectiveBranchId)
+    movementsWhere.branch_id = effectiveBranchId
   }
 
-  const { data: movementsData } = await movementsQuery
+  const movementsData = await prisma.stock_movements.findMany({
+    where: movementsWhere,
+    select: { product_id: true, quantity: true, unit_price: true }
+  })
 
-  let stockQuery = (supabase as any)
-    .from('inventory_stocks')
-    .select('product_id, quantity, warehouses!inner(branch_id)')
-    .eq('org_id', orgId)
-
+  const stockWhere: any = { org_id: orgId }
   if (effectiveBranchId) {
-    stockQuery = stockQuery.or(`branch_id.eq.${effectiveBranchId}`, { foreignTable: 'warehouses' })
+    stockWhere.warehouses = { branch_id: effectiveBranchId }
   }
 
-  const { data: stockRows } = await stockQuery
+  const stockRows = await prisma.inventory_stocks.findMany({
+    where: stockWhere,
+    select: { product_id: true, quantity: true, warehouses: { select: { branch_id: true } } }
+  })
 
   const products = productsData || []
   const movements = movementsData || []
@@ -140,73 +141,50 @@ export async function getProducts(orgId: string, branchId?: string | null): Prom
   })
 }
 
-
-
 export async function createProduct(productData: Partial<Product>) {
-  const supabase = await createClient()
-
-  const { data, error } = await (supabase as any)
-    .from('products')
-    .insert([productData])
-    .select()
-    .single()
-
-  if (error) {
-    (console as any).error('Error creating product:', error.message)
+  try {
+    const data = await prisma.products.create({
+      data: productData as any
+    })
+    revalidatePath('/inventory')
+    return { data: data as unknown as Product }
+  } catch (error: any) {
+    console.error('Error creating product:', error.message)
     return { error: error.message }
   }
-
-  revalidatePath('/inventory')
-  return { data: data as Product }
 }
 
 export async function updateProduct(id: string, orgId: string, productData: Partial<Product>) {
-  const supabase = await createClient()
-
-  const { data, error } = await (supabase as any)
-    .from('products')
-    .update(productData)
-    .eq('id', id)
-    .eq('org_id', orgId)
-    .select()
-    .single()
-
-  if (error) {
-    (console as any).error('Error updating product:', error.message)
+  try {
+    await prisma.products.updateMany({
+      where: { id, org_id: orgId },
+      data: productData as any
+    })
+    const data = await prisma.products.findFirst({ where: { id } })
+    revalidatePath('/inventory')
+    return { data: data as unknown as Product }
+  } catch (error: any) {
+    console.error('Error updating product:', error.message)
     return { error: error.message }
   }
-
-  revalidatePath('/inventory')
-  return { data: data as Product }
 }
 
 export async function deleteProduct(id: string, orgId: string) {
-  const supabase = await createClient()
-
-  const { error } = await supabase
-    .from('products')
-    .delete()
-    .eq('id', id)
-    .eq('org_id', orgId)
-
-  if (error) {
+  try {
+    await prisma.products.deleteMany({
+      where: { id, org_id: orgId }
+    })
+    revalidatePath('/inventory')
+    return { success: true }
+  } catch (error: any) {
     throw new Error(error.message)
   }
-
-  revalidatePath('/inventory')
-  return { success: true }
 }
+
 /**
  * COLLISION-PROOF INSERT HELPER
- * The DB trigger `set_adj_number()` ALWAYS overwrites adj_number using COUNT(*)+1.
- * If old records exist with matching numbers (e.g. ADJ-2026-000003), it causes a 
- * permanent unique constraint violation. This helper:
- * 1. Predicts what the trigger will generate
- * 2. Renames any conflicting old record
- * 3. Retries up to 5 times on failure
  */
 async function insertAdjustmentWithRetry(
-  supabase: any, 
   insertData: Record<string, any>,
   maxRetries = 5
 ): Promise<{ data: any; error: any }> {
@@ -214,44 +192,44 @@ async function insertAdjustmentWithRetry(
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     // Step 1: Count existing records to predict what the trigger will generate
-    const { count } = await supabase
-      .from('inventory_adjustments')
-      .select('id', { count: 'exact', head: true })
-      .eq('org_id', orgId)
+    const count = await prisma.inventory_adjustments.count({
+      where: { org_id: orgId }
+    })
 
     const predictedSeq = String((count || 0) + 1).padStart(4, '0')
 
     // Step 2: Find any existing record whose adj_number contains this sequence 
-    // (the trigger format is ADJ-YYMMDD-XXXX-RANDOM)
-    const { data: conflicts } = await supabase
-      .from('inventory_adjustments')
-      .select('id, adj_number')
-      .eq('org_id', orgId)
-      .like('adj_number', `%-${predictedSeq}%`)
+    const conflicts = await prisma.inventory_adjustments.findMany({
+      where: {
+        org_id: orgId,
+        adj_number: { contains: `-${predictedSeq}-` }
+      },
+      select: { id: true, adj_number: true }
+    })
 
     // Step 3: Rename all conflicting records to clear the way
-    for (const conflict of (conflicts || [])) {
-      await supabase
-        .from('inventory_adjustments')
-        .update({ adj_number: conflict.adj_number + '-R' + Date.now() } as any)
-        .eq('id', conflict.id)
+    for (const conflict of conflicts) {
+        if (conflict.adj_number) {
+            await prisma.inventory_adjustments.update({
+                where: { id: conflict.id },
+                data: { adj_number: conflict.adj_number + '-R' + Date.now() }
+            })
+        }
     }
 
     // Step 4: Attempt the insert (trigger will generate the number)
-    const { data, error } = await supabase
-      .from('inventory_adjustments')
-      .insert(insertData)
-      .select()
-      .single()
-
-    if (!error) return { data, error: null }
-
-    // If it's NOT a duplicate key error, don't retry
-    if (!error.message?.includes('duplicate key') && !error.message?.includes('unique constraint')) {
-      return { data: null, error }
+    try {
+      const data = await prisma.inventory_adjustments.create({
+        data: insertData as any
+      })
+      return { data, error: null }
+    } catch(error: any) {
+        // If it's NOT a duplicate key error, don't retry
+        if (error.code !== 'P2002' && !error.message?.includes('duplicate key') && !error.message?.includes('unique constraint')) {
+            return { data: null, error }
+        }
+        console.warn(`[ADJ] Attempt ${attempt + 1} failed (collision). Retrying.`)
     }
-
-    console.warn(`[ADJ] Attempt ${attempt + 1} failed (collision). Retrying.`)
   }
 
   return { data: null, error: { message: 'Gagal membuat adjustment setelah ' + maxRetries + ' percobaan. Silakan hubungi admin.' } }
@@ -274,8 +252,8 @@ export async function createInventoryAdjustment(
     }[]
   }
 ) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const authSession = await auth()
+  const user = authSession?.user
   if (!user) return { error: 'Unauthorized' }
   const activeBranchResult = await requireActiveBranchId(
     orgId,
@@ -284,7 +262,6 @@ export async function createInventoryAdjustment(
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
   const activeBranchId = activeBranchResult.branchId
   const scopedWarehouses = await getScopedWarehouses(
-    supabase as any,
     orgId,
     payload.items.map((item) => item.warehouse_id),
     activeBranchId
@@ -294,9 +271,9 @@ export async function createInventoryAdjustment(
     return { error: 'Gudang opname tidak tersedia pada unit aktif.' }
   }
 
-  const { data: adj, error: adjErr } = await insertAdjustmentWithRetry(supabase, {
+  const { data: adj, error: adjErr } = await insertAdjustmentWithRetry({
     org_id: orgId,
-    adj_date: payload.adj_date,
+    adj_date: new Date(payload.adj_date),
     type: payload.type,
     status: 'DRAFT',
     total_value: payload.items.reduce((sum: any, it: any) => sum + (Math.abs(it.diff_quantity) * it.unit_cost), 0),
@@ -317,22 +294,23 @@ export async function createInventoryAdjustment(
     total_value: Math.abs(it.diff_quantity) * it.unit_cost,
     notes: it.notes
   }))
+  
+  try {
+    await prisma.inventory_adjustment_items.createMany({
+      data: itemsToInsert as any
+    })
+    
+    await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT set_config('request.jwt.claim.sub', ${user.id}, true)`
+        await tx.$executeRaw`SELECT set_config('request.jwt.claim.role', 'authenticated', true)`
+        await tx.$executeRaw`SELECT process_inventory_adjustment(${adj.id}::uuid, ${user.id}::uuid)`
+    })
 
-  const { error: itemsErr } = await supabase
-    .from('inventory_adjustment_items')
-    .insert(itemsToInsert as any)
-
-  if (itemsErr) return { error: itemsErr.message }
-
-  const { error: procErr } = await (supabase as any).rpc('process_inventory_adjustment', {
-    p_adj_id: adj.id,
-    p_user_id: user.id
-  })
-
-  if (procErr) return { error: 'Gagal memproses penyesuaian: ' + procErr.message }
-
-  revalidatePath('/inventory')
-  return { success: true, adj_id: adj.id }
+    revalidatePath('/inventory')
+    return { success: true, adj_id: adj.id }
+  } catch(error: any) {
+    return { error: 'Gagal memproses penyesuaian: ' + error.message }
+  }
 }
 
 export async function createInventoryTransfer(
@@ -349,8 +327,8 @@ export async function createInventoryTransfer(
     }[]
   }
 ) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const authSession = await auth()
+  const user = authSession?.user
   if (!user) return { error: 'Unauthorized' }
   const activeBranchResult = await requireActiveBranchId(
     orgId,
@@ -359,7 +337,6 @@ export async function createInventoryTransfer(
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
   const activeBranchId = activeBranchResult.branchId
   const scopedWarehouses = await getScopedWarehouses(
-    supabase as any,
     orgId,
     [payload.source_wh_id, payload.target_wh_id],
     activeBranchId
@@ -369,11 +346,10 @@ export async function createInventoryTransfer(
     return { error: 'Gudang transfer tidak tersedia pada unit aktif.' }
   }
 
-  // 🔴 RESILIENCY FIX: Use existing 'inventory_adjustments' table (MIGRATION 031 compatible)
   // Modeling Transfer as a 2-line adjustment: -Qty (Source) and +Qty (Target)
-  const { data: adj, error: adjErr } = await insertAdjustmentWithRetry(supabase, {
+  const { data: adj, error: adjErr } = await insertAdjustmentWithRetry({
     org_id: orgId,
-    adj_date: payload.transfer_date,
+    adj_date: new Date(payload.transfer_date),
     type: 'STOCK_COUNT', // Use existing enum type
     status: 'DRAFT',
     total_value: 0, // Zero sum movement
@@ -383,10 +359,10 @@ export async function createInventoryTransfer(
 
   if (adjErr) return { error: 'Transfer Header Error: ' + adjErr.message }
 
-  const { data: products } = await (supabase as any)
-    .from('products')
-    .select('id, purchase_price, average_cost')
-    .eq('org_id', orgId)
+  const products = await prisma.products.findMany({
+    where: { org_id: orgId },
+    select: { id: true, purchase_price: true, average_cost: true }
+  })
   
   if (!products) return { error: 'Gagal memvalidasi data produk.' }
 
@@ -423,21 +399,20 @@ export async function createInventoryTransfer(
     })
   }
 
-  const { error: itemsErr } = await (supabase as any)
-    .from('inventory_adjustment_items')
-    .insert(itemsToInsert)
+  try {
+      await prisma.inventory_adjustment_items.createMany({ data: itemsToInsert as any })
 
-  if (itemsErr) return { error: 'Transfer Items Error: ' + itemsErr.message }
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT set_config('request.jwt.claim.sub', ${user.id}, true)`
+        await tx.$executeRaw`SELECT set_config('request.jwt.claim.role', 'authenticated', true)`
+        await tx.$executeRaw`SELECT process_inventory_adjustment(${adj.id}::uuid, ${user.id}::uuid)`
+      })
 
-  const { error: procErr } = await (supabase as any).rpc('process_inventory_adjustment', {
-    p_adj_id: adj.id,
-    p_user_id: user.id
-  } as any)
-
-  if (procErr) return { error: 'Gagal memproses mutasi: ' + procErr.message }
-
-  revalidatePath('/inventory')
-  return { success: true, transfer_id: adj.id }
+      revalidatePath('/inventory')
+      return { success: true, transfer_id: adj.id }
+  } catch(error: any) {
+      return { error: 'Gagal memproses mutasi: ' + error.message }
+  }
 }
 
 // Keep backward compatibility for Write-off
@@ -454,73 +429,76 @@ export async function createInventoryWriteOff(orgId: string, payload: any) {
 }
 
 export async function getStockLedger(orgId: string, productId: string, branchId?: string | null) {
-  const supabase = await createClient()
   const branchSelection = await resolveActiveBranchId(orgId, branchId)
   if ('error' in branchSelection) return { error: branchSelection.error }
   const effectiveBranchId = branchSelection.branchId
   
-  const { data: product } = await supabase
-    .from('products')
-    .select('name, sku, unit')
-    .eq('id', productId)
-    .single()
+  const product = await prisma.products.findFirst({
+    where: { id: productId },
+    select: { name: true, sku: true, unit: true }
+  })
 
-  let movementsQuery = supabase
-    .from('stock_movements')
-    .select('*')
-    .eq('org_id', orgId)
-    .eq('product_id', productId)
-
-  if (effectiveBranchId) {
-    movementsQuery = movementsQuery.eq('branch_id', effectiveBranchId)
+  const movementsWhere: any = {
+    org_id: orgId,
+    product_id: productId
   }
 
-  const { data: movements, error } = await movementsQuery.order('created_at', { ascending: true })
-    
-  if (error) return { error: error.message }
-  
-  return {
-    product,
-    movements: movements || []
+  if (effectiveBranchId) {
+    movementsWhere.branch_id = effectiveBranchId
+  }
+
+  try {
+      const movements = await prisma.stock_movements.findMany({
+        where: movementsWhere,
+        orderBy: { created_at: 'asc' }
+      })
+      
+      return {
+        product,
+        movements: movements || []
+      }
+  } catch(error: any) {
+      return { error: error.message }
   }
 }
 
 export async function getWarehouseStocks(orgId: string, productId: string, branchId?: string | null) {
-  const supabase = await createClient()
   const branchSelection = await resolveActiveBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
   const effectiveBranchId = branchSelection.branchId
 
-  let query = (supabase as any)
-    .from('inventory_stocks')
-    .select('warehouse_id, quantity, warehouses!inner(name, branch_id)')
-    .eq('org_id', orgId)
-    .eq('product_id', productId)
-
-  if (effectiveBranchId) {
-    query = query.or(`branch_id.eq.${effectiveBranchId}`, { foreignTable: 'warehouses' })
+  const whereInfo: any = {
+    org_id: orgId,
+    product_id: productId
   }
 
-  const { data, error } = await query
+  if (effectiveBranchId) {
+    whereInfo.warehouses = { branch_id: effectiveBranchId }
+  }
 
-  if (error) return []
-  return data.map((s: any) => ({
-    warehouse_id: s.warehouse_id,
-    warehouse_name: (s.warehouses as any)?.name || 'Unknown',
-    quantity: Number(s.quantity || 0)
-  }))
+  try {
+      const data = await prisma.inventory_stocks.findMany({
+          where: whereInfo,
+          select: { warehouse_id: true, quantity: true, warehouses: { select: { name: true, branch_id: true } } }
+      })
+    
+      return data.map((s: any) => ({
+        warehouse_id: s.warehouse_id,
+        warehouse_name: s.warehouses?.name || 'Unknown',
+        quantity: Number(s.quantity || 0)
+      }))
+  } catch(error) {
+      return []
+  }
 }
 
 export async function getProductByBarcode(orgId: string, barcode: string) {
-  const supabase = await createClient()
-
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .eq('org_id', orgId)
-    .eq('barcode', barcode)
-    .maybeSingle()
-
-  if (error) return null
-  return data as Product | null
+  try {
+      const data = await prisma.products.findFirst({
+        where: { org_id: orgId, barcode }
+      })
+      return data as Product | null
+  } catch(error) {
+      return null
+  }
 }

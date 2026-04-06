@@ -1,6 +1,7 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
@@ -88,128 +89,131 @@ async function requireActiveBranchId(orgId: string, errorMessage: string): Promi
   return { branchId: branchSelection.branchId }
 }
 
-function applyWarehouseBranchFilter(query: any, branchId: string | null) {
-  if (!branchId) return query
-  return query.eq('branch_id', branchId)
-}
-
 async function getAccessibleWarehouse(
-  supabase: any,
   orgId: string,
   warehouseId: string,
   branchId: string | null
 ): Promise<WarehouseAccessRecord | null> {
-  let query = supabase
-    .from('warehouses')
-    .select('id, org_id, branch_id, is_active')
-    .eq('id', warehouseId)
-    .eq('org_id', orgId)
-    .eq('is_active', true)
+  const whereInfo: any = {
+    id: warehouseId,
+    org_id: orgId,
+    is_active: true,
+  }
 
-  query = applyWarehouseBranchFilter(query, branchId)
+  if (branchId) {
+    whereInfo.branch_id = branchId
+  }
 
-  const { data, error } = await query.maybeSingle()
-  if (error) return null
-  return (data as WarehouseAccessRecord | null) ?? null
+  return prisma.warehouses.findFirst({
+    select: { id: true, org_id: true, branch_id: true, is_active: true },
+    where: whereInfo,
+  }) as unknown as WarehouseAccessRecord | null
 }
 
 async function getAccessibleWarehouseBin(
-  supabase: any,
   orgId: string,
   binId: string,
   branchId: string | null
 ): Promise<WarehouseBinAccessRecord | null> {
-  let query = (supabase as any)
-    .from('warehouse_bins')
-    .select('id, warehouse_id, warehouses!inner(branch_id)')
-    .eq('id', binId)
-    .eq('org_id', orgId)
-
-  if (branchId) {
-    query = query.or(`branch_id.eq.${branchId}`, { foreignTable: 'warehouses' })
+  const whereInfo: any = {
+    id: binId,
+    org_id: orgId,
   }
 
-  const { data, error } = await query.maybeSingle()
-  if (error) return null
-  return (data as WarehouseBinAccessRecord | null) ?? null
+  if (branchId) {
+    whereInfo.warehouses = { branch_id: branchId }
+  }
+
+  return prisma.warehouse_bins.findFirst({
+    select: { id: true, warehouse_id: true, warehouses: { select: { branch_id: true } } },
+    where: whereInfo,
+  }) as unknown as WarehouseBinAccessRecord | null
 }
 
 export async function getWarehouses(orgId: string, branchId?: string | null) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return []
+  const authSession = await auth()
+  if (!authSession?.user) return []
   const branchSelection = await resolveActiveBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
   const effectiveBranchId = branchSelection.branchId
 
-  let query = (supabase as any)
-    .from('warehouses')
-    .select('*, branch:branches(id, name, code)')
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-
-  query = applyWarehouseBranchFilter(query, effectiveBranchId)
-
-  const { data, error } = await query.order('name', { ascending: true })
-
-  if (error) return []
-  return data
-}
-
-export async function getWarehouseBins(orgId: string, warehouseId?: string, branchId?: string | null) {
-  const supabase = await createClient()
-  const branchSelection = await resolveActiveBranchId(orgId, branchId)
-  if ('error' in branchSelection) return []
-  const effectiveBranchId = branchSelection.branchId
-  let query = supabase
-    .from('warehouse_bins')
-    .select('*, warehouses!inner(name, code, branch_id)')
-    .eq('org_id', orgId)
-  
-  if (warehouseId) {
-    query = query.eq('warehouse_id', warehouseId)
+  const whereInfo: any = {
+    org_id: orgId,
+    is_active: true,
   }
 
   if (effectiveBranchId) {
-    query = (query as any).or(`branch_id.eq.${effectiveBranchId}`, { foreignTable: 'warehouses' })
+    whereInfo.branch_id = effectiveBranchId
   }
 
-  const { data, error } = await query.order('warehouse_id', { ascending: true })
-  if (error) return []
+  const data = await prisma.warehouses.findMany({
+    where: whereInfo,
+    include: {
+      branches: {
+        select: { id: true, name: true, code: true }
+      }
+    },
+    orderBy: { name: 'asc' }
+  })
+
+  return data.map(d => ({ ...d, branch: d.branches }))
+}
+
+export async function getWarehouseBins(orgId: string, warehouseId?: string, branchId?: string | null) {
+  const branchSelection = await resolveActiveBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
+  const effectiveBranchId = branchSelection.branchId
+
+  const whereInfo: any = {
+    org_id: orgId,
+  }
+  if (warehouseId) {
+    whereInfo.warehouse_id = warehouseId
+  }
+  if (effectiveBranchId) {
+    whereInfo.warehouses = { branch_id: effectiveBranchId }
+  }
+
+  const data = await prisma.warehouse_bins.findMany({
+    where: whereInfo,
+    include: {
+      warehouses: {
+        select: { name: true, code: true, branch_id: true }
+      }
+    },
+    orderBy: { warehouse_id: 'asc' }
+  })
+  
   return data
 }
 
 export async function createWarehouseBin(orgId: string, payload: { warehouse_id: string; code: string; description?: string }) {
-  const supabase = await createClient()
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk mengelola bin gudang.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
   const activeBranchId = activeBranchResult.branchId
-  const warehouse = await getAccessibleWarehouse(supabase as any, orgId, payload.warehouse_id, activeBranchId)
+  const warehouse = await getAccessibleWarehouse(orgId, payload.warehouse_id, activeBranchId)
 
   if (!warehouse) {
     return { error: 'Gudang tidak tersedia pada unit aktif.' }
   }
 
-  const { data, error } = await (supabase as any)
-    .from('warehouse_bins')
-    .insert([{ ...payload, org_id: orgId }])
-    .select()
-    .single()
-
-  if (error) return { error: error.message }
-  revalidateWarehousePages(payload.warehouse_id)
-  return { success: true, data }
+  try {
+    const data = await prisma.warehouse_bins.create({
+      data: { ...payload, org_id: orgId }
+    })
+    revalidateWarehousePages(payload.warehouse_id)
+    return { success: true, data }
+  } catch (error: any) {
+    return { error: error.message }
+  }
 }
 
 export async function createWarehouse(orgId: string, payload: WarehousePayload): Promise<WarehouseMutationResult> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: 'Unauthorized' }
+  const authSession = await auth()
+  if (!authSession?.user) return { error: 'Unauthorized' }
 
   const normalized = normalizeWarehousePayload(payload)
   if ('error' in normalized) return normalized
@@ -220,22 +224,20 @@ export async function createWarehouse(orgId: string, payload: WarehousePayload):
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
   const activeBranchId = activeBranchResult.branchId
 
-  const { data, error } = await (supabase as any)
-    .from('warehouses')
-    .insert([{ ...normalized, org_id: orgId, branch_id: activeBranchId }])
-    .select()
-    .single()
-
-  if (error) return { error: error.message }
-  revalidateWarehousePages(data?.id)
-  return { success: true, data }
+  try {
+    const data = await prisma.warehouses.create({
+      data: { ...normalized, org_id: orgId, branch_id: activeBranchId }
+    })
+    revalidateWarehousePages(data.id)
+    return { success: true, data }
+  } catch (error: any) {
+    return { error: error.message }
+  }
 }
 
 export async function updateWarehouse(orgId: string, id: string, payload: WarehousePayload): Promise<WarehouseMutationResult> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: 'Unauthorized' }
+  const authSession = await auth()
+  if (!authSession?.user) return { error: 'Unauthorized' }
 
   const normalized = normalizeWarehousePayload(payload)
   if ('error' in normalized) return normalized
@@ -245,83 +247,79 @@ export async function updateWarehouse(orgId: string, id: string, payload: Wareho
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
   const activeBranchId = activeBranchResult.branchId
-  const targetWarehouse = await getAccessibleWarehouse(supabase as any, orgId, id, activeBranchId)
+  const targetWarehouse = await getAccessibleWarehouse(orgId, id, activeBranchId)
 
   if (!targetWarehouse) {
     return { error: 'Gudang tidak tersedia pada unit aktif.' }
   }
 
-  const { data, error } = await (supabase as any)
-    .from('warehouses')
-    .update({
-      ...normalized,
-      branch_id: activeBranchId,
-      updated_at: new Date().toISOString(),
+  try {
+    const data = await prisma.warehouses.update({
+      where: { id },
+      data: {
+        ...normalized,
+        branch_id: activeBranchId,
+        updated_at: new Date(),
+      }
     })
-    .eq('id', id)
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .select()
-    .single()
-
-  if (error) return { error: error.message }
-  revalidateWarehousePages(id)
-  return { success: true, data }
+    revalidateWarehousePages(id)
+    return { success: true, data }
+  } catch (error: any) {
+    return { error: error.message }
+  }
 }
 
 export async function deleteWarehouse(orgId: string, id: string): Promise<DeleteWarehouseResult> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const authSession = await auth()
+  if (!authSession?.user) return { error: 'Unauthorized' }
 
-  if (!user) return { error: 'Unauthorized' }
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk mengelola gudang.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
   const activeBranchId = activeBranchResult.branchId
-  const targetWarehouse = await getAccessibleWarehouse(supabase as any, orgId, id, activeBranchId)
+  const targetWarehouse = await getAccessibleWarehouse(orgId, id, activeBranchId)
 
   if (!targetWarehouse) {
     return { error: 'Gudang tidak tersedia pada unit aktif.' }
   }
 
-  const { error } = await (supabase as any)
-    .from('warehouses')
-    .update({
-      is_active: false,
-      updated_at: new Date().toISOString(),
+  try {
+    await prisma.warehouses.update({
+      where: { id },
+      data: {
+        is_active: false,
+        updated_at: new Date(),
+      }
     })
-    .eq('id', id)
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-
-  if (error) return { error: error.message }
-  revalidateWarehousePages(id)
-  return { success: true }
+    revalidateWarehousePages(id)
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message }
+  }
 }
 
 export async function deleteWarehouseBin(orgId: string, id: string) {
-  const supabase = await createClient()
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih unit aktif terlebih dahulu untuk mengelola bin gudang.'
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
   const activeBranchId = activeBranchResult.branchId
-  const targetBin = await getAccessibleWarehouseBin(supabase as any, orgId, id, activeBranchId)
+  const targetBin = await getAccessibleWarehouseBin(orgId, id, activeBranchId)
 
   if (!targetBin) {
     return { error: 'Bin tidak tersedia pada unit aktif.' }
   }
 
-  const { error } = await (supabase as any)
-    .from('warehouse_bins')
-    .delete()
-    .eq('id', id)
-    .eq('org_id', orgId)
-
-  if (error) return { error: error.message }
-  revalidateWarehousePages(targetBin.warehouse_id)
-  return { success: true }
+  try {
+    await prisma.warehouse_bins.delete({
+      where: { id }
+    })
+    revalidateWarehousePages(targetBin.warehouse_id)
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message }
+  }
 }
