@@ -103,11 +103,9 @@ nizam-app/
 | `app/layout.tsx` | Root layout — metadata, viewport, manifest, global CSS |
 | `app/(auth)/layout.tsx` | Auth pages layout (login/register/join) |
 | `app/(dashboard)/layout.tsx` | **Main app guard** — session, org, module, RBAC validation |
-| `proxy.ts` | Next.js 16 Proxy — session refresh, route protection |
-| `lib/supabase/middleware.ts` | Session update, auth/protected page redirect logic |
-| `lib/supabase/config.ts` | Centralized Supabase connection config (remote/local switch) |
-| `lib/supabase/server.ts` | Server-side Supabase client (`createClient`, `createAdminClient`) |
-| `lib/supabase/client.ts` | Browser-side Supabase client |
+| `proxy.ts` | Next.js 16 Proxy — route protection and request gating |
+| `auth.ts` | NextAuth configuration (Credentials + Prisma adapter) |
+| `lib/prisma.ts` | Prisma/PostgreSQL client bootstrap |
 | `next.config.mjs` | Build config: `standalone` output, TypeScript errors ignored |
 
 ---
@@ -147,7 +145,7 @@ Route-to-module mapping uses `RouteModuleEntry` with aliases and permission keys
 
 ### 4.4 Proxy & Middleware
 
-**`proxy.ts`** — Next.js 16 Proxy that calls `updateSession(request)`.
+**`proxy.ts`** — Next.js 16 Proxy for route protection.
 
 Matcher excludes:
 - `api`, `_next/static`, `_next/image`, `_next/webpack-hmr`
@@ -155,12 +153,7 @@ Matcher excludes:
 - Files with extensions
 - Prefetch requests
 
-**`lib/supabase/middleware.ts`** — the actual session logic:
-- Short-circuits for bypassed paths (internal/metadata)
-- Short-circuits for public routes (no auth lookup needed)
-- Redirects authenticated users from login → dashboard (with `redirectTo` support)
-- Redirects unauthenticated users from protected routes → login (preserving `pathname + search`)
-- Validates `redirectTo` to prevent open redirects
+Auth/session enforcement now uses **NextAuth + application guards**, not Supabase SSR middleware.
 
 ### 4.5 Server Actions Pattern
 
@@ -169,21 +162,18 @@ All business logic lives in `modules/*/actions/*.actions.ts`:
 ```typescript
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 export async function doSomething(formData: FormData) {
-  const supabase = await createClient()
   const org = await getActiveOrg()
   if (!org) return { error: 'No active organization' }
   
-  // Business logic with org.orgId for tenant isolation
-  const { data, error } = await supabase
-    .from('some_table')
-    .select('*')
-    .eq('org_id', org.orgId)
+  const data = await prisma.some_table.findMany({
+    where: { org_id: org.orgId }
+  })
   
-  return { data, error: error?.message }
+  return { data }
 }
 ```
 
@@ -198,18 +188,9 @@ app/(dashboard)/sales/SalesClient.tsx   ← Client Component ('use client', all 
 
 Client components import server actions and call them via `startTransition` or form actions.
 
-### 4.7 Supabase Client Usage
+### 4.7 Data Access
 
-| Context | Import | Function |
-|---|---|---|
-| Server Components, Server Actions | `lib/supabase/server.ts` | `createClient()` |
-| Admin operations (password reset, etc.) | `lib/supabase/server.ts` | `createAdminClient()` |
-| Client Components | `lib/supabase/client.ts` | `createClient()` |
-| Middleware | `lib/supabase/middleware.ts` | `createServerClient()` inline |
-
-**Config switching:** `lib/supabase/config.ts` reads `NEXT_PUBLIC_SUPABASE_TARGET`:
-- `'local'` → use `NEXT_PUBLIC_SUPABASE_LOCAL_URL` + local keys
-- anything else → use `NEXT_PUBLIC_SUPABASE_URL` + remote keys
+Runtime data access now uses **Prisma** for reads/writes and **NextAuth** for authentication state.
 
 ---
 
