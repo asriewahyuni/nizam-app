@@ -1,13 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { BadgeDollarSign, CheckCircle2, ClipboardList, Download, Receipt, RefreshCcw } from 'lucide-react'
 import {
   convertQuotationToSale,
   createOperatorQuotation,
+  deleteOperatorQuotation,
   markOperatorSalePaid,
+  updateOperatorQuotation,
+  updateOperatorSaleInvoice,
 } from '@/modules/saas/actions/operator-sales.actions'
 import {
   EXTRA_BRANCH_UNIT_PRICE,
@@ -31,6 +34,8 @@ type Snapshot = {
 
 type InvoiceRecord = {
   id: string
+  org_id: string
+  package_id: string | null
   invoice_number: string
   item_name: string | null
   item_description: string | null
@@ -40,6 +45,7 @@ type InvoiceRecord = {
   tax_amount?: number | null
   amount: number
   status: string
+  due_date?: string | null
   created_at: string
   organization?: { name: string } | null
 }
@@ -56,7 +62,160 @@ function formatDate(dateLike: string) {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'UTC',
+    hour12: false,
   })
+}
+
+function parseCurrencyValue(raw: string) {
+  const normalized = raw.replace(/[^\d-]/g, '')
+  if (!normalized) return 0
+  const value = Number(normalized)
+  return Number.isFinite(value) ? value : 0
+}
+
+function parsePercentValue(raw: string) {
+  const normalized = raw.replace(/[^\d.,-]/g, '').replace(',', '.')
+  if (!normalized) return 0
+  const value = Number(normalized)
+  return Number.isFinite(value) ? value : 0
+}
+
+function createDefaultAddonPromoMap() {
+  return Object.fromEntries(OPERATOR_ADDON_OPTIONS.map((addon) => [addon.id, String(addon.price)]))
+}
+
+function createDefaultAddonAnchorMap() {
+  return Object.fromEntries(OPERATOR_ADDON_OPTIONS.map((addon) => [addon.id, String(addon.anchorPrice || addon.price)]))
+}
+
+type ParsedQuoteAddon = {
+  name: string
+  promoPrice: number
+  anchorPrice: number | null
+}
+
+type ParsedQuoteDraft = {
+  baseAmount: number | null
+  durationMonths: number
+  discountPercent: number
+  taxPercent: number
+  note: string
+  modules: string[]
+  aiTokenLabel: string
+  extraEntityQty: number
+  extraEntityUnitPrice: number
+  extraBranchQty: number
+  extraBranchUnitPrice: number
+  addons: ParsedQuoteAddon[]
+}
+
+function parseQuoteDraft(rawDescription: string | null | undefined): ParsedQuoteDraft {
+  const parsed: ParsedQuoteDraft = {
+    baseAmount: null,
+    durationMonths: 1,
+    discountPercent: 0,
+    taxPercent: 0,
+    note: '',
+    modules: [],
+    aiTokenLabel: '',
+    extraEntityQty: 0,
+    extraEntityUnitPrice: EXTRA_ENTITY_UNIT_PRICE,
+    extraBranchQty: 0,
+    extraBranchUnitPrice: EXTRA_BRANCH_UNIT_PRICE,
+    addons: [],
+  }
+
+  const normalizedDescription = String(rawDescription || '').replace(/\\n/g, '\n')
+  const lines = normalizedDescription
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  lines.forEach((line) => {
+    if (line.startsWith('Paket dasar:')) {
+      parsed.baseAmount = parseCurrencyValue(line.slice('Paket dasar:'.length))
+      return
+    }
+
+    const durationMatch = line.match(/^Durasi:\s+(\d+)\s+bulan$/i)
+    if (durationMatch) {
+      parsed.durationMonths = Math.max(1, Number(durationMatch[1] || 1))
+      return
+    }
+
+    const addonWithAnchor = line.match(/^Add-on(?:\s+Single\s+Bill)?\s+(.+):\s+(.+)\s+->\s+(.+)$/i)
+    if (addonWithAnchor) {
+      parsed.addons.push({
+        name: addonWithAnchor[1].trim(),
+        anchorPrice: parseCurrencyValue(addonWithAnchor[2]),
+        promoPrice: parseCurrencyValue(addonWithAnchor[3]),
+      })
+      return
+    }
+
+    const addonSimple = line.match(/^Add-on(?:\s+Single\s+Bill)?\s+(.+):\s+(.+)$/i)
+    if (addonSimple) {
+      parsed.addons.push({
+        name: addonSimple[1].trim(),
+        anchorPrice: null,
+        promoPrice: parseCurrencyValue(addonSimple[2]),
+      })
+      return
+    }
+
+    if (line.startsWith('Token AI:')) {
+      const tokenText = line.slice('Token AI:'.length).trim()
+      parsed.aiTokenLabel = tokenText.replace(/\s*\([^()]*\)\s*$/, '').trim()
+      return
+    }
+
+    const extraEntityMatch = line.match(/^Entitas tambahan:\s+(\d+)\s+x\s+(.+?)\s+=\s+(.+)$/i)
+    if (extraEntityMatch) {
+      parsed.extraEntityQty = Number(extraEntityMatch[1] || 0)
+      parsed.extraEntityUnitPrice = parseCurrencyValue(extraEntityMatch[2]) || EXTRA_ENTITY_UNIT_PRICE
+      return
+    }
+
+    const extraBranchMatch = line.match(/^Cabang tambahan:\s+(\d+)\s+x\s+(.+?)\s+=\s+(.+)$/i)
+    if (extraBranchMatch) {
+      parsed.extraBranchQty = Number(extraBranchMatch[1] || 0)
+      parsed.extraBranchUnitPrice = parseCurrencyValue(extraBranchMatch[2]) || EXTRA_BRANCH_UNIT_PRICE
+      return
+    }
+
+    const discountMatch = line.match(/^Diskon(?: setelah durasi)?:\s+([\d.,]+)%/i)
+    if (discountMatch) {
+      parsed.discountPercent = parsePercentValue(discountMatch[1])
+      return
+    }
+
+    const taxMatch = line.match(/^Pajak:\s+([\d.,]+)%/i)
+    if (taxMatch) {
+      parsed.taxPercent = parsePercentValue(taxMatch[1])
+      return
+    }
+
+    if (line.startsWith('Modul dipilih:')) {
+      parsed.modules = line
+        .slice('Modul dipilih:'.length)
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+      return
+    }
+
+  })
+
+  parsed.note = extractQuoteNote(normalizedDescription)
+  return parsed
+}
+
+function extractQuoteNote(rawDescription: string | null | undefined) {
+  const normalizedDescription = String(rawDescription || '').replace(/\\n/g, '\n')
+  const blockMatch = normalizedDescription.match(/(?:^|\n)(Catatan(?:\s+tambahan|\s+penawaran|\s+invoice)?|Note)\s*[:\-]?\s*([\s\S]*)$/i)
+  if (blockMatch?.[2]) return blockMatch[2].trim()
+  return ''
 }
 
 export default function SaasOperatorClient({
@@ -68,7 +227,11 @@ export default function SaasOperatorClient({
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [isHydrated, setIsHydrated] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null)
+  const [editingSaleInvoiceId, setEditingSaleInvoiceId] = useState<string | null>(null)
+  const [selectedOrgId, setSelectedOrgId] = useState('')
   const [selectedPackageId, setSelectedPackageId] = useState('')
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([])
   const [selectedModules, setSelectedModules] = useState<string[]>([])
@@ -77,16 +240,13 @@ export default function SaasOperatorClient({
   const [extraBranchQty, setExtraBranchQty] = useState(0)
   const [extraEntityUnitPrice, setExtraEntityUnitPrice] = useState(String(EXTRA_ENTITY_UNIT_PRICE))
   const [extraBranchUnitPrice, setExtraBranchUnitPrice] = useState(String(EXTRA_BRANCH_UNIT_PRICE))
-  const [addonPromoPrices, setAddonPromoPrices] = useState<Record<string, string>>(() => (
-    Object.fromEntries(OPERATOR_ADDON_OPTIONS.map((addon) => [addon.id, String(addon.price)]))
-  ))
-  const [addonAnchorPrices, setAddonAnchorPrices] = useState<Record<string, string>>(() => (
-    Object.fromEntries(OPERATOR_ADDON_OPTIONS.map((addon) => [addon.id, String(addon.anchorPrice || addon.price)]))
-  ))
+  const [addonPromoPrices, setAddonPromoPrices] = useState<Record<string, string>>(createDefaultAddonPromoMap)
+  const [addonAnchorPrices, setAddonAnchorPrices] = useState<Record<string, string>>(createDefaultAddonAnchorMap)
   const [overrideAmount, setOverrideAmount] = useState('')
   const [durationMonths, setDurationMonths] = useState('1')
   const [discountPercent, setDiscountPercent] = useState('0')
   const [taxPercent, setTaxPercent] = useState('0')
+  const [note, setNote] = useState('')
 
   const isQuotesMode = mode === 'quotes'
 
@@ -99,6 +259,13 @@ export default function SaasOperatorClient({
     () => snapshot.aiTokenPackages.find((pkg) => pkg.id === selectedAiTokenPackageId) || null,
     [snapshot.aiTokenPackages, selectedAiTokenPackageId]
   )
+  const addonOptionByName = useMemo(() => (
+    new Map(OPERATOR_ADDON_OPTIONS.map((addon) => [addon.name.trim().toLowerCase(), addon]))
+  ), [])
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
 
   const parseSafeNumber = (raw: string | number, fallback = 0) => {
     const num = Number(raw)
@@ -153,15 +320,163 @@ export default function SaasOperatorClient({
   const estimateTaxAmount = ((estimateSubtotal - estimateDiscountAmount) * safeTaxPercent) / 100
   const estimateGrandTotal = Math.max(0, estimateSubtotal - estimateDiscountAmount + estimateTaxAmount)
 
-  const handleCreateQuote = (formData: FormData) => {
+  const resetQuoteForm = () => {
+    setEditingQuoteId(null)
+    setEditingSaleInvoiceId(null)
+    setSelectedOrgId('')
+    setSelectedPackageId('')
+    setSelectedAddonIds([])
+    setSelectedModules([])
+    setSelectedAiTokenPackageId('')
+    setExtraEntityQty(0)
+    setExtraBranchQty(0)
+    setExtraEntityUnitPrice(String(EXTRA_ENTITY_UNIT_PRICE))
+    setExtraBranchUnitPrice(String(EXTRA_BRANCH_UNIT_PRICE))
+    setAddonPromoPrices(createDefaultAddonPromoMap())
+    setAddonAnchorPrices(createDefaultAddonAnchorMap())
+    setOverrideAmount('')
+    setDurationMonths('1')
+    setDiscountPercent('0')
+    setTaxPercent('0')
+    setNote('')
+  }
+
+  const handleSaveQuote = (formData: FormData) => {
     startTransition(async () => {
-      const res = await createOperatorQuotation(formData)
+      const res = editingQuoteId
+        ? (() => {
+            formData.set('quote_id', editingQuoteId)
+            return updateOperatorQuotation(formData)
+          })()
+        : editingSaleInvoiceId
+          ? (() => {
+              formData.set('invoice_id', editingSaleInvoiceId)
+              return updateOperatorSaleInvoice(formData)
+            })()
+          : createOperatorQuotation(formData)
+      const resolved = await res
+
+      if ('error' in resolved && resolved.error) {
+        setMsg({ type: 'err', text: resolved.error })
+        return
+      }
+
+      const invoiceNumber = 'invoiceNumber' in resolved ? resolved.invoiceNumber : '-'
+      if (editingQuoteId) {
+        setMsg({ type: 'ok', text: `Penawaran berhasil diperbarui (${invoiceNumber}).` })
+        resetQuoteForm()
+      } else if (editingSaleInvoiceId) {
+        setMsg({ type: 'ok', text: `Invoice berhasil diperbarui (${invoiceNumber}).` })
+        resetQuoteForm()
+      } else {
+        setMsg({ type: 'ok', text: `Penawaran berhasil dibuat (${invoiceNumber}).` })
+      }
+
+      router.refresh()
+    })
+  }
+
+  const handleStartEditQuote = (quote: InvoiceRecord) => {
+    const parsed = parseQuoteDraft(quote.item_description)
+    const packageId = quote.package_id || ''
+    const defaultModules = snapshot.packages.find((pkg) => pkg.id === packageId)?.modules || []
+
+    const promoMap = createDefaultAddonPromoMap()
+    const anchorMap = createDefaultAddonAnchorMap()
+    const selectedAddons: string[] = []
+
+    parsed.addons.forEach((addon) => {
+      const mappedAddon = addonOptionByName.get(addon.name.toLowerCase())
+      if (!mappedAddon) return
+      selectedAddons.push(mappedAddon.id)
+      promoMap[mappedAddon.id] = String(addon.promoPrice || mappedAddon.price)
+      anchorMap[mappedAddon.id] = String(addon.anchorPrice || mappedAddon.anchorPrice || mappedAddon.price)
+    })
+
+    const aiTokenPackage = parsed.aiTokenLabel
+      ? snapshot.aiTokenPackages.find((pkg) => parsed.aiTokenLabel.toLowerCase().includes(pkg.name.toLowerCase()))
+      : null
+
+    setEditingQuoteId(quote.id)
+    setEditingSaleInvoiceId(null)
+    setSelectedOrgId(quote.org_id)
+    setSelectedPackageId(packageId)
+    setSelectedModules(parsed.modules.length > 0 ? parsed.modules : defaultModules)
+    setSelectedAddonIds(selectedAddons)
+    setAddonPromoPrices(promoMap)
+    setAddonAnchorPrices(anchorMap)
+    setSelectedAiTokenPackageId(aiTokenPackage?.id || '')
+    setOverrideAmount(parsed.baseAmount && parsed.baseAmount > 0 ? String(parsed.baseAmount) : '')
+    setDurationMonths(String(Math.max(1, parsed.durationMonths || 1)))
+    setDiscountPercent(String(parsed.discountPercent || Number(quote.discount_percent || 0)))
+    setTaxPercent(String(parsed.taxPercent || Number(quote.tax_percent || 0)))
+    setExtraEntityQty(parsed.extraEntityQty)
+    setExtraBranchQty(parsed.extraBranchQty)
+    setExtraEntityUnitPrice(String(parsed.extraEntityUnitPrice || EXTRA_ENTITY_UNIT_PRICE))
+    setExtraBranchUnitPrice(String(parsed.extraBranchUnitPrice || EXTRA_BRANCH_UNIT_PRICE))
+    setNote(parsed.note || '')
+    setMsg({ type: 'ok', text: `Mode edit aktif untuk ${quote.invoice_number}.` })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleStartEditSale = (invoice: InvoiceRecord) => {
+    const parsed = parseQuoteDraft(invoice.item_description)
+    const packageId = invoice.package_id || ''
+    const defaultModules = snapshot.packages.find((pkg) => pkg.id === packageId)?.modules || []
+
+    const promoMap = createDefaultAddonPromoMap()
+    const anchorMap = createDefaultAddonAnchorMap()
+    const selectedAddons: string[] = []
+
+    parsed.addons.forEach((addon) => {
+      const mappedAddon = addonOptionByName.get(addon.name.toLowerCase())
+      if (!mappedAddon) return
+      selectedAddons.push(mappedAddon.id)
+      promoMap[mappedAddon.id] = String(addon.promoPrice || mappedAddon.price)
+      anchorMap[mappedAddon.id] = String(addon.anchorPrice || mappedAddon.anchorPrice || mappedAddon.price)
+    })
+
+    const aiTokenPackage = parsed.aiTokenLabel
+      ? snapshot.aiTokenPackages.find((pkg) => parsed.aiTokenLabel.toLowerCase().includes(pkg.name.toLowerCase()))
+      : null
+
+    setEditingQuoteId(null)
+    setEditingSaleInvoiceId(invoice.id)
+    setSelectedOrgId(invoice.org_id)
+    setSelectedPackageId(packageId)
+    setSelectedModules(parsed.modules.length > 0 ? parsed.modules : defaultModules)
+    setSelectedAddonIds(selectedAddons)
+    setAddonPromoPrices(promoMap)
+    setAddonAnchorPrices(anchorMap)
+    setSelectedAiTokenPackageId(aiTokenPackage?.id || '')
+    setOverrideAmount(parsed.baseAmount && parsed.baseAmount > 0 ? String(parsed.baseAmount) : '')
+    setDurationMonths(String(Math.max(1, parsed.durationMonths || 1)))
+    setDiscountPercent(String(parsed.discountPercent || Number(invoice.discount_percent || 0)))
+    setTaxPercent(String(parsed.taxPercent || Number(invoice.tax_percent || 0)))
+    setExtraEntityQty(parsed.extraEntityQty)
+    setExtraBranchQty(parsed.extraBranchQty)
+    setExtraEntityUnitPrice(String(parsed.extraEntityUnitPrice || EXTRA_ENTITY_UNIT_PRICE))
+    setExtraBranchUnitPrice(String(parsed.extraBranchUnitPrice || EXTRA_BRANCH_UNIT_PRICE))
+    setNote(parsed.note || '')
+    setMsg({ type: 'ok', text: `Mode edit invoice aktif untuk ${invoice.invoice_number}.` })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleDeleteQuote = (invoiceId: string, invoiceNumber: string) => {
+    const confirmed = window.confirm(`Hapus penawaran ${invoiceNumber}? Tindakan ini tidak bisa dibatalkan.`)
+    if (!confirmed) return
+
+    startTransition(async () => {
+      const res = await deleteOperatorQuotation(invoiceId)
       if ('error' in res && res.error) {
         setMsg({ type: 'err', text: res.error })
         return
       }
 
-      setMsg({ type: 'ok', text: `Penawaran berhasil dibuat (${res.invoiceNumber}).` })
+      if (editingQuoteId === invoiceId) {
+        resetQuoteForm()
+      }
+      setMsg({ type: 'ok', text: `Penawaran ${invoiceNumber} berhasil dihapus.` })
       router.refresh()
     })
   }
@@ -185,9 +500,22 @@ export default function SaasOperatorClient({
         setMsg({ type: 'err', text: res.error })
         return
       }
+      if (editingSaleInvoiceId === invoiceId) {
+        resetQuoteForm()
+      }
       setMsg({ type: 'ok', text: 'Penjualan ditandai PAID dan paket tenant diaktifkan.' })
       router.refresh()
     })
+  }
+
+  if (!isHydrated) {
+    return (
+      <div className="space-y-6 pb-20">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-500">
+          Memuat modul penawaran SaaS...
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -240,10 +568,16 @@ export default function SaasOperatorClient({
         </div>
       )}
 
-      {isQuotesMode && (
+      {(isQuotesMode || Boolean(editingSaleInvoiceId)) && (
         <div className="rounded-3xl border border-slate-200 bg-white p-5">
-          <h2 className="text-sm font-black uppercase tracking-wider text-slate-700">Buat Penawaran SaaS Baru</h2>
-          <form action={handleCreateQuote} className="mt-4 space-y-4">
+          <h2 className="text-sm font-black uppercase tracking-wider text-slate-700">
+            {editingQuoteId
+              ? 'Edit Penawaran SaaS'
+              : editingSaleInvoiceId
+                ? 'Edit Invoice SaaS'
+                : 'Buat Penawaran SaaS Baru'}
+          </h2>
+          <form action={handleSaveQuote} className="mt-4 space-y-4">
             {(snapshot.orgs.length === 0 || snapshot.packages.length === 0) && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700">
                 Data tenant/paket belum terbaca. Pastikan daftar tenant & paket tersedia di halaman Admin dan akun ini punya akses ke data tersebut.
@@ -257,7 +591,14 @@ export default function SaasOperatorClient({
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <label className="space-y-1.5">
                   <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Tenant</span>
-                  <select name="org_id" required className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold">
+                  <select
+                    name="org_id"
+                    required
+                    value={selectedOrgId}
+                    onChange={(event) => setSelectedOrgId(event.target.value)}
+                    disabled={Boolean(editingSaleInvoiceId)}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold"
+                  >
                     <option value="">Pilih Tenant</option>
                     {snapshot.orgs.map((org) => (
                       <option key={org.id} value={org.id}>{org.name}</option>
@@ -305,7 +646,9 @@ export default function SaasOperatorClient({
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="mb-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">2. Penyesuaian Harga</p>
-                <p className="mt-1 text-sm font-semibold text-slate-600">Atur durasi, diskon setelah durasi, pajak, dan catatan penawaran dalam satu blok.</p>
+                <p className="mt-1 text-sm font-semibold text-slate-600">
+                  Atur durasi, diskon setelah durasi, pajak, dan catatan {editingSaleInvoiceId ? 'invoice' : 'penawaran'} dalam satu blok.
+                </p>
               </div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <label className="space-y-1.5">
@@ -351,10 +694,14 @@ export default function SaasOperatorClient({
                 </label>
               </div>
               <label className="mt-3 block space-y-1.5">
-                <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Catatan Penawaran</span>
+                <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  {editingSaleInvoiceId ? 'Catatan Invoice' : 'Catatan Penawaran'}
+                </span>
                 <textarea
                   name="note"
                   rows={2}
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
                   placeholder="Catatan penawaran (opsional)"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold"
                 />
@@ -524,6 +871,8 @@ export default function SaasOperatorClient({
             <input type="hidden" name="extra_branch_unit_price" value={extraBranchUnitPriceValue} />
             <input type="hidden" name="addon_price_overrides_json" value={JSON.stringify(addonPromoPrices)} />
             <input type="hidden" name="addon_anchor_overrides_json" value={JSON.stringify(addonAnchorPrices)} />
+            {editingQuoteId && <input type="hidden" name="quote_id" value={editingQuoteId} />}
+            {editingSaleInvoiceId && <input type="hidden" name="invoice_id" value={editingSaleInvoiceId} />}
 
             <div className="flex flex-col gap-2 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
               <div className="text-xs font-bold text-slate-600">
@@ -532,13 +881,39 @@ export default function SaasOperatorClient({
                   Subtotal bulanan {formatIdr(estimateMonthlySubtotal)} x {safeDurationMonths} bulan + one-time {formatIdr(estimateOneTimeSubtotal)} = {formatIdr(estimateSubtotal)} • Diskon {formatIdr(estimateDiscountAmount)} • Pajak {formatIdr(estimateTaxAmount)}
                 </div>
               </div>
-              <button
-                type="submit"
-                disabled={isPending || !selectedPackageId}
-                className="h-11 rounded-xl bg-[#003366] px-4 text-xs font-black uppercase tracking-wider text-white disabled:opacity-60"
-              >
-                {isPending ? 'Menyimpan...' : 'Buat Penawaran'}
-              </button>
+              <div className="flex items-center gap-2">
+                {editingQuoteId && (
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={resetQuoteForm}
+                    className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-xs font-black uppercase tracking-wider text-slate-600 disabled:opacity-60"
+                  >
+                    Batal Edit
+                  </button>
+                )}
+                {editingSaleInvoiceId && !editingQuoteId && (
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={resetQuoteForm}
+                    className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-xs font-black uppercase tracking-wider text-slate-600 disabled:opacity-60"
+                  >
+                    Batal Edit
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={isPending || !selectedOrgId || !selectedPackageId}
+                  className="h-11 rounded-xl bg-[#003366] px-4 text-xs font-black uppercase tracking-wider text-white disabled:opacity-60"
+                >
+                  {isPending
+                    ? 'Menyimpan...'
+                    : editingQuoteId || editingSaleInvoiceId
+                      ? 'Simpan Perubahan'
+                      : 'Buat Penawaran'}
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -580,8 +955,11 @@ export default function SaasOperatorClient({
                   <td className="px-3 py-3 font-semibold text-slate-700">{item.organization?.name || '-'}</td>
                   <td className="px-3 py-3">
                     <div className="font-bold text-slate-800">{item.item_name || '-'}</div>
-                    {item.item_description && (
-                      <div className="mt-1 text-xs text-slate-500">{item.item_description}</div>
+                    {item.item_description && <div className="mt-1 text-xs text-slate-500 whitespace-pre-line">{item.item_description}</div>}
+                    {extractQuoteNote(item.item_description) && (
+                      <div className="mt-1 whitespace-pre-line rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
+                        Catatan: {extractQuoteNote(item.item_description)}
+                      </div>
                     )}
                   </td>
                   <td className="px-3 py-3 font-black text-[#003366]">{formatIdr(Number(item.amount || 0))}</td>
@@ -601,7 +979,15 @@ export default function SaasOperatorClient({
                   <td className="px-3 py-3 text-xs font-semibold text-slate-500">{formatDate(item.created_at)}</td>
                   <td className="px-3 py-3">
                     {isQuotesMode ? (
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => handleStartEditQuote(item)}
+                          className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-indigo-700 disabled:opacity-60"
+                        >
+                          Edit
+                        </button>
                         <button
                           type="button"
                           disabled={isPending}
@@ -616,9 +1002,25 @@ export default function SaasOperatorClient({
                         >
                           <Download size={11} /> Download
                         </Link>
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => handleDeleteQuote(item.id, item.invoice_number)}
+                          className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-rose-700 disabled:opacity-60"
+                        >
+                          Hapus
+                        </button>
                       </div>
                     ) : item.status !== 'PAID' ? (
                       <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => handleStartEditSale(item)}
+                          className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-indigo-700 disabled:opacity-60"
+                        >
+                          Edit Invoice
+                        </button>
                         <button
                           type="button"
                           disabled={isPending}

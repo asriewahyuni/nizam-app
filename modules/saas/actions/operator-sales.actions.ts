@@ -50,6 +50,18 @@ type PackageLookup = {
   price: number
 }
 
+type QuotationDraft = {
+  orgId: string
+  packageId: string
+  packageName: string
+  finalAmount: number
+  discountPercent: number
+  discountAmount: number
+  taxPercent: number
+  taxAmount: number
+  itemDescription: string
+}
+
 export type OperatorInvoiceDocument = {
   id: string
   org_id: string
@@ -641,10 +653,7 @@ export async function getOperatorSaasSnapshot(): Promise<OperatorSnapshot> {
   return { orgs, packages, aiTokenPackages, quotations, sales, summary }
 }
 
-export async function createOperatorQuotation(formData: FormData) {
-  await assertPlatformAdmin()
-  const admin = await createAdminClient()
-
+async function buildQuotationDraftFromFormData(admin: any, formData: FormData): Promise<{ error: string } | { data: QuotationDraft }> {
   const orgId = String(formData.get('org_id') || '')
   const packageId = String(formData.get('package_id') || '')
   const note = String(formData.get('note') || '').trim()
@@ -784,30 +793,53 @@ export async function createOperatorQuotation(formData: FormData) {
     ...(note ? [`Catatan: ${note}`] : []),
   ]
 
-  const itemDescription = detailLines.join('\n')
+  return {
+    data: {
+      orgId,
+      packageId,
+      packageName: pkg.name,
+      finalAmount,
+      discountPercent,
+      discountAmount,
+      taxPercent,
+      taxAmount,
+      itemDescription: detailLines.join('\n') || 'Penawaran dibuat oleh operator SaaS',
+    },
+  }
+}
+
+export async function createOperatorQuotation(formData: FormData) {
+  await assertPlatformAdmin()
+  const admin = await createAdminClient()
+
+  const draftResult = await buildQuotationDraftFromFormData(admin, formData)
+  if ('error' in draftResult) {
+    return { error: draftResult.error }
+  }
+  const draft = draftResult.data
   const invoiceNumber = buildQuoteNumber()
   const baseInvoicePayload = {
-    org_id: orgId,
-    package_id: packageId,
+    org_id: draft.orgId,
+    package_id: draft.packageId,
     invoice_number: invoiceNumber,
-    amount: finalAmount,
+    amount: draft.finalAmount,
     status: 'UNPAID',
     due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
   }
 
   const payloadWithItemsAndPricing = {
     ...baseInvoicePayload,
-    item_name: `Penawaran SaaS: ${pkg.name}`,
-    item_description: itemDescription || 'Penawaran dibuat oleh operator SaaS',
-    discount_percent: discountPercent,
-    discount_amount: discountAmount,
-    tax_percent: taxPercent,
-    tax_amount: taxAmount,
+    item_name: `Penawaran SaaS: ${draft.packageName}`,
+    item_description: draft.itemDescription,
+    discount_percent: draft.discountPercent,
+    discount_amount: draft.discountAmount,
+    tax_percent: draft.taxPercent,
+    tax_amount: draft.taxAmount,
   }
   const payloadWithItemsOnly = {
     ...baseInvoicePayload,
-    item_name: `Penawaran SaaS: ${pkg.name}`,
-    item_description: itemDescription || 'Penawaran dibuat oleh operator SaaS',
+    item_name: `Penawaran SaaS: ${draft.packageName}`,
+    item_description: draft.itemDescription,
   }
 
   let error: { message: string } | null = null
@@ -833,6 +865,235 @@ export async function createOperatorQuotation(formData: FormData) {
   revalidatePath('/saas/penawaran')
   revalidatePath('/saas/penjualan')
   return { success: true, invoiceNumber }
+}
+
+export async function updateOperatorQuotation(formData: FormData) {
+  await assertPlatformAdmin()
+  const admin = await createAdminClient()
+
+  const quoteId = String(formData.get('quote_id') || '').trim()
+  if (!quoteId) return { error: 'ID penawaran tidak valid.' }
+
+  const { data: currentQuoteData } = await admin
+    .from('saas_invoices')
+    .select('id, invoice_number, status, due_date')
+    .eq('id', quoteId)
+    .maybeSingle()
+  const currentQuote = currentQuoteData as Pick<InvoiceRecord, 'id' | 'invoice_number' | 'status' | 'due_date'> | null
+
+  if (!currentQuote) return { error: 'Data penawaran tidak ditemukan.' }
+  if (!isQuotationNumber(currentQuote.invoice_number)) {
+    return { error: 'Data ini bukan penawaran yang bisa diubah.' }
+  }
+  if (currentQuote.status === 'PAID') {
+    return { error: 'Penawaran yang sudah PAID tidak bisa diedit.' }
+  }
+
+  const draftResult = await buildQuotationDraftFromFormData(admin, formData)
+  if ('error' in draftResult) {
+    return { error: draftResult.error }
+  }
+  const draft = draftResult.data
+
+  const baseUpdatePayload = {
+    org_id: currentSale.org_id,
+    package_id: draft.packageId,
+    amount: draft.finalAmount,
+    due_date: currentQuote.due_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+  const payloadWithItemsAndPricing = {
+    ...baseUpdatePayload,
+    item_name: `Penawaran SaaS: ${draft.packageName}`,
+    item_description: draft.itemDescription,
+    discount_percent: draft.discountPercent,
+    discount_amount: draft.discountAmount,
+    tax_percent: draft.taxPercent,
+    tax_amount: draft.taxAmount,
+  }
+  const payloadWithItemsOnly = {
+    ...baseUpdatePayload,
+    item_name: `Penawaran SaaS: ${draft.packageName}`,
+    item_description: draft.itemDescription,
+  }
+
+  let error: { message: string } | null = null
+  const updateAttempts = [payloadWithItemsAndPricing, payloadWithItemsOnly, baseUpdatePayload]
+
+  for (const payload of updateAttempts) {
+    const updateRes = await (admin.from('saas_invoices') as any)
+      .update(payload)
+      .eq('id', quoteId)
+    if (!updateRes.error) {
+      error = null
+      break
+    }
+
+    error = { message: updateRes.error.message }
+    if (!updateRes.error.message.includes('Could not find the')) {
+      break
+    }
+  }
+
+  if (error) {
+    return { error: `Gagal mengubah penawaran: ${error.message}` }
+  }
+
+  revalidatePath('/saas/penawaran')
+  revalidatePath('/saas/penjualan')
+  revalidatePath(`/saas/dokumen/${quoteId}`)
+  return { success: true, invoiceNumber: currentQuote.invoice_number }
+}
+
+export async function updateOperatorSaleInvoice(formData: FormData) {
+  const actor = await assertPlatformAdmin()
+  const admin = await createAdminClient()
+
+  const invoiceId = String(formData.get('invoice_id') || '').trim()
+  if (!invoiceId) return { error: 'ID invoice penjualan tidak valid.' }
+
+  const { data: currentSaleData } = await admin
+    .from('saas_invoices')
+    .select('id, org_id, package_id, invoice_number, status, due_date, created_at, amount, tax_amount')
+    .eq('id', invoiceId)
+    .maybeSingle()
+  const currentSale = currentSaleData as Pick<InvoiceRecord, 'id' | 'org_id' | 'package_id' | 'invoice_number' | 'status' | 'due_date' | 'created_at' | 'amount' | 'tax_amount'> | null
+
+  if (!currentSale) return { error: 'Data invoice penjualan tidak ditemukan.' }
+  if (isQuotationNumber(currentSale.invoice_number)) {
+    return { error: 'Data ini adalah penawaran. Gunakan menu edit penawaran.' }
+  }
+  if (currentSale.status === 'PAID') {
+    return { error: 'Invoice penjualan yang sudah PAID tidak bisa diedit.' }
+  }
+
+  const draftResult = await buildQuotationDraftFromFormData(admin, formData)
+  if ('error' in draftResult) {
+    return { error: draftResult.error }
+  }
+  const draft = draftResult.data
+
+  const preflightJournal = await ensureOperatorSaleJournal(admin, actor.id, {
+    id: currentSale.id,
+    org_id: currentSale.org_id,
+    invoice_number: currentSale.invoice_number,
+    amount: draft.finalAmount,
+    tax_amount: draft.taxAmount,
+    created_at: currentSale.created_at,
+  })
+  if (preflightJournal.error) {
+    return { error: `Gagal validasi jurnal penjualan: ${preflightJournal.error}` }
+  }
+
+  const baseUpdatePayload = {
+    org_id: draft.orgId,
+    package_id: draft.packageId,
+    amount: draft.finalAmount,
+    due_date: currentSale.due_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+  const payloadWithItemsAndPricing = {
+    ...baseUpdatePayload,
+    item_name: `Invoice SaaS: ${draft.packageName}`,
+    item_description: draft.itemDescription,
+    discount_percent: draft.discountPercent,
+    discount_amount: draft.discountAmount,
+    tax_percent: draft.taxPercent,
+    tax_amount: draft.taxAmount,
+  }
+  const payloadWithItemsOnly = {
+    ...baseUpdatePayload,
+    item_name: `Invoice SaaS: ${draft.packageName}`,
+    item_description: draft.itemDescription,
+  }
+
+  let error: { message: string } | null = null
+  const updateAttempts = [payloadWithItemsAndPricing, payloadWithItemsOnly, baseUpdatePayload]
+
+  for (const payload of updateAttempts) {
+    const updateRes = await (admin.from('saas_invoices') as any)
+      .update(payload)
+      .eq('id', invoiceId)
+    if (!updateRes.error) {
+      error = null
+      break
+    }
+
+    error = { message: updateRes.error.message }
+    if (!updateRes.error.message.includes('Could not find the')) {
+      break
+    }
+  }
+
+  if (error) {
+    return { error: `Gagal mengubah invoice penjualan: ${error.message}` }
+  }
+
+  if (preflightJournal.entryId && preflightJournal.existed) {
+    await deleteJournalById(admin, preflightJournal.entryId)
+
+    const recreatedJournal = await ensureOperatorSaleJournal(admin, actor.id, {
+      id: currentSale.id,
+      org_id: currentSale.org_id,
+      invoice_number: currentSale.invoice_number,
+      amount: draft.finalAmount,
+      tax_amount: draft.taxAmount,
+      created_at: currentSale.created_at,
+    })
+
+    if (recreatedJournal.error) {
+      // best effort rollback journal dengan nominal sebelumnya
+      await ensureOperatorSaleJournal(admin, actor.id, {
+        id: currentSale.id,
+        org_id: currentSale.org_id,
+        invoice_number: currentSale.invoice_number,
+        amount: currentSale.amount,
+        tax_amount: currentSale.tax_amount,
+        created_at: currentSale.created_at,
+      })
+      return { error: `Invoice tersimpan, tetapi sinkronisasi jurnal gagal: ${recreatedJournal.error}. Cek jurnal penjualan secara manual.` }
+    }
+  }
+
+  revalidatePath('/saas/penjualan')
+  revalidatePath('/saas/penawaran')
+  revalidatePath('/accounting/journal')
+  revalidatePath(`/saas/dokumen/${invoiceId}`)
+  return { success: true, invoiceNumber: currentSale.invoice_number }
+}
+
+export async function deleteOperatorQuotation(invoiceId: string) {
+  await assertPlatformAdmin()
+  const admin = await createAdminClient()
+
+  if (!invoiceId) return { error: 'ID penawaran tidak valid.' }
+
+  const { data: quoteData } = await admin
+    .from('saas_invoices')
+    .select('id, invoice_number, status')
+    .eq('id', invoiceId)
+    .maybeSingle()
+  const quote = quoteData as Pick<InvoiceRecord, 'id' | 'invoice_number' | 'status'> | null
+
+  if (!quote) return { error: 'Data penawaran tidak ditemukan.' }
+  if (!isQuotationNumber(quote.invoice_number)) {
+    return { error: 'Data ini bukan penawaran yang bisa dihapus.' }
+  }
+  if (quote.status === 'PAID') {
+    return { error: 'Penawaran yang sudah PAID tidak bisa dihapus.' }
+  }
+
+  const { error } = await (admin.from('saas_invoices') as any)
+    .delete()
+    .eq('id', invoiceId)
+
+  if (error) {
+    return { error: `Gagal menghapus penawaran: ${error.message}` }
+  }
+
+  revalidatePath('/saas/penawaran')
+  revalidatePath('/saas/penjualan')
+  return { success: true }
 }
 
 export async function convertQuotationToSale(invoiceId: string) {

@@ -584,6 +584,26 @@ Guards both `/admin` and `/saas/*` routes.
 - Editable anchor/actual pricing per add-on
 - Support ticketing lifecycle (create ticket, operator progress update, doc update feed)
 
+**Latest delivery (April 2026):**
+- Added `Quick Bill` add-on as `Single Bill` (one-time) in SaaS operator pricing.
+- Quotation pricing now supports duration-based calculation: monthly subtotal is multiplied by duration first, then discount and tax are applied.
+- Document numbers were shortened:
+  - Quotation: `QTN-YYMMDD-XXXX`
+  - Invoice: `INV-YYMMDD-XXXX`
+- Added quotation management operations:
+  - Edit quotation (UNPAID only)
+  - Delete quotation (UNPAID only)
+- Added sales invoice edit operation:
+  - Edit invoice (UNPAID only)
+  - Includes automatic journal re-sync safety checks for sale journal consistency.
+- Added multiline note extraction/display compatibility for historical documents:
+  - Supports labels `Catatan`, `Catatan tambahan`, `Catatan penawaran`, `Catatan invoice`, and `Note`.
+  - Supports legacy stored text containing literal `\\n`.
+- SaaS document print layout refinements:
+  - Header metadata block (invoice number/date) remains aligned on the right in print/PDF mode.
+  - Discount row in invoice totals is highlighted for visibility.
+- Hydration stability hardening on SaaS operator pages and SaaS document view to prevent SSR/CSR mismatch and hook-order runtime errors.
+
 ---
 
 ## 8. Shared UI Components

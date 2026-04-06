@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
@@ -92,6 +92,7 @@ type QuoteBreakdown = {
   baseAmount: number | null
   durationMonths: number
   monthlySubtotal: number | null
+  durationSubtotal: number | null
   addons: QuoteAddon[]
   aiTokenLabel: string | null
   aiTokenTotal: number
@@ -116,6 +117,7 @@ function createEmptyBreakdown(): QuoteBreakdown {
     baseAmount: null,
     durationMonths: 1,
     monthlySubtotal: null,
+    durationSubtotal: null,
     addons: [],
     aiTokenLabel: null,
     aiTokenTotal: 0,
@@ -138,7 +140,8 @@ function createEmptyBreakdown(): QuoteBreakdown {
 
 function parseQuoteBreakdown(rawDescription: string | null | undefined): QuoteBreakdown {
   const breakdown = createEmptyBreakdown()
-  const lines = String(rawDescription || '')
+  const normalizedDescription = String(rawDescription || '').replace(/\\n/g, '\n')
+  const lines = normalizedDescription
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
@@ -235,6 +238,12 @@ function parseQuoteBreakdown(rawDescription: string | null | undefined): QuoteBr
       return
     }
 
+    const durationSubtotalMatch = line.match(/^Subtotal durasi\s+\(\d+\s+bulan\):\s+(.+)$/i)
+    if (durationSubtotalMatch) {
+      breakdown.durationSubtotal = parseCurrencyValue(durationSubtotalMatch[1])
+      return
+    }
+
     if (line.startsWith('Subtotal:')) {
       breakdown.subtotal = parseCurrencyValue(line.slice('Subtotal:'.length))
       return
@@ -268,12 +277,17 @@ function parseQuoteBreakdown(rawDescription: string | null | undefined): QuoteBr
       return
     }
 
-    if (line.startsWith('Catatan:')) {
-      breakdown.note = line.slice('Catatan:'.length).trim() || null
-    }
   })
 
+  breakdown.note = extractAdditionalNote(normalizedDescription)
   return breakdown
+}
+
+function extractAdditionalNote(rawDescription: string | null | undefined) {
+  const normalizedDescription = String(rawDescription || '').replace(/\\n/g, '\n')
+  const blockMatch = normalizedDescription.match(/(?:^|\n)(Catatan(?:\s+tambahan|\s+penawaran|\s+invoice)?|Note)\s*[:\-]?\s*([\s\S]*)$/i)
+  if (blockMatch?.[2]) return blockMatch[2].trim()
+  return null
 }
 
 type PricingRow = {
@@ -295,13 +309,23 @@ function TotalsRow({
   label,
   value,
   strong = false,
+  highlight = false,
 }: {
   label: string
   value: string
   strong?: boolean
+  highlight?: boolean
 }) {
   return (
-    <div className={`flex items-center justify-between ${strong ? 'text-base font-black text-slate-900' : 'text-sm font-semibold text-slate-600'}`}>
+    <div
+      className={`flex items-center justify-between ${
+        highlight
+          ? 'rounded-xl border border-amber-300 bg-amber-100 px-3 py-2 text-sm font-black text-amber-900'
+          : strong
+            ? 'text-base font-black text-slate-900'
+            : 'text-sm font-semibold text-slate-600'
+      }`}
+    >
       <span>{label}</span>
       <span>{value}</span>
     </div>
@@ -313,8 +337,13 @@ export default function SaasDocumentView({
 }: {
   snapshot: OperatorDocumentSnapshot
 }) {
+  const [isHydrated, setIsHydrated] = useState(false)
   const router = useRouter()
   const { invoice, saasConfig, packageModules } = snapshot
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
 
   const isQuotation = isQuotationNumber(invoice.invoice_number)
   const documentLabel = isQuotation ? 'Surat Penawaran' : 'Invoice'
@@ -323,35 +352,36 @@ export default function SaasDocumentView({
 
   const bankInfo = useMemo(() => normalizeBankInfo(saasConfig.bank_info), [saasConfig.bank_info])
   const breakdown = useMemo(() => parseQuoteBreakdown(invoice.item_description), [invoice.item_description])
+  const additionalNote = useMemo(
+    () => breakdown.note || extractAdditionalNote(invoice.item_description),
+    [breakdown.note, invoice.item_description]
+  )
 
   const includedModules = breakdown.modules.length > 0 ? breakdown.modules : packageModules
   const selectedAddonNames = breakdown.addons.map((addon) => addon.name)
 
   const pricingRows = useMemo<PricingRow[]>(() => {
     const rows: PricingRow[] = []
-    const durationMultiplier = Math.max(1, breakdown.durationMonths || 1)
 
     if (breakdown.baseAmount && breakdown.baseAmount > 0) {
       rows.push({
         label: itemName,
-        qty: durationMultiplier,
-        total: breakdown.baseAmount * durationMultiplier,
-        note: invoice.package?.billing ? `Skema billing: ${invoice.package.billing} • ${durationMultiplier} bulan` : `${durationMultiplier} bulan`,
+        qty: 1,
+        total: breakdown.baseAmount,
+        note: invoice.package?.billing ? `Skema billing: ${invoice.package.billing} • per bulan` : 'Per bulan',
       })
     }
 
     breakdown.addons.forEach((addon) => {
-      const qty = addon.isSingleBill ? 1 : durationMultiplier
-      const total = addon.promoPrice * qty
       rows.push({
         label: `Add-on ${addon.name}`,
-        qty,
-        total,
+        qty: 1,
+        total: addon.promoPrice,
         note: addon.anchorPrice && addon.anchorPrice > addon.promoPrice
-          ? `Harga normal ${formatIdr(addon.anchorPrice)}${addon.isSingleBill ? ' • single bill' : ` • ${durationMultiplier} bulan`}`
+          ? `Harga normal ${formatIdr(addon.anchorPrice)}${addon.isSingleBill ? ' • single bill' : ' • per bulan'}`
           : addon.anchorPrice
-            ? `Harga add-on ${formatIdr(addon.anchorPrice)}${addon.isSingleBill ? ' • single bill' : ` • ${durationMultiplier} bulan`}`
-            : addon.isSingleBill ? 'Single bill' : `${durationMultiplier} bulan`,
+            ? `Harga add-on ${formatIdr(addon.anchorPrice)}${addon.isSingleBill ? ' • single bill' : ' • per bulan'}`
+            : addon.isSingleBill ? 'Single bill' : 'Per bulan',
       })
     })
 
@@ -367,18 +397,18 @@ export default function SaasDocumentView({
     if (breakdown.extraEntityQty > 0 && breakdown.extraEntityTotal > 0) {
       rows.push({
         label: 'Entitas tambahan',
-        qty: breakdown.extraEntityQty * durationMultiplier,
-        total: breakdown.extraEntityTotal * durationMultiplier,
-        note: `${formatIdr(breakdown.extraEntityUnitPrice)} per entitas • ${durationMultiplier} bulan`,
+        qty: breakdown.extraEntityQty,
+        total: breakdown.extraEntityTotal,
+        note: `${formatIdr(breakdown.extraEntityUnitPrice)} per entitas • per bulan`,
       })
     }
 
     if (breakdown.extraBranchQty > 0 && breakdown.extraBranchTotal > 0) {
       rows.push({
         label: 'Cabang tambahan',
-        qty: breakdown.extraBranchQty * durationMultiplier,
-        total: breakdown.extraBranchTotal * durationMultiplier,
-        note: `${formatIdr(breakdown.extraBranchUnitPrice)} per cabang • ${durationMultiplier} bulan`,
+        qty: breakdown.extraBranchQty,
+        total: breakdown.extraBranchTotal,
+        note: `${formatIdr(breakdown.extraBranchUnitPrice)} per cabang • per bulan`,
       })
     }
 
@@ -406,6 +436,18 @@ export default function SaasDocumentView({
       ? 'Menunggu Persetujuan'
       : 'Menunggu Pembayaran'
 
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-4 md:p-8">
+        <div className="mx-auto max-w-5xl">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-500">
+            Memuat dokumen...
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const handlePrintOrPdf = () => {
     window.print()
   }
@@ -425,7 +467,31 @@ export default function SaasDocumentView({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 print:bg-white print:p-0">
+    <>
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 10mm; }
+          body {
+            background: #fff !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          body * { visibility: hidden !important; }
+          #saas-document-card, #saas-document-card * { visibility: visible !important; }
+          #saas-document-card {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            border: none;
+            box-shadow: none;
+            background: #fff;
+          }
+        }
+      `}</style>
+      <div className="min-h-screen bg-slate-50 p-4 md:p-8 print:bg-white print:p-0">
       <div className="mx-auto max-w-5xl space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
           <button
@@ -457,9 +523,9 @@ export default function SaasDocumentView({
           id="saas-document-card"
           className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm print:rounded-none print:border-none print:shadow-none"
         >
-          <header className="bg-slate-950 px-6 py-8 text-white md:px-10">
-            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-              <div className="space-y-4">
+          <header className="bg-slate-950 px-6 py-8 text-white md:px-10 print:px-8 print:py-7">
+            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between print:flex-row print:items-start print:justify-between print:gap-8">
+              <div className="space-y-4 print:max-w-[62%]">
                 <div className="inline-flex items-center gap-3">
                   <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl bg-white/95 shadow-lg shadow-black/20 ring-1 ring-white/10">
                     <Image
@@ -486,7 +552,7 @@ export default function SaasDocumentView({
                 </div>
               </div>
 
-              <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:min-w-[280px]">
+              <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:min-w-[280px] print:ml-auto print:min-w-[290px] print:max-w-[36%]">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">Nomor Dokumen</p>
                   <p className="mt-1 text-sm font-black text-white">{invoice.invoice_number}</p>
@@ -505,7 +571,7 @@ export default function SaasDocumentView({
             </div>
           </header>
 
-          <section className="grid grid-cols-1 gap-5 border-b border-slate-100 px-6 py-6 md:grid-cols-[1.3fr_0.7fr] md:px-10">
+          <section className="grid grid-cols-1 gap-5 border-b border-slate-100 px-6 py-6 md:grid-cols-[1.3fr_0.7fr] md:px-10 print:grid-cols-[1.3fr_0.7fr]">
             <div className="space-y-3">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Kepada Yth.</p>
               <div>
@@ -542,7 +608,7 @@ export default function SaasDocumentView({
           </section>
 
           <section className="px-6 py-6 md:px-10">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto print:overflow-visible">
               <table className="w-full min-w-[640px] border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
@@ -576,8 +642,8 @@ export default function SaasDocumentView({
             </div>
           </section>
 
-          {(includedModules.length > 0 || selectedAddonNames.length > 0 || breakdown.note) && (
-            <section className="grid grid-cols-1 gap-4 border-t border-slate-100 bg-slate-50 px-6 py-6 md:grid-cols-3 md:px-10">
+          {(includedModules.length > 0 || selectedAddonNames.length > 0 || additionalNote) && (
+            <section className="grid grid-cols-1 gap-4 border-t border-slate-100 bg-slate-50 px-6 py-6 md:grid-cols-3 md:px-10 print:grid-cols-3">
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Cakupan Modul</p>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -611,15 +677,17 @@ export default function SaasDocumentView({
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Catatan Penawaran</p>
-                <p className="mt-3 text-sm font-medium leading-relaxed text-slate-600">
-                  {breakdown.note || 'Tidak ada catatan tambahan.'}
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                  {isQuotation ? 'Catatan Penawaran' : 'Catatan Invoice'}
+                </p>
+                <p className="mt-3 whitespace-pre-line text-sm font-medium leading-relaxed text-slate-600">
+                  {additionalNote || 'Tidak ada catatan tambahan.'}
                 </p>
               </div>
             </section>
           )}
 
-          <section className="grid grid-cols-1 gap-6 px-6 py-6 md:grid-cols-[1.1fr_0.9fr] md:px-10">
+          <section className="grid grid-cols-1 gap-6 px-6 py-6 md:grid-cols-[1.1fr_0.9fr] md:px-10 print:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
                 <CreditCard size={12} /> Pembayaran
@@ -642,11 +710,21 @@ export default function SaasDocumentView({
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <div className="space-y-3">
+                {breakdown.monthlySubtotal && breakdown.monthlySubtotal > 0 && (
+                  <TotalsRow label="Subtotal Bulanan" value={formatIdr(breakdown.monthlySubtotal)} />
+                )}
+                {Math.max(1, breakdown.durationMonths || 1) > 1 && (
+                  <TotalsRow label="Durasi" value={`${Math.max(1, breakdown.durationMonths || 1)} bulan`} />
+                )}
+                {breakdown.durationSubtotal && breakdown.durationSubtotal > 0 && (
+                  <TotalsRow label="Subtotal x Durasi" value={formatIdr(breakdown.durationSubtotal)} />
+                )}
                 <TotalsRow label="Subtotal" value={formatIdr(subtotalAmount)} />
                 {discountAmount > 0 && (
                   <TotalsRow
                     label={`Diskon${(breakdown.discountPercent ?? Number(invoice.discount_percent || 0)) > 0 ? ` (${breakdown.discountPercent ?? Number(invoice.discount_percent || 0)}%)` : ''}`}
                     value={formatIdr(discountAmount)}
+                    highlight={!isQuotation}
                   />
                 )}
                 {taxAmount > 0 && (
@@ -672,5 +750,6 @@ export default function SaasDocumentView({
         </article>
       </div>
     </div>
+    </>
   )
 }
