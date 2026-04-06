@@ -1,42 +1,69 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
+import { prisma } from '@/lib/prisma'
+import { ensureAccountingAccess, formatDateOnly, getCurrentUserId, parseDateOnly } from '@/modules/accounting/lib/reporting.server'
+
+function normalizeFiscalPeriod(period: {
+  id: string
+  org_id: string
+  name: string
+  start_date: Date
+  end_date: Date
+  is_closed: boolean
+  closed_at: Date | null
+  closed_by: string | null
+  created_at: Date
+}) {
+  return {
+    id: period.id,
+    org_id: period.org_id,
+    name: period.name,
+    start_date: formatDateOnly(period.start_date),
+    end_date: formatDateOnly(period.end_date),
+    is_closed: period.is_closed,
+    closed_at: period.closed_at?.toISOString() || null,
+    closed_by: period.closed_by,
+    created_at: period.created_at.toISOString(),
+  }
+}
 
 export async function getFiscalPeriods(orgId: string) {
-  const supabase = await createClient()
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) return []
 
-  const { data, error } = await (supabase as any)
-    .from('fiscal_periods')
-    .select('*')
-    .eq('org_id', orgId)
-    .order('start_date', { ascending: false })
+  const periods = await prisma.fiscal_periods.findMany({
+    where: { org_id: orgId },
+    orderBy: { start_date: 'desc' },
+  })
 
-  if (error) return []
-  return data
+  return periods.map(normalizeFiscalPeriod)
 }
 
 export async function createFiscalPeriod(orgId: string, input: {
-  name: string,
-  start_date: string,
+  name: string
+  start_date: string
   end_date: string
 }) {
-  const supabase = await createClient()
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) return { error: 'Unauthorized' }
 
-  const { error } = await (supabase as any)
-    .from('fiscal_periods')
-    .insert({
-      org_id: orgId,
-      name: input.name,
-      start_date: input.start_date,
-      end_date: input.end_date,
-      is_closed: false
+  try {
+    await prisma.fiscal_periods.create({
+      data: {
+        org_id: orgId,
+        name: input.name,
+        start_date: parseDateOnly(input.start_date),
+        end_date: parseDateOnly(input.end_date),
+        is_closed: false,
+      },
     })
-
-  if (error) {
-    console.error('Create fiscal period error:', error)
-    if (error.code === '23505') return { error: 'Nama periode ini sudah ada.' }
-    return { error: `Gagal membuat periode fiskal: ${error.message}` }
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return { error: 'Nama periode ini sudah ada.' }
+    }
+    return { error: 'Gagal membuat periode fiskal.' }
   }
 
   revalidatePath('/accounting/closing')
@@ -44,40 +71,47 @@ export async function createFiscalPeriod(orgId: string, input: {
 }
 
 export async function closeFiscalPeriod(id: string, orgId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Tidak terautentikasi.' }
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) return { error: 'Tidak terautentikasi.' }
 
-  const { error } = await (supabase as any)
-    .from('fiscal_periods')
-    .update({ 
+  const userId = await getCurrentUserId()
+  if (!userId) return { error: 'Tidak terautentikasi.' }
+
+  const result = await prisma.fiscal_periods.updateMany({
+    where: {
+      id,
+      org_id: orgId,
+    },
+    data: {
       is_closed: true,
-      closed_at: new Date().toISOString(),
-      closed_by: user.id
-    })
-    .eq('id', id)
-    .eq('org_id', orgId)
+      closed_at: new Date(),
+      closed_by: userId,
+    },
+  })
 
-  if (error) return { error: 'Gagal menutup periode.' }
+  if (result.count === 0) return { error: 'Gagal menutup periode.' }
 
   revalidatePath('/accounting/closing')
   return { success: true }
 }
 
 export async function openFiscalPeriod(id: string, orgId: string) {
-  const supabase = await createClient()
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) return { error: 'Unauthorized' }
 
-  const { error } = await (supabase as any)
-    .from('fiscal_periods')
-    .update({ 
+  const result = await prisma.fiscal_periods.updateMany({
+    where: {
+      id,
+      org_id: orgId,
+    },
+    data: {
       is_closed: false,
       closed_at: null,
-      closed_by: null
-    })
-    .eq('id', id)
-    .eq('org_id', orgId)
+      closed_by: null,
+    },
+  })
 
-  if (error) return { error: 'Gagal membuka kembali periode.' }
+  if (result.count === 0) return { error: 'Gagal membuka kembali periode.' }
 
   revalidatePath('/accounting/closing')
   return { success: true }

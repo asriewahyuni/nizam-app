@@ -1,238 +1,216 @@
 'use server'
 
+import { prisma } from '@/lib/prisma'
 import { addDaysToDateString, getDateInTimeZone } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/server'
+import {
+  ensureAccountingAccess,
+  getCashAccountCodes,
+  getPostedEntryIds,
+  resolveBranchFilter,
+  toNumber,
+  type BranchFilter,
+} from '@/modules/accounting/lib/reporting.server'
 
-type BranchFilter = string | null | undefined
-
-async function getCashAccountCodes(db: any, orgId: string) {
-  const { data: linkedAccounts } = await db
-    .from('bank_accounts')
-    .select('account_id, accounts(code)')
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-
-  const codes = Array.from(
-    new Set(
-      (linkedAccounts || [])
-        .map((account: any) => account.accounts?.code)
-        .filter(Boolean)
-    )
-  )
-
-  return codes.length > 0 ? codes : ['1101', '1102', '1103', '1104', '1105']
-}
-
-async function getPostedEntryIds(db: any, orgId: string, branchId?: BranchFilter) {
-  let query = db
-    .from('journal_entries')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('status', 'POSTED')
-
-  if (branchId) {
-    query = query.eq('branch_id', branchId)
-  }
-
-  const { data, error } = await query
-  if (error || !Array.isArray(data)) return []
-
-  return data.map((entry: any) => entry.id)
-}
-
-async function getCurrentCashBalance(db: any, orgId: string, branchId?: BranchFilter) {
+async function getCurrentCashBalance(orgId: string, branchId?: BranchFilter) {
   const [cashAccountCodes, entryIds] = await Promise.all([
-    getCashAccountCodes(db, orgId),
-    getPostedEntryIds(db, orgId, branchId),
+    getCashAccountCodes(orgId, branchId),
+    getPostedEntryIds(orgId, { branchId }),
   ])
 
   if (entryIds.length === 0) return 0
 
-  const { data: lines, error } = await db
-    .from('journal_lines')
-    .select('debit, credit, accounts!inner(code)')
-    .in('entry_id', entryIds)
-    .in('accounts.code', cashAccountCodes) as any
+  const lines = await prisma.journal_lines.findMany({
+    where: {
+      entry_id: { in: entryIds },
+      accounts: {
+        is: {
+          code: { in: cashAccountCodes },
+        },
+      },
+    },
+    select: {
+      debit: true,
+      credit: true,
+    },
+  })
 
-  if (error || !Array.isArray(lines)) return 0
-
-  return lines.reduce((sum: number, line: any) => sum + Number(line.debit || 0) - Number(line.credit || 0), 0)
+  return lines.reduce((sum, line) => sum + toNumber(line.debit) - toNumber(line.credit), 0)
 }
 
-async function getSalesForecastRows(db: any, orgId: string, branchId?: BranchFilter) {
-  let salesQuery = db
-    .from('sales')
-    .select('id, grand_total, due_date, sale_number')
-    .eq('org_id', orgId)
-    .in('payment_status', ['UNPAID', 'PARTIAL'])
-    .neq('status', 'VOIDED')
+async function getSalesForecastRows(orgId: string, branchId?: BranchFilter) {
+  const sales = await prisma.sales.findMany({
+    where: {
+      org_id: orgId,
+      payment_status: { in: ['UNPAID', 'PARTIAL'] },
+      status: { not: 'VOIDED' },
+      ...(branchId ? { branch_id: branchId } : {}),
+    },
+    select: {
+      id: true,
+      grand_total: true,
+      due_date: true,
+      sale_number: true,
+    },
+  })
 
-  if (branchId) {
-    salesQuery = salesQuery.eq('branch_id', branchId)
-  }
+  if (sales.length === 0) return []
 
-  const { data: sales } = await salesQuery
-  if (!Array.isArray(sales) || sales.length === 0) return []
-
-  const saleIds = sales.map((sale: any) => sale.id)
-
-  let paymentsQuery = db
-    .from('sales_payments')
-    .select('sale_id, amount, discount_amount')
-    .in('sale_id', saleIds)
-
-  if (branchId) {
-    paymentsQuery = paymentsQuery.eq('branch_id', branchId)
-  }
-
-  let returnsQuery = db
-    .from('sales_returns')
-    .select('sale_id, grand_total')
-    .in('sale_id', saleIds)
-    .neq('status', 'VOIDED')
-
-  if (branchId) {
-    returnsQuery = returnsQuery.eq('branch_id', branchId)
-  }
-
-  const [{ data: payments }, { data: returns }] = await Promise.all([
-    paymentsQuery,
-    returnsQuery,
+  const saleIds = sales.map((sale) => sale.id)
+  const [payments, returns] = await Promise.all([
+    prisma.sales_payments.findMany({
+      where: {
+        sale_id: { in: saleIds },
+        ...(branchId ? { branch_id: branchId } : {}),
+      },
+      select: {
+        sale_id: true,
+        amount: true,
+        discount_amount: true,
+      },
+    }),
+    prisma.sales_returns.findMany({
+      where: {
+        sale_id: { in: saleIds },
+        status: { not: 'VOIDED' },
+        ...(branchId ? { branch_id: branchId } : {}),
+      },
+      select: {
+        sale_id: true,
+        grand_total: true,
+      },
+    }),
   ])
 
   const paidBySale: Record<string, number> = {}
-  for (const payment of payments || []) {
-    paidBySale[payment.sale_id] = (paidBySale[payment.sale_id] || 0) + Number(payment.amount || 0) + Number(payment.discount_amount || 0)
-  }
+  payments.forEach((payment) => {
+    paidBySale[payment.sale_id] = (paidBySale[payment.sale_id] || 0) + toNumber(payment.amount) + toNumber(payment.discount_amount)
+  })
 
   const returnedBySale: Record<string, number> = {}
-  for (const saleReturn of returns || []) {
-    returnedBySale[saleReturn.sale_id] = (returnedBySale[saleReturn.sale_id] || 0) + Number(saleReturn.grand_total || 0)
-  }
+  returns.forEach((saleReturn) => {
+    returnedBySale[saleReturn.sale_id] = (returnedBySale[saleReturn.sale_id] || 0) + toNumber(saleReturn.grand_total)
+  })
 
   return sales
-    .map((sale: any) => ({
-      ...sale,
-      outstanding: Math.max(0, Number(sale.grand_total || 0) - (paidBySale[sale.id] || 0) - (returnedBySale[sale.id] || 0)),
+    .map((sale) => ({
+      id: sale.id,
+      grand_total: toNumber(sale.grand_total),
+      due_date: sale.due_date?.toISOString().slice(0, 10) || null,
+      sale_number: sale.sale_number,
+      outstanding: Math.max(0, toNumber(sale.grand_total) - (paidBySale[sale.id] || 0) - (returnedBySale[sale.id] || 0)),
     }))
-    .filter((sale: any) => sale.outstanding > 0.01)
+    .filter((sale) => sale.outstanding > 0.01)
 }
 
-async function getPurchaseForecastRows(db: any, orgId: string, branchId?: BranchFilter) {
-  let purchasesQuery = db
-    .from('purchases')
-    .select('id, grand_total, due_date, purchase_number')
-    .eq('org_id', orgId)
-    .in('payment_status', ['UNPAID', 'PARTIAL'])
-    .neq('status', 'VOIDED')
+async function getPurchaseForecastRows(orgId: string, branchId?: BranchFilter) {
+  const purchases = await prisma.purchases.findMany({
+    where: {
+      org_id: orgId,
+      payment_status: { in: ['UNPAID', 'PARTIAL'] },
+      status: { not: 'VOIDED' },
+      ...(branchId ? { branch_id: branchId } : {}),
+    },
+    select: {
+      id: true,
+      grand_total: true,
+      due_date: true,
+      purchase_number: true,
+    },
+  })
 
-  if (branchId) {
-    purchasesQuery = purchasesQuery.eq('branch_id', branchId)
-  }
+  if (purchases.length === 0) return []
 
-  const { data: purchases } = await purchasesQuery
-  if (!Array.isArray(purchases) || purchases.length === 0) return []
-
-  const purchaseIds = purchases.map((purchase: any) => purchase.id)
-
-  let paymentsQuery = db
-    .from('purchase_payments')
-    .select('purchase_id, amount, discount_amount')
-    .in('purchase_id', purchaseIds)
-
-  if (branchId) {
-    paymentsQuery = paymentsQuery.eq('branch_id', branchId)
-  }
-
-  let returnsQuery = db
-    .from('purchase_returns')
-    .select('purchase_id, total_amount, status')
-    .in('purchase_id', purchaseIds)
-
-  if (branchId) {
-    returnsQuery = returnsQuery.eq('branch_id', branchId)
-  }
-
-  const [{ data: payments }, { data: returns }] = await Promise.all([
-    paymentsQuery,
-    returnsQuery,
+  const purchaseIds = purchases.map((purchase) => purchase.id)
+  const [payments, returns] = await Promise.all([
+    prisma.purchase_payments.findMany({
+      where: {
+        purchase_id: { in: purchaseIds },
+      },
+      select: {
+        purchase_id: true,
+        amount: true,
+        discount_amount: true,
+      },
+    }),
+    prisma.purchase_returns.findMany({
+      where: {
+        purchase_id: { in: purchaseIds },
+      },
+      select: {
+        purchase_id: true,
+        total_amount: true,
+      },
+    }),
   ])
 
   const paidByPurchase: Record<string, number> = {}
-  for (const payment of payments || []) {
-    paidByPurchase[payment.purchase_id] = (paidByPurchase[payment.purchase_id] || 0) + Number(payment.amount || 0) + Number(payment.discount_amount || 0)
-  }
+  payments.forEach((payment) => {
+    paidByPurchase[payment.purchase_id] = (paidByPurchase[payment.purchase_id] || 0) + toNumber(payment.amount) + toNumber(payment.discount_amount)
+  })
 
   const returnedByPurchase: Record<string, number> = {}
-  for (const purchaseReturn of returns || []) {
-    if (purchaseReturn.status === 'VOIDED') continue
-    returnedByPurchase[purchaseReturn.purchase_id] = (returnedByPurchase[purchaseReturn.purchase_id] || 0) + Number(purchaseReturn.total_amount || 0)
-  }
+  returns.forEach((purchaseReturn) => {
+    returnedByPurchase[purchaseReturn.purchase_id] = (returnedByPurchase[purchaseReturn.purchase_id] || 0) + toNumber(purchaseReturn.total_amount)
+  })
 
   return purchases
-    .map((purchase: any) => ({
-      ...purchase,
-      outstanding: Math.max(0, Number(purchase.grand_total || 0) - (paidByPurchase[purchase.id] || 0) - (returnedByPurchase[purchase.id] || 0)),
+    .map((purchase) => ({
+      id: purchase.id,
+      grand_total: toNumber(purchase.grand_total),
+      due_date: purchase.due_date?.toISOString().slice(0, 10) || null,
+      purchase_number: purchase.purchase_number,
+      outstanding: Math.max(0, toNumber(purchase.grand_total) - (paidByPurchase[purchase.id] || 0) - (returnedByPurchase[purchase.id] || 0)),
     }))
-    .filter((purchase: any) => purchase.outstanding > 0.01)
+    .filter((purchase) => purchase.outstanding > 0.01)
 }
 
 export async function getCashFlowForecast(orgId: string, days: number = 90, branchId?: BranchFilter) {
-  const supabase = await createClient()
-  const db = supabase as any
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) {
+    return { currentCash: 0, forecast: [], totalProjectedInflow: 0, totalProjectedOutflow: 0, lowestPoint: 0, days }
+  }
 
-  // 1. Current Total Cash
-  const currentCash = await getCurrentCashBalance(db, orgId, branchId)
+  const branchSelection = await resolveBranchFilter(orgId, branchId)
+  if ('error' in branchSelection) {
+    return { currentCash: 0, forecast: [], totalProjectedInflow: 0, totalProjectedOutflow: 0, lowestPoint: 0, days }
+  }
 
-  // 2. Projected Inflow/Outflow based on outstanding amounts
+  const currentCash = await getCurrentCashBalance(orgId, branchSelection.branchId)
   const [sales, purchases] = await Promise.all([
-    getSalesForecastRows(db, orgId, branchId),
-    getPurchaseForecastRows(db, orgId, branchId),
+    getSalesForecastRows(orgId, branchSelection.branchId),
+    getPurchaseForecastRows(orgId, branchSelection.branchId),
   ])
-    
-  // 5. Generate Time Series
-  const forecast = []
+
+  const forecast: Array<{ date: string; inflow: number; outflow: number; balance: number; isNegative: boolean }> = []
   let runningBalance = currentCash
-  
   const todayDateStr = getDateInTimeZone('Asia/Jakarta')
 
-  for (let i = 0; i < days; i++) {
-    const dateStr = addDaysToDateString(todayDateStr, i)
+  for (let index = 0; index < days; index += 1) {
+    const dateStr = addDaysToDateString(todayDateStr, index)
+    const dayInflow = sales
+      .filter((sale) => (index === 0 ? !sale.due_date || sale.due_date <= dateStr : sale.due_date === dateStr))
+      .reduce((sum, sale) => sum + sale.outstanding, 0)
+    const dayOutflow = purchases
+      .filter((purchase) => (index === 0 ? !purchase.due_date || purchase.due_date <= dateStr : purchase.due_date === dateStr))
+      .reduce((sum, purchase) => sum + purchase.outstanding, 0)
 
-    // Calculate delta for this day
-    const dayInflow = (sales || [])
-        .filter((s: any) => {
-           // For Day 0, include ALL overdue (past dates) AND null due dates
-           if (i === 0) return !s.due_date || s.due_date <= dateStr;
-           return s.due_date === dateStr;
-        })
-        .reduce((sum: any, s: any) => sum + Number(s.outstanding), 0)
-    
-    const dayOutflow = (purchases || [])
-        .filter((p: any) => {
-           // For Day 0, include ALL overdue (past dates) AND null due dates
-           if (i === 0) return !p.due_date || p.due_date <= dateStr;
-           return p.due_date === dateStr;
-        })
-        .reduce((sum: any, p: any) => sum + Number(p.outstanding), 0)
-
-    runningBalance += (dayInflow - dayOutflow)
+    runningBalance += dayInflow - dayOutflow
 
     forecast.push({
       date: dateStr,
       inflow: dayInflow,
       outflow: dayOutflow,
       balance: runningBalance,
-      isNegative: runningBalance < 0
+      isNegative: runningBalance < 0,
     })
   }
 
   return {
     currentCash,
     forecast,
-    totalProjectedInflow: sales.reduce((sum: number, sale: any) => sum + Number(sale.outstanding || 0), 0),
-    totalProjectedOutflow: purchases.reduce((sum: number, purchase: any) => sum + Number(purchase.outstanding || 0), 0),
-    lowestPoint: Math.min(...forecast.map((f: any) => f.balance)),
-    days
+    totalProjectedInflow: sales.reduce((sum, sale) => sum + sale.outstanding, 0),
+    totalProjectedOutflow: purchases.reduce((sum, purchase) => sum + purchase.outstanding, 0),
+    lowestPoint: forecast.length > 0 ? Math.min(...forecast.map((item) => item.balance)) : currentCash,
+    days,
   }
 }

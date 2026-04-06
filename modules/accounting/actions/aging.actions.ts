@@ -1,15 +1,20 @@
 'use server'
 
+import { prisma } from '@/lib/prisma'
 import { diffDateOnlyStrings, getDateInTimeZone } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/server'
-
-type BranchFilter = string | null | undefined
+import {
+  ensureAccountingAccess,
+  getPostedEntryIds,
+  resolveBranchFilter,
+  toNumber,
+  type BranchFilter,
+} from '@/modules/accounting/lib/reporting.server'
 
 function getBusinessToday() {
   return getDateInTimeZone('Asia/Jakarta')
 }
 
-function agingBucket(dueDateStr: string, today: string): string {
+function agingBucket(dueDateStr: string, today: string) {
   if (!dueDateStr) return '> 90 Days'
   const days = diffDateOnlyStrings(today, dueDateStr)
   if (days <= 0) return 'Current'
@@ -19,156 +24,156 @@ function agingBucket(dueDateStr: string, today: string): string {
   return '> 90 Days'
 }
 
-async function getPostedEntryIds(
-  db: any,
-  orgId: string,
-  branchId?: BranchFilter
-) {
-  let query = db
-    .from('journal_entries')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('status', 'POSTED')
-
-  if (branchId) {
-    query = query.eq('branch_id', branchId)
-  }
-
-  const { data, error } = await query
-  if (error || !Array.isArray(data)) return []
-  return data.map((entry: any) => entry.id)
-}
-
-async function getAccountCodeBalances(
-  db: any,
-  orgId: string,
-  codes: string[],
-  branchId?: BranchFilter
-) {
-  const entryIds = await getPostedEntryIds(db, orgId, branchId)
+async function getAccountCodeBalances(orgId: string, codes: string[], branchId?: BranchFilter) {
+  const entryIds = await getPostedEntryIds(orgId, { branchId })
   if (entryIds.length === 0 || codes.length === 0) return {}
 
-  const { data, error } = await (db
-    .from('journal_lines')
-    .select('debit, credit, accounts!inner(code, type)')
-    .in('entry_id', entryIds)
-    .in('accounts.code', codes) as any)
-
-  if (error || !Array.isArray(data)) return {}
+  const lines = await prisma.journal_lines.findMany({
+    where: {
+      entry_id: { in: entryIds },
+      accounts: {
+        is: {
+          code: { in: codes },
+        },
+      },
+    },
+    include: {
+      accounts: {
+        select: {
+          code: true,
+          type: true,
+        },
+      },
+    },
+  })
 
   const balances: Record<string, number> = {}
-  data.forEach((line: any) => {
-    const account = line.accounts
-    if (!account?.code) return
+  lines.forEach((line) => {
+    const delta = ['LIABILITY', 'EQUITY', 'REVENUE'].includes(String(line.accounts.type))
+      ? toNumber(line.credit) - toNumber(line.debit)
+      : toNumber(line.debit) - toNumber(line.credit)
 
-    const delta = ['LIABILITY', 'EQUITY', 'REVENUE'].includes(account.type)
-      ? Number(line.credit || 0) - Number(line.debit || 0)
-      : Number(line.debit || 0) - Number(line.credit || 0)
-
-    balances[account.code] = (balances[account.code] || 0) + delta
+    balances[line.accounts.code] = (balances[line.accounts.code] || 0) + delta
   })
 
   return balances
 }
 
-async function getSettlementAccounts(
-  db: any,
-  orgId: string,
-  codes: string[]
-) {
-  const { data, error } = await db
-    .from('accounts')
-    .select('id, code')
-    .eq('org_id', orgId)
-    .in('code', codes)
+async function getSettlementAccounts(orgId: string, codes: string[]) {
+  const accounts = await prisma.accounts.findMany({
+    where: {
+      org_id: orgId,
+      code: { in: codes },
+    },
+    select: {
+      id: true,
+      code: true,
+    },
+  })
 
-  if (error || !Array.isArray(data)) return {}
-
-  return data.reduce((map: Record<string, string>, account: any) => {
-    if (account.code && account.id) {
-      map[account.code] = account.id
-    }
+  return accounts.reduce<Record<string, string>>((map, account) => {
+    map[account.code] = account.id
     return map
   }, {})
 }
 
 export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?: BranchFilter) {
-  const supabase = await createClient()
-  const db = supabase as any
-  const today = getBusinessToday()
-  const settlementAccounts = await getSettlementAccounts(db, orgId, ['1201', '2101', '2201'])
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) return []
 
+  const branchSelection = await resolveBranchFilter(orgId, branchId)
+  if ('error' in branchSelection) return []
+
+  const today = getBusinessToday()
+  const settlementAccounts = await getSettlementAccounts(orgId, ['1201', '2101', '2201'])
   let results: any[] = []
 
   if (type === 'AR') {
-    // 1. Trade AR from Sales Module
-    let salesQuery = db
-      .from('sales')
-      .select('id, sale_number, sale_date, due_date, grand_total, customer_id, contacts!customer_id(name)')
-      .eq('org_id', orgId)
-      .not('status', 'in', '("DRAFT","VOIDED")')
-      .neq('payment_status', 'PAID')
+    const sales = await prisma.sales.findMany({
+      where: {
+        org_id: orgId,
+        status: { notIn: ['DRAFT', 'VOIDED'] },
+        payment_status: { not: 'PAID' },
+        ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+      },
+      select: {
+        id: true,
+        sale_number: true,
+        sale_date: true,
+        due_date: true,
+        grand_total: true,
+        contacts: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    })
 
-    if (branchId) {
-      salesQuery = salesQuery.eq('branch_id', branchId)
-    }
+    if (sales.length > 0) {
+      const saleIds = sales.map((sale) => sale.id)
+      const [payments, returns] = await Promise.all([
+        prisma.sales_payments.findMany({
+          where: {
+            sale_id: { in: saleIds },
+            ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+          },
+          select: {
+            sale_id: true,
+            amount: true,
+            discount_amount: true,
+          },
+        }),
+        prisma.sales_returns.findMany({
+          where: {
+            sale_id: { in: saleIds },
+            status: { not: 'VOIDED' },
+            ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+          },
+          select: {
+            sale_id: true,
+            grand_total: true,
+          },
+        }),
+      ])
 
-    const { data: sales } = await salesQuery
-
-    if (sales && sales.length > 0) {
-      const saleIds = sales.map((s: any) => s.id)
-      let paymentsQuery = db
-        .from('sales_payments')
-        .select('sale_id, amount, discount_amount')
-        .in('sale_id', saleIds)
-      if (branchId) {
-        paymentsQuery = paymentsQuery.eq('branch_id', branchId)
-      }
-      const { data: payments } = await paymentsQuery
       const paidBySale: Record<string, number> = {}
-      for (const p of payments || []) {
-        paidBySale[p.sale_id] = (paidBySale[p.sale_id] || 0) + Number(p.amount) + Number(p.discount_amount || 0)
-      }
-      let returnsQuery = db
-        .from('sales_returns')
-        .select('sale_id, grand_total')
-        .in('sale_id', saleIds)
-        .neq('status', 'VOIDED')
-      if (branchId) {
-        returnsQuery = returnsQuery.eq('branch_id', branchId)
-      }
-      const { data: returns } = await returnsQuery
+      payments.forEach((payment) => {
+        paidBySale[payment.sale_id] = (paidBySale[payment.sale_id] || 0) + toNumber(payment.amount) + toNumber(payment.discount_amount)
+      })
+
       const returnedBySale: Record<string, number> = {}
-      for (const r of returns || []) {
-        returnedBySale[r.sale_id] = (returnedBySale[r.sale_id] || 0) + Number(r.grand_total)
-      }
+      returns.forEach((saleReturn) => {
+        returnedBySale[saleReturn.sale_id] = (returnedBySale[saleReturn.sale_id] || 0) + toNumber(saleReturn.grand_total)
+      })
 
       results = sales
-        .map((s: any) => {
-          const outstanding = Number(s.grand_total) - (paidBySale[s.id] || 0) - (returnedBySale[s.id] || 0)
-          const finalDueDate = s.due_date || s.sale_date
+        .map((sale) => {
+          const finalDueDate = sale.due_date || sale.sale_date
+          const dueDate = finalDueDate.toISOString().slice(0, 10)
+          const outstanding = toNumber(sale.grand_total) - (paidBySale[sale.id] || 0) - (returnedBySale[sale.id] || 0)
+
           return {
-            id: s.id,
-            contact_name: s.contacts?.name || 'Unknown',
-            doc_number: s.sale_number,
-            due_date: finalDueDate,
-            grand_total: Number(s.grand_total),
-            paid_amount: paidBySale[s.id] || 0,
-            returned_amount: returnedBySale[s.id] || 0,
+            id: sale.id,
+            contact_name: sale.contacts?.name || 'Unknown',
+            doc_number: sale.sale_number,
+            due_date: dueDate,
+            grand_total: toNumber(sale.grand_total),
+            paid_amount: paidBySale[sale.id] || 0,
+            returned_amount: returnedBySale[sale.id] || 0,
             outstanding,
-            days_overdue: Math.max(0, diffDateOnlyStrings(today, finalDueDate)),
-            aging_bucket: agingBucket(finalDueDate, today),
-            source_type: 'SALES'
+            days_overdue: Math.max(0, diffDateOnlyStrings(today, dueDate)),
+            aging_bucket: agingBucket(dueDate, today),
+            source_type: 'SALES',
           }
         })
-        .filter((r: any) => r.outstanding > 0.01)
+        .filter((row) => row.outstanding > 0.01)
     }
 
-    // 2. Reconciliation with GL (1201)
-    const balances = await getAccountCodeBalances(db, orgId, ['1201'], branchId)
-    const glBalance = Number(balances['1201'] || 0);
-    const moduleTotal = results.reduce((s: any, r: any) => s + r.outstanding, 0);
-    const diff = glBalance - moduleTotal;
+    const balances = await getAccountCodeBalances(orgId, ['1201'], branchSelection.branchId)
+    const glBalance = toNumber(balances['1201'])
+    const moduleTotal = results.reduce((sum, row) => sum + toNumber(row.outstanding), 0)
+    const diff = glBalance - moduleTotal
 
     if (Math.abs(diff) > 10) {
       results.push({
@@ -184,90 +189,105 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
         aging_bucket: 'Current',
         source_type: 'JOURNAL',
         settlement_account_id: settlementAccounts['1201'] || null,
-      });
+      })
     }
-
   } else {
-    // 1. Trade AP from Purchases Module
-    let purchasesQuery = db
-      .from('purchases')
-      .select('id, purchase_number, purchase_date, due_date, grand_total, vendor_id, contacts!vendor_id(name)')
-      .eq('org_id', orgId)
-      .not('status', 'in', '("DRAFT","VOIDED")')
-      .neq('payment_status', 'PAID')
+    const purchases = await prisma.purchases.findMany({
+      where: {
+        org_id: orgId,
+        status: { notIn: ['DRAFT', 'VOIDED'] },
+        payment_status: { not: 'PAID' },
+        ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+      },
+      select: {
+        id: true,
+        purchase_number: true,
+        purchase_date: true,
+        due_date: true,
+        grand_total: true,
+        contacts: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    })
 
-    if (branchId) {
-      purchasesQuery = purchasesQuery.eq('branch_id', branchId)
-    }
+    if (purchases.length > 0) {
+      const purchaseIds = purchases.map((purchase) => purchase.id)
+      const [payments, returns] = await Promise.all([
+        prisma.purchase_payments.findMany({
+          where: {
+            purchase_id: { in: purchaseIds },
+          },
+          select: {
+            purchase_id: true,
+            amount: true,
+            discount_amount: true,
+          },
+        }),
+        prisma.purchase_returns.findMany({
+          where: {
+            purchase_id: { in: purchaseIds },
+          },
+          select: {
+            purchase_id: true,
+            total_amount: true,
+          },
+        }),
+      ])
 
-    const { data: purchases } = await purchasesQuery
-
-    if (purchases && purchases.length > 0) {
-      const purchaseIds = purchases.map((p: any) => p.id)
-      let paymentsQuery = db
-        .from('purchase_payments')
-        .select('purchase_id, amount, discount_amount')
-        .in('purchase_id', purchaseIds)
-      if (branchId) {
-        paymentsQuery = paymentsQuery.eq('branch_id', branchId)
-      }
-      const { data: payments } = await paymentsQuery
       const paidByPurchase: Record<string, number> = {}
-      for (const p of payments || []) {
-        paidByPurchase[p.purchase_id] = (paidByPurchase[p.purchase_id] || 0) + Number(p.amount) + Number(p.discount_amount || 0)
-      }
-      let returnsQuery = db
-        .from('purchase_returns')
-        .select('purchase_id, total_amount, status')
-        .in('purchase_id', purchaseIds)
-      if (branchId) {
-        returnsQuery = returnsQuery.eq('branch_id', branchId)
-      }
-      const { data: returns } = await returnsQuery
+      payments.forEach((payment) => {
+        paidByPurchase[payment.purchase_id] = (paidByPurchase[payment.purchase_id] || 0) + toNumber(payment.amount) + toNumber(payment.discount_amount)
+      })
+
       const returnedByPurchase: Record<string, number> = {}
-      for (const r of returns || []) {
-        if (r.status === 'VOIDED') continue
-        returnedByPurchase[r.purchase_id] = (returnedByPurchase[r.purchase_id] || 0) + Number(r.total_amount)
-      }
+      returns.forEach((purchaseReturn) => {
+        returnedByPurchase[purchaseReturn.purchase_id] = (returnedByPurchase[purchaseReturn.purchase_id] || 0) + toNumber(purchaseReturn.total_amount)
+      })
 
       results = purchases
-        .map((p: any) => {
-          const outstanding = Number(p.grand_total) - (paidByPurchase[p.id] || 0) - (returnedByPurchase[p.id] || 0)
-          const finalDueDate = p.due_date || p.purchase_date
+        .map((purchase) => {
+          const finalDueDate = purchase.due_date || purchase.purchase_date
+          const dueDate = finalDueDate.toISOString().slice(0, 10)
+          const outstanding = toNumber(purchase.grand_total) - (paidByPurchase[purchase.id] || 0) - (returnedByPurchase[purchase.id] || 0)
+
           return {
-            id: p.id,
-            contact_name: p.contacts?.name || 'Unknown',
-            doc_number: p.purchase_number,
-            due_date: finalDueDate,
-            grand_total: Number(p.grand_total),
-            paid_amount: paidByPurchase[p.id] || 0,
-            returned_amount: returnedByPurchase[p.id] || 0,
+            id: purchase.id,
+            contact_name: purchase.contacts.name || 'Unknown',
+            doc_number: purchase.purchase_number,
+            due_date: dueDate,
+            grand_total: toNumber(purchase.grand_total),
+            paid_amount: paidByPurchase[purchase.id] || 0,
+            returned_amount: returnedByPurchase[purchase.id] || 0,
             outstanding,
-            days_overdue: Math.max(0, diffDateOnlyStrings(today, finalDueDate)),
-            aging_bucket: agingBucket(finalDueDate, today),
-            source_type: 'PURCHASING'
+            days_overdue: Math.max(0, diffDateOnlyStrings(today, dueDate)),
+            aging_bucket: agingBucket(dueDate, today),
+            source_type: 'PURCHASING',
           }
         })
-        .filter((r: any) => r.outstanding > 0.01)
+        .filter((row) => row.outstanding > 0.01)
     }
 
-    // 2. Direct AP (Non-Trade) & Taxes from GL (2101, 2201, 2301, 2401)
-    // Account 2201: Tax (PPN), 21XX: Other Payables
-    const balances = await getAccountCodeBalances(db, orgId, ['2101', '2201', '2301', '2401'], branchId)
+    const balances = await getAccountCodeBalances(orgId, ['2101', '2201', '2301', '2401'], branchSelection.branchId)
     const namedBalances = [
       { code: '2101', balance: balances['2101'] || 0, name: 'Hutang Usaha' },
       { code: '2201', balance: balances['2201'] || 0, name: 'PPN Keluaran (Pajak Dipungut)' },
       { code: '2301', balance: balances['2301'] || 0, name: 'Pendapatan Diterima di Muka' },
       { code: '2401', balance: balances['2401'] || 0, name: 'Hutang Gaji' },
-    ].filter((balance) => Math.abs(balance.balance) > 0.01)
+    ].filter((item) => Math.abs(toNumber(item.balance)) > 0.01)
 
-    for (const b of namedBalances) {
-      if (b.code === '2101') {
-        const tradeModuleTotal = results.filter((r: any) => r.source_type === 'PURCHASING').reduce((s: any, r: any) => s + r.outstanding, 0);
-        const diff = Number(b.balance) - tradeModuleTotal;
+    namedBalances.forEach((balanceRow) => {
+      if (balanceRow.code === '2101') {
+        const tradeModuleTotal = results
+          .filter((row) => row.source_type === 'PURCHASING')
+          .reduce((sum, row) => sum + toNumber(row.outstanding), 0)
+        const diff = toNumber(balanceRow.balance) - tradeModuleTotal
+
         if (Math.abs(diff) > 10) {
           results.push({
-            id: `gl-2101-manual`,
+            id: 'gl-2101-manual',
             contact_name: 'Unallocated (Buku Besar)',
             doc_number: 'GL-2101-ADJ',
             due_date: today,
@@ -279,53 +299,48 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             aging_bucket: 'Current',
             source_type: 'JOURNAL',
             settlement_account_id: settlementAccounts['2101'] || null,
-          });
+          })
         }
-      } else if (b.code === '2201') {
+
+        return
+      }
+
+      if (balanceRow.code === '2201') {
         results.push({
-          id: `gl-tax-${b.code}`,
+          id: `gl-tax-${balanceRow.code}`,
           contact_name: 'Pajak / Negara (PDI)',
-          doc_number: `PPN-OUTSTANDING`,
+          doc_number: 'PPN-OUTSTANDING',
           due_date: today,
-          grand_total: Number(b.balance),
+          grand_total: toNumber(balanceRow.balance),
           paid_amount: 0,
           returned_amount: 0,
-          outstanding: Number(b.balance),
+          outstanding: toNumber(balanceRow.balance),
           days_overdue: 0,
           aging_bucket: 'Current',
           source_type: 'TAX',
           settlement_account_id: settlementAccounts['2201'] || null,
-        });
+        })
       }
-    }
+    })
   }
 
-  return results.sort((a: any, b: any) => b.days_overdue - a.days_overdue)
+  return results.sort((left, right) => right.days_overdue - left.days_overdue)
 }
-
 
 export async function getAgingSummary(orgId: string, branchId?: BranchFilter) {
   const ar = await getAgingReport(orgId, 'AR', branchId)
   const ap = await getAgingReport(orgId, 'AP', branchId)
-
   const buckets = ['Current', '0-30 Days', '31-60 Days', '61-90 Days', '> 90 Days']
 
-  const arSummary = buckets.map((b: any) => ({
-    bucket: b,
-    amount: ar.filter((x: any) => x.aging_bucket === b).reduce((s: number, x: any) => s + Number(x.outstanding), 0)
+  const arSummary = buckets.map((bucket) => ({
+    bucket,
+    amount: ar.filter((row) => row.aging_bucket === bucket).reduce((sum, row) => sum + toNumber(row.outstanding), 0),
   }))
 
-  const apSummary = buckets.map((b: any) => ({
-    bucket: b,
-    amount: ap.filter((x: any) => x.aging_bucket === b).reduce((s: number, x: any) => s + Number(x.outstanding), 0)
+  const apSummary = buckets.map((bucket) => ({
+    bucket,
+    amount: ap.filter((row) => row.aging_bucket === bucket).reduce((sum, row) => sum + toNumber(row.outstanding), 0),
   }))
 
-  return {
-    ar,
-    ap,
-    arSummary,
-    apSummary,
-    totalAR: ar.reduce((s: number, x: any) => s + Number(x.outstanding), 0),
-    totalAP: ap.reduce((s: number, x: any) => s + Number(x.outstanding), 0)
-  }
+  return { ar, ap, arSummary, apSummary }
 }

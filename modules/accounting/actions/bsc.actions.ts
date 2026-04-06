@@ -1,173 +1,143 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
+import { ensureAccountingAccess, getPostedEntryIds, parseDateOnly, resolveBranchFilter, toNumber } from '@/modules/accounting/lib/reporting.server'
 
 export async function getBSCMetrics(orgId: string, branchId?: string | null) {
-  const supabase = await createClient()
-  const db = supabase as any
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) {
+    return {
+      financial: { currentRevenue: 0, currentExpenses: 0, netProfit: 0, profitMargin: 0, revenueGrowth: 0, lastRevenue: 0 },
+      customer: { mtdSales: 0, totalOrders: 0, uniqueCustomers: 0 },
+      internal: { pendingPurchases: 0, pendingSales: 0, totalAssets: 0, overdueDepreciation: 0, processHealth: 100 },
+      learning: { activeEmployees: 0, payrollRunsCompleted: 0, hrCompletionRate: 0 },
+    }
+  }
+
+  const branchSelection = await resolveBranchFilter(orgId, branchId)
+  if ('error' in branchSelection) {
+    return {
+      financial: { currentRevenue: 0, currentExpenses: 0, netProfit: 0, profitMargin: 0, revenueGrowth: 0, lastRevenue: 0 },
+      customer: { mtdSales: 0, totalOrders: 0, uniqueCustomers: 0 },
+      internal: { pendingPurchases: 0, pendingSales: 0, totalAssets: 0, overdueDepreciation: 0, processHealth: 100 },
+      learning: { activeEmployees: 0, payrollRunsCompleted: 0, hrCompletionRate: 0 },
+    }
+  }
+
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
   const monthEnd = now.toISOString().split('T')[0]
   const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0]
   const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0]
 
-  // ===== PERSPECTIVE 1: FINANCIAL =====
-  // Anchor by org via journal_entries, then get P&L lines
-  let thisMonthEntriesQuery = db
-    .from('journal_entries')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('status', 'POSTED')
-    .gte('entry_date', monthStart)
-    .lte('entry_date', monthEnd)
+  const [thisIds, lastIds] = await Promise.all([
+    getPostedEntryIds(orgId, { branchId: branchSelection.branchId, startDate: monthStart, endDate: monthEnd }),
+    getPostedEntryIds(orgId, { branchId: branchSelection.branchId, startDate: lastMonthStart, endDate: lastMonthEnd }),
+  ])
 
-  if (branchId) {
-    thisMonthEntriesQuery = thisMonthEntriesQuery.eq('branch_id', branchId)
-  }
-
-  const { data: thisMonthEntries } = await thisMonthEntriesQuery
-
-  const thisIds = (thisMonthEntries || []).map((e: any) => e.id)
-
-  let currentRevenue = 0, currentExpenses = 0
+  let currentRevenue = 0
+  let currentExpenses = 0
   if (thisIds.length > 0) {
-    const { data: lines } = await db
-      .from('journal_lines')
-      .select('debit, credit, accounts!inner(type, code)')
-      .in('entry_id', thisIds) as any
+    const lines = await prisma.journal_lines.findMany({
+      where: { entry_id: { in: thisIds } },
+      include: { accounts: { select: { type: true, code: true } } },
+    })
 
-    for (const l of lines || []) {
-      const acc = l.accounts
-      if (acc.type === 'REVENUE' || acc.code?.startsWith('4')) currentRevenue += Number(l.credit) - Number(l.debit)
-      if (acc.type === 'EXPENSE' || acc.code?.startsWith('5') || acc.code?.startsWith('6')) currentExpenses += Number(l.debit) - Number(l.credit)
-    }
+    lines.forEach((line) => {
+      const accountType = String(line.accounts.type)
+      if (accountType === 'REVENUE' || line.accounts.code.startsWith('4')) {
+        currentRevenue += toNumber(line.credit) - toNumber(line.debit)
+      }
+      if (accountType === 'EXPENSE' || line.accounts.code.startsWith('5') || line.accounts.code.startsWith('6')) {
+        currentExpenses += toNumber(line.debit) - toNumber(line.credit)
+      }
+    })
   }
 
-  // Last month for comparison
-  let lastMonthEntriesQuery = db
-    .from('journal_entries')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('status', 'POSTED')
-    .gte('entry_date', lastMonthStart)
-    .lte('entry_date', lastMonthEnd)
-
-  if (branchId) {
-    lastMonthEntriesQuery = lastMonthEntriesQuery.eq('branch_id', branchId)
-  }
-
-  const { data: lastMonthEntries } = await lastMonthEntriesQuery
-
-  const lastIds = (lastMonthEntries || []).map((e: any) => e.id)
   let lastRevenue = 0
   if (lastIds.length > 0) {
-    const { data: lastLines } = await db
-      .from('journal_lines')
-      .select('debit, credit, accounts!inner(type, code)')
-      .in('entry_id', lastIds) as any
+    const lastLines = await prisma.journal_lines.findMany({
+      where: { entry_id: { in: lastIds } },
+      include: { accounts: { select: { type: true, code: true } } },
+    })
 
-    for (const l of lastLines || []) {
-      const acc = l.accounts
-      if (acc.type === 'REVENUE' || acc.code?.startsWith('4')) lastRevenue += Number(l.credit) - Number(l.debit)
-    }
+    lastLines.forEach((line) => {
+      const accountType = String(line.accounts.type)
+      if (accountType === 'REVENUE' || line.accounts.code.startsWith('4')) {
+        lastRevenue += toNumber(line.credit) - toNumber(line.debit)
+      }
+    })
   }
 
+  const [salesData, pendingPurchases, pendingSales, totalAssets, overdueAssets, employees, payrollRuns] = await Promise.all([
+    prisma.sales.findMany({
+      where: {
+        org_id: orgId,
+        created_at: {
+          gte: parseDateOnly(monthStart),
+        },
+        ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+      },
+      select: {
+        id: true,
+        grand_total: true,
+        customer_id: true,
+      },
+    }),
+    prisma.purchases.count({
+      where: {
+        org_id: orgId,
+        status: 'DRAFT',
+        ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+      },
+    }),
+    prisma.sales.count({
+      where: {
+        org_id: orgId,
+        status: 'DRAFT',
+        ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+      },
+    }),
+    prisma.fixed_assets.count({
+      where: {
+        org_id: orgId,
+        status: 'ACTIVE',
+        ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+      },
+    }),
+    prisma.fixed_assets.count({
+      where: {
+        org_id: orgId,
+        status: 'ACTIVE',
+        OR: [
+          { last_depreciation_date: null },
+          { last_depreciation_date: { lt: parseDateOnly(lastMonthEnd) } },
+        ],
+        ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+      },
+    }),
+    prisma.employees.count({
+      where: {
+        org_id: orgId,
+        employment_status: { not: 'TERMINATED' },
+        ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+      },
+    }),
+    prisma.payroll_runs.count({
+      where: {
+        org_id: orgId,
+        status: 'PAID',
+        ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+      },
+    }),
+  ])
+
+  const mtdSales = salesData.reduce((sum, sale) => sum + toNumber(sale.grand_total), 0)
+  const totalOrders = salesData.length
+  const uniqueCustomers = new Set(salesData.map((sale) => sale.customer_id).filter(Boolean)).size
   const netProfit = currentRevenue - currentExpenses
   const profitMargin = currentRevenue > 0 ? (netProfit / currentRevenue) * 100 : 0
   const revenueGrowth = lastRevenue > 0 ? ((currentRevenue - lastRevenue) / lastRevenue) * 100 : 0
-
-  // ===== PERSPECTIVE 2: CUSTOMER (Sales) =====
-  let salesQuery = db
-    .from('sales')
-    .select('id, grand_total, status, customer_id')
-    .eq('org_id', orgId)
-    .gte('created_at', monthStart)
-
-  if (branchId) {
-    salesQuery = salesQuery.eq('branch_id', branchId)
-  }
-
-  const { data: salesData } = await salesQuery
-
-  const mtdSales = (salesData || []).reduce((s: any, x: any) => s + Number(x.grand_total), 0)
-  const totalOrders = (salesData || []).length
-  const uniqueCustomers = new Set((salesData || []).map((s: any) => s.customer_id)).size
-
-  // ===== PERSPECTIVE 3: INTERNAL PROCESS (Operational efficiency) =====
-  // Pending approvals / drafts (bottleneck indicator)
-  let pendingPurchasesQuery = db
-    .from('purchases')
-    .select('*', { count: 'exact', head: true })
-    .eq('org_id', orgId)
-    .eq('status', 'DRAFT')
-
-  if (branchId) {
-    pendingPurchasesQuery = pendingPurchasesQuery.eq('branch_id', branchId)
-  }
-
-  const { count: pendingPurchases } = await pendingPurchasesQuery
-
-  let pendingSalesQuery = db
-    .from('sales')
-    .select('*', { count: 'exact', head: true })
-    .eq('org_id', orgId)
-    .eq('status', 'DRAFT')
-
-  if (branchId) {
-    pendingSalesQuery = pendingSalesQuery.eq('branch_id', branchId)
-  }
-
-  const { count: pendingSales } = await pendingSalesQuery
-
-  let totalAssetsQuery = db
-    .from('fixed_assets')
-    .select('*', { count: 'exact', head: true })
-    .eq('org_id', orgId)
-    .eq('status', 'ACTIVE')
-
-  if (branchId) {
-    totalAssetsQuery = totalAssetsQuery.eq('branch_id', branchId)
-  }
-
-  const { count: totalAssets } = await totalAssetsQuery
-
-  let overdueAssetsQuery = db
-    .from('fixed_assets')
-    .select('*', { count: 'exact', head: true })
-    .eq('org_id', orgId)
-    .eq('status', 'ACTIVE')
-    .or(`last_depreciation_date.is.null,last_depreciation_date.lt.${lastMonthEnd}`)
-
-  if (branchId) {
-    overdueAssetsQuery = overdueAssetsQuery.eq('branch_id', branchId)
-  }
-
-  const { count: overdueAssets } = await overdueAssetsQuery
-
-  // ===== PERSPECTIVE 4: LEARNING & GROWTH =====
-  let employeesQuery = db
-    .from('employees')
-    .select('*', { count: 'exact', head: true })
-    .eq('org_id', orgId)
-    .eq('status', 'ACTIVE')
-
-  if (branchId) {
-    employeesQuery = employeesQuery.eq('branch_id', branchId)
-  }
-
-  const { count: employees } = await employeesQuery
-
-  let payrollRunsQuery = db
-    .from('payroll_runs')
-    .select('*', { count: 'exact', head: true })
-    .eq('org_id', orgId)
-    .eq('status', 'PAID')
-
-  if (branchId) {
-    payrollRunsQuery = payrollRunsQuery.eq('branch_id', branchId)
-  }
-
-  const { count: payrollRuns } = await payrollRunsQuery
 
   return {
     financial: {
@@ -176,24 +146,24 @@ export async function getBSCMetrics(orgId: string, branchId?: string | null) {
       netProfit,
       profitMargin: Math.round(profitMargin * 10) / 10,
       revenueGrowth: Math.round(revenueGrowth * 10) / 10,
-      lastRevenue
+      lastRevenue,
     },
     customer: {
       mtdSales,
       totalOrders,
-      uniqueCustomers
+      uniqueCustomers,
     },
     internal: {
-      pendingPurchases: pendingPurchases || 0,
-      pendingSales: pendingSales || 0,
-      totalAssets: totalAssets || 0,
-      overdueDepreciation: overdueAssets || 0,
-      processHealth: Math.max(0, 100 - ((pendingPurchases || 0) + (pendingSales || 0)) * 2)
+      pendingPurchases,
+      pendingSales,
+      totalAssets,
+      overdueDepreciation: overdueAssets,
+      processHealth: Math.max(0, 100 - (pendingPurchases + pendingSales) * 2),
     },
     learning: {
-      activeEmployees: employees || 0,
-      payrollRunsCompleted: payrollRuns || 0,
-      hrCompletionRate: (payrollRuns || 0) > 0 ? 100 : 0
-    }
+      activeEmployees: employees,
+      payrollRunsCompleted: payrollRuns,
+      hrCompletionRate: payrollRuns > 0 ? 100 : 0,
+    },
   }
 }

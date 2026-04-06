@@ -6,7 +6,6 @@
  * Board Sprint 1 — Executed.
  */
 
-import { createClient } from '@/lib/supabase/server'
 import { getProfitLoss, getBalanceSheet, getGeneralLedger } from './reports.actions'
 import { getZakatSummary } from './zakat.actions'
 import ExcelJS from 'exceljs'

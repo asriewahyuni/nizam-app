@@ -1,23 +1,70 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { Prisma } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { ensureAccountingAccess, formatDateOnly, parseDateOnly, toNumber } from '@/modules/accounting/lib/reporting.server'
 
 type BranchFilterResult =
   | { branchId: string | null }
   | { error: string }
 
+function normalizeBudgetRow(budget: {
+  id: string
+  org_id: string
+  account_id: string
+  period: Date
+  budget_amount: Prisma.Decimal
+  created_at: Date
+  updated_at: Date
+  branch_id: string | null
+  accounts: { code: string; name: string; type: string }
+  branches: { id: string; name: string; code: string } | null
+}) {
+  return {
+    id: budget.id,
+    org_id: budget.org_id,
+    account_id: budget.account_id,
+    period: formatDateOnly(budget.period),
+    budget_amount: toNumber(budget.budget_amount),
+    created_at: budget.created_at.toISOString(),
+    updated_at: budget.updated_at.toISOString(),
+    branch_id: budget.branch_id,
+    accounts: {
+      code: budget.accounts.code,
+      name: budget.accounts.name,
+      type: budget.accounts.type,
+    },
+    branch: budget.branches
+      ? {
+          id: budget.branches.id,
+          name: budget.branches.name,
+          code: budget.branches.code,
+        }
+      : null,
+  }
+}
+
 async function resolveBudgetBranchId(orgId: string, branchId?: string | null): Promise<BranchFilterResult> {
-  const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) return { error: 'Unauthorized' }
+
+  const trimmedBranchId = typeof branchId === 'string' ? branchId.trim() : ''
+  if (!trimmedBranchId) return { branchId: null }
+
+  const branchSelection = await resolveAccessibleBranchSelection(orgId, trimmedBranchId)
   if ('error' in branchSelection) {
-    return branchSelection
+    return { error: branchSelection.error || 'Akses unit tidak ditemukan.' }
   }
 
   return { branchId: branchSelection.branchId }
 }
 
 async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<BranchFilterResult> {
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) return { error: 'Unauthorized' }
+
   const branchSelection = await resolveAccessibleBranchSelection(orgId)
   if ('error' in branchSelection || !branchSelection.branchId) {
     return { error: errorMessage }
@@ -27,45 +74,85 @@ async function requireActiveBranchId(orgId: string, errorMessage: string): Promi
 }
 
 export async function getBudgets(orgId: string, period: string, branchId?: string | null) {
-  const supabase = await createClient()
   const branchSelection = await resolveBudgetBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
 
-  let query = (supabase as any)
-    .from('budgets')
-    .select('*, accounts(code, name, type), branch:branches(id, name, code)')
-    .eq('org_id', orgId)
-    .eq('period', period)
+  const budgets = await prisma.budgets.findMany({
+    where: {
+      org_id: orgId,
+      period: parseDateOnly(period),
+      ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+    },
+    include: {
+      accounts: {
+        select: {
+          code: true,
+          name: true,
+          type: true,
+        },
+      },
+      branches: {
+        select: {
+          id: true,
+          name: true,
+          code: true,
+        },
+      },
+    },
+    orderBy: [{ branches: { name: 'asc' } }, { accounts: { code: 'asc' } }],
+  })
 
-  if (branchSelection.branchId) {
-    query = query.eq('branch_id', branchSelection.branchId)
-  }
-
-  const { data, error } = await query
-
-  if (error) return []
-  return data
+  return budgets.map(normalizeBudgetRow)
 }
 
 export async function saveBudget(orgId: string, accountId: string, period: string, amount: number) {
-  const supabase = await createClient()
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih satu unit aktif terlebih dahulu untuk menyimpan budget.'
   )
-  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  const { error } = await (supabase as any)
-    .from('budgets')
-    .upsert({
-      org_id: orgId,
-      branch_id: activeBranchResult.branchId,
-      account_id: accountId,
-      period,
-      budget_amount: amount,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'org_id,branch_id,account_id,period' })
-  if (error) return { error: error.message || 'Gagal menyimpan budget.' }
+  if ('error' in activeBranchResult) {
+    return { error: activeBranchResult.error }
+  }
+
+  const periodDate = parseDateOnly(period)
+
+  try {
+    const existing = await prisma.budgets.findFirst({
+      where: {
+        org_id: orgId,
+        branch_id: activeBranchResult.branchId,
+        account_id: accountId,
+        period: periodDate,
+      },
+      select: { id: true },
+    })
+
+    if (existing?.id) {
+      await prisma.budgets.update({
+        where: { id: existing.id },
+        data: {
+          budget_amount: amount,
+          updated_at: new Date(),
+        },
+      })
+    } else {
+      await prisma.budgets.create({
+        data: {
+          org_id: orgId,
+          branch_id: activeBranchResult.branchId,
+          account_id: accountId,
+          period: periodDate,
+          budget_amount: amount,
+        },
+      })
+    }
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return { error: 'Budget untuk akun dan periode ini sudah ada.' }
+    }
+    return { error: 'Gagal menyimpan budget.' }
+  }
 
   revalidatePath('/accounting/budgets')
   return { success: true, branchId: activeBranchResult.branchId }
@@ -77,105 +164,126 @@ export async function getBudgetVsActual(
   endDate: string,
   branchId?: string | null
 ) {
-  const supabase = await createClient()
   const branchSelection = await resolveBudgetBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
 
-  // 1. Get ALL relevant accounts
-  const { data: accounts } = await (supabase as any)
-    .from('accounts')
-    .select('id, code, name, type, normal_balance')
-    .eq('org_id', orgId)
-    .in('type', ['REVENUE', 'EXPENSE', 'COGS'])
+  const accounts = await prisma.accounts.findMany({
+    where: {
+      org_id: orgId,
+      type: { in: ['REVENUE', 'EXPENSE'] },
+    },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      type: true,
+      normal_balance: true,
+    },
+    orderBy: { code: 'asc' },
+  })
 
-  if (!accounts || accounts.length === 0) return []
+  if (accounts.length === 0) return []
 
-  // 2. Get budgets
-  let budgetsQuery = (supabase as any)
-    .from('budgets')
-    .select('*')
-    .eq('org_id', orgId)
-    .gte('period', startDate)
-    .lte('period', endDate)
-
-  if (branchSelection.branchId) {
-    budgetsQuery = budgetsQuery.eq('branch_id', branchSelection.branchId)
-  }
-
-  const { data: budgets } = await budgetsQuery
+  const budgets = await prisma.budgets.findMany({
+    where: {
+      org_id: orgId,
+      period: {
+        gte: parseDateOnly(startDate),
+        lte: parseDateOnly(endDate),
+      },
+      ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+    },
+    select: {
+      account_id: true,
+      budget_amount: true,
+    },
+  })
 
   const budgetByAccount: Record<string, number> = {}
-  for (const b of budgets || []) {
-    budgetByAccount[b.account_id] = (budgetByAccount[b.account_id] || 0) + Number(b.budget_amount)
-  }
+  budgets.forEach((budget) => {
+    budgetByAccount[budget.account_id] = (budgetByAccount[budget.account_id] || 0) + toNumber(budget.budget_amount)
+  })
 
-  // 3. Get actuals
-  let entriesQuery = (supabase as any)
-    .from('journal_entries')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('status', 'POSTED')
-    .gte('entry_date', startDate)
-    .lte('entry_date', endDate)
+  const entries = await prisma.journal_entries.findMany({
+    where: {
+      org_id: orgId,
+      status: 'POSTED',
+      entry_date: {
+        gte: parseDateOnly(startDate),
+        lte: parseDateOnly(endDate),
+      },
+      ...(branchSelection.branchId ? { branch_id: branchSelection.branchId } : {}),
+    },
+    select: { id: true },
+  })
 
-  if (branchSelection.branchId) {
-    entriesQuery = entriesQuery.eq('branch_id', branchSelection.branchId)
-  }
-
-  const { data: entries } = await entriesQuery
-
-  const entryIds = (entries || []).map((e: any) => e.id)
   const actualByAccount: Record<string, number> = {}
-  
-  if (entryIds.length > 0) {
-    const { data: lines } = await (supabase as any)
-      .from('journal_lines')
-      .select('account_id, debit, credit')
-      .in('entry_id', entryIds)
+  if (entries.length > 0) {
+    const lines = await prisma.journal_lines.findMany({
+      where: {
+        entry_id: { in: entries.map((entry) => entry.id) },
+      },
+      select: {
+        account_id: true,
+        debit: true,
+        credit: true,
+      },
+    })
 
-    for (const l of lines || []) {
-      actualByAccount[l.account_id] = (actualByAccount[l.account_id] || 0) + Number(l.debit) - Number(l.credit)
-    }
-  }
-
-  // 4. Combine
-  const result = []
-  for (const acc of accounts) {
-    const budgetAmount = budgetByAccount[acc.id] || 0
-    const actualRaw = actualByAccount[acc.id] || 0
-    
-    // Adjust signs based on normal balance
-    const actualAmount = acc.normal_balance === 'DEBIT' ? actualRaw : -actualRaw
-    
-    if (budgetAmount === 0 && actualAmount === 0) continue
-
-    const variance = actualAmount - budgetAmount
-    const variancePct = budgetAmount > 0 ? (variance / budgetAmount) * 100 : 0
-    
-    result.push({
-      account_id: acc.id,
-      account_code: acc.code,
-      account_name: acc.name,
-      account_type: acc.type,
-      period: startDate,
-      budget_amount: budgetAmount,
-      actual_amount: actualAmount,
-      variance,
-      variance_pct: Math.round(variancePct * 10) / 10,
-      status: Math.abs(variancePct) <= 5 ? 'ON_TRACK' : variance < 0 ? 'UNDER' : 'OVER'
+    lines.forEach((line) => {
+      actualByAccount[line.account_id] = (actualByAccount[line.account_id] || 0) + toNumber(line.debit) - toNumber(line.credit)
     })
   }
 
-  return result.sort((a: any, b: any) => a.account_code.localeCompare(b.account_code))
+  return accounts
+    .map((account) => {
+      const budgetAmount = budgetByAccount[account.id] || 0
+      const actualRaw = actualByAccount[account.id] || 0
+      const actualAmount = account.normal_balance === 'DEBIT' ? actualRaw : -actualRaw
+
+      if (budgetAmount === 0 && actualAmount === 0) return null
+
+      const variance = actualAmount - budgetAmount
+      const variancePct = budgetAmount > 0 ? (variance / budgetAmount) * 100 : 0
+
+      return {
+        account_id: account.id,
+        account_code: account.code,
+        account_name: account.name,
+        account_type: String(account.type),
+        period: startDate,
+        budget_amount: budgetAmount,
+        actual_amount: actualAmount,
+        variance,
+        variance_pct: Math.round(variancePct * 10) / 10,
+        status: Math.abs(variancePct) <= 5 ? 'ON_TRACK' : variance < 0 ? 'UNDER' : 'OVER',
+      }
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
 }
 
 export async function getChartOfAccountsForBudget(orgId: string) {
-  const supabase = await createClient()
-  const { data } = await (supabase as any)
-    .from('accounts')
-    .select('id, code, name, type')
-    .eq('org_id', orgId)
-    .in('type', ['REVENUE', 'EXPENSE'])
-    .order('code')
-  return data || []
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) return []
+
+  const accounts = await prisma.accounts.findMany({
+    where: {
+      org_id: orgId,
+      type: { in: ['REVENUE', 'EXPENSE'] },
+    },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      type: true,
+    },
+    orderBy: { code: 'asc' },
+  })
+
+  return accounts.map((account) => ({
+    id: account.id,
+    code: account.code,
+    name: account.name,
+    type: String(account.type),
+  }))
 }

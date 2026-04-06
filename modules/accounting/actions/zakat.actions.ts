@@ -1,110 +1,88 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { prisma } from '@/lib/prisma'
+import { getCurrentUserId, ensureAccountingAccess, toNumber } from '@/modules/accounting/lib/reporting.server'
 import { getAccountBalances } from './coa.actions'
 import { createJournalEntry } from './journal.actions'
 
-// Helper: Penentuan Hari Berdasarkan Fiqh (Pergantian hari di waktu Maghrib ~ 18:00 WIB)
 function getIslamicToday(timeZone: string = 'Asia/Jakarta'): string {
-  const now = new Date();
-  
+  const now = new Date()
   const options: Intl.DateTimeFormatOptions = {
-    timeZone, year: 'numeric', month: '2-digit', day: '2-digit', 
-    hour: '2-digit', hourCycle: 'h23' 
-  };
-  const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(now);
-
-  const getPart = (type: string) => parts.find((p: any) => p.type === type)?.value;
-  const year = parseInt(getPart('year') || '1970', 10);
-  const month = parseInt(getPart('month') || '1', 10) - 1; 
-  const day = parseInt(getPart('day') || '1', 10);
-  
-  let hourStr = getPart('hour') || '00';
-  if (hourStr === '24') hourStr = '00'; // Safari fallback
-  const hour = parseInt(hourStr, 10);
-
-  // Gunakan Date.UTC murni untuk manipulasi penambahan hari
-  let d = new Date(Date.UTC(year, month, day));
-  // Prinsip: Jika >= 18:00 (Maghrib), masuk ke hari Hijriah berikutnya
-  if (hour >= 18) {
-    d.setUTCDate(d.getUTCDate() + 1);
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hourCycle: 'h23',
   }
 
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const d2 = String(d.getUTCDate()).padStart(2, '0');
-  
-  return `${y}-${m}-${d2}`;
+  const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(now)
+  const getPart = (type: string) => parts.find((part) => part.type === type)?.value
+  const year = parseInt(getPart('year') || '1970', 10)
+  const month = parseInt(getPart('month') || '1', 10) - 1
+  const day = parseInt(getPart('day') || '1', 10)
+  let hourStr = getPart('hour') || '00'
+
+  if (hourStr === '24') hourStr = '00'
+
+  const hour = parseInt(hourStr, 10)
+  const date = new Date(Date.UTC(year, month, day))
+  if (hour >= 18) {
+    date.setUTCDate(date.getUTCDate() + 1)
+  }
+
+  const currentYear = date.getUTCFullYear()
+  const currentMonth = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const currentDay = String(date.getUTCDate()).padStart(2, '0')
+  return `${currentYear}-${currentMonth}-${currentDay}`
 }
 
-// ============================================================
-// CONSTANTS - Shariah Fiqh
-// ============================================================
-const NISHAB_DINAR_COUNT = 20        // 20 Dinar
-const GRAMS_PER_DINAR = 4.25         // 1 Dinar = 4.25 gram emas
-const NISHAB_GOLD_GRAMS = NISHAB_DINAR_COUNT * GRAMS_PER_DINAR  // = 85 gram
+const NISHAB_DINAR_COUNT = 20
+const GRAMS_PER_DINAR = 4.25
+const NISHAB_GOLD_GRAMS = NISHAB_DINAR_COUNT * GRAMS_PER_DINAR
+const NISHAB_DIRHAM_COUNT = 200
+const GRAMS_PER_DIRHAM = 2.975
+const NISHAB_SILVER_GRAMS = NISHAB_DIRHAM_COUNT * GRAMS_PER_DIRHAM
+const ZAKAT_RATE = 0.025
 
-const NISHAB_DIRHAM_COUNT = 200      // 200 Dirham
-const GRAMS_PER_DIRHAM = 2.975       // 1 Dirham = 2.975 gram perak
-const NISHAB_SILVER_GRAMS = NISHAB_DIRHAM_COUNT * GRAMS_PER_DIRHAM  // = 595 gram
-
-const ZAKAT_RATE = 0.025             // 2.5%
-
-// ============================================================
-// Get Zakat-able assets — correct Fiqh Zakat Tijarah formula:
-//
-//   Harta Zakat = Kas & Bank + Piutang Dagang (AR) + Persediaan + Laba Bersih
-//
-//   TIDAK termasuk: Aset Tetap (kendaraan, gedung, perabot, peralatan)
-//   Dasar: Hanya harta yang "diputar/diperdagangkan" yang kena zakat
-// ============================================================
 async function getTotalZakatAssets(orgId: string) {
   const balances = await getAccountBalances(orgId)
 
-  // 1. Kas & Bank (1101–1199)
   const cashAccounts = balances
-    .filter((b: any) => b.code >= '1101' && b.code <= '1199')
-    .map((b: any) => ({ name: b.name, code: b.code, balance: b.balance || 0, type: 'CASH' as const }))
-  const totalCash = cashAccounts.reduce((s: any, a: any) => s + a.balance, 0)
+    .filter((balance) => balance.code >= '1101' && balance.code <= '1199')
+    .map((balance) => ({ name: balance.name, code: balance.code, balance: balance.balance || 0, type: 'CASH' as const }))
+  const totalCash = cashAccounts.reduce((sum, account) => sum + account.balance, 0)
 
-  // 2. Piutang Dagang / AR (1201–1299) — yang diharapkan kembali
   const arAccounts = balances
-    .filter((b: any) => b.code >= '1201' && b.code <= '1299')
-    .map((b: any) => ({ name: b.name, code: b.code, balance: b.balance || 0, type: 'AR' as const }))
-  const totalAR = arAccounts.reduce((s: any, a: any) => s + a.balance, 0)
+    .filter((balance) => balance.code >= '1201' && balance.code <= '1299')
+    .map((balance) => ({ name: balance.name, code: balance.code, balance: balance.balance || 0, type: 'AR' as const }))
+  const totalAR = arAccounts.reduce((sum, account) => sum + account.balance, 0)
 
-  // 3. Persediaan / Inventory (1301–1399)
   const inventoryAccounts = balances
-    .filter((b: any) => b.code >= '1301' && b.code <= '1399')
-    .map((b: any) => ({ name: b.name, code: b.code, balance: b.balance || 0, type: 'INVENTORY' as const }))
-  const totalInventory = inventoryAccounts.reduce((s: any, a: any) => s + a.balance, 0)
+    .filter((balance) => balance.code >= '1301' && balance.code <= '1399')
+    .map((balance) => ({ name: balance.name, code: balance.code, balance: balance.balance || 0, type: 'INVENTORY' as const }))
+  const totalInventory = inventoryAccounts.reduce((sum, account) => sum + account.balance, 0)
 
-  // 4. Laba Bersih (Hanya sebagai info, JANGAN DITAMBAH ke Harta Zakat!)
-  // Karena wujud laba sudah nyata berada di Kas, Piutang, atau Persediaan. Menambahkan laba = double counting.
   const totalRevenue = balances
-    .filter((b: any) => b.code >= '4000' && b.code <= '4999')
-    .reduce((s: any, b: any) => s + (b.balance || 0), 0)
+    .filter((balance) => balance.code >= '4000' && balance.code <= '4999')
+    .reduce((sum, balance) => sum + (balance.balance || 0), 0)
   const totalExpenses = balances
-    .filter((b: any) => b.code >= '5000' && b.code <= '7999')
-    .reduce((s: any, b: any) => s + (b.balance || 0), 0)
+    .filter((balance) => balance.code >= '5000' && balance.code <= '7999')
+    .reduce((sum, balance) => sum + (balance.balance || 0), 0)
   const netProfit = Math.max(0, totalRevenue - totalExpenses)
 
-  // 5. Hutang Lancar / AP (2101-2199) - Mengurangi kewajiban zakat
   const apAccounts = balances
-    .filter((b: any) => b.code >= '2101' && b.code <= '2199')
-    .map((b: any) => ({ name: b.name, code: b.code, balance: Math.abs(b.balance || 0), type: 'AP' as const }))
-  const totalAP = apAccounts.reduce((s: any, a: any) => s + a.balance, 0)
+    .filter((balance) => balance.code >= '2101' && balance.code <= '2199')
+    .map((balance) => ({ name: balance.name, code: balance.code, balance: Math.abs(balance.balance || 0), type: 'AP' as const }))
+  const totalAP = apAccounts.reduce((sum, account) => sum + account.balance, 0)
 
-  // 6. Total Harta Zakat = (Kas + Piutang + Persediaan) - Hutang Lancar
-  // Aset Tetap (1401+) TIDAK dihitung. Laba bersih TIDAK ditambahkan ulang.
   const totalAssets = Math.max(0, totalCash + totalAR + totalInventory - totalAP)
-
   const zakatAssets = [
     ...cashAccounts,
     ...arAccounts,
     ...inventoryAccounts,
-    ...apAccounts.map((a: any) => ({ ...a, balance: -a.balance })) // minus sign for display
+    ...apAccounts.map((account) => ({ ...account, balance: -account.balance })),
   ]
 
   return {
@@ -118,151 +96,191 @@ async function getTotalZakatAssets(orgId: string) {
       totalRevenue,
       totalExpenses,
       netProfit,
-    }
+    },
   }
 }
 
-// ============================================================
-// MAIN: Get full Zakat Summary with Haul awareness
-// ============================================================
-export async function getZakatSummary(orgId: string, currentPrices: { goldPerGram: number, silverPerGram: number }) {
-  const supabase = await createClient()
+async function getActiveHaul(orgId: string) {
+  return prisma.zakat_haul.findFirst({
+    where: {
+      org_id: orgId,
+      status: 'ACTIVE',
+    },
+    orderBy: {
+      created_at: 'desc',
+    },
+  })
+}
 
-  // 1. Get current assets
+export async function getZakatSummary(orgId: string, currentPrices: { goldPerGram: number; silverPerGram: number }) {
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) {
+    return {
+      scopeLevel: 'ORG',
+      scopeLabel: 'Level Organisasi',
+      isShariahEnabled: false,
+      zakatAssets: [],
+      totalAssets: 0,
+      nishabGold: 0,
+      nishabSilver: 0,
+      nishabGoldGrams: NISHAB_GOLD_GRAMS,
+      nishabSilverGrams: NISHAB_SILVER_GRAMS,
+      isReachedGold: false,
+      isReachedSilver: false,
+      isZakatObligated: false,
+      zakatAmount: 0,
+      hauledPrices: currentPrices,
+      currentPrices,
+      haulStatus: 'NO_HAUL',
+      haulStartDate: null,
+      haulDaysElapsed: 0,
+      haulDaysRemaining: 354,
+      haulBatalReason: null,
+      haulHistory: [],
+      dailyAssetsChart: [],
+      activeHaul: null,
+      breakdown: { totalCash: 0, totalAR: 0, totalInventory: 0, totalAP: 0, totalRevenue: 0, totalExpenses: 0, netProfit: 0 },
+      fiqh: { dinarCount: NISHAB_DINAR_COUNT, gramsPerDinar: GRAMS_PER_DINAR, dirhamCount: NISHAB_DIRHAM_COUNT, gramsPerDirham: GRAMS_PER_DIRHAM },
+    }
+  }
+
   const { zakatAssets, totalAssets, breakdown } = await getTotalZakatAssets(orgId)
+  let activeHaul = await getActiveHaul(orgId)
 
-  // 2. Check for active haul
-  let { data: activeHaul } = await (supabase as any)
-    .from('zakat_haul')
-    .select('*')
-    .eq('org_id', orgId)
-    .eq('status', 'ACTIVE')
-    .maybeSingle()
-
-  // 3. Determine which prices to use for nishab
   const hauledPrices = activeHaul
-    ? { goldPerGram: Number(activeHaul.gold_price_per_gram), silverPerGram: Number(activeHaul.silver_price_per_gram) }
+    ? { goldPerGram: toNumber(activeHaul.gold_price_per_gram), silverPerGram: toNumber(activeHaul.silver_price_per_gram) }
     : currentPrices
 
-  const nishabGold   = NISHAB_GOLD_GRAMS   * hauledPrices.goldPerGram
+  const nishabGold = NISHAB_GOLD_GRAMS * hauledPrices.goldPerGram
   const nishabSilver = NISHAB_SILVER_GRAMS * hauledPrices.silverPerGram
-
-  const isReachedGold   = totalAssets >= nishabGold
+  const isReachedGold = totalAssets >= nishabGold
   const isReachedSilver = totalAssets >= nishabSilver
-
   const isZakatObligated = isReachedSilver || isReachedGold
   const zakatAmount = isZakatObligated ? totalAssets * ZAKAT_RATE : 0
 
-  // 4. Haul status
   let haulStatus = 'NO_HAUL'
   let haulStartDate: string | null = null
   let haulDaysElapsed = 0
-  let haulDaysRemaining = 354 // Lunar year
+  let haulDaysRemaining = 354
   let haulBatalReason: string | null = null
 
   if (activeHaul) {
     if (!isZakatObligated) {
-      const formatRupiah = (v: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(v)
+      const formatRupiah = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value)
       haulBatalReason = `Otomatis: Harta (${formatRupiah(totalAssets)}) turun di bawah nishab perak pada ${new Date().toLocaleString('id-ID')}`
-      
-      await (supabase as any).from('zakat_haul')
-        .update({ status: 'BATAL', batal_reason: haulBatalReason })
-        .eq('id', activeHaul.id)
+
+      await prisma.zakat_haul.update({
+        where: { id: activeHaul.id },
+        data: {
+          status: 'BATAL',
+          batal_reason: haulBatalReason,
+        },
+      })
 
       haulStatus = 'BATAL'
       activeHaul = null
     } else {
-      haulStartDate = activeHaul.haul_start_date
-      const start = new Date(activeHaul.haul_start_date + 'T00:00:00Z')
-      const todayIslamic = new Date(getIslamicToday() + 'T00:00:00Z')
+      haulStartDate = activeHaul.haul_start_date.toISOString().slice(0, 10)
+      const start = new Date(`${haulStartDate}T00:00:00Z`)
+      const todayIslamic = new Date(`${getIslamicToday()}T00:00:00Z`)
       haulDaysElapsed = Math.floor((todayIslamic.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
       haulDaysRemaining = Math.max(0, 354 - haulDaysElapsed)
       haulStatus = haulDaysElapsed >= 354 ? 'COMPLETED' : 'ACTIVE'
     }
-  } 
-  
+  }
+
   if (!activeHaul) {
-    const { data: batalHaul } = await (supabase as any)
-      .from('zakat_haul')
-      .select('*')
-      .eq('org_id', orgId)
-      .eq('status', 'BATAL')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const batalHaul = await prisma.zakat_haul.findFirst({
+      where: {
+        org_id: orgId,
+        status: 'BATAL',
+      },
+      orderBy: {
+        updated_at: 'desc',
+      },
+    })
+
     if (batalHaul) {
       haulStatus = 'BATAL'
       haulBatalReason = batalHaul.batal_reason
     }
   }
 
-  // 5. Get haul history events
-  const { data: haulHistory } = await (supabase as any)
-    .from('zakat_haul')
-    .select('id, haul_start_date, status, nishab_gold, nishab_silver, gold_price_per_gram, silver_price_per_gram, batal_reason, created_at')
-    .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
-    .limit(5)
+  const haulHistory = await prisma.zakat_haul.findMany({
+    where: { org_id: orgId },
+    select: {
+      id: true,
+      haul_start_date: true,
+      status: true,
+      nishab_gold: true,
+      nishab_silver: true,
+      gold_price_per_gram: true,
+      silver_price_per_gram: true,
+      batal_reason: true,
+      created_at: true,
+    },
+    orderBy: { created_at: 'desc' },
+    take: 5,
+  })
 
-  // 6. Record to org-level timeline
-  const { data: lastTimelineEvent } = await (supabase as any)
-    .from('zakat_asset_timeline')
-    .select('total_assets')
-    .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const lastTimelineEvent = await prisma.zakat_asset_timeline.findFirst({
+    where: { org_id: orgId },
+    select: { total_assets: true },
+    orderBy: { created_at: 'desc' },
+  })
 
-  if (!lastTimelineEvent || Number(lastTimelineEvent.total_assets) !== totalAssets) {
-    await (supabase as any).from('zakat_asset_timeline').insert({
-      org_id: orgId,
-      total_assets: totalAssets,
-      nishab_silver: nishabSilver,
-      is_above_nishab: isZakatObligated,
-      haul_id: activeHaul?.id ?? null
+  if (!lastTimelineEvent || toNumber(lastTimelineEvent.total_assets) !== totalAssets) {
+    await prisma.zakat_asset_timeline.create({
+      data: {
+        org_id: orgId,
+        total_assets: totalAssets,
+        nishab_silver: nishabSilver,
+        is_above_nishab: isZakatObligated,
+        haul_id: activeHaul?.id || null,
+      },
     })
   }
 
-  // 7. Fetch timeline points
-  let dailyAssetsChart: { name: string; value: number; aboveNishab: boolean }[] = []
-  const { data: timelineEvents } = await (supabase as any)
-    .from('zakat_asset_timeline')
-    .select('created_at, total_assets, is_above_nishab')
-    .eq('org_id', orgId)
-    .order('created_at', { ascending: true })
-    .limit(200)
+  const timelineEvents = await prisma.zakat_asset_timeline.findMany({
+    where: { org_id: orgId },
+    select: {
+      created_at: true,
+      total_assets: true,
+      is_above_nishab: true,
+    },
+    orderBy: { created_at: 'asc' },
+    take: 200,
+  })
 
-  if (timelineEvents && timelineEvents.length > 0) {
-    dailyAssetsChart = timelineEvents.map((e: any) => {
-      const d = new Date(e.created_at)
-      const day = d.getDate().toString().padStart(2, '0')
-      const month = (d.getMonth() + 1).toString().padStart(2, '0')
-      const hours = d.getHours().toString().padStart(2, '0')
-      const mins = d.getMinutes().toString().padStart(2, '0')
-      return {
-        name: `${day}/${month} ${hours}:${mins}`,
-        value: Number(e.total_assets),
-        aboveNishab: e.is_above_nishab ?? true
-      }
-    })
-
-    if (dailyAssetsChart.length === 1) {
-      dailyAssetsChart.unshift({ ...dailyAssetsChart[0], name: 'Start' })
+  let dailyAssetsChart = timelineEvents.map((event) => {
+    const date = new Date(event.created_at)
+    const day = date.getDate().toString().padStart(2, '0')
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const hours = date.getHours().toString().padStart(2, '0')
+    const minutes = date.getMinutes().toString().padStart(2, '0')
+    return {
+      name: `${day}/${month} ${hours}:${minutes}`,
+      value: toNumber(event.total_assets),
+      aboveNishab: event.is_above_nishab ?? true,
     }
+  })
+
+  if (dailyAssetsChart.length === 1) {
+    dailyAssetsChart = [{ ...dailyAssetsChart[0], name: 'Start' }, ...dailyAssetsChart]
   }
 
-  // 8. Check if Shariah Accounts are active
-  const { count: shariahCount } = await (supabase as any)
-    .from('accounts')
-    .select('*', { count: 'exact', head: true })
-    .eq('org_id', orgId)
-    .in('code', ['3100', '2600', '6100', '6200'])
-    .eq('is_active', true)
+  const shariahCount = await prisma.accounts.count({
+    where: {
+      org_id: orgId,
+      code: { in: ['3100', '2600', '6100', '6200'] },
+      is_active: true,
+    },
+  })
 
   return {
     scopeLevel: 'ORG',
     scopeLabel: 'Level Organisasi',
-    isShariahEnabled: (shariahCount || 0) > 0,
+    isShariahEnabled: shariahCount > 0,
     zakatAssets,
     totalAssets,
     nishabGold,
@@ -280,82 +298,113 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
     haulDaysElapsed,
     haulDaysRemaining,
     haulBatalReason,
-    haulHistory: haulHistory || [],
+    haulHistory: haulHistory.map((haul) => ({
+      id: haul.id,
+      haul_start_date: haul.haul_start_date.toISOString().slice(0, 10),
+      status: haul.status,
+      nishab_gold: toNumber(haul.nishab_gold),
+      nishab_silver: toNumber(haul.nishab_silver),
+      gold_price_per_gram: toNumber(haul.gold_price_per_gram),
+      silver_price_per_gram: toNumber(haul.silver_price_per_gram),
+      batal_reason: haul.batal_reason,
+      created_at: haul.created_at?.toISOString() || null,
+    })),
     dailyAssetsChart,
-    activeHaul,
+    activeHaul: activeHaul
+      ? {
+          ...activeHaul,
+          haul_start_date: activeHaul.haul_start_date.toISOString().slice(0, 10),
+          gold_price_per_gram: toNumber(activeHaul.gold_price_per_gram),
+          silver_price_per_gram: toNumber(activeHaul.silver_price_per_gram),
+          nishab_gold: toNumber(activeHaul.nishab_gold),
+          nishab_silver: toNumber(activeHaul.nishab_silver),
+          created_at: activeHaul.created_at?.toISOString() || null,
+          updated_at: activeHaul.updated_at?.toISOString() || null,
+          gold_price_set_at: activeHaul.gold_price_set_at?.toISOString() || null,
+        }
+      : null,
     breakdown,
     fiqh: {
       dinarCount: NISHAB_DINAR_COUNT,
       gramsPerDinar: GRAMS_PER_DINAR,
       dirhamCount: NISHAB_DIRHAM_COUNT,
       gramsPerDirham: GRAMS_PER_DIRHAM,
-    }
+    },
   }
 }
 
 export async function startZakatHaul(
-  orgId: string, 
-  goldPrice: number, 
+  orgId: string,
+  goldPrice: number,
   silverPrice: number,
   goldPriceSource: string = 'Manual Input',
   goldPriceEvidenceUrl?: string
 ) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) return { error: 'Unauthorized' }
 
-  const nishabGold   = NISHAB_GOLD_GRAMS   * goldPrice
+  const userId = await getCurrentUserId()
+  const nishabGold = NISHAB_GOLD_GRAMS * goldPrice
   const nishabSilver = NISHAB_SILVER_GRAMS * silverPrice
-
   const { totalAssets } = await getTotalZakatAssets(orgId)
 
   if (totalAssets < nishabSilver && totalAssets < nishabGold) {
     return { error: `Aset saat ini (${totalAssets.toLocaleString('id-ID')}) masih di bawah nishab. Haul baru belum dapat dimulai.` }
   }
 
-  await (supabase as any).from('zakat_haul').update({ status: 'ARCHIVED' }).eq('org_id', orgId).eq('status', 'BATAL')
-
-  const { error } = await (supabase as any).from('zakat_haul').insert({
-    org_id: orgId,
-    haul_start_date: getIslamicToday(),
-    gold_price_per_gram: goldPrice,
-    silver_price_per_gram: silverPrice,
-    nishab_gold: nishabGold,
-    nishab_silver: nishabSilver,
-    status: 'ACTIVE',
-    gold_price_source: goldPriceSource,
-    gold_price_evidence_url: goldPriceEvidenceUrl || null,
-    gold_price_set_by: user?.id || null,
-    gold_price_set_at: new Date().toISOString(),
+  await prisma.zakat_haul.updateMany({
+    where: {
+      org_id: orgId,
+      status: 'BATAL',
+    },
+    data: {
+      status: 'ARCHIVED',
+    },
   })
 
-  if (error) return { error: 'Gagal memulai haul: ' + error.message }
+  try {
+    await prisma.zakat_haul.create({
+      data: {
+        org_id: orgId,
+        haul_start_date: new Date(`${getIslamicToday()}T00:00:00.000Z`),
+        gold_price_per_gram: goldPrice,
+        silver_price_per_gram: silverPrice,
+        nishab_gold: nishabGold,
+        nishab_silver: nishabSilver,
+        status: 'ACTIVE',
+        gold_price_source: goldPriceSource,
+        gold_price_evidence_url: goldPriceEvidenceUrl || null,
+        gold_price_set_by: userId,
+        gold_price_set_at: new Date(),
+      },
+    })
+  } catch (error) {
+    return { error: error instanceof Error ? `Gagal memulai haul: ${error.message}` : 'Gagal memulai haul.' }
+  }
 
   revalidatePath('/accounting/zakat')
   return { success: true }
 }
 
 export async function checkAndCancelHaul(orgId: string) {
-  const supabase = await createClient()
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) return { error: 'Unauthorized' }
 
-  const { data: activeHaul } = await (supabase as any)
-    .from('zakat_haul')
-    .select('*')
-    .eq('org_id', orgId)
-    .eq('status', 'ACTIVE')
-    .maybeSingle()
-
+  const activeHaul = await getActiveHaul(orgId)
   if (!activeHaul) return { alreadyInactive: true }
 
   const { totalAssets } = await getTotalZakatAssets(orgId)
-  const nishabGold   = Number(activeHaul.nishab_gold)
-  const nishabSilver = Number(activeHaul.nishab_silver)
+  const nishabGold = toNumber(activeHaul.nishab_gold)
+  const nishabSilver = toNumber(activeHaul.nishab_silver)
 
   if (totalAssets < nishabSilver && totalAssets < nishabGold) {
-    const today = getIslamicToday()
-    await (supabase as any).from('zakat_haul').update({
-      status: 'BATAL',
-      batal_reason: `Aset turun di bawah nishab pada ${today}. Aset: Rp ${totalAssets.toLocaleString('id-ID')}. Haul baru dimulai saat aset kembali di atas nishab.`
-    }).eq('id', activeHaul.id)
+    await prisma.zakat_haul.update({
+      where: { id: activeHaul.id },
+      data: {
+        status: 'BATAL',
+        batal_reason: `Aset turun di bawah nishab pada ${getIslamicToday()}. Aset: Rp ${totalAssets.toLocaleString('id-ID')}. Haul baru dimulai saat aset kembali di atas nishab.`,
+      },
+    })
 
     revalidatePath('/accounting/zakat')
     return { batal: true, totalAssets, nishabSilver, nishabGold }
@@ -364,79 +413,94 @@ export async function checkAndCancelHaul(orgId: string) {
   return { active: true, totalAssets }
 }
 
-export async function evaluateZakatDaily(orgId: string, currentPrices: { gold: number, silver: number }) {
-  const supabase = await createClient()
+export async function evaluateZakatDaily(orgId: string, currentPrices: { gold: number; silver: number }) {
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) return
 
   const { totalAssets } = await getTotalZakatAssets(orgId)
-
-  const { data: activeHaul } = await (supabase as any)
-    .from('zakat_haul')
-    .select('*')
-    .eq('org_id', orgId)
-    .eq('status', 'ACTIVE')
-    .maybeSingle()
-
+  const activeHaul = await getActiveHaul(orgId)
   const today = getIslamicToday()
   let activeId = activeHaul?.id
-  const nishabGold = activeHaul ? Number(activeHaul.nishab_gold) : NISHAB_GOLD_GRAMS * currentPrices.gold
-  const nishabSilver = activeHaul ? Number(activeHaul.nishab_silver) : NISHAB_SILVER_GRAMS * currentPrices.silver
+  const nishabGold = activeHaul ? toNumber(activeHaul.nishab_gold) : NISHAB_GOLD_GRAMS * currentPrices.gold
+  const nishabSilver = activeHaul ? toNumber(activeHaul.nishab_silver) : NISHAB_SILVER_GRAMS * currentPrices.silver
   const isUnderNishab = totalAssets < nishabSilver && totalAssets < nishabGold
-  
+
   if (activeHaul) {
     if (isUnderNishab) {
-      await (supabase as any).from('zakat_haul').update({
-        status: 'BATAL',
-        batal_reason: `Aset turun di bawah nishab pada ${today}. Aset: Rp ${totalAssets.toLocaleString('id-ID')}`
-      }).eq('id', activeHaul.id)
+      await prisma.zakat_haul.update({
+        where: { id: activeHaul.id },
+        data: {
+          status: 'BATAL',
+          batal_reason: `Aset turun di bawah nishab pada ${today}. Aset: Rp ${totalAssets.toLocaleString('id-ID')}`,
+        },
+      })
       activeId = undefined
     }
-  } else {
-    if (!isUnderNishab) {
-      const { data: newHaul } = await (supabase as any).from('zakat_haul').insert({
+  } else if (!isUnderNishab) {
+    const newHaul = await prisma.zakat_haul.create({
+      data: {
         org_id: orgId,
-        haul_start_date: today,
+        haul_start_date: new Date(`${today}T00:00:00.000Z`),
         gold_price_per_gram: currentPrices.gold,
         silver_price_per_gram: currentPrices.silver,
         nishab_gold: nishabGold,
         nishab_silver: nishabSilver,
-        status: 'ACTIVE'
-      }).select('id').single()
-      if (newHaul) activeId = newHaul.id
-    }
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+    })
+    activeId = newHaul.id
   }
 
   if (activeId) {
-    const { count } = await (supabase as any).from('zakat_haul_events')
-      .select('*', { count: 'exact', head: true })
-      .eq('haul_id', activeId)
-      .eq('event_date', today)
-    
-    if (!count || count === 0) {
-      await (supabase as any).from('zakat_haul_events').insert({
+    const count = await prisma.zakat_haul_events.count({
+      where: {
         haul_id: activeId,
-        org_id: orgId,
-        event_date: today,
-        total_assets: totalAssets,
-        is_above_nishab: !isUnderNishab
+        event_date: new Date(`${today}T00:00:00.000Z`),
+      },
+    })
+
+    if (count === 0) {
+      await prisma.zakat_haul_events.create({
+        data: {
+          haul_id: activeId,
+          org_id: orgId,
+          event_date: new Date(`${today}T00:00:00.000Z`),
+          total_assets: totalAssets,
+          is_above_nishab: !isUnderNishab,
+        },
       })
     }
   }
 }
 
 export async function payZakat(orgId: string, accountId: string, amount: number) {
-  const supabase = await createClient()
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) return { error: 'Unauthorized' }
 
-  let { data: zakatAcc } = await (supabase as any).from('accounts').select('id').eq('org_id', orgId).ilike('name', '%Zakat Tijarah%').single()
-  if (!zakatAcc) {
-     const { data: alt } = await (supabase as any).from('accounts').select('id').eq('org_id', orgId).ilike('name', '%Zakat%').limit(1).single()
-     zakatAcc = alt
+  let zakatAccount = await prisma.accounts.findFirst({
+    where: {
+      org_id: orgId,
+      name: { contains: 'Zakat Tijarah', mode: 'insensitive' },
+    },
+    select: { id: true },
+  })
+
+  if (!zakatAccount) {
+    zakatAccount = await prisma.accounts.findFirst({
+      where: {
+        org_id: orgId,
+        name: { contains: 'Zakat', mode: 'insensitive' },
+      },
+      select: { id: true },
+    })
   }
-  
-  if (!zakatAcc) {
+
+  if (!zakatAccount) {
     return { error: 'Akun Beban Zakat tidak ditemukan. Harap aktifkan Syariah Add-on terlebih dahulu.' }
   }
 
-  const res = await createJournalEntry({
+  const result = await createJournalEntry({
     org_id: orgId,
     entry_date: getIslamicToday(),
     description: 'Pembayaran Zakat Tijarah Haul',
@@ -444,14 +508,22 @@ export async function payZakat(orgId: string, accountId: string, amount: number)
     allow_org_scope: true,
     auto_post: true,
     lines: [
-      { account_id: zakatAcc.id, debit: amount, credit: 0, memo: 'Pembayaran Zakat' },
+      { account_id: zakatAccount.id, debit: amount, credit: 0, memo: 'Pembayaran Zakat' },
       { account_id: accountId, debit: 0, credit: amount, memo: 'Pengeluaran Kas/Bank untuk Zakat' },
-    ]
+    ],
   })
 
-  if ('error' in res) return res
+  if ('error' in result) return result
 
-  await (supabase as any).from('zakat_haul').update({ status: 'COMPLETED' }).eq('org_id', orgId).eq('status', 'ACTIVE')
+  await prisma.zakat_haul.updateMany({
+    where: {
+      org_id: orgId,
+      status: 'ACTIVE',
+    },
+    data: {
+      status: 'COMPLETED',
+    },
+  })
 
   revalidatePath('/accounting/zakat')
   revalidatePath('/accounting/journal')
@@ -459,24 +531,22 @@ export async function payZakat(orgId: string, accountId: string, amount: number)
 }
 
 export async function syncActiveHaulPrices(orgId: string, goldPrice: number, silverPrice: number) {
-  const supabase = await createClient()
+  const membership = await ensureAccountingAccess(orgId)
+  if (!membership) return { error: 'Unauthorized' }
 
-  const nishabGold = 85 * goldPrice
-  const nishabSilver = 595 * silverPrice
-
-  const { data, error } = await (supabase as any).from('zakat_haul')
-    .update({
+  await prisma.zakat_haul.updateMany({
+    where: {
+      org_id: orgId,
+      status: { in: ['ACTIVE', 'BATAL'] },
+    },
+    data: {
       gold_price_per_gram: goldPrice,
       silver_price_per_gram: silverPrice,
-      nishab_gold: nishabGold,
-      nishab_silver: nishabSilver
-    })
-    .eq('org_id', orgId)
-    .in('status', ['ACTIVE', 'BATAL'])
-    .select('id')
+      nishab_gold: 85 * goldPrice,
+      nishab_silver: 595 * silverPrice,
+    },
+  })
 
-    if (error) throw new Error(`Failed to sync prices: ${error.message}`)
-    
   revalidatePath('/accounting/zakat')
   return { success: true }
 }
