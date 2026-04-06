@@ -129,7 +129,7 @@ export function AppHeader({
     startCreateOrgTransition(async () => {
       const result: Awaited<ReturnType<typeof createOrganizationQuick>> = await createOrganizationQuick(formData)
       if ('error' in result) {
-        setOrgFeedback({ type: 'error', message: result.error })
+        setOrgFeedback({ type: 'error', message: result.error || 'Gagal memperbarui hierarki organisasi.' })
         return
       }
 
@@ -169,7 +169,7 @@ export function AppHeader({
         normalizedParentId
       )
       if ('error' in result) {
-        setOrgFeedback({ type: 'error', message: result.error })
+        setOrgFeedback({ type: 'error', message: result.error || 'Gagal memperbarui hierarki organisasi.' })
         return
       }
 

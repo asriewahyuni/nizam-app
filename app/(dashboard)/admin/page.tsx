@@ -76,6 +76,11 @@ type AdminInvoice = AdminSnapshot['invoices'][number]
 type AdminOrganization = AdminSnapshot['orgs'][number]
 type AdminPackage = AdminSnapshot['packages'][number]
 type AdminTopupPackage = AdminSnapshot['aiTopupPackages'][number]
+type AdminPackageWithLimits = AdminPackage & {
+  max_branches?: number | null
+  max_child_orgs?: number | null
+  max_users?: number | null
+}
 
 export default function SaaSAdminPage() {
   const [invoices, setInvoices] = useState<AdminInvoice[]>([])
@@ -1141,11 +1146,11 @@ export default function SaaSAdminPage() {
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Branch / Cabang</label>
-                          <input name="max_branches" type="number" defaultValue={pkgModal.editData?.max_branches ?? ''} placeholder="Kosong = Unlimited" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+                          <input name="max_branches" type="number" defaultValue={(pkgModal.editData as AdminPackageWithLimits | null)?.max_branches ?? ''} placeholder="Kosong = Unlimited" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                        </div>
                        <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Anak Perusahaan</label>
-                          <input name="max_child_orgs" type="number" defaultValue={pkgModal.editData?.max_child_orgs ?? ''} placeholder="Kosong = Unlimited" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+                          <input name="max_child_orgs" type="number" defaultValue={(pkgModal.editData as AdminPackageWithLimits | null)?.max_child_orgs ?? ''} placeholder="Kosong = Unlimited" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                        </div>
                     </div>
 
@@ -1160,7 +1165,7 @@ export default function SaaSAdminPage() {
                        </div>
                        <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Users</label>
-                          <input name="max_users" type="number" defaultValue={pkgModal.editData?.max_users ?? ''} placeholder="Unlimited" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
+                          <input name="max_users" type="number" defaultValue={(pkgModal.editData as AdminPackageWithLimits | null)?.max_users ?? ''} placeholder="Unlimited" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                        </div>
                     </div>
 

@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   prisma: {
+    organizations: {
+      findMany: vi.fn(),
+    },
     journal_entries: {
       findMany: vi.fn(),
     },
@@ -35,13 +38,16 @@ import { getCashFlow, getGeneralLedger, getProfitLoss } from '@/modules/accounti
 describe('Reports Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.prisma.organizations.findMany.mockResolvedValue([])
     mocks.getAuthUser.mockResolvedValue({ userId: 'user-1' })
     mocks.getMembership.mockResolvedValue({ memberId: 'member-1', orgId: 'org-1', userId: 'user-1', role: 'admin', roleId: null, permissions: [], isOwner: false, isAdmin: true, isOwnerOrAdmin: true })
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({ scope: { accessibleBranchIds: ['branch-1'] }, branchId: 'branch-1' })
   })
 
   it('filters general ledger by active branch', async () => {
-    mocks.prisma.journal_entries.findMany.mockResolvedValue([
+    mocks.prisma.journal_entries.findMany
+      .mockResolvedValueOnce([{ id: 'je-1' }])
+      .mockResolvedValueOnce([
       {
         id: 'je-1',
         org_id: 'org-1',
@@ -68,7 +74,8 @@ describe('Reports Branch Context', () => {
     const result = await getGeneralLedger('org-1', 'branch-1')
 
     expect(result).toEqual([expect.objectContaining({ id: 'je-1', branch_id: 'branch-1', journal_lines: [] })])
-    expect(mocks.prisma.journal_entries.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ org_id: 'org-1', status: 'POSTED', branch_id: 'branch-1' }) }))
+    expect(mocks.prisma.journal_entries.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({ where: expect.objectContaining({ org_id: { in: ['org-1'] }, status: 'POSTED', branch_id: 'branch-1' }) }))
+    expect(mocks.prisma.journal_entries.findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({ where: { id: { in: ['je-1'] } } }))
   })
 
   it('scopes profit and loss calculations to the active branch', async () => {

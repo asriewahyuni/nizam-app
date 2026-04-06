@@ -240,7 +240,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       },
     })
 
-    const salamPurchasesFiltered = salamPurchases.filter(
+    const salamPurchasesFiltered = (salamPurchases || []).filter(
       (purchase) => isSalamMode(purchase.shariah_mode) || isIstishnaMode(purchase.shariah_mode)
     )
 

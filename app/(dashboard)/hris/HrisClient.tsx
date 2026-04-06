@@ -465,11 +465,12 @@ export default function HrisClient({
           : row
       )
     )
+    const warning = 'warning' in res ? res.warning : undefined
     showToast(
-      res.warning
-        ? `Status resign tersimpan, dengan catatan: ${res.warning}`
+      warning
+        ? `Status resign tersimpan, dengan catatan: ${warning}`
         : 'Status karyawan berhasil diubah ke RESIGNED.',
-      res.warning ? 'info' : 'success'
+      warning ? 'info' : 'success'
     )
     refreshHrisPage()
     setLoading(false)

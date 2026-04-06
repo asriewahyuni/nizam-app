@@ -371,7 +371,10 @@ export default function PurchasingClient({
 
     const res = await createPurchaseEntry(orgId, payload)
 
-    if (res?.error) setError(res.error)
+    if (res?.error) {
+      const message = typeof res.error === 'string' ? res.error : 'Gagal menerima PO.'
+      setError(message)
+    }
     else {
       const dpFinalAmount = dpMode === 'PERCENT' ? (grandTotal * (parseFloat(dpPercent) || 0) / 100) : (parseFloat(dpAmount) || 0)
       if (!isDraftSave && resolvedPaymentTerm === 'TEMPO' && hasDp && dpFinalAmount > 0 && dpAccountId && res.purchaseId) {
@@ -444,8 +447,9 @@ export default function PurchasingClient({
     if (!confirm('Tandai bahwa barang sudah diterima (Status -> RECEIVED)?')) return
     setLoading(true)
     const res = await receivePurchase(orgId, id)
-    if (res?.error) setError(res.error)
-    else {
+    if (res?.error) {
+      setError(typeof res.error === 'string' ? res.error : 'Gagal menerima PO.')
+    } else {
       setSuccess('Status PO berhasil diubah menjadi RECEIVED!')
       setTimeout(() => setSuccess(null), 3500)
     }

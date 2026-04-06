@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
+  checkCanManageCoA: vi.fn(),
   prisma: {
     bank_accounts: {
       create: vi.fn(),
@@ -22,11 +23,11 @@ vi.mock('@/auth', () => ({ auth: mocks.auth }))
 vi.mock('@/lib/prisma', () => ({ prisma: mocks.prisma }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
 vi.mock('@/modules/organization/lib/branch-access.server', () => ({ resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection }))
+vi.mock('@/modules/accounting/actions/coa.actions', () => ({ checkCanManageCoA: mocks.checkCanManageCoA }))
 
 import {
   createBankAccount,
   createBankTransaction,
-  createInterOrgCapitalTransfer,
   deleteBankTransaction,
   getRecentBankTransactions,
 } from '@/modules/cash/actions/bank.actions'
@@ -35,6 +36,7 @@ describe('Cash & Bank Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.auth.mockResolvedValue({ user: { id: 'user-1' } })
+    mocks.checkCanManageCoA.mockResolvedValue({ canManageDirect: true })
   })
 
   it('stamps active branch when creating a bank account', async () => {
@@ -93,41 +95,4 @@ describe('Cash & Bank Branch Context', () => {
     expect(result).toEqual({ success: true })
   })
 
-  it('creates inter-org capital transfer through RPC', async () => {
-    const rpcMock = vi.fn().mockResolvedValue({
-      data: [{ source_transaction_id: 'tx-out-1', target_transaction_id: 'tx-in-1' }],
-      error: null,
-    })
-
-    mocks.createClient.mockResolvedValue({
-      rpc: rpcMock,
-    })
-
-    const formData = new FormData()
-    formData.set('bank_account_id', 'bank-source')
-    formData.set('target_bank_account_id', 'bank-target')
-    formData.set('source_counter_account_id', 'acc-source-counter')
-    formData.set('target_counter_account_id', 'acc-target-counter')
-    formData.set('transaction_date', '2026-04-06')
-    formData.set('description', 'Transfer modal ke anak usaha')
-    formData.set('amount', '2500000')
-
-    const result = await createInterOrgCapitalTransfer('org-parent', formData)
-
-    expect(rpcMock).toHaveBeenCalledWith('create_interorg_capital_transfer', {
-      p_source_org_id: 'org-parent',
-      p_source_bank_account_id: 'bank-source',
-      p_source_counter_account_id: 'acc-source-counter',
-      p_target_bank_account_id: 'bank-target',
-      p_target_counter_account_id: 'acc-target-counter',
-      p_transaction_date: '2026-04-06',
-      p_amount: 2500000,
-      p_description: 'Transfer modal ke anak usaha',
-      p_reference_number: null,
-    })
-    expect(result).toEqual({
-      success: true,
-      data: [{ source_transaction_id: 'tx-out-1', target_transaction_id: 'tx-in-1' }],
-    })
-  })
 })

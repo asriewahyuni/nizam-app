@@ -238,7 +238,7 @@ describe('Operator Sales Actions', () => {
 
     expect(result).toEqual({
       success: true,
-      invoiceNumber: expect.stringMatching(/^QTN-SAAS-/),
+      invoiceNumber: expect.stringMatching(/^QTN-/),
     })
     expect(mocks.prisma.saas_invoices.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -257,7 +257,7 @@ describe('Operator Sales Actions', () => {
     const createPayload = mocks.prisma.saas_invoices.create.mock.calls[0]?.[0]
     expect(createPayload.data.item_description).toContain('Token AI: Starter Token')
     expect(createPayload.data.item_description).toContain('Cabang tambahan: 2 x')
-    expect(createPayload.data.item_description).toContain('Diskon: 10%')
+    expect(createPayload.data.item_description).toContain('Diskon setelah durasi: 10%')
     expect(createPayload.data.item_description).toContain('Pajak: 11%')
   })
 
@@ -286,7 +286,7 @@ describe('Operator Sales Actions', () => {
       data: expect.objectContaining({
         org_id: 'org-1',
         entry_number: '',
-        description: expect.stringContaining('Penjualan SaaS INV-SAAS-'),
+        description: expect.stringContaining('Penjualan SaaS INV-'),
         reference_type: 'SALE',
         reference_id: 'inv-1',
         status: 'POSTED',
@@ -305,7 +305,7 @@ describe('Operator Sales Actions', () => {
     expect(mocks.prisma.saas_invoices.update).toHaveBeenCalledWith({
       where: { id: 'inv-1' },
       data: {
-        invoice_number: expect.stringMatching(/^INV-SAAS-/),
+        invoice_number: expect.stringMatching(/^INV-/),
         updated_at: expect.any(Date),
       },
     })

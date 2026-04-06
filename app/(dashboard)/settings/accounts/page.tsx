@@ -29,7 +29,7 @@ export default async function ChartOfAccountsPage() {
   if (parentOrgId) {
     const syncResult = await syncParentCoAToChildOrg(parentOrgId, orgData.org.id)
     if (!syncResult.success) {
-      ;(console as any).warn('CoA sync warning (ChartOfAccountsPage):', syncResult.error)
+      ;(console as any).warn('CoA sync warning (ChartOfAccountsPage)')
     }
   }
 

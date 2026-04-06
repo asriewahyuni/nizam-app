@@ -15,6 +15,15 @@ const mocks = vi.hoisted(() => ({
     accounts: {
       count: vi.fn(),
     },
+    organizations: {
+      findUnique: vi.fn(),
+    },
+    products: {
+      count: vi.fn(),
+    },
+    service_orders: {
+      count: vi.fn(),
+    },
   },
   getAuthUser: vi.fn(),
   getMembership: vi.fn(),
@@ -59,46 +68,19 @@ describe('Zakat Accounting Boundary', () => {
   })
 
   it('disables trade zakat obligation for service/labour business', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        organizations: [
-          {
-            maybeSingleResult: success({
-              settings: {
-                business_type: 'LAYANAN_JASA',
-              },
-            }),
-          },
-        ],
-        zakat_haul: [
-          {
-            maybeSingleResult: success(null),
-          },
-          {
-            maybeSingleResult: success(null),
-          },
-          {
-            result: success([]),
-          },
-        ],
-        zakat_asset_timeline: [
-          {
-            maybeSingleResult: success(null),
-          },
-          {
-            result: success([]),
-          },
-          {
-            result: success([]),
-          },
-        ],
-        accounts: [
-          {
-            result: { data: null, error: null, count: 4 } as any,
-          },
-        ],
+    mocks.prisma.organizations.findUnique.mockResolvedValue({
+      settings: {
+        business_type: 'LAYANAN_JASA',
       },
     })
+    mocks.prisma.products.count.mockResolvedValue(0)
+    mocks.prisma.service_orders.count.mockResolvedValue(0)
+    mocks.prisma.zakat_haul.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+    mocks.prisma.zakat_haul.findMany.mockResolvedValue([])
+    mocks.prisma.zakat_asset_timeline.findFirst.mockResolvedValue(null)
+    mocks.prisma.zakat_asset_timeline.findMany.mockResolvedValue([])
+    mocks.prisma.zakat_asset_timeline.create.mockResolvedValue({ id: 'timeline-1' })
+    mocks.prisma.accounts.count.mockResolvedValue(4)
 
     mocks.getAccountBalances.mockResolvedValue([
       { code: '1101', name: 'Kas', balance: 300000000 },
@@ -106,8 +88,6 @@ describe('Zakat Accounting Boundary', () => {
       { code: '1301', name: 'Persediaan', balance: 0 },
       { code: '2101', name: 'Hutang Dagang', balance: -50000000 },
     ])
-    mocks.createClient.mockResolvedValue(supabase.client)
-
     const result = await getZakatSummary('org-jasa', {
       goldPerGram: 1500000,
       silverPerGram: 15000,

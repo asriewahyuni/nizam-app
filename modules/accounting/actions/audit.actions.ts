@@ -162,23 +162,29 @@ export async function getAuditOverview(orgId: string) {
   }
 
   // GL Inventory balance (inventory asset block 1301-1399)
-  const { data: inventoryAccounts } = await db
-    .from('accounts')
-    .select('id, code')
-    .eq('org_id', orgId)
-    .gte('code', '1301')
-    .lte('code', '1399')
+  const inventoryAccounts = await prisma.accounts.findMany({
+    where: {
+      org_id: orgId,
+      code: {
+        gte: '1301',
+        lte: '1399',
+      },
+    },
+    select: { id: true, code: true },
+  })
 
   let glInventoryBalance = 0
-  const inventoryAccountIds = (inventoryAccounts || []).map((acc: any) => acc.id)
+  const inventoryAccountIds = inventoryAccounts.map((acc) => acc.id)
   if (inventoryAccountIds.length > 0 && entryIds.length > 0) {
-    const { data: invLines } = await db
-      .from('journal_lines')
-      .select('debit, credit')
-      .in('account_id', inventoryAccountIds)
-      .in('entry_id', entryIds)
+    const invLines = await prisma.journal_lines.findMany({
+      where: {
+        account_id: { in: inventoryAccountIds },
+        entry_id: { in: entryIds },
+      },
+      select: { debit: true, credit: true },
+    })
 
-    for (const l of invLines || []) {
+    for (const l of invLines) {
       glInventoryBalance += Number(l.debit) - Number(l.credit)
     }
   }

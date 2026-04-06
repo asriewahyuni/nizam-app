@@ -674,7 +674,7 @@ export async function linkSubOrganization(parentOrgId: string, childOrgId: strin
 
   const coaSync = await syncParentCoAToChildOrg(activeOrgId, trimmedChildOrgId)
   if (!coaSync.success) {
-    console.warn('CoA sync warning (linkSubOrganization):', coaSync.error)
+    console.warn('CoA sync warning (linkSubOrganization)')
   }
 
   revalidatePath('/settings/sub-orgs')
@@ -904,7 +904,7 @@ export async function setOrganizationParent(childOrgId: string, parentOrgId: str
   if (trimmedParentOrgId) {
     const coaSync = await syncParentCoAToChildOrg(trimmedParentOrgId, trimmedChildOrgId)
     if (!coaSync.success) {
-      ;(console as any).warn('CoA sync warning (setOrganizationParent):', coaSync.error)
+      ;(console as any).warn('CoA sync warning (setOrganizationParent)')
     }
   }
 

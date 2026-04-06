@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
     warehouses: { findFirst: vi.fn() },
     warehouse_bins: { findFirst: vi.fn(), findMany: vi.fn() },
     inventory_stocks: { upsert: vi.fn() },
-    products: { findFirst: vi.fn() },
+    products: { findMany: vi.fn() },
     $transaction: vi.fn(),
   },
   revalidatePath: vi.fn(),
@@ -51,38 +51,9 @@ describe('Factory Branch Context', () => {
 
   it('stamps active branch on new BoM records', async () => {
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({ scope: { accessibleBranchIds: ['branch-1'] }, branchId: 'branch-1' })
-    mocks.prisma.$transaction.mockImplementation(async (callback: any) => callback({
-      production_boms: { create: vi.fn().mockResolvedValue({ id: 'bom-1' }) },
-      production_bom_items: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
-    }))
-    const itemsInsert = vi.fn().mockResolvedValue({ error: null })
-    const productsQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockResolvedValue({
-        data: [{ id: 'prod-rm', name: 'Bahan A', unit: 'Pcs' }],
-        error: null,
-      }),
-    }
-
-    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
-      scope: {
-        accessibleBranches: [],
-        accessibleBranchIds: ['branch-1'],
-        canAccessAllBranches: false,
-        membershipId: 'member-1',
-        role: 'staff',
-      },
-      branchId: 'branch-1',
-    })
-    mocks.createClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table === 'production_boms') return { insert: bomInsert }
-        if (table === 'production_bom_items') return { insert: itemsInsert }
-        if (table === 'products') return productsQuery
-        throw new Error(`Unexpected table ${table}`)
-      }),
-    })
+    mocks.prisma.production_boms.create.mockResolvedValue({ id: 'bom-1' })
+    mocks.prisma.products.findMany.mockResolvedValue([{ id: 'prod-rm', name: 'Bahan A', unit: 'Pcs' }])
+    mocks.prisma.production_bom_items.createMany.mockResolvedValue({ count: 1 })
 
     const result = await createBom('org-1', {
       productId: 'prod-fg',
@@ -92,42 +63,29 @@ describe('Factory Branch Context', () => {
     })
 
     expect(result).toEqual({ success: true })
-    expect(bomInsert).toHaveBeenCalledWith(
+    expect(mocks.prisma.production_boms.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        org_id: 'org-1',
-        branch_id: 'branch-1',
-        product_id: 'prod-fg',
+        data: expect.objectContaining({
+          org_id: 'org-1',
+          branch_id: 'branch-1',
+          product_id: 'prod-fg',
+        }),
       })
     )
-    expect(itemsInsert).toHaveBeenCalledWith([
+    expect(mocks.prisma.production_bom_items.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        product_id: 'prod-rm',
-        quantity: 2,
-        unit: 'Pcs',
-      }),
-    ])
+        data: [
+          expect.objectContaining({
+            product_id: 'prod-rm',
+            quantity: 2,
+            unit: 'Pcs',
+          }),
+        ],
+      })
+    )
   })
 
   it('normalizes BoM quantity into product base unit before saving', async () => {
-    const bomSingle = vi.fn().mockResolvedValue({
-      data: { id: 'bom-2' },
-      error: null,
-    })
-    const bomInsert = vi.fn(() => ({
-      select: vi.fn(() => ({
-        single: bomSingle,
-      })),
-    }))
-    const itemsInsert = vi.fn().mockResolvedValue({ error: null })
-    const productsQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockResolvedValue({
-        data: [{ id: 'prod-rm', name: 'Daging Sapi', unit: 'Kg' }],
-        error: null,
-      }),
-    }
-
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: {
         accessibleBranches: [],
@@ -138,14 +96,9 @@ describe('Factory Branch Context', () => {
       },
       branchId: 'branch-1',
     })
-    mocks.createClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table === 'production_boms') return { insert: bomInsert }
-        if (table === 'production_bom_items') return { insert: itemsInsert }
-        if (table === 'products') return productsQuery
-        throw new Error(`Unexpected table ${table}`)
-      }),
-    })
+    mocks.prisma.production_boms.create.mockResolvedValue({ id: 'bom-2' })
+    mocks.prisma.products.findMany.mockResolvedValue([{ id: 'prod-rm', name: 'Daging Sapi', unit: 'Kg' }])
+    mocks.prisma.production_bom_items.createMany.mockResolvedValue({ count: 1 })
 
     const result = await createBom('org-1', {
       productId: 'prod-fg',
@@ -155,13 +108,17 @@ describe('Factory Branch Context', () => {
     })
 
     expect(result).toEqual({ success: true })
-    expect(itemsInsert).toHaveBeenCalledWith([
+    expect(mocks.prisma.production_bom_items.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        product_id: 'prod-rm',
-        quantity: 0.1,
-        unit: 'Kg',
-      }),
-    ])
+        data: [
+          expect.objectContaining({
+            product_id: 'prod-rm',
+            quantity: 0.1,
+            unit: 'Kg',
+          }),
+        ],
+      })
+    )
   })
 
   it('rejects work order creation when the selected BoM belongs to another branch', async () => {

@@ -97,7 +97,7 @@ async function ensurePosStockAvailability(
   if (!requirements.length) return { success: true as const }
 
   const productIds = requirements.map((item) => item.productId)
-  let stockRows: Array<{ product_id: string; quantity: number | string | null }> = []
+  let stockRows: Array<{ product_id: string; quantity: unknown }> = []
   try {
     stockRows = await prisma.inventory_stocks.findMany({
       where: {
