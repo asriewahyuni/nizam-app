@@ -1,25 +1,38 @@
 # AI Handover Document: Supabase -> Prisma/Auth Migration Status
 
-**Updated:** 2026-04-05 (sesi ke-14, POS action layer migration)  
-**Status:** `IN PROGRESS` — Org + Auth + Branch access selesai. HRIS actions + role management + settings/users member management + audit/billing/approval action slice selesai. Billing UI + invoice print page + pricing catalog UI + admin SaaS backoffice sudah dipindahkan dari Supabase browser ke server actions. Slice contacts/services/accounting shared read model, sales + POS action layer utama, dan sejumlah server page shell juga sudah keluar dari Supabase.
+**Updated:** 2026-04-06 (sesi ke-16, Purchasing + Inventory + Warehouse migration)  
+**Status:** `IN PROGRESS` — Sesi 15 (Purchasing Backbone) selesai. Target berikutnya adalah Prioritas 2: Billing/Operator Backoffice dan Ticketing/Cash.
 
-Dokumen ini menggantikan rencana eksekusi lama dan dimaksudkan sebagai handover aktif untuk agent berikutnya. Target awal migrasi `modules/organization/actions/org.actions.ts` sudah lama selesai; sesi-sesi setelah itu melanjutkan migrasi slice organisasi yang masih bergantung ke Supabase.
+Dokumen ini adalah rencana eksekusi dan handover aktif untuk agen. Sesi-sesi sebelumnya telah menyelesaikan migrasi pada domain auth, org, HRIS, audit, billing, accounting, contacts, services, sales, sales-write, POS.
 
 ---
 
 ## 0. Snapshot Repo Saat Ini
 
-- Validasi terakhir yang sudah lulus:
-  - `npx tsc --noEmit`
-  - `npm test`
-- Hasil validasi terakhir:
-  - `36` file test lulus
-  - `178` test lulus
-- Footprint Supabase yang masih tersisa setelah sesi ini: `32` file aplikasi (`app/`, `modules/`, `lib/`) masih mengandung import/client call/helper Supabase berdasarkan pencarian import/helper saat ini.
-- Validasi tambahan sesi ini yang sudah lulus:
-  - `npx tsc --noEmit`
-  - `npx vitest run __tests__/sales.actions.test.ts`
-- Sesi ini tidak hanya menyelaraskan dokumen; ada migrasi lanjutan nyata pada action layer POS dan helper shared sales write-path.
+- Sesi sebelumnya telah membersihkan semua penggunaan klien Supabase pada domain operasional `sales` dan `pos`. 
+- Sesi ini (Sesi 15) akan fokus pada eksekusi Prioritas 1: **Core Sales / Purchasing Backbone**.
+
+### Ruang Lingkup Target Sesi 15:
+1. `modules/purchasing/actions/purchasing.actions.ts`
+2. `modules/inventory/actions/inventory.actions.ts`
+3. `modules/inventory/actions/warehouse.actions.ts`
+
+### Rencana Migrasi (Sesi 15):
+#### [MODIFY] `modules/purchasing/actions/purchasing.actions.ts`
+- Ubah fetch data (`getPurchases`, `getPurchaseRequests`, `getPendingPurchaseRequestsCount`) untuk menggunakan `prisma.purchases.findMany` dan `prisma.purchase_requests`.
+- Ganti fungsi keamanan: dari RPC `nizam_has_permission` ke aplikasi-level gate memakai `auth()` dan `getMembership()`.
+- Transisi mutasi atomik (`createPurchaseEntry`, `createPurchasePayment`, `createPurchaseReturn`, `voidPurchase`) dengan mempertahankan RPC Postgres (`process_purchase_atomic` dll.) tapi dieksekusi via injeksi konteks `withDbUserContext` dari `sales-write.server.ts` agar session Supabase dihilangkan tapi RPC DB lama tetap jalan normal.
+- Perbarui rekap mutasi `receivePurchase` untuk mengarah ke API Prisma.
+
+#### [MODIFY] `modules/inventory/actions/inventory.actions.ts`
+- Rekonstruksi queries kompleks seperti `getProducts` (mengkombinasikan metrics `stock_movements` dan `inventory_stocks`) dengan kueri Prisma dan map.
+- Transisi mutasi basic (`createProduct`, `updateProduct`, `deleteProduct`) ke API Prisma basic.
+- Ganti logic `insertAdjustmentWithRetry` untuk menangani duplikasi constraint (P2002 pada Prisma code) tanpa bergantung pada query-builder Supabase, lalu pakai RPC `process_inventory_adjustment` lewat `prisma.$executeRaw` dengan membungkus sesi `request.jwt.claim.sub` seperti pattern yang sudah diterapkan.
+- `createInventoryAdjustment` dan `createInventoryTransfer` perlu dikonversi dari helper native Supabase client agar menggunakan relasi Prisma ke `inventory_adjustments` dan `inventory_adjustment_items`.
+
+#### [MODIFY] `modules/inventory/actions/warehouse.actions.ts`
+- Ganti fungsi-fungsi loader (`getAccessibleWarehouse`, `getAccessibleWarehouseBin`, `getWarehouses`, `getWarehouseBins`) menjadi memakai fungsi `findFirst/findMany` di ORM Prisma (`prisma.warehouses`, `prisma.warehouse_bins`).
+- Ganti semua mutasi (create, update, delete) untuk memakai Prisma.
 
 ---
 
@@ -76,6 +89,9 @@ File-file berikut **sudah tidak lagi memakai Supabase data client**:
 - `app/(dashboard)/accounting/assets/page.tsx` ✅
 - `app/(dashboard)/fleet/page.tsx` ✅
 - `app/(dashboard)/profil-saya/page.tsx` ✅
+- `modules/purchasing/actions/purchasing.actions.ts` ✅ (sesi 16)
+- `modules/inventory/actions/inventory.actions.ts` ✅ (sesi 16)
+- `modules/inventory/actions/warehouse.actions.ts` ✅ (sesi 16)
 
 ---
 
@@ -111,25 +127,27 @@ File-file berikut **sudah tidak lagi memakai Supabase data client**:
 - `deleteInvitation`
 - `getInvitationByCode`
 
-### C. Slice baru yang selesai pada sesi ini
+### C. Slice baru yang selesai pada sesi ini (sesi 16)
 
-Role management yang sebelumnya tersebar di beberapa page/client component dan masih query langsung ke tabel `roles` via Supabase sekarang sudah dipindahkan ke server actions Prisma/Auth di:
+Domain purchasing, inventory, dan warehouse sekarang sepenuhnya bebas dari Supabase client:
 
-- `modules/organization/actions/hris.actions.ts`
+**`modules/purchasing/actions/purchasing.actions.ts`**
+- `getPurchases`, `getPurchaseRequests`, `getPendingPurchaseRequestsCount` → Prisma `findMany`/`count`
+- Auth guard: `nizam_has_permission` RPC diganti `auth()` + `getMembership()`
+- Mutasi atomik (`createPurchaseEntry`, `createPurchasePayment`, `createPurchaseReturn`, `voidPurchase`) sekarang memanggil RPC Postgres lewat `withDbUserContext` (injeksi `request.jwt.claim.sub`) — session Supabase dihilangkan, RPC DB lama tetap berjalan
+- `receivePurchase` sekarang penuh Prisma: stock movements, average cost update, sync stok gudang, dan GL entry via `createJournalEntry`
+- Fallback `fallbackInventoryStockSync` menggunakan Prisma `inventory_stocks` jika RPC `adjust_inventory_stock` tidak tersedia di schema cache
+- Export baru `updatePurchaseRequestStatus` ditambahkan untuk kompatibilitas `PurchasingClient.tsx`
 
-Action yang ditambahkan:
+**`modules/inventory/actions/inventory.actions.ts`**
+- `getProducts`, `getStockLedger`, `getWarehouseStocks`, `getProductByBarcode` → Prisma queries
+- CRUD produk (`createProduct`, `updateProduct`, `deleteProduct`) → Prisma mutators
+- `createInventoryAdjustment`: pakai `insertAdjustmentWithRetry` dengan logika rename konflik berdasarkan sequence number; RPC `process_inventory_adjustment` dipanggil via `prisma.$transaction` + `$executeRaw` set_config
+- `createInventoryTransfer`: buat dua adjustment (keluar + masuk) dan trigger kedua RPC dalam satu flow; type cast Decimal → unknown → `Product` untuk kompatibilitas tipe
 
-- `getOrgRoles`
-- `createOrgRole`
-- `updateOrgRole`
-- `updateOrgRolePermissions`
-- `reorderOrgRoles`
-- `deleteOrgRole`
-
-Action membership management yang ditambahkan di `modules/organization/actions/org.actions.ts`:
-
-- `updateOrgMemberRole`
-- `removeOrgMember`
+**`modules/inventory/actions/warehouse.actions.ts`**
+- Loader: `getAccessibleWarehouse`, `getAccessibleWarehouseBin`, `getWarehouses`, `getWarehouseBins` → Prisma `findMany`
+- Mutasi: `createWarehouse`, `updateWarehouse`, `deleteWarehouse`, `createWarehouseBin`, `deleteWarehouseBin` → Prisma dengan tenant isolation via `org_id` + `branch_id`
 
 Audit migration yang selesai:
 
@@ -361,11 +379,6 @@ Berikut file yang **masih memakai Supabase** dan relevan untuk lanjutan migrasi:
 
 ### Prioritas tinggi
 
-- `modules/purchasing/actions/purchasing.actions.ts`
-  - domain purchasing page shell sudah bersih, tetapi action layer dan approval/journal flow masih Supabase-heavy
-- `modules/inventory/actions/inventory.actions.ts`
-- `modules/inventory/actions/warehouse.actions.ts`
-  - setelah `sales.actions.ts` dan `pos.actions.ts` pindah, cluster ini menjadi blocker terbesar berikutnya untuk dashboard POS/purchasing/inventory
 - `modules/saas/actions/operator-sales.actions.ts`
   - masih Supabase-heavy untuk penawaran/penjualan operator SaaS, jurnal otomatis, dan dokumen operator
   - tetap jadi hotspot SaaS/operator terbesar yang tersisa
@@ -425,15 +438,12 @@ Berikut file yang **masih memakai Supabase** dan relevan untuk lanjutan migrasi:
 
 Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file dan dampak terbesarnya:
 
-### PRIORITAS 1: Core Sales / Purchasing Backbone
-- `modules/purchasing/actions/purchasing.actions.ts`
-- `modules/inventory/actions/inventory.actions.ts`
-- `modules/inventory/actions/warehouse.actions.ts`
-- alasan:
-  - page shell penjualan/purchasing/POS sudah bersih, dan sales + POS write-path sudah keluar dari Supabase; value tertinggi berikutnya ada di purchasing + inventory backbone
-  - setelah tiga file ini pindah, banyak route dashboard operasional akan otomatis mendekati zero Supabase
+### PRIORITAS 1 ✅ SELESAI: Core Sales / Purchasing Backbone
+- `modules/purchasing/actions/purchasing.actions.ts` ✅
+- `modules/inventory/actions/inventory.actions.ts` ✅
+- `modules/inventory/actions/warehouse.actions.ts` ✅
 
-### PRIORITAS 2: Billing / Operator Backoffice
+### PRIORITAS 2 (AKTIF): Billing / Operator Backoffice
 - `modules/saas/actions/operator-sales.actions.ts`
 - lanjutkan ke `/saas/penawaran`, `/saas/penjualan`, dan `/saas/dokumen/[id]` supaya domain operator SaaS benar-benar keluar dari Supabase
 
@@ -538,5 +548,11 @@ Target yang **paling masuk akal** untuk sesi berikutnya berdasarkan jumlah file 
   - `__tests__/approval.actions.test.ts`
   - `__tests__/organization-hris.actions.test.ts`
   - `__tests__/service.actions.test.ts`
+
+- Sesi 16 (Purchasing + Inventory + Warehouse):
+  - `modules/purchasing/actions/purchasing.actions.ts`
+  - `modules/inventory/actions/inventory.actions.ts`
+  - `modules/inventory/actions/warehouse.actions.ts`
+  - `modules/sales/lib/sales-write.server.ts` (helper `withDbUserContext` reused)
 
 Dokumen ini siap diberikan ke agent berikutnya sebagai status handover terbaru.
