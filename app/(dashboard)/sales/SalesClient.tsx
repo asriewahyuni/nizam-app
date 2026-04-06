@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory } from 'lucide-react'
+import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createSaleEntry, deliverSale, voidSale, paySale, processSalesReturn, processSalesPayment } from '@/modules/sales/actions/sales.actions'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
@@ -125,7 +125,7 @@ export default function SalesClient({
     website: orgSettings.website || '',
   }
   
-  const [lines, setLines] = useState([{
+  const createEmptySaleLine = () => ({
     id: Date.now(),
     product_name: '',
     product_id: '',
@@ -135,7 +135,9 @@ export default function SalesClient({
     stock_available: 0,
     type: 'INVENTORY' as 'INVENTORY' | 'NON_INVENTORY' | 'SERVICE',
     unit: 'Pcs'
-  }])
+  })
+  const [lines, setLines] = useState([createEmptySaleLine()])
+  const [editingDraftSaleId, setEditingDraftSaleId] = useState<string | null>(null)
 
   // Filter COA for payment accounts (Kas/Bank) if Lunas
   const paymentAccounts = coa?.filter((a: any) => a.type === 'ASSET' && (a.code.startsWith('11') || a.code.startsWith('12'))) || []
@@ -149,18 +151,79 @@ export default function SalesClient({
   const grandTotal = taxableAmount + calculatedTax
   const STOCK_EPSILON = 0.000001
 
+  const resetSaleForm = () => {
+    setEditingDraftSaleId(null)
+    setLines([createEmptySaleLine()])
+    setCustomerId('')
+    setSaleDate(new Date().toISOString().split('T')[0])
+    setDueDate('')
+    setNotes('')
+    setPaymentTerm('TEMPO')
+    setPaymentAccountId('')
+    setCustomGlobalDiscount(null)
+    setHeaderTaxPercent(0)
+    setShariahMode('CASH')
+    setHasDp(false)
+    setDpMode('NOMINAL')
+    setDpPercent('0')
+    setDpAmount('0')
+    setDpAccountId('')
+    setError(null)
+  }
+
+  const openDraftSaleEditor = (sale: any) => {
+    const parsedShariah = String(sale?.shariah_mode || 'CASH').toUpperCase()
+    const nextShariahMode: 'CASH' | 'SALAM' | 'ISTISHNA' =
+      parsedShariah === 'SALAM' || parsedShariah === 'ISTISHNA' ? parsedShariah : 'CASH'
+    const nextPaymentTerm: 'TEMPO' | 'LUNAS' =
+      String(sale?.payment_term || 'TEMPO').toUpperCase() === 'LUNAS' ? 'LUNAS' : 'TEMPO'
+
+    const mappedLines = (sale?.sales_items || []).map((item: any) => {
+      const linkedProduct = products.find((p: ProductWithStock) => p.id === item?.product_id)
+      const productType = (linkedProduct?.type || item?.products?.type || 'INVENTORY') as 'INVENTORY' | 'NON_INVENTORY' | 'SERVICE'
+      return {
+        id: Date.now() + Math.floor(Math.random() * 10000),
+        product_name: String(item?.description || linkedProduct?.name || ''),
+        product_id: String(item?.product_id || ''),
+        quantity: Number(item?.quantity || 1),
+        unit_price: Number(item?.unit_price || 0),
+        discount_amount: Number(item?.discount_amount || 0),
+        stock_available: Number(linkedProduct?.stock_available || 0),
+        type: productType,
+        unit: String(linkedProduct?.unit || item?.products?.unit || 'Pcs'),
+      }
+    })
+
+    const total = Number(sale?.total_amount || 0)
+    const discount = Number(sale?.discount_amount || 0)
+    const taxableBase = Math.max(0, total - discount)
+    const taxPercent = taxableBase > 0
+      ? (Number(sale?.tax_amount || 0) / taxableBase) * 100
+      : 0
+
+    setEditingDraftSaleId(String(sale.id))
+    setCustomerId(String(sale.customer_id || ''))
+    setSaleDate(String(sale.sale_date || new Date().toISOString().split('T')[0]))
+    setDueDate(sale?.due_date ? String(sale.due_date) : '')
+    setNotes(String(sale?.notes || ''))
+    setPaymentTerm(nextPaymentTerm)
+    setPaymentAccountId(String(sale?.payment_account_id || ''))
+    setCustomGlobalDiscount(discount)
+    setHeaderTaxPercent(Number.isFinite(taxPercent) ? Number(taxPercent.toFixed(2)) : 0)
+    setShariahMode(nextShariahMode)
+    setHasDp(false)
+    setDpMode('NOMINAL')
+    setDpPercent('0')
+    setDpAmount('0')
+    setDpAccountId('')
+    setLines(mappedLines.length > 0 ? mappedLines : [createEmptySaleLine()])
+    setError(null)
+    setSuccess(null)
+    setShowModal(true)
+  }
+
   const handleAddLine = () => {
-    setLines([...lines, {
-      id: Date.now(),
-      product_name: '',
-      product_id: '',
-      quantity: 1,
-      unit_price: 0,
-      discount_amount: 0,
-      stock_available: 0,
-      type: 'INVENTORY',
-      unit: 'Pcs'
-    }])
+    setLines([...lines, createEmptySaleLine()])
   }
 
   const handleRemoveLine = (id: number) => {
@@ -225,12 +288,19 @@ export default function SalesClient({
 
   const handleCreateSale = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!customerId) return setError('Customer harus dipilih!')
-    if (paymentTerm === 'LUNAS' && !paymentAccountId) return setError('Pilih akun penerimaan untuk transaksi Lunas!')
-    if (shariahMode === 'SALAM' && paymentTerm !== 'LUNAS') return setError('Akad SALAM wajib dibayar lunas (tunai) di awal.')
-    if ((paymentTerm === 'TEMPO' || shariahMode === 'SALAM') && !dueDate) return setError('Tanggal jatuh tempo pengiriman wajib diisi.')
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+    const requestedMode = String(submitter?.value || 'PUBLISH').toUpperCase()
+    const isDraftSave = requestedMode === 'DRAFT'
 
-    if (lines.some(l => !l.product_name || l.quantity <= 0 || l.unit_price < 0)) {
+    const usableLines = lines.filter((line) => String(line.product_name || '').trim().length > 0)
+
+    if (!customerId) return setError('Customer harus dipilih!')
+    if (usableLines.length === 0) return setError('Tambahkan minimal 1 item sebelum menyimpan dokumen.')
+    if (!isDraftSave && paymentTerm === 'LUNAS' && !paymentAccountId) return setError('Pilih akun penerimaan untuk transaksi Lunas!')
+    if (!isDraftSave && shariahMode === 'SALAM' && paymentTerm !== 'LUNAS') return setError('Akad SALAM wajib dibayar lunas (tunai) di awal.')
+    if (!isDraftSave && (paymentTerm === 'TEMPO' || shariahMode === 'SALAM') && !dueDate) return setError('Tanggal jatuh tempo pengiriman wajib diisi.')
+
+    if (!isDraftSave && usableLines.some(l => !l.product_name || l.quantity <= 0 || l.unit_price < 0)) {
       return setError('Lengkapi detail barang, kuantitas, dan Harga Jual pada setiap baris.')
     }
 
@@ -239,11 +309,11 @@ export default function SalesClient({
     let resolvedShariahMode: 'CASH' | 'SALAM' | 'ISTISHNA' = shariahMode
     let resolvedPaymentTerm: 'TEMPO' | 'LUNAS' = shariahMode === 'SALAM' ? 'LUNAS' : paymentTerm
 
-    if (resolvedPaymentTerm === 'TEMPO' && hasDp && dpFinalAmount > grandTotal) {
+    if (!isDraftSave && resolvedPaymentTerm === 'TEMPO' && hasDp && dpFinalAmount > grandTotal) {
       return setError('Nilai Uang Muka (DP) tidak boleh melebihi Total Penjualan.')
     }
 
-    if (resolvedShariahMode !== 'SALAM' && resolvedShariahMode !== 'ISTISHNA') {
+    if (!isDraftSave && resolvedShariahMode !== 'SALAM' && resolvedShariahMode !== 'ISTISHNA') {
       const stockShortage = getFirstNonSalamStockShortage()
       if (stockShortage) {
         const stockMessage = `Stok produk "${stockShortage.productName}" tidak mencukupi. Dibutuhkan ${formatStockQuantity(
@@ -278,7 +348,9 @@ export default function SalesClient({
       discount_amount: appliedDiscount,
       tax_amount: calculatedTax,
       shariah_mode: resolvedShariahMode,
-      lines: lines.map(l => ({
+      mode: isDraftSave ? 'DRAFT' : 'PUBLISH',
+      draft_id: editingDraftSaleId || undefined,
+      lines: usableLines.map(l => ({
         product_id: l.product_id || undefined,
         product_name: l.product_name,
         quantity: l.quantity,
@@ -292,7 +364,7 @@ export default function SalesClient({
     if (res?.error) setError(res.error)
     else {
       // DIRECTLY PROCESS DOWN PAYMENT IF SUPPLIED
-      if (resolvedPaymentTerm === 'TEMPO' && hasDp && dpFinalAmount > 0 && dpAccountId && res.saleId) {
+      if (!isDraftSave && resolvedPaymentTerm === 'TEMPO' && hasDp && dpFinalAmount > 0 && dpAccountId && res.saleId) {
          try {
            const dpRes = await processSalesPayment(orgId, {
              sale_id: res.saleId,
@@ -317,22 +389,13 @@ export default function SalesClient({
          }
       }
 
-      setSuccess('Penjualan baru berhasil dicatat.')
+      if (isDraftSave) {
+        setSuccess(editingDraftSaleId ? 'Draft SO berhasil diperbarui.' : 'Draft SO berhasil disimpan.')
+      } else {
+        setSuccess(editingDraftSaleId ? 'SO draft berhasil diterbitkan ke approval.' : 'SO baru berhasil dikirim ke approval.')
+      }
       setShowModal(false)
-      // Reset form
-      setLines([{ id: Date.now(), product_name: '', product_id: '', quantity: 1, unit_price: 0, discount_amount: 0, stock_available: 0, type: 'INVENTORY', unit: 'Pcs' }])
-      setCustomerId('')
-      setNotes('')
-      setSaleDate(new Date().toISOString().split('T')[0])
-      setDueDate('')
-      setPaymentAccountId('')
-      setPaymentTerm('TEMPO')
-      setCustomGlobalDiscount(null)
-      setHeaderTaxPercent(0)
-      setHasDp(false)
-      setDpAmount('0')
-      setDpAccountId('')
-      setShariahMode('CASH')
+      resetSaleForm()
       setTimeout(() => setSuccess(null), 3500)
     }
     setLoading(false)
@@ -549,7 +612,10 @@ export default function SalesClient({
             <SafeButton 
               variant="primary"
               icon={<Plus size={18} />}
-              onClick={() => setShowModal(true)}
+              onClick={() => {
+                resetSaleForm()
+                setShowModal(true)
+              }}
             >
               Buat Invoice Jual
             </SafeButton>
@@ -666,12 +732,18 @@ export default function SalesClient({
                     </td>
                     <td className="px-8 py-6 text-center">
                        <StatusBadge 
-                         label={s.status === 'FINISHED' ? 'Delivered' : s.status === 'DRAFT' ? 'Menunggu Approval' : s.status} 
+                         label={s.status === 'FINISHED' ? 'Delivered' : s.status} 
                          variant={s.status === 'FINISHED' ? 'success' : s.status === 'VOIDED' ? 'error' : 'warning'} 
                        />
                     </td>
                     <td className="px-8 py-6">
                        <div className="flex flex-wrap items-center justify-end gap-2">
+                         {s.status === 'DRAFT' && (
+                           <button onClick={() => openDraftSaleEditor(s)} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-500 hover:text-white transition-all border border-indigo-100" title="Edit Draft SO">
+                             <Pencil size={16}/>
+                           </button>
+                         )}
+
                          {s.status === 'ORDERED' && (
                            <button onClick={() => handleDeliverPO(s)} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm border border-emerald-100 group/btn" title="Kirim Barang">
                              <CheckSquare size={16}/>
@@ -742,10 +814,12 @@ export default function SalesClient({
         {/* MODAL BUAT INVOICE (DENGAN LINE ITEMS) */}
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setShowModal(false); resetSaleForm() }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl p-8 overflow-hidden max-h-[90vh] overflow-y-auto">
                 <div className="absolute top-0 left-0 w-2 h-full bg-blue-600" />
-                <h3 className="text-xl font-bold mb-6">Buat Pesanan Penjualan (SO / Invoice)</h3>
+                <h3 className="text-xl font-bold mb-6">
+                  {editingDraftSaleId ? 'Edit Draft Sales Order (SO)' : 'Buat Pesanan Penjualan (SO / Invoice)'}
+                </h3>
                 
                 <form onSubmit={handleCreateSale} className="space-y-6">
                   {/* HEADER SALES */}
@@ -1011,8 +1085,13 @@ export default function SalesClient({
                   </div>
 
                   <div className="flex gap-3 pt-4 border-t border-slate-100">
-                    <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-2xl transition">Batal</button>
-                    <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-2xl shadow-lg transition">{loading ? 'Memproses...' : 'Simpan Invoice'}</button>
+                    <button type="button" onClick={() => { setShowModal(false); resetSaleForm() }} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-2xl transition">Batal</button>
+                    <button type="submit" value="DRAFT" disabled={loading} className="flex-1 py-4 px-6 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-2xl border border-indigo-200 transition">
+                      {loading ? 'Menyimpan...' : 'Save Draft'}
+                    </button>
+                    <button type="submit" value="PUBLISH" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-2xl shadow-lg transition">
+                      {loading ? 'Memproses...' : 'Terbitkan SO'}
+                    </button>
                   </div>
                 </form>
              </motion.div>

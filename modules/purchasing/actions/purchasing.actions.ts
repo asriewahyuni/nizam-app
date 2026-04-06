@@ -246,7 +246,7 @@ export async function getPurchases(orgId: string, branchId?: string | null) {
         quantity,
         unit_price,
         total_amount,
-        products (name, sku, unit)
+        products (name, sku, unit, category, selling_price)
       ),
       purchase_payments (amount, discount_amount),
       purchase_returns (total_amount)
@@ -276,7 +276,7 @@ export async function getPurchases(orgId: string, branchId?: string | null) {
           quantity,
           unit_price,
           total_amount,
-          products (name, sku, unit)
+          products (name, sku, unit, category, selling_price)
         )
       ` as any)
       .eq('org_id', orgId)
@@ -320,6 +320,8 @@ export interface CreatePurchaseData {
   payment_term: 'LUNAS' | 'TEMPO'
   payment_account_id?: string
   shariah_mode?: 'CASH' | 'SALAM' | 'ISTISHNA'
+  mode?: 'DRAFT' | 'PUBLISH'
+  draft_id?: string
   lines: PurchaseLineData[]
 }
 
@@ -329,7 +331,13 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
   const { data: { user } } = await (supabase as any).auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  if (!payload.vendor_id || payload.lines.length === 0) {
+  const createMode: 'DRAFT' | 'PUBLISH' =
+    String(payload.mode || 'PUBLISH').toUpperCase() === 'DRAFT'
+      ? 'DRAFT'
+      : 'PUBLISH'
+
+  const normalizedLines = (payload.lines || []).filter((line) => String(line?.product_name || '').trim().length > 0)
+  if (!payload.vendor_id || normalizedLines.length === 0) {
     return { error: 'Vendor dan baris produk wajib diisi.' }
   }
 
@@ -356,11 +364,11 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
 
   // 1. Calculate Subtotals to perform Value-Based Allocation for Landed Costs
   const totalOverhead = (payload.shipping_amount || 0) + (payload.insurance_amount || 0)
-  const grossSubTotal = payload.lines.reduce((acc: any, l: any) => acc + (l.quantity * l.unit_price) - (l.discount_amount || 0), 0)
+  const grossSubTotal = normalizedLines.reduce((acc: any, l: any) => acc + (l.quantity * l.unit_price) - (l.discount_amount || 0), 0)
 
   // 2. Pre-process Products
   const processedLines: any[] = []
-  for (const line of payload.lines) {
+  for (const line of normalizedLines) {
     let finalProductId = line.product_id
 
     // Accurate true Landed Cost HPP per Unit
@@ -416,6 +424,178 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
 
   // Simpan info termin di metadata/notes sementara atau via RPC (Saya asumsikan RPC sudah diupdate atau kita pakai p_notes)
   const notesWithTerm = `[TERMIN: ${resolvedPaymentTerm}] ${payload.payment_account_id ? `[ACC: ${payload.payment_account_id}] ` : ''}${payload.notes || ''}`
+
+  const approvalReason = `Purchase Order Baru (${shariahMode})`
+
+  if (payload.draft_id) {
+    const { data: existingPurchase, error: existingPurchaseError } = await (supabase as any)
+      .from('purchases')
+      .select('id, status, branch_id')
+      .eq('id', payload.draft_id)
+      .eq('org_id', orgId)
+      .maybeSingle()
+
+    if (existingPurchaseError || !existingPurchase) {
+      return { error: 'Draft PO tidak ditemukan.' }
+    }
+
+    const purchaseAccess = await ensurePurchaseDocumentAccess(orgId, existingPurchase.branch_id)
+    if ('error' in purchaseAccess) return { error: purchaseAccess.error }
+
+    if (existingPurchase.status !== 'DRAFT') {
+      return { error: 'Hanya dokumen PO berstatus DRAFT yang bisa diedit atau diterbitkan ulang.' }
+    }
+
+    const { error: updatePurchaseError } = await (supabase as any)
+      .from('purchases')
+      .update({
+        vendor_id: payload.vendor_id,
+        branch_id: purchaseBranchId,
+        purchase_date: payload.purchase_date,
+        due_date: resolvedDueDate,
+        total_amount: headerSubtotal,
+        tax_amount: headerTax,
+        discount_amount: headerDiscount,
+        shipping_amount: Number(payload.shipping_amount || 0),
+        insurance_amount: Number(payload.insurance_amount || 0),
+        grand_total: headerGrand,
+        notes: notesWithTerm,
+        shariah_mode: shariahMode,
+        status: createMode === 'DRAFT' ? 'DRAFT' : 'ORDERED',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', payload.draft_id)
+      .eq('org_id', orgId)
+
+    if (updatePurchaseError) {
+      return { error: 'Gagal memperbarui draft PO: ' + updatePurchaseError.message }
+    }
+
+    const { error: deleteItemsError } = await (supabase as any)
+      .from('purchase_items')
+      .delete()
+      .eq('org_id', orgId)
+      .eq('purchase_id', payload.draft_id)
+
+    if (deleteItemsError) {
+      return { error: 'Gagal memperbarui baris item draft PO: ' + deleteItemsError.message }
+    }
+
+    const { error: insertItemsError } = await (supabase as any)
+      .from('purchase_items')
+      .insert(
+        processedLines.map((line) => ({
+          org_id: orgId,
+          purchase_id: payload.draft_id,
+          product_id: line.product_id || null,
+          description: line.description,
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          discount_amount: line.discount_amount || 0,
+          tax_amount: line.tax_amount || 0,
+        }))
+      )
+
+    if (insertItemsError) {
+      return { error: 'Gagal menyimpan item draft PO: ' + insertItemsError.message }
+    }
+
+    if (createMode === 'PUBLISH') {
+      await (supabase as any)
+        .from('approval_requests')
+        .update({
+          status: 'VOIDED',
+          reason: 'Approval PO lama diganti oleh versi draft terbaru',
+          decided_at: new Date().toISOString(),
+        })
+        .eq('org_id', orgId)
+        .eq('source_type', 'PURCHASE_ORDER')
+        .eq('source_id', payload.draft_id)
+        .eq('status', 'PENDING')
+
+      const { error: approvalError } = await (supabase as any)
+        .from('approval_requests')
+        .insert({
+          org_id: orgId,
+          branch_id: purchaseBranchId,
+          requester_id: user.id,
+          source_type: 'PURCHASE_ORDER',
+          source_id: payload.draft_id,
+          status: 'PENDING',
+          reason: approvalReason,
+        })
+
+      if (approvalError) {
+        return { error: 'Draft PO tersimpan, tapi gagal kirim approval: ' + approvalError.message }
+      }
+    } else {
+      await (supabase as any)
+        .from('approval_requests')
+        .update({
+          status: 'VOIDED',
+          reason: 'Draft PO diperbarui sebelum diterbitkan',
+          decided_at: new Date().toISOString(),
+        })
+        .eq('org_id', orgId)
+        .eq('source_type', 'PURCHASE_ORDER')
+        .eq('source_id', payload.draft_id)
+        .eq('status', 'PENDING')
+    }
+
+    revalidatePath('/purchasing')
+    return { success: true, purchaseId: payload.draft_id }
+  }
+
+  if (createMode === 'DRAFT') {
+    const { data: draftPurchase, error: draftInsertError } = await (supabase as any)
+      .from('purchases')
+      .insert({
+        org_id: orgId,
+        branch_id: purchaseBranchId,
+        vendor_id: payload.vendor_id,
+        purchase_date: payload.purchase_date,
+        due_date: resolvedDueDate,
+        total_amount: headerSubtotal,
+        tax_amount: headerTax,
+        discount_amount: headerDiscount,
+        shipping_amount: Number(payload.shipping_amount || 0),
+        insurance_amount: Number(payload.insurance_amount || 0),
+        grand_total: headerGrand,
+        notes: notesWithTerm,
+        shariah_mode: shariahMode,
+        status: 'DRAFT',
+        created_by: user.id,
+      })
+      .select('id')
+      .single()
+
+    if (draftInsertError || !draftPurchase?.id) {
+      return { error: 'Gagal menyimpan draft PO: ' + (draftInsertError?.message || 'Unknown error') }
+    }
+
+    const { error: draftItemsError } = await (supabase as any)
+      .from('purchase_items')
+      .insert(
+        processedLines.map((line) => ({
+          org_id: orgId,
+          purchase_id: draftPurchase.id,
+          product_id: line.product_id || null,
+          description: line.description,
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          discount_amount: line.discount_amount || 0,
+          tax_amount: line.tax_amount || 0,
+        }))
+      )
+
+    if (draftItemsError) {
+      await (supabase as any).from('purchases').delete().eq('id', draftPurchase.id).eq('org_id', orgId)
+      return { error: 'Gagal menyimpan item draft PO: ' + draftItemsError.message }
+    }
+
+    revalidatePath('/purchasing')
+    return { success: true, purchaseId: draftPurchase.id }
+  }
 
   const { data: rpcRes, error: rpcError } = await (supabase as any).rpc('process_purchase_atomic', {
       p_org_id: orgId,

@@ -20,7 +20,8 @@ import {
   Wallet,
   FileText,
   Printer,
-  X
+  X,
+  Pencil
 } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createPurchaseEntry, receivePurchase, voidPurchase, createPurchasePayment, createPurchaseReturn } from '@/modules/purchasing/actions/purchasing.actions'
@@ -129,7 +130,7 @@ export default function PurchasingClient({
   const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0])
   const [returnNotes, setReturnNotes] = useState('')
   const UNIT_OPTIONS = ['Pcs', 'Unit', 'Kg', 'Gram', 'Liter', 'Ml', 'Box', 'Pack', 'Roll', 'Lembar', 'Set', 'Lusin', 'Meter', 'Cm', 'Pasang', 'Rim', 'Karton', 'Botol', 'Galon', 'Lainnya']
-  const [lines, setLines] = useState([{
+  const createEmptyLine = () => ({
     id: Date.now(),
     product_name: '',
     product_id: '',
@@ -137,12 +138,14 @@ export default function PurchasingClient({
     unit: 'Pcs',
     custom_unit: '',
     unit_price: 0,
-    margin: 20, 
+    margin: 20,
     discount_amount: 0,
     category: 'Bahan',
     selling_price: 0,
     requestId: ''
-  }])
+  })
+  const [lines, setLines] = useState([createEmptyLine()])
+  const [editingDraftPurchaseId, setEditingDraftPurchaseId] = useState<string | null>(null)
 
   // Filter COA for payment accounts (Kas/Bank) if Lunas
   const paymentAccounts = coa?.filter((a: any) => a.type === 'ASSET' && (a.code.startsWith('11') || a.code.startsWith('12')))
@@ -159,21 +162,102 @@ export default function PurchasingClient({
   const calculatedTax = (taxableAmount * headerTaxPercent) / 100
   const grandTotal = taxableAmount + calculatedTax + (parseFloat(shippingAmount) || 0) + (parseFloat(insuranceAmount) || 0)
 
+  const resetPurchaseForm = () => {
+    setEditingDraftPurchaseId(null)
+    setLines([createEmptyLine()])
+    setVendorId('')
+    setPurchaseDate(new Date().toISOString().split('T')[0])
+    setNotes('')
+    setPaymentAccountId('')
+    setHasDp(false)
+    setDpAmount('0')
+    setDpAccountId('')
+    setDpMode('NOMINAL')
+    setDpPercent('0')
+    setPaymentTerm('TEMPO')
+    setDueDate('')
+    setCustomGlobalDiscount(null)
+    setHeaderTaxPercent(0)
+    setShippingAmount('0')
+    setInsuranceAmount('0')
+    setPayOverheadNow(false)
+    setOverheadAccountId('')
+    setShariahMode('CASH')
+    setError(null)
+  }
+
+  const stripPurchaseMetaFromNotes = (rawNotes: string) =>
+    rawNotes
+      .replace(/\[TERMIN:\s*(LUNAS|TEMPO)\]\s*/gi, '')
+      .replace(/\[ACC:\s*[a-f0-9-]+\]\s*/gi, '')
+      .replace(/\[OVERHEAD_ACC:\s*[a-f0-9-]+\]\s*/gi, '')
+      .trim()
+
+  const openDraftPurchaseEditor = (purchase: any) => {
+    const noteText = String(purchase?.notes || '')
+    const termMatch = noteText.match(/\[TERMIN:\s*(LUNAS|TEMPO)\]/i)
+    const paymentAccMatch = noteText.match(/\[ACC:\s*([a-f0-9-]+)\]/i)
+    const overheadAccMatch = noteText.match(/\[OVERHEAD_ACC:\s*([a-f0-9-]+)\]/i)
+    const parsedPaymentTerm = termMatch?.[1]?.toUpperCase() === 'LUNAS' ? 'LUNAS' : 'TEMPO'
+    const parsedShariahMode = String(purchase?.shariah_mode || 'CASH').toUpperCase()
+    const nextShariahMode: 'CASH' | 'SALAM' | 'ISTISHNA' =
+      parsedShariahMode === 'SALAM' || parsedShariahMode === 'ISTISHNA' ? parsedShariahMode : 'CASH'
+
+    const mappedLines = (purchase?.purchase_items || []).map((item: any) => {
+      const unit = item?.products?.unit || 'Pcs'
+      const sellingPrice = Number(item?.products?.selling_price || 0)
+      const unitPrice = Number(item?.unit_price || 0)
+      const margin = unitPrice > 0 && sellingPrice > 0
+        ? Math.max(0, Math.min(99, Math.round(100 - ((unitPrice / sellingPrice) * 100))))
+        : 20
+
+      return {
+        id: Date.now() + Math.floor(Math.random() * 10000),
+        product_name: String(item?.description || item?.products?.name || ''),
+        product_id: String(item?.product_id || ''),
+        quantity: Number(item?.quantity || 1),
+        unit: UNIT_OPTIONS.includes(unit) ? unit : 'Lainnya',
+        custom_unit: UNIT_OPTIONS.includes(unit) ? '' : unit,
+        unit_price: unitPrice,
+        margin,
+        discount_amount: Number(item?.discount_amount || 0),
+        category: item?.products?.category || 'Bahan',
+        selling_price: sellingPrice || 0,
+        requestId: '',
+      }
+    })
+
+    const safeSubTotal = mappedLines.reduce((sum: number, line: { quantity: number; unit_price: number }) => sum + (line.quantity * line.unit_price), 0)
+    const safeTaxableBase = Math.max(0, safeSubTotal - Number(purchase?.discount_amount || 0))
+    const safeTaxPercent = safeTaxableBase > 0
+      ? (Number(purchase?.tax_amount || 0) / safeTaxableBase) * 100
+      : 0
+
+    setEditingDraftPurchaseId(String(purchase.id))
+    setVendorId(String(purchase.vendor_id || ''))
+    setPurchaseDate(String(purchase.purchase_date || new Date().toISOString().split('T')[0]))
+    setDueDate(purchase?.due_date ? String(purchase.due_date) : '')
+    setPaymentTerm(parsedPaymentTerm)
+    setPaymentAccountId(paymentAccMatch?.[1] || '')
+    setPayOverheadNow(Boolean(overheadAccMatch?.[1]))
+    setOverheadAccountId(overheadAccMatch?.[1] || '')
+    setNotes(stripPurchaseMetaFromNotes(noteText))
+    setCustomGlobalDiscount(Number(purchase?.discount_amount || 0))
+    setHeaderTaxPercent(Number.isFinite(safeTaxPercent) ? Number(safeTaxPercent.toFixed(2)) : 0)
+    setShippingAmount(String(Number(purchase?.shipping_amount || 0)))
+    setInsuranceAmount(String(Number(purchase?.insurance_amount || 0)))
+    setShariahMode(nextShariahMode)
+    setHasDp(false)
+    setDpAmount('0')
+    setDpAccountId('')
+    setLines(mappedLines.length > 0 ? mappedLines : [createEmptyLine()])
+    setError(null)
+    setSuccess(null)
+    setShowModal(true)
+  }
+
   const handleAddLine = () => {
-    setLines([...lines, {
-      id: Date.now(),
-      product_name: '',
-      product_id: '',
-      quantity: 1,
-      unit: 'Pcs',
-      custom_unit: '',
-      unit_price: 0,
-      margin: 20,
-      discount_amount: 0,
-      category: 'Bahan',
-      selling_price: 0,
-      requestId: ''
-    }])
+    setLines([...lines, createEmptyLine()])
   }
 
   const handleRemoveLine = (id: number) => {
@@ -225,13 +309,21 @@ export default function PurchasingClient({
 
   const handleCreatePurchase = async (e: React.FormEvent) => {
     e.preventDefault()
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+    const requestedMode = String(submitter?.value || 'PUBLISH').toUpperCase()
+    const isDraftSave = requestedMode === 'DRAFT'
     const resolvedPaymentTerm: 'TEMPO' | 'LUNAS' = shariahMode === 'SALAM' ? 'LUNAS' : paymentTerm
+
+    const usableLines = lines.filter((line) => String(line.product_name || '').trim().length > 0)
+
     if (!vendorId) return setError('Vendor harus dipilih!')
-    if (resolvedPaymentTerm === 'LUNAS' && !paymentAccountId) return setError('Pilih akun pembayaran untuk transaksi Lunas!')
-    if (shariahMode === 'SALAM' && !dueDate) return setError('Akad SALAM wajib mengisi tanggal barang disediakan.')
-    if (resolvedPaymentTerm === 'TEMPO' && payOverheadNow && !overheadAccountId) return setError('Silakan pilih rekening Kas/Bank untuk membayar Ongkir/Asuransi yang dibayar terpisah secara tunai.')
-    
-    if (lines.some(l => !l.product_name || l.quantity <= 0 || l.unit_price < 0)) {
+    if (usableLines.length === 0) return setError('Tambahkan minimal 1 item untuk menyimpan dokumen.')
+
+    if (!isDraftSave && resolvedPaymentTerm === 'LUNAS' && !paymentAccountId) return setError('Pilih akun pembayaran untuk transaksi Lunas!')
+    if (!isDraftSave && shariahMode === 'SALAM' && !dueDate) return setError('Akad SALAM wajib mengisi tanggal barang disediakan.')
+    if (!isDraftSave && resolvedPaymentTerm === 'TEMPO' && payOverheadNow && !overheadAccountId) return setError('Silakan pilih rekening Kas/Bank untuk membayar Ongkir/Asuransi yang dibayar terpisah secara tunai.')
+
+    if (!isDraftSave && usableLines.some(l => !l.product_name || l.quantity <= 0 || l.unit_price < 0)) {
       return setError('Lengkapi detail barang, kuantitas, dan HPP untuk setiap baris.')
     }
 
@@ -242,6 +334,7 @@ export default function PurchasingClient({
       ? (notes ? notes + '\n' : '') + `[OVERHEAD_ACC: ${overheadAccountId}]` 
       : notes
 
+    const submitMode: 'DRAFT' | 'PUBLISH' = isDraftSave ? 'DRAFT' : 'PUBLISH'
     const payload = {
       vendor_id: vendorId,
       branch_id: activeBranchId || undefined,
@@ -255,7 +348,9 @@ export default function PurchasingClient({
       shipping_amount: parseFloat(shippingAmount) || 0,
       insurance_amount: parseFloat(insuranceAmount) || 0,
       shariah_mode: shariahMode,
-      lines: lines.map(line => {
+      mode: submitMode,
+      draft_id: editingDraftPurchaseId || undefined,
+      lines: usableLines.map(line => {
         const totalOverhead = (parseFloat(shippingAmount) || 0) + (parseFloat(insuranceAmount) || 0)
         const itemValue = (line.quantity * line.unit_price) - (line.discount_amount || 0)
         const allocatedOverheadPerUnit = grossSubTotal > 0 ? (itemValue / grossSubTotal * totalOverhead) / (line.quantity || 1) : 0
@@ -279,7 +374,7 @@ export default function PurchasingClient({
     if (res?.error) setError(res.error)
     else {
       const dpFinalAmount = dpMode === 'PERCENT' ? (grandTotal * (parseFloat(dpPercent) || 0) / 100) : (parseFloat(dpAmount) || 0)
-      if (resolvedPaymentTerm === 'TEMPO' && hasDp && dpFinalAmount > 0 && dpAccountId && res.purchaseId) {
+      if (!isDraftSave && resolvedPaymentTerm === 'TEMPO' && hasDp && dpFinalAmount > 0 && dpAccountId && res.purchaseId) {
          try {
            const { createPurchasePayment } = await import('@/modules/purchasing/actions/purchasing.actions')
            const dpRes = await createPurchasePayment(orgId, {
@@ -300,28 +395,20 @@ export default function PurchasingClient({
          }
       }
 
-      setSuccess('PO Baru berhasil disimpan!')
+      if (isDraftSave) {
+        setSuccess(editingDraftPurchaseId ? 'Draft PO berhasil diperbarui.' : 'Draft PO berhasil disimpan.')
+      } else {
+        setSuccess(editingDraftPurchaseId ? 'PO draft berhasil diterbitkan.' : 'PO baru berhasil diterbitkan.')
+      }
       setShowModal(false)
-      // Reset form
-      setLines([{ id: Date.now(), product_name: '', product_id: '', quantity: 1, unit: 'Pcs', custom_unit: '', unit_price: 0, margin: 20, discount_amount: 0, category: 'Bahan', selling_price: 0, requestId: '' }])
-      setVendorId('')
-      setNotes('')
-      setPaymentAccountId('')
-      setHasDp(false)
-      setDpAmount('0')
-      setDpAccountId('')
-      setPaymentTerm('TEMPO')
-      setDueDate('')
-      setCustomGlobalDiscount(null)
-      setHeaderTaxPercent(0)
-      setShippingAmount('0')
-      setInsuranceAmount('0')
-      setShariahMode('CASH')
-      
-      // Update linked purchase requests to ORDERED
-      for (const line of lines) {
-        if ((line as any).requestId) {
-          await updatePurchaseRequestStatus(orgId, (line as any).requestId, 'ORDERED', activeBranchId || undefined)
+      resetPurchaseForm()
+
+      // Update linked purchase requests to ORDERED only after publish
+      if (!isDraftSave) {
+        for (const line of usableLines) {
+          if ((line as any).requestId) {
+            await updatePurchaseRequestStatus(orgId, (line as any).requestId, 'ORDERED', activeBranchId || undefined)
+          }
         }
       }
 
@@ -512,7 +599,10 @@ export default function PurchasingClient({
             <SafeButton 
               variant="danger"
               icon={<Plus size={18} />}
-              onClick={() => setShowModal(true)}
+              onClick={() => {
+                resetPurchaseForm()
+                setShowModal(true)
+              }}
             >
               Buat PO (Belanja)
             </SafeButton>
@@ -652,8 +742,14 @@ export default function PurchasingClient({
                          <button onClick={() => handleOpenDetail(p)} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-500 hover:text-white transition-all border border-blue-100" title="Detail Dokumen PO">
                            <FileText size={16}/>
                          </button>
+
+                         {p.status === 'DRAFT' && (
+                           <button onClick={() => openDraftPurchaseEditor(p)} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-500 hover:text-white transition-all border border-indigo-100" title="Edit Draft PO">
+                             <Pencil size={16}/>
+                           </button>
+                         )}
                          
-                         {(p.status === 'DRAFT' || p.status === 'ORDERED') && (
+                         {p.status === 'ORDERED' && (
                            <button onClick={() => handleReceivePO(p.id)} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm border border-emerald-100 group/btn" title="Terima Barang">
                              <CheckSquare size={16}/>
                            </button>
@@ -732,7 +828,7 @@ export default function PurchasingClient({
                             <>
                               <button 
                                 onClick={() => {
-                                  // Pre-fill PO form logic could be added here
+                                  resetPurchaseForm()
                                   setLines([{
                                     id: Date.now(),
                                     product_name: r.product_name,
@@ -783,10 +879,12 @@ export default function PurchasingClient({
         {/* MODAL BUAT PO BARU (DENGAN LINE ITEMS) */}
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setShowModal(false); resetPurchaseForm() }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl p-8 overflow-hidden max-h-[90vh] overflow-y-auto">
                 <div className="absolute top-0 left-0 w-2 h-full bg-rose-500" />
-                <h3 className="text-xl font-bold mb-6">Buat Purchase Order (PO) & Update Master Barang</h3>
+                <h3 className="text-xl font-bold mb-6">
+                  {editingDraftPurchaseId ? 'Edit Draft Purchase Order (PO)' : 'Buat Purchase Order (PO) & Update Master Barang'}
+                </h3>
                 
                 <form onSubmit={handleCreatePurchase} className="space-y-6">
                   {/* HEADER PO */}
@@ -1152,8 +1250,13 @@ export default function PurchasingClient({
                   </div>
 
                   <div className="flex gap-3 pt-4 border-t border-slate-100">
-                    <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-2xl transition">Batal</button>
-                    <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-2xl shadow-lg transition">{loading ? 'Menyimpan...' : 'Simpan PO & Produk'}</button>
+                    <button type="button" onClick={() => { setShowModal(false); resetPurchaseForm() }} className="flex-1 py-4 text-xs font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 rounded-2xl transition">Batal</button>
+                    <button type="submit" value="DRAFT" disabled={loading} className="flex-1 py-4 px-6 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-2xl border border-indigo-200 transition">
+                      {loading ? 'Menyimpan...' : 'Save Draft'}
+                    </button>
+                    <button type="submit" value="PUBLISH" disabled={loading} className="flex-2 py-4 px-8 text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-2xl shadow-lg transition">
+                      {loading ? 'Memproses...' : 'Terbitkan PO'}
+                    </button>
                   </div>
                 </form>
              </motion.div>

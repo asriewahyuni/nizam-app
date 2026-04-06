@@ -135,9 +135,9 @@ async function ensureCreateSaleStockAvailability(
   if (!firstShortage) return { success: true }
 
   return {
-    error: `Stok produk "${firstShortage.name}" tidak mencukupi. Dibutuhkan ${formatQuantity(
+    error: `Stok produk "${firstShortage.name}" tidak mencukupi untuk invoice biasa. Dibutuhkan ${formatQuantity(
       firstShortage.required
-    )}, tersedia ${formatQuantity(Math.max(0, firstShortage.available))}. Silakan ubah mode transaksi menjadi akad SALAM atau ISTISHNA.`,
+    )}, tersedia ${formatQuantity(Math.max(0, firstShortage.available))}. Ubah transaksi ke akad SALAM agar pesanan tetap bisa dicatat tanpa mengurangi stok saat ini.`,
   }
 }
 
@@ -480,58 +480,119 @@ export async function createSaleEntry(orgId: string, payload: any) {
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
   const activeBranchId = activeBranchResult.branchId
 
+  const createMode: 'DRAFT' | 'PUBLISH' =
+    String(payload.mode || 'PUBLISH').toUpperCase() === 'DRAFT'
+      ? 'DRAFT'
+      : 'PUBLISH'
+
+  const normalizedLines = (payload.lines || []).filter((line: any) => String(line?.product_name || '').trim().length > 0)
+  if (!payload.customer_id || normalizedLines.length === 0) {
+    return { error: 'Customer dan minimal satu baris item wajib diisi.' }
+  }
+
   const shariahMode = normalizeShariahMode(payload.shariah_mode)
   const salamMode = isSalamMode(shariahMode)
   const paymentTerm = salamMode ? 'LUNAS' : (String(payload.payment_term || 'TEMPO').toUpperCase() === 'LUNAS' ? 'LUNAS' : 'TEMPO')
   const dueDate = (paymentTerm === 'TEMPO' || salamMode) ? (payload.due_date || null) : null
 
-  if ((paymentTerm === 'TEMPO' || salamMode) && !dueDate) {
+  if (createMode === 'PUBLISH' && (paymentTerm === 'TEMPO' || salamMode) && !dueDate) {
     return { error: 'Tanggal jatuh tempo pengiriman wajib diisi.' }
   }
 
-  if (salamMode && paymentTerm !== 'LUNAS') {
+  if (createMode === 'PUBLISH' && salamMode && paymentTerm !== 'LUNAS') {
     return { error: 'Akad SALAM wajib dibayar lunas (tunai) di awal.' }
   }
 
-  if (!salamMode && shariahMode !== 'ISTISHNA') {
+  if (createMode === 'PUBLISH' && !salamMode && shariahMode !== 'ISTISHNA') {
     const createStockCheck = await ensureCreateSaleStockAvailability(
       supabase as any,
       orgId,
       activeBranchId,
-      payload.lines || []
+      normalizedLines
     )
     if ('error' in createStockCheck) return { error: createStockCheck.error }
   }
 
-  const { data: sale, error: saleErr } = await (supabase as any)
-    .from('sales')
-    .insert({
-      org_id: orgId,
-      branch_id: activeBranchId,
-      customer_id: payload.customer_id,
-      sale_date: payload.sale_date,
-      due_date: dueDate,
-      payment_term: paymentTerm,
-      total_amount: payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0),
-      tax_amount: payload.tax_amount || 0,
-      discount_amount: payload.discount_amount || 0,
-      grand_total: (payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)) - (payload.discount_amount || 0) + (payload.tax_amount || 0),
-      shariah_mode: shariahMode,
-      notes: payload.notes,
-      created_by: user.id,
-      status: 'DRAFT'
-    })
-    .select('id')
-    .single()
+  const totalAmount = normalizedLines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)
+  const computedTotal = totalAmount - (payload.discount_amount || 0) + (payload.tax_amount || 0)
 
-  if (saleErr) return { error: saleErr.message }
+  const salePayload = {
+    customer_id: payload.customer_id,
+    sale_date: payload.sale_date,
+    due_date: dueDate,
+    payment_term: paymentTerm,
+    total_amount: totalAmount,
+    tax_amount: payload.tax_amount || 0,
+    discount_amount: payload.discount_amount || 0,
+    grand_total: computedTotal,
+    shariah_mode: shariahMode,
+    notes: payload.notes,
+    updated_at: new Date().toISOString(),
+  }
+
+  let saleId: string | null = null
+
+  if (payload.draft_id) {
+    const { data: existingSale, error: existingSaleError } = await (supabase as any)
+      .from('sales')
+      .select('id, status')
+      .eq('id', payload.draft_id)
+      .eq('org_id', orgId)
+      .eq('branch_id', activeBranchId)
+      .maybeSingle()
+
+    if (existingSaleError || !existingSale) {
+      return { error: 'Draft SO tidak ditemukan pada unit aktif.' }
+    }
+
+    if (existingSale.status !== 'DRAFT') {
+      return { error: 'Hanya dokumen SO berstatus DRAFT yang bisa diedit atau diterbitkan ulang.' }
+    }
+
+    const { error: updateSaleError } = await (supabase as any)
+      .from('sales')
+      .update({
+        ...salePayload,
+        status: 'DRAFT',
+      })
+      .eq('id', payload.draft_id)
+      .eq('org_id', orgId)
+      .eq('branch_id', activeBranchId)
+
+    if (updateSaleError) return { error: updateSaleError.message }
+    saleId = payload.draft_id
+
+    const { error: deleteLinesError } = await (supabase as any)
+      .from('sales_items')
+      .delete()
+      .eq('org_id', orgId)
+      .eq('branch_id', activeBranchId)
+      .eq('sale_id', saleId)
+
+    if (deleteLinesError) return { error: deleteLinesError.message }
+  } else {
+    const { data: sale, error: saleErr } = await (supabase as any)
+      .from('sales')
+      .insert({
+        org_id: orgId,
+        branch_id: activeBranchId,
+        ...salePayload,
+        created_by: user.id,
+        status: 'DRAFT'
+      })
+      .select('id')
+      .single()
+
+    if (saleErr || !sale?.id) return { error: saleErr?.message || 'Gagal membuat draft SO.' }
+    saleId = sale.id
+  }
 
   const { error: linesErr } = await (supabase as any)
     .from('sales_items')
-    .insert(payload.lines.map((l: any) => ({
+    .insert(normalizedLines.map((l: any) => ({
       org_id: orgId,
       branch_id: activeBranchId,
-      sale_id: sale.id,
+      sale_id: saleId,
       product_id: l.product_id,
       description: l.product_name,
       quantity: l.quantity,
@@ -542,24 +603,55 @@ export async function createSaleEntry(orgId: string, payload: any) {
 
   if (linesErr) {
     // Cleanup if lines fail
-    await (supabase as any).from('sales').delete().eq('id', sale.id)
+    if (!payload.draft_id && saleId) {
+      await (supabase as any).from('sales').delete().eq('id', saleId)
+    }
     return { error: linesErr.message }
   }
 
-  // Insert to approval flow
-  const computedTotal = payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0) - (payload.discount_amount || 0) + (payload.tax_amount || 0)
-  await (supabase as any).from('approval_requests' as any).insert({
-    org_id: orgId,
-    branch_id: activeBranchId,
-    requester_id: user.id,
-    source_type: 'SALES_ORDER',
-    source_id: sale.id,
-    status: 'PENDING',
-    reason: `Sales Order Baru (${shariahMode}) - Customer: ${payload.customer_name || ''} - ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(computedTotal)}`
-  })
+  if (createMode === 'PUBLISH') {
+    const approvalTable = (supabase as any).from('approval_requests')
+    if (typeof approvalTable?.update === 'function') {
+      await approvalTable
+        .update({
+          status: 'VOIDED',
+          reason: 'Approval SO lama diganti oleh versi draft terbaru',
+          decided_at: new Date().toISOString(),
+        })
+        .eq('org_id', orgId)
+        .eq('source_type', 'SALES_ORDER')
+        .eq('source_id', saleId)
+        .eq('status', 'PENDING')
+    }
+
+    await (supabase as any).from('approval_requests' as any).insert({
+      org_id: orgId,
+      branch_id: activeBranchId,
+      requester_id: user.id,
+      source_type: 'SALES_ORDER',
+      source_id: saleId,
+      status: 'PENDING',
+      reason: `Sales Order Baru (${shariahMode}) - Customer: ${payload.customer_name || ''} - ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(computedTotal)}`
+    })
+  } else {
+    const approvalTable = (supabase as any).from('approval_requests')
+    if (typeof approvalTable?.update === 'function') {
+      await approvalTable
+        .update({
+          status: 'VOIDED',
+          reason: 'Draft SO diperbarui sebelum diterbitkan',
+          decided_at: new Date().toISOString(),
+        })
+        .eq('org_id', orgId)
+        .eq('branch_id', activeBranchId)
+        .eq('source_type', 'SALES_ORDER')
+        .eq('source_id', saleId)
+        .eq('status', 'PENDING')
+    }
+  }
 
   revalidatePath('/sales')
-  return { success: true, saleId: sale.id }
+  return { success: true, saleId }
 }
 
 export async function deliverSale(orgId: string, saleId: string, warehouseId?: string | null) {
