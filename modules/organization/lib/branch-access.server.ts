@@ -218,6 +218,8 @@ export async function getBranchAccessScope(orgId: string): Promise<BranchAccessS
       accessibleBranches: [],
       accessibleBranchIds: [],
       canAccessAllBranches: false,
+      hasPersistedSelection: Boolean(membership.last_active_at),
+      storedBranchId: membership.last_active_branch_id ? String(membership.last_active_branch_id) : null,
     }
   }
 

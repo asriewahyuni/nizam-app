@@ -18,6 +18,83 @@ type MirrorableAccount = Pick<
   'id' | 'code' | 'name' | 'type' | 'normal_balance' | 'parent_id' | 'description' | 'is_system' | 'is_active'
 >
 
+type StandardCoATemplate = {
+  code: string
+  name: string
+  type: AccountType
+  normal_balance: NormalBalance
+  parent_code?: string | null
+}
+
+const CORE_PSAK_CODES = ['1000', '2000', '3000', '4000', '5000', '6000'] as const
+
+const STANDARD_PSAK_COA_TEMPLATE: StandardCoATemplate[] = [
+  { code: '1000', name: 'Aset', type: 'ASSET', normal_balance: 'DEBIT' },
+  { code: '1100', name: 'Aset Lancar', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1101', name: 'Kas Besar', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1102', name: 'Kas Kecil (Petty Cash)', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1103', name: 'Bank - Rekening Operasional', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1104', name: 'Bank - Rekening Payroll', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1105', name: 'Bank - Rekening Lainnya', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1201', name: 'Piutang Usaha', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1202', name: 'Piutang Karyawan', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1203', name: 'Cadangan Kerugian Piutang', type: 'ASSET', normal_balance: 'CREDIT', parent_code: '1000' },
+  { code: '1301', name: 'Persediaan Barang Dagangan', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1302', name: 'Persediaan Barang Dalam Proses', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1303', name: 'Persediaan Bahan Baku', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1304', name: 'Persediaan Barang Jadi', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1401', name: 'PPN Masukan (Pajak Dibayar)', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1402', name: 'Biaya Dibayar Dimuka', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1403', name: 'Uang Muka Pembelian', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1500', name: 'Aset Tetap', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1501', name: 'Tanah', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1502', name: 'Bangunan', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1503', name: 'Akumulasi Penyusutan Bangunan', type: 'ASSET', normal_balance: 'CREDIT', parent_code: '1000' },
+  { code: '1504', name: 'Kendaraan', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1505', name: 'Akumulasi Penyusutan Kendaraan', type: 'ASSET', normal_balance: 'CREDIT', parent_code: '1000' },
+  { code: '1506', name: 'Peralatan & Mesin', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1507', name: 'Akumulasi Penyusutan Peralatan', type: 'ASSET', normal_balance: 'CREDIT', parent_code: '1000' },
+  { code: '2000', name: 'Liabilitas', type: 'LIABILITY', normal_balance: 'CREDIT' },
+  { code: '2101', name: 'Hutang Usaha', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '2102', name: 'Hutang Bank Jangka Pendek', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '2201', name: 'PPN Keluaran (Pajak Dipungut)', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '2202', name: 'Hutang PPh 21', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '2203', name: 'Hutang PPh 23', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '2204', name: 'Hutang PPh Badan', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '2301', name: 'Pendapatan Diterima di Muka', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '2302', name: 'Uang Muka Penjualan', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '2401', name: 'Hutang Gaji', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '2501', name: 'Hutang Bank Jangka Panjang', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
+  { code: '3000', name: 'Ekuitas', type: 'EQUITY', normal_balance: 'CREDIT' },
+  { code: '3001', name: 'Modal Disetor', type: 'EQUITY', normal_balance: 'CREDIT', parent_code: '3000' },
+  { code: '3002', name: 'Laba Ditahan', type: 'EQUITY', normal_balance: 'CREDIT', parent_code: '3000' },
+  { code: '3003', name: 'Laba Periode Berjalan', type: 'EQUITY', normal_balance: 'CREDIT', parent_code: '3000' },
+  { code: '3004', name: 'Prive / Dividen', type: 'EQUITY', normal_balance: 'DEBIT', parent_code: '3000' },
+  { code: '4000', name: 'Pendapatan', type: 'REVENUE', normal_balance: 'CREDIT' },
+  { code: '4001', name: 'Pendapatan Usaha', type: 'REVENUE', normal_balance: 'CREDIT', parent_code: '4000' },
+  { code: '4002', name: 'Diskon Penjualan (Contra)', type: 'REVENUE', normal_balance: 'DEBIT', parent_code: '4000' },
+  { code: '4003', name: 'Retur Penjualan', type: 'REVENUE', normal_balance: 'DEBIT', parent_code: '4000' },
+  { code: '4101', name: 'Pendapatan Bunga', type: 'REVENUE', normal_balance: 'CREDIT', parent_code: '4000' },
+  { code: '4102', name: 'Pendapatan Lain-lain', type: 'REVENUE', normal_balance: 'CREDIT', parent_code: '4000' },
+  { code: '5000', name: 'Beban Pokok Penjualan', type: 'EXPENSE', normal_balance: 'DEBIT' },
+  { code: '5001', name: 'HPP / Cost of Goods Sold', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '5000' },
+  { code: '5002', name: 'Biaya Pengiriman Masuk (Freight In)', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '5000' },
+  { code: '5003', name: 'Retur Pembelian (Contra)', type: 'EXPENSE', normal_balance: 'CREDIT', parent_code: '5000' },
+  { code: '6000', name: 'Beban Operasional', type: 'EXPENSE', normal_balance: 'DEBIT' },
+  { code: '6001', name: 'Gaji & Tunjangan', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
+  { code: '6002', name: 'Sewa Tempat', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
+  { code: '6003', name: 'Utilitas (Listrik, Air, Internet)', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
+  { code: '6004', name: 'Perlengkapan Kantor', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
+  { code: '6005', name: 'Biaya Pemasaran & Iklan', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
+  { code: '6006', name: 'Biaya Transportasi', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
+  { code: '6007', name: 'Biaya Perbaikan & Pemeliharaan', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
+  { code: '6008', name: 'Biaya Asuransi', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
+  { code: '6009', name: 'Biaya Penyusutan', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
+  { code: '6010', name: 'Biaya Profesional & Konsultan', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
+  { code: '6099', name: 'Beban Lain-lain', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
+  { code: '6101', name: 'Biaya Bunga Pinjaman', type: 'EXPENSE', normal_balance: 'DEBIT', parent_code: '6000' },
+]
+
 function buildMirrorPayload(
   source: MirrorableAccount,
   childParentId: string | null,
@@ -33,6 +110,83 @@ function buildMirrorPayload(
     is_system: source.is_system,
     is_active: source.is_active,
   }
+}
+
+async function backfillStandardPsaKCoA(orgId: string) {
+  const admin = await createAdminClient()
+  const { data: existingRows, error: existingError } = await (admin as any)
+    .from('accounts')
+    .select('id, code, parent_id')
+    .eq('org_id', orgId)
+
+  if (existingError) {
+    return { success: false, error: existingError.message || 'Gagal membaca akun existing.' }
+  }
+
+  const rowByCode = new Map<string, { id: string; code: string; parent_id: string | null }>()
+  for (const row of (existingRows || []) as any[]) {
+    const code = String(row?.code || '').trim()
+    const id = String(row?.id || '').trim()
+    if (!code || !id) continue
+    rowByCode.set(code, {
+      id,
+      code,
+      parent_id: row?.parent_id ? String(row.parent_id) : null,
+    })
+  }
+
+  let insertedCount = 0
+  let updatedCount = 0
+  for (const template of STANDARD_PSAK_COA_TEMPLATE) {
+    const existing = rowByCode.get(template.code)
+    const parentId = template.parent_code ? rowByCode.get(template.parent_code)?.id || null : null
+    const payload = {
+      code: template.code,
+      name: template.name,
+      type: template.type,
+      normal_balance: template.normal_balance,
+      parent_id: parentId ?? existing?.parent_id ?? null,
+      description: null as string | null,
+      is_system: true,
+      is_active: true,
+    }
+
+    if (existing?.id) {
+      const { error: updateError } = await (admin as any)
+        .from('accounts')
+        .update(payload)
+        .eq('org_id', orgId)
+        .eq('id', existing.id)
+
+      if (updateError) {
+        return { success: false, error: updateError.message || `Gagal update akun ${template.code}.` }
+      }
+      updatedCount += 1
+      continue
+    }
+
+    const { data: insertedRow, error: insertError } = await (admin as any)
+      .from('accounts')
+      .insert({
+        org_id: orgId,
+        ...payload,
+      })
+      .select('id, code, parent_id')
+      .single()
+
+    if (insertError || !insertedRow?.id) {
+      return { success: false, error: insertError?.message || `Gagal membuat akun ${template.code}.` }
+    }
+
+    rowByCode.set(String(insertedRow.code), {
+      id: String(insertedRow.id),
+      code: String(insertedRow.code),
+      parent_id: insertedRow.parent_id ? String(insertedRow.parent_id) : null,
+    })
+    insertedCount += 1
+  }
+
+  return { success: true, insertedCount, updatedCount }
 }
 
 async function getDescendantOrganizationIds(admin: any, parentOrgId: string): Promise<string[]> {
@@ -545,28 +699,81 @@ export async function getAccountBalances(orgId: string): Promise<AccountBalance[
 // ─────────────────────────────────────────────────────────────
 export async function seedInitialCoA(orgId: string) {
   const supabase = await createClient()
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
 
-  // First check if already has accounts to prevent double seeding
-  const { data: existing } = await (supabase as any)
-    .from('accounts')
-    .select('id')
-    .eq('org_id', orgId)
-    .limit(1)
+  const { data: orgRow } = await (supabase as any)
+    .from('organizations')
+    .select('parent_org_id')
+    .eq('id', trimmedOrgId)
+    .maybeSingle()
 
-  if (existing && existing.length > 0) {
-    return { error: 'Sudah ada akun CoA untuk organisasi ini.' }
+  const parentOrgId = String(orgRow?.parent_org_id || '').trim() || null
+
+  // Child/cabang entity: CoA wajib mengikuti parent (bukan seed PSAK mandiri).
+  if (parentOrgId) {
+    const syncResult = await syncParentCoAToChildOrg(parentOrgId, trimmedOrgId)
+    if (!syncResult.success) {
+      return { error: syncResult.error || 'Gagal sinkron CoA dari parent.' }
+    }
+    if ((syncResult.syncedCount ?? 0) <= 0) {
+      return { error: 'CoA parent belum aktif. Aktifkan CoA di organisasi induk terlebih dahulu.' }
+    }
+    revalidatePath('/settings/accounts')
+    return { success: true, mode: 'sync_parent', syncedCount: syncResult.syncedCount }
   }
 
-  // Use RPC if available, or just call the seed function
-  const { error } = await (supabase as any).rpc('seed_default_coa', { p_org_id: orgId })
+  const { data: existingRows, error: existingError } = await (supabase as any)
+    .from('accounts')
+    .select('code')
+    .eq('org_id', trimmedOrgId)
 
-  if (error) {
-    (console as any).error('Seed CoA Error:', error)
-    return { error: 'Gagal menyiapkan akun standar. Silakan hubungi dukungan.' }
+  if (existingError) {
+    return { error: existingError.message || 'Gagal membaca akun CoA.' }
+  }
+
+  const existingCodes = new Set(
+    ((existingRows || []) as Array<{ code?: string | null }>)
+      .map((row) => String(row?.code || '').trim())
+      .filter(Boolean)
+  )
+  const hasCorePsaK = CORE_PSAK_CODES.every((code) => existingCodes.has(code))
+  if (hasCorePsaK) {
+    return { error: 'CoA standar PSAK sudah aktif untuk organisasi ini.' }
+  }
+
+  // Parent/main org: org benar-benar baru (belum ada akun sama sekali) -> pakai RPC legacy.
+  if (existingCodes.size === 0) {
+    const { error } = await (supabase as any).rpc('seed_default_coa', { p_org_id: trimmedOrgId })
+    if (!error) {
+      revalidatePath('/settings/accounts')
+      return { success: true, mode: 'seed_psak' }
+    }
+
+    const message = String(error.message || '')
+    const recoverable =
+      error.code === '23505' ||
+      /duplicate key|already exists|unique/i.test(message)
+
+    if (!recoverable) {
+      ;(console as any).error('Seed CoA Error:', error)
+      return { error: 'Gagal menyiapkan akun standar. Silakan hubungi dukungan.' }
+    }
+  }
+
+  // Org dengan akun parsial (contoh hanya 1302/1303/1304) -> lengkapi template PSAK.
+  const backfillResult = await backfillStandardPsaKCoA(trimmedOrgId)
+  if (!backfillResult.success) {
+    return { error: backfillResult.error || 'Gagal melengkapi CoA standar PSAK.' }
   }
 
   revalidatePath('/settings/accounts')
-  return { success: true }
+  return {
+    success: true,
+    mode: 'backfill_psak',
+    insertedCount: backfillResult.insertedCount,
+    updatedCount: backfillResult.updatedCount,
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -575,8 +782,11 @@ export async function seedInitialCoA(orgId: string) {
 export async function setShariahAccountsActive(orgId: string, active: boolean) {
   const supabase = await createClient()
 
-  // Common syariah codes from migration 1006
-  const syariahCodes = ['1404', '2600', '2601', '2602', '3100', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
+  // Hanya 3100 yang tidak lagi dipakai pada CoAS.
+  // 3110 & 3120 tetap dipertahankan sebagai akun Syirkah.
+  const activationCodes = ['1404', '2600', '2601', '2602', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
+  const deactivationCodes = [...activationCodes, '3100']
+  const syariahCodes = active ? activationCodes : deactivationCodes
 
   const { error } = await (supabase as any)
     .from('accounts')

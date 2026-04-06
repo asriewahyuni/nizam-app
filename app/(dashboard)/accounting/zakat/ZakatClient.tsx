@@ -606,8 +606,8 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
             <p className="text-[10px] font-black text-slate-900 uppercase italic tracking-widest">Syariah Add-on (CoAS)</p>
             <p className="text-[11px] font-medium text-slate-500 leading-relaxed italic">
               {summary.isShariahEnabled 
-                ? 'Struktur akun Syariah (Syirkah, Ijarah, Zakat) saat ini AKTIF di CoA Anda.'
-                : 'Suntikkan akun Permodalan Syirkah, Ijarah, dan Zakat otomatis ke CoA Anda.'}
+                ? 'Struktur akun Syariah (Syirkah, Qard, Ijarah, Zakat) saat ini AKTIF di CoA Anda.'
+                : 'Suntikkan akun Syariah (Syirkah, Qard, Ijarah, Zakat) otomatis ke CoA Anda.'}
             </p>
             
             {summary.isShariahEnabled ? (

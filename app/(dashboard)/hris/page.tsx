@@ -103,7 +103,8 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
           .eq('user_id', user.id)
           .eq('is_active', true)
           .maybeSingle()
-        const holdingRole = String(parentMembership?.role || '').toLowerCase()
+        const typedParentMembership = parentMembership as { role?: string | null } | null
+        const holdingRole = String(typedParentMembership?.role || '').toLowerCase()
         canTransferAcrossHolding = ['owner', 'admin'].includes(holdingRole)
       }
 

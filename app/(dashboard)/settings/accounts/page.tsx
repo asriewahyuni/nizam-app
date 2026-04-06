@@ -16,6 +16,7 @@ const TYPE_LABELS: Record<AccountType, { label: string; color: string; bg: strin
   REVENUE:   { label: 'Pendapatan', color: '#065f46', bg: '#d1fae5' },
   EXPENSE:   { label: 'Beban',      color: '#be185d', bg: '#fce7f3' },
 }
+const CORE_PSAK_CODES = ['1000', '2000', '3000', '4000', '5000', '6000'] as const
 
 export default async function ChartOfAccountsPage() {
   const orgData = await getActiveOrg()
@@ -23,6 +24,7 @@ export default async function ChartOfAccountsPage() {
 
   const orgEntity = orgData.org as typeof orgData.org & { parent_org_id?: string | null }
   const parentOrgId = orgEntity.parent_org_id ?? null
+  const isChildOrganization = Boolean(parentOrgId)
 
   // Self-healing sync:
   // setiap child membuka halaman CoA, tarik pembaruan terbaru dari parent dulu.
@@ -37,6 +39,9 @@ export default async function ChartOfAccountsPage() {
     getChartOfAccounts(orgData.org.id),
     checkCanManageCoA(orgData.org.id),
   ])
+  const isCoAEmpty = accounts.length === 0
+  const hasCorePsaK = CORE_PSAK_CODES.every((code) => accounts.some((account) => account.code === code))
+  const needsCoAActivation = !hasCorePsaK
 
   // Group by type
   const grouped = accounts.reduce(
@@ -56,11 +61,23 @@ export default async function ChartOfAccountsPage() {
         <div>
           <h1 className="text-xl font-bold text-gray-900">Chart of Accounts</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {accounts.length} akun • Standar PSAK • Otomatis dibuat saat registrasi
+            {accounts.length} akun • Standar PSAK • {needsCoAActivation ? 'Aktivasi awal via tombol CoA' : (isChildOrganization ? 'Mengikuti parent (holding)' : 'Siap digunakan')}
           </p>
         </div>
-        {canManageDirect ? (
-          /* Parent/Holding: bisa tambah langsung */
+        {needsCoAActivation ? (
+          <form action={async () => {
+            'use server'
+            await seedInitialCoA(orgData.org.id)
+          }}>
+            <button
+              type="submit"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-all"
+              style={{ background: isChildOrganization ? 'linear-gradient(135deg, #0f766e, #14b8a6)' : 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
+            >
+              {isChildOrganization ? 'Sinkronkan CoA Parent' : 'Aktifkan CoA PSAK'}
+            </button>
+          </form>
+        ) : canManageDirect ? (
           <a
             href="/settings/accounts/new"
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-all"
@@ -69,7 +86,6 @@ export default async function ChartOfAccountsPage() {
             + Tambah Akun
           </a>
         ) : (
-          /* Child/Branch: harus melalui sistem request */
           <div className="flex items-center gap-2">
             <a
               href="/accounting/coa-requests"
@@ -85,30 +101,44 @@ export default async function ChartOfAccountsPage() {
         )}
       </div>
 
-      {/* Empty State */}
-      {accounts.length === 0 && (
+      {needsCoAActivation && (
         <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">
           <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
           </div>
-          <h3 className="text-lg font-bold text-gray-900 mb-2">Belum ada akun CoA</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">
+            {isChildOrganization
+              ? 'CoA child/cabang belum tersinkron'
+              : (isCoAEmpty ? 'CoA belum diaktivasi' : 'CoA belum lengkap')}
+          </h3>
           <p className="text-gray-500 max-w-sm mx-auto mb-8 text-sm">
-            Tabel Chart of Accounts (CoA) Anda masih kosong. Ini bisa terjadi jika terjadi kendala saat registrasi otomatis.
+            {isChildOrganization
+              ? 'Untuk entitas anak/cabang, struktur rekening harus mengikuti parent. Jalankan sinkronisasi agar CoA mengikuti holding.'
+              : (isCoAEmpty
+                ? 'Aktifkan Chart of Accounts (CoA) standar PSAK agar modul akuntansi siap dipakai.'
+                : 'Ditemukan akun parsial. Jalankan aktivasi CoA agar sistem melengkapi seluruh struktur PSAK.')}
           </p>
-          
+
           <form action={async () => {
             'use server'
             await seedInitialCoA(orgData.org.id)
           }}>
             <button
               type="submit"
-              className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+              className="px-6 py-2.5 text-white rounded-lg font-semibold transition-colors"
+              style={{ backgroundColor: isChildOrganization ? '#0f766e' : '#2563eb' }}
             >
-              Siapkan Akun Standar PSAK Sekarang
+              {isChildOrganization ? 'Sinkronkan CoA Dari Parent' : 'Aktifkan CoA Standar PSAK'}
             </button>
           </form>
+
+          {!isParentOrg && (
+            <p className="text-xs text-slate-400 mt-4">
+              Pengajuan rekening baru tetap melalui menu Pengajuan CoA setelah sinkronisasi selesai.
+            </p>
+          )}
         </div>
       )}
 

@@ -154,38 +154,6 @@ function mapCreateOrganizationError(
   return defaultMessage
 }
 
-async function seedDefaultCoAAfterBranchReady(db: any, orgId: string) {
-  const trimmedOrgId = String(orgId || '').trim()
-  if (!trimmedOrgId) return
-  if (!db || typeof db.rpc !== 'function') return
-
-  try {
-    // Avoid duplicate seeding for environments where trigger already seeded CoA.
-    try {
-      if (typeof db.from === 'function') {
-        const { data: existingAccounts } = await db
-          .from('accounts')
-          .select('id')
-          .eq('org_id', trimmedOrgId)
-          .limit(1)
-
-        if (Array.isArray(existingAccounts) && existingAccounts.length > 0) {
-          return
-        }
-      }
-    } catch (checkError) {
-      ;(console as any).warn('CreateOrganization: account pre-check skipped', checkError)
-    }
-
-    const { error } = await db.rpc('seed_default_coa', { p_org_id: trimmedOrgId })
-    if (error) {
-      ;(console as any).warn('CreateOrganization: post-branch CoA seed failed', error)
-    }
-  } catch (seedError) {
-    ;(console as any).warn('CreateOrganization: post-branch CoA seed threw error', seedError)
-  }
-}
-
 async function getHoldingManagementContext(
   expectedParentOrgId?: string,
   options?: HoldingContextOptions
@@ -370,7 +338,12 @@ async function createOrganizationRecord(
       }
     }
 
-    await seedDefaultCoAAfterBranchReady(privilegedDb, orgId)
+    if (parentOrgId) {
+      const coaSync = await syncParentCoAToChildOrg(parentOrgId, orgId)
+      if (!coaSync.success) {
+        ;(console as any).warn('CreateOrganization: CoA parent sync warning', coaSync.error)
+      }
+    }
 
     await persistMembershipActiveContext(privilegedDb, {
       userId: user.id,

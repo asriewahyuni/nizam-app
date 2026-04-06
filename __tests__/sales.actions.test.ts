@@ -490,9 +490,9 @@ describe('Sales Branch Context', () => {
         data: { status: 'ORDERED', warehouse_id: null, shariah_mode: 'CASH' },
       }),
     }
-    const saleItemsQuery = {
+    const saleItemsQuery: any = {
       select: vi.fn(() => saleItemsQuery),
-      eq: vi.fn(() => saleItemsQuery),
+      eq: vi.fn((..._args: any[]) => saleItemsQuery),
     }
     saleItemsQuery.eq = vi.fn((column: string, value: string) => {
       if (column === 'sale_id' && value === 'sale-1') {
@@ -554,9 +554,9 @@ describe('Sales Branch Context', () => {
         data: { status: 'ORDERED', warehouse_id: null, shariah_mode: 'CASH' },
       }),
     }
-    const saleItemsQuery = {
+    const saleItemsQuery: any = {
       select: vi.fn(() => saleItemsQuery),
-      eq: vi.fn(() => saleItemsQuery),
+      eq: vi.fn((..._args: any[]) => saleItemsQuery),
     }
     saleItemsQuery.eq = vi.fn((column: string, value: string) => {
       if (column === 'sale_id' && value === 'sale-1') {
@@ -693,9 +693,9 @@ describe('Sales Branch Context', () => {
       }),
       update: vi.fn(() => saleQuery),
     }
-    const stockMovementQuery = {
+    const stockMovementQuery: any = {
       select: vi.fn(() => stockMovementQuery),
-      eq: vi.fn(() => stockMovementQuery),
+      eq: vi.fn((..._args: any[]) => stockMovementQuery),
       delete: vi.fn(() => stockMovementQuery),
     }
     let stockMovementEqCount = 0
@@ -712,9 +712,9 @@ describe('Sales Branch Context', () => {
       }
       return stockMovementQuery
     })
-    const journalEntryQuery = {
+    const journalEntryQuery: any = {
       update: vi.fn(() => journalEntryQuery),
-      eq: vi.fn(() => journalEntryQuery),
+      eq: vi.fn((..._args: any[]) => journalEntryQuery),
     }
     journalEntryQuery.eq = vi.fn((column: string) => {
       if (column === 'status') {

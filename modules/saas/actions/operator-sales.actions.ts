@@ -876,10 +876,10 @@ export async function updateOperatorQuotation(formData: FormData) {
 
   const { data: currentQuoteData } = await admin
     .from('saas_invoices')
-    .select('id, invoice_number, status, due_date')
+    .select('id, org_id, invoice_number, status, due_date')
     .eq('id', quoteId)
     .maybeSingle()
-  const currentQuote = currentQuoteData as Pick<InvoiceRecord, 'id' | 'invoice_number' | 'status' | 'due_date'> | null
+  const currentQuote = currentQuoteData as Pick<InvoiceRecord, 'id' | 'org_id' | 'invoice_number' | 'status' | 'due_date'> | null
 
   if (!currentQuote) return { error: 'Data penawaran tidak ditemukan.' }
   if (!isQuotationNumber(currentQuote.invoice_number)) {
@@ -896,7 +896,7 @@ export async function updateOperatorQuotation(formData: FormData) {
   const draft = draftResult.data
 
   const baseUpdatePayload = {
-    org_id: currentSale.org_id,
+    org_id: currentQuote.org_id,
     package_id: draft.packageId,
     amount: draft.finalAmount,
     due_date: currentQuote.due_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),

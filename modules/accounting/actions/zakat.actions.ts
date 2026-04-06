@@ -351,7 +351,7 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
     .from('accounts')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
-    .in('code', ['3100', '2600', '6100', '6200'])
+    .in('code', ['2600', '6100', '6200'])
     .eq('is_active', true)
 
   return {

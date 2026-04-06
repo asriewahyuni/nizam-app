@@ -31,25 +31,48 @@ export async function injectShariahPack(orgId: string) {
     const rootMap: Record<string, string> = {}
     for (const r of (roots || [])) rootMap[r.code] = r.id
 
-    // 1. EQUITY SYARIAH
-    const ekuitasSyariahId = await upsert('3100', 'Ekuitas Syariah', 'EQUITY', 'CREDIT', rootMap['3000'] ?? null)
-    await upsert('3110', 'Modal Syirkah Mudharabah', 'EQUITY', 'CREDIT', ekuitasSyariahId)
-    await upsert('3120', 'Modal Syirkah Inan', 'EQUITY', 'CREDIT', ekuitasSyariahId)
+    // Cleanup akun induk ekuitas syariah lama (3100) saja.
+    // Coba hapus dulu, fallback ke nonaktif jika sudah terhubung transaksi/relasi.
+    const { data: legacyEquityParent } = await (supabase as any)
+      .from('accounts')
+      .select('id, code')
+      .eq('org_id', orgId)
+      .eq('code', '3100')
 
-    // 2. LIABILITIES (QARD)
+    for (const acc of (legacyEquityParent || []) as Array<{ id: string; code: string }>) {
+      const { error: deleteError } = await (supabase as any)
+        .from('accounts')
+        .delete()
+        .eq('org_id', orgId)
+        .eq('id', acc.id)
+
+      if (deleteError) {
+        await (supabase as any)
+          .from('accounts')
+          .update({ is_active: false })
+          .eq('org_id', orgId)
+          .eq('id', acc.id)
+      }
+    }
+
+    // 0. EQUITY SYIRKAH (tanpa akun 3100)
+    await upsert('3110', 'Modal Syirkah Mudharabah', 'EQUITY', 'CREDIT', rootMap['3000'] ?? null)
+    await upsert('3120', 'Modal Syirkah Inan', 'EQUITY', 'CREDIT', rootMap['3000'] ?? null)
+
+    // 1. LIABILITIES (QARD)
     const kewajSyariahId = await upsert('2600', 'Kewajiban Syariah', 'LIABILITY', 'CREDIT', rootMap['2000'] ?? null)
     await upsert('2601', 'Hutang Qard (Kebajikan)', 'LIABILITY', 'CREDIT', kewajSyariahId)
     await upsert('2602', 'Hutang Salam', 'LIABILITY', 'CREDIT', kewajSyariahId)
 
-    // 2b. SALAM RECEIVABLE (ASSET)
+    // 1b. SALAM RECEIVABLE (ASSET)
     await upsert('1404', 'Piutang Salam Vendor', 'ASSET', 'DEBIT', rootMap['1000'] ?? null)
 
-    // 3. IJARAH (EXPENSES)
+    // 2. IJARAH (EXPENSES)
     const ijarahId = await upsert('6100', 'Beban Ijarah & Ujrah', 'EXPENSE', 'DEBIT', rootMap['6000'] ?? null)
     await upsert('6110', 'Beban Ujrah Gaji', 'EXPENSE', 'DEBIT', ijarahId)
     await upsert('6120', 'Beban Ujrah Sewa & Lainnya', 'EXPENSE', 'DEBIT', ijarahId)
 
-    // 4. ZAKAT & CUKAI (EXPENSES)
+    // 3. ZAKAT & CUKAI (EXPENSES)
     const zakatId = await upsert('6200', 'Beban Zakat & Sosial', 'EXPENSE', 'DEBIT', rootMap['6000'] ?? null)
     await upsert('6210', 'Zakat Maal Pemilik', 'EXPENSE', 'DEBIT', zakatId)
     await upsert('6220', 'Zakat Tijarah (Perdagangan)', 'EXPENSE', 'DEBIT', zakatId)
@@ -66,8 +89,11 @@ export async function injectShariahPack(orgId: string) {
 export async function setShariahAccountsActive(orgId: string, active: boolean) {
   const supabase = await createClient()
 
-  // Syariah codes from injectShariahPack
-  const syariahCodes = ['1404', '2600', '2601', '2602', '3100', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
+  // Hanya 3100 yang tidak lagi dipakai pada CoAS.
+  // 3110 & 3120 tetap dipertahankan sebagai akun Syirkah.
+  const activationCodes = ['1404', '2600', '2601', '2602', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
+  const deactivationCodes = [...activationCodes, '3100']
+  const syariahCodes = active ? activationCodes : deactivationCodes
 
   const { error } = await (supabase as any)
     .from('accounts')
