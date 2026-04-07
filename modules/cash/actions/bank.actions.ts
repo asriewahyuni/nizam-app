@@ -4,9 +4,37 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { checkCanManageCoA } from '@/modules/accounting/actions/coa.actions'
-import type { BankAccount, BankTransaction } from '@/types/database.types'
+import type { Account, BankAccount, BankTransaction } from '@/types/database.types'
 
 type ActiveBranchResult = { branchId: string } | { error: string }
+
+function isInvestingTransferAccount(account: Pick<Account, 'code' | 'name' | 'type' | 'cash_flow_category'> | null | undefined) {
+  const code = String(account?.code || '').trim()
+  const name = String(account?.name || '').toLowerCase()
+
+  return (
+    account?.type === 'ASSET' &&
+    (
+      account?.cash_flow_category === 'INVESTING' ||
+      code.startsWith('16') ||
+      name.includes('investasi')
+    )
+  )
+}
+
+function isFinancingTransferAccount(account: Pick<Account, 'code' | 'type' | 'cash_flow_category'> | null | undefined) {
+  const code = String(account?.code || '').trim()
+
+  return (
+    (account?.type === 'EQUITY' || account?.type === 'LIABILITY') &&
+    (
+      account?.cash_flow_category === 'FINANCING' ||
+      code.startsWith('25') ||
+      code.startsWith('26') ||
+      code.startsWith('3')
+    )
+  )
+}
 
 async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
   const branchSelection = await resolveAccessibleBranchSelection(orgId)
@@ -247,26 +275,36 @@ export async function createInterOrgCapitalTransfer(orgId: string, formData: For
 
   const { data: sourceCounterAccount, error: sourceCounterError } = await (supabase as any)
     .from('accounts')
-    .select('id, code, name, type')
+    .select('id, code, name, type, cash_flow_category')
     .eq('id', sourceCounterAccountId)
     .eq('org_id', orgId)
     .maybeSingle()
 
   if (sourceCounterError || !sourceCounterAccount?.id) {
-    return { error: 'Akun lawan parent (sumber) tidak ditemukan.' }
+    return { error: 'Akun investasi parent (sumber) tidak ditemukan.' }
   }
 
-  const sourceCounterCode = String(sourceCounterAccount.code || '')
-  const sourceCounterName = String(sourceCounterAccount.name || '').toLowerCase()
-  const isSourceCashBankLike =
-    sourceCounterAccount.type === 'ASSET'
-    && (sourceCounterCode.startsWith('11') || sourceCounterName.includes('kas') || sourceCounterName.includes('bank'))
-
-  if (!isSourceCashBankLike) {
+  if (!isInvestingTransferAccount(sourceCounterAccount)) {
     return {
       error:
-        'Akun lawan parent harus akun kas/bank anak (kelompok 11xx). ' +
-        'Gunakan rekening anak/cabang yang sudah direquest, bukan akun investasi.',
+        'Akun lawan parent harus akun investasi (kelompok 16xx), misalnya 1601 Investasi pada Entitas Anak / Unit.',
+    }
+  }
+
+  const { data: targetCounterAccount, error: targetCounterError } = await (supabase as any)
+    .from('accounts')
+    .select('id, code, name, type, cash_flow_category')
+    .eq('id', targetCounterAccountId)
+    .maybeSingle()
+
+  if (targetCounterError || !targetCounterAccount?.id) {
+    return { error: 'Akun lawan entitas tujuan tidak ditemukan.' }
+  }
+
+  if (!isFinancingTransferAccount(targetCounterAccount)) {
+    return {
+      error:
+        'Akun lawan entitas tujuan harus akun pendanaan/modal (kelompok 25xx, 26xx, atau 3xxx), misalnya 3001 Modal Disetor.',
     }
   }
 

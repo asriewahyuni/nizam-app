@@ -14,7 +14,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { createBillingInvoice, submitPaymentProof, applyVoucher } from '@/modules/organization/actions/billing.actions'
 import { normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
-import { OPERATOR_ADDON_OPTIONS } from '@/lib/saas/operator-pricing'
+import { OPERATOR_ADDON_OPTIONS, isAddonSelfServiceEnabled } from '@/lib/saas/operator-pricing'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
 
 const db = createClient() as any
@@ -65,6 +65,8 @@ const AVAILABLE_ADDONS = OPERATOR_ADDON_OPTIONS.map((addon) => ({
   desc: addon.description,
   benefits: ADDON_UI_META[addon.id]?.benefits || [],
 }))
+
+const BILLING_MARKETPLACE_ADDONS = AVAILABLE_ADDONS.filter((addon) => isAddonSelfServiceEnabled(addon))
 
 function BillingContent() {
   const searchParams = useSearchParams()
@@ -489,7 +491,7 @@ function BillingContent() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {AVAILABLE_ADDONS.map((addon: any) => (
+          {BILLING_MARKETPLACE_ADDONS.map((addon) => (
             <div key={addon.id} className="bg-white rounded-[32px] border border-slate-100 p-6 flex flex-col transition-all hover:-translate-y-2 hover:shadow-2xl hover:border-indigo-100 group">
               <div className={`w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center mb-6 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner`}>
                 <addon.icon size={28} />
@@ -500,7 +502,7 @@ function BillingContent() {
               </p>
               
               <div className="space-y-3 mb-8 flex-1">
-                {addon.benefits.map((b: any, i: number) => (
+                {addon.benefits.map((b, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
                     <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">{b}</span>

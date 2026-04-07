@@ -166,6 +166,78 @@ function formatCurrencyId(value: number) {
   }).format(value || 0)
 }
 
+function extractAddonNamesFromDescription(rawDescription: string | null | undefined) {
+  const lines = String(rawDescription || '')
+    .replace(/\\n/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  const addonNames = lines.flatMap((line) => {
+    const match = line.match(/^Add-on(?:\s+Single\s+Bill)?\s+(.+?):\s+/i)
+    return match?.[1] ? [match[1].trim()] : []
+  })
+
+  return normalizeSaasEntitlementList(addonNames)
+}
+
+function getActiveAddonName(entry: unknown) {
+  if (typeof entry === 'string') return entry.trim()
+  if (entry && typeof entry === 'object' && typeof (entry as { name?: unknown }).name === 'string') {
+    return String((entry as { name?: string }).name || '').trim()
+  }
+  return ''
+}
+
+async function syncOperatorInvoiceAddons(
+  admin: Awaited<ReturnType<typeof createAdminClient>>,
+  invoice: { id: string; org_id: string; item_description?: string | null }
+) {
+  const addonNames = extractAddonNamesFromDescription(invoice.item_description)
+  if (addonNames.length === 0) return { success: true as const }
+
+  const { data: orgData, error: orgError } = await admin
+    .from('organizations')
+    .select('active_addons')
+    .eq('id', invoice.org_id)
+    .maybeSingle()
+
+  if (orgError) {
+    return { error: orgError.message }
+  }
+
+  const currentAddons = Array.isArray(orgData?.active_addons) ? orgData.active_addons : []
+  const existingAddonNames = new Set(
+    normalizeSaasEntitlementList(currentAddons.map((entry: unknown) => getActiveAddonName(entry)).filter(Boolean))
+  )
+
+  const nowIso = new Date().toISOString()
+  const addonsToInsert = addonNames
+    .filter((name) => !existingAddonNames.has(name))
+    .map((name, index) => ({
+      id: `${invoice.id}:addon:${index + 1}`,
+      name,
+      activated_at: nowIso,
+      source: 'saas_operator',
+    }))
+
+  if (addonsToInsert.length === 0) return { success: true as const }
+
+  const { error: updateError } = await admin
+    .from('organizations')
+    .update({
+      active_addons: [...currentAddons, ...addonsToInsert],
+      updated_at: nowIso,
+    })
+    .eq('id', invoice.org_id)
+
+  if (updateError) {
+    return { error: updateError.message }
+  }
+
+  return { success: true as const }
+}
+
 type AccountingAccount = {
   id: string
   code?: string | null
@@ -1156,13 +1228,19 @@ export async function markOperatorSalePaid(invoiceId: string, paymentMethod: str
 
   const { data: invoiceData } = await admin
     .from('saas_invoices')
-    .select('id, org_id, package_id, invoice_number, amount, tax_amount, status, payment_method, created_at, updated_at')
+    .select('id, org_id, package_id, invoice_number, item_description, amount, tax_amount, status, payment_method, created_at, updated_at')
     .eq('id', invoiceId)
     .maybeSingle()
-  const invoice = invoiceData as Pick<InvoiceRecord, 'id' | 'org_id' | 'package_id' | 'invoice_number' | 'amount' | 'tax_amount' | 'status' | 'payment_method' | 'created_at' | 'updated_at'> | null
+  const invoice = invoiceData as Pick<InvoiceRecord, 'id' | 'org_id' | 'package_id' | 'invoice_number' | 'item_description' | 'amount' | 'tax_amount' | 'status' | 'payment_method' | 'created_at' | 'updated_at'> | null
 
   if (!invoice) return { error: 'Data penjualan tidak ditemukan.' }
-  if (invoice.status === 'PAID') return { success: true }
+  if (invoice.status === 'PAID') {
+    const addonSyncResult = await syncOperatorInvoiceAddons(admin, invoice)
+    if (addonSyncResult.error) {
+      return { error: `Invoice sudah PAID, tetapi sinkronisasi add-on gagal: ${addonSyncResult.error}` }
+    }
+    return { success: true }
+  }
 
   const saleJournalResult = await ensureOperatorSaleJournal(admin, actor.id, {
     id: invoice.id,
@@ -1225,6 +1303,15 @@ export async function markOperatorSalePaid(invoiceId: string, paymentMethod: str
         })
         .eq('id', invoice.org_id)
     }
+  }
+
+  const addonSyncResult = await syncOperatorInvoiceAddons(admin, invoice)
+  if (addonSyncResult.error) {
+    revalidatePath('/saas/penjualan')
+    revalidatePath('/billing')
+    revalidatePath('/accounting/journal')
+    revalidatePath('/', 'layout')
+    return { error: `Invoice sudah PAID, tetapi aktivasi add-on gagal: ${addonSyncResult.error}` }
   }
 
   revalidatePath('/saas/penjualan')

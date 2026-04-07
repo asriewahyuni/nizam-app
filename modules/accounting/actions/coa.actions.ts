@@ -54,6 +54,8 @@ const STANDARD_PSAK_COA_TEMPLATE: StandardCoATemplate[] = [
   { code: '1505', name: 'Akumulasi Penyusutan Kendaraan', type: 'ASSET', normal_balance: 'CREDIT', parent_code: '1000' },
   { code: '1506', name: 'Peralatan & Mesin', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
   { code: '1507', name: 'Akumulasi Penyusutan Peralatan', type: 'ASSET', normal_balance: 'CREDIT', parent_code: '1000' },
+  { code: '1600', name: 'Investasi Jangka Panjang', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
+  { code: '1601', name: 'Investasi pada Entitas Anak / Unit', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1600' },
   { code: '2000', name: 'Liabilitas', type: 'LIABILITY', normal_balance: 'CREDIT' },
   { code: '2101', name: 'Hutang Usaha', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },
   { code: '2102', name: 'Hutang Bank Jangka Pendek', type: 'LIABILITY', normal_balance: 'CREDIT', parent_code: '2000' },

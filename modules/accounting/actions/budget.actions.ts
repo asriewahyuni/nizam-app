@@ -3,10 +3,55 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import type { Account, JournalEntry, JournalLine } from '@/types/database.types'
 
 type BranchFilterResult =
   | { branchId: string | null }
   | { error: string }
+
+type BudgetRow = {
+  id: string
+  org_id: string
+  branch_id: string | null
+  account_id: string
+  period: string
+  budget_amount: number | string
+  updated_at: string
+  accounts?: {
+    code: string
+    name: string
+    type: string
+  } | null
+  branch?: {
+    id: string
+    name: string
+    code: string
+  } | null
+}
+
+type BudgetVsActualRow = {
+  account_id: string
+  account_code: string
+  account_name: string
+  account_type: string
+  period: string
+  budget_amount: number
+  actual_amount: number
+  variance: number
+  variance_pct: number
+  status: 'ON_TRACK' | 'UNDER' | 'OVER'
+}
+
+type BudgetSaveResult =
+  | { success: true; branchId: string }
+  | { error: string }
+
+export type BudgetPeriodStatus = {
+  periodDate: string
+  fiscalPeriodId: string | null
+  fiscalPeriodName: string | null
+  isClosed: boolean
+}
 
 async function resolveBudgetBranchId(orgId: string, branchId?: string | null): Promise<BranchFilterResult> {
   const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
@@ -26,12 +71,42 @@ async function requireActiveBranchId(orgId: string, errorMessage: string): Promi
   return { branchId: branchSelection.branchId }
 }
 
+export async function getBudgetPeriodStatus(orgId: string, period: string): Promise<BudgetPeriodStatus> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('fiscal_periods')
+    .select('id, name, is_closed')
+    .eq('org_id', orgId)
+    .lte('start_date', period)
+    .gte('end_date', period)
+    .order('start_date', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error || !data) {
+    return {
+      periodDate: period,
+      fiscalPeriodId: null,
+      fiscalPeriodName: null,
+      isClosed: false,
+    }
+  }
+
+  return {
+    periodDate: period,
+    fiscalPeriodId: String(data.id),
+    fiscalPeriodName: String(data.name || ''),
+    isClosed: Boolean(data.is_closed),
+  }
+}
+
 export async function getBudgets(orgId: string, period: string, branchId?: string | null) {
   const supabase = await createClient()
   const branchSelection = await resolveBudgetBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
 
-  let query = (supabase as any)
+  let query = supabase
     .from('budgets')
     .select('*, accounts(code, name, type), branch:branches(id, name, code)')
     .eq('org_id', orgId)
@@ -44,10 +119,15 @@ export async function getBudgets(orgId: string, period: string, branchId?: strin
   const { data, error } = await query
 
   if (error) return []
-  return data
+  return (data ?? []) as BudgetRow[]
 }
 
-export async function saveBudget(orgId: string, accountId: string, period: string, amount: number) {
+export async function saveBudget(
+  orgId: string,
+  accountId: string,
+  period: string,
+  amount: number
+): Promise<BudgetSaveResult> {
   const supabase = await createClient()
   const activeBranchResult = await requireActiveBranchId(
     orgId,
@@ -55,17 +135,88 @@ export async function saveBudget(orgId: string, accountId: string, period: strin
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  const { error } = await (supabase as any)
+  if (!Number.isFinite(amount)) {
+    return { error: 'Nilai budget tidak valid.' }
+  }
+
+  const periodStatus = await getBudgetPeriodStatus(orgId, period)
+  if (periodStatus.isClosed) {
+    return {
+      error: periodStatus.fiscalPeriodName
+        ? `Periode fiskal "${periodStatus.fiscalPeriodName}" sudah ditutup. Budget tidak dapat diubah.`
+        : 'Periode fiskal ini sudah ditutup. Budget tidak dapat diubah.',
+    }
+  }
+
+  const branchId = activeBranchResult.branchId
+  const payload = {
+    org_id: orgId,
+    branch_id: branchId,
+    account_id: accountId,
+    period,
+    budget_amount: amount,
+    updated_at: new Date().toISOString(),
+  }
+
+  // budgets now use partial unique indexes for branch-aware rows, so a plain
+  // PostgREST upsert can no longer infer the ON CONFLICT target reliably.
+  const { data: existingRows, error: existingBudgetError } = await supabase
     .from('budgets')
-    .upsert({
-      org_id: orgId,
-      branch_id: activeBranchResult.branchId,
-      account_id: accountId,
-      period,
-      budget_amount: amount,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'org_id,branch_id,account_id,period' })
-  if (error) return { error: error.message || 'Gagal menyimpan budget.' }
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('branch_id', branchId)
+    .eq('account_id', accountId)
+    .eq('period', period)
+    .limit(1)
+
+  if (existingBudgetError) {
+    return { error: existingBudgetError.message || 'Gagal memeriksa budget yang sudah ada.' }
+  }
+
+  const existingBudgetId = existingRows?.[0]?.id ? String(existingRows[0].id) : null
+
+  if (existingBudgetId) {
+    const { error: updateError } = await supabase
+      .from('budgets')
+      .update({
+        budget_amount: amount,
+        updated_at: payload.updated_at,
+      })
+      .eq('id', existingBudgetId)
+
+    if (updateError) {
+      return { error: updateError.message || 'Gagal memperbarui budget.' }
+    }
+  } else {
+    const { error: insertError } = await supabase
+      .from('budgets')
+      .insert(payload)
+
+    if (insertError) {
+      const insertErrorMessage = String(insertError.message || '').toLowerCase()
+      const isDuplicateInsert =
+        insertError.code === '23505' || insertErrorMessage.includes('duplicate key')
+
+      if (!isDuplicateInsert) {
+        return { error: insertError.message || 'Gagal menyimpan budget.' }
+      }
+
+      const { error: retryUpdateError } = await supabase
+        .from('budgets')
+        .update({
+          budget_amount: amount,
+          updated_at: payload.updated_at,
+        })
+        .eq('org_id', orgId)
+        .eq('branch_id', branchId)
+        .eq('account_id', accountId)
+        .eq('period', period)
+
+      if (retryUpdateError) {
+        return { error: retryUpdateError.message || 'Gagal menyimpan budget.' }
+      }
+    }
+  }
 
   revalidatePath('/accounting/budgets')
   return { success: true, branchId: activeBranchResult.branchId }
@@ -82,16 +233,17 @@ export async function getBudgetVsActual(
   if ('error' in branchSelection) return []
 
   // 1. Get ALL relevant accounts
-  const { data: accounts } = await (supabase as any)
+  const { data: rawAccounts } = await supabase
     .from('accounts')
     .select('id, code, name, type, normal_balance')
     .eq('org_id', orgId)
     .in('type', ['REVENUE', 'EXPENSE', 'COGS'])
 
+  const accounts = (rawAccounts ?? []) as Pick<Account, 'id' | 'code' | 'name' | 'type' | 'normal_balance'>[]
   if (!accounts || accounts.length === 0) return []
 
   // 2. Get budgets
-  let budgetsQuery = (supabase as any)
+  let budgetsQuery = supabase
     .from('budgets')
     .select('*')
     .eq('org_id', orgId)
@@ -102,15 +254,16 @@ export async function getBudgetVsActual(
     budgetsQuery = budgetsQuery.eq('branch_id', branchSelection.branchId)
   }
 
-  const { data: budgets } = await budgetsQuery
+  const { data: rawBudgets } = await budgetsQuery
+  const budgets = (rawBudgets ?? []) as BudgetRow[]
 
   const budgetByAccount: Record<string, number> = {}
-  for (const b of budgets || []) {
+  for (const b of budgets) {
     budgetByAccount[b.account_id] = (budgetByAccount[b.account_id] || 0) + Number(b.budget_amount)
   }
 
   // 3. Get actuals
-  let entriesQuery = (supabase as any)
+  let entriesQuery = supabase
     .from('journal_entries')
     .select('id')
     .eq('org_id', orgId)
@@ -122,24 +275,28 @@ export async function getBudgetVsActual(
     entriesQuery = entriesQuery.eq('branch_id', branchSelection.branchId)
   }
 
-  const { data: entries } = await entriesQuery
+  const { data: rawEntries } = await entriesQuery
+  const entries = (rawEntries ?? []) as Pick<JournalEntry, 'id'>[]
 
-  const entryIds = (entries || []).map((e: any) => e.id)
+  const entryIds = entries.map((entry) => entry.id)
   const actualByAccount: Record<string, number> = {}
   
   if (entryIds.length > 0) {
-    const { data: lines } = await (supabase as any)
+    const { data: rawLines } = await supabase
       .from('journal_lines')
       .select('account_id, debit, credit')
       .in('entry_id', entryIds)
 
-    for (const l of lines || []) {
-      actualByAccount[l.account_id] = (actualByAccount[l.account_id] || 0) + Number(l.debit) - Number(l.credit)
+    const lines = (rawLines ?? []) as Pick<JournalLine, 'account_id' | 'debit' | 'credit'>[]
+
+    for (const line of lines) {
+      actualByAccount[line.account_id] =
+        (actualByAccount[line.account_id] || 0) + Number(line.debit) - Number(line.credit)
     }
   }
 
   // 4. Combine
-  const result = []
+  const result: BudgetVsActualRow[] = []
   for (const acc of accounts) {
     const budgetAmount = budgetByAccount[acc.id] || 0
     const actualRaw = actualByAccount[acc.id] || 0
@@ -166,12 +323,12 @@ export async function getBudgetVsActual(
     })
   }
 
-  return result.sort((a: any, b: any) => a.account_code.localeCompare(b.account_code))
+  return result.sort((a, b) => a.account_code.localeCompare(b.account_code))
 }
 
 export async function getChartOfAccountsForBudget(orgId: string) {
   const supabase = await createClient()
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .from('accounts')
     .select('id, code, name, type')
     .eq('org_id', orgId)

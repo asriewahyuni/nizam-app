@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useMemo, useState, useSyncExternalStore, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { BadgeDollarSign, CheckCircle2, ClipboardList, Download, Receipt, RefreshCcw } from 'lucide-react'
 import {
@@ -218,6 +218,18 @@ function extractQuoteNote(rawDescription: string | null | undefined) {
   return ''
 }
 
+function subscribeToHydration() {
+  return () => {}
+}
+
+function getClientHydrationState() {
+  return true
+}
+
+function getServerHydrationState() {
+  return false
+}
+
 export default function SaasOperatorClient({
   mode,
   snapshot,
@@ -227,7 +239,11 @@ export default function SaasOperatorClient({
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [isHydrated, setIsHydrated] = useState(false)
+  const isHydrated = useSyncExternalStore(
+    subscribeToHydration,
+    getClientHydrationState,
+    getServerHydrationState
+  )
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null)
   const [editingSaleInvoiceId, setEditingSaleInvoiceId] = useState<string | null>(null)
@@ -262,10 +278,19 @@ export default function SaasOperatorClient({
   const addonOptionByName = useMemo(() => (
     new Map(OPERATOR_ADDON_OPTIONS.map((addon) => [addon.name.trim().toLowerCase(), addon]))
   ), [])
-
-  useEffect(() => {
-    setIsHydrated(true)
-  }, [])
+  const selectedPackageAddonNames = useMemo(
+    () => new Set((selectedPackage?.addons || []).map((addonName) => addonName.trim().toLowerCase())),
+    [selectedPackage?.addons]
+  )
+  const visiblePackageModules = useMemo(
+    () => (selectedPackage?.modules || []).filter((moduleName) => {
+      const normalizedModuleName = moduleName.trim().toLowerCase()
+      const isAddonModule = selectedPackageAddonNames.has(normalizedModuleName) || addonOptionByName.has(normalizedModuleName)
+      if (!isAddonModule) return true
+      return selectedModules.includes(moduleName)
+    }),
+    [addonOptionByName, selectedModules, selectedPackage?.modules, selectedPackageAddonNames]
+  )
 
   const parseSafeNumber = (raw: string | number, fallback = 0) => {
     const num = Number(raw)
@@ -776,8 +801,8 @@ export default function SaasOperatorClient({
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                   <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Modul Paket</p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {(selectedPackage?.modules || []).length > 0 ? (
-                      (selectedPackage?.modules || []).map((moduleName) => (
+                    {visiblePackageModules.length > 0 ? (
+                      visiblePackageModules.map((moduleName) => (
                         <label key={moduleName} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600">
                           <input
                             type="checkbox"
@@ -814,6 +839,18 @@ export default function SaasOperatorClient({
                           </span>
                           <span className="font-black text-indigo-700">{formatIdr(parseSafeNumber(addonPromoPrices[addon.id], addon.price))}</span>
                         </label>
+                        {(addon.capacityNote || addon.description) && (
+                          <div className="mt-2 space-y-1">
+                            {addon.capacityNote && (
+                              <div className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-blue-700">
+                                {addon.capacityNote}
+                              </div>
+                            )}
+                            <p className="text-[10px] font-semibold leading-relaxed text-slate-500">
+                              {addon.description}
+                            </p>
+                          </div>
+                        )}
                         <div className="mt-2 grid grid-cols-2 gap-2">
                           <input
                             type="number"

@@ -5,10 +5,30 @@ import { getChartOfAccounts, checkCanManageCoA } from '@/modules/accounting/acti
 import { getRecentBankTransactions } from '@/modules/cash/actions/bank.actions'
 import { getActiveBranch, getActiveOrg, getBranches, getChildOrgs } from '@/modules/organization/actions/org.actions'
 import { getPendingCoaRequestCount } from '@/modules/accounting/actions/coa-request.actions'
-import { Account } from '@/types/database.types'
+import { Account, CashFlowCategory } from '@/types/database.types'
 
 type PlacementAccountOption = { id: string; code: string; name: string }
-type TransferCategoryOption = { id: string; code: string; name: string; type: string }
+type TransferCategoryOption = {
+  id: string
+  code: string
+  name: string
+  type: string
+  cash_flow_category?: CashFlowCategory | null
+}
+
+function isInvestingTransferAccount(account: Account) {
+  const code = String(account.code || '').trim()
+  const name = String(account.name || '').toLowerCase()
+
+  return (
+    account.type === 'ASSET' &&
+    (
+      account.cash_flow_category === 'INVESTING' ||
+      code.startsWith('16') ||
+      name.includes('investasi')
+    )
+  )
+}
 
 function readRelationName(relation: any): string | null {
   if (!relation) return null
@@ -203,6 +223,7 @@ export default async function CashPage() {
     branches: { id: string; name: string }[]
     accounts: PlacementAccountOption[]
   }[] = []
+  const interOrgSourceAccounts = allAccounts.filter(isInvestingTransferAccount)
   const transferCategoryNodes: {
     orgId: string
     orgName: string
@@ -227,6 +248,7 @@ export default async function CashPage() {
         code: a.code,
         name: a.name,
         type: a.type,
+        cash_flow_category: a.cash_flow_category ?? null,
       })),
     })
     // 2. Fetch and add all Child Orgs
@@ -251,6 +273,7 @@ export default async function CashPage() {
              code: a.code,
              name: a.name,
              type: a.type,
+             cash_flow_category: a.cash_flow_category ?? null,
            })),
        })
     }
@@ -276,6 +299,7 @@ export default async function CashPage() {
         managedBankAccounts={managedBankAccounts}
         categoryAccounts={categoryAccounts}
         bankGlAccounts={bankGlAccounts}
+        interOrgSourceAccounts={interOrgSourceAccounts}
         recentTransactions={recentTransactions}
         userRole={orgData.role}
         activeBranchId={activeBranch?.id ?? null}

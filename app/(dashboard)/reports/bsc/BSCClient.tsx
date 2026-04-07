@@ -18,6 +18,7 @@ import {
 import { useRouter } from 'next/navigation'
 import { formatRupiah, getDateInTimeZone } from '@/lib/utils'
 import {
+  generateBSCKpisFromExistingData,
   saveBSCPerspectiveWeights,
   upsertBSCKPI,
   archiveBSCKPI,
@@ -26,7 +27,7 @@ import {
   syncBSCKpisFromExistingData,
   applyBscKpiSuggestedIndicator,
 } from '@/modules/accounting/actions/bsc.actions'
-import { analyzeBscKpiCoverage, buildOperationalMetricCatalog } from '@/modules/accounting/lib/bsc-kpi-mapping'
+import { analyzeBscKpiCoverage, buildOperationalMetricCatalog, getPerspectiveSuggestions } from '@/modules/accounting/lib/bsc-kpi-mapping'
 
 type BSCPerspective = 'FINANCIAL' | 'CUSTOMER' | 'INTERNAL_PROCESS' | 'LEARNING_GROWTH'
 type BSCDirection = 'HIGHER_BETTER' | 'LOWER_BETTER'
@@ -34,6 +35,13 @@ type BSCDirection = 'HIGHER_BETTER' | 'LOWER_BETTER'
 type BSCWeightMap = Record<BSCPerspective, number>
 
 const PERSPECTIVES: BSCPerspective[] = ['FINANCIAL', 'CUSTOMER', 'INTERNAL_PROCESS', 'LEARNING_GROWTH']
+
+function normalizeKpiText(value: string | null | undefined) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
 
 type ActionOutcome = {
   error?: string
@@ -158,10 +166,11 @@ export function BSCClient({
     unit: '',
     direction: 'HIGHER_BETTER',
     weightPercent: '25',
-    targetValue: '0',
+    targetValue: '1',
   })
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [measurementDrafts, setMeasurementDrafts] = useState<Record<string, { actual: string; date: string; note: string }>>({})
+  const [showAdvancedSetup, setShowAdvancedSetup] = useState(false)
 
   const sortedKpis = useMemo(() => {
     return [...setupData.kpis].sort((a, b) => {
@@ -183,19 +192,6 @@ export function BSCClient({
     )
   }, [sortedKpis, metricCatalog])
 
-  const perspectiveKpiMap = useMemo(() => {
-    const grouped: Record<BSCPerspective, typeof sortedKpis> = {
-      FINANCIAL: [],
-      CUSTOMER: [],
-      INTERNAL_PROCESS: [],
-      LEARNING_GROWTH: [],
-    }
-    for (const kpi of sortedKpis) {
-      grouped[kpi.perspective].push(kpi)
-    }
-    return grouped
-  }, [sortedKpis])
-
   const unmappedByPerspective = useMemo(() => {
     const grouped = {
       FINANCIAL: [] as typeof kpiCoverage.unmapped,
@@ -207,13 +203,35 @@ export function BSCClient({
       grouped[item.perspective].push(item)
     }
     return grouped
-  }, [kpiCoverage.unmapped])
+  }, [kpiCoverage])
+
+  const quickStartSuggestions = useMemo(() => {
+    const coveredMetricKeys = new Set(kpiCoverage.measurable.map((item) => item.metric.key))
+    const existingNames = new Set(sortedKpis.map((kpi) => normalizeKpiText(kpi.name)).filter(Boolean))
+    const existingFormulaKeys = new Set(
+      sortedKpis
+        .map((kpi) => normalizeKpiText(kpi.formula_key).replace(/\s+/g, '_'))
+        .filter(Boolean)
+    )
+
+    return PERSPECTIVES.map((perspective) => {
+      const suggestions = getPerspectiveSuggestions(perspective, metricCatalog, 3).filter((metric) => {
+        const formulaKey = metric.key.split('.').slice(1).join('_')
+        return !coveredMetricKeys.has(metric.key)
+          && !existingFormulaKeys.has(normalizeKpiText(formulaKey).replace(/\s+/g, '_'))
+          && !existingNames.has(normalizeKpiText(metric.label))
+      })
+
+      return { perspective, suggestions }
+    }).filter((group) => group.suggestions.length > 0)
+  }, [kpiCoverage, metricCatalog, sortedKpis])
 
   const totalActiveKpis = sortedKpis.length
-  const measuredActiveKpis = sortedKpis.filter((kpi) => Boolean(kpi.latest_measurement)).length
+  const quickStartSuggestionCount = quickStartSuggestions.reduce((sum, group) => sum + group.suggestions.length, 0)
 
-  const formatMetricValue = (unit: string, value: number) => {
+  const formatMetricValue = (unit: string | null, value: number) => {
     const numericValue = Number.isFinite(value) ? Math.round(value * 100) / 100 : 0
+    if (!unit) return String(numericValue)
     if (unit === 'IDR') return formatRupiah(numericValue)
     if (unit === '%') return `${numericValue}%`
     return `${numericValue} ${unit}`
@@ -264,24 +282,6 @@ export function BSCClient({
     },
   }
 
-  const getScoreStatus = (score100: number) => {
-    if (score100 >= 85) {
-      return { label: 'On Track', className: 'bg-emerald-50 text-emerald-700 border-emerald-100' }
-    }
-    if (score100 >= 70) {
-      return { label: 'Perlu Akselerasi', className: 'bg-amber-50 text-amber-700 border-amber-100' }
-    }
-    return { label: 'Perhatian', className: 'bg-rose-50 text-rose-700 border-rose-100' }
-  }
-
-  const formatKpiValue = (value: number, unit: string | null) => {
-    const parsed = Math.round((Number(value) || 0) * 100) / 100
-    if (!unit) return String(parsed)
-    if (unit === '%') return `${parsed}%`
-    if (unit.toUpperCase() === 'IDR') return formatRupiah(parsed)
-    return `${parsed} ${unit}`
-  }
-
   const getMeasurementDraft = (kpiId: string, fallbackActual: number | null, fallbackDate: string | null) => {
     const existing = measurementDrafts[kpiId]
     if (existing) return existing
@@ -322,6 +322,49 @@ export function BSCClient({
         window.alert(actionResult.error)
         return
       }
+      router.refresh()
+    })
+  }
+
+  const handleGenerateFromExistingData = () => {
+    if (!canManageSetup) {
+      window.alert('Pilih unit aktif terlebih dahulu untuk membuat KPI otomatis dari data existing.')
+      return
+    }
+
+    startTransition(async () => {
+      const result = await generateBSCKpisFromExistingData(orgId, activeBranchId)
+      const actionResult = result as ActionOutcome & {
+        inserted_count?: number
+        synced_count?: number
+        skipped_count?: number
+        warning?: string
+        generated?: Array<{
+          name: string
+          perspective: BSCPerspective
+          target_value: number
+          unit: string
+        }>
+      }
+
+      if (actionResult.error) {
+        window.alert(actionResult.error)
+        return
+      }
+
+      const generatedPreview = (actionResult.generated || [])
+        .slice(0, 4)
+        .map((item) => `- ${item.name} (${perspectiveLabel[item.perspective]}) target awal ${item.target_value} ${item.unit}`)
+        .join('\n')
+
+      window.alert(
+        `Generator selesai.\n` +
+          `KPI baru: ${actionResult.inserted_count || 0}\n` +
+          `Nilai awal tersinkron: ${actionResult.synced_count || 0}\n` +
+          `Dilewati karena sudah ada: ${actionResult.skipped_count || 0}` +
+          (generatedPreview ? `\n\nContoh KPI baru:\n${generatedPreview}` : '') +
+          (actionResult.warning ? `\n\nCatatan:\n${actionResult.warning}` : '')
+      )
       router.refresh()
     })
   }
@@ -393,7 +436,7 @@ export function BSCClient({
       unit: '',
       direction: 'HIGHER_BETTER',
       weightPercent: '25',
-      targetValue: '0',
+      targetValue: '1',
     })
   }
 
@@ -521,6 +564,15 @@ export function BSCClient({
         {PERSPECTIVES.map((perspective) => {
           const visual = perspectiveVisual[perspective]
           const Icon = visual.icon
+          const perspectiveKpis = sortedKpis.filter((kpi) => kpi.perspective === perspective)
+          const measuredCount = perspectiveKpis.filter((kpi) => Boolean(kpi.latest_measurement)).length
+          const autoCount = perspectiveKpis.filter((kpi) => kpi.source_type === 'AUTO').length
+          const perspectiveSummary = setupData.summary.perspective_scores[perspective]
+          const perspectiveSuggestions = quickStartSuggestions.find((group) => group.perspective === perspective)?.suggestions || []
+          const coveragePercent = perspectiveSummary.kpi_count > 0
+            ? Math.round((measuredCount / perspectiveSummary.kpi_count) * 100)
+            : 0
+          const previewKpis = perspectiveKpis.slice(0, 2)
 
           return (
             <motion.div
@@ -528,7 +580,7 @@ export function BSCClient({
               variants={item}
               className={`bg-white rounded-[34px] p-7 border border-slate-100 shadow-sm transition-all ${visual.cardAccentClass}`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${visual.iconWrapClass}`}>
                     <Icon size={22} />
@@ -538,11 +590,82 @@ export function BSCClient({
                     <h3 className="text-lg font-black text-slate-900">{visual.title}</h3>
                   </div>
                 </div>
+                <div className={`px-3 py-2 rounded-2xl border text-right ${visual.scorePillClass}`}>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Score</p>
+                  <p className="text-base font-black">{perspectiveSummary.score_100}/100</p>
+                </div>
               </div>
 
-              <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
-                <p className="text-xs font-black text-slate-700 uppercase tracking-widest">Kosong</p>
-                <p className="text-xs text-slate-500 font-medium mt-2">Card perspektif ini sementara dikosongkan.</p>
+              <div className="mt-5 space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">KPI Aktif</p>
+                    <p className="text-lg font-black text-slate-900 mt-1">{perspectiveSummary.kpi_count}</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Terukur</p>
+                    <p className="text-lg font-black text-slate-900 mt-1">{measuredCount}</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Auto</p>
+                    <p className="text-lg font-black text-slate-900 mt-1">{autoCount}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Coverage</p>
+                    <p className="text-xs font-black text-slate-700">{coveragePercent}%</p>
+                  </div>
+                  <div className="h-2 rounded-full bg-white border border-slate-200 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${visual.progressClass}`}
+                      style={{ width: `${Math.max(0, Math.min(100, coveragePercent))}%` }}
+                    />
+                  </div>
+
+                  {previewKpis.length > 0 ? (
+                    <div className="space-y-2">
+                      {previewKpis.map((kpi) => (
+                        <div key={kpi.id} className="rounded-xl bg-white border border-slate-200 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-black text-slate-900">{kpi.name}</p>
+                              <p className="text-[11px] font-semibold text-slate-500 mt-1">
+                                Target {formatMetricValue(kpi.unit, kpi.target_value)}
+                              </p>
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                              {kpi.latest_measurement ? 'Measured' : 'Pending'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 font-medium mt-2">
+                            {kpi.latest_measurement
+                              ? `Actual ${formatMetricValue(kpi.unit, kpi.latest_measurement.actual_value)}`
+                              : 'Belum ada pengukuran terbaru.'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : perspectiveSuggestions.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Siap Digenerate</p>
+                      {perspectiveSuggestions.slice(0, 2).map((suggestion) => (
+                        <div key={`${perspective}-${suggestion.key}`} className="rounded-xl bg-white border border-dashed border-slate-300 p-3">
+                          <p className="text-xs font-black text-slate-900">{suggestion.label}</p>
+                          <p className="text-[11px] text-slate-600 font-medium mt-1">
+                            Nilai sekarang {formatMetricValue(suggestion.unit, suggestion.value)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-white border border-dashed border-slate-300 p-4 text-center">
+                      <p className="text-xs font-black text-slate-700 uppercase tracking-widest">Belum Ada KPI</p>
+                      <p className="text-xs text-slate-500 font-medium mt-2">Perspective ini belum punya KPI maupun saran dari data saat ini.</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </motion.div>
           )
@@ -561,13 +684,23 @@ export function BSCClient({
             <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
+                onClick={handleGenerateFromExistingData}
+                disabled={isPending}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black uppercase tracking-wider disabled:opacity-60"
+                title="Buat KPI siap pakai dari data existing lalu isi nilai awal otomatis."
+              >
+                <Zap size={14} />
+                Generate KPI dari Data Saya
+              </button>
+              <button
+                type="button"
                 onClick={handleSyncFromExistingData}
                 disabled={isPending}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-wider disabled:opacity-60"
-                title="Sinkronkan KPI yang punya sumber data existing secara otomatis."
+                title="Segarkan nilai KPI yang sudah punya sumber data existing."
               >
-                <Zap size={14} />
-                Sinkron Data Existing
+                <RefreshCcw size={14} />
+                Refresh Nilai Existing
               </button>
               <button
                 type="button"
@@ -578,6 +711,13 @@ export function BSCClient({
               >
                 <RefreshCcw size={14} />
                 Isi Template KPI
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAdvancedSetup((prev) => !prev)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-black uppercase tracking-wider text-slate-700"
+              >
+                {showAdvancedSetup ? 'Sembunyikan Mode Lanjutan' : 'Buka Mode Lanjutan'}
               </button>
               <div className={`px-4 py-2 rounded-full border text-[10px] font-black uppercase tracking-widest ${activeBranchName ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
                 Scope: {scopeLabel}
@@ -602,137 +742,210 @@ export function BSCClient({
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 space-y-6">
-            <div className="flex items-center justify-between">
-              <h4 className="text-lg font-black text-slate-900">Bobot Perspektif</h4>
-              <button
-                type="button"
-                onClick={handleSaveWeights}
-                disabled={isPending}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-wider disabled:opacity-60"
-              >
-                <Save size={14} />
-                Simpan Bobot
-              </button>
+        <div className="bg-gradient-to-br from-blue-50 via-white to-emerald-50 rounded-[32px] border border-blue-100 shadow-sm p-8 space-y-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-2 max-w-3xl">
+              <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Quick Start</p>
+              <h4 className="text-xl font-black text-slate-900">Jalur tercepat: ubah data operasional jadi KPI siap pakai</h4>
+              <p className="text-sm text-slate-600 font-medium">
+                Sistem akan membuat KPI yang paling relevan dari data yang sudah ada, memberi target awal otomatis, lalu langsung mengisi nilai awalnya.
+              </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {(Object.keys(weightDraft) as BSCPerspective[]).map((perspective) => (
-                <label key={perspective} className="space-y-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{perspectiveLabel[perspective]}</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={weightDraft[perspective]}
-                    onChange={(event) =>
-                      setWeightDraft((prev) => ({
-                        ...prev,
-                        [perspective]: Number(event.target.value || 0),
-                      }))
-                    }
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-800 outline-none focus:border-blue-400"
-                  />
-                </label>
+            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider">
+              <span className="px-3 py-1 rounded-full bg-white border border-blue-200 text-blue-700">
+                Siap dibuat: {quickStartSuggestionCount}
+              </span>
+              <span className="px-3 py-1 rounded-full bg-white border border-emerald-200 text-emerald-700">
+                KPI aktif: {totalActiveKpis}
+              </span>
+            </div>
+          </div>
+
+          {quickStartSuggestionCount === 0 ? (
+            <div className="rounded-3xl border border-dashed border-emerald-200 bg-white/80 px-6 py-8 text-center">
+              <p className="text-sm font-black text-emerald-800 uppercase tracking-widest">Jalur cepat sudah terpakai semua</p>
+              <p className="text-sm text-slate-600 font-medium mt-2">
+                KPI rekomendasi dari data existing sudah aktif. Tinggal klik refresh nilai atau buka mode lanjutan jika ingin KPI tambahan.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {quickStartSuggestions.map((group) => (
+                <div key={`quick-start-${group.perspective}`} className="rounded-3xl border border-white/70 bg-white/85 p-5 space-y-3 shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Perspective</p>
+                      <h5 className="text-base font-black text-slate-900">{perspectiveLabel[group.perspective]}</h5>
+                    </div>
+                    <span className="px-2 py-1 rounded-full bg-blue-50 border border-blue-100 text-[10px] font-black uppercase tracking-widest text-blue-700">
+                      {group.suggestions.length} KPI
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {group.suggestions.map((suggestion) => (
+                      <div key={`${group.perspective}-${suggestion.key}`} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
+                        <p className="text-xs font-black text-slate-900">{suggestion.label}</p>
+                        <p className="text-[11px] font-semibold text-slate-600 mt-1">
+                          Nilai sekarang: {formatMetricValue(suggestion.unit, suggestion.value)}
+                        </p>
+                        <p className="text-[11px] text-slate-500 font-medium mt-1">
+                          Sumber: {suggestion.references.map((reference) => reference.label).join(', ')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 text-sm font-semibold text-slate-600">
-              Total bobot: {(Object.values(weightDraft).reduce((sum, value) => sum + Number(value || 0), 0)).toFixed(2)}%
+          )}
+        </div>
+
+        <div className="rounded-[32px] border border-slate-200 bg-slate-50/80 p-6 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mode Lanjutan</p>
+              <h4 className="text-lg font-black text-slate-900">Bobot perspektif dan KPI manual</h4>
+              <p className="text-sm text-slate-500 font-medium mt-1">Buka bagian ini hanya jika ingin mengatur bobot sendiri atau menambah KPI yang tidak ditemukan otomatis.</p>
             </div>
             <button
               type="button"
-              onClick={handleSeedTemplate}
-              disabled={isPending}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-black uppercase tracking-wider disabled:opacity-60"
+              onClick={() => setShowAdvancedSetup((prev) => !prev)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-black uppercase tracking-wider text-slate-700"
             >
-              <RefreshCcw size={14} />
-              Isi Template KPI 4x4
+              {showAdvancedSetup ? 'Sembunyikan' : 'Buka'}
             </button>
           </div>
 
-          <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 space-y-6">
-            <div className="flex items-center justify-between">
-              <h4 className="text-lg font-black text-slate-900">Tambah KPI</h4>
+          {showAdvancedSetup ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-lg font-black text-slate-900">Bobot Perspektif</h4>
+                  <button
+                    type="button"
+                    onClick={handleSaveWeights}
+                    disabled={isPending}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-wider disabled:opacity-60"
+                  >
+                    <Save size={14} />
+                    Simpan Bobot
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {(Object.keys(weightDraft) as BSCPerspective[]).map((perspective) => (
+                    <label key={perspective} className="space-y-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{perspectiveLabel[perspective]}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={weightDraft[perspective]}
+                        onChange={(event) =>
+                          setWeightDraft((prev) => ({
+                            ...prev,
+                            [perspective]: Number(event.target.value || 0),
+                          }))
+                        }
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-800 outline-none focus:border-blue-400"
+                      />
+                    </label>
+                  ))}
+                </div>
+                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 text-sm font-semibold text-slate-600">
+                  Total bobot: {(Object.values(weightDraft).reduce((sum, value) => sum + Number(value || 0), 0)).toFixed(2)}%
+                </div>
+              </div>
+
+              <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-lg font-black text-slate-900">Tambah KPI Manual</h4>
+                </div>
+                <form onSubmit={handleSubmitKpi} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label className="space-y-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Perspektif</span>
+                      <select
+                        value={kpiForm.perspective}
+                        onChange={(event) => setKpiForm((prev) => ({ ...prev, perspective: event.target.value as BSCPerspective }))}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
+                      >
+                        {PERSPECTIVES.map((perspective) => (
+                          <option key={perspective} value={perspective}>
+                            {perspectiveLabel[perspective]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Arah KPI</span>
+                      <select
+                        value={kpiForm.direction}
+                        onChange={(event) => setKpiForm((prev) => ({ ...prev, direction: event.target.value as BSCDirection }))}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
+                      >
+                        <option value="HIGHER_BETTER">Semakin tinggi semakin baik</option>
+                        <option value="LOWER_BETTER">Semakin rendah semakin baik</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <label className="space-y-1 block">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nama KPI</span>
+                    <input
+                      value={kpiForm.name}
+                      onChange={(event) => setKpiForm((prev) => ({ ...prev, name: event.target.value }))}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
+                      placeholder="Contoh: Net Profit Margin"
+                    />
+                  </label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <label className="space-y-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target</span>
+                      <input
+                        type="number"
+                        value={kpiForm.targetValue}
+                        onChange={(event) => setKpiForm((prev) => ({ ...prev, targetValue: event.target.value }))}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Bobot KPI (%)</span>
+                      <input
+                        type="number"
+                        value={kpiForm.weightPercent}
+                        onChange={(event) => setKpiForm((prev) => ({ ...prev, weightPercent: event.target.value }))}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Satuan</span>
+                      <input
+                        value={kpiForm.unit}
+                        onChange={(event) => setKpiForm((prev) => ({ ...prev, unit: event.target.value }))}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
+                        placeholder="%, days, docs"
+                      />
+                    </label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black uppercase tracking-wider disabled:opacity-60"
+                  >
+                    <Plus size={14} />
+                    Tambah KPI
+                  </button>
+                </form>
+              </div>
             </div>
-            <form onSubmit={handleSubmitKpi} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Perspektif</span>
-                  <select
-                    value={kpiForm.perspective}
-                    onChange={(event) => setKpiForm((prev) => ({ ...prev, perspective: event.target.value as BSCPerspective }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
-                  >
-                    {PERSPECTIVES.map((perspective) => (
-                      <option key={perspective} value={perspective}>
-                        {perspectiveLabel[perspective]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Arah KPI</span>
-                  <select
-                    value={kpiForm.direction}
-                    onChange={(event) => setKpiForm((prev) => ({ ...prev, direction: event.target.value as BSCDirection }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
-                  >
-                    <option value="HIGHER_BETTER">Semakin tinggi semakin baik</option>
-                    <option value="LOWER_BETTER">Semakin rendah semakin baik</option>
-                  </select>
-                </label>
-              </div>
-
-              <label className="space-y-1 block">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nama KPI</span>
-                <input
-                  value={kpiForm.name}
-                  onChange={(event) => setKpiForm((prev) => ({ ...prev, name: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
-                  placeholder="Contoh: Net Profit Margin"
-                />
-              </label>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target</span>
-                  <input
-                    type="number"
-                    value={kpiForm.targetValue}
-                    onChange={(event) => setKpiForm((prev) => ({ ...prev, targetValue: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Bobot KPI (%)</span>
-                  <input
-                    type="number"
-                    value={kpiForm.weightPercent}
-                    onChange={(event) => setKpiForm((prev) => ({ ...prev, weightPercent: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
-                  />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Satuan</span>
-                  <input
-                    value={kpiForm.unit}
-                    onChange={(event) => setKpiForm((prev) => ({ ...prev, unit: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
-                    placeholder="%, days, docs"
-                  />
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isPending}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black uppercase tracking-wider disabled:opacity-60"
-              >
-                <Plus size={14} />
-                Tambah KPI
-              </button>
-            </form>
-          </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-6 text-sm font-medium text-slate-500">
+              Form manual dan pengaturan bobot disembunyikan dulu supaya halaman fokus ke jalur cepat dari data existing.
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 space-y-6">
@@ -843,7 +1056,7 @@ export function BSCClient({
           {sortedKpis.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center space-y-2">
               <p className="text-sm font-black text-slate-700 uppercase tracking-widest">Belum ada KPI di siklus ini</p>
-              <p className="text-sm text-slate-500 font-medium">Gunakan form di atas atau klik tombol template 4x4 untuk mulai cepat.</p>
+              <p className="text-sm text-slate-500 font-medium">Klik `Generate KPI dari Data Saya` untuk jalur tercepat, atau buka mode lanjutan jika ingin bikin KPI manual.</p>
             </div>
           ) : (
             <div className="space-y-4">

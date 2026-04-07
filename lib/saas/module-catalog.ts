@@ -122,6 +122,26 @@ const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
     canonical: 'Multi-Entity (PT/CV)',
     aliases: ['multi-entity (pt/cv)', 'multi-entity', 'multi entity', 'multi entity (pt/cv)'],
   },
+  {
+    canonical: 'Quick Bill',
+    aliases: ['quick bill', 'billing cepat', 'tagihan cepat'],
+  },
+  {
+    canonical: 'Fleet Maintenance Pack',
+    aliases: ['fleet maintenance pack', 'oil record', 'tire record', 'tyre record', 'oil & tire record', 'fleet maintenance'],
+  },
+  {
+    canonical: 'Package Tracking',
+    aliases: ['package tracking', 'tracking paket', 'pelacakan paket', 'resi', 'tracking resi'],
+  },
+  {
+    canonical: 'Sales AR Cockpit',
+    aliases: ['sales ar cockpit', 'ar dashboard salesman', 'ar dashboard sales', 'dashboard piutang salesman', 'dashboard piutang sales'],
+  },
+  {
+    canonical: 'Sales AR Seat Pack',
+    aliases: ['sales ar seat pack', 'seat sales ar', 'seat tambahan sales ar', 'tambahan seat salesman', 'tambahan 3 salesman'],
+  },
 ]
 
 function normalizeLookupValue(value: string) {

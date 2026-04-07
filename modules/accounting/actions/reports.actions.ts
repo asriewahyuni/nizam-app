@@ -1,9 +1,38 @@
 import { createClient } from '@/lib/supabase/server'
 import { unstable_noStore as noStore } from 'next/cache'
-import { addDaysToDateString, getDateInTimeZone } from '@/lib/utils'
+import { addDaysToDateString, diffDateOnlyStrings, getDateInTimeZone } from '@/lib/utils'
 import type { BranchSummary } from '@/modules/organization/lib/org-context'
 
 type BranchFilter = string | null | undefined
+type CashFlowCategory = 'OPERATING' | 'INVESTING' | 'FINANCING'
+
+type CashFlowLineAccount = {
+  id?: string | null
+  code?: string | null
+  name?: string | null
+  type?: string | null
+  normal_balance?: string | null
+  parent_id?: string | null
+  cash_flow_category?: CashFlowCategory | null
+}
+
+type CashFlowLine = {
+  entry_id?: string | null
+  debit?: number | string | null
+  credit?: number | string | null
+  accounts?: CashFlowLineAccount | null
+}
+
+type CashFlowItem = {
+  code: string
+  name: string
+  amount: number
+}
+
+type CashFlowOptions = {
+  startDate?: string
+  endDate?: string
+}
 
 export type DeckCashSummary = {
   cash: number
@@ -149,6 +178,118 @@ async function getCashBalance(
   }, 0)
 }
 
+function resolveCashFlowCategory(account: CashFlowLineAccount | null | undefined): CashFlowCategory {
+  const mappedCategory = account?.cash_flow_category
+  if (mappedCategory === 'OPERATING' || mappedCategory === 'INVESTING' || mappedCategory === 'FINANCING') {
+    return mappedCategory
+  }
+
+  const code = String(account?.code || '').trim()
+  if (code.startsWith('15') || code.startsWith('16')) return 'INVESTING'
+  if (code.startsWith('25') || code.startsWith('26') || code.startsWith('3')) return 'FINANCING'
+  return 'OPERATING'
+}
+
+async function getJournalLinesForEntries(
+  db: any,
+  entryIds: string[],
+  cashAccountCodes?: string[]
+): Promise<CashFlowLine[]> {
+  if (entryIds.length === 0) return []
+
+  let query = db
+    .from('journal_lines')
+    .select('entry_id, debit, credit, accounts!inner(id, code, name, type, normal_balance, parent_id, cash_flow_category)')
+    .in('entry_id', entryIds) as any
+
+  if (Array.isArray(cashAccountCodes) && cashAccountCodes.length > 0) {
+    query = query.in('accounts.code', cashAccountCodes)
+  }
+
+  const { data, error } = await query
+  if (error || !Array.isArray(data)) return []
+  return data as CashFlowLine[]
+}
+
+function summarizeCashFlowFromLines(lines: CashFlowLine[], cashAccountCodes: string[]) {
+  if (lines.length === 0) {
+    return {
+      ocf: 0,
+      icf: 0,
+      fcf: 0,
+      netChange: 0,
+      ocfItems: [] as CashFlowItem[],
+      icfItems: [] as CashFlowItem[],
+      fcfItems: [] as CashFlowItem[],
+    }
+  }
+
+  const linesByEntryId = new Map<string, CashFlowLine[]>()
+  lines.forEach((line) => {
+    const entryId = String(line?.entry_id || '').trim()
+    if (!entryId) return
+    const existing = linesByEntryId.get(entryId) || []
+    existing.push(line)
+    linesByEntryId.set(entryId, existing)
+  })
+
+  let ocf = 0
+  let icf = 0
+  let fcf = 0
+  const itemMap = new Map<string, CashFlowItem>()
+
+  for (const entryLines of linesByEntryId.values()) {
+    const cashLines = entryLines.filter((line) => cashAccountCodes.includes(String(line?.accounts?.code || '')))
+    if (cashLines.length === 0) continue
+
+    const nonCashLines = entryLines.filter((line) => !cashAccountCodes.includes(String(line?.accounts?.code || '')))
+    if (nonCashLines.length === 0) continue
+
+    nonCashLines.forEach((line) => {
+      const account = line.accounts
+      const code = String(account?.code || '').trim()
+      if (!code) return
+
+      const amount = Number(line.credit || 0) - Number(line.debit || 0)
+      if (Math.abs(amount) < 0.01) return
+
+      const category = resolveCashFlowCategory(account)
+      const itemKey = `${category}:${code}`
+      const existingItem = itemMap.get(itemKey)
+      if (existingItem) {
+        existingItem.amount += amount
+      } else {
+        itemMap.set(itemKey, {
+          code,
+          name: String(account?.name || 'Tanpa Nama Akun'),
+          amount,
+        })
+      }
+
+      if (category === 'OPERATING') ocf += amount
+      else if (category === 'INVESTING') icf += amount
+      else fcf += amount
+    })
+  }
+
+  const toSortedItems = (category: CashFlowCategory) =>
+    Array.from(itemMap.entries())
+      .filter(([key]) => key.startsWith(`${category}:`))
+      .map(([, item]) => item)
+      .filter((item) => Math.abs(item.amount) > 0.01)
+      .sort((a, b) => a.code.localeCompare(b.code))
+
+  return {
+    ocf,
+    icf,
+    fcf,
+    netChange: ocf + icf + fcf,
+    ocfItems: toSortedItems('OPERATING'),
+    icfItems: toSortedItems('INVESTING'),
+    fcfItems: toSortedItems('FINANCING'),
+  }
+}
+
 export async function getGeneralLedger(orgId: string, branchId?: BranchFilter, consolidated: boolean = false) {
   noStore()
   const supabase = await createClient()
@@ -242,8 +383,57 @@ export async function getBalanceSheet(
     .map((a: any) => mapBalance(a, 'CREDIT'))
     .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
-  const pl = await getProfitLoss(orgId, '1970-01-01', finalAsOfDate, branchId, consolidated)
-  equity.push({ code: '9999', name: 'Laba Ditahan / Periode Berjalan', balance: pl.netProfit, type: 'EQUITY' })
+  const fiscalYearStart = `${finalAsOfDate.slice(0, 4)}-01-01`
+  const { data: latestClosedPeriod } = await db
+    .from('fiscal_periods')
+    .select('end_date')
+    .eq('org_id', orgId)
+    .eq('is_closed', true)
+    .lte('end_date', finalAsOfDate)
+    .order('end_date', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const latestClosedEnd = String(latestClosedPeriod?.end_date || '').trim() || null
+  const nextOpenDate = latestClosedEnd ? addDaysToDateString(latestClosedEnd, 1) : null
+  const currentPeriodStart = nextOpenDate && nextOpenDate > fiscalYearStart ? nextOpenDate : fiscalYearStart
+  const retainedEarningsEnd = addDaysToDateString(currentPeriodStart, -1)
+
+  const retainedProfit = retainedEarningsEnd >= '1970-01-01'
+    ? (await getProfitLoss(orgId, '1970-01-01', retainedEarningsEnd, branchId, consolidated)).netProfit
+    : 0
+  const currentProfit = currentPeriodStart <= finalAsOfDate
+    ? (await getProfitLoss(orgId, currentPeriodStart, finalAsOfDate, branchId, consolidated)).netProfit
+    : 0
+
+  const referenceByCode = new Map<string, any>(accounts.map((account: any) => [String(account?.code || ''), account]))
+  const equityParent = referenceByCode.get('3000')
+  const upsertDerivedEquity = (code: string, fallbackName: string, balanceDelta: number) => {
+    const existingIndex = equity.findIndex((row: any) => String(row?.code || '').trim() === code)
+    if (existingIndex >= 0) {
+      equity[existingIndex] = {
+        ...equity[existingIndex],
+        balance: Number(equity[existingIndex]?.balance || 0) + balanceDelta,
+        isSystemComputed: true,
+      }
+      return
+    }
+
+    const referenceAccount = referenceByCode.get(code)
+    equity.push({
+      ...(referenceAccount || {}),
+      code,
+      name: referenceAccount?.name || fallbackName,
+      type: 'EQUITY',
+      parent_id: referenceAccount?.parent_id || equityParent?.id || null,
+      balance: balanceDelta,
+      isSystemComputed: true,
+    })
+  }
+
+  upsertDerivedEquity('3002', 'Laba Ditahan', retainedProfit)
+  upsertDerivedEquity('3003', 'Laba Periode Berjalan', currentProfit)
+  equity.sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
   return { assets, liabilities, equity }
 }
@@ -287,99 +477,69 @@ export async function getProfitLoss(orgId: string, startDate?: string, endDate?:
   return { revenue, expenses, totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses }
 }
 
-export async function getCashFlow(orgId: string, branchId?: BranchFilter, consolidated: boolean = false) {
+export async function getCashFlow(
+  orgId: string,
+  branchId?: BranchFilter,
+  consolidated: boolean = false,
+  options: CashFlowOptions = {}
+) {
   noStore()
   const supabase = await createClient()
   const db = supabase as any
   const orgIdsToSearch = await resolveOrgIdsForReport(db, orgId, consolidated)
 
   const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
-  const currentMonthStart = `${todayInJakarta.slice(0, 7)}-01`
-  const lastMonthEnd = addDaysToDateString(currentMonthStart, -1)
-  const lastMonthStart = `${lastMonthEnd.slice(0, 7)}-01`
+  const startDate = options.startDate || `${todayInJakarta.slice(0, 7)}-01`
+  const endDate = options.endDate || todayInJakarta
+  const periodLengthDays = Math.max(diffDateOnlyStrings(endDate, startDate), 0) + 1
+  const previousEndDate = addDaysToDateString(startDate, -1)
+  const previousStartDate = addDaysToDateString(previousEndDate, -(periodLengthDays - 1))
 
   const cashAccountCodes = await getCashAccountCodes(supabase, orgIdsToSearch, branchId, consolidated)
 
-  const allEntryIds = await getPostedEntryIds(db, orgId, { branchId, consolidated })
-  const accounts = await getAccountBalancesFromEntries(db, allEntryIds)
-
-  if (accounts.length === 0) return { ocf: 0, icf: 0, fcf: 0, netChange: 0, ocfItems: [], icfItems: [], fcfItems: [] }
-
-  // 1. Calculate Periods for Trend — anchor by org via journal_entries first
   const currentEntryIds = await getPostedEntryIds(db, orgId, {
     branchId,
-    startDate: currentMonthStart,
+    startDate,
+    endDate,
     consolidated,
   })
-  const currentMonthLines = currentEntryIds.length > 0
-    ? (await (supabase as any).from('journal_lines')
-        .select('debit, credit, accounts!inner(code)')
-        .in('entry_id', currentEntryIds)
-        .in('accounts.code', cashAccountCodes) as any).data || []
-    : []
 
-  const lastEntryIds = await getPostedEntryIds(db, orgId, {
+  const previousEntryIds = await getPostedEntryIds(db, orgId, {
     branchId,
-    startDate: lastMonthStart,
-    endDate: lastMonthEnd,
+    startDate: previousStartDate,
+    endDate: previousEndDate,
     consolidated,
   })
-  const lastMonthLines = lastEntryIds.length > 0
-    ? (await (supabase as any).from('journal_lines')
-        .select('debit, credit, accounts!inner(code)')
-        .in('entry_id', lastEntryIds)
-        .in('accounts.code', cashAccountCodes) as any).data || []
-    : []
 
-  const currentChangeTotal = (currentMonthLines || []).reduce((sum: number, l: any) => sum + (Number(l.debit) - Number(l.credit)), 0)
-  const lastChangeTotal = (lastMonthLines || []).reduce((sum: number, l: any) => sum + (Number(l.debit) - Number(l.credit)), 0)
+  const [currentLines, previousCashLines] = await Promise.all([
+    getJournalLinesForEntries(db, currentEntryIds),
+    getJournalLinesForEntries(db, previousEntryIds, cashAccountCodes),
+  ])
 
-  let ocf = 0, icf = 0, fcf = 0
-  const ocfItems: any[] = [], icfItems: any[] = [], fcfItems: any[] = []
-  
-  accounts.forEach((acc: any) => {
-    if (cashAccountCodes.includes(acc.code)) return
-
-    const balance = ['LIABILITY', 'EQUITY', 'REVENUE'].includes(acc.type) 
-      ? (acc.total_credit || 0) - (acc.total_debit || 0)
-      : (acc.total_debit || 0) - (acc.total_credit || 0)
-
-    if (Math.abs(balance) < 0.01) return
-    
-    // Use stored mapping, or fallback to heuristic if not set
-    const category = acc.cash_flow_category || (
-      (acc.type === 'REVENUE' || acc.type === 'EXPENSE' || 
-       acc.code.startsWith('12') || acc.code.startsWith('13') || acc.code.startsWith('14') ||
-       acc.code.startsWith('21') || acc.code.startsWith('22') || acc.code.startsWith('23') || acc.code.startsWith('24')) ? 'OPERATING' :
-      (acc.code.startsWith('15')) ? 'INVESTING' :
-      (acc.code.startsWith('25') || acc.code.startsWith('3')) ? 'FINANCING' : 
-      'OPERATING'
-    )
-
-    let cashImpact = ['REVENUE', 'LIABILITY', 'EQUITY'].includes(acc.type) ? balance : -balance
-    const item = { code: acc.code, name: acc.name, amount: cashImpact }
-
-    if (category === 'OPERATING') { ocf += cashImpact; ocfItems.push(item) }
-    else if (category === 'INVESTING') { icf += cashImpact; icfItems.push(item) }
-    else if (category === 'FINANCING') { fcf += cashImpact; fcfItems.push(item) }
-  })
-
-  // Net Change is the sum of all sections
-  const netChange = ocf + icf + fcf
-  const netChangeTrend = currentChangeTotal >= lastChangeTotal ? 'UP' : 'DOWN'
+  const currentSummary = summarizeCashFlowFromLines(currentLines, cashAccountCodes)
+  const previousChangeTotal = previousCashLines.reduce(
+    (sum: number, line: CashFlowLine) => sum + (Number(line.debit || 0) - Number(line.credit || 0)),
+    0
+  )
+  const netChangeTrend = currentSummary.netChange >= previousChangeTotal ? 'UP' : 'DOWN'
 
   // Percent change based on real bank movements if available, otherwise 0
   let changePercent = 0
-  if (lastChangeTotal !== 0) {
-    changePercent = ((currentChangeTotal - lastChangeTotal) / Math.abs(lastChangeTotal)) * 100
-  } else if (currentChangeTotal !== 0) {
+  if (previousChangeTotal !== 0) {
+    changePercent = ((currentSummary.netChange - previousChangeTotal) / Math.abs(previousChangeTotal)) * 100
+  } else if (currentSummary.netChange !== 0) {
     changePercent = 100
   }
 
   return { 
-    ocf, icf, fcf, netChange, 
-    ocfItems, icfItems, fcfItems,
-    netChangeTrend: (currentChangeTotal >= lastChangeTotal ? 'UP' : 'DOWN') as 'UP' | 'DOWN',
+    ocf: currentSummary.ocf,
+    icf: currentSummary.icf,
+    fcf: currentSummary.fcf,
+    netChange: currentSummary.netChange,
+    ocfItems: currentSummary.ocfItems,
+    icfItems: currentSummary.icfItems,
+    fcfItems: currentSummary.fcfItems,
+    netChangeTrend: netChangeTrend as 'UP' | 'DOWN',
     changePercent
   }
 }

@@ -3,38 +3,76 @@
 import React, { useState, useTransition } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Coins, 
   Target, 
-  PieChart, 
-  Activity, 
   Plus, 
-  Save, 
   Calendar,
-  ChevronRight,
-  ChevronDown,
   AlertCircle,
-  TrendingDown,
-  TrendingUp,
-  History,
-  ArrowRight,
   Filter,
   Package,
-  FileText,
-  CheckCircle2
+  CheckCircle2,
+  Save
 } from 'lucide-react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah } from '@/lib/utils'
+import type { BudgetPeriodStatus } from '@/modules/accounting/actions/budget.actions'
 import { saveBudget } from '@/modules/accounting/actions/budget.actions'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import type { Account } from '@/types/database.types'
+
+type BudgetEntry = {
+  account_id: string
+  budget_amount: number | string
+}
+
+type BudgetReportRow = {
+  account_id: string
+  account_code: string
+  account_name: string
+  budget_amount: number
+  actual_amount: number
+}
+
+type BudgetAccount = Pick<Account, 'id' | 'code' | 'name'> & {
+  type: string
+  description?: string | null
+}
+
+function getAllocationCategory(account: BudgetAccount) {
+  if (account.type === 'REVENUE' || account.code.startsWith('4')) return 'Pendapatan'
+  if (account.type === 'COGS' || account.code.startsWith('5')) return 'Biaya Pokok'
+  if (account.type === 'EXPENSE' || account.code.startsWith('6')) return 'Beban Operasional'
+  return 'Anggaran'
+}
+
+function getAllocationDescription(account: BudgetAccount) {
+  const customDescription = String(account.description || '').trim()
+  if (customDescription) return customDescription
+
+  if (account.type === 'REVENUE' || account.code.startsWith('4')) {
+    return 'Tetapkan target pendapatan bulanan yang ingin dicapai pada akun ini.'
+  }
+
+  if (account.type === 'COGS' || account.code.startsWith('5')) {
+    return 'Batasi biaya pokok atau biaya langsung agar realisasi tetap terkendali.'
+  }
+
+  if (account.type === 'EXPENSE' || account.code.startsWith('6')) {
+    return 'Tentukan pagu beban operasional bulanan untuk menjaga efisiensi pengeluaran.'
+  }
+
+  return 'Tetapkan alokasi budget bulanan untuk akun ini.'
+}
 
 interface BudgetClientProps {
   orgId: string
   activeBranchId?: string | null
   activeBranchName?: string | null
   allowAllBranchSelection?: boolean
-  initialBudgets: any[]
-  reportData: any[]
-  accounts: any[]
+  initialBudgets: BudgetEntry[]
+  reportData: BudgetReportRow[]
+  accounts: BudgetAccount[]
   currentPeriod: string
+  periodStatus?: BudgetPeriodStatus | null
 }
 
 export function BudgetClient({
@@ -46,33 +84,77 @@ export function BudgetClient({
   reportData,
   accounts,
   currentPeriod,
+  periodStatus = null,
 }: BudgetClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [activeTab, setActiveTab] = useState<'EDIT' | 'ANALYSIS'>('ANALYSIS')
-  const canEditBudget = Boolean(activeBranchId)
+  const [savingAccountId, setSavingAccountId] = useState<string | null>(null)
+  const safePeriodStatus: BudgetPeriodStatus = periodStatus ?? {
+    periodDate: currentPeriod,
+    fiscalPeriodId: null,
+    fiscalPeriodName: null,
+    isClosed: false,
+  }
+  const hasActiveBranch = Boolean(activeBranchId)
+  const isPeriodClosed = safePeriodStatus.isClosed
+  const canEditBudget = hasActiveBranch && !isPeriodClosed
   const scopeLabel = activeBranchName || (allowAllBranchSelection ? 'Semua Unit' : 'Unit belum dipilih')
   const branchGuardMessage = 'Pilih satu unit aktif terlebih dahulu untuk mengelola budget.'
+  const periodLockMessage = safePeriodStatus.fiscalPeriodName
+    ? `Periode fiskal ${safePeriodStatus.fiscalPeriodName} sudah ditutup. Budget untuk periode ini terkunci.`
+    : 'Periode fiskal untuk bulan ini sudah ditutup. Budget untuk periode ini terkunci.'
+  const readOnlyBudgetHint = allowAllBranchSelection
+    ? 'Pilih satu unit aktif dari header untuk membuka form input budget bulanan.'
+    : 'Akses unit aktif belum tersedia untuk akun ini, sehingga budget hanya bisa dilihat.'
+  const budgetableAccounts = accounts.filter((account) =>
+    ['REVENUE', 'EXPENSE', 'COGS'].includes(account.type) ||
+    account.code.startsWith('4') ||
+    account.code.startsWith('5') ||
+    account.code.startsWith('6')
+  )
+  const hasBudgetableAccounts = budgetableAccounts.length > 0
   
   // Local state for editing amounts
-  const [editMap, setEditMap] = useState<Record<string, number>>(
-    initialBudgets.reduce((acc, b) => ({ ...acc, [b.account_id]: Number(b.budget_amount) }), {})
+  const [editMap, setEditMap] = useState<Record<string, string>>(
+    initialBudgets.reduce(
+      (acc, b) => ({ ...acc, [b.account_id]: String(Number(b.budget_amount)) }),
+      {} as Record<string, string>
+    )
   )
 
-  const handleSave = async (accountId: string, amount: number) => {
-    if (!canEditBudget) {
+  const handleSave = async (accountId: string) => {
+    if (!hasActiveBranch) {
       window.alert(branchGuardMessage)
       return
     }
 
+    if (isPeriodClosed) {
+      window.alert(periodLockMessage)
+      return
+    }
+
+    const rawAmount = String(editMap[accountId] ?? '').trim()
+    const amount = rawAmount === '' ? 0 : Number(rawAmount)
+
+    if (!Number.isFinite(amount)) {
+      window.alert('Nilai budget tidak valid.')
+      return
+    }
+
     startTransition(async () => {
-       const result = await saveBudget(orgId, accountId, currentPeriod, amount)
-       if ((result as any)?.error) {
-         window.alert((result as any).error)
-         return
+       setSavingAccountId(accountId)
+       try {
+         const result = await saveBudget(orgId, accountId, currentPeriod, amount)
+         if ('error' in result) {
+           window.alert(result.error)
+           return
+         }
+         router.refresh()
+       } finally {
+         setSavingAccountId(null)
        }
-       router.refresh()
     })
   }
 
@@ -107,6 +189,12 @@ export function BudgetClient({
             <Package size={12} />
             {scopeLabel}
           </div>
+          {isPeriodClosed && (
+            <div className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-rose-700">
+              <AlertCircle size={12} />
+              Periode Terkunci
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -118,20 +206,13 @@ export function BudgetClient({
               Realisasi Anggaran
             </button>
             <button 
-              onClick={() => {
-                if (!canEditBudget) {
-                  window.alert(branchGuardMessage)
-                  return
-                }
-                setActiveTab('EDIT')
-              }}
-              disabled={!canEditBudget}
+              onClick={() => setActiveTab('EDIT')}
               className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${
                 activeTab === 'EDIT'
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
                   : canEditBudget
                     ? 'text-slate-500 hover:text-slate-800'
-                    : 'text-slate-300 cursor-not-allowed'
+                    : 'text-amber-700 hover:text-amber-800 bg-amber-50'
               }`}
             >
               Alokasi Budget
@@ -150,13 +231,31 @@ export function BudgetClient({
         </div>
       </div>
 
-      {!canEditBudget && (
+      {!hasActiveBranch && (
         <div className="rounded-[32px] border border-amber-200 bg-amber-50 px-6 py-5 flex items-start gap-4">
           <AlertCircle className="text-amber-600 mt-0.5" size={18} />
           <div className="space-y-1">
             <p className="text-sm font-black text-amber-900 uppercase tracking-widest">Mode Read-Only</p>
             <p className="text-sm font-medium text-amber-800">
               Pilih satu unit aktif terlebih dahulu untuk menyusun atau mengubah budget. Dalam mode ini data masih tampil sebagai ringkasan {scopeLabel.toLowerCase()}.
+            </p>
+            <p className="text-sm font-semibold text-amber-700">
+              {readOnlyBudgetHint}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isPeriodClosed && (
+        <div className="rounded-[32px] border border-rose-200 bg-rose-50 px-6 py-5 flex items-start gap-4">
+          <AlertCircle className="text-rose-600 mt-0.5" size={18} />
+          <div className="space-y-1">
+            <p className="text-sm font-black text-rose-900 uppercase tracking-widest">Periode Terkunci</p>
+            <p className="text-sm font-medium text-rose-800">
+              {periodLockMessage}
+            </p>
+            <p className="text-sm font-semibold text-rose-700">
+              Anda masih bisa melihat realisasi anggaran, tetapi perubahan alokasi harus dilakukan setelah periode dibuka kembali dari menu Penutupan Buku.
             </p>
           </div>
         </div>
@@ -240,13 +339,35 @@ export function BudgetClient({
             key="edit"
             className="bg-white rounded-[50px] border border-slate-100 shadow-sm overflow-hidden"
           >
-             {!canEditBudget ? (
+             {!hasActiveBranch ? (
                <div className="p-16 text-center space-y-4">
                  <AlertCircle size={28} className="mx-auto text-amber-500" />
                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Pilih Unit Aktif</h3>
                  <p className="text-sm font-medium text-slate-500 max-w-xl mx-auto">
                    Budget sekarang disimpan per unit. Pilih satu unit aktif dari header sebelum melakukan alokasi budget bulanan.
                  </p>
+                 <p className="text-sm font-semibold text-amber-700 max-w-xl mx-auto">
+                   {readOnlyBudgetHint}
+                 </p>
+               </div>
+             ) : isPeriodClosed ? (
+               <div className="p-16 text-center space-y-4">
+                 <AlertCircle size={28} className="mx-auto text-rose-500" />
+                 <h3 className="text-xl font-black text-slate-900 tracking-tight">Periode Budget Terkunci</h3>
+                 <p className="text-sm font-medium text-slate-500 max-w-xl mx-auto">
+                   {periodLockMessage}
+                 </p>
+                 <p className="text-sm font-semibold text-rose-700 max-w-xl mx-auto">
+                   Buka kembali periode terkait dari menu Penutupan Buku jika Anda perlu mengubah alokasi budget bulan ini.
+                 </p>
+                 <div className="pt-2">
+                   <Link
+                     href="/accounting/closing"
+                     className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-100 transition hover:bg-slate-800"
+                   >
+                     Buka Menu Penutupan Buku
+                   </Link>
+                 </div>
                </div>
              ) : (
               <>
@@ -263,30 +384,87 @@ export function BudgetClient({
                 </div>
 
                 <div className="p-10">
-                  <div className="grid grid-cols-1 gap-4">
-                    {accounts.filter(a => ['REVENUE', 'EXPENSE', 'COGS'].includes(a.type) || a.code.startsWith('4') || a.code.startsWith('5') || a.code.startsWith('6')).map((a) => (
-                      <div key={a.id} className="flex flex-col md:flex-row md:items-center gap-6 p-6 hover:bg-slate-50 rounded-[32px] transition-all group">
-                        <div className="w-64">
-                          <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">{a.code}</p>
-                          <p className="font-black text-slate-800 uppercase italic group-hover:text-blue-600 transition-colors truncate">{a.name}</p>
-                        </div>
-                        <div className="flex-1">
-                          <div className="relative group/input">
-                            <input
-                              type="number"
-                              placeholder="IDR 0,00"
-                              defaultValue={editMap[a.id]}
-                              onBlur={(e) => handleSave(a.id, Number(e.target.value))}
-                              className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 text-sm font-black outline-none transition-all placeholder:text-slate-300"
-                            />
-                            <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2 opacity-0 group-focus-within/input:opacity-100 transition-opacity">
-                              <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest italic tracking-tighter">Auto-saving...</span>
+                  {hasBudgetableAccounts ? (
+                    <div className="grid grid-cols-1 gap-4">
+                      {budgetableAccounts.map((account) => (
+                        <div key={account.id} className="flex flex-col md:flex-row md:items-center gap-6 p-6 hover:bg-slate-50 rounded-[32px] transition-all group">
+                          <div className="w-64">
+                            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">{account.code}</p>
+                            <p className="font-black text-slate-800 uppercase italic group-hover:text-blue-600 transition-colors truncate">{account.name}</p>
+                            <p className="mt-2 text-xs font-medium leading-relaxed text-slate-500">
+                              {getAllocationDescription(account)}
+                            </p>
+                            <div className="mt-3 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                              {getAllocationCategory(account)}
                             </div>
                           </div>
+                          <div className="flex-1">
+                            <div className="relative">
+                              <input
+                                type="number"
+                                placeholder="IDR 0,00"
+                                value={editMap[account.id] ?? ''}
+                                onChange={(e) => {
+                                  setEditMap((current) => ({
+                                    ...current,
+                                    [account.id]: e.target.value,
+                                  }))
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    void handleSave(account.id)
+                                  }
+                                }}
+                                className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 text-sm font-black outline-none transition-all placeholder:text-slate-300"
+                              />
+                            </div>
+                            <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                              Tekan Enter atau klik Simpan untuk menyimpan alokasi.
+                            </p>
+                          </div>
+                          <div className="md:w-[148px]">
+                            <button
+                              type="button"
+                              onClick={() => void handleSave(account.id)}
+                              disabled={isPending && savingAccountId === account.id}
+                              className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-4 text-sm font-black transition-all ${
+                                isPending && savingAccountId === account.id
+                                  ? 'cursor-wait bg-slate-200 text-slate-500'
+                                  : 'bg-blue-600 text-white shadow-lg shadow-blue-100 hover:bg-blue-700'
+                              }`}
+                            >
+                              <Save size={16} />
+                              {isPending && savingAccountId === account.id ? 'Menyimpan...' : 'Simpan'}
+                            </button>
+                          </div>
                         </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-[32px] border border-dashed border-slate-200 bg-slate-50 px-8 py-12 text-center space-y-4">
+                      <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mx-auto text-slate-500">
+                        <AlertCircle size={24} />
                       </div>
-                    ))}
-                  </div>
+                      <div className="space-y-2 max-w-2xl mx-auto">
+                        <h4 className="text-xl font-black text-slate-900 tracking-tight">Akun budget belum tersedia</h4>
+                        <p className="text-sm font-medium text-slate-500">
+                          Halaman ini hanya menampilkan akun pendapatan dan beban. Organisasi aktif Anda belum memiliki akun CoA yang bisa dialokasikan untuk budget.
+                        </p>
+                        <p className="text-sm font-semibold text-slate-600">
+                          Buka pengaturan CoA untuk mengaktifkan atau melengkapi akun standar PSAK terlebih dahulu.
+                        </p>
+                      </div>
+                      <div className="pt-2">
+                        <Link
+                          href="/settings/accounts"
+                          className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700"
+                        >
+                          Buka Pengaturan CoA
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
              )}

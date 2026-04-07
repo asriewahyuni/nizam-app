@@ -40,16 +40,47 @@ import {
 import { useRouter } from 'next/navigation'
 import { createBankAccount, createBankTransaction, createInterOrgCapitalTransfer, deleteBankAccount, deleteBankTransaction } from '@/modules/cash/actions/bank.actions'
 import { processBankCSV } from '@/modules/cash/actions/reconcile.actions'
-import { BankTransaction, BankAccount, Account } from '@/types/database.types'
+import { BankTransaction, BankAccount, Account, CashFlowCategory } from '@/types/database.types'
 import { formatRupiah, formatDate, getDateInTimeZone } from '@/lib/utils'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 
+type CashAccountOption = Account & {
+  cash_flow_category?: CashFlowCategory | null
+}
+
 type CashBankAccount = BankAccount & {
-  account: Account
+  account: CashAccountOption
   balances?: { balance: number }
   org_name?: string | null
   branch_name?: string | null
+}
+
+type TransferCategoryOption = {
+  id: string
+  code: string
+  name: string
+  type: string
+  cash_flow_category?: CashFlowCategory | null
+}
+
+type RecentTransactionOption = BankTransaction & {
+  bank_account: { bank_name?: string | null; account_number?: string | null } | null
+  category: { name?: string | null; code?: string | null } | null
+}
+
+function isFinancingTransferAccount(account: Pick<TransferCategoryOption, 'code' | 'type' | 'cash_flow_category'> | null | undefined) {
+  const code = String(account?.code || '').trim()
+
+  return (
+    (account?.type === 'EQUITY' || account?.type === 'LIABILITY') &&
+    (
+      account?.cash_flow_category === 'FINANCING' ||
+      code.startsWith('25') ||
+      code.startsWith('26') ||
+      code.startsWith('3')
+    )
+  )
 }
 
 interface CashClientProps {
@@ -59,9 +90,10 @@ interface CashClientProps {
   activeBranchName: string | null
   bankAccounts: CashBankAccount[]
   managedBankAccounts?: CashBankAccount[]
-  categoryAccounts: Account[]
-  bankGlAccounts: Account[]
-  recentTransactions: (BankTransaction & { bank_account: any; category: any })[]
+  categoryAccounts: CashAccountOption[]
+  bankGlAccounts: CashAccountOption[]
+  interOrgSourceAccounts?: CashAccountOption[]
+  recentTransactions: RecentTransactionOption[]
   userRole: string
   /** TRUE jika org adalah Parent/Holding dan user bisa kelola rekening langsung */
   canManageDirect: boolean
@@ -78,7 +110,7 @@ interface CashClientProps {
   transferCategoryNodes?: {
     orgId: string
     orgName: string
-    accounts: { id: string; code: string; name: string; type: string }[]
+    accounts: TransferCategoryOption[]
   }[]
 }
 
@@ -101,6 +133,7 @@ export function CashClient({
   managedBankAccounts = [],
   categoryAccounts,
   bankGlAccounts,
+  interOrgSourceAccounts = [],
   recentTransactions,
   userRole,
   canManageDirect,
@@ -151,10 +184,31 @@ export function CashClient({
   const targetOrgTransferAccounts = selectedTransferTarget?.org_id
     ? categoryNodeByOrg.get(selectedTransferTarget.org_id)?.accounts || []
     : []
+  const targetFinancingAccounts = targetOrgTransferAccounts.filter(isFinancingTransferAccount)
   const selectedSourceBankAccount = bankAccounts.find((bankAccount) => bankAccount.id === txBankAccountId) || null
-  const sourceInterOrgCounterAccounts = bankGlAccounts.filter(
+  const sourceInterOrgCounterAccounts = interOrgSourceAccounts.filter(
     (account) => account.id !== selectedSourceBankAccount?.account_id
   )
+  const preferredSourceInterOrgAccount =
+    sourceInterOrgCounterAccounts.find((account) => account.code === '1601')
+    || sourceInterOrgCounterAccounts[0]
+    || null
+  const hasSelectedSourceInterOrgAccount = sourceInterOrgCounterAccounts.some(
+    (account) => account.id === txSourceCounterAccountId
+  )
+  const effectiveSourceCounterAccountId = isInterOrgTransfer
+    ? (hasSelectedSourceInterOrgAccount ? txSourceCounterAccountId : preferredSourceInterOrgAccount?.id || '')
+    : txSourceCounterAccountId
+  const preferredTargetFinancingAccount =
+    targetFinancingAccounts.find((account) => account.code === '3001')
+    || targetFinancingAccounts[0]
+    || null
+  const hasSelectedTargetFinancingAccount = targetFinancingAccounts.some(
+    (account) => account.id === txTargetCounterAccountId
+  )
+  const effectiveTargetCounterAccountId = isInterOrgTransfer
+    ? (hasSelectedTargetFinancingAccount ? txTargetCounterAccountId : preferredTargetFinancingAccount?.id || '')
+    : txTargetCounterAccountId
   const isOwner = userRole === 'owner'
   const canWriteCash = Boolean(activeBranchId)
   const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
@@ -963,7 +1017,7 @@ export function CashClient({
                             </select>
                             <p className="text-[10px] font-bold text-blue-500 ml-1">
                               {isInterOrgTransfer
-                                ? 'Transfer lintas entitas: sistem akan posting OUT di parent dan IN di entitas tujuan.'
+                                ? 'Transfer lintas entitas: pilih rekening child/unit yang sudah diajukan dan aktif. Sistem akan posting OUT investasi di parent dan IN pendanaan di entitas tujuan.'
                                 : 'Target harus rekening kas/bank lain dalam unit aktif yang sama.'}
                             </p>
                           </>
@@ -994,40 +1048,46 @@ export function CashClient({
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div className="space-y-1">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] ml-1">
-                         Akun Lawan Parent (OUT)
+                         Akun Investasi Parent (OUT)
                        </label>
                        <select
                          name="source_counter_account_id"
                          required
-                         value={txSourceCounterAccountId}
+                         value={effectiveSourceCounterAccountId}
                          onChange={(e) => setTxSourceCounterAccountId(e.target.value)}
                          className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all"
                        >
-                         <option value="">Select Child/Branch Cash Account...</option>
+                         <option value="">Select Parent Investment Account...</option>
                          {sourceInterOrgCounterAccounts.map((account) => (
                            <option key={account.id} value={account.id} className="text-white">
                              {account.code} - {account.name}
                            </option>
                          ))}
                        </select>
-                       <p className="text-[10px] font-bold text-blue-500 ml-1">
-                         Gunakan akun kas/bank anak (11xx), bukan akun investasi (12xx).
-                       </p>
+                       {sourceInterOrgCounterAccounts.length > 0 ? (
+                         <p className="text-[10px] font-bold text-blue-500 ml-1">
+                           Gunakan akun investasi parent, idealnya 1601 Investasi pada Entitas Anak / Unit.
+                         </p>
+                       ) : (
+                         <p className="text-[10px] font-bold text-amber-600 ml-1">
+                           Akun investasi parent belum tersedia. Jalankan migrasi terbaru atau sinkronkan CoA terlebih dahulu.
+                         </p>
+                       )}
                      </div>
                      <div className="space-y-1">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] ml-1">
-                         Akun Lawan Entitas Tujuan (IN)
+                         Akun Modal/Pendanaan Entitas Tujuan (IN)
                        </label>
                        <select
                          name="target_counter_account_id"
                          required
-                         value={txTargetCounterAccountId}
+                         value={effectiveTargetCounterAccountId}
                          onChange={(e) => setTxTargetCounterAccountId(e.target.value)}
                          className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all"
                        >
-                         <option value="">Select Target Counterparty...</option>
-                         {['EXPENSE', 'LIABILITY', 'ASSET', 'REVENUE', 'EQUITY'].map(type => {
-                           const group = targetOrgTransferAccounts.filter(a => a.type === type)
+                         <option value="">Select Target Financing Account...</option>
+                         {['EQUITY', 'LIABILITY'].map(type => {
+                           const group = targetFinancingAccounts.filter(a => a.type === type)
                            if (group.length === 0) return null
                            return (
                              <optgroup key={`target-${type}`} className="text-slate-400" label={type}>
@@ -1036,6 +1096,9 @@ export function CashClient({
                            )
                          })}
                        </select>
+                       <p className="text-[10px] font-bold text-blue-500 ml-1">
+                         Gunakan akun pendanaan/modal milik penerima, biasanya 3001 Modal Disetor.
+                       </p>
                      </div>
                    </div>
                  )}
@@ -1047,7 +1110,7 @@ export function CashClient({
                       : txType === 'IN'
                         ? 'Choosing REVENUE will increase equity. Choosing an ASSET account like Accounts Receivable will settle a customer debt.'
                         : isInterOrgTransfer
-                          ? 'Transfer modal antar entitas membuat dua jurnal otomatis: OUT pada parent/sumber dan IN pada entitas tujuan.'
+                          ? 'Transfer modal antar entitas membuat dua jurnal otomatis: parent mencatat arus kas investasi, sedangkan child/unit penerima mencatat arus kas pendanaan pada rekening target yang dipilih.'
                           : 'A transfer credits the source bank account and debits the target bank account in the same unit.'}
                  </div>
 

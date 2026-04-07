@@ -12,6 +12,7 @@ export type Json =
 // ─── Shared Enums ──────────────────────────────────────────────
 export type NormalBalance = 'DEBIT' | 'CREDIT'
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE'
+export type CashFlowCategory = 'OPERATING' | 'INVESTING' | 'FINANCING'
 export type JournalReferenceType = string
 
 // ─── Row Types ─────────────────────────────────────────────────
@@ -19,6 +20,7 @@ export type Account = {
   id: string; org_id: string; code: string; name: string
   type: AccountType; normal_balance: NormalBalance
   parent_id: string | null; description: string | null
+  cash_flow_category?: CashFlowCategory | null
   is_system: boolean; is_active: boolean
   created_at: string; updated_at: string
 }

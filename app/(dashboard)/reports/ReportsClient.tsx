@@ -49,6 +49,7 @@ interface BalanceTreeRow {
   balance: number
   level: number
   hasChildren: boolean
+  isSystemComputed?: boolean
 }
 
 const BALANCE_EPSILON = 0.01
@@ -96,6 +97,7 @@ function buildBalanceTreeRows(accounts: any[] = [], showEmptyAccounts: boolean):
         balance: ownBalance,
         level,
         hasChildren: children.length > 0,
+        isSystemComputed: Boolean(account?.isSystemComputed),
       },
       ...childRows,
     ]
@@ -170,7 +172,14 @@ export default function ReportsClient({
           <span className="w-4 text-slate-300 text-xs">{row.level > 0 ? '-' : ''}</span>
           <span className="w-4 text-slate-400">{row.hasChildren ? <ChevronDown size={12} /> : ''}</span>
           <span className="text-[10px] font-mono text-slate-400 mr-2">{row.code}</span>
-          <span className={`truncate ${row.hasChildren ? 'text-slate-700 font-bold' : 'text-slate-600 font-medium'}`}>{row.name}</span>
+          <div className="min-w-0 flex items-center gap-2">
+            <span className={`truncate ${row.hasChildren ? 'text-slate-700 font-bold' : 'text-slate-600 font-medium'}`}>{row.name}</span>
+            {row.isSystemComputed && (
+              <span className="shrink-0 rounded-full bg-amber-50 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-amber-700 border border-amber-100">
+                Otomatis
+              </span>
+            )}
+          </div>
         </div>
         <span className="text-slate-900 font-bold shrink-0">{formatRupiah(row.balance)}</span>
       </div>
@@ -552,6 +561,9 @@ export default function ReportsClient({
                     {/* Equity */}
                     <div className="space-y-2">
                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Modal</p>
+                       <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+                         Akun <span className="font-mono font-black">3002</span> menampung laba/rugi periode lampau atau periode yang sudah ditutup, sedangkan <span className="font-mono font-black">3003</span> menampung laba/rugi periode berjalan. Beban utilitas tetap dicatat di laba rugi, lalu dampaknya mengurangi laba periode berjalan di neraca.
+                       </p>
                        {renderBalanceRows(equityTreeRows)}
                     </div>
                     

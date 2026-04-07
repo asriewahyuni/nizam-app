@@ -10,6 +10,8 @@ export type OperatorAddonOption = {
   anchorPrice?: number
   billing: string
   description: string
+  capacityNote?: string
+  selfServiceEnabled?: boolean
 }
 
 export const OPERATOR_ADDON_OPTIONS: OperatorAddonOption[] = [
@@ -61,6 +63,44 @@ export const OPERATOR_ADDON_OPTIONS: OperatorAddonOption[] = [
     billing: 'Single Bill',
     description: 'Add-on single bill untuk penerbitan tagihan cepat (Quick Bill).',
   },
+  {
+    id: 'addon_fleet_maintenance',
+    name: 'Fleet Maintenance Pack',
+    price: 249000,
+    anchorPrice: 349000,
+    billing: 'Bulan',
+    description: 'Bundel pencatatan oil record, tire record, odometer, dan reminder servis armada.',
+    selfServiceEnabled: false,
+  },
+  {
+    id: 'addon_package_tracking',
+    name: 'Package Tracking',
+    price: 199000,
+    anchorPrice: 299000,
+    billing: 'Bulan',
+    description: 'Pelacakan paket ekspedisi dengan status perjalanan dan histori pengiriman.',
+    selfServiceEnabled: false,
+  },
+  {
+    id: 'addon_sales_ar_cockpit',
+    name: 'Sales AR Cockpit',
+    price: 149000,
+    anchorPrice: 249000,
+    billing: 'Bulan',
+    description: 'Dashboard piutang per salesman untuk follow up jatuh tempo, aging, dan collection.',
+    capacityNote: 'Include 3 orang salesman',
+    selfServiceEnabled: false,
+  },
+  {
+    id: 'addon_sales_ar_seat_pack',
+    name: 'Sales AR Seat Pack',
+    price: 99000,
+    anchorPrice: 149000,
+    billing: 'Bulan',
+    description: 'Tambahan seat untuk dashboard piutang salesman dan monitoring collection tim penjualan.',
+    capacityNote: 'Tambah 3 orang salesman',
+    selfServiceEnabled: false,
+  },
 ]
 
 export const EXTRA_ENTITY_UNIT_PRICE = 249000
@@ -68,4 +108,8 @@ export const EXTRA_BRANCH_UNIT_PRICE = 149000
 
 export function getOperatorAddonById(id: string) {
   return OPERATOR_ADDON_OPTIONS.find((addon) => addon.id === id)
+}
+
+export function isAddonSelfServiceEnabled(addon: Pick<OperatorAddonOption, 'selfServiceEnabled'>) {
+  return addon.selfServiceEnabled !== false
 }

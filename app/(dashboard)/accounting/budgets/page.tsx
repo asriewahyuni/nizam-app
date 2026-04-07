@@ -1,6 +1,6 @@
 import { canSelectAllBranches, getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
-import { getBudgets, getBudgetVsActual } from '@/modules/accounting/actions/budget.actions'
+import { getBudgets, getBudgetPeriodStatus, getBudgetVsActual } from '@/modules/accounting/actions/budget.actions'
 import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
 import { BudgetClient } from '@/app/(dashboard)/accounting/budgets/BudgetClient'
 
@@ -20,11 +20,12 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
   monthEnd.setDate(0)
   const currentPeriodEnd = monthEnd.toISOString().split('T')[0]
   
-  const [budgets, bva, accounts, allowAllBranchSelection] = await Promise.all([
+  const [budgets, bva, accounts, allowAllBranchSelection, periodStatus] = await Promise.all([
     getBudgets(orgData.org.id, currentPeriod, activeBranch?.id),
     getBudgetVsActual(orgData.org.id, currentPeriod, currentPeriodEnd, activeBranch?.id),
     getChartOfAccounts(orgData.org.id),
     canSelectAllBranches(orgData.org.id),
+    getBudgetPeriodStatus(orgData.org.id, currentPeriod),
   ])
 
   return (
@@ -38,6 +39,7 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
         reportData={bva}
         accounts={accounts}
         currentPeriod={currentPeriod}
+        periodStatus={periodStatus}
       />
     </div>
   )

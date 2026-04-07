@@ -22,7 +22,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const [balanceSheet, profitLoss, cashFlow] = await Promise.all([
     getBalanceSheet(orgData.org.id, endDate, reportBranchId, isConsolidated),
     getProfitLoss(orgData.org.id, startDate, endDate, reportBranchId, isConsolidated),
-    getCashFlow(orgData.org.id, reportBranchId, isConsolidated)
+    getCashFlow(orgData.org.id, reportBranchId, isConsolidated, { startDate, endDate })
   ])
 
   return (

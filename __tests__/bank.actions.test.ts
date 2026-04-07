@@ -219,8 +219,37 @@ describe('Cash & Bank Branch Context', () => {
       data: [{ source_transaction_id: 'tx-out-1', target_transaction_id: 'tx-in-1' }],
       error: null,
     })
+    const accountQuery = {
+      select: vi.fn(() => accountQuery),
+      eq: vi.fn(() => accountQuery),
+      maybeSingle: vi.fn()
+        .mockResolvedValueOnce({
+          data: {
+            id: 'acc-source-counter',
+            code: '1601',
+            name: 'Investasi pada Entitas Anak / Unit',
+            type: 'ASSET',
+            cash_flow_category: 'INVESTING',
+          },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: {
+            id: 'acc-target-counter',
+            code: '3001',
+            name: 'Modal Disetor',
+            type: 'EQUITY',
+            cash_flow_category: 'FINANCING',
+          },
+          error: null,
+        }),
+    }
 
     mocks.createClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table !== 'accounts') throw new Error(`Unexpected table ${table}`)
+        return accountQuery
+      }),
       rpc: rpcMock,
     })
 
@@ -250,5 +279,100 @@ describe('Cash & Bank Branch Context', () => {
       success: true,
       data: [{ source_transaction_id: 'tx-out-1', target_transaction_id: 'tx-in-1' }],
     })
+  })
+
+  it('rejects inter-org capital transfer when source account is not an investing account', async () => {
+    const rpcMock = vi.fn()
+    const accountQuery = {
+      select: vi.fn(() => accountQuery),
+      eq: vi.fn(() => accountQuery),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: {
+          id: 'acc-source-counter',
+          code: '1103',
+          name: 'Bank - Rekening Operasional',
+          type: 'ASSET',
+          cash_flow_category: null,
+        },
+        error: null,
+      }),
+    }
+
+    mocks.createClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table !== 'accounts') throw new Error(`Unexpected table ${table}`)
+        return accountQuery
+      }),
+      rpc: rpcMock,
+    })
+
+    const formData = new FormData()
+    formData.set('bank_account_id', 'bank-source')
+    formData.set('target_bank_account_id', 'bank-target')
+    formData.set('source_counter_account_id', 'acc-source-counter')
+    formData.set('target_counter_account_id', 'acc-target-counter')
+    formData.set('transaction_date', '2026-04-06')
+    formData.set('description', 'Transfer modal ke anak usaha')
+    formData.set('amount', '2500000')
+
+    const result = await createInterOrgCapitalTransfer('org-parent', formData)
+
+    expect(result).toEqual({
+      error: 'Akun lawan parent harus akun investasi (kelompok 16xx), misalnya 1601 Investasi pada Entitas Anak / Unit.',
+    })
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects inter-org capital transfer when target account is not a financing account', async () => {
+    const rpcMock = vi.fn()
+    const accountQuery = {
+      select: vi.fn(() => accountQuery),
+      eq: vi.fn(() => accountQuery),
+      maybeSingle: vi.fn()
+        .mockResolvedValueOnce({
+          data: {
+            id: 'acc-source-counter',
+            code: '1601',
+            name: 'Investasi pada Entitas Anak / Unit',
+            type: 'ASSET',
+            cash_flow_category: 'INVESTING',
+          },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: {
+            id: 'acc-target-counter',
+            code: '2101',
+            name: 'Hutang Usaha',
+            type: 'LIABILITY',
+            cash_flow_category: 'OPERATING',
+          },
+          error: null,
+        }),
+    }
+
+    mocks.createClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table !== 'accounts') throw new Error(`Unexpected table ${table}`)
+        return accountQuery
+      }),
+      rpc: rpcMock,
+    })
+
+    const formData = new FormData()
+    formData.set('bank_account_id', 'bank-source')
+    formData.set('target_bank_account_id', 'bank-target')
+    formData.set('source_counter_account_id', 'acc-source-counter')
+    formData.set('target_counter_account_id', 'acc-target-counter')
+    formData.set('transaction_date', '2026-04-06')
+    formData.set('description', 'Transfer modal ke anak usaha')
+    formData.set('amount', '2500000')
+
+    const result = await createInterOrgCapitalTransfer('org-parent', formData)
+
+    expect(result).toEqual({
+      error: 'Akun lawan entitas tujuan harus akun pendanaan/modal (kelompok 25xx, 26xx, atau 3xxx), misalnya 3001 Modal Disetor.',
+    })
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 })

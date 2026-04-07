@@ -14,7 +14,13 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { getDateInTimeZone, generateSlug } from '@/lib/utils'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
-import { analyzeBscKpiCoverage, buildOperationalMetricCatalog } from '@/modules/accounting/lib/bsc-kpi-mapping'
+import {
+  analyzeBscKpiCoverage,
+  buildOperationalMetricCatalog,
+  getPerspectiveSuggestions,
+  type BSCOperationalMetric,
+  type BSCOperationalMetricKey,
+} from '@/modules/accounting/lib/bsc-kpi-mapping'
 
 export type BSCPerspective = 'FINANCIAL' | 'CUSTOMER' | 'INTERNAL_PROCESS' | 'LEARNING_GROWTH'
 export type BSCDirection = 'HIGHER_BETTER' | 'LOWER_BETTER'
@@ -129,6 +135,15 @@ const PERSPECTIVE_CODE_MAP: Record<BSCPerspective, string> = {
   INTERNAL_PROCESS: 'INT',
   LEARNING_GROWTH: 'LRN',
 }
+
+const LOWER_IS_BETTER_METRIC_KEYS = new Set<BSCOperationalMetricKey>([
+  'financial.operating_expense_ratio',
+  'financial.current_expenses',
+  'internal.draft_document_backlog',
+  'internal.pending_purchases',
+  'internal.pending_sales',
+  'internal.overdue_depreciation',
+])
 
 const DEFAULT_KPI_4X4_TEMPLATE: Array<{
   perspective: BSCPerspective
@@ -259,6 +274,136 @@ function buildDefaultTemplateRows(cycleId: string, userId: string | null) {
       created_by: userId,
     }
   })
+}
+
+function normalizeKpiText(value: string | null | undefined) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function normalizeFormulaKey(value: string | null | undefined) {
+  return normalizeKpiText(value).replace(/\s+/g, '_')
+}
+
+function distributeExactWeights(count: number) {
+  if (count <= 0) return []
+  const baseWeight = Math.floor(10000 / count) / 100
+  const weights = Array.from({ length: count }, () => baseWeight)
+  const allocatedWeight = round2(baseWeight * count)
+  weights[count - 1] = round2(weights[count - 1] + (100 - allocatedWeight))
+  return weights
+}
+
+function inferGeneratedKpiDirection(metricKey: BSCOperationalMetricKey): BSCDirection {
+  return LOWER_IS_BETTER_METRIC_KEYS.has(metricKey) ? 'LOWER_BETTER' : 'HIGHER_BETTER'
+}
+
+function inferGeneratedKpiTarget(metric: BSCOperationalMetric, direction: BSCDirection) {
+  const currentValue = round2(Math.abs(toFiniteNumber(metric.value)))
+
+  if (metric.key === 'learning.active_employees' || metric.key === 'learning.payroll_runs_completed') {
+    return round2(Math.max(1, currentValue))
+  }
+
+  if (direction === 'LOWER_BETTER') {
+    if (metric.unit === '%') return round2(clamp(currentValue > 0 ? currentValue * 0.9 : 10, 1, 100))
+    if (metric.unit === 'IDR') return round2(Math.max(1, currentValue > 0 ? currentValue * 0.95 : 1000000))
+    if (metric.unit === 'docs' || metric.unit === 'assets') return round2(Math.max(1, currentValue > 0 ? Math.floor(currentValue * 0.85) : 1))
+    return round2(Math.max(1, currentValue > 0 ? currentValue * 0.9 : 1))
+  }
+
+  if (metric.unit === '%') return round2(clamp(currentValue > 0 ? currentValue * 1.1 : 80, 1, 100))
+  if (metric.unit === 'IDR') return round2(Math.max(1, currentValue > 0 ? currentValue * 1.1 : 1000000))
+  if (['orders', 'customers', 'employees', 'runs', 'assets'].includes(metric.unit)) {
+    return round2(Math.max(1, currentValue + Math.max(1, Math.ceil(currentValue * 0.1))))
+  }
+  return round2(Math.max(1, currentValue > 0 ? currentValue * 1.1 : 1))
+}
+
+function buildGeneratedKpiRows(
+  cycleId: string,
+  userId: string | null,
+  activeKpis: Array<{ id: string; perspective: BSCPerspective; name: string; formula_key: string | null }>,
+  catalog: Record<BSCOperationalMetricKey, BSCOperationalMetric>
+) {
+  const activeCoverage = analyzeBscKpiCoverage(activeKpis, catalog)
+  const coveredMetricKeys = new Set(activeCoverage.measurable.map((item) => item.metric.key))
+  const existingFormulaKeys = new Set(
+    activeKpis
+      .map((kpi) => normalizeFormulaKey(kpi.formula_key))
+      .filter(Boolean)
+  )
+  const existingNames = new Set(
+    activeKpis
+      .map((kpi) => normalizeKpiText(kpi.name))
+      .filter(Boolean)
+  )
+
+  const generated: Array<{
+    cycle_id: string
+    perspective: BSCPerspective
+    code: string
+    name: string
+    description: string
+    unit: string
+    direction: BSCDirection
+    weight_percent: number
+    target_value: number
+    baseline_value: number
+    source_type: 'AUTO'
+    formula_key: string
+    is_active: true
+    created_by: string | null
+    metric_key: BSCOperationalMetricKey
+  }> = []
+
+  let totalSuggested = 0
+
+  for (const perspective of PERSPECTIVES) {
+    const availableSuggestions = getPerspectiveSuggestions(perspective, catalog, 3)
+    totalSuggested += availableSuggestions.length
+
+    const filteredSuggestions = availableSuggestions.filter((metric) => {
+      const formulaKey = metric.key.split('.').slice(1).join('_')
+      return !coveredMetricKeys.has(metric.key)
+        && !existingFormulaKeys.has(normalizeFormulaKey(formulaKey))
+        && !existingNames.has(normalizeKpiText(metric.label))
+    })
+
+    const weights = distributeExactWeights(filteredSuggestions.length)
+
+    filteredSuggestions.forEach((metric, index) => {
+      const formulaKey = metric.key.split('.').slice(1).join('_')
+      const direction = inferGeneratedKpiDirection(metric.key)
+      const code = `${PERSPECTIVE_CODE_MAP[perspective]}_${formulaKey.toUpperCase().slice(0, 24)}`
+
+      generated.push({
+        cycle_id: cycleId,
+        perspective,
+        code,
+        name: metric.label,
+        description: `Dibuat otomatis dari data operasional: ${metric.label}.`,
+        unit: metric.unit,
+        direction,
+        weight_percent: weights[index] || 0,
+        target_value: inferGeneratedKpiTarget(metric, direction),
+        baseline_value: round2(metric.value),
+        source_type: 'AUTO',
+        formula_key: formulaKey,
+        is_active: true,
+        created_by: userId,
+        metric_key: metric.key,
+      })
+    })
+  }
+
+  return {
+    generated,
+    totalSuggested,
+    skippedCount: totalSuggested - generated.length,
+  }
 }
 
 function ensureWeightMap(rows: any[] | null | undefined): BSCWeightMap {
@@ -912,24 +1057,7 @@ export async function getBSCSetup(orgId: string, branchId?: string | null): Prom
     )
   }
 
-  let activeKpiRows = (kpiRows || []) as any[]
-  if (activeKpiRows.length === 0) {
-    const userId = (await supabase.auth.getUser())?.data?.user?.id || null
-    const { error: seedError } = await db
-      .from('bsc_kpis')
-      .insert(buildDefaultTemplateRows(cycle.id, userId))
-
-    if (!seedError) {
-      const { data: refetchedRows } = await db
-        .from('bsc_kpis')
-        .select('*')
-        .eq('cycle_id', cycle.id)
-        .eq('is_active', true)
-        .order('perspective', { ascending: true })
-        .order('created_at', { ascending: true })
-      activeKpiRows = (refetchedRows || []) as any[]
-    }
-  }
+  const activeKpiRows = (kpiRows || []) as any[]
 
   const kpiIds = activeKpiRows.map((kpi) => String(kpi.id))
 
@@ -1227,6 +1355,99 @@ export async function seedDefaultBSCKpis(orgId: string, branchId?: string | null
   return { success: true, inserted: rows.length }
 }
 
+export async function generateBSCKpisFromExistingData(orgId: string, branchId?: string | null) {
+  const ensured = await ensureActiveCycle(orgId, branchId)
+  if ('error' in ensured) return { error: ensured.error }
+
+  const supabase = await createClient()
+  const db = supabase as any
+
+  const [{ data: activeKpis, error: kpiError }, metrics] = await Promise.all([
+    db
+      .from('bsc_kpis')
+      .select('id, perspective, name, formula_key')
+      .eq('cycle_id', ensured.cycle.id)
+      .eq('is_active', true),
+    getBSCMetrics(orgId, ensured.branchId),
+  ])
+
+  if (kpiError) {
+    return { error: kpiError.message || 'Gagal memuat KPI aktif untuk generator otomatis.' }
+  }
+
+  const normalizedKpis = (activeKpis || [])
+    .map((row: any) => {
+      const perspectiveRaw = String(row.perspective || '')
+      if (!isPerspective(perspectiveRaw)) return null
+      return {
+        id: String(row.id),
+        perspective: perspectiveRaw,
+        name: String(row.name || ''),
+        formula_key: row.formula_key ? String(row.formula_key) : null,
+      }
+    })
+    .filter(Boolean) as Array<{ id: string; perspective: BSCPerspective; name: string; formula_key: string | null }>
+
+  const metricCatalog = buildOperationalMetricCatalog(metrics)
+  const userId = typeof supabase.auth?.getUser === 'function'
+    ? (await supabase.auth.getUser())?.data?.user?.id || null
+    : null
+  const generation = buildGeneratedKpiRows(ensured.cycle.id, userId, normalizedKpis, metricCatalog)
+
+  if (generation.generated.length > 0) {
+    const rowsToInsert = generation.generated.map((item) => {
+      const row = { ...item }
+      delete (row as { metric_key?: BSCOperationalMetricKey }).metric_key
+      return row
+    })
+    const { error: insertError } = await db
+      .from('bsc_kpis')
+      .insert(rowsToInsert)
+
+    if (insertError) {
+      return { error: insertError.message || 'Gagal membuat KPI otomatis dari data existing.' }
+    }
+  }
+
+  const syncResult = await syncBSCKpisFromExistingData(orgId, branchId)
+  if (syncResult.error && generation.generated.length === 0) {
+    return { error: syncResult.error }
+  }
+
+  if (syncResult.error) {
+    return {
+      success: true,
+      inserted_count: generation.generated.length,
+      skipped_count: generation.skippedCount,
+      synced_count: 0,
+      warning: syncResult.error,
+      generated: generation.generated.map((item) => ({
+        name: item.name,
+        perspective: item.perspective,
+        metric_key: item.metric_key,
+        target_value: item.target_value,
+        unit: item.unit,
+      })),
+    }
+  }
+
+  revalidatePath('/reports/bsc')
+
+  return {
+    success: true,
+    inserted_count: generation.generated.length,
+    skipped_count: generation.skippedCount,
+    synced_count: syncResult.synced_count || 0,
+    generated: generation.generated.map((item) => ({
+      name: item.name,
+      perspective: item.perspective,
+      metric_key: item.metric_key,
+      target_value: item.target_value,
+      unit: item.unit,
+    })),
+  }
+}
+
 export async function applyBscKpiSuggestedIndicator(
   orgId: string,
   input: { kpiId: string; metricKey: string },
@@ -1327,7 +1548,9 @@ export async function syncBSCKpisFromExistingData(orgId: string, branchId?: stri
     }
   }
 
-  const userId = (await supabase.auth.getUser())?.data?.user?.id || null
+  const userId = typeof supabase.auth?.getUser === 'function'
+    ? (await supabase.auth.getUser())?.data?.user?.id || null
+    : null
   const measurementDate = getDateInTimeZone('Asia/Jakarta')
   const metadataUpdateTime = new Date().toISOString()
 
