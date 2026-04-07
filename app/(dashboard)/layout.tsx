@@ -2,17 +2,18 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { unstable_noStore as noStore } from 'next/cache'
 import { getAdminImpersonationState, getSession } from '@/modules/auth/actions/auth.actions'
-import { getActiveBranch, getActiveOrg, getBranches, getMyOrganizations } from '@/modules/organization/actions/org.actions'
+import { getActiveBranch, getActiveOrg, getBranches, getBranchesByOrganizations, getMyOrganizations } from '@/modules/organization/actions/org.actions'
 import { getPendingApprovalsCount } from '@/modules/organization/actions/approval.actions'
 import { getUnpostedJournalsCount } from '@/modules/accounting/actions/journal.actions'
 import { getPendingPurchaseRequestsCount } from '@/modules/purchasing/actions/purchasing.actions'
 import { getResetRequestsCount } from '@/modules/organization/actions/hris.actions'
-import { getCashFlow } from '@/modules/accounting/actions/reports.actions'
+import { getCashFlow, getDeckCashSummaries } from '@/modules/accounting/actions/reports.actions'
 import { canAccessAllBranchesForOrg } from '@/modules/organization/lib/branch-access.server'
 import { isDemoSession } from '@/modules/demo/actions/demo.actions'
 import { getAiTokenHeaderSummary } from '@/modules/ai/lib/ai-token.server'
 import { saasModuleMatches } from '@/lib/saas/module-catalog'
 import { getPendingCoaRequestCount } from '@/modules/accounting/actions/coa-request.actions'
+import { getBSCDeckSummaries } from '@/modules/accounting/actions/bsc.actions'
 import { AppSidebar } from '@/components/shared/AppSidebar'
 import { AppHeader } from '@/components/shared/AppHeader'
 import { AdminImpersonationBanner } from '@/components/shared/AdminImpersonationBanner'
@@ -83,6 +84,16 @@ export default async function DashboardLayout({
   const isDemo = resolveDashboardDependency('demo session state', dependencyResults[7], false)
   const aiTokens = resolveDashboardDependency('AI token summary', dependencyResults[8], null)
   const pendingCoaRequests = resolveDashboardDependency('pending coa requests', dependencyResults[9], 0)
+  const orgBscSummaries = await getBSCDeckSummaries(
+    organizations.map((membership) => membership.orgId)
+  )
+  const orgBranchesByOrgId = await getBranchesByOrganizations(
+    organizations.map((membership) => membership.orgId)
+  )
+  const deckCashSummaries = await getDeckCashSummaries(
+    organizations.map((membership) => membership.orgId),
+    orgBranchesByOrgId
+  )
   const effectivePlanName = isDemo ? 'Demo' : (orgData.org.settings?.plan || 'Trial')
 
   // ─────────────────────────────────────────────────────────────
@@ -204,6 +215,10 @@ export default async function DashboardLayout({
           pendingApprovals={pendingApprovals}
           cashFlow={cashFlow}
           aiTokens={aiTokens}
+          orgBscSummaries={orgBscSummaries}
+          orgBranchesByOrgId={orgBranchesByOrgId}
+          orgCashSummaries={deckCashSummaries.orgSummaries}
+          branchCashSummaries={deckCashSummaries.branchSummaries}
         />
         <StartupWizard isDemo={isDemo} />
         <MobilePullToRefresh scrollContainerId="dashboard-scroll-root" />

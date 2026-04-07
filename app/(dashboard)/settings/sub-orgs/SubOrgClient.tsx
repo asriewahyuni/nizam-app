@@ -2,12 +2,14 @@
 
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Layers, Building, Calendar, Activity, Link as LinkIcon, UserCircle, Pencil, Trash2, CheckCircle2, Loader2 } from 'lucide-react'
+import { Layers, Building, Calendar, Activity, Link as LinkIcon, UserCircle, Pencil, Trash2, CheckCircle2, Loader2, Plus, ArrowRight } from 'lucide-react'
 import {
   linkSubOrganization,
   assignSubOrgManager,
   updateChildOrganization,
   deleteChildOrganization,
+  createOrganizationQuick,
+  setActiveOrg,
 } from '@/modules/organization/actions/org.actions'
 import { formatDate } from '@/lib/utils'
 
@@ -34,7 +36,10 @@ export default function SubOrgClient({
   limits,
 }: Props) {
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [createLoading, setCreateLoading] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
   const [editingChild, setEditingChild] = useState<{ id: string; name: string } | null>(null)
   const [editLoading, setEditLoading] = useState(false)
   const [deletingChildId, setDeletingChildId] = useState<string | null>(null)
@@ -57,6 +62,32 @@ export default function SubOrgClient({
       else window.location.reload()
     }
     setLoading(false)
+  }
+
+  const handleCreateChildOrg = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setCreateLoading(true)
+    setCreateError(null)
+
+    const fd = new FormData(e.currentTarget)
+    fd.set('parent_org_id', orgId)
+
+    const res = await createOrganizationQuick(fd) as any
+    if (res?.error) {
+      setCreateError(res.error)
+      setCreateLoading(false)
+      return
+    }
+
+    const restoreParentContext = await setActiveOrg(orgId) as any
+    if (restoreParentContext?.error) {
+      setCreateError(restoreParentContext.error)
+      setCreateLoading(false)
+      return
+    }
+
+    setIsCreateModalOpen(false)
+    window.location.reload()
   }
 
   const handleAssignPIC = async (childId: string, empId: string) => {
@@ -134,12 +165,27 @@ export default function SubOrgClient({
                Pemakaian Kuota: <span className="text-slate-800">{limits.currentChildOrgs}</span> / {limits.maxChildOrgs === null ? '∞' : limits.maxChildOrgs} Entitas
              </div>
            )}
-           <div className="flex items-center gap-3 w-full md:w-auto">
-             {unlinkedOrgs.length > 0 && (
+           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+             {canMutate && (
+               <button
+                 type="button"
+                 onClick={() => {
+                   setCreateError(null)
+                   setIsCreateModalOpen(true)
+                 }}
+                 disabled={limits?.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs}
+                 title={limits?.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs ? 'Batas entitas tercapai.' : ''}
+                 className="px-6 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 flex-1 shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+               >
+                 <Plus size={16} /> Tambah Anak Perusahaan
+               </button>
+             )}
+             {canMutate && unlinkedOrgs.length > 0 && (
                <button 
+                 type="button"
                  onClick={() => setIsLinkModalOpen(true)}
-                 disabled={limits?.maxChildOrgs !== null && limits!.currentChildOrgs >= limits!.maxChildOrgs}
-                 title={limits?.maxChildOrgs !== null && limits!.currentChildOrgs >= limits!.maxChildOrgs ? 'Batas entitas tercapai.' : ''}
+                 disabled={limits?.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs}
+                 title={limits?.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs ? 'Batas entitas tercapai.' : ''}
                  className="px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-2 flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
                >
                  <LinkIcon size={16} /> Tautkan Entitas
@@ -269,13 +315,122 @@ export default function SubOrgClient({
           )
         })}
         {childOrgs.length === 0 && (
-          <div className="col-span-1 md:col-span-2 py-20 text-center border-2 border-dashed border-slate-200 rounded-[32px] bg-slate-50 flex flex-col items-center justify-center space-y-4">
-            <Layers size={48} className="text-slate-300" />
-            <h3 className="text-lg font-black text-slate-700">Belum Ada Anak Perusahaan</h3>
-            <p className="text-sm text-slate-500">Klik tombol di atas untuk menautkan afiliasi.</p>
+          <div className="col-span-1 md:col-span-2 border-2 border-dashed border-slate-200 rounded-[32px] bg-slate-50 p-8 md:p-12">
+            <div className="flex flex-col items-center justify-center text-center space-y-4">
+              <Layers size={48} className="text-slate-300" />
+              <h3 className="text-lg font-black text-slate-700">Belum Ada Anak Perusahaan</h3>
+              <p className="max-w-xl text-sm text-slate-500">
+                Mulai dari membuat entitas anak baru langsung dari halaman ini, atau tautkan organisasi mandiri yang sudah Anda miliki.
+              </p>
+            </div>
+
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setCreateError(null)
+                  setIsCreateModalOpen(true)
+                }}
+                disabled={!canMutate || (limits?.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs)}
+                className="rounded-[28px] border border-blue-200 bg-white p-6 text-left transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
+                      <Plus size={20} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-black text-slate-900">Tambah Anak Perusahaan</div>
+                      <div className="mt-1 text-xs font-medium text-slate-500">Buat entitas baru langsung di bawah holding ini.</div>
+                    </div>
+                  </div>
+                  <ArrowRight size={16} className="text-blue-500" />
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsLinkModalOpen(true)}
+                disabled={!canMutate || unlinkedOrgs.length === 0 || (limits?.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs)}
+                className="rounded-[28px] border border-slate-200 bg-white p-6 text-left transition hover:border-slate-300 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                      <LinkIcon size={20} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-black text-slate-900">Tautkan Entitas Yang Sudah Ada</div>
+                      <div className="mt-1 text-xs font-medium text-slate-500">
+                        {unlinkedOrgs.length > 0
+                          ? `${unlinkedOrgs.length} organisasi siap ditautkan ke holding ini.`
+                          : 'Belum ada organisasi mandiri milik Anda yang siap ditautkan.'}
+                      </div>
+                    </div>
+                  </div>
+                  <ArrowRight size={16} className="text-slate-400" />
+                </div>
+              </button>
+            </div>
+
+            {!canMutate && (
+              <p className="mt-6 text-center text-xs font-semibold text-slate-400">
+                Hanya Owner yang dapat menambah atau menautkan anak perusahaan.
+              </p>
+            )}
           </div>
         )}
       </div>
+
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            onClick={() => !createLoading && setIsCreateModalOpen(false)}
+          />
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl p-10">
+            <h3 className="text-2xl font-black text-slate-900 mb-2">Tambah Anak Perusahaan</h3>
+            <p className="text-sm text-slate-500 mb-8">
+              Buat organisasi anak baru yang langsung terhubung ke holding ini. Unit utama dan struktur dasarnya akan disiapkan otomatis.
+            </p>
+
+            <form onSubmit={handleCreateChildOrg} className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Nama Anak Perusahaan</label>
+                <input
+                  required
+                  name="name"
+                  placeholder="Misal: PT Anak Sukses Abadi"
+                  className="w-full px-5 py-4 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold"
+                />
+              </div>
+
+              {createError && (
+                <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                  {createError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={createLoading}
+                  className="px-8 py-3 rounded-2xl bg-blue-600 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all disabled:opacity-50"
+                >
+                  {createLoading ? 'Membuat...' : 'Buat Anak Perusahaan'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
 
       {isLinkModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">

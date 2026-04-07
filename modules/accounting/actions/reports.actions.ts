@@ -1,8 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { unstable_noStore as noStore } from 'next/cache'
 import { addDaysToDateString, getDateInTimeZone } from '@/lib/utils'
+import type { BranchSummary } from '@/modules/organization/lib/org-context'
 
 type BranchFilter = string | null | undefined
+
+export type DeckCashSummary = {
+  cash: number
+  ocf: number
+  icf: number
+  fcf: number
+}
 
 async function resolveOrgIdsForReport(db: any, orgId: string, consolidated: boolean = false) {
   if (!consolidated) return [orgId]
@@ -93,6 +101,52 @@ async function getAccountBalancesFromEntries(
   })
 
   return Object.values(accountMap)
+}
+
+async function getCashAccountCodes(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgIdsToSearch: string[],
+  branchId?: BranchFilter,
+  consolidated: boolean = false
+) {
+  let linkedAccountsQuery = (supabase as any)
+    .from('bank_accounts')
+    .select('account_id, accounts(code)')
+    .in('org_id', orgIdsToSearch)
+
+  if (branchId && !consolidated) {
+    linkedAccountsQuery = linkedAccountsQuery.eq('branch_id', branchId)
+  }
+
+  const { data: linkedAccounts } = await linkedAccountsQuery
+  const cashAccountCodes = (linkedAccounts || [])
+    .map((la: any) => la.accounts?.code)
+    .filter(Boolean)
+
+  if (cashAccountCodes.length === 0) {
+    cashAccountCodes.push('1101', '1102', '1103', '1104', '1105')
+  }
+
+  return Array.from(new Set(cashAccountCodes))
+}
+
+async function getCashBalance(
+  db: any,
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string,
+  branchId?: BranchFilter,
+  consolidated: boolean = false
+) {
+  const orgIdsToSearch = await resolveOrgIdsForReport(db, orgId, consolidated)
+  const cashAccountCodes = await getCashAccountCodes(supabase, orgIdsToSearch, branchId, consolidated)
+  const entryIds = await getPostedEntryIds(db, orgId, { branchId, consolidated })
+  const balances = await getAccountBalancesFromEntries(db, entryIds, cashAccountCodes)
+
+  return balances.reduce((sum: number, account: any) => {
+    const totalDebit = Number(account?.total_debit || 0)
+    const totalCredit = Number(account?.total_credit || 0)
+    return sum + (totalDebit - totalCredit)
+  }, 0)
 }
 
 export async function getGeneralLedger(orgId: string, branchId?: BranchFilter, consolidated: boolean = false) {
@@ -244,25 +298,7 @@ export async function getCashFlow(orgId: string, branchId?: BranchFilter, consol
   const lastMonthEnd = addDaysToDateString(currentMonthStart, -1)
   const lastMonthStart = `${lastMonthEnd.slice(0, 7)}-01`
 
-  // Get all accounts linked to bank/cash module to treat them as cash accounts
-  let linkedAccountsQuery = (supabase as any)
-    .from('bank_accounts')
-    .select('account_id, accounts(code)')
-    .in('org_id', orgIdsToSearch)
-
-  if (branchId && !consolidated) {
-    linkedAccountsQuery = linkedAccountsQuery.eq('branch_id', branchId)
-  }
-
-  const { data: linkedAccounts } = await linkedAccountsQuery
-  const cashAccountCodes = (linkedAccounts || [])
-    .map((la: any) => la.accounts?.code)
-    .filter(Boolean)
-  
-  // Add defaults if still empty (fallback)
-  if (cashAccountCodes.length === 0) {
-    cashAccountCodes.push('1101', '1102', '1103', '1104', '1105')
-  }
+  const cashAccountCodes = await getCashAccountCodes(supabase, orgIdsToSearch, branchId, consolidated)
 
   const allEntryIds = await getPostedEntryIds(db, orgId, { branchId, consolidated })
   const accounts = await getAccountBalancesFromEntries(db, allEntryIds)
@@ -345,5 +381,60 @@ export async function getCashFlow(orgId: string, branchId?: BranchFilter, consol
     ocfItems, icfItems, fcfItems,
     netChangeTrend: (currentChangeTotal >= lastChangeTotal ? 'UP' : 'DOWN') as 'UP' | 'DOWN',
     changePercent
+  }
+}
+
+export async function getDeckCashSummaries(
+  orgIds: string[],
+  branchesByOrgId: Record<string, BranchSummary[]>
+): Promise<{
+  orgSummaries: Record<string, DeckCashSummary>
+  branchSummaries: Record<string, DeckCashSummary>
+}> {
+  const normalizedOrgIds = Array.from(new Set(orgIds.map((orgId) => String(orgId || '').trim()).filter(Boolean)))
+  if (normalizedOrgIds.length === 0) {
+    return { orgSummaries: {}, branchSummaries: {} }
+  }
+
+  const supabase = await createClient()
+  const db = supabase as any
+
+  const orgEntries = await Promise.all(
+    normalizedOrgIds.map(async (orgId) => {
+      const [cashFlow, cash] = await Promise.all([
+        getCashFlow(orgId, null, false),
+        getCashBalance(db, supabase, orgId, null, false),
+      ])
+
+      return [orgId, {
+        cash,
+        ocf: Number(cashFlow?.ocf || 0),
+        icf: Number(cashFlow?.icf || 0),
+        fcf: Number(cashFlow?.fcf || 0),
+      }] as const
+    })
+  )
+
+  const branchEntries = await Promise.all(
+    normalizedOrgIds.flatMap((orgId) =>
+      (branchesByOrgId[orgId] || []).map(async (branch) => {
+        const [cashFlow, cash] = await Promise.all([
+          getCashFlow(orgId, branch.id, false),
+          getCashBalance(db, supabase, orgId, branch.id, false),
+        ])
+
+        return [`${orgId}:${branch.id}`, {
+          cash,
+          ocf: Number(cashFlow?.ocf || 0),
+          icf: Number(cashFlow?.icf || 0),
+          fcf: Number(cashFlow?.fcf || 0),
+        }] as const
+      })
+    )
+  )
+
+  return {
+    orgSummaries: Object.fromEntries(orgEntries),
+    branchSummaries: Object.fromEntries(branchEntries),
   }
 }

@@ -17,19 +17,17 @@ type BusinessProfile = {
 export default function BusinessClient({ 
   orgId, 
   currentRole,
-  initialSettings
+  initialSettings,
+  baseUrl,
 }: { 
   orgId: string, 
   currentRole: string,
   initialSettings: BusinessProfile
+  baseUrl: string
 }) {
   const [settings, setSettings] = useState<BusinessSettingsMap>(initialSettings?.settings || {})
   const [currentSlug, setCurrentSlug] = useState(initialSettings?.slug || '')
   const [loading, setLoading] = useState(false)
-  const [baseUrl] = useState(() => {
-    if (typeof window !== 'undefined') return window.location.origin
-    return 'https://nizam.app'
-  })
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
   const [isResetModalOpen, setIsResetModalOpen] = useState(false)
   const [resetMode, setResetMode] = useState<ResetOrganizationMode>('transactions')
@@ -95,14 +93,14 @@ export default function BusinessClient({
       confirmationText: resetConfirmation.trim(),
     })
 
-    const resAny = res as any
-    if (!resAny.success) {
-      alert(resAny.error)
+    const resetResult = res as { success?: boolean; error?: string; message?: string }
+    if (!resetResult.success) {
+      alert(resetResult.error)
       setLoading(false)
       return
     }
 
-    alert(resAny.message || 'Reset data selesai.')
+    alert(resetResult.message || 'Reset data selesai.')
     setIsResetModalOpen(false)
     setResetConfirmation('')
     window.location.reload()
@@ -353,7 +351,7 @@ export default function BusinessClient({
               Reset Semua Data Operasional
             </div>
             <p className="text-sm text-rose-700/80 leading-6">
-              Selain transaksi, mode ini juga menghapus produk, kontak, karyawan, bank account, gudang, cabang, fleet master, invitation link, dan master operasional lain. Profil bisnis, owner, role, akun, serta billing tetap dipertahankan.
+              Selain transaksi, mode ini juga menghapus produk, kontak, karyawan, bank account, gudang, fleet master, invitation link, dan master operasional lain. Struktur cabang akan dikembalikan ke satu Unit Utama. Profil bisnis, owner, role, akun, serta billing tetap dipertahankan.
             </p>
           </div>
         </div>
@@ -419,7 +417,7 @@ export default function BusinessClient({
                   >
                     <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Reset Semua Data Operasional</p>
                     <p className="text-sm text-slate-500 mt-3 leading-6">
-                      Menghapus transaksi sekaligus master operasional sehingga organisasi terasa kembali ke fase awal, namun profil bisnis, akun, role, dan billing tetap aman.
+                      Menghapus transaksi sekaligus master operasional sehingga organisasi terasa kembali ke fase awal, dengan menyisakan satu Unit Utama untuk akun dan konteks dasar organisasi.
                     </p>
                   </button>
                 </div>

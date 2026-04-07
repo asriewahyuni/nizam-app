@@ -649,6 +649,17 @@ export async function deleteAccount(accountId: string, orgId: string) {
   if (!existing) return { error: 'Akun tidak ditemukan.' }
   if (existing.is_system) return { error: 'Akun sistem tidak dapat dihapus.' }
 
+  // Guard: parent akun tidak bisa dihapus selama masih punya turunan.
+  const { count: childCount } = await (supabase as any)
+    .from('accounts')
+    .select('*', { count: 'exact', head: true })
+    .eq('org_id', orgId)
+    .eq('parent_id', accountId)
+
+  if ((childCount ?? 0) > 0) {
+    return { error: 'Akun ini masih memiliki sub-akun. Hapus/pindahkan sub-akun terlebih dahulu.' }
+  }
+
   // Check for existing journal lines
   const { count } = await (supabase as any)
     .from('journal_lines')
@@ -665,7 +676,24 @@ export async function deleteAccount(accountId: string, orgId: string) {
     .eq('id', accountId)
     .eq('org_id', orgId)
 
-  if (error) return { error: 'Gagal menghapus akun.' }
+  if (error) {
+    const rawMessage = String((error as any)?.message || '').trim()
+    const normalizedMessage = rawMessage.toLowerCase()
+    const errorCode = String((error as any)?.code || '')
+
+    if (errorCode === '23503') {
+      return {
+        error:
+          'Akun masih dipakai pada data lain (mis. bank account, produk, payroll, aset, budget, atau transaksi terkait). Lepaskan relasinya terlebih dahulu.',
+      }
+    }
+
+    if (normalizedMessage.includes('organisasi utama pada konteks unit utama')) {
+      return { error: 'Akun hanya bisa dihapus dari Organisasi Utama dengan konteks Unit Utama.' }
+    }
+
+    return { error: rawMessage ? `Gagal menghapus akun: ${rawMessage}` : 'Gagal menghapus akun.' }
+  }
 
   const syncDeleteResult = await propagateDeletedParentAccountToDescendants(
     orgId,

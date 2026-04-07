@@ -32,7 +32,7 @@ import {
 } from 'lucide-react'
 import { PageHeader, SectionCard, SectionHeader, SafeButton, StatusBadge, ConfirmDialog } from '@/components/ui/NizamUI'
 import { createClient } from '@/lib/supabase/client'
-import { signInAsTenantOwner } from '@/modules/auth/actions/auth.actions'
+import { deleteInactiveTenantByPlatformAdmin, signInAsTenantOwner } from '@/modules/auth/actions/auth.actions'
 import { Organization } from '@/types/database.types'
 import Link from 'next/link'
 import {
@@ -138,6 +138,8 @@ export default function SaaSAdminPage() {
   })
   const [loginAsPending, startLoginAsTransition] = useTransition()
   const [loginAsOrgId, setLoginAsOrgId] = useState<string | null>(null)
+  const [tenantDeleteMode, setTenantDeleteMode] = useState(false)
+  const [deletingOrgId, setDeletingOrgId] = useState<string | null>(null)
 
   // State local untuk helper set date di modal org
   const [modalExpireDate, setModalExpireDate] = useState('')
@@ -551,16 +553,34 @@ export default function SaaSAdminPage() {
     }
   }
 
-  const handleDeleteOrg = (id: string, name: string) => {
+  const handleDeleteOrg = (org: Organization) => {
+     if (!tenantDeleteMode) {
+        alert('Aktifkan Mode Hapus Tenant Nonaktif terlebih dahulu.')
+        return
+     }
+
+     if (org.is_active) {
+        alert(`Tenant "${org.name}" masih aktif. Ubah status ke Suspended terlebih dahulu sebelum menghapus.`)
+        return
+     }
+
      setConfirmState({
         open: true,
         title: "Hapus Tenant?",
-        message: `PERINGATAN: Menghapus organisasi "${name}" akan menghapus seluruh data yang terkait di dalamnya. Lanjutkan?`,
+        message: `PERINGATAN: Tenant nonaktif "${org.name}" akan dihapus permanen beserta seluruh data terkait. Lanjutkan?`,
         action: async () => {
-           const { error } = await db.from('organizations').delete().eq('id', id)
-           if (error) alert(error.message)
-           else fetchOrganizations()
-           setConfirmState(prev => ({ ...prev, open: false }))
+           setDeletingOrgId(org.id)
+           try {
+             const result = await deleteInactiveTenantByPlatformAdmin(org.id)
+             if (result?.error) {
+               alert(result.error)
+             } else {
+               await fetchOrganizations()
+             }
+           } finally {
+             setDeletingOrgId(null)
+             setConfirmState(prev => ({ ...prev, open: false }))
+           }
         }
      })
   }
@@ -895,8 +915,21 @@ export default function SaaSAdminPage() {
 
               <div className="flex flex-wrap gap-3">
                  <SafeButton variant="primary" onClick={() => setOrgModal({ open: true, editData: null })} icon={<Plus size={18} />}>Registrasi Tenant Baru</SafeButton>
+                 <SafeButton
+                   variant={tenantDeleteMode ? 'danger' : 'white'}
+                   onClick={() => setTenantDeleteMode(prev => !prev)}
+                   icon={tenantDeleteMode ? <X size={18} /> : <Trash2 size={18} />}
+                 >
+                   {tenantDeleteMode ? 'Keluar Mode Hapus' : 'Mode Hapus Tenant Nonaktif'}
+                 </SafeButton>
                  <button onClick={fetchOrganizations} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors shadow-sm"><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></button>
               </div>
+
+              {tenantDeleteMode && (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-700">
+                  Mode hapus aktif: hanya tenant berstatus <span className="font-black">Suspended</span> yang dapat dihapus.
+                </div>
+              )}
 
               <SectionCard>
                 <div className="overflow-x-auto">
@@ -970,9 +1003,16 @@ export default function SaaSAdminPage() {
                               <button onClick={() => setOrgModal({ open: true, editData: org })} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
                                  <Edit3 size={18} />
                               </button>
-                              <button onClick={() => handleDeleteOrg(org.id, org.name)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
-                                 <Trash2 size={18} />
-                              </button>
+                              {tenantDeleteMode && (
+                                <button
+                                  onClick={() => handleDeleteOrg(org)}
+                                  disabled={org.is_active || deletingOrgId === org.id}
+                                  title={org.is_active ? 'Hanya tenant Suspended yang bisa dihapus.' : 'Hapus tenant nonaktif'}
+                                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                                >
+                                  {deletingOrgId === org.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

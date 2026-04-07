@@ -799,6 +799,58 @@ export async function getAdminImpersonationState() {
   }
 }
 
+export async function deleteInactiveTenantByPlatformAdmin(orgId: string) {
+  const supabase = await createClient()
+  const adminClient = await createAdminClient()
+  const trimmedOrgId = String(orgId || '').trim()
+
+  if (!trimmedOrgId) {
+    return { error: 'Tenant tidak valid.' }
+  }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  const user = userData.user
+  const adminEmail = String(user?.email || '').trim().toLowerCase()
+
+  if (userError || !user) {
+    return { error: 'Sesi admin tidak ditemukan. Silakan login ulang.' }
+  }
+
+  if (!isPlatformAdminEmail(adminEmail)) {
+    return { error: 'Akses ditolak. Hanya platform admin yang bisa menghapus tenant.' }
+  }
+
+  const { data: org, error: orgError } = await (adminClient as any)
+    .from('organizations')
+    .select('id, name, is_active')
+    .eq('id', trimmedOrgId)
+    .maybeSingle()
+
+  if (orgError) {
+    return { error: `Gagal membaca data tenant: ${orgError.message}` }
+  }
+
+  if (!org) {
+    return { error: 'Tenant tidak ditemukan atau sudah terhapus.' }
+  }
+
+  if (Boolean(org.is_active)) {
+    return { error: `Tenant "${org.name}" masih aktif. Nonaktifkan tenant terlebih dahulu sebelum menghapus.` }
+  }
+
+  const { error: deleteError } = await (adminClient as any)
+    .from('organizations')
+    .delete()
+    .eq('id', trimmedOrgId)
+
+  if (deleteError) {
+    return { error: `Gagal menghapus tenant: ${deleteError.message}` }
+  }
+
+  revalidatePath('/admin')
+  return { success: true }
+}
+
 export async function signInAsTenantOwner(orgId: string) {
   const supabase = await createClient()
   const adminClient = await createAdminClient()

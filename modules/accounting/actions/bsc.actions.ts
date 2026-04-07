@@ -83,6 +83,16 @@ export type BSCSetupPayload = {
   error?: string
 }
 
+export type BSCDeckSummary = {
+  overall_score_100: number | null
+  overall_score_4: number | null
+  completion_percent: number | null
+  cycle_name: string | null
+  perspective_scores: Record<BSCPerspective, { score_100: number; score_4: number; kpi_count: number }>
+  status: 'ready' | 'empty' | 'error'
+  error?: string
+}
+
 type UpsertBSCKPIInput = {
   id?: string
   perspective: BSCPerspective
@@ -401,6 +411,260 @@ async function ensureActiveCycle(orgId: string, branchId?: string | null) {
     startDate,
     endDate,
   }
+}
+
+export async function getBSCDeckSummaries(orgIds: string[]): Promise<Record<string, BSCDeckSummary>> {
+  const normalizedOrgIds = Array.from(
+    new Set(orgIds.map((orgId) => String(orgId || '').trim()).filter(Boolean))
+  )
+
+  if (normalizedOrgIds.length === 0) {
+    return {}
+  }
+
+  const supabase = await createClient()
+  const db = supabase as any
+  const range = getCurrentCycleRange()
+
+  const { data: cycleRows, error: cycleError } = await db
+    .from('bsc_cycles')
+    .select('id, org_id, branch_id, cycle_name, cycle_key, created_at')
+    .in('org_id', normalizedOrgIds)
+    .eq('cycle_key', range.cycleKey)
+    .eq('status', 'ACTIVE')
+    .order('created_at', { ascending: false })
+
+  if (cycleError) {
+    return Object.fromEntries(
+      normalizedOrgIds.map((orgId) => [
+        orgId,
+        {
+          overall_score_100: null,
+          overall_score_4: null,
+          completion_percent: null,
+          cycle_name: null,
+          perspective_scores: {
+            FINANCIAL: { score_100: 0, score_4: 0, kpi_count: 0 },
+            CUSTOMER: { score_100: 0, score_4: 0, kpi_count: 0 },
+            INTERNAL_PROCESS: { score_100: 0, score_4: 0, kpi_count: 0 },
+            LEARNING_GROWTH: { score_100: 0, score_4: 0, kpi_count: 0 },
+          },
+          status: 'error' as const,
+          error: cycleError.message || 'Gagal memuat ringkasan BSC.',
+        },
+      ])
+    )
+  }
+
+  const preferredCycleByOrg = new Map<string, {
+    id: string
+    org_id: string
+    branch_id: string | null
+    cycle_name: string | null
+  }>()
+
+  for (const row of (cycleRows || []) as Array<Record<string, unknown>>) {
+    const orgId = String(row.org_id || '').trim()
+    const cycleId = String(row.id || '').trim()
+    if (!orgId || !cycleId) continue
+
+    const candidate = {
+      id: cycleId,
+      org_id: orgId,
+      branch_id: row.branch_id ? String(row.branch_id) : null,
+      cycle_name: row.cycle_name ? String(row.cycle_name) : null,
+    }
+
+    const existing = preferredCycleByOrg.get(orgId)
+    if (!existing) {
+      preferredCycleByOrg.set(orgId, candidate)
+      continue
+    }
+
+    if (existing.branch_id && !candidate.branch_id) {
+      preferredCycleByOrg.set(orgId, candidate)
+    }
+  }
+
+  const cycleIds = Array.from(preferredCycleByOrg.values()).map((cycle) => cycle.id)
+  if (cycleIds.length === 0) {
+    return Object.fromEntries(
+      normalizedOrgIds.map((orgId) => [
+        orgId,
+        {
+          overall_score_100: null,
+          overall_score_4: null,
+          completion_percent: null,
+          cycle_name: null,
+          perspective_scores: {
+            FINANCIAL: { score_100: 0, score_4: 0, kpi_count: 0 },
+            CUSTOMER: { score_100: 0, score_4: 0, kpi_count: 0 },
+            INTERNAL_PROCESS: { score_100: 0, score_4: 0, kpi_count: 0 },
+            LEARNING_GROWTH: { score_100: 0, score_4: 0, kpi_count: 0 },
+          },
+          status: 'empty' as const,
+        },
+      ])
+    )
+  }
+
+  const [{ data: weightRows, error: weightError }, { data: kpiRows, error: kpiError }] = await Promise.all([
+    db
+      .from('bsc_perspective_weights')
+      .select('cycle_id, perspective, weight_percent')
+      .in('cycle_id', cycleIds),
+    db
+      .from('bsc_kpis')
+      .select('id, cycle_id, perspective, weight_percent, is_active')
+      .in('cycle_id', cycleIds)
+      .eq('is_active', true),
+  ])
+
+  if (weightError || kpiError) {
+    const message = weightError?.message || kpiError?.message || 'Gagal memuat detail BSC.'
+    return Object.fromEntries(
+      normalizedOrgIds.map((orgId) => [
+        orgId,
+        {
+          overall_score_100: null,
+          overall_score_4: null,
+          completion_percent: null,
+          cycle_name: preferredCycleByOrg.get(orgId)?.cycle_name || null,
+          perspective_scores: {
+            FINANCIAL: { score_100: 0, score_4: 0, kpi_count: 0 },
+            CUSTOMER: { score_100: 0, score_4: 0, kpi_count: 0 },
+            INTERNAL_PROCESS: { score_100: 0, score_4: 0, kpi_count: 0 },
+            LEARNING_GROWTH: { score_100: 0, score_4: 0, kpi_count: 0 },
+          },
+          status: preferredCycleByOrg.has(orgId) ? 'error' as const : 'empty' as const,
+          ...(preferredCycleByOrg.has(orgId) ? { error: message } : {}),
+        },
+      ])
+    )
+  }
+
+  const activeKpis = (kpiRows || []) as Array<Record<string, unknown>>
+  const kpiIds = activeKpis.map((kpi) => String(kpi.id || '')).filter(Boolean)
+  let latestByKpi = new Map<string, BSCLatestMeasurement>()
+
+  if (kpiIds.length > 0) {
+    const { data: latestRows, error: latestError } = await db
+      .from('v_bsc_latest_kpi_measurements')
+      .select('id, kpi_id, measurement_date, actual_value, achievement_percent, score_100, score_4, note')
+      .in('kpi_id', kpiIds)
+
+    if (latestError) {
+      return Object.fromEntries(
+        normalizedOrgIds.map((orgId) => [
+          orgId,
+          {
+            overall_score_100: null,
+            overall_score_4: null,
+            completion_percent: null,
+            cycle_name: preferredCycleByOrg.get(orgId)?.cycle_name || null,
+            perspective_scores: {
+              FINANCIAL: { score_100: 0, score_4: 0, kpi_count: 0 },
+              CUSTOMER: { score_100: 0, score_4: 0, kpi_count: 0 },
+              INTERNAL_PROCESS: { score_100: 0, score_4: 0, kpi_count: 0 },
+              LEARNING_GROWTH: { score_100: 0, score_4: 0, kpi_count: 0 },
+            },
+            status: preferredCycleByOrg.has(orgId) ? 'error' as const : 'empty' as const,
+            ...(preferredCycleByOrg.has(orgId) ? { error: latestError.message || 'Gagal memuat score BSC.' } : {}),
+          },
+        ])
+      )
+    }
+
+    latestByKpi = new Map(
+      ((latestRows || []) as Array<Record<string, unknown>>).map((measurement) => [
+        String(measurement.kpi_id),
+        {
+          id: String(measurement.id || ''),
+          measurement_date: String(measurement.measurement_date || ''),
+          actual_value: toFiniteNumber(measurement.actual_value),
+          achievement_percent: toFiniteNumber(measurement.achievement_percent),
+          score_100: toFiniteNumber(measurement.score_100),
+          score_4: toFiniteNumber(measurement.score_4),
+          note: measurement.note ? String(measurement.note) : null,
+        },
+      ])
+    )
+  }
+
+  const weightsByCycle = new Map<string, Array<Record<string, unknown>>>()
+  for (const row of (weightRows || []) as Array<Record<string, unknown>>) {
+    const cycleId = String(row.cycle_id || '').trim()
+    if (!cycleId) continue
+    const current = weightsByCycle.get(cycleId) || []
+    current.push(row)
+    weightsByCycle.set(cycleId, current)
+  }
+
+  const kpisByCycle = new Map<string, BSCKPIItem[]>()
+  for (const row of activeKpis) {
+    const cycleId = String(row.cycle_id || '').trim()
+    const kpiId = String(row.id || '').trim()
+    if (!cycleId || !kpiId) continue
+
+    const current = kpisByCycle.get(cycleId) || []
+    current.push({
+      id: kpiId,
+      cycle_id: cycleId,
+      perspective: isPerspective(String(row.perspective)) ? (row.perspective as BSCPerspective) : 'FINANCIAL',
+      code: '',
+      name: '',
+      description: null,
+      unit: null,
+      direction: 'HIGHER_BETTER',
+      weight_percent: toFiniteNumber(row.weight_percent),
+      target_value: 0,
+      baseline_value: null,
+      source_type: 'MANUAL',
+      formula_key: null,
+      is_active: Boolean(row.is_active),
+      latest_measurement: latestByKpi.get(kpiId) || null,
+    })
+    kpisByCycle.set(cycleId, current)
+  }
+
+  return Object.fromEntries(
+    normalizedOrgIds.map((orgId) => {
+      const cycle = preferredCycleByOrg.get(orgId)
+      if (!cycle) {
+        return [
+          orgId,
+          {
+            overall_score_100: null,
+            overall_score_4: null,
+            completion_percent: null,
+            cycle_name: null,
+            perspective_scores: {
+              FINANCIAL: { score_100: 0, score_4: 0, kpi_count: 0 },
+              CUSTOMER: { score_100: 0, score_4: 0, kpi_count: 0 },
+              INTERNAL_PROCESS: { score_100: 0, score_4: 0, kpi_count: 0 },
+              LEARNING_GROWTH: { score_100: 0, score_4: 0, kpi_count: 0 },
+            },
+            status: 'empty' as const,
+          },
+        ]
+      }
+
+      const weights = ensureWeightMap(weightsByCycle.get(cycle.id))
+      const summary = computeBSCSummary(kpisByCycle.get(cycle.id) || [], weights)
+
+      return [
+        orgId,
+        {
+          overall_score_100: summary.overall_score_100,
+          overall_score_4: summary.overall_score_4,
+          completion_percent: summary.completion_percent,
+          cycle_name: cycle.cycle_name,
+          perspective_scores: summary.perspective_scores,
+          status: 'ready' as const,
+        },
+      ]
+    })
+  )
 }
 
 // ---------------------------------------------------------------------

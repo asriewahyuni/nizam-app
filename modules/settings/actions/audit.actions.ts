@@ -12,6 +12,9 @@ type ResetOrganizationOptions = {
 
 type AdminDbClient = Awaited<ReturnType<typeof createAdminClient>>
 
+const RESET_DEFAULT_BRANCH_NAME = 'Unit Utama'
+const RESET_DEFAULT_BRANCH_CODE = 'MAIN'
+
 const TRANSACTION_RESET_TABLES = [
   'approval_requests',
   'intercompany_transactions',
@@ -62,7 +65,6 @@ const FULL_RESET_MASTER_TABLES = [
   'intercompany_accounts',
   'warehouse_bins',
   'warehouses',
-  'branches',
   'products',
   'contacts',
 ] as const
@@ -75,32 +77,32 @@ function getExpectedConfirmationText(orgName: string, mode: ResetOrganizationMod
   return 'RESET TRANSAKSI'
 }
 
-async function clearTablesByOrg(db: AdminDbClient, orgId: string, tables: readonly string[]) {
-  const isSkippableMissingObjectError = (error: { code?: string; message?: string } | null | undefined) => {
-    if (!error) return false
+function isSkippableMissingObjectError(error: { code?: string; message?: string } | null | undefined) {
+  if (!error) return false
 
-    const code = String(error.code || '').toUpperCase()
-    const message = String(error.message || '').toLowerCase()
+  const code = String(error.code || '').toUpperCase()
+  const message = String(error.message || '').toLowerCase()
 
-    // postgres
-    if (code === '42P01' || code === '42703') return true
+  // postgres
+  if (code === '42P01' || code === '42703') return true
 
-    // postgrest schema-cache misses
-    if (code === 'PGRST205' || code === 'PGRST204') return true
+  // postgrest schema-cache misses
+  if (code === 'PGRST205' || code === 'PGRST204') return true
 
-    // fallback by message (in case code differs across env)
-    if (
-      message.includes('could not find the table') ||
-      message.includes('schema cache') ||
-      message.includes('does not exist') ||
-      message.includes('could not find the') && message.includes('column')
-    ) {
-      return true
-    }
-
-    return false
+  // fallback by message (in case code differs across env)
+  if (
+    message.includes('could not find the table') ||
+    message.includes('schema cache') ||
+    message.includes('does not exist') ||
+    message.includes('could not find the') && message.includes('column')
+  ) {
+    return true
   }
 
+  return false
+}
+
+async function clearTablesByOrg(db: AdminDbClient, orgId: string, tables: readonly string[]) {
   for (const table of tables) {
     const { error } = await db
       .from(table)
@@ -110,6 +112,83 @@ async function clearTablesByOrg(db: AdminDbClient, orgId: string, tables: readon
     if (error && !isSkippableMissingObjectError(error)) {
       return { success: false, error: `Error di tabel ${table}: ${error.message}` }
     }
+  }
+
+  return { success: true as const }
+}
+
+/**
+ * Full reset keeps CoA/accounts intact, so we must also keep one branch alive
+ * because accounts.managed_branch_id is required and guarded by a FK.
+ */
+async function collapseOperationalBranches(db: AdminDbClient, orgId: string) {
+  const { data: existingBranch, error: branchLookupError } = await db
+    .from('branches')
+    .select('id')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (branchLookupError) {
+    if (isSkippableMissingObjectError(branchLookupError)) {
+      return { success: true as const }
+    }
+
+    return { success: false, error: `Error menyiapkan branch reset: ${branchLookupError.message}` }
+  }
+
+  const preservedBranchId = existingBranch?.id || crypto.randomUUID()
+
+  if (!existingBranch?.id) {
+    const { error: createBranchError } = await db
+      .from('branches')
+      .insert({
+        id: preservedBranchId,
+        org_id: orgId,
+        name: RESET_DEFAULT_BRANCH_NAME,
+        code: RESET_DEFAULT_BRANCH_CODE,
+        address: null,
+        is_active: true,
+      })
+
+    if (createBranchError && !isSkippableMissingObjectError(createBranchError)) {
+      return { success: false, error: `Error membuat branch default reset: ${createBranchError.message}` }
+    }
+  }
+
+  const { error: rebindAccountsError } = await db
+    .from('accounts')
+    .update({ managed_branch_id: preservedBranchId })
+    .eq('org_id', orgId)
+
+  if (rebindAccountsError && !isSkippableMissingObjectError(rebindAccountsError)) {
+    return { success: false, error: `Error memindahkan CoA ke branch default: ${rebindAccountsError.message}` }
+  }
+
+  const { error: deleteExtraBranchesError } = await db
+    .from('branches')
+    .delete()
+    .eq('org_id', orgId)
+    .neq('id', preservedBranchId)
+
+  if (deleteExtraBranchesError && !isSkippableMissingObjectError(deleteExtraBranchesError)) {
+    return { success: false, error: `Error merapikan cabang saat reset: ${deleteExtraBranchesError.message}` }
+  }
+
+  const { error: normalizeBranchError } = await db
+    .from('branches')
+    .update({
+      name: RESET_DEFAULT_BRANCH_NAME,
+      code: RESET_DEFAULT_BRANCH_CODE,
+      address: null,
+      is_active: true,
+    })
+    .eq('id', preservedBranchId)
+    .eq('org_id', orgId)
+
+  if (normalizeBranchError && !isSkippableMissingObjectError(normalizeBranchError)) {
+    return { success: false, error: `Error menormalkan branch default reset: ${normalizeBranchError.message}` }
   }
 
   return { success: true as const }
@@ -203,6 +282,11 @@ export async function resetOrganizationData(orgId: string, options: ResetOrganiz
       if (!masterReset.success) {
         return masterReset
       }
+
+      const branchReset = await collapseOperationalBranches(adminClient, orgId)
+      if (!branchReset.success) {
+        return branchReset
+      }
     }
 
     await (adminClient as any).from('audit_logs').insert({
@@ -244,7 +328,7 @@ export async function resetOrganizationData(orgId: string, options: ResetOrganiz
       success: true,
       mode,
       message: mode === 'all_data'
-        ? 'Seluruh data operasional berhasil direset. Profil bisnis, owner, role, akun, dan billing tetap dipertahankan.'
+        ? 'Seluruh data operasional berhasil direset. Struktur cabang dikembalikan ke satu Unit Utama, sementara profil bisnis, owner, role, akun, dan billing tetap dipertahankan.'
         : 'Seluruh transaksi berhasil direset. Data master utama tetap dipertahankan.',
     }
   } catch (error) {

@@ -1,12 +1,14 @@
 'use client'
 
-import { getInitials } from '@/lib/utils'
-import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2 } from 'lucide-react'
+import { formatRupiah, getInitials } from '@/lib/utils'
+import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type DragEvent } from 'react'
 import Link from 'next/link'
 import type { Organization } from '@/types/database.types'
 import type { AiTokenHeaderSummary } from '@/modules/ai/lib/ai-token'
+import type { BSCDeckSummary } from '@/modules/accounting/actions/bsc.actions'
+import type { DeckCashSummary } from '@/modules/accounting/actions/reports.actions'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import type {
   AccessibleOrganization,
@@ -14,7 +16,6 @@ import type {
 } from '@/modules/organization/lib/org-context'
 import {
   createBranch,
-  createOrganizationQuick,
   deleteChildOrganization,
   setActiveBranch,
   setActiveOrg,
@@ -35,6 +36,10 @@ interface AppHeaderProps {
   pendingApprovals?: number
   cashFlow?: unknown
   aiTokens?: AiTokenHeaderSummary | null
+  orgBscSummaries?: Record<string, BSCDeckSummary>
+  orgBranchesByOrgId?: Record<string, BranchSummary[]>
+  orgCashSummaries?: Record<string, DeckCashSummary>
+  branchCashSummaries?: Record<string, DeckCashSummary>
 }
 
 type PendingContextSwitch =
@@ -53,6 +58,125 @@ type PendingContextSwitch =
 
 const ACTIVE_ORG_CHANGE_EVENT = 'nizam_active_org_change'
 const ACTIVE_BRANCH_CHANGE_EVENT = 'nizam_active_branch_change'
+const ORG_DECK_CARD_WIDTH = 272
+const ORG_DECK_CARD_HEIGHT = 308
+const ORG_DECK_CARD_EXPANDED_HEIGHT = 430
+const ORG_DECK_BRANCH_CARD_WIDTH = 186
+const ORG_DECK_BRANCH_CARD_HEIGHT = 160
+const ORG_DECK_COLUMN_SPACING = 560
+
+type OrgDeckBranchNode = {
+  key: string
+  branch: BranchSummary
+  orgId: string
+  x: number
+  y: number
+}
+
+type OrgDeckBranchOffset = {
+  x: number
+  y: number
+}
+
+type OrgDeckPosition = {
+  x: number
+  y: number
+}
+
+type OrgDeckLink = {
+  childId: string
+  parentId: string
+}
+
+function buildInitialOrgDeckPositions(
+  organizations: AccessibleOrganization[],
+  activeOrgId: string
+): Record<string, OrgDeckPosition> {
+  const positions: Record<string, OrgDeckPosition> = {}
+  const knownOrgIds = new Set(organizations.map((membership) => membership.orgId))
+  const childrenMap = new Map<string | null, AccessibleOrganization[]>()
+  let verticalCursor = 72
+
+  const pushChild = (parentId: string | null, membership: AccessibleOrganization) => {
+    const current = childrenMap.get(parentId) || []
+    current.push(membership)
+    childrenMap.set(parentId, current)
+  }
+
+  organizations.forEach((membership) => {
+    const parentId = membership.org.parent_org_id && knownOrgIds.has(membership.org.parent_org_id)
+      ? membership.org.parent_org_id
+      : null
+    pushChild(parentId, membership)
+  })
+
+  childrenMap.forEach((group) => {
+    group.sort((left, right) => {
+      if (left.orgId === activeOrgId) return -1
+      if (right.orgId === activeOrgId) return 1
+      return left.org.name.localeCompare(right.org.name, 'id-ID')
+    })
+  })
+
+  const placeNode = (membership: AccessibleOrganization, depth: number): number => {
+    const children = childrenMap.get(membership.orgId) || []
+    if (children.length === 0) {
+      positions[membership.orgId] = {
+        x: 72 + depth * ORG_DECK_COLUMN_SPACING,
+        y: verticalCursor,
+      }
+      verticalCursor += 344
+      return positions[membership.orgId].y
+    }
+
+    const childAnchors = children.map((child) => placeNode(child, depth + 1))
+    const nodeY = Math.round((childAnchors[0] + childAnchors[childAnchors.length - 1]) / 2)
+    positions[membership.orgId] = {
+      x: 72 + depth * ORG_DECK_COLUMN_SPACING,
+      y: nodeY,
+    }
+    return nodeY
+  }
+
+  const roots = childrenMap.get(null) || []
+  roots.forEach((root, index) => {
+    placeNode(root, 0)
+    if (index < roots.length - 1) {
+      verticalCursor += 36
+    }
+  })
+
+  organizations.forEach((membership, index) => {
+    if (!positions[membership.orgId]) {
+      positions[membership.orgId] = {
+        x: 72 + (index % 3) * ORG_DECK_COLUMN_SPACING,
+        y: 72 + index * 344,
+      }
+    }
+  })
+
+  return positions
+}
+
+function buildOrgDeckLinks(organizations: AccessibleOrganization[]): OrgDeckLink[] {
+  const knownOrgIds = new Set(organizations.map((membership) => membership.orgId))
+
+  return organizations.flatMap((membership) => {
+    const parentId = membership.org.parent_org_id
+    if (!parentId || !knownOrgIds.has(parentId)) {
+      return []
+    }
+
+    return [{
+      childId: membership.orgId,
+      parentId,
+    }]
+  })
+}
+
+function getOrgDeckCardHeight(isPerspectiveExpanded: boolean, bscIsReady: boolean) {
+  return isPerspectiveExpanded && bscIsReady ? ORG_DECK_CARD_EXPANDED_HEIGHT : ORG_DECK_CARD_HEIGHT
+}
 
 export function AppHeader({
   user,
@@ -66,26 +190,67 @@ export function AppHeader({
   canManageBranches = false,
   pendingApprovals = 0,
   aiTokens,
+  orgBscSummaries = {},
+  orgBranchesByOrgId = {},
+  orgCashSummaries = {},
+  branchCashSummaries = {},
 }: AppHeaderProps) {
   const router = useRouter()
-  const [isCreatingOrg, startCreateOrgTransition] = useTransition()
   const [isCreatingBranch, startCreateBranchTransition] = useTransition()
   const [isUpdatingHierarchy, startHierarchyTransition] = useTransition()
   const [pendingContextSwitch, setPendingContextSwitch] = useState<PendingContextSwitch | null>(null)
   const [isTokenPopupOpen, setIsTokenPopupOpen] = useState(false)
   const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false)
-  const [isQuickCreateOrgOpen, setIsQuickCreateOrgOpen] = useState(false)
+  const [isOrgDeckOpen, setIsOrgDeckOpen] = useState(false)
   const [orgFeedback, setOrgFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [draggingOrgId, setDraggingOrgId] = useState<string | null>(null)
   const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false)
   const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false)
   const [branchFeedback, setBranchFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [expandedDeckOrgIds, setExpandedDeckOrgIds] = useState<Record<string, boolean>>({})
+  const [orgDeckBranchOffsets, setOrgDeckBranchOffsets] = useState<Record<string, OrgDeckBranchOffset>>({})
+  const initialOrgDeckPositions = useMemo(
+    () => buildInitialOrgDeckPositions(organizations, activeOrgId),
+    [organizations, activeOrgId]
+  )
+  const orgDeckLinks = useMemo(() => buildOrgDeckLinks(organizations), [organizations])
+  const [orgDeckPositions, setOrgDeckPositions] = useState<Record<string, OrgDeckPosition>>(initialOrgDeckPositions)
   const tokenPopupRef = useRef<HTMLDivElement | null>(null)
   const orgMenuRef = useRef<HTMLDivElement | null>(null)
   const branchMenuRef = useRef<HTMLDivElement | null>(null)
+  const orgDeckDragRef = useRef<{
+    orgId: string
+    startClientX: number
+    startClientY: number
+    originX: number
+    originY: number
+  } | null>(null)
+  const orgDeckBranchDragRef = useRef<{
+    key: string
+    startClientX: number
+    startClientY: number
+    originX: number
+    originY: number
+  } | null>(null)
 
   const activeBranch = branches.find((branch) => branch.id === activeBranchId) || null
   const isSwitchingContext = pendingContextSwitch !== null
+  const bscPerspectiveMeta: Array<{
+    key: keyof NonNullable<BSCDeckSummary['perspective_scores']>
+    label: string
+    accent: string
+  }> = [
+    { key: 'FINANCIAL', label: 'Financial', accent: 'bg-emerald-100 text-emerald-700' },
+    { key: 'CUSTOMER', label: 'Customer', accent: 'bg-sky-100 text-sky-700' },
+    { key: 'INTERNAL_PROCESS', label: 'Internal', accent: 'bg-amber-100 text-amber-700' },
+    { key: 'LEARNING_GROWTH', label: 'Learning', accent: 'bg-fuchsia-100 text-fuchsia-700' },
+  ]
+  const cashMetricMeta: Array<{ key: keyof DeckCashSummary; label: string }> = [
+    { key: 'cash', label: 'Kas' },
+    { key: 'ocf', label: 'OCF' },
+    { key: 'icf', label: 'ICF' },
+    { key: 'fcf', label: 'FCF' },
+  ]
 
   const handleOrgChange = async (orgId: string) => {
     if (orgId === activeOrgId) return
@@ -111,45 +276,11 @@ export function AppHeader({
       label: targetOrg?.org.name || 'organisasi terpilih',
     })
     setOrgFeedback(null)
-    setIsQuickCreateOrgOpen(false)
     setIsOrgMenuOpen(false)
     window.dispatchEvent(new CustomEvent(ACTIVE_ORG_CHANGE_EVENT, { detail: { orgId } }))
     window.dispatchEvent(new CustomEvent(ACTIVE_BRANCH_CHANGE_EVENT, { detail: { orgId, branchId: result.branchId } }))
     router.refresh()
     setPendingContextSwitch(null)
-  }
-
-  const handleCreateOrganization = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    const form = event.currentTarget
-    const formData = new FormData(form)
-    setOrgFeedback(null)
-
-    startCreateOrgTransition(async () => {
-      const result: Awaited<ReturnType<typeof createOrganizationQuick>> = await createOrganizationQuick(formData)
-      if ('error' in result) {
-        setOrgFeedback({ type: 'error', message: result.error })
-        return
-      }
-
-      const createdOrgId = result.orgId || null
-      const createdBranchId = result.branchId || null
-      if (createdOrgId) {
-        window.dispatchEvent(new CustomEvent(ACTIVE_ORG_CHANGE_EVENT, { detail: { orgId: createdOrgId } }))
-        window.dispatchEvent(
-          new CustomEvent(ACTIVE_BRANCH_CHANGE_EVENT, {
-            detail: { orgId: createdOrgId, branchId: createdBranchId },
-          })
-        )
-      }
-
-      setOrgFeedback({ type: 'success', message: 'Organisasi baru dibuat dan langsung dijadikan konteks aktif.' })
-      setIsQuickCreateOrgOpen(false)
-      setIsOrgMenuOpen(false)
-      form.reset()
-      router.refresh()
-    })
   }
 
   const handleHierarchyDrop = (childOrgId: string, parentOrgId: string | null) => {
@@ -271,6 +402,52 @@ export function AppHeader({
     setPendingContextSwitch(null)
   }
 
+  const handleDeckBranchActivate = async (targetOrgId: string, targetBranchId: string) => {
+    const targetBranches = orgBranchesByOrgId[targetOrgId] || []
+    const targetBranch = targetBranches.find((branch) => branch.id === targetBranchId)
+
+    setPendingContextSwitch({
+      kind: 'branch',
+      orgId: targetOrgId,
+      branchId: targetBranchId,
+      label: targetBranch?.name || 'unit terpilih',
+    })
+
+    if (targetOrgId !== activeOrgId) {
+      const orgResult: Awaited<ReturnType<typeof setActiveOrg>> = await setActiveOrg(targetOrgId)
+      if ('error' in orgResult) {
+        setPendingContextSwitch(null)
+        alert(orgResult.error)
+        return
+      }
+
+      window.dispatchEvent(new CustomEvent(ACTIVE_ORG_CHANGE_EVENT, { detail: { orgId: targetOrgId } }))
+      window.dispatchEvent(
+        new CustomEvent(ACTIVE_BRANCH_CHANGE_EVENT, {
+          detail: { orgId: targetOrgId, branchId: orgResult.branchId },
+        })
+      )
+    }
+
+    const branchResult: Awaited<ReturnType<typeof setActiveBranch>> = await setActiveBranch(targetOrgId, targetBranchId)
+    if ('error' in branchResult) {
+      setPendingContextSwitch(null)
+      alert(branchResult.error)
+      return
+    }
+
+    setOrgFeedback(null)
+    setBranchFeedback(null)
+    setIsOrgDeckOpen(false)
+    window.dispatchEvent(
+      new CustomEvent(ACTIVE_BRANCH_CHANGE_EVENT, {
+        detail: { orgId: targetOrgId, branchId: targetBranchId },
+      })
+    )
+    router.refresh()
+    setPendingContextSwitch(null)
+  }
+
   const handleCreateBranch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -378,14 +555,238 @@ export function AppHeader({
   const canManageAffiliates =
     Boolean(activeOrganization) &&
     (activeOrganization?.role === 'owner' || activeOrganization?.role === 'admin')
+  const orgChildrenCount = useMemo(() => {
+    const counts: Record<string, number> = {}
+
+    organizations.forEach((membership) => {
+      const parentId = membership.org.parent_org_id
+      if (!parentId) return
+      counts[parentId] = (counts[parentId] || 0) + 1
+    })
+
+    return counts
+  }, [organizations])
   const contextSwitchLabel = pendingContextSwitch
     ? pendingContextSwitch.kind === 'org'
       ? `Membuka ${pendingContextSwitch.label}...`
       : `Mengganti unit ke ${pendingContextSwitch.label}...`
     : null
 
+  const openOrgDeck = useCallback(() => {
+    setIsOrgMenuOpen(false)
+    setIsQuickCreateOrgOpen(false)
+    setOrgFeedback(null)
+    setIsOrgDeckOpen(true)
+  }, [])
+
+  const closeOrgDeck = useCallback(() => {
+    setIsOrgDeckOpen(false)
+    orgDeckDragRef.current = null
+    orgDeckBranchDragRef.current = null
+  }, [])
+
+  const handleOrgDeckPointerDown = (orgId: string, clientX: number, clientY: number) => {
+    const origin = orgDeckPositions[orgId] || initialOrgDeckPositions[orgId]
+    if (!origin) return
+
+    orgDeckDragRef.current = {
+      orgId,
+      startClientX: clientX,
+      startClientY: clientY,
+      originX: origin.x,
+      originY: origin.y,
+    }
+  }
+
+  const handleOrgDeckBranchPointerDown = (branchKey: string, clientX: number, clientY: number) => {
+    const origin = orgDeckBranchOffsets[branchKey] || { x: 0, y: 0 }
+
+    orgDeckBranchDragRef.current = {
+      key: branchKey,
+      startClientX: clientX,
+      startClientY: clientY,
+      originX: origin.x,
+      originY: origin.y,
+    }
+  }
+
+  useEffect(() => {
+    setOrgDeckPositions(initialOrgDeckPositions)
+  }, [initialOrgDeckPositions])
+
+  useEffect(() => {
+    if (!isOrgDeckOpen) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isOrgDeckOpen])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const isTypingTarget = Boolean(
+        target?.isContentEditable ||
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.tagName === 'SELECT'
+      )
+
+      if (isTypingTarget) return
+
+      if (event.key === 'Escape') {
+        setIsOrgDeckOpen(false)
+        orgDeckDragRef.current = null
+        return
+      }
+
+      if (event.shiftKey && event.key.toLowerCase() === 'd') {
+        event.preventDefault()
+        setIsOrgMenuOpen(false)
+        setIsQuickCreateOrgOpen(false)
+        setOrgFeedback(null)
+        setIsOrgDeckOpen((previous) => !previous)
+        orgDeckDragRef.current = null
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isOrgDeckOpen, openOrgDeck, closeOrgDeck])
+
+  useEffect(() => {
+    if (!isOrgDeckOpen) return
+
+    const onPointerMove = (event: PointerEvent) => {
+      const dragState = orgDeckDragRef.current
+      if (dragState) {
+        const nextX = Math.max(24, dragState.originX + (event.clientX - dragState.startClientX))
+        const nextY = Math.max(24, dragState.originY + (event.clientY - dragState.startClientY))
+
+        setOrgDeckPositions((current) => ({
+          ...current,
+          [dragState.orgId]: { x: nextX, y: nextY },
+        }))
+        return
+      }
+
+      const branchDragState = orgDeckBranchDragRef.current
+      if (!branchDragState) return
+
+      const nextOffsetX = branchDragState.originX + (event.clientX - branchDragState.startClientX)
+      const nextOffsetY = branchDragState.originY + (event.clientY - branchDragState.startClientY)
+
+      setOrgDeckBranchOffsets((current) => ({
+        ...current,
+        [branchDragState.key]: { x: nextOffsetX, y: nextOffsetY },
+      }))
+    }
+
+    const stopDragging = () => {
+      orgDeckDragRef.current = null
+      orgDeckBranchDragRef.current = null
+    }
+
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', stopDragging)
+    window.addEventListener('pointercancel', stopDragging)
+
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', stopDragging)
+      window.removeEventListener('pointercancel', stopDragging)
+    }
+  }, [isOrgDeckOpen])
+
+  const renderCashMetricGrid = (
+    summary: DeckCashSummary | undefined,
+    options: { active: boolean; compact?: boolean }
+  ) => {
+    const { active, compact = false } = options
+
+    return (
+      <div className={`grid grid-cols-2 gap-2 ${compact ? '' : 'mt-1'}`}>
+        {cashMetricMeta.map((metric) => (
+          <div
+            key={metric.key}
+            className={`rounded-2xl border px-2.5 py-2 ${
+              active
+                ? 'border-white/10 bg-white/5 text-white'
+                : 'border-slate-200 bg-white text-slate-900'
+            }`}
+          >
+            <div className={`text-[9px] font-black uppercase tracking-[0.14em] ${
+              active ? 'text-slate-300' : 'text-slate-400'
+            }`}>
+              {metric.label}
+            </div>
+            <div className={`mt-1 text-[11px] font-black leading-tight ${
+              active ? 'text-white' : 'text-slate-900'
+            }`}>
+              {formatRupiah(summary?.[metric.key] ?? 0, true)}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  const orgDeckBranchNodes = useMemo(() => {
+    const nodes: OrgDeckBranchNode[] = []
+
+    organizations.forEach((membership) => {
+      const orgPosition = orgDeckPositions[membership.orgId] || initialOrgDeckPositions[membership.orgId]
+      const branchesForOrg = orgBranchesByOrgId[membership.orgId] || []
+      if (!orgPosition || branchesForOrg.length === 0) return
+
+      const bscSummary = orgBscSummaries[membership.orgId]
+      const bscIsReady = bscSummary?.status === 'ready'
+      const isPerspectiveExpanded = Boolean(expandedDeckOrgIds[membership.orgId])
+      const orgCardHeight = getOrgDeckCardHeight(isPerspectiveExpanded, bscIsReady)
+      const branchGapY = 14
+      const startX = orgPosition.x + ORG_DECK_CARD_WIDTH + 34
+      const totalHeight = branchesForOrg.length * ORG_DECK_BRANCH_CARD_HEIGHT + Math.max(0, branchesForOrg.length - 1) * branchGapY
+      const startY = orgPosition.y + Math.max(10, (orgCardHeight - totalHeight) / 2)
+
+      branchesForOrg.forEach((branch, index) => {
+        nodes.push({
+          key: `${membership.orgId}:${branch.id}`,
+          branch,
+          orgId: membership.orgId,
+          x: Math.round(startX + (orgDeckBranchOffsets[`${membership.orgId}:${branch.id}`]?.x || 0)),
+          y: Math.round(startY + index * (ORG_DECK_BRANCH_CARD_HEIGHT + branchGapY) + (orgDeckBranchOffsets[`${membership.orgId}:${branch.id}`]?.y || 0)),
+        })
+      })
+    })
+
+    return nodes
+  }, [organizations, orgDeckPositions, initialOrgDeckPositions, orgBranchesByOrgId, orgBscSummaries, expandedDeckOrgIds, orgDeckBranchOffsets])
+
+  const deckCanvasSize = useMemo(() => {
+    const orgMaxX = Object.values(orgDeckPositions).reduce((current, position) => Math.max(current, position.x + ORG_DECK_CARD_WIDTH), 0)
+    const orgMaxY = organizations.reduce((current, membership) => {
+      const position = orgDeckPositions[membership.orgId] || initialOrgDeckPositions[membership.orgId]
+      if (!position) return current
+      const bscSummary = orgBscSummaries[membership.orgId]
+      const height = getOrgDeckCardHeight(Boolean(expandedDeckOrgIds[membership.orgId]), bscSummary?.status === 'ready')
+      return Math.max(current, position.y + height)
+    }, 0)
+
+    const branchMaxX = orgDeckBranchNodes.reduce((current, node) => Math.max(current, node.x + ORG_DECK_BRANCH_CARD_WIDTH), 0)
+    const branchMaxY = orgDeckBranchNodes.reduce((current, node) => Math.max(current, node.y + ORG_DECK_BRANCH_CARD_HEIGHT), 0)
+
+    return {
+      width: Math.max(1120, Math.max(orgMaxX, branchMaxX) + 180),
+      height: Math.max(720, Math.max(orgMaxY, branchMaxY) + 180),
+    }
+  }, [organizations, orgDeckPositions, initialOrgDeckPositions, orgDeckBranchNodes, orgBscSummaries, expandedDeckOrgIds])
+
   return (
-    <header className="h-16 flex items-center justify-between px-4 md:px-8 border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-30 print:hidden">
+    <>
+      <header className="h-16 flex items-center justify-between px-4 md:px-8 border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-30 print:hidden">
       <div className="flex items-center gap-2 md:gap-6">
         <button 
           onClick={() => window.dispatchEvent(new CustomEvent('nizam_sidebar_toggle'))}
@@ -451,9 +852,25 @@ export function AppHeader({
                     </span>
                   </div>
                   {canManageAffiliates && (
-                    <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-blue-600">
-                      Drag handle ≡ ke organisasi lain untuk ubah hierarki, atau drop ke ROOT.
-                    </p>
+                    <>
+                      <div className="mt-3 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={openOrgDeck}
+                          className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700 transition hover:bg-blue-100"
+                        >
+                          <Workflow size={13} />
+                          Open Deck
+                        </button>
+                        <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500">
+                          <Command size={10} />
+                          Shift + D
+                        </div>
+                      </div>
+                      <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-blue-600">
+                        Drag handle ≡ untuk pindah hierarki cepat, atau buka deck untuk lihat mindmap grup.
+                      </p>
+                    </>
                   )}
                 </div>
 
@@ -644,17 +1061,18 @@ export function AppHeader({
 
                 <div className="mt-3 border-t border-slate-100 pt-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOrgFeedback(null)
-                        setIsQuickCreateOrgOpen((prev) => !prev)
-                      }}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-700 hover:bg-slate-50 transition-all"
-                    >
-                      <Plus size={14} />
-                      Tambah Org Mandiri
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {canManageAffiliates && (
+                        <Link
+                          href="/settings/sub-orgs"
+                          onClick={() => setIsOrgMenuOpen(false)}
+                          className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-blue-700 transition hover:bg-blue-100"
+                        >
+                          <Plus size={14} />
+                          Tambah Anak Perusahaan
+                        </Link>
+                      )}
+                    </div>
                     {canManageAffiliates && (
                       <Link
                         href="/settings/sub-orgs"
@@ -668,27 +1086,9 @@ export function AppHeader({
 
                   {canManageAffiliates && (
                     <p className="rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] font-semibold leading-relaxed text-blue-800">
-                      Pendaftaran anak perusahaan hanya melalui menu <span className="font-black">Kelola Anak Perusahaan</span>.
-                      Tombol <span className="font-black">Tambah Org Mandiri</span> membuat organisasi baru yang berdiri sendiri.
+                      Struktur entitas anak dikelola melalui menu <span className="font-black">Kelola Anak Perusahaan</span>.
+                      Cabang tetap dibuat dari menu cabang dalam organisasi aktif, bukan dari area ini.
                     </p>
-                  )}
-
-                  {isQuickCreateOrgOpen && (
-                    <form onSubmit={handleCreateOrganization} className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                      <input
-                        name="name"
-                        required
-                        placeholder="Nama organisasi mandiri"
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-slate-900"
-                      />
-                      <button
-                        type="submit"
-                        disabled={isCreatingOrg || isSwitchingContext}
-                        className="w-full rounded-2xl bg-slate-900 px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.16em] text-white hover:bg-[#003366] transition-all disabled:cursor-wait disabled:opacity-60"
-                      >
-                        {isCreatingOrg ? 'Membuat Org...' : 'Buat Dan Aktifkan'}
-                      </button>
-                    </form>
                   )}
                 </div>
               </div>
@@ -942,6 +1342,482 @@ export function AppHeader({
           </div>
         </div>
       </div>
-    </header>
+      </header>
+
+      {isOrgDeckOpen && (
+        <div className="fixed inset-0 z-[90]">
+          <button
+            type="button"
+            aria-label="Tutup Open Deck"
+            onClick={closeOrgDeck}
+            className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+          />
+
+          <div className="relative flex h-full items-center justify-center p-3 md:p-6">
+            <div className="relative flex h-[min(90vh,860px)] w-full max-w-[min(96vw,1600px)] flex-col overflow-hidden rounded-[36px] border border-white/70 bg-white shadow-2xl">
+              <div className="border-b border-slate-100 bg-[radial-gradient(circle_at_top_left,_rgba(191,219,254,0.32),_transparent_48%),linear-gradient(135deg,_rgba(248,250,252,0.98),_rgba(255,255,255,0.98))] px-5 py-4 md:px-7">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div className="max-w-3xl">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">
+                        <Workflow size={12} />
+                        Open Deck
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500">
+                        <Command size={10} />
+                        Shift + D
+                      </span>
+                    </div>
+                    <h2 className="mt-3 text-xl font-black tracking-tight text-slate-950 md:text-2xl">
+                      Struktur grup yang bisa dijelajahi tanpa banyak klik
+                    </h2>
+                    <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-slate-500">
+                      Geser kartu seperti mindmap untuk memahami hubungan parent-child, aktifkan konteks kerja dari sini,
+                      lalu lanjutkan ke pengaturan jika ingin ubah struktur lebih detail.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-600">
+                      <Move size={12} />
+                      Geser Kartu
+                    </div>
+                    {canManageAffiliates && (
+                      <Link
+                        href="/settings/sub-orgs"
+                        onClick={closeOrgDeck}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700 transition hover:bg-blue-100"
+                      >
+                        <Plus size={12} />
+                        Tambah Anak Perusahaan
+                      </Link>
+                    )}
+                    {canManageAffiliates && (
+                      <Link
+                        href="/settings/sub-orgs"
+                        onClick={closeOrgDeck}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Kelola Struktur
+                        <ArrowUpRight size={12} />
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      onClick={closeOrgDeck}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-700 transition hover:bg-slate-50"
+                    >
+                      <X size={12} />
+                      Tutup
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto bg-[linear-gradient(rgba(226,232,240,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(226,232,240,0.55)_1px,transparent_1px)] bg-[size:28px_28px]">
+                <div
+                  className="relative"
+                  style={{
+                    width: `${deckCanvasSize.width}px`,
+                    height: `${deckCanvasSize.height}px`,
+                  }}
+                >
+                  <svg
+                    className="pointer-events-none absolute inset-0"
+                    width={deckCanvasSize.width}
+                    height={deckCanvasSize.height}
+                    viewBox={`0 0 ${deckCanvasSize.width} ${deckCanvasSize.height}`}
+                    fill="none"
+                  >
+                    {orgDeckLinks.map((link) => {
+                      const parentPosition = orgDeckPositions[link.parentId]
+                      const childPosition = orgDeckPositions[link.childId]
+                      if (!parentPosition || !childPosition) return null
+
+                      const parentBsc = orgBscSummaries[link.parentId]
+                      const childBsc = orgBscSummaries[link.childId]
+                      const parentHeight = getOrgDeckCardHeight(Boolean(expandedDeckOrgIds[link.parentId]), parentBsc?.status === 'ready')
+                      const childHeight = getOrgDeckCardHeight(Boolean(expandedDeckOrgIds[link.childId]), childBsc?.status === 'ready')
+                      const startX = parentPosition.x + ORG_DECK_CARD_WIDTH
+                      const startY = parentPosition.y + parentHeight / 2
+                      const endX = childPosition.x
+                      const endY = childPosition.y + childHeight / 2
+                      const curveStrength = Math.max(84, (endX - startX) / 2)
+
+                      return (
+                        <path
+                          key={`${link.parentId}-${link.childId}`}
+                          d={`M ${startX} ${startY} C ${startX + curveStrength} ${startY}, ${endX - curveStrength} ${endY}, ${endX} ${endY}`}
+                          stroke="rgba(59, 130, 246, 0.32)"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+                      )
+                    })}
+                    {orgDeckBranchNodes.map((node) => {
+                      const orgPosition = orgDeckPositions[node.orgId] || initialOrgDeckPositions[node.orgId]
+                      if (!orgPosition) return null
+
+                      const bscSummary = orgBscSummaries[node.orgId]
+                      const orgCardHeight = getOrgDeckCardHeight(Boolean(expandedDeckOrgIds[node.orgId]), bscSummary?.status === 'ready')
+                      const startX = orgPosition.x + ORG_DECK_CARD_WIDTH
+                      const startY = orgPosition.y + orgCardHeight / 2
+                      const endX = node.x
+                      const endY = node.y + ORG_DECK_BRANCH_CARD_HEIGHT / 2
+                      const midX = startX + Math.max(18, (endX - startX) / 2)
+
+                      return (
+                        <path
+                          key={`branch-link-${node.key}`}
+                          d={`M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`}
+                          stroke="rgba(148, 163, 184, 0.42)"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                        />
+                      )
+                    })}
+                  </svg>
+
+                  {organizations.map((membership) => {
+                    const position = orgDeckPositions[membership.orgId] || initialOrgDeckPositions[membership.orgId] || { x: 72, y: 72 }
+                    const isActiveCard = membership.orgId === activeOrgId
+                    const isPendingTarget = pendingContextSwitch?.kind === 'org' && pendingContextSwitch.orgId === membership.orgId
+                    const childCount = orgChildrenCount[membership.orgId] || 0
+                    const relationLabel = membership.org.parent_org_name ? `Child dari ${membership.org.parent_org_name}` : 'Root / Parent'
+                    const bscSummary = orgBscSummaries[membership.orgId]
+                    const bscIsReady = bscSummary?.status === 'ready'
+                    const bscHasError = bscSummary?.status === 'error'
+                    const isPerspectiveExpanded = Boolean(expandedDeckOrgIds[membership.orgId])
+                    const orgCardHeight = getOrgDeckCardHeight(isPerspectiveExpanded, bscIsReady)
+                    const orgCashSummary = orgCashSummaries[membership.orgId]
+
+                    return (
+                      <div
+                        key={`deck-${membership.orgId}`}
+                        className={`absolute w-[272px] rounded-[28px] border shadow-xl transition ${
+                          isActiveCard
+                            ? 'border-slate-900 bg-slate-950 text-white shadow-slate-900/20'
+                            : 'border-slate-200 bg-white text-slate-900 shadow-slate-200/70'
+                        }`}
+                        style={{
+                          left: `${position.x}px`,
+                          top: `${position.y}px`,
+                          minHeight: `${orgCardHeight}px`,
+                        }}
+                      >
+                        <div
+                          onPointerDown={(event) => {
+                            if (event.button !== 0) return
+                            handleOrgDeckPointerDown(membership.orgId, event.clientX, event.clientY)
+                          }}
+                          className={`flex cursor-grab items-center justify-between rounded-t-[28px] border-b px-4 py-3 active:cursor-grabbing ${
+                            isActiveCard
+                              ? 'border-white/10 bg-white/5'
+                              : 'border-slate-100 bg-slate-50/80'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <div className={`text-[9px] font-black uppercase tracking-[0.18em] ${isActiveCard ? 'text-slate-300' : 'text-slate-400'}`}>
+                              {membership.role}
+                            </div>
+                            <div className={`mt-1 text-[11px] font-semibold ${isActiveCard ? 'text-slate-200' : 'text-slate-500'}`}>
+                              Geser kartu
+                            </div>
+                          </div>
+                          <div className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] ${
+                            isActiveCard
+                              ? 'bg-white/10 text-white'
+                              : 'bg-blue-50 text-blue-700'
+                          }`}>
+                            <Move size={10} />
+                            Mindmap
+                          </div>
+                        </div>
+
+                        <div className="space-y-4 p-4">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <div className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${
+                                isActiveCard
+                                  ? 'border-white/10 bg-white/10 text-white'
+                                  : 'border-slate-200 bg-slate-50 text-[#003366]'
+                              }`}>
+                                <Building2 size={18} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <div className="truncate text-sm font-black">{membership.org.name}</div>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <div className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black ${
+                                      bscIsReady
+                                        ? (bscSummary?.overall_score_100 ?? 0) >= 85
+                                          ? isActiveCard
+                                            ? 'bg-emerald-500/20 text-emerald-100'
+                                            : 'bg-emerald-100 text-emerald-700'
+                                          : (bscSummary?.overall_score_100 ?? 0) >= 70
+                                            ? isActiveCard
+                                              ? 'bg-blue-500/20 text-blue-100'
+                                              : 'bg-blue-100 text-blue-700'
+                                            : isActiveCard
+                                              ? 'bg-amber-500/20 text-amber-100'
+                                              : 'bg-amber-100 text-amber-700'
+                                        : isActiveCard
+                                          ? 'bg-white/10 text-slate-100'
+                                          : 'bg-slate-100 text-slate-600'
+                                    }`}>
+                                      {bscIsReady ? `${bscSummary?.overall_score_100 ?? 0}` : 'BSC -'}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      disabled={!bscIsReady}
+                                      onClick={(event) => {
+                                        event.stopPropagation()
+                                        setExpandedDeckOrgIds((current) => ({
+                                          ...current,
+                                          [membership.orgId]: !current[membership.orgId],
+                                        }))
+                                      }}
+                                      className={`inline-flex h-8 w-8 items-center justify-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                                        isActiveCard
+                                          ? 'border-white/10 bg-white/5 text-white hover:bg-white/10'
+                                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                                      }`}
+                                      aria-label="Tampilkan 4 perspektif BSC"
+                                    >
+                                      <ChevronDown size={14} className={`transition-transform ${isPerspectiveExpanded ? 'rotate-180' : ''}`} />
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className={`mt-1 truncate text-[10px] font-bold uppercase tracking-[0.14em] ${
+                                  isActiveCard ? 'text-slate-300' : 'text-slate-400'
+                                }`}>
+                                  {membership.org.slug}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] ${
+                              membership.org.parent_org_id
+                                ? isActiveCard
+                                  ? 'bg-orange-500/20 text-orange-100'
+                                  : 'bg-orange-100 text-orange-700'
+                                : isActiveCard
+                                  ? 'bg-emerald-500/20 text-emerald-100'
+                                  : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                              {membership.org.parent_org_id ? 'Child' : 'Parent'}
+                            </span>
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] ${
+                              isActiveCard
+                                ? 'bg-white/10 text-slate-100'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {childCount} anak
+                            </span>
+                          </div>
+
+                          <div className={`rounded-2xl border px-3 py-2 text-[11px] font-semibold leading-relaxed ${
+                            isActiveCard
+                              ? 'border-white/10 bg-white/5 text-slate-200'
+                              : 'border-slate-200 bg-slate-50 text-slate-600'
+                          }`}>
+                            {relationLabel}
+                          </div>
+
+                          <div className={`rounded-2xl border px-3 py-3 ${
+                            isActiveCard
+                              ? 'border-white/10 bg-white/5'
+                              : 'border-slate-200 bg-slate-50'
+                          }`}>
+                            <div className={`mb-2 text-[9px] font-black uppercase tracking-[0.18em] ${
+                              isActiveCard ? 'text-slate-300' : 'text-slate-400'
+                            }`}>
+                              Kas / Cash Flow
+                            </div>
+                            {renderCashMetricGrid(orgCashSummary, { active: isActiveCard })}
+                          </div>
+
+                          {bscIsReady && isPerspectiveExpanded && (
+                            <div className={`grid grid-cols-2 gap-2 rounded-2xl border p-2 ${
+                              isActiveCard
+                                ? 'border-white/10 bg-white/5'
+                                : 'border-slate-200 bg-slate-50'
+                            }`}>
+                              {bscPerspectiveMeta.map((perspective) => {
+                                const perspectiveScore = bscSummary?.perspective_scores[perspective.key]
+
+                                return (
+                                  <div
+                                    key={`${membership.orgId}-${perspective.key}`}
+                                    className={`rounded-2xl border px-3 py-2 ${
+                                      isActiveCard
+                                        ? 'border-white/10 bg-white/5'
+                                        : 'border-slate-200 bg-white'
+                                    }`}
+                                  >
+                                    <div className={`inline-flex rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] ${perspective.accent}`}>
+                                      {perspective.label}
+                                    </div>
+                                    <div className={`mt-2 text-lg font-black ${
+                                      isActiveCard ? 'text-white' : 'text-slate-900'
+                                    }`}>
+                                      {perspectiveScore?.score_100 ?? 0}
+                                    </div>
+                                    <div className={`text-[10px] font-bold uppercase tracking-[0.14em] ${
+                                      isActiveCard ? 'text-slate-300' : 'text-slate-500'
+                                    }`}>
+                                      {perspectiveScore?.score_4 ?? 0} / 4
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          {!bscIsReady && (
+                            <div className={`text-[11px] font-semibold leading-relaxed ${
+                              isActiveCard ? 'text-slate-300' : 'text-slate-500'
+                            }`}>
+                              {bscHasError
+                                ? 'Ringkasan BSC belum bisa dibaca untuk organisasi ini.'
+                                : 'Belum ada global score BSC yang siap ditampilkan.'}
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={isActiveCard || isSwitchingContext}
+                              onClick={() => {
+                                closeOrgDeck()
+                                void handleOrgChange(membership.orgId)
+                              }}
+                              className={`inline-flex flex-1 items-center justify-center gap-2 rounded-2xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition disabled:cursor-wait disabled:opacity-60 ${
+                                isActiveCard
+                                  ? 'bg-white/10 text-white'
+                                  : 'bg-slate-900 text-white hover:bg-[#003366]'
+                              }`}
+                            >
+                              {isPendingTarget ? <LoaderCircle size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                              {isActiveCard ? 'Sedang Aktif' : 'Aktifkan'}
+                            </button>
+                            {canManageAffiliates && (
+                              <Link
+                                href="/settings/sub-orgs"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  closeOrgDeck()
+                                }}
+                                className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition ${
+                                  isActiveCard
+                                    ? 'border-white/10 bg-white/5 text-white hover:bg-white/10'
+                                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                }`}
+                              >
+                                Atur
+                                <ArrowUpRight size={12} />
+                              </Link>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {orgDeckBranchNodes.map((node) => {
+                    const isActiveBranchCard = node.orgId === activeOrgId && node.branch.id === activeBranchId
+                    const isParentOrgActive = node.orgId === activeOrgId
+                    const isPendingBranchTarget =
+                      pendingContextSwitch?.kind === 'branch' &&
+                      pendingContextSwitch.orgId === node.orgId &&
+                      pendingContextSwitch.branchId === node.branch.id
+                    const branchCashSummary = branchCashSummaries[`${node.orgId}:${node.branch.id}`]
+
+                    return (
+                      <button
+                        type="button"
+                        key={`branch-card-${node.key}`}
+                        disabled={isActiveBranchCard || isSwitchingContext}
+                        onClick={() => void handleDeckBranchActivate(node.orgId, node.branch.id)}
+                        className={`absolute w-[186px] rounded-[22px] border text-left transition disabled:cursor-wait disabled:opacity-70 ${
+                          isActiveBranchCard
+                            ? 'border-[#003366] bg-[#003366] text-white shadow-lg shadow-[#003366]/20'
+                            : isParentOrgActive
+                              ? 'border-blue-200 bg-blue-50/90 text-slate-900 shadow-md shadow-blue-100/80 hover:border-blue-300 hover:bg-blue-100/80'
+                              : 'border-slate-200 bg-white/96 text-slate-900 shadow-md shadow-slate-200/80 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                        style={{
+                          left: `${node.x}px`,
+                          top: `${node.y}px`,
+                          minHeight: `${ORG_DECK_BRANCH_CARD_HEIGHT}px`,
+                        }}
+                      >
+                        <div className="flex items-center gap-2 px-3 pt-3">
+                          <div className={`flex h-9 w-9 items-center justify-center rounded-2xl border ${
+                            isActiveBranchCard
+                              ? 'border-white/10 bg-white/10 text-white'
+                              : isParentOrgActive
+                                ? 'border-blue-200 bg-white text-[#003366]'
+                                : 'border-slate-200 bg-slate-50 text-slate-600'
+                          }`}>
+                            <MapPin size={14} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="truncate text-[11px] font-black uppercase tracking-[0.12em]">
+                                  {node.branch.name}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onPointerDown={(event) => {
+                                  event.preventDefault()
+                                  event.stopPropagation()
+                                  if (event.button !== 0) return
+                                  handleOrgDeckBranchPointerDown(node.key, event.clientX, event.clientY)
+                                }}
+                                onClick={(event) => {
+                                  event.preventDefault()
+                                  event.stopPropagation()
+                                }}
+                                className={`inline-flex h-7 w-7 items-center justify-center rounded-lg border ${
+                                  isActiveBranchCard
+                                    ? 'border-white/10 bg-white/10 text-white'
+                                    : 'border-slate-200 bg-white/80 text-slate-500 hover:text-blue-700'
+                                }`}
+                                aria-label="Geser kartu unit"
+                              >
+                                <Move size={11} />
+                              </button>
+                            </div>
+                            <div className={`mt-1 flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.14em] ${
+                              isActiveBranchCard
+                                ? 'text-slate-200'
+                                : 'text-slate-500'
+                            }`}>
+                              <span>{node.branch.code}</span>
+                              {isPendingBranchTarget && <LoaderCircle size={10} className="animate-spin" />}
+                              {isActiveBranchCard && <span className="rounded-full bg-white/10 px-2 py-0.5 text-white">Aktif</span>}
+                              {!isActiveBranchCard && !isPendingBranchTarget && <span>Aktifkan</span>}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="px-3 pb-3">
+                          {renderCashMetricGrid(branchCashSummary, { active: isActiveBranchCard, compact: true })}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

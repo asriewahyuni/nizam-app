@@ -1340,6 +1340,22 @@ export async function getBranches(orgId: string) {
   return scope.accessibleBranches
 }
 
+export async function getBranchesByOrganizations(orgIds: string[]) {
+  const normalizedOrgIds = Array.from(new Set(orgIds.map((orgId) => String(orgId || '').trim()).filter(Boolean)))
+  if (normalizedOrgIds.length === 0) {
+    return {} as Record<string, BranchSummary[]>
+  }
+
+  const entries = await Promise.all(
+    normalizedOrgIds.map(async (orgId) => {
+      const branches = await getBranches(orgId)
+      return [orgId, branches] as const
+    })
+  )
+
+  return Object.fromEntries(entries) as Record<string, BranchSummary[]>
+}
+
 export async function getActiveBranch(orgId: string) {
   return getCurrentAccessibleBranch(orgId)
 }
