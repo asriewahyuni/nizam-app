@@ -2,7 +2,6 @@
 
 import { motion } from 'framer-motion'
 import { 
-  Plus, 
   Search, 
   ChevronRight, 
   Clock, 
@@ -139,9 +138,6 @@ export function DashboardClient({ data }: DashboardClientProps) {
         <div className="flex items-center gap-3">
            <button className="bg-white border border-slate-200 p-3 rounded-2xl text-slate-400 hover:text-slate-900 transition-all shadow-sm">
              <Search size={20} />
-           </button>
-           <button className="bg-slate-900 text-white px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all">
-             <Plus size={16} /> New Transaction
            </button>
         </div>
       </motion.div>
