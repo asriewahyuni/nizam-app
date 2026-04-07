@@ -513,7 +513,6 @@ export function AppHeader({
       const targetNode = event.target as Node
       if (!orgMenuRef.current?.contains(targetNode)) {
         setIsOrgMenuOpen(false)
-        setIsQuickCreateOrgOpen(false)
         setOrgFeedback(null)
       }
     }
@@ -574,7 +573,6 @@ export function AppHeader({
 
   const openOrgDeck = useCallback(() => {
     setIsOrgMenuOpen(false)
-    setIsQuickCreateOrgOpen(false)
     setOrgFeedback(null)
     setIsOrgDeckOpen(true)
   }, [])
@@ -646,7 +644,6 @@ export function AppHeader({
       if (event.shiftKey && event.key.toLowerCase() === 'd') {
         event.preventDefault()
         setIsOrgMenuOpen(false)
-        setIsQuickCreateOrgOpen(false)
         setOrgFeedback(null)
         setIsOrgDeckOpen((previous) => !previous)
         orgDeckDragRef.current = null
@@ -809,7 +806,6 @@ export function AppHeader({
               disabled={isSwitchingContext}
               onClick={() => {
                 setOrgFeedback(null)
-                setIsQuickCreateOrgOpen(false)
                 setIsOrgMenuOpen((prev) => !prev)
               }}
               className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl shadow-sm hover:bg-slate-100/70 transition-all disabled:cursor-wait disabled:opacity-70"
@@ -954,7 +950,7 @@ export function AppHeader({
                       >
                         <button
                           type="button"
-                          disabled={isSwitchingContext || isCreatingOrg || isUpdatingHierarchy}
+                          disabled={isSwitchingContext || isUpdatingHierarchy}
                           onClick={() => handleOrgChange(membership.orgId)}
                           className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl text-left transition disabled:cursor-wait disabled:opacity-60 ${
                             activeOrgId === membership.orgId ? 'bg-slate-900 text-white' : 'hover:bg-slate-50 text-slate-700'
@@ -1737,12 +1733,26 @@ export function AppHeader({
                     const branchCashSummary = branchCashSummaries[`${node.orgId}:${node.branch.id}`]
 
                     return (
-                      <button
-                        type="button"
+                      <div
                         key={`branch-card-${node.key}`}
-                        disabled={isActiveBranchCard || isSwitchingContext}
-                        onClick={() => void handleDeckBranchActivate(node.orgId, node.branch.id)}
-                        className={`absolute w-[186px] rounded-[22px] border text-left transition disabled:cursor-wait disabled:opacity-70 ${
+                        role="button"
+                        tabIndex={isActiveBranchCard || isSwitchingContext ? -1 : 0}
+                        aria-disabled={isActiveBranchCard || isSwitchingContext}
+                        onClick={() => {
+                          if (isActiveBranchCard || isSwitchingContext) return
+                          void handleDeckBranchActivate(node.orgId, node.branch.id)
+                        }}
+                        onKeyDown={(event) => {
+                          if (isActiveBranchCard || isSwitchingContext) return
+                          if (event.key !== 'Enter' && event.key !== ' ') return
+                          event.preventDefault()
+                          void handleDeckBranchActivate(node.orgId, node.branch.id)
+                        }}
+                        className={`absolute w-[186px] rounded-[22px] border text-left transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${
+                          isActiveBranchCard || isSwitchingContext
+                            ? 'cursor-wait opacity-70'
+                            : 'cursor-pointer'
+                        } ${
                           isActiveBranchCard
                             ? 'border-[#003366] bg-[#003366] text-white shadow-lg shadow-[#003366]/20'
                             : isParentOrgActive
@@ -1809,7 +1819,7 @@ export function AppHeader({
                         <div className="px-3 pb-3">
                           {renderCashMetricGrid(branchCashSummary, { active: isActiveBranchCard, compact: true })}
                         </div>
-                      </button>
+                      </div>
                     )
                   })}
                 </div>
