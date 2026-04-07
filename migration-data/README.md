@@ -15,7 +15,19 @@ Folder ini berisi artifact kerja untuk migrasi data dari Supabase source ke data
 
 - `scripts/export_supabase_data.sh`
 - `scripts/load_local_target.sh`
+- `scripts/sync_auth_runtime_users.sh`
 - `scripts/validate_migration_counts.py`
+
+## Catatan Auth Runtime
+
+Karena source Supabase menyimpan identity utama di `auth.users`, sementara runtime aplikasi sekarang memakai Auth.js + Prisma pada `public.users`, workflow load akan menjalankan sinkronisasi otomatis:
+
+- `auth.users` → `public.users`
+- memastikan tabel runtime Auth.js tersedia:
+  - `public.users`
+  - `public.oauth_accounts`
+  - `public.sessions`
+  - `public.verification_tokens`
 
 ## Catatan
 

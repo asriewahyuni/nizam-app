@@ -102,6 +102,8 @@ docker cp migration-data/add_missing_columns.sql "$CONTAINER_NAME":/tmp/add_miss
 
 docker exec "$CONTAINER_NAME" sh -lc 'psql -U postgres -d postgres -f /tmp/add_missing_columns.sql >/tmp/add_missing_columns.log && psql -v ON_ERROR_STOP=1 -U postgres -d postgres -f /tmp/truncate_existing_tables.sql >/tmp/final_truncate.log && psql -v ON_ERROR_STOP=1 -U postgres -d postgres -f /tmp/source_data_existing.sql >/tmp/final_load.log'
 
+"$ROOT_DIR/scripts/sync_auth_runtime_users.sh" "$CONTAINER_NAME"
+
 docker exec "$CONTAINER_NAME" psql -U postgres -d postgres -At -F '=' -c "select 'public.organizations', count(*) from public.organizations union all select 'public.org_members', count(*) from public.org_members union all select 'public.branches', count(*) from public.branches union all select 'public.employees', count(*) from public.employees union all select 'public.accounts', count(*) from public.accounts union all select 'public.contacts', count(*) from public.contacts union all select 'public.products', count(*) from public.products union all select 'public.sales', count(*) from public.sales union all select 'public.purchases', count(*) from public.purchases union all select 'public.journal_entries', count(*) from public.journal_entries union all select 'auth.users', count(*) from auth.users union all select 'public.purchase_requests', count(*) from public.purchase_requests union all select 'public.saas_invoices', count(*) from public.saas_invoices union all select 'public.ai_token_wallets', count(*) from public.ai_token_wallets;" > migration-logs/target_counts.txt
 
 echo "Load complete. Backup saved to $BACKUP_NAME"

@@ -299,7 +299,15 @@ docker cp ./migration-data/01_users.sql supabase_db_nizam-app:/tmp/01_users.sql
 docker exec -it supabase_db_nizam-app psql -U postgres -d postgres -f /tmp/01_users.sql
 ```
 
-### Step 5 — Jalankan smoke validation
+### Step 5 — Sinkronkan auth runtime setelah load
+
+```bash
+./scripts/sync_auth_runtime_users.sh
+```
+
+Langkah ini penting karena source Supabase menyimpan identity di `auth.users`, sedangkan runtime aplikasi sekarang membaca login user dari `public.users` via Prisma/Auth.js.
+
+### Step 6 — Jalankan smoke validation
 
 Contoh query:
 
@@ -312,7 +320,7 @@ select count(*) from purchases;
 select count(*) from journal_entries;
 ```
 
-### Step 6 — Jalankan app verification
+### Step 7 — Jalankan app verification
 
 ```bash
 npx tsc --noEmit
@@ -320,7 +328,7 @@ npm test
 npm run build
 ```
 
-### Step 7 — Functional verification
+### Step 8 — Functional verification
 
 Checklist minimal:
 
