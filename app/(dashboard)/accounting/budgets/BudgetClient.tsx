@@ -63,6 +63,11 @@ function getAllocationDescription(account: BudgetAccount) {
   return 'Tetapkan alokasi budget bulanan untuk akun ini.'
 }
 
+function formatVarianceLabel(amount: number) {
+  if (amount === 0) return formatRupiah(0)
+  return `${amount > 0 ? '+' : '-'}${formatRupiah(Math.abs(amount))}`
+}
+
 interface BudgetClientProps {
   orgId: string
   activeBranchId?: string | null
@@ -123,6 +128,14 @@ export function BudgetClient({
       {} as Record<string, string>
     )
   )
+  const savedBudgetByAccount = initialBudgets.reduce((acc, budget) => {
+    acc[budget.account_id] = Number(budget.budget_amount)
+    return acc
+  }, {} as Record<string, number>)
+  const reportByAccount = reportData.reduce((acc, row) => {
+    acc[row.account_id] = row
+    return acc
+  }, {} as Record<string, BudgetReportRow>)
 
   const handleSave = async (accountId: string) => {
     if (!hasActiveBranch) {
@@ -386,60 +399,105 @@ export function BudgetClient({
                 <div className="p-10">
                   {hasBudgetableAccounts ? (
                     <div className="grid grid-cols-1 gap-4">
-                      {budgetableAccounts.map((account) => (
-                        <div key={account.id} className="flex flex-col md:flex-row md:items-center gap-6 p-6 hover:bg-slate-50 rounded-[32px] transition-all group">
-                          <div className="w-64">
-                            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">{account.code}</p>
-                            <p className="font-black text-slate-800 uppercase italic group-hover:text-blue-600 transition-colors truncate">{account.name}</p>
-                            <p className="mt-2 text-xs font-medium leading-relaxed text-slate-500">
-                              {getAllocationDescription(account)}
-                            </p>
-                            <div className="mt-3 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                              {getAllocationCategory(account)}
+                      <div className="rounded-[32px] border border-blue-100 bg-blue-50/70 px-6 py-5">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-700">Info Realisasi</p>
+                        <p className="mt-2 text-sm font-medium leading-relaxed text-blue-900">
+                          Tab ini hanya untuk menyimpan pagu budget. Pembayaran yang sudah dicatat tidak mengubah angka alokasi di form ini, dan akan muncul pada tab
+                          {' '}
+                          <span className="font-black">Realisasi Anggaran</span>
+                          {' '}
+                          setelah jurnal berstatus
+                          {' '}
+                          <span className="font-black">POSTED</span>
+                          {' '}
+                          ke akun dan unit yang sama.
+                        </p>
+                      </div>
+                      {budgetableAccounts.map((account) => {
+                        const reportRow = reportByAccount[account.id]
+                        const savedBudgetAmount = reportRow?.budget_amount ?? savedBudgetByAccount[account.id] ?? 0
+                        const actualAmount = reportRow?.actual_amount ?? 0
+                        const varianceAmount = actualAmount - savedBudgetAmount
+                        const hasRealizationSnapshot = savedBudgetAmount !== 0 || actualAmount !== 0
+
+                        return (
+                          <div key={account.id} className="flex flex-col md:flex-row md:items-center gap-6 p-6 hover:bg-slate-50 rounded-[32px] transition-all group">
+                            <div className="w-64">
+                              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">{account.code}</p>
+                              <p className="font-black text-slate-800 uppercase italic group-hover:text-blue-600 transition-colors truncate">{account.name}</p>
+                              <p className="mt-2 text-xs font-medium leading-relaxed text-slate-500">
+                                {getAllocationDescription(account)}
+                              </p>
+                              <div className="mt-3 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                {getAllocationCategory(account)}
+                              </div>
+                            </div>
+                            <div className="flex-1">
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  placeholder="IDR 0,00"
+                                  value={editMap[account.id] ?? ''}
+                                  onChange={(e) => {
+                                    setEditMap((current) => ({
+                                      ...current,
+                                      [account.id]: e.target.value,
+                                    }))
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault()
+                                      void handleSave(account.id)
+                                    }
+                                  }}
+                                  className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 text-sm font-black outline-none transition-all placeholder:text-slate-300"
+                                />
+                              </div>
+                              <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                Tekan Enter atau klik Simpan untuk menyimpan alokasi.
+                              </p>
+                              {hasRealizationSnapshot ? (
+                                <div className="mt-4 flex flex-wrap items-center gap-2">
+                                  <div className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
+                                    Budget Tersimpan {formatRupiah(savedBudgetAmount)}
+                                  </div>
+                                  <div className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-blue-700">
+                                    Realisasi {formatRupiah(actualAmount)}
+                                  </div>
+                                  <div className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${
+                                    varianceAmount > 0
+                                      ? 'bg-rose-50 text-rose-700'
+                                      : varianceAmount < 0
+                                        ? 'bg-emerald-50 text-emerald-700'
+                                        : 'bg-slate-100 text-slate-600'
+                                  }`}>
+                                    Selisih {formatVarianceLabel(varianceAmount)}
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="mt-4 text-xs font-medium text-slate-400">
+                                  Belum ada realisasi yang terbaca untuk akun ini pada periode dan unit aktif.
+                                </p>
+                              )}
+                            </div>
+                            <div className="md:w-[148px]">
+                              <button
+                                type="button"
+                                onClick={() => void handleSave(account.id)}
+                                disabled={isPending && savingAccountId === account.id}
+                                className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-4 text-sm font-black transition-all ${
+                                  isPending && savingAccountId === account.id
+                                    ? 'cursor-wait bg-slate-200 text-slate-500'
+                                    : 'bg-blue-600 text-white shadow-lg shadow-blue-100 hover:bg-blue-700'
+                                }`}
+                              >
+                                <Save size={16} />
+                                {isPending && savingAccountId === account.id ? 'Menyimpan...' : 'Simpan'}
+                              </button>
                             </div>
                           </div>
-                          <div className="flex-1">
-                            <div className="relative">
-                              <input
-                                type="number"
-                                placeholder="IDR 0,00"
-                                value={editMap[account.id] ?? ''}
-                                onChange={(e) => {
-                                  setEditMap((current) => ({
-                                    ...current,
-                                    [account.id]: e.target.value,
-                                  }))
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault()
-                                    void handleSave(account.id)
-                                  }
-                                }}
-                                className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 text-sm font-black outline-none transition-all placeholder:text-slate-300"
-                              />
-                            </div>
-                            <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                              Tekan Enter atau klik Simpan untuk menyimpan alokasi.
-                            </p>
-                          </div>
-                          <div className="md:w-[148px]">
-                            <button
-                              type="button"
-                              onClick={() => void handleSave(account.id)}
-                              disabled={isPending && savingAccountId === account.id}
-                              className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-4 text-sm font-black transition-all ${
-                                isPending && savingAccountId === account.id
-                                  ? 'cursor-wait bg-slate-200 text-slate-500'
-                                  : 'bg-blue-600 text-white shadow-lg shadow-blue-100 hover:bg-blue-700'
-                              }`}
-                            >
-                              <Save size={16} />
-                              {isPending && savingAccountId === account.id ? 'Menyimpan...' : 'Simpan'}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   ) : (
                     <div className="rounded-[32px] border border-dashed border-slate-200 bg-slate-50 px-8 py-12 text-center space-y-4">

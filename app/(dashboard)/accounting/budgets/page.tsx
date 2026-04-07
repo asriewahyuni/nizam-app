@@ -6,6 +6,19 @@ import { BudgetClient } from '@/app/(dashboard)/accounting/budgets/BudgetClient'
 
 export const dynamic = 'force-dynamic'
 
+function getMonthEndDate(periodStart: string) {
+  const [yearPart, monthPart] = periodStart.split('-')
+  const year = Number(yearPart)
+  const month = Number(monthPart)
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return periodStart
+  }
+
+  const lastDayOfMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  return `${yearPart}-${monthPart}-${String(lastDayOfMonth).padStart(2, '0')}`
+}
+
 export default async function BudgetPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
   const params = await searchParams
   const orgData = await getActiveOrg()
@@ -15,10 +28,7 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
   // Set default period: This month (YYYY-MM-01)
   const now = new Date()
   const currentPeriod = params.period || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-  const monthEnd = new Date(`${currentPeriod}T00:00:00`)
-  monthEnd.setMonth(monthEnd.getMonth() + 1)
-  monthEnd.setDate(0)
-  const currentPeriodEnd = monthEnd.toISOString().split('T')[0]
+  const currentPeriodEnd = getMonthEndDate(currentPeriod)
   
   const [budgets, bva, accounts, allowAllBranchSelection, periodStatus] = await Promise.all([
     getBudgets(orgData.org.id, currentPeriod, activeBranch?.id),

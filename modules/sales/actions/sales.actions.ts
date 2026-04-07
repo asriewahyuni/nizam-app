@@ -938,8 +938,19 @@ export async function createQuotation(orgId: string, payload: any) {
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
   const activeBranchId = activeBranchResult.branchId
 
-  const total = payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)
-  const grandTotal = total - (payload.discount_amount || 0) + (payload.tax_amount || 0)
+  const normalizedLines = (payload.lines || []).filter((line: any) => String(line?.product_name || '').trim().length > 0)
+  if (!payload.customer_id || normalizedLines.length === 0) {
+    return { error: 'Customer dan minimal satu baris item wajib diisi.' }
+  }
+
+  const total = normalizedLines.reduce((acc: number, l: any) => acc + (Number(l.quantity || 0) * Number(l.unit_price || 0)), 0)
+  const lineDiscountTotal = normalizedLines.reduce(
+    (acc: number, l: any) => acc + (Number(l.quantity || 0) * Number(l.discount_amount || 0)),
+    0
+  )
+  const headerDiscount = Number(payload.discount_amount || 0)
+  const taxAmount = Number(payload.tax_amount || 0)
+  const grandTotal = total - lineDiscountTotal - headerDiscount + taxAmount
 
   const { data: quote, error: quoteErr } = await (supabase as any)
     .from('sales')
@@ -951,8 +962,8 @@ export async function createQuotation(orgId: string, payload: any) {
       due_date: payload.due_date,
       payment_term: payload.payment_term || 'TEMPO',
       total_amount: total,
-      tax_amount: payload.tax_amount || 0,
-      discount_amount: payload.discount_amount || 0,
+      tax_amount: taxAmount,
+      discount_amount: headerDiscount,
       grand_total: grandTotal,
       shariah_mode: payload.shariah_mode || 'CASH',
       notes: payload.notes,
@@ -966,7 +977,7 @@ export async function createQuotation(orgId: string, payload: any) {
 
   const { error: linesErr } = await (supabase as any)
     .from('sales_items')
-    .insert(payload.lines.map((l: any) => ({
+    .insert(normalizedLines.map((l: any) => ({
       org_id: orgId,
       branch_id: activeBranchId,
       sale_id: quote.id,

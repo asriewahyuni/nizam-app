@@ -14,11 +14,23 @@ export default async function QuotationsPage() {
   if (!orgData) return null
 
   const orgId = orgData.org.id
+  const orgName = orgData.org.name || 'Nizam'
+  const orgSettings = orgData.org.settings || {}
   const activeBranch = await getActiveBranch(orgId)
   const quotations = await getQuotations(orgId, activeBranch?.id)
   
   const { data: customers } = await supabase.from('contacts').select('id, name').eq('org_id', orgId).eq('type', 'CUSTOMER')
   const products = await getProducts(orgId, activeBranch?.id)
 
-  return <QuotationClient orgId={orgId} quotations={quotations} customers={customers || []} products={products || []} />
+  return (
+    <QuotationClient
+      orgId={orgId}
+      orgName={orgName}
+      orgSettings={orgSettings}
+      activeBranchName={activeBranch?.name || null}
+      quotations={quotations}
+      customers={customers || []}
+      products={products || []}
+    />
+  )
 }
