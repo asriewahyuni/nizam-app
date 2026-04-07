@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getBalanceSheet, getProfitLoss, getCashFlow } from '@/modules/accounting/actions/reports.actions'
 import { unstable_noStore as noStore } from 'next/cache'
 import ReportsClient from './ReportsClient'
+import { toPlainSerializable } from '@/lib/serialization'
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ startDate?: string, endDate?: string, consolidated?: string }> }) {
   noStore()
@@ -30,9 +31,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       orgId={orgData.org.id}
       orgName={orgData.org.name}
       branchId={reportBranchId}
-      balanceSheet={balanceSheet} 
-      profitLoss={profitLoss} 
-      cashFlow={cashFlow}
+      balanceSheet={toPlainSerializable(balanceSheet)} 
+      profitLoss={toPlainSerializable(profitLoss)} 
+      cashFlow={toPlainSerializable(cashFlow)}
       isConsolidated={isConsolidated}
       isParentOrg={isParentOrg}
     />

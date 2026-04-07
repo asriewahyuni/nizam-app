@@ -144,6 +144,12 @@ async function getAuthenticatedUser() {
   }
 }
 
+function toIsoString(value: Date | string | null | undefined) {
+  if (!value) return null
+  if (typeof value === 'string') return value
+  return value.toISOString()
+}
+
 export async function getEmployees(orgId: string, branchId?: string | null) {
   const branchSelection = await resolveEmployeeBranchSelection(orgId, branchId)
   if ('error' in branchSelection) throw new Error('Branch Selection Error: ' + branchSelection.error)
@@ -177,7 +183,19 @@ export async function getEmployees(orgId: string, branchId?: string | null) {
 
   return employees.map((employee) => ({
     ...employee,
-    branch: employee.branches,
+    date_of_birth: toIsoString(employee.date_of_birth),
+    join_date: toIsoString(employee.join_date),
+    end_date: toIsoString(employee.end_date),
+    basic_salary: Number(employee.basic_salary || 0),
+    created_at: toIsoString(employee.created_at),
+    updated_at: toIsoString(employee.updated_at),
+    branch: employee.branches
+      ? {
+          id: employee.branches.id,
+          name: employee.branches.name,
+          code: employee.branches.code,
+        }
+      : null,
     managed_branches: managedBranches.filter((branch) => branch.pic_employee_id === employee.id).map((branch) => ({ id: branch.id })),
     managed_child_orgs: childOrgs.filter((org) => org.manager_employee_id === employee.id).map((org) => ({ id: org.id, name: org.name })),
   }))

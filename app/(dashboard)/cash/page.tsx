@@ -205,8 +205,20 @@ async function getManagedBankAccountsForParent(parentOrgId: string) {
   }
 
   return accounts.map((account: any) => ({
-    ...account,
+    id: account.id,
+    org_id: account.org_id,
+    branch_id: account.branch_id,
+    account_id: account.account_id,
+    account_name: account.accounts.name,
+    bank_name: account.bank_name,
+    account_number: account.account_number,
+    currency: account.currency,
+    current_balance: balanceByAccountId.get(String(account.account_id)) || 0,
+    is_active: account.is_active,
+    created_at: account.created_at?.toISOString?.() ?? account.created_at,
+    updated_at: account.updated_at?.toISOString?.() ?? account.updated_at,
     balances: { balance: balanceByAccountId.get(String(account.account_id)) || 0 },
+    account: normalizeAccountForCash(account.accounts),
     org_name: readRelationName(account.organizations),
     branch_name: readRelationName(account.branches),
   }))
@@ -233,7 +245,7 @@ export default async function CashPage() {
     getChildOrgs(orgId),
   ])
 
-  const managedBankAccounts =
+  const managedBankAccounts: Awaited<ReturnType<typeof getBankAccountsWithBalance>> =
     canManageDirect && isParentOrg ? await getManagedBankAccountsForParent(orgId) : bankAccounts
 
   // Prepare explicit placement options for Parent users

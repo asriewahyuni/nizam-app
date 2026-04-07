@@ -339,6 +339,14 @@ Checklist minimal:
 - CoA, cash, purchasing, sales, POS, HRIS bisa membuka data
 - laporan utama (`/reports`, `/accounting/*`) tidak error
 
+Tambahan setelah migrasi selesai:
+
+```bash
+./scripts/run_regression_smoke.sh
+```
+
+Dan gunakan `REGRESSION_CHECKLIST.md` untuk smoke test manual flow kritis (auth, cash, HRIS, billing, profil saya).
+
 ---
 
 ## 9. Validasi Pasca-Migrasi
@@ -427,10 +435,17 @@ Mitigasi:
 Langkah implementasi berikutnya sebaiknya menghasilkan artefak berikut:
 
 1. `migration-data/README.md`
+2. `scripts/run_full_migration.sh`
 2. `scripts/export_supabase_data.sh`
 3. `scripts/load_local_target.sh`
 4. `scripts/validate_migration.sql`
 5. `scripts/reset_target_from_backup.sh`
+
+Saat ini workflow praktis yang tersedia sudah bisa dijalankan lewat:
+
+```bash
+./scripts/run_full_migration.sh
+```
 
 ---
 

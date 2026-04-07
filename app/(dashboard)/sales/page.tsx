@@ -9,6 +9,7 @@ import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 import SalesClient from './SalesClient'
 
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { toPlainSerializable } from '@/lib/serialization'
 
 export default async function SalesPage() {
   const session = await auth()
@@ -36,12 +37,12 @@ export default async function SalesPage() {
         <SalesClient 
           orgId={orgId}
           orgName={orgName}
-          sales={sales}
-          customers={customers}
-          products={products}
-          warehouses={warehouses}
-          coa={coa}
-          orgSettings={orgSettings}
+          sales={toPlainSerializable(sales)}
+          customers={toPlainSerializable(customers)}
+          products={toPlainSerializable(products)}
+          warehouses={toPlainSerializable(warehouses)}
+          coa={toPlainSerializable(coa)}
+          orgSettings={toPlainSerializable(orgSettings)}
           activeBranchName={activeBranch?.name || null}
         />
       </Suspense>

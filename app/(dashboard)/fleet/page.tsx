@@ -4,6 +4,7 @@ import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getContacts } from '@/modules/contacts/actions/contact.actions'
 import { getAssets, getBookings, getRoutes, getSchedules, getAllMedicalRecords, getFleetCrew, getTerminals, getFleetAttendanceToday } from '@/modules/fleet/actions/fleet.actions'
 import { FleetClient } from './FleetClient'
+import { toPlainSerializable } from '@/lib/serialization'
 
 export const revalidate = 0
 
@@ -30,15 +31,15 @@ export default async function FleetPage() {
     <div className="p-4 md:p-8 min-h-screen bg-slate-50/30">
       <FleetClient 
         orgId={orgData.org.id}
-        assets={assets}
-        bookings={bookings}
-        routes={routes}
-        schedules={schedules}
-        medicalRecords={medicalRecords}
-        crew={crew}
-        terminals={terminals}
-        attendanceToday={attendanceToday}
-        contacts={contacts}
+        assets={toPlainSerializable(assets)}
+        bookings={toPlainSerializable(bookings)}
+        routes={toPlainSerializable(routes)}
+        schedules={toPlainSerializable(schedules)}
+        medicalRecords={toPlainSerializable(medicalRecords)}
+        crew={toPlainSerializable(crew)}
+        terminals={toPlainSerializable(terminals)}
+        attendanceToday={toPlainSerializable(attendanceToday)}
+        contacts={toPlainSerializable(contacts)}
       />
     </div>
   )

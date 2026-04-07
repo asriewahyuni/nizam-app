@@ -4,6 +4,7 @@ import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getContacts } from '@/modules/contacts/actions/contact.actions'
 import { getServiceOrders } from '@/modules/services/actions/service.actions'
 import { ServiceOrderClient } from './ServiceOrderClient'
+import { toPlainSerializable } from '@/lib/serialization'
 
 export const revalidate = 0
 
@@ -23,8 +24,8 @@ export default async function ServiceOrdersPage() {
     <div className="p-4 md:p-8 min-h-screen">
       <ServiceOrderClient 
         orgId={orgData.org.id}
-        orders={orders}
-        contacts={contacts}
+        orders={toPlainSerializable(orders)}
+        contacts={toPlainSerializable(contacts)}
       />
     </div>
   )

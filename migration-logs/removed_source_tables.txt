@@ -1,0 +1,9 @@
+public.bsc_cycles
+public.bsc_kpi_measurements
+public.bsc_kpis
+public.bsc_perspective_weights
+public.coa_account_requests
+public.support_ticket_updates
+public.support_tickets
+storage.buckets
+storage.objects

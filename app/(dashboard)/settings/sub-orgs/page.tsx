@@ -8,6 +8,7 @@ import {
 } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
 import SubOrgClient from './SubOrgClient'
+import { toPlainSerializable } from '@/lib/serialization'
 
 export default async function SubOrgsPage() {
   const orgData = await getActiveOrg()
@@ -49,13 +50,12 @@ export default async function SubOrgsPage() {
   return (
     <SubOrgClient
       orgId={orgData.org.id}
-      childOrgs={childOrgs}
-      unlinkedOrgs={unlinkedOrgs.map((o) => o.org)}
-      employees={employees}
+      childOrgs={toPlainSerializable(childOrgs)}
+      unlinkedOrgs={toPlainSerializable(unlinkedOrgs.map((o) => o.org))}
+      employees={toPlainSerializable(employees)}
       canMutate={canMutate}
       picFeatureEnabled={picFeatureEnabled}
-      limits={limits}
+      limits={toPlainSerializable(limits)}
     />
   )
 }
-

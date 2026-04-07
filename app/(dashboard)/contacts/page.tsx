@@ -5,6 +5,21 @@ import { getDashboardAnalytics } from '@/modules/accounting/actions/analytics.ac
 import ContactClient from './ContactClient'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 
+function toPlainValue(value: unknown): unknown {
+  if (value === null || value === undefined) return value
+  if (value instanceof Date) return value.toISOString()
+  if (Array.isArray(value)) return value.map((item) => toPlainValue(item))
+  if (typeof value === 'object') {
+    if ('toNumber' in (value as Record<string, unknown>) && typeof (value as { toNumber?: unknown }).toNumber === 'function') {
+      return (value as { toNumber: () => number }).toNumber()
+    }
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [key, toPlainValue(entry)])
+    )
+  }
+  return value
+}
+
 type ContactsSearchParams = Promise<{
   type?: string | string[] | undefined
 }>
@@ -30,12 +45,15 @@ export default async function ContactsPage({
     getContacts(orgId),
     getDashboardAnalytics(orgId, activeBranch?.id)
   ])
+
+  const safeContacts = toPlainValue(contacts) as any[]
+  const safeCustomerPareto = toPlainValue(analytics.customerPareto)
   
   return (
     <ContactClient 
       orgId={orgId} 
-      contacts={contacts} 
-      customerPareto={analytics.customerPareto} 
+      contacts={safeContacts} 
+      customerPareto={safeCustomerPareto} 
       initialTypeFilter={initialTypeFilter}
     />
   )

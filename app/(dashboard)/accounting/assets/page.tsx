@@ -3,6 +3,7 @@ import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/or
 import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
 import { getFixedAssets } from '@/modules/accounting/actions/assets.actions'
 import { AssetClient } from './AssetClient'
+import { toPlainSerializable } from '@/lib/serialization'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,8 +30,8 @@ export default async function AssetsPage() {
         orgName={orgData.org.name}
         activeBranchId={activeBranch?.id ?? null}
         activeBranchName={activeBranch?.name ?? null}
-        initialAssets={assets} 
-        coa={coaRes.filter((account) => account.is_active)} 
+        initialAssets={toPlainSerializable(assets)} 
+        coa={toPlainSerializable(coaRes.filter((account) => account.is_active))} 
       />
     </div>
   )

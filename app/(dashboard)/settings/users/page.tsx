@@ -2,6 +2,7 @@ import { getActiveOrg, getBranches, getInvitations, getOrgMembers } from '@/modu
 import { redirect } from 'next/navigation'
 import UsersClient from './UsersClient'
 import { getOrgRoles } from '@/modules/organization/actions/hris.actions'
+import { toPlainSerializable } from '@/lib/serialization'
 
 export default async function UsersPage() {
   const orgData = await getActiveOrg()
@@ -17,10 +18,10 @@ export default async function UsersPage() {
   return (
     <UsersClient
       orgId={orgData.org.id}
-      initialMembers={members || []}
-      branches={branches || []}
-      roles={rolesResult.roles || []}
-      initialInvitations={invitations || []}
+      initialMembers={toPlainSerializable(members || [])}
+      branches={toPlainSerializable(branches || [])}
+      roles={toPlainSerializable(rolesResult.roles || [])}
+      initialInvitations={toPlainSerializable(invitations || [])}
     />
   )
 }

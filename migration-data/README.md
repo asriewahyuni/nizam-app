@@ -13,10 +13,27 @@ Folder ini berisi artifact kerja untuk migrasi data dari Supabase source ke data
 
 ## Script terkait
 
+- `scripts/run_full_migration.sh`
 - `scripts/export_supabase_data.sh`
 - `scripts/load_local_target.sh`
 - `scripts/sync_auth_runtime_users.sh`
 - `scripts/validate_migration_counts.py`
+
+## Workflow tercepat
+
+Untuk menjalankan seluruh alur end-to-end:
+
+```bash
+./scripts/run_full_migration.sh
+```
+
+Opsi tambahan:
+
+```bash
+./scripts/run_full_migration.sh --skip-export
+./scripts/run_full_migration.sh --skip-smoke
+./scripts/run_full_migration.sh --container=supabase_db_nizam-app
+```
 
 ## Catatan Auth Runtime
 

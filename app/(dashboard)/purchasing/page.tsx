@@ -9,6 +9,21 @@ import PurchasingClient from './PurchasingClient'
 
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 
+function toPlainValue(value: unknown): unknown {
+  if (value === null || value === undefined) return value
+  if (value instanceof Date) return value.toISOString()
+  if (Array.isArray(value)) return value.map((item) => toPlainValue(item))
+  if (typeof value === 'object') {
+    if ('toNumber' in (value as Record<string, unknown>) && typeof (value as { toNumber?: unknown }).toNumber === 'function') {
+      return (value as { toNumber: () => number }).toNumber()
+    }
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [key, toPlainValue(entry)])
+    )
+  }
+  return value
+}
+
 export default async function PurchasingPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
@@ -28,6 +43,12 @@ export default async function PurchasingPage() {
     getPurchaseRequests(orgId, activeBranch?.id)
   ])
 
+  const safePurchases = toPlainValue(purchases)
+  const safeVendors = toPlainValue(vendors)
+  const safeProducts = toPlainValue(products)
+  const safeCoa = toPlainValue(coa)
+  const safePurchaseRequests = toPlainValue(purchaseRequests)
+
   return (
     <div className="p-10 space-y-10">
       <Suspense fallback={<div className="p-10 text-center font-black animate-pulse">Loading Purchasing Dashboard...</div>}>
@@ -37,11 +58,11 @@ export default async function PurchasingPage() {
           org={orgData.org}
           activeBranchId={activeBranch?.id || null}
           activeBranchName={activeBranch?.name || null}
-          purchases={purchases}
-          vendors={vendors}
-          products={products}
-          coa={coa}
-          purchaseRequests={purchaseRequests}
+          purchases={safePurchases}
+          vendors={safeVendors}
+          products={safeProducts}
+          coa={safeCoa}
+          purchaseRequests={safePurchaseRequests}
         />
       </Suspense>
     </div>

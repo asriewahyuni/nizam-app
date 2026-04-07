@@ -1,18 +1,1 @@
-ALTER TABLE "public"."branches" ADD COLUMN IF NOT EXISTS "phone" "text";
-ALTER TABLE "public"."branches" ADD COLUMN IF NOT EXISTS "metadata" "jsonb" DEFAULT '{}'::"jsonb";
-ALTER TABLE "public"."branches" ADD COLUMN IF NOT EXISTS "pic_employee_id" "uuid";
-ALTER TABLE "public"."employees" ADD COLUMN IF NOT EXISTS "department_ids" "public"."nizam_department"[] DEFAULT '{}'::"public"."nizam_department"[];
-ALTER TABLE "public"."production_work_orders" ADD COLUMN IF NOT EXISTS "deadline_date" "date";
-ALTER TABLE "public"."fixed_assets" ADD COLUMN IF NOT EXISTS "acquisition_method" "text" DEFAULT 'LUNAS'::"text";
-ALTER TABLE "public"."fixed_assets" ADD COLUMN IF NOT EXISTS "source_account_id" "uuid";
-ALTER TABLE "public"."inventory_stocks" ADD COLUMN IF NOT EXISTS "branch_id" "uuid";
-ALTER TABLE "public"."org_members" ADD COLUMN IF NOT EXISTS "last_active_at" timestamp with time zone;
-ALTER TABLE "public"."org_members" ADD COLUMN IF NOT EXISTS "last_active_branch_id" "uuid";
-ALTER TABLE "public"."purchases" ADD COLUMN IF NOT EXISTS "insurance_amount" numeric(20,2) DEFAULT 0;
-ALTER TABLE "public"."roles" ADD COLUMN IF NOT EXISTS "source_org_id" "uuid";
-ALTER TABLE "public"."roles" ADD COLUMN IF NOT EXISTS "source_role_id" "uuid";
-ALTER TABLE "public"."saas_config" ADD COLUMN IF NOT EXISTS "description" "text";
-ALTER TABLE "public"."saas_packages" ADD COLUMN IF NOT EXISTS "max_branches" integer DEFAULT 1;
-ALTER TABLE "public"."saas_packages" ADD COLUMN IF NOT EXISTS "max_child_orgs" integer DEFAULT 1;
-ALTER TABLE "public"."saas_packages" ADD COLUMN IF NOT EXISTS "max_users" integer DEFAULT 5;
-ALTER TABLE "public"."service_orders" ADD COLUMN IF NOT EXISTS "completion_date" timestamp with time zone;
+

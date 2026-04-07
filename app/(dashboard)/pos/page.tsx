@@ -6,6 +6,7 @@ import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
 import { getContacts } from '@/modules/contacts/actions/contact.actions'
 import { getProducts } from '@/modules/inventory/actions/inventory.actions'
 import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
+import { toPlainSerializable } from '@/lib/serialization'
 
 export default async function POSPage() {
   const session = await auth()
@@ -40,11 +41,11 @@ export default async function POSPage() {
   return (
     <POSClient
       orgId={orgId}
-      org={orgData.org}
-      products={productsWithStock}
-      customers={customers}
-      accounts={accounts}
-      warehouses={warehouses || []}
+      org={toPlainSerializable(orgData.org)}
+      products={toPlainSerializable(productsWithStock)}
+      customers={toPlainSerializable(customers)}
+      accounts={toPlainSerializable(accounts)}
+      warehouses={toPlainSerializable(warehouses || [])}
       currentUser={session.user}
       activeBranchId={activeBranch?.id || null}
       activeBranchName={activeBranch?.name || null}
