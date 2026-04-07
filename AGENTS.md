@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Gambaran Umum Codebase Nizam App
-Repository `nizam-app` adalah sebuah solusi ERP (Enterprise Resource Planning) modern yang dikembangkan menggunakan TypeScript. Repository ini dirancang secara modular dan terstruktur untuk mendukung fitur seperti autentikasi pengguna, onboarding, dan pengelolaan basis data menggunakan Supabase.
+Repository `nizam-app` adalah sebuah solusi ERP (Enterprise Resource Planning) modern yang dikembangkan menggunakan TypeScript. Repository ini dirancang secara modular dan terstruktur untuk mendukung fitur seperti autentikasi pengguna, onboarding, dan pengelolaan basis data menggunakan Prisma + PostgreSQL, dengan autentikasi berbasis NextAuth.
 
 Panduan ini ditujukan untuk asisten AI agar memahami struktur kode, konvensi, dan alur kerja pengembangan dalam repository ini.
 
@@ -18,15 +18,14 @@ Panduan ini ditujukan untuk asisten AI agar memahami struktur kode, konvensi, da
 - **`lib/`**:
   Library utilitas dan integrasi eksternal.
   - `utils.ts`: Fungsi utilitas umum (misalnya, format mata uang, membuat slug).
-  - `supabase/`: Konfigurasi dan helper untuk Supabase.
+  - `prisma.ts`: Bootstrap client Prisma untuk akses database PostgreSQL.
   - `email/`: Utilitas pengiriman email untuk invoice dan promosi.
 
 - **`scripts/`**:
-  Skrip untuk pengaturan dan pemeliharaan. Contoh:
-  - `migrate-supabase-to-local.mjs`: Membantu migrasi data Supabase ke database lokal untuk pengujian.
+  Skrip untuk pengaturan dan pemeliharaan internal repository.
 
 - **`supabase/`**:
-  Berisi skrip migrasi database dan implementasi kontrol akses berbasis peran (RBAC).
+  Berisi arsip migrasi SQL historis proyek. Folder ini dipertahankan sebagai jejak evolusi skema, tetapi runtime aplikasi tidak lagi memakai client/helper Supabase.
 
 ### 2. **Komponen Utama**
 - **Komponen UI / Client-Side**:
@@ -36,7 +35,7 @@ Panduan ini ditujukan untuk asisten AI agar memahami struktur kode, konvensi, da
   Integrasi API seperti pengiriman email menggunakan library `Resend` untuk mengelola email transaksional (lihat `sender.ts`).
 
 - **Integrasi Basis Data**:
-  Repository ini menggunakan Supabase untuk pengelolaan database. Skrip migrasi database dan konfigurasi Supabase dapat ditemukan di `supabase/`.
+  Runtime repository ini sekarang menggunakan Prisma untuk akses PostgreSQL. Guard akses tenant/branch dilakukan di layer aplikasi, bukan lagi melalui client Supabase.
 
 ---
 
@@ -53,11 +52,11 @@ Panduan ini ditujukan untuk asisten AI agar memahami struktur kode, konvensi, da
 
 4. **Library Pihak Ketiga**:
    - Email: [Resend API](https://resend.com).
-   - Database: [Supabase](https://supabase.com).
+   - Database ORM: [Prisma](https://www.prisma.io/).
    - Animasi: [Framer Motion](https://www.framer.com/motion/).
 
 5. **Pengujian**:
-   - Skrip seperti di `scripts/migrate-supabase-to-local.mjs` memastikan setup pengujian lokal berjalan lancar.
+   - Gunakan Vitest (`npm test`) untuk validasi logic unit/integration repository.
 
 6. **Dokumentasi Kode**:
    Setiap modul wajib memiliki komentar dengan deskripsi fungsinya untuk meningkatkan keterbacaan.
@@ -75,17 +74,17 @@ Panduan ini ditujukan untuk asisten AI agar memahami struktur kode, konvensi, da
   npm install
   ```
 - Setel environment variables:
-  Gunakan referensi dari `.env.example` untuk mengetahui variabel environment yang diperlukan, terutama kredensial Supabase.
+  Gunakan referensi dari `.env.example` / `.env.local.example` untuk mengetahui variabel environment yang diperlukan, terutama `DATABASE_URL`, auth secret, dan kredensial email.
 
 ### **Menjalankan Proyek Secara Lokal**
-- Untuk pengembangan lokal dengan Supabase:
+- Untuk pengembangan lokal:
   ```bash
   npm run dev
   ```
 
 ### **Skrip dan Utilitas**
 1. **Migrasi Database**:
-   - Gunakan skrip di `scripts/migrate-supabase-to-local.mjs` untuk migrasi data Supabase secara lokal.
+   - Gunakan workflow migrasi PostgreSQL/Prisma yang berlaku di repository.
 
 2. **Pengujian Pengiriman Email**:
    - Email (misalnya, invoice) dapat diuji menggunakan utilitas di `lib/email/sender.ts`.
@@ -101,7 +100,7 @@ Panduan ini ditujukan untuk asisten AI agar memahami struktur kode, konvensi, da
 ---
 
 Untuk informasi lebih lanjut, para kontributor dapat membuka:
-- [Dokumentasi Supabase](https://supabase.com/docs)
+- [Dokumentasi Prisma](https://www.prisma.io/docs)
 - [Dokumentasi Next.js](https://nextjs.org/docs)
 
 Selamat Coding!

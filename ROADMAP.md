@@ -1,13 +1,13 @@
 # NIZAM ERP — Roadmap 5 Phase
 
-This roadmap outlines the development plan for NIZAM ERP, a multi-tenant accounting and enterprise resource planning system built with Next.js and Supabase.
+This roadmap outlines the development plan for NIZAM ERP, a multi-tenant accounting and enterprise resource planning system built with Next.js, Prisma, and PostgreSQL.
 
 ---
 
 ## Phase 1 — Foundation (~2 minggu)
 > "Tanpa ini, semua phase berikutnya goyah"
 
-- [x] **Setup Supabase**: schema multi-tenant (org, users, roles)
+- [x] **Setup database foundation**: schema multi-tenant (org, users, roles) now running via Prisma/PostgreSQL
 - [x] **Row Level Security (RLS)**: per organisasi
 - [x] **Auth**: login, MFA, RBAC (admin / staff / manager)
 - [x] **Chart of Accounts (CoA)**: standar PSAK

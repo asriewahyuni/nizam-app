@@ -1,33 +1,30 @@
 # AI Handover Document: Supabase -> Prisma/Auth Migration Status
 
-**Updated:** 2026-04-06 (sesi ke-25, Fleet migration)  
-**Status:** `IN PROGRESS` — Prioritas Cash, Journal, Reimbursement, Fixed Assets, Factory, Sales Page, dan Fleet sudah selesai. Estimasi progres migrasi keseluruhan saat ini sekitar `99%`. Target berikutnya adalah accounting/reporting residual dan demo tooling yang masih Supabase-heavy.
+**Updated:** 2026-04-07  
+**Status:** `COMPLETED` — Migrasi runtime aplikasi dari Supabase client ke Prisma/Auth/NextAuth sudah selesai, termasuk cleanup pasca-merge `origin/main`.
 
-Dokumen ini adalah rencana eksekusi dan handover aktif untuk agen. Sesi-sesi sebelumnya telah menyelesaikan migrasi pada domain auth, org, HRIS, audit, billing, accounting, contacts, services, sales, sales-write, POS.
+Dokumen ini sekarang berfungsi sebagai **catatan historis handover migrasi**, bukan rencana eksekusi aktif. Sesi-sesi lanjutan sebaiknya mengacu ke `README.md`, `DOCUMENTATION.md`, dan `AGENTS.md` untuk arsitektur terkini.
 
 ---
 
 ## 0. Snapshot Repo Saat Ini
 
-- Estimasi progres migrasi keseluruhan: `99%`
-- Estimasi sisa pekerjaan utama: `1%`
-  - Ticketing sudah selesai dipindah dari Supabase data client ke Prisma/Auth raw SQL
-  - Slice cash inti sekarang sudah selesai: `modules/cash/actions/bank.actions.ts` dan `modules/cash/actions/reconcile.actions.ts` sudah memakai Prisma/Auth
-  - Slice journal inti sekarang juga sudah selesai: `modules/accounting/actions/journal.actions.ts` sudah memakai Prisma/Auth
-  - Slice reimbursement sekarang juga sudah selesai: `modules/accounting/actions/reimburse.actions.ts` sudah memakai Prisma/Auth + storage wrapper server-side
-  - Slice fixed assets sekarang juga sudah selesai: `modules/accounting/actions/assets.actions.ts` sudah memakai Prisma/Auth, dengan RPC disposal tetap lewat DB context Prisma
-  - Slice factory sekarang juga sudah selesai: `modules/factory/actions/factory.actions.ts` sudah memakai Prisma/Auth, dengan RPC completion work order tetap lewat DB context Prisma
-  - Slice sales page sekarang juga sudah selesai: `modules/sales/lib/sales-page.server.ts` sudah memakai Prisma/Auth, termasuk public lead capture dan AI token billing flow
-  - Slice fleet sekarang juga sudah selesai: `modules/fleet/actions/fleet.actions.ts` sudah memakai Prisma/Auth, dengan RPC maintenance tetap lewat DB context Prisma dan fallback insert manual saat fungsi DB belum tersedia
-  - Sisa terbesar sekarang bergeser ke accounting/reporting residual dan demo tooling
+- Estimasi progres migrasi keseluruhan: `100%`
+- Estimasi sisa pekerjaan runtime: `0%`
+  - Runtime app tidak lagi memakai `createClient()` / `createAdminClient()` Supabase.
+  - Auth berjalan via `auth()` / NextAuth credentials.
+  - Akses data berjalan via Prisma + PostgreSQL.
+  - Storage upload feature-layer berjalan via server-side public upload helper.
+  - Debug scripts Supabase lama dan wrapper `lib/supabase/*` sudah dibersihkan.
 
-- Sesi sebelumnya telah membersihkan semua penggunaan klien Supabase pada domain operasional `sales` dan `pos`. 
-- Sesi ini (Sesi 15) akan fokus pada eksekusi Prioritas 1: **Core Sales / Purchasing Backbone**.
+**Verifikasi final pada 7 April 2026:**
+- grep runtime untuk `@/lib/supabase`, `@supabase/*`, `createClient(`, `createAdminClient(` = **0 match**
+- `npx tsc --noEmit` ✅
+- `npm test` ✅
+- `npm run build` ✅
 
-### Ruang Lingkup Target Sesi 15:
-1. `modules/purchasing/actions/purchasing.actions.ts`
-2. `modules/inventory/actions/inventory.actions.ts`
-3. `modules/inventory/actions/warehouse.actions.ts`
+### Catatan
+Bagian-bagian detail di bawah tetap dipertahankan sebagai jejak historis proses migrasi lintas sesi. Namun status aktifnya sekarang sudah ditutup sebagai selesai.
 
 ### Rencana Migrasi (Sesi 15):
 #### [MODIFY] `modules/purchasing/actions/purchasing.actions.ts`

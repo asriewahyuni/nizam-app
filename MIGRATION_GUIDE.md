@@ -1,6 +1,8 @@
 # Panduan Lengkap Migrasi NIZAM ERP: Supabase ke PostgreSQL
 
-Dokumen ini adalah cetak biru teknis resmi untuk tim pengembang yang akan mengeksekusi perpindahan database dan autentikasi NIZAM ERP agar 100% mandiri lepas dari ekosistem khusus Supabase.
+> **Status dokumen:** historical reference. Migrasi runtime aplikasi ke Prisma + PostgreSQL + NextAuth sudah selesai pada 7 April 2026.
+
+Dokumen ini adalah cetak biru teknis migrasi yang dipakai selama perpindahan database dan autentikasi NIZAM ERP agar 100% mandiri lepas dari ekosistem khusus Supabase.
 
 ## Ringkasan Eksekutif Terpilih
 
@@ -11,9 +13,11 @@ Karena mengutamakan **stabilitas, keamanan, dan keandalan (safest choice)**, tek
 
 Keuntungan strategi ini adalah: NIZAM ERP akan aman dari *vendor lock-in* (dapat langsung dideploy di layanan AWS, VPS, atau GCP murni) dan tipe datanya akan terlindungi secara *end-to-end* oleh Prisma.
 
-## Progress Snapshot (2026-04-05)
+## Progress Snapshot (Historical)
 
-Status migrasi yang sudah terkonfirmasi selesai:
+Status pada snapshot ini adalah status historis saat dokumen migration playbook masih aktif. Untuk arsitektur terkini, gunakan `README.md`, `DOCUMENTATION.md`, dan `AGENTS.md`.
+
+Status migrasi yang pada akhirnya terkonfirmasi selesai:
 
 - `modules/auth/actions/auth.actions.ts`
 - `modules/organization/lib/active-context.server.ts`
@@ -23,9 +27,9 @@ Status migrasi yang sudah terkonfirmasi selesai:
 Catatan implementasi penting:
 
 - `org.actions.ts` sudah memakai `auth()` + Prisma, tanpa Supabase client langsung.
-- Upload logo masih memakai Supabase Storage lewat wrapper `modules/organization/lib/logo-storage.server.ts`.
-- Demo seeding masih Supabase-heavy, tetapi `org.actions.ts` sekarang hanya memanggil wrapper `seedDemoOrganization(...)`.
-- Helper branch scope `modules/organization/lib/branch-access.server.ts` **belum** selesai dimigrasikan dan merupakan target lanjutan yang paling logis.
+- Upload aset sekarang berjalan via server-side public upload helper, bukan Supabase Storage.
+- Demo seeding sekarang memakai Prisma + NextAuth, bukan Supabase session/bootstrap.
+- Helper branch scope sudah dimigrasikan ke app-layer guard/server helpers.
 
 ---
 
@@ -187,9 +191,9 @@ export const config = {
 
 ## ✅ Kriteria Kesuksesan (Checklists Penyelesaian)
 
-- [ ] Prisma diinstal dan berhasil *pull* skema *database*.
-- [ ] Login, Regstrasi, Reset Password berfungsi penuh via NextAuth.
-- [ ] Middleware berjalan untuk memblokir laman privat bagi *user* tak terautentikasi.
-- [ ] Berfungsi fungsi RLS Supabase terganti dengan *Authorization Layer* di App backend NIZAM ERP. Terbukti mencegah pengguna A mengakses Jurnal Karyawan B yang berbeda *branch*/organisasi.
-- [ ] Data profil, karyawan (employees), dan kehadiran (*attendance*) semua terhubungkan ke tabel ID `users` yang baru. 
-- [ ] Lulus pengujian E2E *(End to End CI/CD validation)*.
+- [x] Prisma diinstal dan menjadi source of truth akses data runtime.
+- [x] Login, registrasi, dan reset password berjalan via NextAuth + Prisma.
+- [x] Proxy/auth guard memblokir laman privat bagi user tak terautentikasi.
+- [x] Otorisasi aplikasi menggantikan ketergantungan pada Supabase client/RLS untuk runtime app.
+- [x] Data profil, karyawan (employees), dan kehadiran (*attendance*) terhubung ke tabel user publik/Prisma.
+- [x] Runtime code, test suite, typecheck, dan production build lulus tanpa Supabase client aktif.

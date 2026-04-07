@@ -1,12 +1,12 @@
 # NIZAM ERP — Comprehensive Codebase Documentation
 
-> **Last updated:** 6 April 2026 (rev 9) — updated with organization onboarding bootstrap hardening (CoA/main-branch race fix), plus migration timeline up to `1150`.
+> **Last updated:** 7 April 2026 (rev 10) — updated after full Supabase runtime/client removal and post-merge Prisma/NextAuth reconciliation.
 
 ---
 
 ## 1. Executive Summary
 
-NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **Supabase (PostgreSQL)**. It consolidates accounting, cash & bank, inventory/WMS, purchasing, sales, POS, CRM, HRIS & payroll, fixed assets, budgeting, tax, zakat (Islamic finance), approval workflows, audit trails, manufacturing, fleet management, service orders, SaaS billing, AI token economy, and a sales page builder — all within a single monorepo.
+NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **Prisma + PostgreSQL**. It consolidates accounting, cash & bank, inventory/WMS, purchasing, sales, POS, CRM, HRIS & payroll, fixed assets, budgeting, tax, zakat (Islamic finance), approval workflows, audit trails, manufacturing, fleet management, service orders, SaaS billing, AI token economy, and a sales page builder — all within a single monorepo.
 
 ### Codebase Snapshot
 
@@ -30,9 +30,9 @@ NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **
 | UI Runtime | React **19.2.4** |
 | Rendering | Server Components + Client Components + Server Actions |
 | Request Interception | `proxy.ts` (Next.js 16 Proxy convention) |
-| Database | Supabase / PostgreSQL with RLS |
-| Auth | Supabase Auth (email/password, NIK/password for staff) |
-| Security | RLS + org isolation + role/module gating + branch-level ACL |
+| Database | Prisma + PostgreSQL |
+| Auth | NextAuth Credentials + application-level identity linking |
+| Security | App-layer tenant isolation + role/module gating + branch-level ACL |
 | Styling | Tailwind CSS **4.2.2** + custom design tokens + Framer Motion |
 | UI Components | Custom `NizamUI` component library + Radix UI primitives |
 | Charts | Recharts |
@@ -69,7 +69,7 @@ nizam-app/
 │   ├── email/           # Email sender (Resend)
 │   ├── hooks/           # Client hooks (useActiveOrgId)
 │   ├── saas/            # SaaS module catalog, pricing, platform admin
-│   ├── supabase/        # Supabase clients (server, client, middleware, config)
+│   ├── storage/         # Server-side upload helpers for public assets
 │   └── utils.ts         # cn(), formatRupiah(), formatDate(), generateSlug(), etc.
 ├── modules/             # Domain business logic (server actions + lib)
 │   ├── accounting/      # 17 action files
@@ -89,10 +89,10 @@ nizam-app/
 │   ├── services/        # Service/job orders
 │   └── settings/        # Settings audit
 ├── types/
-│   └── database.types.ts # Auto-generated Supabase types
+│   └── database.types.ts # Historical generated DB types (legacy reference)
 ├── __tests__/           # Vitest test suites (33 files)
 ├── supabase/
-│   └── migrations/      # 191 SQL migration files
+│   └── migrations/      # Historical SQL migration archive
 ├── scripts/             # Data migration scripts
 └── public/              # PWA manifest, logo, static assets
 ```
@@ -200,7 +200,7 @@ Runtime data access now uses **Prisma** for reads/writes and **NextAuth** for au
 ### 5.1 Multi-Tenant Model
 
 - Every business table has `org_id` for tenant isolation
-- PostgreSQL RLS policies read `auth.uid()` and check org membership
+- Tenant/branch access is enforced in application services and server actions
 - Key tables: `organizations`, `org_members`, `roles`, `branches`
 
 ### 5.2 Authentication Flows
@@ -212,7 +212,7 @@ Runtime data access now uses **Prisma** for reads/writes and **NextAuth** for au
 | Staff login | `signInWithNik(formData)` | NIK/password |
 | Staff invitation | `verifyEmployeeNikByToken(token, nik)` | Join link → `/join/[token]` |
 | Staff registration | `registerEmployeeAccount(formData)` | After invitation verification |
-| Password reset (owner) | `sendPasswordResetEmail(formData)` | Via Supabase email |
+| Password reset (owner) | `sendPasswordResetEmail(formData)` | Email link + Prisma verification token |
 | Password reset (staff) | `requestPasswordReset(nik)` → `resetEmployeePassword(...)` | HR-initiated |
 
 ### 5.3 Active Organization Resolution
