@@ -123,13 +123,18 @@ function isDemoPlanName(value: unknown): boolean {
   return typeof value === 'string' && value.trim().toLowerCase() === 'demo'
 }
 
-function isDemoOrganizationState(org: unknown): boolean {
-  if (!isPlainObject(org)) return false
-  if (Boolean(org.is_demo)) return true
+function readPlanNameFromSettings(settings: unknown): string | null {
+  if (!isPlainObject(settings)) return null
 
-  const settings = isPlainObject(org.settings) ? org.settings : null
-  if (!settings) return false
+  const rawPlan = settings.plan
+  if (typeof rawPlan !== 'string') return null
 
+  const trimmedPlan = rawPlan.trim()
+  return trimmedPlan || null
+}
+
+function readDemoFlagFromSettings(settings: unknown): boolean {
+  if (!isPlainObject(settings)) return false
   return Boolean(settings.is_demo) || isDemoPlanName(settings.plan)
 }
 
@@ -140,9 +145,14 @@ function isDemoAccountUser(user: { email?: string | null; user_metadata?: Record
   return Boolean(user.user_metadata && (user.user_metadata as Record<string, unknown>).is_demo)
 }
 
-async function isOrganizationDemo(db: any, orgId: string): Promise<boolean> {
+async function getOrganizationPackageState(
+  db: any,
+  orgId: string
+): Promise<{ plan: string | null; isDemo: boolean }> {
   const trimmedOrgId = String(orgId || '').trim()
-  if (!trimmedOrgId) return false
+  if (!trimmedOrgId) {
+    return { plan: null, isDemo: false }
+  }
 
   const { data: orgRow, error } = await db
     .from('organizations')
@@ -150,58 +160,77 @@ async function isOrganizationDemo(db: any, orgId: string): Promise<boolean> {
     .eq('id', trimmedOrgId)
     .maybeSingle()
 
-  if (error || !orgRow) return false
-  return isDemoOrganizationState(orgRow)
+  if (error || !orgRow) {
+    return { plan: null, isDemo: false }
+  }
+
+  const plan = readPlanNameFromSettings(orgRow.settings)
+  const isDemo = Boolean(orgRow.is_demo) || readDemoFlagFromSettings(orgRow.settings) || isDemoPlanName(plan)
+
+  return { plan, isDemo }
 }
 
-async function enforceOrganizationAsDemo(
+function mergeOrganizationSettingsWithPlanState(
+  settings: unknown,
+  packageState: { plan: string | null; isDemo: boolean }
+) {
+  const nextSettings = isPlainObject(settings) ? { ...settings } : {}
+
+  if (packageState.plan) {
+    nextSettings.plan = packageState.plan
+  }
+  nextSettings.is_demo = packageState.isDemo
+
+  return nextSettings
+}
+
+async function syncChildOrganizationPlanFromParent(
   db: any,
-  orgId: string
+  parentOrgId: string,
+  childOrgId: string
 ): Promise<{ success: true } | { success: false; error: string }> {
-  const trimmedOrgId = String(orgId || '').trim()
-  if (!trimmedOrgId) {
-    return { success: false, error: 'Organisasi target demo tidak valid.' }
+  const trimmedParentOrgId = String(parentOrgId || '').trim()
+  const trimmedChildOrgId = String(childOrgId || '').trim()
+  if (!trimmedParentOrgId || !trimmedChildOrgId) {
+    return { success: false, error: 'Parameter sinkronisasi paket parent-child tidak valid.' }
+  }
+  if (trimmedParentOrgId === trimmedChildOrgId) {
+    return { success: false, error: 'Sinkronisasi paket parent-child tidak bisa dilakukan pada org yang sama.' }
   }
 
-  const { data: orgRow, error: orgError } = await db
-    .from('organizations')
-    .select('id, is_demo, settings')
-    .eq('id', trimmedOrgId)
-    .maybeSingle()
-
-  if (orgError || !orgRow) {
-    return { success: false, error: orgError?.message || 'Organisasi target demo tidak ditemukan.' }
-  }
-
-  const currentSettings = isPlainObject(orgRow.settings) ? orgRow.settings : {}
-  const nextSettings = {
-    ...currentSettings,
-    plan: 'Demo',
-    is_demo: true,
-  }
-
-  const updatePayload: Record<string, unknown> = {
-    settings: nextSettings,
-    is_demo: true,
-    updated_at: new Date().toISOString(),
-  }
-
-  let { error: updateError } = await db
-    .from('organizations')
-    .update(updatePayload)
-    .eq('id', trimmedOrgId)
-
-  const missingColumn = extractMissingColumnName(updateError)
-  if (missingColumn === 'is_demo') {
-    delete updatePayload.is_demo
-    ;({ error: updateError } = await db
+  const [parentPackageState, { data: childOrg, error: childOrgError }] = await Promise.all([
+    getOrganizationPackageState(db, trimmedParentOrgId),
+    db
       .from('organizations')
-      .update(updatePayload)
-      .eq('id', trimmedOrgId))
+      .select('id, is_demo, settings')
+      .eq('id', trimmedChildOrgId)
+      .maybeSingle(),
+  ])
+
+  if (childOrgError || !childOrg) {
+    return { success: false, error: childOrgError?.message || 'Organisasi anak tidak ditemukan.' }
   }
+
+  const currentPlan = readPlanNameFromSettings(childOrg.settings)
+  const currentIsDemo = Boolean(childOrg.is_demo) || readDemoFlagFromSettings(childOrg.settings)
+  const shouldSyncPlan = Boolean(parentPackageState.plan)
+  if ((!shouldSyncPlan || currentPlan === parentPackageState.plan) && currentIsDemo === parentPackageState.isDemo) {
+    return { success: true }
+  }
+
+  const nextSettings = mergeOrganizationSettingsWithPlanState(childOrg.settings, parentPackageState)
+
+  const { error: updateError } = await db
+    .from('organizations')
+    .update({
+      settings: nextSettings,
+      is_demo: parentPackageState.isDemo,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', trimmedChildOrgId)
 
   if (updateError) {
-    return { success: false, error: updateError.message || 'Gagal menyinkronkan paket demo organisasi.' }
+    return { success: false, error: updateError.message || 'Sinkronisasi paket parent-child gagal.' }
   }
 
   return { success: true }
@@ -359,6 +388,7 @@ async function createOrganizationRecord(
     const parentOrgId = parentOrgIdRaw || null
     const accountIsDemo = isDemoAccountUser(user as { email?: string | null; user_metadata?: Record<string, unknown> | null })
     let parentOrgIsDemo = false
+    let parentPackageState: { plan: string | null; isDemo: boolean } | null = null
 
     if (parentOrgId) {
       const holdingContext = await getHoldingManagementContext(parentOrgId, { ownerOnly: true })
@@ -372,12 +402,16 @@ async function createOrganizationRecord(
         }
       }
 
-      parentOrgIsDemo = await isOrganizationDemo(db, parentOrgId)
+      parentPackageState = await getOrganizationPackageState(db, parentOrgId)
+      parentOrgIsDemo = parentPackageState.isDemo
     }
 
     const isDemo = accountIsDemo || requestedDemoPlan || parentOrgIsDemo
-    const isAbs = !isDemo && planParam === 'abs'
-    const selectedPlan = isDemo ? 'Demo' : 'Trial'
+    const shouldAutoApplyAbsVoucher = !parentOrgId && !isDemo && planParam === 'abs'
+    let selectedPlan = isDemo ? 'Demo' : 'Trial'
+    if (parentPackageState?.plan) {
+      selectedPlan = parentPackageState.plan
+    }
 
     const orgInsertPayload: Record<string, unknown> = {
       id: orgId,
@@ -499,7 +533,7 @@ async function createOrganizationRecord(
     }
 
     // IF ABS, APPLY VOUCHER AUTOMATICALLY
-    if (isAbs) {
+    if (shouldAutoApplyAbsVoucher) {
       try {
         await applyVoucher(orgId, 'ABS2024')
       } catch (absErr) {
@@ -659,13 +693,10 @@ export async function linkSubOrganization(parentOrgId: string, childOrgId: strin
 
   if (error) return { error: error.message }
 
-  const parentIsDemo = await isOrganizationDemo(db, activeOrgId)
-  if (parentIsDemo) {
-    const demoSync = await enforceOrganizationAsDemo(db, trimmedChildOrgId)
-    if (!demoSync.success) {
-      const demoSyncError = 'error' in demoSync ? demoSync.error : 'Unknown demo sync error.'
-      ;(console as any).warn('Demo sync warning (linkSubOrganization):', demoSyncError)
-    }
+  const planSync = await syncChildOrganizationPlanFromParent(db, activeOrgId, trimmedChildOrgId)
+  if (!planSync.success) {
+    const planSyncError = 'error' in planSync ? planSync.error : 'Unknown plan sync error.'
+    ;(console as any).warn('Plan sync warning (linkSubOrganization):', planSyncError)
   }
 
   const coaSync = await syncParentCoAToChildOrg(activeOrgId, trimmedChildOrgId)
@@ -937,13 +968,10 @@ export async function setOrganizationParent(childOrgId: string, parentOrgId: str
   if (updateError) return { error: updateError.message }
 
   if (trimmedParentOrgId) {
-    const parentIsDemo = await isOrganizationDemo(db, trimmedParentOrgId)
-    if (parentIsDemo) {
-      const demoSync = await enforceOrganizationAsDemo(db, trimmedChildOrgId)
-      if (!demoSync.success) {
-        const demoSyncError = 'error' in demoSync ? demoSync.error : 'Unknown demo sync error.'
-        ;(console as any).warn('Demo sync warning (setOrganizationParent):', demoSyncError)
-      }
+    const planSync = await syncChildOrganizationPlanFromParent(db, trimmedParentOrgId, trimmedChildOrgId)
+    if (!planSync.success) {
+      const planSyncError = 'error' in planSync ? planSync.error : 'Unknown plan sync error.'
+      ;(console as any).warn('Plan sync warning (setOrganizationParent):', planSyncError)
     }
 
     const coaSync = await syncParentCoAToChildOrg(trimmedParentOrgId, trimmedChildOrgId)

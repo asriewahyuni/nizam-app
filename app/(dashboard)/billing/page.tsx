@@ -128,10 +128,20 @@ function BillingContent() {
     return `${m}:${s.toString().padStart(2, '0')}`
   }
 
-  const handleBuyItem = async (orgId: string, item: any) => {
+  const handleBuyItem = async (org: any, item: any) => {
+    if (!org?.id) {
+      alert('Organisasi aktif tidak ditemukan.')
+      return
+    }
+
+    if (item.type === 'PACKAGE' && org.parent_org_id) {
+      alert('Paket SaaS child mengikuti holding. Upgrade paket dilakukan dari organisasi induk.')
+      return
+    }
+
     setProcessing(true)
     try {
-      const res = await createBillingInvoice(orgId, item)
+      const res = await createBillingInvoice(org.id, item)
       if (res.success) {
         setCheckoutInvoice({
           id: res.id,
@@ -144,7 +154,7 @@ function BillingContent() {
         
         const { data: invs } = await db.from('saas_invoices')
           .select('*')
-          .eq('org_id', orgId)
+          .eq('org_id', org.id)
           .order('created_at', { ascending: false })
         setInvoices(invs || [])
       } else {
@@ -204,7 +214,7 @@ function BillingContent() {
         if (pkgId) {
           const pkg = pkgs?.find((p: any) => p.id === pkgId)
           if (pkg) {
-            handleBuyItem(org.id, { id: pkg.id, name: pkg.name, price: pkg.price, type: 'PACKAGE' })
+            handleBuyItem(org, { id: pkg.id, name: pkg.name, price: pkg.price, type: 'PACKAGE' })
           }
         }
       } else {
@@ -220,6 +230,11 @@ function BillingContent() {
   }, [pkgId, activeOrgId, activeOrgLoading])
 
   const openCheckout = (inv: any) => {
+    if (activeOrg?.parent_org_id && inv?.package_id) {
+      alert('Invoice paket untuk child dikelola dari organisasi induk/holding.')
+      return
+    }
+
     setCheckoutInvoice(inv)
     setTimeLeft(900)
     setShowCheckoutModal(true)
@@ -259,6 +274,9 @@ function BillingContent() {
 
   const handleApplyVoucher = async () => {
     if (!activeOrg || !voucherCode) return alert('Silakan masukkan kode voucher.')
+    if (activeOrg.parent_org_id) {
+      return alert('Voucher paket child harus diapply dari organisasi induk/holding.')
+    }
     
     setApplyingVoucher(true)
     try {
@@ -277,6 +295,9 @@ function BillingContent() {
   }
 
   if (loading) return <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest animate-pulse">Memuat Data Billing...</div>
+
+  const inheritsPlanFromHolding = Boolean(activeOrg?.parent_org_id)
+  const inheritedPlanNotice = 'Paket inti mengikuti organisasi induk. Upgrade paket dan voucher dikelola dari holding.'
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-12">
@@ -360,6 +381,11 @@ function BillingContent() {
              <Zap size={48} className="text-amber-400 fill-amber-400/20 mb-4 animate-bounce" />
              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">PAKET ANDA</p>
              <h2 className="text-3xl font-black tracking-tighter uppercase">{activeOrg?.settings?.plan || 'Free'}</h2>
+             {inheritsPlanFromHolding && (
+               <div className="mt-2 px-3 py-1 bg-sky-500/15 border border-sky-400/30 rounded-full text-[9px] font-black text-sky-200 uppercase tracking-widest">
+                 MENGIKUTI HOLDING
+               </div>
+             )}
              {activeOrg?.settings?.is_demo && (
                <div className="mt-2 px-3 py-1 bg-amber-500/20 border border-amber-500/50 rounded-full text-[9px] font-black text-amber-500 uppercase tracking-widest">
                  SESI DEMO
@@ -402,40 +428,51 @@ function BillingContent() {
             </div>
 
             <div className="flex flex-col md:flex-row items-center gap-6 pt-4 w-full">
-               <div className="flex items-center gap-4">
-                  <Link href="/pricing" className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-black text-sm rounded-2xl hover:bg-slate-900 transition-all shadow-lg shadow-indigo-200">
-                    <Package size={18} /> Upgrade Paket Utama
-                  </Link>
-                  <button className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-600 font-black text-sm rounded-2xl hover:bg-slate-50 transition-all">
-                    <CreditCard size={18} /> Update Payment Method
-                  </button>
-               </div>
+               {inheritsPlanFromHolding ? (
+                 <div className="w-full rounded-[28px] border border-amber-200 bg-amber-50 px-6 py-5">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">Paket Mengikuti Holding</p>
+                    <p className="mt-2 text-sm font-bold text-amber-900 leading-relaxed">
+                      {inheritedPlanNotice}
+                    </p>
+                 </div>
+               ) : (
+                 <>
+                   <div className="flex items-center gap-4">
+                      <Link href="/pricing" className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-black text-sm rounded-2xl hover:bg-slate-900 transition-all shadow-lg shadow-indigo-200">
+                        <Package size={18} /> Upgrade Paket Utama
+                      </Link>
+                      <button className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-600 font-black text-sm rounded-2xl hover:bg-slate-50 transition-all">
+                        <CreditCard size={18} /> Update Payment Method
+                      </button>
+                   </div>
 
-               <div className="h-10 w-px bg-slate-200 hidden md:block" />
+                   <div className="h-10 w-px bg-slate-200 hidden md:block" />
 
-               <div className="flex-1 flex items-center gap-2 w-full md:w-auto">
-                  <div className="relative flex-1">
-                    <input 
-                      type="text" 
-                      placeholder="Punya Voucher? Contoh: ABS2024"
-                      value={voucherCode}
-                      onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                      className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                    />
-                    {voucherCode && (
-                       <div className="absolute right-4 top-1/2 -translate-y-1/2 text-indigo-600 animate-pulse">
-                          <Plus size={14} />
-                       </div>
-                    )}
-                  </div>
-                  <button 
-                    disabled={applyingVoucher || !voucherCode}
-                    onClick={handleApplyVoucher}
-                    className="px-6 py-3 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-indigo-600 transition-all disabled:opacity-50 shadow-xl"
-                  >
-                    {applyingVoucher ? 'Wait...' : 'Apply →'}
-                  </button>
-               </div>
+                   <div className="flex-1 flex items-center gap-2 w-full md:w-auto">
+                      <div className="relative flex-1">
+                        <input 
+                          type="text" 
+                          placeholder="Punya Voucher? Contoh: ABS2024"
+                          value={voucherCode}
+                          onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                          className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        />
+                        {voucherCode && (
+                           <div className="absolute right-4 top-1/2 -translate-y-1/2 text-indigo-600 animate-pulse">
+                              <Plus size={14} />
+                           </div>
+                        )}
+                      </div>
+                      <button 
+                        disabled={applyingVoucher || !voucherCode}
+                        onClick={handleApplyVoucher}
+                        className="px-6 py-3 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-indigo-600 transition-all disabled:opacity-50 shadow-xl"
+                      >
+                        {applyingVoucher ? 'Wait...' : 'Apply →'}
+                      </button>
+                   </div>
+                 </>
+               )}
             </div>
           </div>
         </div>
@@ -478,7 +515,7 @@ function BillingContent() {
                  </div>
                  <button 
                   disabled={processing}
-                  onClick={() => activeOrg && handleBuyItem(activeOrg.id, { id: addon.id, name: addon.name, price: addon.price, type: 'ADDON' })}
+                  onClick={() => activeOrg && handleBuyItem(activeOrg, { id: addon.id, name: addon.name, price: addon.price, type: 'ADDON' })}
                   className="w-full py-3 bg-slate-100 text-slate-600 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-slate-900 hover:text-white transition-all group-hover:bg-indigo-600 group-hover:text-white shadow-sm disabled:opacity-50"
                  >
                    {processing ? 'Processing...' : 'Aktivasi Add-On'}
@@ -531,7 +568,7 @@ function BillingContent() {
                 </div>
                 <button
                   disabled={processing || !activeOrg}
-                  onClick={() => activeOrg && handleBuyItem(activeOrg.id, {
+                  onClick={() => activeOrg && handleBuyItem(activeOrg, {
                     id: pkg.id,
                     name: pkg.name,
                     price: Number(pkg.price_idr || 0),
@@ -605,12 +642,18 @@ function BillingContent() {
                        <div className="flex flex-col items-center gap-1.5">
                           <SubscriptionStatus status={inv.status} />
                           {inv.status === 'UNPAID' && (
-                             <button 
-                               onClick={() => openCheckout(inv)}
-                               className="text-[9px] font-black text-rose-500 hover:text-rose-600 uppercase tracking-[0.1em] flex items-center gap-1 animate-pulse"
-                             >
-                               <CreditCard size={10} /> Bayar Sekarang
-                             </button>
+                             inheritsPlanFromHolding && inv.package_id ? (
+                               <span className="text-[9px] font-black text-amber-600 uppercase tracking-[0.1em]">
+                                 Kelola via Holding
+                               </span>
+                             ) : (
+                               <button 
+                                 onClick={() => openCheckout(inv)}
+                                 className="text-[9px] font-black text-rose-500 hover:text-rose-600 uppercase tracking-[0.1em] flex items-center gap-1 animate-pulse"
+                               >
+                                 <CreditCard size={10} /> Bayar Sekarang
+                               </button>
+                             )
                           )}
                        </div>
                     </td>

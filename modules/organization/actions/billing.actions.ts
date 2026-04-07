@@ -3,6 +3,46 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function mergeOrganizationSettings(
+  currentSettings: unknown,
+  patch: Record<string, unknown>
+) {
+  return {
+    ...(isPlainObject(currentSettings) ? currentSettings : {}),
+    ...patch,
+  }
+}
+
+async function ensurePackageManagedFromRoot(db: any, orgId: string) {
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) {
+    return { success: false as const, error: 'Organisasi tidak valid.' }
+  }
+
+  const { data: org, error } = await db
+    .from('organizations')
+    .select('id, parent_org_id')
+    .eq('id', trimmedOrgId)
+    .maybeSingle()
+
+  if (error || !org) {
+    return { success: false as const, error: error?.message || 'Organisasi tidak ditemukan.' }
+  }
+
+  if (org.parent_org_id) {
+    return {
+      success: false as const,
+      error: 'Paket SaaS child mengikuti organisasi induk. Silakan upgrade atau apply voucher dari holding/parent.',
+    }
+  }
+
+  return { success: true as const }
+}
+
 export async function createBillingInvoice(
   orgId: string,
   item: {
@@ -18,6 +58,13 @@ export async function createBillingInvoice(
   const invoiceKey = `${item.type}-${item.id}`
   const isPackage = item.type === 'PACKAGE'
   const isTopup = item.type === 'AI_TOKEN_TOPUP'
+
+  if (isPackage) {
+    const packageScope = await ensurePackageManagedFromRoot(supabase as any, orgId)
+    if (!packageScope.success) {
+      return { error: packageScope.error }
+    }
+  }
 
   // 1. Cek apakah sudah ada invoice UNPAID untuk item ini di org ini (agar tidak double)
   const { data: existing } = await (supabase as any)
@@ -95,22 +142,31 @@ export async function createBillingInvoice(
 
 export async function submitPaymentProof(orgId: string, invoiceId: string, proofUrl: string, method: string) {
   const supabase = await createClient()
+  const db = supabase as any
 
   // 1. Fetch invoice info for activation
-  const { data: inv } = await (supabase as any)
+  const { data: inv } = await db
     .from('saas_invoices')
     .select('*, saas_packages(name)')
     .eq('id', invoiceId)
     .single()
 
-  const { data: topupOrder } = await (supabase as any)
+  const { data: topupOrder } = await db
     .from('ai_token_topup_orders')
     .select('*')
     .eq('invoice_id', invoiceId)
     .maybeSingle()
 
+  const isPackageInvoice = Boolean((inv as any)?.package_id)
+  if (isPackageInvoice) {
+    const packageScope = await ensurePackageManagedFromRoot(db, orgId)
+    if (!packageScope.success) {
+      return { error: packageScope.error }
+    }
+  }
+
   // 2. Update Invoice to PAID
-  await (supabase as any).from('saas_invoices')
+  await db.from('saas_invoices')
     .update({ 
       status: 'PAID',
       payment_method: method,
@@ -128,14 +184,14 @@ export async function submitPaymentProof(orgId: string, invoiceId: string, proof
     }
 
     const tokenAmount = Number((topupOrder as any).tokens || 0)
-    const { data: wallet } = await (supabase as any)
+    const { data: wallet } = await db
       .from('ai_token_wallets')
       .select('*')
       .eq('org_id', orgId)
       .maybeSingle()
 
     if ((wallet as any)?.org_id) {
-      await (supabase as any)
+      await db
         .from('ai_token_wallets')
         .update({
           balance_tokens: Number((wallet as any).balance_tokens || 0) + tokenAmount,
@@ -144,7 +200,7 @@ export async function submitPaymentProof(orgId: string, invoiceId: string, proof
         } as any)
         .eq('org_id', orgId)
     } else {
-      await (supabase as any)
+      await db
         .from('ai_token_wallets')
         .insert({
           org_id: orgId,
@@ -154,7 +210,7 @@ export async function submitPaymentProof(orgId: string, invoiceId: string, proof
         } as any)
     }
 
-    await (supabase as any)
+    await db
       .from('ai_token_usage_logs')
       .insert({
         org_id: orgId,
@@ -166,7 +222,7 @@ export async function submitPaymentProof(orgId: string, invoiceId: string, proof
         meta: { topup_order_id: (topupOrder as any).id, package_id: (topupOrder as any).package_id },
       } as any)
 
-    await (supabase as any)
+    await db
       .from('ai_token_topup_orders')
       .update({
         status: 'PAID',
@@ -182,12 +238,18 @@ export async function submitPaymentProof(orgId: string, invoiceId: string, proof
 
   // 3. Update Org Settings (Instant Upgrade for Demo)
   if ((inv as any)?.saas_packages && (inv as any).saas_packages.name) {
-    await (supabase as any).from('organizations')
+    const { data: orgRow } = await db
+      .from('organizations')
+      .select('settings')
+      .eq('id', orgId)
+      .maybeSingle()
+
+    await db.from('organizations')
       .update({
-        settings: {
+        settings: mergeOrganizationSettings(orgRow?.settings, {
           plan: (inv as any).saas_packages.name,
-          updated_at: new Date().toISOString()
-        } as any
+        }) as any,
+        updated_at: new Date().toISOString(),
       } as any)
       .eq('id', orgId)
   }
@@ -199,9 +261,15 @@ export async function submitPaymentProof(orgId: string, invoiceId: string, proof
 
 export async function applyVoucher(orgId: string, voucherCode: string) {
   const supabase = await createClient()
+  const db = supabase as any
+
+  const packageScope = await ensurePackageManagedFromRoot(db, orgId)
+  if (!packageScope.success) {
+    return { error: packageScope.error }
+  }
 
   // 1. Validasi Voucher
-  const { data: voucher, error: vErr } = await (supabase as any)
+  const { data: voucher, error: vErr } = await db
     .from('saas_vouchers')
     .select('*, saas_packages(*)')
     .eq('code', voucherCode)
@@ -224,7 +292,7 @@ export async function applyVoucher(orgId: string, voucherCode: string) {
   // 3. Ambil paket ABS (Default if not specified in voucher)
   let targetPackage = (voucher as any).saas_packages
   if (!targetPackage) {
-    const { data: absPkg } = await (supabase as any)
+    const { data: absPkg } = await db
       .from('saas_packages')
       .select('*')
       .eq('name', 'ABS Special')
@@ -240,7 +308,7 @@ export async function applyVoucher(orgId: string, voucherCode: string) {
   const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase()
   const invoiceNumber = `ABS-${randomStr}`
 
-  const { error: invErr } = await (supabase as any)
+  const { error: invErr } = await db
     .from('saas_invoices')
     .insert({
       org_id: orgId,
@@ -258,17 +326,23 @@ export async function applyVoucher(orgId: string, voucherCode: string) {
   }
 
   // 5. Update Org Settings
-  await (supabase as any).from('organizations')
+  const { data: orgRow } = await db
+    .from('organizations')
+    .select('settings')
+    .eq('id', orgId)
+    .maybeSingle()
+
+  await db.from('organizations')
     .update({
-      settings: {
+      settings: mergeOrganizationSettings(orgRow?.settings, {
         plan: targetPackage.name,
-        updated_at: new Date().toISOString()
-      } as any
+      }) as any,
+      updated_at: new Date().toISOString(),
     } as any)
     .eq('id', orgId)
 
   // 6. Increment Voucher Count
-  await (supabase as any).from('saas_vouchers')
+  await db.from('saas_vouchers')
     .update({ uses_count: (voucher as any).uses_count + 1 } as any)
     .eq('id', (voucher as any).id)
 
