@@ -1,0 +1,14 @@
+public.organizations=20
+public.org_members=28
+public.branches=20
+public.employees=23
+public.accounts=618
+public.contacts=33
+public.products=100
+public.sales=2
+public.purchases=6
+public.journal_entries=7
+auth.users=47
+public.purchase_requests=0
+public.saas_invoices=2
+public.ai_token_wallets=20
