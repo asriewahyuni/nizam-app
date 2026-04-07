@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import CommissionClient from './CommissionClient'
+import { getActiveResellers } from '@/modules/sales/actions/commission.actions'
+import { getSales } from '@/modules/sales/actions/sales.actions'
 
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 
@@ -14,16 +16,17 @@ export default async function CommissionPage() {
 
   const orgId = orgData.org.id
   const activeBranch = await getActiveBranch(orgId)
-  
-  let query = supabase.from('sales').select('status, grand_total, created_at, created_by')
-    .eq('org_id', orgId)
-    .in('status', ['FINISHED', 'ORDERED'])
+  const [sales, resellers] = await Promise.all([
+    getSales(orgId, activeBranch?.id),
+    getActiveResellers(orgId),
+  ])
 
-  if (activeBranch?.id) {
-    query = query.eq('branch_id', activeBranch.id)
-  }
-
-  const { data: sales } = await query
-
-  return <CommissionClient sales={sales || []} />
+  return (
+    <CommissionClient
+      orgId={orgId}
+      sales={sales || []}
+      resellers={resellers || []}
+      activeBranchName={activeBranch?.name || null}
+    />
+  )
 }

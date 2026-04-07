@@ -6,6 +6,7 @@ import { getContacts } from '@/modules/contacts/actions/contact.actions'
 import { getProducts } from '@/modules/inventory/actions/inventory.actions'
 import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
 import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
+import { getActiveResellers } from '@/modules/sales/actions/commission.actions'
 import SalesClient from './SalesClient'
 
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
@@ -24,12 +25,13 @@ export default async function SalesPage() {
   const orgSettings = orgData.org.settings || {}
   const activeBranch = await getActiveBranch(orgId)
 
-  const [sales, customers, products, coa, warehouses] = await Promise.all([
+  const [sales, customers, products, coa, warehouses, resellers] = await Promise.all([
     getSales(orgId, activeBranch?.id),
     getContacts(orgId, 'CUSTOMER'),
     getProducts(orgId, activeBranch?.id),
     getChartOfAccounts(orgId),
     getWarehouses(orgId, activeBranch?.id),
+    getActiveResellers(orgId),
   ])
 
   return (
@@ -42,6 +44,7 @@ export default async function SalesPage() {
           customers={customers}
           products={products}
           warehouses={warehouses}
+          resellers={resellers}
           coa={coa}
           orgSettings={orgSettings}
           activeBranchName={activeBranch?.name || null}

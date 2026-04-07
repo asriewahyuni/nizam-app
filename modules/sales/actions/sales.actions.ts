@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { getResellerCommissionSnapshot } from '@/modules/sales/actions/commission.actions'
 
 type ActiveBranchResult =
   | { branchId: string }
@@ -189,7 +190,7 @@ async function resolveDeliveryWarehouseId(
   branchId: string,
   explicitWarehouseId?: string | null
 ): Promise<DeliveryWarehouseResult> {
-  let query = (supabase as any)
+  const query = (supabase as any)
     .from('warehouses')
     .select('id, name, branch_id')
     .eq('org_id', orgId)
@@ -456,7 +457,7 @@ export async function getSales(orgId: string, branchId?: string | null) {
   const effectiveBranchId = branchSelection.branchId
   let query = supabase
     .from('sales' as any)
-    .select('*, branches(name, code), contacts(name), sales_items(*, products(name, sku, unit, type)), sales_returns(status, grand_total, return_number), sales_payments(amount, discount_amount)' as any)
+    .select('*, branches(name, code), contacts(name), sales_resellers(id, name, reseller_type, company_name, contact_person), sales_items(*, products(name, sku, unit, type)), sales_returns(status, grand_total, return_number), sales_payments(amount, discount_amount)' as any)
     .eq('org_id', orgId)
 
   if (effectiveBranchId) {
@@ -515,9 +516,17 @@ export async function createSaleEntry(orgId: string, payload: any) {
 
   const totalAmount = normalizedLines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)
   const computedTotal = totalAmount - (payload.discount_amount || 0) + (payload.tax_amount || 0)
+  const resellerSnapshot = await getResellerCommissionSnapshot(orgId, payload.reseller_id)
+
+  if (resellerSnapshot?.error) {
+    return { error: resellerSnapshot.error }
+  }
 
   const salePayload = {
     customer_id: payload.customer_id,
+    reseller_id: resellerSnapshot.resellerId,
+    commission_type: resellerSnapshot.commissionType,
+    commission_value: resellerSnapshot.commissionValue,
     sale_date: payload.sale_date,
     due_date: dueDate,
     payment_term: paymentTerm,
@@ -913,7 +922,7 @@ export async function getQuotations(orgId: string, branchId?: string | null) {
   const effectiveBranchId = branchSelection.branchId
   let query = supabase
     .from('sales' as any)
-    .select('*, branches(name, code), contacts(name), sales_items(*, products(name, sku, unit, type))' as any)
+    .select('*, branches(name, code), contacts(name), sales_resellers(id, name, reseller_type, company_name, contact_person), sales_items(*, products(name, sku, unit, type))' as any)
     .eq('org_id', orgId)
     .eq('status', 'QUOTATION')
 
@@ -951,6 +960,11 @@ export async function createQuotation(orgId: string, payload: any) {
   const headerDiscount = Number(payload.discount_amount || 0)
   const taxAmount = Number(payload.tax_amount || 0)
   const grandTotal = total - lineDiscountTotal - headerDiscount + taxAmount
+  const resellerSnapshot = await getResellerCommissionSnapshot(orgId, payload.reseller_id)
+
+  if (resellerSnapshot?.error) {
+    return { error: resellerSnapshot.error }
+  }
 
   const { data: quote, error: quoteErr } = await (supabase as any)
     .from('sales')
@@ -958,6 +972,9 @@ export async function createQuotation(orgId: string, payload: any) {
       org_id: orgId,
       branch_id: activeBranchId,
       customer_id: payload.customer_id,
+      reseller_id: resellerSnapshot.resellerId,
+      commission_type: resellerSnapshot.commissionType,
+      commission_value: resellerSnapshot.commissionValue,
       sale_date: payload.sale_date,
       due_date: payload.due_date,
       payment_term: payload.payment_term || 'TEMPO',

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
-import { createSaleEntry, deliverSale, voidSale, paySale, processSalesReturn, processSalesPayment } from '@/modules/sales/actions/sales.actions'
+import { createSaleEntry, deliverSale, voidSale, processSalesReturn, processSalesPayment } from '@/modules/sales/actions/sales.actions'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
 import { createContact } from '@/modules/contacts/actions/contact.actions'
 import type { ProductWithStock } from '@/modules/inventory/actions/inventory.actions'
@@ -14,6 +14,12 @@ import { QRCodeSVG } from 'qrcode.react'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { formatRupiah } from '@/lib/utils'
+import { getCommissionSchemeLabel, getResellerDisplayName, getResellerSubtitle } from '@/modules/sales/lib/commission'
+
+function pickRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
+}
 
 export default function SalesClient({
   orgId,
@@ -22,6 +28,7 @@ export default function SalesClient({
   customers,
   products,
   warehouses = [],
+  resellers = [],
   coa,
   orgSettings = {},
   activeBranchName,
@@ -97,6 +104,7 @@ export default function SalesClient({
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0])
   const [dueDate, setDueDate] = useState('')
   const [notes, setNotes] = useState('')
+  const [resellerId, setResellerId] = useState('')
   const [paymentTerm, setPaymentTerm] = useState<'TEMPO' | 'LUNAS'>('TEMPO')
   const [paymentAccountId, setPaymentAccountId] = useState('')
   const [customGlobalDiscount, setCustomGlobalDiscount] = useState<number | null>(null)
@@ -138,6 +146,7 @@ export default function SalesClient({
   })
   const [lines, setLines] = useState([createEmptySaleLine()])
   const [editingDraftSaleId, setEditingDraftSaleId] = useState<string | null>(null)
+  const selectedReseller = (resellers || []).find((item: any) => item.id === resellerId) || null
 
   // Filter COA for payment accounts (Kas/Bank) if Lunas
   const paymentAccounts = coa?.filter((a: any) => a.type === 'ASSET' && (a.code.startsWith('11') || a.code.startsWith('12'))) || []
@@ -158,6 +167,7 @@ export default function SalesClient({
     setSaleDate(new Date().toISOString().split('T')[0])
     setDueDate('')
     setNotes('')
+    setResellerId('')
     setPaymentTerm('TEMPO')
     setPaymentAccountId('')
     setCustomGlobalDiscount(null)
@@ -203,6 +213,7 @@ export default function SalesClient({
 
     setEditingDraftSaleId(String(sale.id))
     setCustomerId(String(sale.customer_id || ''))
+    setResellerId(String(sale.reseller_id || ''))
     setSaleDate(String(sale.sale_date || new Date().toISOString().split('T')[0]))
     setDueDate(sale?.due_date ? String(sale.due_date) : '')
     setNotes(String(sale?.notes || ''))
@@ -340,6 +351,7 @@ export default function SalesClient({
     
     const payload = {
       customer_id: customerId,
+      reseller_id: resellerId || null,
       sale_date: saleDate,
       due_date: (resolvedPaymentTerm === 'TEMPO' || resolvedShariahMode === 'SALAM') ? dueDate : null,
       notes,
@@ -700,6 +712,12 @@ export default function SalesClient({
                             {s.sales_items?.[0]?.description}{s.sales_items?.length > 1 ? ` & ${s.sales_items.length - 1} lainnya` : ''}
                           </span>
                        </div>
+                       {pickRelation(s.sales_resellers) && (
+                         <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[10px] font-black text-indigo-700">
+                           <span className="uppercase tracking-widest">Reseller</span>
+                           <span className="truncate">{getResellerDisplayName(pickRelation(s.sales_resellers))}</span>
+                         </div>
+                       )}
                     </td>
                     <td className="px-8 py-6 text-right">
                        {(() => {
@@ -882,6 +900,47 @@ export default function SalesClient({
                          <input type="date" required value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-amber-50/50 font-bold text-slate-900 shadow-sm focus:border-amber-500 transition-all" />
                        </div>
                     )}
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 p-5 bg-indigo-50/60 rounded-[28px] border border-indigo-100">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block px-1">Reseller / Perusahaan Mitra</label>
+                      <select value={resellerId} onChange={(e) => setResellerId(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-indigo-200 rounded-2xl outline-none text-sm bg-white font-black text-slate-900 shadow-sm focus:border-indigo-500 transition-all">
+                        <option value="">Tanpa reseller (direct customer)</option>
+                        {resellers.map((reseller: any) => (
+                          <option key={reseller.id} value={reseller.id}>
+                            {getResellerDisplayName(reseller)}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] font-bold text-indigo-700/80 px-1">
+                        Komisi reseller dihitung off-invoice. Nilai invoice customer tetap satu, tidak berubah, dan tidak dibuatkan invoice ganda.
+                      </p>
+                    </div>
+
+                    <div className="rounded-[24px] border border-white/70 bg-white/80 px-5 py-4">
+                      {selectedReseller ? (
+                        <div className="space-y-2">
+                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Snapshot Komisi Saat SO Dibuat</div>
+                          <div className="text-sm font-black text-slate-900">{getResellerDisplayName(selectedReseller)}</div>
+                          <div className="text-[11px] font-bold text-slate-500">{getResellerSubtitle(selectedReseller)}</div>
+                          <div className="inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700">
+                            {getCommissionSchemeLabel(selectedReseller.commission_type, selectedReseller.commission_value)}
+                          </div>
+                          <div className="text-[10px] font-bold text-slate-500">
+                            Target bulanan: {formatRupiah(Number(selectedReseller.target_amount || 0))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Mode Direct Sales</div>
+                          <div className="text-sm font-black text-slate-900">Invoice tidak terhubung reseller</div>
+                          <div className="text-[11px] font-bold text-slate-500">
+                            Pilih reseller jika transaksi ini berasal dari personal reseller atau perusahaan mitra.
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                      {paymentTerm === 'LUNAS' && (
@@ -1348,6 +1407,11 @@ export default function SalesClient({
                       <div>
                          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">Customer / Klien</p>
                          <p className="font-bold text-slate-900">{viewSale.contacts?.name || 'Unknown'}</p>
+                         {pickRelation(viewSale.sales_resellers) && (
+                           <p className="mt-2 text-[11px] font-bold text-indigo-600">
+                             Reseller: {getResellerDisplayName(pickRelation(viewSale.sales_resellers))}
+                           </p>
+                         )}
                       </div>
                       <div className="text-right">
                          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">Tanggal & Status</p>
