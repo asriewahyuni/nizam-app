@@ -5,4 +5,4 @@ cmds = ["npm ci", "npx prisma generate"]
 cmds = ["npx prisma generate", "npm run build"]
 
 [start]
-cmd = "HOSTNAME=0.0.0.0 node .next/standalone/server.js"
+cmd = "cd .next/standalone && HOSTNAME=0.0.0.0 node server.js"

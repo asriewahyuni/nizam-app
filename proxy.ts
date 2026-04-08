@@ -77,9 +77,12 @@ export async function proxy(request: NextRequest) {
   }
 
   // Use JWT-based token check — lightweight, no DB hit
+  const isSecureCookie = request.nextUrl.protocol === 'https:' || process.env.NODE_ENV === 'production'
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
+    secureCookie: isSecureCookie,
+    cookieName: isSecureCookie ? '__Secure-authjs.session-token' : 'authjs.session-token',
   })
 
   const isAuthenticated = !!token
