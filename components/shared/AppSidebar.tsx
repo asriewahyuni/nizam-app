@@ -332,7 +332,9 @@ export function AppSidebar({
     <>
       {/* Mobile Overlay */}
       {isMobileOpen && (
-        <div 
+        <button
+          type="button"
+          aria-label="Tutup menu samping"
           className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
           onClick={() => setIsMobileOpen(false)}
         />
@@ -345,6 +347,7 @@ export function AppSidebar({
       `}>
       {/* Collapse Toggle Button */}
       <button
+        type="button"
         onClick={toggleCollapse}
         className="absolute -right-3 top-24 w-6 h-6 bg-white border border-slate-200 rounded-full hidden md:flex items-center justify-center text-slate-400 hover:text-emerald-600 shadow-sm z-50 transition-transform hover:scale-110"
       >
@@ -414,6 +417,7 @@ export function AppSidebar({
                         <li key={item.href}>
                           <Link
                             href={item.href}
+                            prefetch={false}
                             onClick={() => setIsMobileOpen(false)}
                             title={isCollapsed ? item.label : ''}
                             className={`flex items-center rounded-2xl text-sm font-bold transition-all duration-200 group/item relative
@@ -479,6 +483,7 @@ export function AppSidebar({
                       <li key={item.href}>
                         <Link
                           href={item.href}
+                          prefetch={false}
                           onClick={() => setIsMobileOpen(false)}
                           title={item.label}
                           className={`flex items-center justify-center rounded-2xl p-3 text-sm font-bold transition-all duration-200 group/item relative
@@ -514,7 +519,7 @@ export function AppSidebar({
       <div className={`p-4 border-t border-slate-50 bg-slate-50/30 ${isCollapsed ? 'items-center' : ''}`}>
         <div className={`flex items-center ${isCollapsed ? 'flex-col gap-4' : 'justify-between'}`}>
           <div className="flex items-center gap-3">
-          <Link href="/profil-saya" onClick={() => setIsMobileOpen(false)} className="w-10 h-10 shrink-0 rounded-2xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center text-xs font-black text-slate-800 shadow-sm relative hover:ring-2 hover:ring-blue-400 transition-all" title="Edit Profil Saya">
+          <Link href="/profil-saya" prefetch={false} onClick={() => setIsMobileOpen(false)} className="w-10 h-10 shrink-0 rounded-2xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center text-xs font-black text-slate-800 shadow-sm relative hover:ring-2 hover:ring-blue-400 transition-all" title="Edit Profil Saya">
               {userRole?.slice(0, 1).toUpperCase()}
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#003366] border-2 border-white" />
             </Link>
@@ -530,6 +535,7 @@ export function AppSidebar({
           <div className={`flex items-center ${isCollapsed ? 'flex-col gap-1' : 'gap-1'}`}>
             <Link 
               href={isOwnerOrAdmin ? '/settings/business' : '/profil-saya'} 
+              prefetch={false}
               onClick={() => setIsMobileOpen(false)}
               title={isOwnerOrAdmin ? 'Pengaturan Bisnis' : 'Profil & Password Saya'}
               className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
@@ -549,7 +555,7 @@ export function AppSidebar({
         </div>
       {isCollapsed && (
         <div className="px-3 pb-3">
-          <Link href="/billing" onClick={() => setIsMobileOpen(false)} title="Langganan & Billing" className="flex items-center justify-center w-full p-2.5 rounded-xl bg-[#003366]/5 text-[#003366] hover:bg-[#003366] hover:text-white transition-all shadow-sm">
+          <Link href="/billing" prefetch={false} onClick={() => setIsMobileOpen(false)} title="Langganan & Billing" className="flex items-center justify-center w-full p-2.5 rounded-xl bg-[#003366]/5 text-[#003366] hover:bg-[#003366] hover:text-white transition-all shadow-sm">
             <Zap size={16} />
           </Link>
         </div>

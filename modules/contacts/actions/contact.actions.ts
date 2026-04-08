@@ -87,7 +87,6 @@ function revalidateContactPages() {
   revalidatePath('/contacts')
   revalidatePath('/sales')
   revalidatePath('/purchasing')
-  revalidatePath('/dashboard')
 }
 
 export async function getContacts(orgId: string, type?: 'CUSTOMER' | 'SUPPLIER') {

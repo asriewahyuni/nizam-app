@@ -229,7 +229,6 @@ export default function ContactClient({
 
     setSuccess(editingContact ? `${formType === 'SUPPLIER' ? 'Vendor' : 'Kontak'} berhasil diperbarui.` : `${formType === 'SUPPLIER' ? 'Vendor' : 'Kontak'} baru berhasil ditambahkan.`)
     closeFormModal()
-    startTransition(() => router.refresh())
     setTimeout(() => setSuccess(null), 3200)
     setLoading(false)
   }
@@ -251,7 +250,6 @@ export default function ContactClient({
 
     setContactItems((current) => current.filter((item) => item.id !== contact.id))
     setSuccess(`${contact.type === 'SUPPLIER' ? 'Vendor' : 'Kontak'} berhasil dihapus.`)
-    startTransition(() => router.refresh())
     setTimeout(() => setSuccess(null), 3200)
     setLoading(false)
   }

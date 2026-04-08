@@ -127,6 +127,7 @@ export function StartupWizard({ isDemo = false }: { isDemo?: boolean }) {
            <div className="flex items-center gap-3 shrink-0 pl-6 border-l border-slate-100">
               <Link
                 href={WIZARD_STEPS[currentStep].href}
+                prefetch={false}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all group"
               >
                 Mulai {WIZARD_STEPS[currentStep].title}
