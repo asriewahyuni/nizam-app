@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, BookOpen, X, Trash2, Download, FileText, Filter, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createJournalEntry, postJournalEntry, voidJournalEntry, deleteJournalEntry, hardDeleteDraftJournal } from '@/modules/accounting/actions/journal.actions'
@@ -25,6 +26,7 @@ export default function JournalClient({
   activeBranchId,
   activeBranchName,
 }: JournalClientProps) {
+  const router = useRouter()
   const [entries, setEntries] = useState<any[]>(initialEntries)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -132,7 +134,7 @@ export default function JournalClient({
       })
 
       if ((res as any).error) throw new Error((res as any).error)
-      window.location.reload()
+      router.refresh()
     } catch (error: any) {
       alert(error.message || "Gagal membuat jurnal")
       setIsSubmitting(false)
@@ -143,7 +145,7 @@ export default function JournalClient({
     if (!confirm("Posting jurnal ini? Jurnal tidak bisa diubah setelah di-posting.")) return
     const res = await postJournalEntry(id, orgId)
     if (res.error) alert(res.error)
-    else window.location.reload()
+    else router.refresh()
   }
 
   const handleVoid = async (id: string) => {
@@ -151,7 +153,7 @@ export default function JournalClient({
     if (!reason) return
     const res = await voidJournalEntry(id, orgId, reason)
     if (res.error) alert(res.error)
-    else window.location.reload()
+    else router.refresh()
   }
 
   const handleExportCSV = () => {
@@ -193,6 +195,7 @@ export default function JournalClient({
             <div className="flex bg-slate-100/60 p-1 rounded-2xl border border-slate-100 mr-2 shadow-inner">
               {(['POSTED', 'VOIDED', 'DRAFT'] as const).map((s) => (
                 <button
+                  type="button"
                   key={s}
                   onClick={() => setFilterStatus(s)}
                   className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${filterStatus === s ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
@@ -351,11 +354,12 @@ export default function JournalClient({
                                 POSTING
                               </SafeButton>
                               <button 
+                                type="button"
                                 onClick={async () => {
                                   if (!confirm("Hapus draft jurnal ini secara permanen?")) return
                                   const res = await hardDeleteDraftJournal(entry.id, orgId)
                                   if (res.error) alert(res.error)
-                                  else window.location.reload()
+                                  else router.refresh()
                                 }} 
                                 className="text-[9px] font-black text-rose-400 hover:text-rose-600 px-2 py-1 uppercase tracking-widest transition-colors"
                               >
@@ -398,7 +402,7 @@ export default function JournalClient({
                       </h3>
                       <p className="text-xs text-blue-100 mt-1 font-medium italic">Manually create a draft journal entry into the ledger.</p>
                     </div>
-                    <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition">
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition">
                       <X size={20} />
                     </button>
                 </div>
@@ -406,16 +410,16 @@ export default function JournalClient({
                 <div className="flex-1 overflow-y-auto p-10">
                    <div className="grid grid-cols-2 gap-6 mb-10 bg-slate-50 p-6 rounded-[28px] border border-slate-100 shadow-inner">
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jurnal Date</label>
-                          <input type="date" required value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className="w-full px-5 py-4 bg-white rounded-2xl border border-slate-200 font-bold outline-none focus:border-blue-500 transition-all shadow-sm" />
+                          <label htmlFor="journal-date" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jurnal Date</label>
+                          <input id="journal-date" type="date" required value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className="w-full px-5 py-4 bg-white rounded-2xl border border-slate-200 font-bold outline-none focus:border-blue-500 transition-all shadow-sm" />
                       </div>
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Main Description</label>
-                          <input required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Initial Capital Deposit" className="w-full px-5 py-4 bg-white rounded-2xl border border-slate-200 font-bold outline-none focus:border-blue-500 transition-all shadow-sm" />
+                          <label htmlFor="journal-description" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Main Description</label>
+                          <input id="journal-description" required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Initial Capital Deposit" className="w-full px-5 py-4 bg-white rounded-2xl border border-slate-200 font-bold outline-none focus:border-blue-500 transition-all shadow-sm" />
                       </div>
                       <div className="col-span-2 space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Additional Notes</label>
-                          <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="External reference or specific explanation" className="w-full px-5 py-4 bg-white rounded-2xl border border-slate-200 font-medium text-slate-600 outline-none focus:border-blue-500 transition-all shadow-sm" />
+                          <label htmlFor="journal-notes" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Additional Notes</label>
+                          <input id="journal-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="External reference or specific explanation" className="w-full px-5 py-4 bg-white rounded-2xl border border-slate-200 font-medium text-slate-600 outline-none focus:border-blue-500 transition-all shadow-sm" />
                       </div>
                    </div>
 

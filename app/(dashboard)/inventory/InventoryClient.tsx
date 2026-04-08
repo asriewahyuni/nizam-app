@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import React, { useState, useEffect, startTransition } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Plus, Package, X, Edit, Trash2, AlertTriangle, Calendar, Info, ShoppingCart, History as HistoryIcon, Search, TrendingUp, Wallet, Clock, Box } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
@@ -28,6 +28,7 @@ export default function InventoryClient({
   initialProducts,
   warehouses = [],
 }: InventoryClientProps) {
+  const router = useRouter()
   const [products, setProducts] = useState<ProductWithStock[]>(initialProducts)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isWriteOffModalOpen, setIsWriteOffModalOpen] = useState(false)
@@ -204,7 +205,7 @@ export default function InventoryClient({
         notes: 'Hasil penghitungan fisik (Stock Opname)'
       }]
     })
-    if ('error' in res && res.error) alert(res.error); else { alert('Berhasil melakukan Stok Opname!'); window.location.reload(); }
+    if ('error' in res && res.error) alert(res.error); else { alert('Berhasil melakukan Stok Opname!'); startTransition(() => router.refresh()); }
     setIsSubmitting(false)
   }
 
@@ -223,7 +224,7 @@ export default function InventoryClient({
         notes: 'Mutasi stok antar gudang'
       }]
     })
-    if ('error' in res && res.error) alert(res.error); else { alert('Berhasil memindahkan stok!'); window.location.reload(); }
+    if ('error' in res && res.error) alert(res.error); else { alert('Berhasil memindahkan stok!'); startTransition(() => router.refresh()); }
     setIsSubmitting(false)
   }
 
@@ -243,7 +244,7 @@ export default function InventoryClient({
         notes: writeOffForm.line_notes
       }]
     })
-    if ('error' in res && res.error) alert(res.error); else { alert('Berhasil melakukan Write-off!'); window.location.reload(); }
+    if ('error' in res && res.error) alert(res.error); else { alert('Berhasil melakukan Write-off!'); startTransition(() => router.refresh()); }
     setIsSubmitting(false)
   }
 

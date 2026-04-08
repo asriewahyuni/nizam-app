@@ -1,7 +1,6 @@
 'use client'
 
-import React, { startTransition, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useEffect, useState } from 'react'
 import { Plus, Shield, Trash2, Edit2, ShieldAlert, Link as LinkIcon, Copy, X } from 'lucide-react'
 import {
   createInvitationToken,
@@ -28,7 +27,6 @@ export default function UsersClient({
   roles = [],
   initialInvitations = [],
 }: UsersClientProps) {
-  const router = useRouter()
   const [members, setMembers] = useState(initialMembers)
   const [invitations, setInvitations] = useState(initialInvitations)
   const [loading, setLoading] = useState(false)
@@ -65,12 +63,6 @@ export default function UsersClient({
     } catch {
       alert('Gagal menyalin link. Silakan salin manual dari kotak yang tersedia.')
     }
-  }
-
-  const refreshUsersPage = () => {
-    startTransition(() => {
-      router.refresh()
-    })
   }
 
   const handleInvite = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -111,7 +103,6 @@ export default function UsersClient({
 
     if (res.success) {
       setMembers((current: any[]) => current.filter((member: any) => member.id !== memberId))
-      refreshUsersPage()
     } else {
       alert(res.error)
     }
@@ -149,7 +140,6 @@ export default function UsersClient({
       setMembers((current: any[]) => current.map((member: any) => (
         member.id === memberId ? { ...member, role: normalizedRole } : member
       )))
-      refreshUsersPage()
     } else {
       alert(res.error)
     }
@@ -240,8 +230,9 @@ export default function UsersClient({
 
           <form onSubmit={handleInvite} className="space-y-4 mt-5">
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase">Label Undangan</label>
+              <label htmlFor="invite-label" className="text-xs font-bold text-slate-400 uppercase">Label Undangan</label>
               <input
+                id="invite-label"
                 type="text"
                 required
                 value={inviteLabel}
@@ -252,8 +243,9 @@ export default function UsersClient({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase">Role / Jabatan</label>
+              <label htmlFor="invite-role" className="text-xs font-bold text-slate-400 uppercase">Role / Jabatan</label>
               <select
+                id="invite-role"
                 value={roleIdToInvite}
                 onChange={(e) => setRoleIdToInvite(e.target.value)}
                 className="w-full mt-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500"
@@ -268,8 +260,9 @@ export default function UsersClient({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase">Masa Berlaku</label>
+              <label htmlFor="invite-duration" className="text-xs font-bold text-slate-400 uppercase">Masa Berlaku</label>
               <select
+                id="invite-duration"
                 value={inviteDuration}
                 onChange={(e) => setInviteDuration(e.target.value)}
                 className="w-full mt-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500"
@@ -379,6 +372,7 @@ export default function UsersClient({
                       <div className="flex items-center justify-end gap-2">
                         {!['owner', 'admin'].includes(member.role) && (
                           <button
+                            type="button"
                             onClick={() => openUnitAccessModal(member)}
                             className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
                             title="Atur Akses Unit"
@@ -387,6 +381,7 @@ export default function UsersClient({
                           </button>
                         )}
                         <button
+                          type="button"
                           onClick={() => handleUpdateRole(member.id, member.role)}
                           className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
                           title="Ubah Peran"
@@ -394,6 +389,7 @@ export default function UsersClient({
                           <Edit2 size={16} />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDelete(member.id)}
                           className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
                           title="Hapus User"
@@ -464,7 +460,9 @@ export default function UsersClient({
 
       {memberUnitsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
+          <button
+            type="button"
+            aria-label="Tutup modal akses unit"
             className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
             onClick={() => setMemberUnitsModal(null)}
           />

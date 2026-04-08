@@ -175,7 +175,6 @@ export function WarehouseClient({
 
     setSuccess(editingWarehouse ? 'Gudang berhasil diperbarui.' : 'Gudang baru berhasil ditambahkan.')
     closeModal()
-    startTransition(() => router.refresh())
     setTimeout(() => setSuccess(null), 3200)
     setSubmitting(false)
   }
@@ -196,7 +195,6 @@ export function WarehouseClient({
 
     setWarehouses((current) => current.filter((item) => item.id !== warehouse.id))
     setSuccess('Gudang berhasil dihapus.')
-    startTransition(() => router.refresh())
     setTimeout(() => setSuccess(null), 3200)
     setSubmitting(false)
   }
@@ -353,7 +351,7 @@ export function WarehouseClient({
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={closeModal} />
+          <button type="button" aria-label="Tutup modal gudang" className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={closeModal} />
           <div className="relative bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -367,8 +365,9 @@ export function WarehouseClient({
 
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Kode Gudang (Singkatan)</label>
+                <label htmlFor="warehouse-code" className="text-xs font-bold text-slate-700 uppercase tracking-wide">Kode Gudang (Singkatan)</label>
                 <input
+                  id="warehouse-code"
                   type="text"
                   value={formData.code}
                   onChange={(event) => setFormData((current) => ({ ...current, code: event.target.value.toUpperCase() }))}
@@ -380,8 +379,9 @@ export function WarehouseClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Nama Gudang</label>
+                <label htmlFor="warehouse-name" className="text-xs font-bold text-slate-700 uppercase tracking-wide">Nama Gudang</label>
                 <input
+                  id="warehouse-name"
                   type="text"
                   value={formData.name}
                   onChange={(event) => setFormData((current) => ({ ...current, name: event.target.value }))}
@@ -392,8 +392,9 @@ export function WarehouseClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">Alamat Fisik</label>
+                <label htmlFor="warehouse-address" className="text-xs font-bold text-slate-700 uppercase tracking-wide">Alamat Fisik</label>
                 <textarea
+                  id="warehouse-address"
                   value={formData.address}
                   onChange={(event) => setFormData((current) => ({ ...current, address: event.target.value }))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all resize-none h-24"
