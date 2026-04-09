@@ -95,6 +95,20 @@ describe('Journal Branch Guardrails', () => {
         }),
       },
       from: vi.fn((table: string) => {
+        if (table === 'fiscal_periods') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            lte: vi.fn().mockReturnThis(),
+            gte: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: null,
+              error: null,
+            }),
+          }
+        }
         if (table === 'journal_entries') {
           return { insert: insertEntryMock }
         }

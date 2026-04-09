@@ -69,6 +69,11 @@ describe('Budget Branch Context', () => {
   it('stamps branch_id when saving a budget', async () => {
     const supabase = createSupabaseMock({
       tables: {
+        fiscal_periods: [
+          {
+            maybeSingleResult: success(null),
+          },
+        ],
         budgets: [
           {
             result: success([]),
@@ -92,10 +97,13 @@ describe('Budget Branch Context', () => {
     const result = await saveBudget('org-1', 'acc-1', '2026-04-01', 1500000)
 
     expect(result).toEqual({ success: true, branchId: 'branch-1' })
-    expect(supabase.calls[0]?.operations).toEqual(
+    const insertCall = supabase.calls.find(
+      (call) => call.table === 'budgets' && call.operations.some((operation) => operation.method === 'insert')
+    )
+    expect(insertCall?.operations).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          method: 'upsert',
+          method: 'insert',
           args: [
             expect.objectContaining({
               org_id: 'org-1',
@@ -103,9 +111,6 @@ describe('Budget Branch Context', () => {
               account_id: 'acc-1',
               period: '2026-04-01',
               budget_amount: 1500000,
-            }),
-            expect.objectContaining({
-              onConflict: 'org_id,branch_id,account_id,period',
             }),
           ],
         }),

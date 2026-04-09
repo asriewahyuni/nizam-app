@@ -263,11 +263,11 @@ describe('Reports Branch Context', () => {
     expect(result.fcf).toBe(300000)
     expect(result.netChange).toBe(450000)
     expect(result.ocfItems).toEqual([
-      { code: '4001', name: 'Penjualan', amount: 200000 },
-      { code: '6003', name: 'Utilitas', amount: -50000 },
+      { code: '4001', name: 'Penerimaan dari Pelanggan / Penjualan', amount: 200000 },
+      { code: '6003', name: 'Pembayaran Utilitas', amount: -50000 },
     ])
     expect(result.fcfItems).toEqual([
-      { code: '2501', name: 'Hutang Bank Jangka Panjang', amount: 300000 },
+      { code: '2501', name: 'Penerimaan Hutang Bank Jangka Panjang', amount: 300000 },
     ])
 
     const journalEntryCalls = supabase.calls.filter((call) => call.table === 'journal_entries')
