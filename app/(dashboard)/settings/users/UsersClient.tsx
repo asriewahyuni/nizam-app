@@ -329,6 +329,14 @@ export default function UsersClient({
                       </div>
                     </td>
                     <td className="px-6 py-4">
+                      {member.custom_role?.name ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-bold text-slate-900">{member.custom_role.name}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                            base: {member.role}
+                          </span>
+                        </div>
+                      ) : (
                       <span
                         className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border ${
                           member.role === 'owner'
@@ -342,6 +350,7 @@ export default function UsersClient({
                       >
                         {member.role}
                       </span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       {['owner', 'admin'].includes(member.role) ? (

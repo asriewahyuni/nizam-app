@@ -163,6 +163,10 @@ describe('Auth Actions', () => {
     mocks.cookies.mockResolvedValue(cookieStore)
     mocks.createClient.mockResolvedValue({
       auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: null },
+          error: null,
+        }),
         signOut: signOutMock,
       },
     })

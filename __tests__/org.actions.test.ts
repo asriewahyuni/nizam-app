@@ -49,6 +49,7 @@ import {
   createOrganization,
   createOrganizationQuick,
   getActiveBranch,
+  getActiveOrg,
   setActiveBranch,
   setActiveOrg,
 } from '@/modules/organization/actions/org.actions'
@@ -98,6 +99,80 @@ describe('Organization Branch Bootstrap', () => {
       address: null,
       is_active: true,
     })
+  })
+
+  it('falls back to role permissions by employee job title when membership role_id is empty', async () => {
+    const cookieStore = createCookieStore({
+      nizam_active_org_id: 'org-1',
+    })
+    mocks.cookies.mockResolvedValue(cookieStore)
+
+    const supabase = createSupabaseMock({
+      tables: {
+        org_members: [
+          {
+            maybeSingleResult: success({
+              org_id: 'org-1',
+              role: 'staff',
+              role_id: null,
+              organizations: {
+                id: 'org-1',
+                settings: { plan: 'Demo' },
+                active_addons: [],
+              },
+              roles: null,
+            }),
+          },
+        ],
+        saas_packages: [
+          {
+            maybeSingleResult: success({
+              modules: ['Accounting', 'Finance', 'HRIS'],
+            }),
+          },
+        ],
+        employees: [
+          {
+            maybeSingleResult: success({
+              job_title: 'Staff',
+              role_id: null,
+            }),
+          },
+        ],
+        roles: [
+          {
+            result: success([
+              {
+                id: 'role-staff',
+                name: 'Staff',
+                permissions: ['coa:read', 'bank:read', 'journal:read'],
+              },
+            ]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue({
+      ...supabase.client,
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1', email: 'staff@example.com' } },
+          error: null,
+        }),
+      },
+    })
+
+    const result = await getActiveOrg()
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        role: 'staff',
+        roleId: 'role-staff',
+        jobTitle: 'Staff',
+        permissions: ['coa:read', 'bank:read', 'journal:read'],
+      })
+    )
   })
 
   it('returns the sole active branch id when no branch cookie is set', async () => {

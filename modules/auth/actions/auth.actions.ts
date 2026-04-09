@@ -239,6 +239,7 @@ async function deactivateStaleStaffMemberships(
 
 async function resolveRoleIdForEmployee(adminClient: Awaited<ReturnType<typeof createAdminClient>>, inviteRoleId: string | null | undefined, emp: any) {
   if (inviteRoleId) return inviteRoleId
+  if (emp?.role_id) return emp.role_id
 
   const { data: allRoles } = await (adminClient as any)
     .from('roles')

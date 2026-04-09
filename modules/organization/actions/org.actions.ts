@@ -53,6 +53,66 @@ function resolvePersistedBranchIdForOrgSwitch(
   return null
 }
 
+function normalizeRoleName(value: string | null | undefined) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function getLegacyRoleLabel(role: string | null | undefined) {
+  const normalizedRole = normalizeRoleName(role)
+  if (normalizedRole === 'manager') return 'Manager'
+  if (normalizedRole === 'staff') return 'Staff'
+  if (normalizedRole === 'viewer') return 'Viewer'
+  return null
+}
+
+async function resolveFallbackMembershipRole(
+  db: any,
+  orgId: string,
+  input: {
+    membershipRoleId?: string | null
+    employeeRoleId?: string | null
+    employeeJobTitle?: string | null
+    membershipRole?: string | null
+  }
+) {
+  const { data: roleRows, error } = await db
+    .from('roles')
+    .select('id, name, permissions')
+    .eq('org_id', orgId)
+
+  if (error || !Array.isArray(roleRows) || roleRows.length === 0) {
+    return null
+  }
+
+  const orderedRoleIds = [
+    String(input.membershipRoleId || '').trim(),
+    String(input.employeeRoleId || '').trim(),
+  ].filter(Boolean)
+
+  const fallbackById = orderedRoleIds
+    .map((roleId) => roleRows.find((role: any) => String(role?.id || '').trim() === roleId))
+    .find(Boolean)
+  if (fallbackById) return fallbackById
+
+  const normalizedJobTitle = normalizeRoleName(input.employeeJobTitle)
+  if (normalizedJobTitle) {
+    const fallbackByJobTitle = roleRows.find(
+      (role: any) => normalizeRoleName(role?.name) === normalizedJobTitle
+    )
+    if (fallbackByJobTitle) return fallbackByJobTitle
+  }
+
+  const legacyRoleLabel = getLegacyRoleLabel(input.membershipRole)
+  if (legacyRoleLabel) {
+    const fallbackLegacyRole = roleRows.find(
+      (role: any) => normalizeRoleName(role?.name) === legacyRoleLabel.toLowerCase()
+    )
+    if (fallbackLegacyRole) return fallbackLegacyRole
+  }
+
+  return null
+}
+
 type CreateOrganizationSuccess = {
   success: true
   orgId: string
@@ -1061,17 +1121,38 @@ export async function getActiveOrg() {
   // Fetch Job Title from employees table
   const { data: empData } = await db
     .from('employees')
-    .select('job_title')
+    .select('job_title, role_id')
     .eq('org_id', activeOrgId)
     .eq('user_id', user.id)
     .maybeSingle()
 
+  let resolvedRoleId = String(memberData.role_id || empData?.role_id || '').trim() || null
+  let resolvedPermissions = Array.isArray((memberData.roles as any)?.permissions)
+    ? (memberData.roles as any).permissions.filter((permission: unknown): permission is string => typeof permission === 'string')
+    : []
+
+  if (!resolvedPermissions.length) {
+    const fallbackRole = await resolveFallbackMembershipRole(db, activeOrgId, {
+      membershipRoleId: memberData.role_id,
+      employeeRoleId: empData?.role_id,
+      employeeJobTitle: empData?.job_title,
+      membershipRole: memberData.role,
+    })
+
+    if (fallbackRole) {
+      resolvedRoleId = String(resolvedRoleId || fallbackRole.id || '').trim() || null
+      resolvedPermissions = Array.isArray(fallbackRole.permissions)
+        ? fallbackRole.permissions.filter((permission: unknown): permission is string => typeof permission === 'string')
+        : []
+    }
+  }
+
   return {
     org,
     role: memberData.role as string,
-    roleId: memberData.role_id,
+    roleId: resolvedRoleId,
     jobTitle: empData?.job_title || memberData.role,
-    permissions: (memberData.roles as any)?.permissions || [],
+    permissions: resolvedPermissions,
     enabledModules,
     user
   }
@@ -1258,6 +1339,7 @@ export async function getOrgMembers(orgId: string) {
     .from('org_members')
     .select(`
       *,
+      custom_role:roles(name),
       organizations(name),
       user:user_id (
         email

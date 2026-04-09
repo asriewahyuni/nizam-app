@@ -287,7 +287,7 @@ export function AppSidebar({
       if (isDemo) return true
 
       // 1. SaaS Module Check
-      if (item.module_key) {
+      if (item.module_key && enabledModules.length > 0) {
         const matches = enabledModules.some((moduleName) => {
           const enabledLower = moduleName.trim().toLowerCase()
 
