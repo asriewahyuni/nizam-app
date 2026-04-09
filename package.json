@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "node .next/standalone/server.js",
+    "start": "node scripts/start-standalone.mjs",
     "perf:local": "npm run build && npm run start",
     "lint": "eslint",
     "supabase:start": "npx supabase start",
