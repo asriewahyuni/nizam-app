@@ -779,7 +779,7 @@ export async function signOut() {
   cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
   await supabase.auth.signOut()
   revalidatePath('/', 'layout')
-  redirect('/login')
+  redirect('/')
 }
 
 export async function getSession() {

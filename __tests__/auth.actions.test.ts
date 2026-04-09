@@ -152,7 +152,7 @@ describe('Auth Actions', () => {
     expect(result).toBeNull()
   })
 
-  it('signs out, revalidates layout, and redirects to login', async () => {
+  it('signs out, revalidates layout, and redirects to home page', async () => {
     const signOutMock = vi.fn().mockResolvedValue({})
     const cookieStore = createCookieStore({
       nizam_active_org_id: 'org-1',
@@ -178,7 +178,7 @@ describe('Auth Actions', () => {
     expect(cookieStore.delete).toHaveBeenCalledWith('nizam_admin_impersonation')
     expect(signOutMock).toHaveBeenCalledOnce()
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/', 'layout')
-    expect(mocks.redirect).toHaveBeenCalledWith('/login')
+    expect(mocks.redirect).toHaveBeenCalledWith('/')
   })
 
   it('signs in employee by NIK using a shared auth user and keeps active org preference', async () => {
