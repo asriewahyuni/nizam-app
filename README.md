@@ -69,7 +69,32 @@ npm run supabase:stop
 npm run supabase:status
 npm run supabase:db:reset
 npm run supabase:migrate-local-data
+npm run db:railway:sync
+npm run db:railway:sync:apply
+npm run db:railway:parity
 ```
+
+### Sinkronisasi Supabase -> Railway (Staging/Prod)
+
+Gunakan flow ini supaya schema Railway tetap mutakhir mengikuti migration di `supabase/migrations`.
+
+1. Cek parity dulu:
+   ```bash
+   npm run db:railway:parity
+   ```
+2. Simulasikan migration (aman, tidak apply):
+   ```bash
+   npm run db:railway:sync
+   ```
+3. Jika hasil dry-run sesuai, apply ke Railway:
+   ```bash
+   npm run db:railway:sync:apply
+   ```
+
+Catatan:
+- `db:railway:sync` default **dry-run** agar tidak ada perubahan tidak sengaja.
+- Script otomatis mencoba ambil DB URL dari Railway CLI (`Postgres` service).
+- Untuk source Supabase via linked project, pastikan `supabase login`/`SUPABASE_ACCESS_TOKEN` tersedia.
 
 ## Mode Supabase Saat Development
 
