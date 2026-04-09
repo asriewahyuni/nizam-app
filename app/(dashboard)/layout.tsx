@@ -1,19 +1,11 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { unstable_noStore as noStore } from 'next/cache'
-import { getAdminImpersonationState, getSession } from '@/modules/auth/actions/auth.actions'
-import { getActiveBranch, getActiveOrg, getBranches, getBranchesByOrganizations, getMyOrganizations } from '@/modules/organization/actions/org.actions'
-import { getPendingApprovalsCount } from '@/modules/organization/actions/approval.actions'
-import { getUnpostedJournalsCount } from '@/modules/accounting/actions/journal.actions'
-import { getPendingPurchaseRequestsCount } from '@/modules/purchasing/actions/purchasing.actions'
-import { getResetRequestsCount } from '@/modules/organization/actions/hris.actions'
-import { getCashFlow, getDeckCashSummaries } from '@/modules/accounting/actions/reports.actions'
+import { getAdminImpersonationState } from '@/modules/auth/actions/auth.actions'
+import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { canAccessAllBranchesForOrg } from '@/modules/organization/lib/branch-access.server'
 import { isDemoSession } from '@/modules/demo/actions/demo.actions'
-import { getAiTokenHeaderSummary } from '@/modules/ai/lib/ai-token.server'
 import { saasModuleMatches } from '@/lib/saas/module-catalog'
-import { getPendingCoaRequestCount } from '@/modules/accounting/actions/coa-request.actions'
-import { getBSCDeckSummaries } from '@/modules/accounting/actions/bsc.actions'
 import { AppSidebar } from '@/components/shared/AppSidebar'
 import { AppHeader } from '@/components/shared/AppHeader'
 import { AdminImpersonationBanner } from '@/components/shared/AdminImpersonationBanner'
@@ -22,6 +14,7 @@ import { StartupWizard } from '@/components/shared/StartupWizard'
 import { FloatingPlanBadge } from '@/components/shared/FloatingPlanBadge'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import { MobilePullToRefresh } from '@/components/shared/MobilePullToRefresh'
+import { RouteProgressBar } from '@/components/shared/RouteProgressBar'
 
 type RouteModuleEntry = {
   path: string
@@ -34,66 +27,21 @@ function moduleNameMatches(enabledModuleRaw: string, candidateRaw: string) {
   return saasModuleMatches(enabledModuleRaw, candidateRaw)
 }
 
-function resolveDashboardDependency<T>(
-  label: string,
-  result: PromiseSettledResult<T>,
-  fallback: T
-) {
-  if (result.status === 'fulfilled') return result.value
-
-  console.error(`[DashboardLayout] Failed to load ${label}:`, result.reason)
-  return fallback
-}
-
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   noStore()
-  const session = await getSession()
-  if (!session) redirect('/login')
-
+  const requestPathname = (await headers()).get('x-pathname') || ''
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
-  const adminImpersonation = await getAdminImpersonationState()
-  const [activeBranch, allowAllBranchSelection] = await Promise.all([
+  const [adminImpersonation, activeBranch, allowAllBranchSelection, isDemo] = await Promise.all([
+    getAdminImpersonationState(),
     getActiveBranch(orgData.org.id),
     canAccessAllBranchesForOrg(orgData.org.id),
-  ])
-
-  const dependencyResults = await Promise.allSettled([
-    getPendingApprovalsCount(orgData.org.id, activeBranch?.id),
-    getUnpostedJournalsCount(orgData.org.id, activeBranch?.id),
-    getPendingPurchaseRequestsCount(orgData.org.id, activeBranch?.id),
-    getResetRequestsCount(orgData.org.id),
-    getCashFlow(orgData.org.id, activeBranch?.id),
-    getBranches(orgData.org.id),
-    getMyOrganizations(),
     isDemoSession(),
-    getAiTokenHeaderSummary(orgData.org.id),
-    getPendingCoaRequestCount(orgData.org.id),
   ])
-  const pendingApprovals = resolveDashboardDependency('pending approvals', dependencyResults[0], 0)
-  const unpostedJournals = resolveDashboardDependency('unposted journals', dependencyResults[1], 0)
-  const pendingPurchaseRequests = resolveDashboardDependency('pending purchase requests', dependencyResults[2], 0)
-  const resetRequests = resolveDashboardDependency('HR reset requests', dependencyResults[3], 0)
-  const cashFlow = resolveDashboardDependency('cash flow summary', dependencyResults[4], null)
-  const branches = resolveDashboardDependency('branches', dependencyResults[5], [])
-  const organizations = resolveDashboardDependency('accessible organizations', dependencyResults[6], [])
-  const isDemo = resolveDashboardDependency('demo session state', dependencyResults[7], false)
-  const aiTokens = resolveDashboardDependency('AI token summary', dependencyResults[8], null)
-  const pendingCoaRequests = resolveDashboardDependency('pending coa requests', dependencyResults[9], 0)
-  const orgBscSummaries = await getBSCDeckSummaries(
-    organizations.map((membership) => membership.orgId)
-  )
-  const orgBranchesByOrgId = await getBranchesByOrganizations(
-    organizations.map((membership) => membership.orgId)
-  )
-  const deckCashSummaries = await getDeckCashSummaries(
-    organizations.map((membership) => membership.orgId),
-    orgBranchesByOrgId
-  )
   const effectivePlanName = isDemo ? 'Demo' : (orgData.org.settings?.plan || 'Trial')
 
   // ─────────────────────────────────────────────────────────────
@@ -101,7 +49,6 @@ export default async function DashboardLayout({
   // ─────────────────────────────────────────────────────────────
   const isOwnerOrAdmin = orgData.role === 'owner' || orgData.role === 'admin'
   const canManageSubOrganizations = isOwnerOrAdmin
-  const pathname = (await headers()).get('x-pathname') || ''
 
   // Map paths to their required module names (matching saas_packages.modules)
   // Each entry can have multiple aliases to support both English & Indonesian module names
@@ -110,7 +57,7 @@ export default async function DashboardLayout({
     { path: '/inventory/warehouses', requiredModule: 'Warehouse', aliases: ['Warehouse', 'WMS'], permissionKeys: ['inventory', 'warehouse'] },
     { path: '/accounting/audit', requiredModule: 'Audit', aliases: ['Audit', 'Audit Trail'], permissionKeys: ['audit', 'approval'] },
     { path: '/settings/audit', requiredModule: 'Audit', aliases: ['Audit', 'Audit Trail'], permissionKeys: ['audit', 'approval'] },
-    { path: '/settings/ticketing', requiredModule: 'Config', aliases: ['Config', 'Ticketing', 'Doc Update Ticketing'], permissionKeys: ['business', 'support', 'ticketing'] },
+    { path: '/settings/ticketing', requiredModule: 'Config', aliases: ['Config', 'Ticketing', 'Support Ticket', 'Doc Update Ticketing', 'Dokumen Update Support Ticket'], permissionKeys: ['business', 'support', 'ticketing'] },
     { path: '/settings/roles', requiredModule: 'HRIS', aliases: ['HRIS', 'Akses & Jabatan'], permissionKeys: ['business'] },
     { path: '/settings/branches', requiredModule: 'Config', aliases: ['Config', 'Cabang & Divisi'], permissionKeys: ['branch'] },
     { path: '/settings/business', requiredModule: 'Config', aliases: ['Config', 'Pengaturan Bisnis'], permissionKeys: ['business'] },
@@ -135,7 +82,7 @@ export default async function DashboardLayout({
   ]
 
   // Identify which module is being accessed
-  const accessedEntry = routeModuleMap.find((entry) => pathname.startsWith(entry.path))
+  const accessedEntry = routeModuleMap.find((entry) => requestPathname.startsWith(entry.path))
   
   if (accessedEntry) {
     const { requiredModule, aliases = [requiredModule], permissionKeys = [] } = accessedEntry
@@ -147,7 +94,7 @@ export default async function DashboardLayout({
       : orgData.enabledModules.some((m: string) => allNames.some((candidate) => moduleNameMatches(m, candidate)))
 
     if (!isModulePaid) {
-      console.log(`[ACL] Redirecting - Module not paid: ${requiredModule} (checked aliases: ${allNames.join(', ')}) for path: ${pathname}`)
+      console.log(`[ACL] Redirecting - Module not paid: ${requiredModule} (checked aliases: ${allNames.join(', ')}) for path: ${requestPathname}`)
       return redirect('/dashboard')
     }
 
@@ -162,7 +109,7 @@ export default async function DashboardLayout({
         (permission) => permissionKeys.some((permissionKey) => permission.includes(permissionKey.toLowerCase()))
       )
       if (!hasPermission) {
-        console.log(`[ACL] Redirecting - No permission for: ${requiredModule} for path: ${pathname}`)
+        console.log(`[ACL] Redirecting - No permission for: ${requiredModule} for path: ${requestPathname}`)
         return redirect('/dashboard')
       }
     }
@@ -170,8 +117,12 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 print:block print:h-auto print:overflow-visible print:bg-white">
+      <RouteProgressBar />
       {/* Sidebar */}
       <AppSidebar 
+        key={`sidebar:${orgData.org.id}:${activeBranch?.id || 'all'}`}
+        orgId={orgData.org.id}
+        activeBranchId={activeBranch?.id || null}
         userRole={orgData.role} 
         jobTitle={orgData.jobTitle}
         user={{
@@ -180,11 +131,6 @@ export default async function DashboardLayout({
         }}
         permissions={orgData.permissions}
         enabledModules={orgData.enabledModules}
-        pendingApprovals={pendingApprovals} 
-        unpostedJournals={unpostedJournals} 
-        pendingPurchaseRequests={pendingPurchaseRequests}
-        hrisNotifications={resetRequests}
-        pendingCoaRequests={pendingCoaRequests}
         isDemo={isDemo}
         planName={effectivePlanName}
         canManageSubOrganizations={canManageSubOrganizations}
@@ -200,31 +146,26 @@ export default async function DashboardLayout({
         )}
         {isDemo && <DemoBanner />}
         <AppHeader
+          key={`header:${orgData.org.id}:${activeBranch?.id || 'all'}`}
           user={{
             fullName: orgData.user?.user_metadata?.full_name || orgData.user?.email,
             email: orgData.user?.email || ''
           }}
           jobTitle={orgData.jobTitle}
           org={orgData.org}
-          organizations={organizations}
           activeOrgId={orgData.org.id}
-          branches={branches || []}
           activeBranchId={activeBranch?.id || null}
+          activeBranch={activeBranch}
+          activeOrgRole={orgData.role}
+          activeOrgParentId={(orgData.org as { parent_org_id?: string | null }).parent_org_id ?? null}
           allowAllBranchSelection={allowAllBranchSelection}
           canManageBranches={isOwnerOrAdmin}
-          pendingApprovals={pendingApprovals}
-          cashFlow={cashFlow}
-          aiTokens={aiTokens}
-          orgBscSummaries={orgBscSummaries}
-          orgBranchesByOrgId={orgBranchesByOrgId}
-          orgCashSummaries={deckCashSummaries.orgSummaries}
-          branchCashSummaries={deckCashSummaries.branchSummaries}
         />
         <StartupWizard isDemo={isDemo} />
         <MobilePullToRefresh scrollContainerId="dashboard-scroll-root" />
         <main id="dashboard-scroll-root" className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6 print:overflow-visible print:p-0 print:pb-0">
           <div className="max-w-7xl mx-auto print:max-w-none">
-            {allowAllBranchSelection && !activeBranch && branches.length > 1 && (
+            {allowAllBranchSelection && !activeBranch && (
               <div className="mb-6 rounded-[28px] border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50 px-5 py-4 shadow-sm">
                 <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
                   <div>

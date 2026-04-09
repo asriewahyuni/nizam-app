@@ -221,6 +221,102 @@ export interface Database {
         Update: Partial<Account>
         Relationships: []
       }
+      bank_accounts: {
+        Row: {
+          id: string
+          org_id: string
+          branch_id: string
+          account_id: string
+          bank_name: string
+          account_number: string | null
+          account_holder: string | null
+          currency: string
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          branch_id: string
+          account_id: string
+          bank_name: string
+          account_number?: string | null
+          account_holder?: string | null
+          currency?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<{
+          id: string
+          org_id: string
+          branch_id: string
+          account_id: string
+          bank_name: string
+          account_number: string | null
+          account_holder: string | null
+          currency: string
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }>
+        Relationships: []
+      }
+      bank_transactions: {
+        Row: {
+          id: string
+          org_id: string
+          branch_id: string
+          bank_account_id: string
+          transaction_date: string
+          description: string
+          amount: number
+          type: 'IN' | 'OUT'
+          reference_number: string | null
+          category_id: string | null
+          journal_entry_id: string | null
+          status: string
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          branch_id: string
+          bank_account_id: string
+          transaction_date?: string
+          description: string
+          amount: number
+          type: 'IN' | 'OUT'
+          reference_number?: string | null
+          category_id?: string | null
+          journal_entry_id?: string | null
+          status?: string
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<{
+          id: string
+          org_id: string
+          branch_id: string
+          bank_account_id: string
+          transaction_date: string
+          description: string
+          amount: number
+          type: 'IN' | 'OUT'
+          reference_number: string | null
+          category_id: string | null
+          journal_entry_id: string | null
+          status: string
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }>
+        Relationships: []
+      }
       products: {
         Row: Product
         Insert: Omit<Product, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }

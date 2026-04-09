@@ -1,5 +1,4 @@
 import { Suspense } from 'react'
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { getPurchases, getPurchaseRequests } from '@/modules/purchasing/actions/purchasing.actions'
 import { getContacts } from '@/modules/contacts/actions/contact.actions'
@@ -10,11 +9,6 @@ import PurchasingClient from './PurchasingClient'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 export default async function PurchasingPage() {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
 

@@ -5,9 +5,10 @@ import {
   createGeneratedSalesPage,
   duplicateSalesPage,
   removeSalesPage,
+  upsertSalesPageAiProfileForOrg,
   updateSalesPageContent,
 } from '@/modules/sales/lib/sales-page.server'
-import type { SalesPageGeneratorInput, SalesPagePayload } from '@/modules/sales/lib/sales-page'
+import type { SalesPageAiProfilePayload, SalesPageGeneratorInput, SalesPagePayload } from '@/modules/sales/lib/sales-page'
 
 function publicPath(orgSlug: string, pageSlug: string) {
   return `/sp/${orgSlug}/${pageSlug}`
@@ -42,4 +43,10 @@ export async function deleteSalesPage(orgId: string, salesPageId: string, orgSlu
   revalidatePath('/sales/pages')
   revalidatePath(publicPath(orgSlug, pageSlug))
   return { success: true }
+}
+
+export async function saveSalesPageAiProfile(orgId: string, payload: SalesPageAiProfilePayload) {
+  const profile = await upsertSalesPageAiProfileForOrg(orgId, payload)
+  revalidatePath('/sales/pages')
+  return profile
 }

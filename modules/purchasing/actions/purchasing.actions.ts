@@ -49,6 +49,13 @@ type InventorySyncParams = {
   diff: number
 }
 
+function getInventoryAssetFallbackCode(category?: string | null) {
+  if (category === 'Setengah Jadi') return '1302'
+  if (category === 'Bahan' || category === 'Pelengkap') return '1303'
+  if (category === 'Siap Jual') return '1304'
+  return '1301'
+}
+
 function normalizePurchaseShariahMode(value?: string | null): 'CASH' | 'SALAM' | 'ISTISHNA' {
   const normalized = String(value || '')
     .trim()
@@ -627,7 +634,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
   // 1. Fetch info
   const { data: purchase } = await (supabase as any)
     .from('purchases' as any)
-    .select('*, purchase_items(*, products(asset_account_id))')
+    .select('*, purchase_items(*, products(asset_account_id, category))')
     .eq('id', purchaseId)
     .eq('org_id', orgId)
     .single()
@@ -722,7 +729,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
   }
 
   const stockMovements: any[] = []
-  const inventoryDebitAllocations: Array<{ assetAccountId: string | null; amount: number }> = []
+  const inventoryDebitAllocations: Array<{ assetAccountId: string | null; assetFallbackCode: string; amount: number }> = []
 
   // 3. Process Items for WAC & Stock Card
   for (const item of purchase.purchase_items) {
@@ -756,8 +763,10 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 
     const productRel = Array.isArray((item as any).products) ? (item as any).products[0] : (item as any).products
     const rawAssetAccountId = productRel?.asset_account_id
+    const assetFallbackCode = getInventoryAssetFallbackCode(productRel?.category)
     inventoryDebitAllocations.push({
       assetAccountId: typeof rawAssetAccountId === 'string' ? rawAssetAccountId : null,
+      assetFallbackCode,
       amount: landedTotal,
     })
   }
@@ -791,9 +800,12 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     .from('accounts' as any)
     .select('id, code')
     .eq('org_id', orgId)
-    .in('code', ['1205', '1301', '1401', '1403', '1404', '2101'])
+    .in('code', ['1205', '1301', '1302', '1303', '1304', '1401', '1403', '1404', '2101'])
 
-  const accPersediaan = accounts?.find((a:any) => a.code === '1301')?.id
+  const inventoryAccountByCode = Object.fromEntries(
+    ((accounts || []) as any[]).map((account: any) => [account.code, account.id])
+  ) as Record<string, string | undefined>
+  const accPersediaan = inventoryAccountByCode['1301']
   const accPpnMasukan = accounts?.find((a:any) => a.code === '1401')?.id
   const accUangMuka = accounts?.find((a:any) => a.code === '1403')?.id
   const accIstishnaAsset = accounts?.find((a:any) => a.code === '1205')?.id
@@ -843,7 +855,11 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 
     const inventoryDebitByAccount: Record<string, number> = {}
     for (const allocation of inventoryDebitAllocations) {
-      const accountId = allocation.assetAccountId || accPersediaan || null
+      const accountId =
+        allocation.assetAccountId
+        || inventoryAccountByCode[allocation.assetFallbackCode]
+        || accPersediaan
+        || null
       if (!accountId) continue
       inventoryDebitByAccount[accountId] = (inventoryDebitByAccount[accountId] || 0) + Number(allocation.amount || 0)
     }

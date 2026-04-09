@@ -129,7 +129,7 @@ export default function PurchasingClient({
   const [returnNumber, setReturnNumber] = useState('')
   const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0])
   const [returnNotes, setReturnNotes] = useState('')
-  const UNIT_OPTIONS = ['Pcs', 'Unit', 'Kg', 'Gram', 'Liter', 'Ml', 'Box', 'Pack', 'Roll', 'Lembar', 'Set', 'Lusin', 'Meter', 'Cm', 'Pasang', 'Rim', 'Karton', 'Botol', 'Galon', 'Lainnya']
+  const UNIT_OPTIONS = ['Pcs', 'Unit', 'Kg', 'Gram', 'Liter', 'Ml', 'Box', 'Pack', 'Roll', 'Lembar', 'Set', 'Lusin', 'Meter', 'Cm', 'Pasang', 'Rim', 'Karton', 'Botol', 'Galon', 'Ekor', 'Lainnya']
   const createEmptyLine = () => ({
     id: Date.now(),
     product_name: '',

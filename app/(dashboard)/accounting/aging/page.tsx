@@ -16,7 +16,6 @@ export default async function AgingPage({ searchParams }: { searchParams: { view
   return (
     <div className="p-10 min-h-screen bg-slate-50/20">
       <AgingClient 
-        orgId={orgData.org.id} 
         initialData={summary} 
         initialView={initialView}
       />

@@ -5,11 +5,51 @@ import { revalidatePath } from 'next/cache'
 import { Product } from '@/types/database.types'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
-export interface ProductWithStock extends Product {
+type ProductInventoryFields = Pick<
+  Product,
+  'id' | 'name' | 'sku' | 'type' | 'unit' | 'purchase_price' | 'selling_price' | 'category' | 'is_active'
+> & {
+  barcode?: string | null
+  average_cost?: number | null
+}
+
+export interface ProductWithStock extends ProductInventoryFields {
   stock_in: number
   stock_value: number
   stock_out: number
   stock_available: number
+}
+
+export type InventoryWarehouseStockRow = {
+  product_id: string
+  product_name: string
+  product_sku: string | null
+  product_unit: string | null
+  product_category: string | null
+  warehouse_id: string
+  warehouse_name: string
+  warehouse_code: string | null
+  quantity: number
+  unit_cost: number
+  stock_value: number
+}
+
+export type InventoryMutationRow = {
+  id: string
+  product_id: string
+  product_name: string
+  product_sku: string | null
+  product_unit: string | null
+  product_category: string | null
+  movement_date: string
+  quantity: number
+  unit_price: number
+  reference_type: string
+  reference_id: string
+  notes: string | null
+  warehouse_id: string | null
+  warehouse_name: string | null
+  warehouse_code: string | null
 }
 
 type WarehouseScopeRecord = {
@@ -71,69 +111,42 @@ export async function getProducts(orgId: string, branchId?: string | null): Prom
   if ('error' in branchSelection) return []
   const effectiveBranchId = branchSelection.branchId
 
-  const { data: productsData } = await supabase.from('products').select('*').eq('org_id', orgId).order('name', { ascending: true })
-  let movementsQuery = supabase
-    .from('stock_movements')
-    .select('product_id, quantity, unit_price')
+  const { data: productsData } = await supabase
+    .from('products')
+    .select('id, name, sku, barcode, type, unit, purchase_price, selling_price, category, average_cost, is_active')
     .eq('org_id', orgId)
-
-  if (effectiveBranchId) {
-    movementsQuery = movementsQuery.eq('branch_id', effectiveBranchId)
-  }
-
-  const { data: movementsData } = await movementsQuery
+    .order('name', { ascending: true })
 
   let stockQuery = (supabase as any)
     .from('inventory_stocks')
-    .select('product_id, quantity, warehouses!inner(branch_id)')
+    .select('product_id, quantity, warehouses!inner(branch_id, is_active)')
     .eq('org_id', orgId)
+    .eq('warehouses.is_active', true)
 
   if (effectiveBranchId) {
-    stockQuery = stockQuery.or(`branch_id.eq.${effectiveBranchId}`, { foreignTable: 'warehouses' })
+    stockQuery = stockQuery.eq('warehouses.branch_id', effectiveBranchId)
   }
 
   const { data: stockRows } = await stockQuery
 
-  const products = productsData || []
-  const movements = movementsData || []
+  const products = (productsData as ProductInventoryFields[]) || []
   const currentStocks = stockRows || []
 
-  // Aggregate Movements per Product (Sub-Ledger Logic)
-  const aggregation: Record<string, { in: number, out: number, value: number }> = {}
   const stockByProduct: Record<string, number> = {}
-  
-  movements.forEach((m: any) => {
-    if (!aggregation[m.product_id]) aggregation[m.product_id] = { in: 0, out: 0, value: 0 }
-    
-    const qty = Number(m.quantity || 0)
-    const price = Number(m.unit_price || 0)
-
-    if (qty > 0) {
-      aggregation[m.product_id].in += qty
-    } else if (qty < 0) {
-      aggregation[m.product_id].out += Math.abs(qty)
-    }
-    
-    // Total Value strictly from Sub-ledger records
-    aggregation[m.product_id].value += (qty * price)
-  })
 
   currentStocks.forEach((stock: any) => {
     stockByProduct[stock.product_id] = (stockByProduct[stock.product_id] || 0) + Number(stock.quantity || 0)
   })
 
-  return products.map((p: any) => {
-    const stats = aggregation[p.id] || { in: 0, out: 0, value: 0 }
-    const available = effectiveBranchId ? (stockByProduct[p.id] || 0) : (stats.in - stats.out)
-    const weightedUnitCost = Number((p as any).average_cost ?? p.purchase_price ?? 0)
-    const stockValue = effectiveBranchId
-      ? Math.max(0, available * weightedUnitCost)
-      : Math.max(0, stats.value)
+  return products.map((product) => {
+    const available = stockByProduct[product.id] || 0
+    const weightedUnitCost = Number(product.average_cost ?? product.purchase_price ?? 0)
+    const stockValue = Math.max(0, available * weightedUnitCost)
 
     return {
-      ...p,
-      stock_in: stats.in,
-      stock_out: stats.out,
+      ...product,
+      stock_in: 0,
+      stock_out: 0,
       stock_available: available,
       stock_value: stockValue,
     }
@@ -498,17 +511,245 @@ export async function getWarehouseStocks(orgId: string, productId: string, branc
     .eq('product_id', productId)
 
   if (effectiveBranchId) {
-    query = query.or(`branch_id.eq.${effectiveBranchId}`, { foreignTable: 'warehouses' })
+    query = query.eq('warehouses.branch_id', effectiveBranchId)
   }
 
   const { data, error } = await query
 
-  if (error) return []
-  return data.map((s: any) => ({
-    warehouse_id: s.warehouse_id,
-    warehouse_name: (s.warehouses as any)?.name || 'Unknown',
-    quantity: Number(s.quantity || 0)
-  }))
+  if (error || !Array.isArray(data)) return []
+
+  const stocksByWarehouse = new Map<string, { warehouse_id: string; warehouse_name?: string; quantity: number }>()
+
+  data.forEach((stock: any) => {
+    const warehouseId = String(stock?.warehouse_id || '').trim()
+    if (!warehouseId) return
+
+    const quantity = Number(stock?.quantity || 0)
+    const warehouseName = (stock?.warehouses as any)?.name || 'Unknown'
+    const existing = stocksByWarehouse.get(warehouseId)
+
+    if (existing) {
+      existing.quantity += quantity
+      return
+    }
+
+    stocksByWarehouse.set(warehouseId, {
+      warehouse_id: warehouseId,
+      warehouse_name: warehouseName,
+      quantity,
+    })
+  })
+
+  return Array.from(stocksByWarehouse.values()).sort((left, right) =>
+    String(left.warehouse_name || '').localeCompare(String(right.warehouse_name || ''))
+  )
+}
+
+export async function getInventoryWarehouseSnapshot(orgId: string, branchId?: string | null): Promise<InventoryWarehouseStockRow[]> {
+  const supabase = await createClient()
+  const branchSelection = await resolveActiveBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
+  const effectiveBranchId = branchSelection.branchId
+
+  let query = (supabase as any)
+    .from('inventory_stocks')
+    .select(`
+      product_id,
+      warehouse_id,
+      quantity,
+      products!inner(name, sku, unit, category, purchase_price, average_cost),
+      warehouses!inner(name, code, branch_id, is_active)
+    `)
+    .eq('org_id', orgId)
+    .eq('warehouses.is_active', true)
+
+  if (effectiveBranchId) {
+    query = query.eq('warehouses.branch_id', effectiveBranchId)
+  }
+
+  const { data, error } = await query
+  if (error || !Array.isArray(data)) return []
+
+  const snapshotByKey = new Map<string, InventoryWarehouseStockRow>()
+
+  data.forEach((row: any) => {
+    const product = row?.products
+    const warehouse = row?.warehouses
+    const productId = String(row?.product_id || '').trim()
+    const warehouseId = String(row?.warehouse_id || '').trim()
+    if (!productId || !warehouseId || !product || !warehouse) return
+
+    const key = `${productId}:${warehouseId}`
+    const existing = snapshotByKey.get(key)
+    const quantity = Number(row?.quantity || 0)
+    const unitCost = Number(product?.average_cost ?? product?.purchase_price ?? 0)
+
+    if (existing) {
+      existing.quantity += quantity
+      existing.stock_value = Math.max(0, existing.quantity * existing.unit_cost)
+      return
+    }
+
+    snapshotByKey.set(key, {
+      product_id: productId,
+      product_name: String(product?.name || 'Tanpa Nama Produk'),
+      product_sku: product?.sku ? String(product.sku) : null,
+      product_unit: product?.unit ? String(product.unit) : null,
+      product_category: product?.category ? String(product.category) : null,
+      warehouse_id: warehouseId,
+      warehouse_name: String(warehouse?.name || 'Gudang'),
+      warehouse_code: warehouse?.code ? String(warehouse.code) : null,
+      quantity,
+      unit_cost: unitCost,
+      stock_value: Math.max(0, quantity * unitCost),
+    })
+  })
+
+  return Array.from(snapshotByKey.values())
+    .filter((row) => Math.abs(row.quantity) > 0.0001)
+    .sort((left, right) => {
+      const byWarehouse = left.warehouse_name.localeCompare(right.warehouse_name)
+      if (byWarehouse !== 0) return byWarehouse
+      return left.product_name.localeCompare(right.product_name)
+    })
+}
+
+export async function getInventoryMutations(
+  orgId: string,
+  branchId?: string | null,
+  limit: number = 80
+): Promise<InventoryMutationRow[]> {
+  const supabase = await createClient()
+  const branchSelection = await resolveActiveBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
+  const effectiveBranchId = branchSelection.branchId
+
+  let movementsQuery = (supabase as any)
+    .from('stock_movements')
+    .select(`
+      id,
+      product_id,
+      movement_date,
+      quantity,
+      unit_price,
+      reference_type: referenceType,
+      reference_id,
+      notes,
+      branch_id,
+      products(name, sku, unit, category)
+    `)
+    .eq('org_id', orgId)
+    .order('movement_date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (effectiveBranchId) {
+    movementsQuery = movementsQuery.eq('branch_id', effectiveBranchId)
+  }
+
+  const { data: movements, error } = await movementsQuery
+  if (error || !Array.isArray(movements) || movements.length === 0) return []
+
+  const movementRows = movements as any[]
+  const saleIds = [...new Set(movementRows.filter((row) => row.reference_type === 'SALE' || row.reference_type === 'SALES_RETURN').map((row) => row.reference_id).filter(Boolean))]
+  const purchaseIds = [...new Set(movementRows.filter((row) => row.reference_type === 'PURCHASE' || row.reference_type === 'PURCHASE_RETURN').map((row) => row.reference_id).filter(Boolean))]
+  const adjustmentIds = [...new Set(movementRows.filter((row) => row.reference_type === 'ADJUSTMENT').map((row) => row.reference_id).filter(Boolean))]
+
+  const [salesResult, purchasesResult, adjustmentItemsResult] = await Promise.all([
+    saleIds.length > 0
+      ? (supabase as any)
+          .from('sales')
+          .select('id, warehouse_id, warehouses(name, code, branch_id)')
+          .eq('org_id', orgId)
+          .in('id', saleIds)
+      : Promise.resolve({ data: [] }),
+    purchaseIds.length > 0
+      ? (supabase as any)
+          .from('purchases')
+          .select('id, warehouse_id, warehouses(name, code, branch_id)')
+          .eq('org_id', orgId)
+          .in('id', purchaseIds)
+      : Promise.resolve({ data: [] }),
+    adjustmentIds.length > 0
+      ? (supabase as any)
+          .from('inventory_adjustment_items')
+          .select('adjustment_id, product_id, diff_quantity, warehouse_id, warehouses(name, code, branch_id)')
+          .eq('org_id', orgId)
+          .in('adjustment_id', adjustmentIds)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  const saleWarehouseMap = new Map<string, { warehouse_id: string | null; warehouse_name: string | null; warehouse_code: string | null }>()
+  ;(Array.isArray(salesResult.data) ? salesResult.data : []).forEach((row: any) => {
+    const warehouse = row?.warehouses
+    saleWarehouseMap.set(String(row?.id || ''), {
+      warehouse_id: row?.warehouse_id ? String(row.warehouse_id) : null,
+      warehouse_name: warehouse?.name ? String(warehouse.name) : null,
+      warehouse_code: warehouse?.code ? String(warehouse.code) : null,
+    })
+  })
+
+  const purchaseWarehouseMap = new Map<string, { warehouse_id: string | null; warehouse_name: string | null; warehouse_code: string | null }>()
+  ;(Array.isArray(purchasesResult.data) ? purchasesResult.data : []).forEach((row: any) => {
+    const warehouse = row?.warehouses
+    purchaseWarehouseMap.set(String(row?.id || ''), {
+      warehouse_id: row?.warehouse_id ? String(row.warehouse_id) : null,
+      warehouse_name: warehouse?.name ? String(warehouse.name) : null,
+      warehouse_code: warehouse?.code ? String(warehouse.code) : null,
+    })
+  })
+
+  const adjustmentWarehouseQueues = new Map<string, Array<{ warehouse_id: string | null; warehouse_name: string | null; warehouse_code: string | null }>>()
+  ;(Array.isArray(adjustmentItemsResult.data) ? adjustmentItemsResult.data : []).forEach((row: any) => {
+    const warehouse = row?.warehouses
+    if (effectiveBranchId && warehouse?.branch_id && String(warehouse.branch_id) !== effectiveBranchId) return
+
+    const sign = Number(row?.diff_quantity || 0) >= 0 ? 'IN' : 'OUT'
+    const key = `${String(row?.adjustment_id || '')}:${String(row?.product_id || '')}:${sign}`
+    const existing = adjustmentWarehouseQueues.get(key) || []
+    existing.push({
+      warehouse_id: row?.warehouse_id ? String(row.warehouse_id) : null,
+      warehouse_name: warehouse?.name ? String(warehouse.name) : null,
+      warehouse_code: warehouse?.code ? String(warehouse.code) : null,
+    })
+    adjustmentWarehouseQueues.set(key, existing)
+  })
+
+  return movementRows.map((row: any) => {
+    let resolvedWarehouse: { warehouse_id: string | null; warehouse_name: string | null; warehouse_code: string | null } | null = null
+    const referenceType = String(row?.reference_type || '').trim().toUpperCase()
+
+    if (referenceType === 'SALE' || referenceType === 'SALES_RETURN') {
+      resolvedWarehouse = saleWarehouseMap.get(String(row?.reference_id || '')) || null
+    } else if (referenceType === 'PURCHASE' || referenceType === 'PURCHASE_RETURN') {
+      resolvedWarehouse = purchaseWarehouseMap.get(String(row?.reference_id || '')) || null
+    } else if (referenceType === 'ADJUSTMENT') {
+      const sign = Number(row?.quantity || 0) >= 0 ? 'IN' : 'OUT'
+      const key = `${String(row?.reference_id || '')}:${String(row?.product_id || '')}:${sign}`
+      const queue = adjustmentWarehouseQueues.get(key) || []
+      resolvedWarehouse = queue.shift() || null
+      adjustmentWarehouseQueues.set(key, queue)
+    }
+
+    const product = row?.products
+    return {
+      id: String(row?.id || ''),
+      product_id: String(row?.product_id || ''),
+      product_name: String(product?.name || 'Tanpa Nama Produk'),
+      product_sku: product?.sku ? String(product.sku) : null,
+      product_unit: product?.unit ? String(product.unit) : null,
+      product_category: product?.category ? String(product.category) : null,
+      movement_date: String(row?.movement_date || row?.created_at || ''),
+      quantity: Number(row?.quantity || 0),
+      unit_price: Number(row?.unit_price || 0),
+      reference_type: referenceType,
+      reference_id: String(row?.reference_id || ''),
+      notes: row?.notes ? String(row.notes) : null,
+      warehouse_id: resolvedWarehouse?.warehouse_id || null,
+      warehouse_name: resolvedWarehouse?.warehouse_name || null,
+      warehouse_code: resolvedWarehouse?.warehouse_code || null,
+    } satisfies InventoryMutationRow
+  })
 }
 
 export async function getProductByBarcode(orgId: string, barcode: string) {

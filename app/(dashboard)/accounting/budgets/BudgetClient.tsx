@@ -34,6 +34,7 @@ type BudgetReportRow = {
 
 type BudgetAccount = Pick<Account, 'id' | 'code' | 'name'> & {
   type: string
+  parent_id?: string | null
   description?: string | null
 }
 
@@ -113,13 +114,22 @@ export function BudgetClient({
   const readOnlyBudgetHint = allowAllBranchSelection
     ? 'Pilih satu unit aktif dari header untuk membuka form input budget bulanan.'
     : 'Akses unit aktif belum tersedia untuk akun ini, sehingga budget hanya bisa dilihat.'
-  const budgetableAccounts = accounts.filter((account) =>
-    ['REVENUE', 'EXPENSE', 'COGS'].includes(account.type) ||
-    account.code.startsWith('4') ||
-    account.code.startsWith('5') ||
-    account.code.startsWith('6')
+  const parentAccountIds = new Set(
+    accounts
+      .map((account) => String(account.parent_id || '').trim())
+      .filter(Boolean)
   )
+  const budgetableAccounts = accounts.filter((account) => {
+    const isBudgetType =
+      ['REVENUE', 'EXPENSE', 'COGS'].includes(account.type) ||
+      account.code.startsWith('4') ||
+      account.code.startsWith('5') ||
+      account.code.startsWith('6')
+
+    return isBudgetType && !parentAccountIds.has(account.id)
+  })
   const hasBudgetableAccounts = budgetableAccounts.length > 0
+  const budgetableAccountIds = new Set(budgetableAccounts.map((account) => account.id))
   
   // Local state for editing amounts
   const [editMap, setEditMap] = useState<Record<string, string>>(
@@ -132,10 +142,34 @@ export function BudgetClient({
     acc[budget.account_id] = Number(budget.budget_amount)
     return acc
   }, {} as Record<string, number>)
-  const reportByAccount = reportData.reduce((acc, row) => {
+  const filteredReportData = reportData.filter((row) => budgetableAccountIds.has(row.account_id))
+  const reportByAccount = filteredReportData.reduce((acc, row) => {
     acc[row.account_id] = row
     return acc
   }, {} as Record<string, BudgetReportRow>)
+  const analysisRows = [...filteredReportData]
+
+  for (const budget of initialBudgets) {
+    const accountId = String(budget.account_id || '').trim()
+    const budgetAmount = Number(budget.budget_amount)
+
+    if (!accountId || !Number.isFinite(budgetAmount) || budgetAmount === 0 || reportByAccount[accountId]) {
+      continue
+    }
+
+    const account = accounts.find((candidate) => candidate.id === accountId)
+    if (!account) continue
+
+    analysisRows.push({
+      account_id: account.id,
+      account_code: account.code,
+      account_name: account.name,
+      budget_amount: budgetAmount,
+      actual_amount: 0,
+    })
+  }
+
+  analysisRows.sort((left, right) => left.account_code.localeCompare(right.account_code))
 
   const handleSave = async (accountId: string) => {
     if (!hasActiveBranch) {
@@ -285,7 +319,7 @@ export function BudgetClient({
           >
             {/* Analysis Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-               {reportData.map((row) => {
+               {analysisRows.map((row) => {
                   const percent = Math.min(100, Math.max(0, (row.actual_amount / row.budget_amount) * 100))
                   const isOver = row.actual_amount > row.budget_amount
                   
@@ -341,7 +375,7 @@ export function BudgetClient({
                   )
                })}
             </div>
-            {reportData.length === 0 && (
+            {analysisRows.length === 0 && (
               <div className="py-32 text-center bg-white rounded-[50px] border-2 border-dashed border-slate-100 italic font-bold text-slate-300 uppercase tracking-widest">
                  No budget realization data for this period.
               </div>

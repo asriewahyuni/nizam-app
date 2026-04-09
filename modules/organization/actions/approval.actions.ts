@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { ensureSellableBranchStockAvailability, shouldGuardOrderedSaleStock } from '@/modules/sales/lib/stock-guard.server'
 
 async function resolveApprovalBranchId(orgId: string, branchId?: string | null) {
   const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
@@ -174,6 +175,46 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
   const { data: reqData, error: reqErr } = await requestLookup.single()
 
   if (reqErr || !reqData) return { error: 'Request tidak ditemukan' }
+
+  if (reqData.source_type === 'SALES_ORDER' && status === 'APPROVED') {
+    const approvalBranchId = reqData.branch_id || effectiveBranchId
+    if (!approvalBranchId) {
+      return { error: 'Sales order tidak memiliki unit aktif untuk validasi stok.' }
+    }
+
+    let salesLookup = (supabase as any)
+      .from('sales' as any)
+      .select('id, shariah_mode, sales_items(product_id, description, quantity)')
+      .eq('id', reqData.source_id)
+      .eq('org_id', orgId)
+
+    if (reqData.branch_id) {
+      salesLookup = salesLookup.eq('branch_id', reqData.branch_id)
+    }
+
+    const { data: saleDetail, error: saleDetailError } = await salesLookup.single()
+    if (saleDetailError || !saleDetail) {
+      return { error: 'Sales order tidak ditemukan untuk validasi stok.' }
+    }
+
+    if (shouldGuardOrderedSaleStock((saleDetail as any).shariah_mode)) {
+      const stockGuard = await ensureSellableBranchStockAvailability(supabase as any, {
+        orgId,
+        branchId: approvalBranchId,
+        lines: Array.isArray((saleDetail as any).sales_items)
+          ? (saleDetail as any).sales_items.map((item: any) => ({
+              product_id: item?.product_id || null,
+              product_name: item?.description || null,
+              quantity: Number(item?.quantity || 0),
+            }))
+          : [],
+      })
+
+      if ('error' in stockGuard) {
+        return { error: stockGuard.error }
+      }
+    }
+  }
 
   let approvalUpdate = (supabase as any)
     .from('approval_requests')

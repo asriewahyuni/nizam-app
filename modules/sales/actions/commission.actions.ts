@@ -98,13 +98,14 @@ function revalidateSalesCommissionPages() {
 
 export async function getActiveResellers(orgId: string) {
   const supabase = await createClient()
+  const db = supabase as any
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) return []
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('sales_resellers')
     .select('*')
     .eq('org_id', orgId)
@@ -112,11 +113,12 @@ export async function getActiveResellers(orgId: string) {
     .order('name', { ascending: true })
 
   if (error) return []
-  return data || []
+  return (data || []) as SalesResellerRecord[]
 }
 
 export async function createReseller(orgId: string, formData: FormData): Promise<ResellerMutationResult> {
   const supabase = await createClient()
+  const db = supabase as any
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -126,7 +128,7 @@ export async function createReseller(orgId: string, formData: FormData): Promise
   const payload = parseResellerFormData(formData)
   if ('error' in payload) return payload
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('sales_resellers')
     .insert({
       org_id: orgId,
@@ -150,11 +152,12 @@ export async function createReseller(orgId: string, formData: FormData): Promise
   if (error) return { error: 'Gagal membuat reseller: ' + error.message }
 
   revalidateSalesCommissionPages()
-  return { success: true, data }
+  return { success: true, data: data as SalesResellerRecord }
 }
 
 export async function updateReseller(orgId: string, resellerId: string, formData: FormData): Promise<ResellerMutationResult> {
   const supabase = await createClient()
+  const db = supabase as any
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -164,7 +167,7 @@ export async function updateReseller(orgId: string, resellerId: string, formData
   const payload = parseResellerFormData(formData)
   if ('error' in payload) return payload
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('sales_resellers')
     .update({
       name: payload.name,
@@ -189,18 +192,19 @@ export async function updateReseller(orgId: string, resellerId: string, formData
   if (error) return { error: 'Gagal memperbarui reseller: ' + error.message }
 
   revalidateSalesCommissionPages()
-  return { success: true, data }
+  return { success: true, data: data as SalesResellerRecord }
 }
 
 export async function deleteReseller(orgId: string, resellerId: string): Promise<DeleteResellerResult> {
   const supabase = await createClient()
+  const db = supabase as any
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) return { error: 'Unauthorized' }
 
-  const { error } = await supabase
+  const { error } = await db
     .from('sales_resellers')
     .update({
       is_active: false,
@@ -229,8 +233,9 @@ export async function getResellerCommissionSnapshot(orgId: string, resellerId?: 
   }
 
   const supabase = await createClient()
+  const db = supabase as any
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('sales_resellers')
     .select('id, name, commission_type, commission_value, is_active')
     .eq('org_id', orgId)
@@ -241,18 +246,26 @@ export async function getResellerCommissionSnapshot(orgId: string, resellerId?: 
     return { error: 'Gagal membaca data reseller: ' + error.message }
   }
 
-  if (!data || data.is_active === false) {
+  const reseller = (data as {
+    id?: string
+    name?: string | null
+    commission_type?: string | null
+    commission_value?: number | null
+    is_active?: boolean | null
+  } | null) ?? null
+
+  if (!reseller || reseller.is_active === false) {
     return { error: 'Reseller tidak ditemukan atau sudah nonaktif.' }
   }
 
   return {
     success: true,
-    resellerId: String(data.id),
-    resellerName: data.name ? String(data.name) : null,
-    commissionType: normalizeCommissionType(data.commission_type) || null,
+    resellerId: String(reseller.id),
+    resellerName: reseller.name ? String(reseller.name) : null,
+    commissionType: normalizeCommissionType(reseller.commission_type) || null,
     commissionValue:
-      data.commission_value === null || data.commission_value === undefined
+      reseller.commission_value === null || reseller.commission_value === undefined
         ? null
-        : Number(data.commission_value),
+        : Number(reseller.commission_value),
   }
 }

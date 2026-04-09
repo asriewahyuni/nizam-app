@@ -40,34 +40,17 @@ import {
 import { useRouter } from 'next/navigation'
 import { createBankAccount, createBankTransaction, createInterOrgCapitalTransfer, deleteBankAccount, deleteBankTransaction } from '@/modules/cash/actions/bank.actions'
 import { processBankCSV } from '@/modules/cash/actions/reconcile.actions'
-import { BankTransaction, BankAccount, Account, CashFlowCategory } from '@/types/database.types'
 import { formatRupiah, formatDate, getDateInTimeZone } from '@/lib/utils'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
-
-type CashAccountOption = Account & {
-  cash_flow_category?: CashFlowCategory | null
-}
-
-type CashBankAccount = BankAccount & {
-  account: CashAccountOption
-  balances?: { balance: number }
-  org_name?: string | null
-  branch_name?: string | null
-}
-
-type TransferCategoryOption = {
-  id: string
-  code: string
-  name: string
-  type: string
-  cash_flow_category?: CashFlowCategory | null
-}
-
-type RecentTransactionOption = BankTransaction & {
-  bank_account: { bank_name?: string | null; account_number?: string | null } | null
-  category: { name?: string | null; code?: string | null } | null
-}
+import type {
+  CashAccountOption,
+  CashBankAccount,
+  CashViewMode,
+  PlacementAccountOption,
+  RecentTransactionOption,
+  TransferCategoryOption,
+} from '@/modules/cash/types'
 
 function isFinancingTransferAccount(account: Pick<TransferCategoryOption, 'code' | 'type' | 'cash_flow_category'> | null | undefined) {
   const code = String(account?.code || '').trim()
@@ -86,6 +69,7 @@ function isFinancingTransferAccount(account: Pick<TransferCategoryOption, 'code'
 interface CashClientProps {
   orgId: string
   orgName: string
+  isAllBranchesView?: boolean
   activeBranchId: string | null
   activeBranchName: string | null
   bankAccounts: CashBankAccount[]
@@ -94,6 +78,7 @@ interface CashClientProps {
   bankGlAccounts: CashAccountOption[]
   interOrgSourceAccounts?: CashAccountOption[]
   recentTransactions: RecentTransactionOption[]
+  cashViewMode: CashViewMode
   userRole: string
   /** TRUE jika org adalah Parent/Holding dan user bisa kelola rekening langsung */
   canManageDirect: boolean
@@ -105,7 +90,7 @@ interface CashClientProps {
     orgId: string;
     orgName: string;
     branches: { id: string; name: string }[];
-    accounts: { id: string; code: string; name: string }[];
+    accounts: PlacementAccountOption[];
   }[]
   transferCategoryNodes?: {
     orgId: string
@@ -127,6 +112,7 @@ const item = {
 export function CashClient({
   orgId,
   orgName,
+  isAllBranchesView = false,
   activeBranchId,
   activeBranchName,
   bankAccounts,
@@ -135,6 +121,7 @@ export function CashClient({
   bankGlAccounts,
   interOrgSourceAccounts = [],
   recentTransactions,
+  cashViewMode,
   userRole,
   canManageDirect,
   isParentOrg,
@@ -154,7 +141,14 @@ export function CashClient({
   // Find currently active node to supply dynamic GL accounts
   const activePlacementNode = placementNodes.find(n => n.orgId === targetOrgId)
   const dynamicGlAccounts = activePlacementNode ? activePlacementNode.accounts : bankGlAccounts
-  const displayBankAccounts = canManageDirect && managedBankAccounts.length > 0 ? managedBankAccounts : bankAccounts
+  const canUseHoldingView = canManageDirect && isParentOrg
+  const isHoldingView = cashViewMode === 'holding'
+  const visibleBankAccounts = isHoldingView && canManageDirect && managedBankAccounts.length > 0
+    ? managedBankAccounts
+    : bankAccounts
+  const transferBankAccounts = canManageDirect && managedBankAccounts.length > 0
+    ? managedBankAccounts
+    : bankAccounts
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'overview' | 'reconcile'>('overview')
@@ -176,7 +170,7 @@ export function CashClient({
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const categoryNodeByOrg = new Map(transferCategoryNodes.map((node) => [node.orgId, node]))
-  const transferTargetBankOptions = (canManageDirect ? displayBankAccounts : bankAccounts).filter(
+  const transferTargetBankOptions = transferBankAccounts.filter(
     (bankAccount) => bankAccount.id !== txBankAccountId
   )
   const selectedTransferTarget = transferTargetBankOptions.find((bankAccount) => bankAccount.id === txTargetBankId) || null
@@ -213,10 +207,36 @@ export function CashClient({
   const canWriteCash = Boolean(activeBranchId)
   const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
   const hasSettlementPrefill = Boolean(searchParams.get('pay'))
-  const hasCrossEntityAccounts = displayBankAccounts.some((account) => account.org_id !== orgId)
+  const hasCrossEntityAccounts = transferBankAccounts.some((account) => account.org_id !== orgId)
   const availableCashBalance = Number(selectedSourceBankAccount?.balances?.balance || 0)
   const shouldCheckAvailableCash = txType === 'OUT' || txType === 'TRANSFER'
   const isAmountExceedingAvailable = shouldCheckAvailableCash && Boolean(txBankAccountId) && txAmount > availableCashBalance
+  const reconcileScopeLabel = activeBranchName
+    ? `unit aktif ${activeBranchName}`
+    : 'unit aktif parent yang sedang dipilih'
+  const visibleScopeLabel = isAllBranchesView
+    ? 'semua unit'
+    : activeBranchName
+      ? `unit aktif ${activeBranchName}`
+      : 'unit aktif parent yang sedang dipilih'
+
+  const handleCashViewChange = (nextMode: CashViewMode) => {
+    if (!canUseHoldingView || nextMode === cashViewMode) return
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('cash_view', nextMode)
+    const nextQuery = params.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+  }
+
+  const pageSubtitle = isHoldingView
+    ? 'Mode holding aktif. Pantau saldo dan mutasi parent + seluruh entitas dari satu halaman.'
+    : isAllBranchesView
+      ? (activeBranchName
+          ? `Menampilkan saldo dan mutasi semua unit. Transaksi baru tetap diproses dari unit aktif ${activeBranchName}.`
+          : 'Menampilkan saldo dan mutasi semua unit. Pilih unit aktif spesifik untuk membuat rekening atau transaksi baru.')
+    : activeBranchName
+      ? `Mutasi kas dan bank untuk unit aktif ${activeBranchName}.`
+      : 'Mode semua unit aktif. Pilih unit spesifik untuk membuat rekening atau transaksi baru.'
 
   useEffect(() => {
     const pay = searchParams.get('pay')
@@ -365,12 +385,26 @@ export function CashClient({
       <PageHeader
         icon={<Wallet />}
         title="Kas & Bank"
-        subtitle={activeBranchName
-          ? `Mutasi kas dan bank untuk unit aktif ${activeBranchName}.`
-          : 'Mode semua unit aktif. Pilih unit spesifik untuk membuat rekening atau transaksi baru.'}
+        subtitle={pageSubtitle}
         tag="Cash Module"
         actions={
           <>
+            {canUseHoldingView ? (
+              <div className="flex bg-blue-50 p-1 rounded-2xl border border-blue-100 mr-2 shadow-inner">
+                <button
+                  onClick={() => handleCashViewChange('parent')}
+                  className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${!isHoldingView ? 'bg-white text-blue-700 shadow-md' : 'text-blue-400 hover:text-blue-600'}`}
+                >
+                  Kas Parent
+                </button>
+                <button
+                  onClick={() => handleCashViewChange('holding')}
+                  className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${isHoldingView ? 'bg-white text-blue-700 shadow-md' : 'text-blue-400 hover:text-blue-600'}`}
+                >
+                  Kas Holding
+                </button>
+              </div>
+            ) : null}
             <div className="flex bg-slate-100/60 p-1 rounded-2xl border border-slate-100 mr-2 shadow-inner">
                <button
                   onClick={() => setActiveTab('overview')}
@@ -447,19 +481,27 @@ export function CashClient({
           Pilih unit aktif terlebih dahulu untuk menambah rekening, mencatat transaksi, atau unggah mutasi bank.
         </div>
       ) : null}
-      {hasCrossEntityAccounts ? (
+      {isHoldingView && hasCrossEntityAccounts ? (
         <div className="rounded-3xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-900 shadow-sm">
-          Parent melihat rekening lintas entitas (anak perusahaan/cabang). Rekening lintas entitas tampil untuk visibilitas, sementara transaksi tetap diproses pada unit aktif.
+          Mode holding aktif: kartu rekening dan aktivitas terbaru menampilkan parent + child. Pencatatan transaksi baru dan rekonsiliasi tetap diproses dari unit aktif parent.
+        </div>
+      ) : canUseHoldingView && hasCrossEntityAccounts ? (
+        <div className="rounded-3xl border border-slate-200 bg-slate-50 px-6 py-4 text-sm font-semibold text-slate-700 shadow-sm">
+          Mode parent aktif: yang tampil hanya rekening dan mutasi parent. Pindah ke `Kas Holding` untuk melihat seluruh entitas.
+        </div>
+      ) : isAllBranchesView ? (
+        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-semibold text-emerald-900 shadow-sm">
+          Mode semua unit aktif: total likuiditas dan daftar rekening di bawah ini mencakup seluruh branch dalam entitas ini. Pencatatan transaksi baru tetap memakai unit aktif {activeBranchName || 'yang sedang dipilih'}.
         </div>
       ) : null}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           label="Total Likuiditas" 
-          value={formatRupiah(displayBankAccounts.reduce((sum, acc) => sum + (acc.balances?.balance || 0), 0))} 
+          value={formatRupiah(visibleBankAccounts.reduce((sum, acc) => sum + (acc.balances?.balance || 0), 0))} 
           icon={Wallet}
           color="emerald"
-          sub="Total Saldo dari Seluruh Rekening"
+          sub={isHoldingView ? 'Total saldo parent + seluruh entitas' : `Total saldo rekening pada ${visibleScopeLabel}`}
         />
         <StatCard 
           label="Transaksi Bulan Ini" 
@@ -495,7 +537,7 @@ export function CashClient({
           >
             {/* Account Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {displayBankAccounts.length === 0 ? (
+              {visibleBankAccounts.length === 0 ? (
                 <div className="col-span-full py-24 bg-white rounded-[40px] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-center space-y-6 shadow-inner">
                   <div className="w-20 h-20 rounded-[32px] bg-slate-50 flex items-center justify-center text-slate-200 border border-slate-100 shadow-sm">
                     <PiggyBank size={36} strokeWidth={1.5} />
@@ -506,8 +548,10 @@ export function CashClient({
                   </div>
                 </div>
               ) : (
-                displayBankAccounts.map((acc, idx) => {
+                visibleBankAccounts.map((acc, idx) => {
                   const isCrossEntity = acc.org_id !== orgId
+                  const showScopeBadge = isCrossEntity || (isAllBranchesView && Boolean(acc.branch_name))
+                  const canOpenDetails = !isCrossEntity || isHoldingView
                   return (
                     <motion.div
                       key={acc.id}
@@ -526,9 +570,11 @@ export function CashClient({
                         <div className="text-right">
                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">{acc.bank_name}</span>
                            <span className="text-xs font-black text-slate-900 font-mono tracking-tighter bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">{acc.account_number || 'Cash Asset'}</span>
-                           {isCrossEntity && (
+                           {showScopeBadge && (
                              <span className="mt-2 inline-flex items-center rounded-lg bg-blue-50 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-blue-700 border border-blue-100">
-                               {acc.org_name || 'Entitas Anak'} {acc.branch_name ? `• ${acc.branch_name}` : ''}
+                               {isCrossEntity
+                                 ? `${acc.org_name || 'Entitas Anak'}${acc.branch_name ? ` • ${acc.branch_name}` : ''}`
+                                 : (acc.branch_name || 'Semua Unit')}
                              </span>
                            )}
                         </div>
@@ -546,7 +592,7 @@ export function CashClient({
                       </div>
 
                       <div className="mt-10 pt-8 border-t border-slate-50 flex items-center justify-between relative z-10">
-                        {isCrossEntity ? (
+                        {!canOpenDetails ? (
                           <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-4 py-2 rounded-xl border border-blue-100">
                             Lintas Entitas
                           </span>
@@ -589,8 +635,10 @@ export function CashClient({
                 <SectionCard>
                   <div id="recent-activities" />
                   <SectionHeader 
-                    title="Aktivitas Keuangan Terkini" 
-                    subtitle="Daftar mutasi kas dan bank yang sudah terposting."
+                    title={isHoldingView ? 'Aktivitas Holding Terkini' : 'Aktivitas Keuangan Terkini'} 
+                    subtitle={isHoldingView
+                      ? 'Mutasi kas/bank terbaru dari parent dan seluruh entitas dalam holding.'
+                      : 'Daftar mutasi kas dan bank yang sudah terposting.'}
                     icon={History}
                     actions={
                       <div className="flex items-center gap-2">
@@ -651,11 +699,16 @@ export function CashClient({
                                       <span className="text-sm font-black text-slate-900 leading-tight">{tx.description}</span>
                                       <div className="flex items-center gap-2">
                                         <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded text-[9px] font-black text-slate-500 uppercase">
-                                          <Building size={10} /> {tx.bank_account.bank_name}
+                                          <Building size={10} /> {tx.bank_account?.bank_name || 'Rekening'}
                                         </div>
                                         <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 rounded text-[9px] font-black text-indigo-500 uppercase">
-                                          <Activity size={10} /> {tx.category.name}
+                                          <Activity size={10} /> {tx.category?.name || 'Uncategorized'}
                                         </div>
+                                        {isHoldingView && (tx.org_name || tx.org_id !== orgId) ? (
+                                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded text-[9px] font-black text-emerald-600 uppercase">
+                                            <Building2 size={10} /> {tx.org_name || 'Entitas'}{tx.branch_name ? ` / ${tx.branch_name}` : ''}
+                                          </div>
+                                        ) : null}
                                       </div>
                                    </div>
                                 </td>
@@ -727,6 +780,11 @@ export function CashClient({
             className="grid grid-cols-1 lg:grid-cols-3 gap-10"
           >
             <div className="space-y-8">
+              {isHoldingView ? (
+                <div className="rounded-3xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-900 shadow-sm">
+                  Mode holding tetap mengizinkan rekonsiliasi, tetapi proses impor CSV hanya berjalan untuk {reconcileScopeLabel}. Gunakan toggle `Kas Parent` jika Anda ingin fokus penuh pada rekening parent saja.
+                </div>
+              ) : null}
               <SectionCard className="p-10 space-y-10">
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Rekening Target</label>
@@ -752,7 +810,9 @@ export function CashClient({
                 <div className="space-y-6 pt-10 border-t border-slate-50">
                   <div className="space-y-2">
                     <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest tracking-tighter">Import CSV Mutasi</h4>
-                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">Unggah riwayat transaksi dari e-banking (BCA, Mandiri, BNI, dll) untuk pencocokan otomatis.</p>
+                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">
+                      Unggah riwayat transaksi dari e-banking (BCA, Mandiri, BNI, dll) untuk pencocokan otomatis pada {reconcileScopeLabel}.
+                    </p>
                   </div>
                   <form onSubmit={handleUploadCSV} className="space-y-6">
                     <div className="relative group">

@@ -4,6 +4,9 @@ import { createSupabaseMock, success } from './helpers/supabase-mock'
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   createAdminClient: vi.fn(),
+  getServerAuthContext: vi.fn(),
+  persistMembershipActiveContext: vi.fn(),
+  resolveActiveMembership: vi.fn(),
   cookies: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn(),
@@ -16,6 +19,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/supabase/server', () => ({
   createClient: mocks.createClient,
   createAdminClient: mocks.createAdminClient,
+}))
+
+vi.mock('@/lib/supabase/auth.server', () => ({
+  getServerAuthContext: mocks.getServerAuthContext,
 }))
 
 vi.mock('next/headers', () => ({
@@ -44,8 +51,15 @@ vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   canAccessAllBranchesForOrg: vi.fn(),
 }))
 
+vi.mock('@/modules/organization/lib/active-context.server', () => ({
+  ACTIVE_ORG_COOKIE: 'nizam_active_org_id',
+  persistMembershipActiveContext: mocks.persistMembershipActiveContext,
+  resolveActiveMembership: mocks.resolveActiveMembership,
+}))
+
 import {
   createBranch,
+  getActiveOrg,
   createOrganization,
   createOrganizationQuick,
   getActiveBranch,
@@ -76,6 +90,75 @@ describe('Organization Branch Bootstrap', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.cookies.mockResolvedValue(createCookieStore())
+    mocks.getServerAuthContext.mockImplementation(async () => {
+      const supabase = await mocks.createClient()
+      const authResult = await supabase.auth.getUser()
+
+      return {
+        supabase,
+        user: authResult?.data?.user ?? null,
+        error: authResult?.error ?? null,
+      }
+    })
+    mocks.persistMembershipActiveContext.mockImplementation(async (admin: any, input: any) => {
+      return admin
+        .from('org_members')
+        .update({
+          last_active_at: new Date().toISOString(),
+          last_active_branch_id: input.branchId,
+        })
+        .eq('user_id', input.userId)
+        .eq('org_id', input.orgId)
+        .eq('is_active', true)
+    })
+    mocks.resolveActiveMembership.mockImplementation(async (db: any, user: any, cookieStore: any, select: string) => {
+      const activeOrgId = cookieStore.get('nizam_active_org_id')?.value
+
+      if (activeOrgId) {
+        const { data } = await db
+          .from('org_members')
+          .select(select)
+          .eq('user_id', user.id)
+          .eq('org_id', activeOrgId)
+          .eq('is_active', true)
+          .maybeSingle()
+
+        if (data) return data
+      }
+
+      const { data: storedMembership } = await db
+        .from('org_members')
+        .select('org_id, last_active_at, joined_at')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('last_active_at', { ascending: false, nullsFirst: false })
+        .order('joined_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (storedMembership?.org_id) {
+        const { data } = await db
+          .from('org_members')
+          .select(select)
+          .eq('user_id', user.id)
+          .eq('org_id', storedMembership.org_id)
+          .eq('is_active', true)
+          .maybeSingle()
+
+        if (data) return data
+      }
+
+      const { data } = await db
+        .from('org_members')
+        .select(select)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('joined_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      return data
+    })
   })
 
   it('falls back to the sole active branch when no branch cookie is set', async () => {
@@ -98,6 +181,73 @@ describe('Organization Branch Bootstrap', () => {
       address: null,
       is_active: true,
     })
+  })
+
+  it('falls back to role permissions by employee job title when membership role_id is empty', async () => {
+    const cookieStore = createCookieStore()
+    mocks.cookies.mockResolvedValue(cookieStore)
+
+    const supabase = createSupabaseMock({
+      tables: {
+        saas_packages: [
+          {
+            maybeSingleResult: success({
+              modules: ['Accounting', 'Finance', 'HRIS'],
+            }),
+          },
+        ],
+        employees: [
+          {
+            maybeSingleResult: success({
+              job_title: 'Staff',
+              role_id: null,
+            }),
+          },
+        ],
+        roles: [
+          {
+            result: success([
+              {
+                id: 'role-staff',
+                name: 'Staff',
+                permissions: ['coa:read', 'bank:read', 'journal:read'],
+              },
+            ]),
+          },
+        ],
+      },
+    })
+
+    mocks.getServerAuthContext.mockResolvedValue({
+      supabase: supabase.client,
+      user: {
+        id: 'user-1',
+        email: 'staff@example.com',
+        user_metadata: {},
+      },
+    })
+    mocks.resolveActiveMembership.mockResolvedValue({
+      org_id: 'org-1',
+      role: 'staff',
+      role_id: null,
+      organizations: {
+        id: 'org-1',
+        settings: { plan: 'Demo' },
+        active_addons: [],
+      },
+      roles: null,
+    })
+
+    const result = await getActiveOrg()
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        role: 'staff',
+        roleId: 'role-staff',
+        jobTitle: 'Staff',
+        permissions: ['coa:read', 'bank:read', 'journal:read'],
+      })
+    )
   })
 
   it('returns the sole active branch id when no branch cookie is set', async () => {
@@ -125,6 +275,16 @@ describe('Organization Branch Bootstrap', () => {
     const memberUpdateBuilder = {
       update: vi.fn(() => memberUpdateBuilder),
       eq: vi.fn(() => memberUpdateBuilder),
+    }
+    const branchesQuery = {
+      select: vi.fn(() => branchesQuery),
+      eq: vi.fn(() => branchesQuery),
+      order: vi.fn().mockResolvedValue({
+        data: [
+          { id: 'branch-2', org_id: 'org-2', name: 'Unit Bandung', code: 'BDG', address: null, is_active: true },
+        ],
+        error: null,
+      }),
     }
 
     const randomUuidMock = vi.spyOn(globalThis.crypto, 'randomUUID')
@@ -171,6 +331,7 @@ describe('Organization Branch Bootstrap', () => {
         settings: expect.objectContaining({
           plan: 'Trial',
           is_demo: false,
+          skip_coa_seed: true,
         }),
       })
     )
@@ -265,6 +426,7 @@ describe('Organization Branch Bootstrap', () => {
           plan: 'Demo',
           is_demo: true,
           business_type: 'CATERING',
+          skip_coa_seed: false,
         }),
       })
     )
@@ -321,11 +483,13 @@ describe('Organization Branch Bootstrap', () => {
 
     const result = await createOrganizationQuick(formData)
 
-    expect(result).toEqual({
-      success: true,
-      orgId: 'org-2',
-      branchId: 'branch-2',
-    })
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        orgId: 'org-2',
+        branchId: 'branch-2',
+      })
+    )
     expect(cookieStore.set).toHaveBeenCalledWith(
       'nizam_active_org_id',
       'org-2',
@@ -635,6 +799,16 @@ describe('Organization Branch Bootstrap', () => {
       update: vi.fn(() => memberUpdateBuilder),
       eq: vi.fn(() => memberUpdateBuilder),
     }
+    const branchesQuery = {
+      select: vi.fn(() => branchesQuery),
+      eq: vi.fn(() => branchesQuery),
+      order: vi.fn().mockResolvedValue({
+        data: [
+          { id: 'branch-2', org_id: 'org-2', name: 'Unit Bandung', code: 'BDG', address: null, is_active: true },
+        ],
+        error: null,
+      }),
+    }
 
     mocks.createClient.mockResolvedValue({
       auth: {
@@ -657,6 +831,7 @@ describe('Organization Branch Bootstrap', () => {
             eq: memberUpdateBuilder.eq,
           }
         }
+        if (table === 'branches') return branchesQuery
         throw new Error(`Unexpected admin table ${table}`)
       }),
     })
@@ -717,13 +892,23 @@ describe('Organization Branch Bootstrap', () => {
       select: vi.fn(() => membershipQuery),
       eq: vi.fn(() => membershipQuery),
       maybeSingle: vi.fn().mockResolvedValue({
-        data: { org_id: 'org-2' },
+        data: { id: 'member-2', org_id: 'org-2', role: 'owner' },
         error: null,
       }),
     }
     const memberUpdateBuilder = {
       update: vi.fn(() => memberUpdateBuilder),
       eq: vi.fn(() => memberUpdateBuilder),
+    }
+    const branchesQuery = {
+      select: vi.fn(() => branchesQuery),
+      eq: vi.fn(() => branchesQuery),
+      order: vi.fn().mockResolvedValue({
+        data: [
+          { id: 'branch-2', org_id: 'org-2', name: 'Unit Bandung', code: 'BDG', address: null, is_active: true },
+        ],
+        error: null,
+      }),
     }
 
     mocks.createClient.mockResolvedValue({
@@ -745,6 +930,7 @@ describe('Organization Branch Bootstrap', () => {
             eq: memberUpdateBuilder.eq,
           }
         }
+        if (table === 'branches') return branchesQuery
         throw new Error(`Unexpected admin table ${table}`)
       }),
     })

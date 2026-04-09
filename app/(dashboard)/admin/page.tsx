@@ -58,6 +58,12 @@ const ADDON_MODULES = [
   'Fleet & Rental', 'Job Order (Jasa)'
 ]
 
+function formatModuleLabel(moduleName: string) {
+  if (moduleName === 'Ticketing') return 'Support Ticket'
+  if (moduleName === 'Doc Update Ticketing') return 'Dokumen Update Support Ticket'
+  return moduleName
+}
+
 type Tab = 'users' | 'packages' | 'invoices' | 'settings' | 'ai_tokens'
 
 export default function SaaSAdminPage() {
@@ -1067,7 +1073,7 @@ export default function SaaSAdminPage() {
                            <div className="flex flex-wrap gap-1.5">
                               {pkg.modules?.slice(0, 4).map((mod: string) => (
                                  <span key={mod} className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
-                                   {mod}
+                                   {formatModuleLabel(mod)}
                                  </span>
                               ))}
                               {pkg.modules?.length > 4 && <span className="text-[9px] font-bold text-slate-400">+{pkg.modules.length - 4} more</span>}
@@ -1354,7 +1360,7 @@ export default function SaaSAdminPage() {
                                             defaultChecked={pkgModal.editData?.modules?.includes(item)}
                                             className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
                                          />
-                                         <span className="text-[9px] font-black uppercase text-slate-500 group-hover:text-blue-600 truncate">{item}</span>
+                                         <span className="text-[9px] font-black text-slate-500 group-hover:text-blue-600 truncate">{formatModuleLabel(item)}</span>
                                       </label>
                                    ))}
                                 </div>

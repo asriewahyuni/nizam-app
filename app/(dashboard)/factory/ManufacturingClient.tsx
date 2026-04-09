@@ -650,7 +650,7 @@ export function ManufacturingClient({
                         </select>
                         <input id="item-qty" type="number" step="any" placeholder="Qty" className="w-20 px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm" />
                         <select id="item-unit" className="w-24 px-2 py-3 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-blue-700">
-                           {['Pcs', 'Unit', 'Kg', 'Gram', 'Liter', 'Ml', 'Box', 'Pack', 'Roll', 'Lembar', 'Set', 'Lusin', 'Meter', 'Cm', 'Pasang'].map(u => <option key={u} value={u}>{u}</option>)}
+                           {['Pcs', 'Unit', 'Kg', 'Gram', 'Liter', 'Ml', 'Box', 'Pack', 'Roll', 'Lembar', 'Set', 'Lusin', 'Meter', 'Cm', 'Pasang', 'Ekor'].map(u => <option key={u} value={u}>{u}</option>)}
                         </select>
                         <button 
                           type="button" 

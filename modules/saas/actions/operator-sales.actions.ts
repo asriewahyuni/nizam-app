@@ -193,10 +193,11 @@ async function syncOperatorInvoiceAddons(
   admin: Awaited<ReturnType<typeof createAdminClient>>,
   invoice: { id: string; org_id: string; item_description?: string | null }
 ) {
+  const db = admin as any
   const addonNames = extractAddonNamesFromDescription(invoice.item_description)
   if (addonNames.length === 0) return { success: true as const }
 
-  const { data: orgData, error: orgError } = await admin
+  const { data: orgData, error: orgError } = await db
     .from('organizations')
     .select('active_addons')
     .eq('id', invoice.org_id)
@@ -206,7 +207,10 @@ async function syncOperatorInvoiceAddons(
     return { error: orgError.message }
   }
 
-  const currentAddons = Array.isArray(orgData?.active_addons) ? orgData.active_addons : []
+  const orgRecord = (orgData as { active_addons?: unknown[] | null } | null) ?? null
+  const currentAddons: unknown[] = Array.isArray(orgRecord?.active_addons)
+    ? orgRecord.active_addons
+    : []
   const existingAddonNames = new Set(
     normalizeSaasEntitlementList(currentAddons.map((entry: unknown) => getActiveAddonName(entry)).filter(Boolean))
   )
@@ -223,7 +227,7 @@ async function syncOperatorInvoiceAddons(
 
   if (addonsToInsert.length === 0) return { success: true as const }
 
-  const { error: updateError } = await admin
+  const { error: updateError } = await db
     .from('organizations')
     .update({
       active_addons: [...currentAddons, ...addonsToInsert],

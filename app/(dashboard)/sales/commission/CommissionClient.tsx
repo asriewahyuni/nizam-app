@@ -202,8 +202,9 @@ export default function CommissionClient({
     setSuccess(null)
 
     const formData = buildResellerFormData(formState)
+    const editingResellerOrgId = editingReseller?.org_id ? String(editingReseller.org_id) : orgId
     const response = editingReseller
-      ? await updateReseller(editingReseller.org_id, editingReseller.id, formData)
+      ? await updateReseller(editingResellerOrgId, editingReseller.id, formData)
       : await createReseller(orgId, formData)
 
     if (response?.error) {
@@ -230,6 +231,7 @@ export default function CommissionClient({
   }
 
   const handleDelete = async (reseller: SalesResellerRecord) => {
+    const resellerOrgId = reseller.org_id ? String(reseller.org_id) : orgId
     const relatedInvoiceCount = monthlySales.filter((sale) => String(sale?.reseller_id || '') === String(reseller.id)).length
     const confirmed = confirm(
       relatedInvoiceCount > 0
@@ -242,7 +244,7 @@ export default function CommissionClient({
     setError(null)
     setSuccess(null)
 
-    const response = await deleteReseller(reseller.org_id, reseller.id)
+    const response = await deleteReseller(resellerOrgId, reseller.id)
     if (response?.error) {
       setError(response.error)
       setLoading(false)

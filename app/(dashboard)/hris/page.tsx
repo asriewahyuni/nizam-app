@@ -92,15 +92,15 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
   if (!sourceCanTransferEmployee) {
     transferDisabledReason = 'Hanya owner/admin pada organisasi asal yang dapat memproses mutasi.'
   } else if (sourceCanTransferEmployee) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user?.id) {
+    const userId = String(orgData.user?.id || '').trim()
+    if (userId) {
       let canTransferAcrossHolding = !isChildOrg
       if (isChildOrg) {
         const { data: parentMembership } = await supabase
           .from('org_members')
           .select('role')
           .eq('org_id', holdingOrgId)
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .eq('is_active', true)
           .maybeSingle()
         const typedParentMembership = parentMembership as { role?: string | null } | null

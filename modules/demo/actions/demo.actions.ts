@@ -371,7 +371,7 @@ export async function ensureBlankDemoBudgetingSetup(orgId: string, preferredBran
   const branchId = normalizedBranchId || await ensureDemoBranch(supabase, trimmedOrgId)
   if (!branchId) return { branchId: null, didSeed: false }
 
-  const coaResult = await seedInitialCoA(trimmedOrgId)
+  const coaResult = await seedInitialCoA(trimmedOrgId, { revalidate: false })
   if (coaResult && typeof coaResult === 'object' && 'error' in coaResult) {
     const message = String(coaResult.error || '')
     if (message && !/sudah aktif/i.test(message)) {

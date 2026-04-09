@@ -9,6 +9,10 @@ type BranchFilterResult =
   | { branchId: string | null }
   | { error: string }
 
+type ActiveBranchResult =
+  | { branchId: string }
+  | { error: string }
+
 type BudgetRow = {
   id: string
   org_id: string
@@ -62,7 +66,7 @@ async function resolveBudgetBranchId(orgId: string, branchId?: string | null): P
   return { branchId: branchSelection.branchId }
 }
 
-async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<BranchFilterResult> {
+async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
   const branchSelection = await resolveAccessibleBranchSelection(orgId)
   if ('error' in branchSelection || !branchSelection.branchId) {
     return { error: errorMessage }
@@ -73,8 +77,9 @@ async function requireActiveBranchId(orgId: string, errorMessage: string): Promi
 
 export async function getBudgetPeriodStatus(orgId: string, period: string): Promise<BudgetPeriodStatus> {
   const supabase = await createClient()
+  const db = supabase as any
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('fiscal_periods')
     .select('id, name, is_closed')
     .eq('org_id', orgId)
@@ -103,10 +108,11 @@ export async function getBudgetPeriodStatus(orgId: string, period: string): Prom
 
 export async function getBudgets(orgId: string, period: string, branchId?: string | null) {
   const supabase = await createClient()
+  const db = supabase as any
   const branchSelection = await resolveBudgetBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
 
-  let query = supabase
+  let query = db
     .from('budgets')
     .select('*, accounts(code, name, type), branch:branches(id, name, code)')
     .eq('org_id', orgId)
@@ -129,6 +135,7 @@ export async function saveBudget(
   amount: number
 ): Promise<BudgetSaveResult> {
   const supabase = await createClient()
+  const db = supabase as any
   const activeBranchResult = await requireActiveBranchId(
     orgId,
     'Pilih satu unit aktif terlebih dahulu untuk menyimpan budget.'
@@ -160,7 +167,7 @@ export async function saveBudget(
 
   // budgets now use partial unique indexes for branch-aware rows, so a plain
   // PostgREST upsert can no longer infer the ON CONFLICT target reliably.
-  const { data: existingRows, error: existingBudgetError } = await supabase
+  const { data: existingRows, error: existingBudgetError } = await db
     .from('budgets')
     .select('id')
     .eq('org_id', orgId)
@@ -176,7 +183,7 @@ export async function saveBudget(
   const existingBudgetId = existingRows?.[0]?.id ? String(existingRows[0].id) : null
 
   if (existingBudgetId) {
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from('budgets')
       .update({
         budget_amount: amount,
@@ -188,7 +195,7 @@ export async function saveBudget(
       return { error: updateError.message || 'Gagal memperbarui budget.' }
     }
   } else {
-    const { error: insertError } = await supabase
+    const { error: insertError } = await db
       .from('budgets')
       .insert(payload)
 
@@ -201,7 +208,7 @@ export async function saveBudget(
         return { error: insertError.message || 'Gagal menyimpan budget.' }
       }
 
-      const { error: retryUpdateError } = await supabase
+      const { error: retryUpdateError } = await db
         .from('budgets')
         .update({
           budget_amount: amount,
@@ -229,6 +236,7 @@ export async function getBudgetVsActual(
   branchId?: string | null
 ) {
   const supabase = await createClient()
+  const db = supabase as any
   const branchSelection = await resolveBudgetBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
 
@@ -243,7 +251,7 @@ export async function getBudgetVsActual(
   if (!accounts || accounts.length === 0) return []
 
   // 2. Get budgets
-  let budgetsQuery = supabase
+  let budgetsQuery = db
     .from('budgets')
     .select('*')
     .eq('org_id', orgId)

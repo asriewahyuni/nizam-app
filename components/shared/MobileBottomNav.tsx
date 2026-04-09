@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useCallback, useRef } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { 
   LayoutDashboard, 
   Store, 
@@ -11,15 +12,33 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+const ROUTE_LOADING_START_EVENT = 'nizam_route_loading_start'
+
 export function MobileBottomNav() {
+  const router = useRouter()
   const pathname = usePathname()
+  const prefetchedRoutesRef = useRef<Set<string>>(new Set())
+
+  const prefetchRoute = useCallback((href: string) => {
+    const normalizedHref = String(href || '').trim()
+    if (!normalizedHref || normalizedHref === pathname || prefetchedRoutesRef.current.has(normalizedHref)) {
+      return
+    }
+
+    prefetchedRoutesRef.current.add(normalizedHref)
+    void router.prefetch(normalizedHref)
+  }, [pathname, router])
+
+  const notifyRouteLoadingStart = () => {
+    window.dispatchEvent(new Event(ROUTE_LOADING_START_EVENT))
+  }
 
   const items = [
     { label: 'Dash', href: '/dashboard', icon: LayoutDashboard },
     { label: 'POS', href: '/pos', icon: Store },
     { label: 'Laporan', href: '/reports', icon: FileText },
-    { label: 'Audit', href: '/audit', icon: History },
-    { label: 'Akun', href: '/profile', icon: User },
+    { label: 'Audit', href: '/accounting/audit', icon: History },
+    { label: 'Akun', href: '/profil-saya', icon: User },
   ]
 
   return (
@@ -31,6 +50,14 @@ export function MobileBottomNav() {
           <Link 
             key={item.href} 
             href={item.href}
+            onMouseEnter={() => prefetchRoute(item.href)}
+            onFocus={() => prefetchRoute(item.href)}
+            onTouchStart={() => prefetchRoute(item.href)}
+            onPointerDown={() => prefetchRoute(item.href)}
+            onClick={() => {
+              prefetchRoute(item.href)
+              notifyRouteLoadingStart()
+            }}
             className={cn(
               "flex flex-col items-center gap-1 min-w-[64px] transition-colors",
               isActive ? "text-[#003366]" : "text-gray-400 hover:text-gray-600"

@@ -1,0 +1,272 @@
+1
+00:00:00,000 --> 00:00:20,000
+Selamat datang di tutorial penggunaan
+NIZAM ERP.
+
+Kalau Anda sedang membangun atau
+merapikan operasional bisnis,
+video ini dibuat untuk membantu
+Anda melihat alur kerja NIZAM
+dengan lebih tenang dan lebih jelas.
+
+Untuk saat ini, pintu masuk NIZAM
+memang dimulai dari halaman login.
+
+2
+00:00:20,000 --> 00:00:55,000
+Di halaman login NIZAM, ada dua
+jalur masuk.
+
+Pemilik atau admin bisnis masuk
+dengan email dan password,
+sedangkan karyawan bisa masuk
+dengan NIK dan password.
+
+Untuk tutorial ini, kita masuk
+sebagai owner atau admin agar
+seluruh menu setup dan operasional
+bisa terlihat lengkap.
+
+3
+00:00:55,000 --> 00:01:20,000
+Jika akun sudah login tetapi belum
+punya organisasi aktif, NIZAM akan
+langsung membuka halaman onboarding.
+
+Di sini kita cukup mengisi nama
+perusahaan, lalu klik aktivasi agar
+sistem menyiapkan lingkungan ERP
+untuk bisnis kita.
+
+4
+00:01:20,000 --> 00:01:55,000
+Setelah onboarding selesai, kita
+masuk ke dashboard utama.
+
+Di sinilah alur kerja NIZAM
+mulai terasa terhubung.
+
+Sidebar di kiri berisi area finance,
+operasional, marketing dan sales,
+HRIS, insight, serta pengaturan.
+
+Sementara di bagian atas, kita bisa
+berpindah organisasi atau memilih
+unit aktif untuk transaksi.
+
+5
+00:01:55,000 --> 00:02:20,000
+Untuk membantu user baru, NIZAM
+menampilkan startup wizard.
+
+Urutannya sederhana dan aman
+untuk implementasi awal:
+buat kas dan bank, input modal awal,
+siapkan stok, mulai berjualan,
+lalu pantau arus kas dari laporan.
+
+6
+00:02:20,000 --> 00:02:55,000
+Langkah setup pertama yang saya
+sarankan adalah melengkapi
+profil bisnis.
+
+Di menu ini kita bisa mengatur
+nama brand, logo, slug, dan
+identitas bisnis yang nanti dipakai
+di dokumen-dokumen resmi seperti
+invoice maupun surat jalan.
+
+7
+00:02:55,000 --> 00:03:25,000
+Setelah itu, aktifkan Chart of
+Accounts atau CoA.
+
+Ini adalah fondasi akuntansi NIZAM.
+
+Begitu CoA aktif, struktur akun
+aset, liabilitas, ekuitas,
+pendapatan, dan beban akan siap
+dipakai oleh modul-modul lain.
+
+8
+00:03:25,000 --> 00:04:00,000
+Jika bisnis punya lebih dari satu
+lokasi, kita bisa menambahkan cabang
+terlebih dahulu.
+
+Setelah itu, lanjut ke pengaturan
+pengguna untuk membuat link aktivasi
+tim, lalu atur role dan permission
+agar setiap orang hanya mengakses
+modul yang sesuai tanggung jawabnya.
+
+9
+00:04:00,000 --> 00:04:30,000
+Sesudah struktur organisasi siap,
+kita masuk ke kas dan bank.
+
+Di sini kita membuat rekening
+operasional, kas kecil, atau akun
+bank utama, lalu mencatat modal awal
+sebagai transaksi masuk agar arus kas
+awal bisnis tercatat rapi.
+
+10
+00:04:30,000 --> 00:04:55,000
+Sebelum melakukan pembelian dan
+penjualan, siapkan dulu master
+relasi bisnis.
+
+Di modul CRM, kita bisa membuat
+data customer, supplier, dan kontak
+lain yang nantinya dipakai ulang
+di berbagai modul.
+
+11
+00:04:55,000 --> 00:05:35,000
+Selanjutnya kita siapkan gudang
+dan produk.
+
+Buat dulu lokasi gudang, lalu masuk
+ke inventory untuk menambahkan produk
+lengkap dengan SKU, kategori, satuan,
+barcode, serta akun persediaannya.
+
+NIZAM juga sudah mendukung kartu stok,
+write-off, dan transfer antar gudang.
+
+12
+00:05:35,000 --> 00:06:10,000
+Setelah produk dan vendor tersedia,
+kita bisa mulai pembelian.
+
+Di modul Purchasing, admin membuat
+purchase order, menentukan item dan
+termin pembayaran, lalu menerbitkan PO.
+
+Saat barang diterima, stok akan
+bertambah dan jurnal yang relevan
+ikut tersinkron otomatis.
+
+13
+00:06:10,000 --> 00:06:45,000
+Untuk tim sales, alur penjualan bisa
+dimulai dari quotation.
+
+Penawaran resmi ini dapat dikirim ke
+calon pelanggan dan kemudian
+dikonversi menjadi order.
+
+Jika ingin melihat progres peluang
+bisnis, gunakan Sales Pipeline
+dengan tampilan kanban yang memudahkan
+monitoring dari tahap awal sampai
+closing.
+
+14
+00:06:45,000 --> 00:07:30,000
+Setelah penawaran disetujui, kita
+masuk ke modul sales.
+
+Di sini kita dapat membuat sales order
+atau invoice penjualan, menentukan
+termin, menyimpan draft bila perlu,
+lalu menerbitkan dokumen final.
+
+Dari modul yang sama, kita juga bisa
+mencetak invoice, surat jalan,
+memproses pengiriman, dan menangani
+retur penjualan.
+
+15
+00:07:30,000 --> 00:08:00,000
+Jika bisnis memakai reseller atau
+channel partner, gunakan menu target
+dan komisi.
+
+Kita bisa membuat master reseller,
+menentukan target, serta menyimpan
+skema komisi per invoice tanpa
+mengubah nilai tagihan ke customer.
+
+16
+00:08:00,000 --> 00:08:35,000
+Untuk transaksi yang lebih cepat,
+NIZAM juga menyediakan POS.
+
+Kasir tinggal memilih produk,
+menambahkan customer, memakai promo
+jika ada, lalu menyelesaikan
+pembayaran.
+
+Setelah transaksi selesai, stok fisik
+berkurang dan pencatatan ke rekening
+POS ikut berjalan otomatis.
+
+17
+00:08:35,000 --> 00:09:10,000
+Di luar transaksi dagang, NIZAM juga
+punya modul HRIS.
+
+Kita bisa mengelola data karyawan,
+absensi, cuti, komponen payroll,
+sampai proses penggajian,
+semuanya tetap terhubung dengan
+struktur organisasi dan hak akses
+pengguna.
+
+18
+00:09:10,000 --> 00:09:45,000
+Supaya kontrol internal tetap rapi,
+gunakan Approval Center untuk
+memproses dokumen yang butuh
+persetujuan.
+
+Selain itu ada juga audit trail dan
+audit integritas untuk membantu admin
+memeriksa histori perubahan data dan
+kesehatan transaksi bisnis.
+
+19
+00:09:45,000 --> 00:10:35,000
+Semua transaksi tadi akan bermuara
+ke laporan.
+
+Dari sini owner dapat membaca
+laba rugi, neraca, arus kas,
+aging piutang dan hutang,
+serta proyeksi kas.
+
+Yang cukup menonjol, NIZAM juga
+menyediakan manajemen zakat
+dan strategi berbasis
+Balanced Scorecard.
+
+20
+00:10:35,000 --> 00:11:10,000
+Jika paket modul Anda aktif, NIZAM
+juga menyediakan area lanjutan seperti
+manufaktur, fleet, job order jasa,
+dan sales page.
+
+Semuanya tetap memakai pola data
+yang sama: organisasi, cabang,
+approval, dan pelacakan transaksi
+yang terhubung.
+
+21
+00:11:10,000 --> 00:12:00,000
+Itulah alur utama penggunaan
+NIZAM ERP.
+
+Dengan urutan setup yang benar,
+yang ingin ditunjukkan di sini
+bukan klaim berlebihan,
+tetapi alur kerja yang memang
+sudah tersedia dan saling
+terhubung.
+
+Mulai dari keuangan, stok,
+penjualan, SDM, approval,
+sampai zakat dan BSC.

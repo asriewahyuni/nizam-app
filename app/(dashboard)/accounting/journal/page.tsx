@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getJournalEntries } from '@/modules/accounting/actions/journal.actions'
 import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
+import { getFiscalPeriods } from '@/modules/accounting/actions/closing.actions'
 import JournalClient from './JournalClient'
 
 export default async function JournalPage() {
@@ -10,9 +11,10 @@ export default async function JournalPage() {
   const activeBranch = await getActiveBranch(orgData.org.id)
 
   // Parallel data fetching for performance
-  const [entries, accounts] = await Promise.all([
+  const [entries, accounts, fiscalPeriods] = await Promise.all([
     getJournalEntries(orgData.org.id, { branch_id: activeBranch?.id }),
-    getChartOfAccounts(orgData.org.id)
+    getChartOfAccounts(orgData.org.id),
+    getFiscalPeriods(orgData.org.id),
   ])
 
   return (
@@ -20,6 +22,7 @@ export default async function JournalPage() {
       orgId={orgData.org.id}
       initialEntries={entries}
       accounts={accounts}
+      fiscalPeriods={fiscalPeriods}
       userRole={orgData.role}
       activeBranchId={activeBranch?.id ?? null}
       activeBranchName={activeBranch?.name ?? null}

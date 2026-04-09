@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { unstable_noStore as noStore } from 'next/cache'
+import { cache } from 'react'
 import { addDaysToDateString, diffDateOnlyStrings, getDateInTimeZone } from '@/lib/utils'
 import type { BranchSummary } from '@/modules/organization/lib/org-context'
 
@@ -21,6 +22,11 @@ type CashFlowLine = {
   debit?: number | string | null
   credit?: number | string | null
   accounts?: CashFlowLineAccount | null
+  journal_entries?: {
+    description?: string | null
+    notes?: string | null
+    reference_type?: string | null
+  } | null
 }
 
 type CashFlowItem = {
@@ -41,9 +47,11 @@ export type DeckCashSummary = {
   fcf: number
 }
 
-async function resolveOrgIdsForReport(db: any, orgId: string, consolidated: boolean = false) {
+const getResolvedOrgIdsForReport = cache(async (orgId: string, consolidated: boolean = false) => {
   if (!consolidated) return [orgId]
 
+  const supabase = await createClient()
+  const db = supabase as any
   const { data: consolidatedOrgs, error: rpcError } = await db.rpc('get_consolidated_org_ids', { p_parent_org_id: orgId })
   if (rpcError || !Array.isArray(consolidatedOrgs)) return [orgId]
 
@@ -53,6 +61,10 @@ async function resolveOrgIdsForReport(db: any, orgId: string, consolidated: bool
 
   if (!orgIds.includes(orgId)) orgIds.unshift(orgId)
   return Array.from(new Set(orgIds))
+})
+
+async function resolveOrgIdsForReport(_db: any, orgId: string, consolidated: boolean = false) {
+  return getResolvedOrgIdsForReport(orgId, consolidated)
 }
 
 async function getPostedEntryIds(
@@ -137,26 +149,129 @@ async function getCashAccountCodes(
   orgIdsToSearch: string[],
   branchId?: BranchFilter,
   consolidated: boolean = false
-) {
+): Promise<string[]> {
+  const fallbackCashAccountCodes = ['1101', '1102', '1103', '1104', '1105']
   let linkedAccountsQuery = (supabase as any)
     .from('bank_accounts')
     .select('account_id, accounts(code)')
     .in('org_id', orgIdsToSearch)
+    .eq('is_active', true)
 
   if (branchId && !consolidated) {
     linkedAccountsQuery = linkedAccountsQuery.eq('branch_id', branchId)
   }
 
   const { data: linkedAccounts } = await linkedAccountsQuery
-  const cashAccountCodes = (linkedAccounts || [])
-    .map((la: any) => la.accounts?.code)
-    .filter(Boolean)
+  const cashAccountCodes = (Array.isArray(linkedAccounts) ? linkedAccounts : []).reduce<string[]>(
+    (codes, linkedAccount: { accounts?: { code?: unknown } | null }) => {
+      const code = typeof linkedAccount.accounts?.code === 'string'
+        ? linkedAccount.accounts.code.trim()
+        : ''
 
-  if (cashAccountCodes.length === 0) {
-    cashAccountCodes.push('1101', '1102', '1103', '1104', '1105')
-  }
+      if (code) codes.push(code)
+      return codes
+    },
+    []
+  )
+
+  cashAccountCodes.push(...fallbackCashAccountCodes)
 
   return Array.from(new Set(cashAccountCodes))
+}
+
+function isCashAccountCode(code: string, cashAccountCodes: string[]) {
+  return cashAccountCodes.includes(code)
+}
+
+function isOperatingReceivableCode(code: string) {
+  if (!code || code === '1203') return false
+  return code.startsWith('12')
+}
+
+function isOperatingInventoryCode(code: string) {
+  return Boolean(code) && code.startsWith('13')
+}
+
+function isOperatingPrepaidCode(code: string) {
+  return Boolean(code) && code.startsWith('14')
+}
+
+function isOperatingLiabilityCode(code: string) {
+  if (!code) return false
+  return code === '2101' || code.startsWith('22') || code.startsWith('23') || code.startsWith('24')
+}
+
+function isOperatingReceiptSettlementCode(code: string) {
+  if (!code) return false
+  return isOperatingReceivableCode(code) || code.startsWith('23')
+}
+
+function isOperatingAccrualSettlementCode(code: string) {
+  if (!code) return false
+  return code === '2101' || code.startsWith('22') || code.startsWith('24')
+}
+
+function isOperatingWorkingCapitalCode(code: string) {
+  return (
+    isOperatingReceivableCode(code) ||
+    isOperatingInventoryCode(code) ||
+    isOperatingPrepaidCode(code) ||
+    isOperatingLiabilityCode(code)
+  )
+}
+
+function isOperatingRevenueCode(code: string) {
+  return Boolean(code) && code.startsWith('4')
+}
+
+function isOperatingExpenseCode(code: string) {
+  return Boolean(code) && (code.startsWith('5') || code.startsWith('6') || code.startsWith('9'))
+}
+
+function isAllowedOperatingDetailCode(code: string) {
+  return (
+    isOperatingWorkingCapitalCode(code) ||
+    isOperatingRevenueCode(code) ||
+    isOperatingExpenseCode(code)
+  )
+}
+
+function shouldExcludeCashFlowDetailLine(
+  line: CashFlowLine,
+  nonCashLines: CashFlowLine[],
+  cashAccountCodes: string[]
+) {
+  const code = String(line?.accounts?.code || '').trim()
+  if (!code) return true
+  if (isCashAccountCode(code, cashAccountCodes)) return true
+
+  const category = resolveCashFlowCategory(line.accounts)
+  if (category !== 'OPERATING') return false
+  if (!isAllowedOperatingDetailCode(code)) return true
+
+  const hasReceiptSettlementLine = nonCashLines.some((candidate) =>
+    isOperatingReceiptSettlementCode(String(candidate?.accounts?.code || '').trim())
+  )
+  const hasAccrualSettlementLine = nonCashLines.some((candidate) =>
+    isOperatingAccrualSettlementCode(String(candidate?.accounts?.code || '').trim())
+  )
+  const hasInventoryAssetLine = nonCashLines.some((candidate) =>
+    isOperatingInventoryCode(String(candidate?.accounts?.code || '').trim())
+  )
+
+  if (isOperatingRevenueCode(code) && hasReceiptSettlementLine) {
+    return true
+  }
+
+  if (code === '5001' && hasInventoryAssetLine) {
+    return true
+  }
+
+  if (isOperatingExpenseCode(code) && code !== '5001' && hasAccrualSettlementLine) {
+    return true
+  }
+
+  return false
 }
 
 async function getCashBalance(
@@ -178,6 +293,17 @@ async function getCashBalance(
   }, 0)
 }
 
+export async function getCashBalanceSnapshot(
+  orgId: string,
+  branchId?: BranchFilter,
+  consolidated: boolean = false
+) {
+  noStore()
+  const supabase = await createClient()
+  const db = supabase as any
+  return getCashBalance(db, supabase, orgId, branchId, consolidated)
+}
+
 function resolveCashFlowCategory(account: CashFlowLineAccount | null | undefined): CashFlowCategory {
   const mappedCategory = account?.cash_flow_category
   if (mappedCategory === 'OPERATING' || mappedCategory === 'INVESTING' || mappedCategory === 'FINANCING') {
@@ -185,9 +311,222 @@ function resolveCashFlowCategory(account: CashFlowLineAccount | null | undefined
   }
 
   const code = String(account?.code || '').trim()
+  if (code === '2102') return 'FINANCING'
   if (code.startsWith('15') || code.startsWith('16')) return 'INVESTING'
   if (code.startsWith('25') || code.startsWith('26') || code.startsWith('3')) return 'FINANCING'
   return 'OPERATING'
+}
+
+function resolveEntryCashFlowCategory(nonCashLines: CashFlowLine[]): CashFlowCategory {
+  const categories = nonCashLines
+    .map((line) => resolveCashFlowCategory(line.accounts))
+    .filter((category): category is CashFlowCategory => Boolean(category))
+
+  if (categories.includes('INVESTING')) return 'INVESTING'
+  if (categories.includes('FINANCING')) return 'FINANCING'
+  return 'OPERATING'
+}
+
+function findPreferredCashFlowLine(
+  lines: CashFlowLine[],
+  predicates: Array<(code: string, line: CashFlowLine) => boolean>
+) {
+  for (const predicate of predicates) {
+    const match = lines.find((line) => {
+      const code = String(line?.accounts?.code || '').trim()
+      return Boolean(code) && predicate(code, line)
+    })
+
+    if (match) return match
+  }
+
+  return lines[0] || null
+}
+
+function resolvePrimaryCashFlowLine(
+  nonCashLines: CashFlowLine[],
+  cashAccountCodes: string[],
+  category: CashFlowCategory,
+  cashAmount: number
+) {
+  const preferredLines = nonCashLines.filter((line) =>
+    !shouldExcludeCashFlowDetailLine(line, nonCashLines, cashAccountCodes)
+  )
+  const candidateLines = preferredLines.length > 0
+    ? preferredLines
+    : nonCashLines.filter((line) => String(line?.accounts?.code || '').trim().length > 0)
+
+  if (candidateLines.length === 0) return null
+
+  if (category === 'INVESTING') {
+    return findPreferredCashFlowLine(candidateLines, [
+      (code) => code.startsWith('15') || code.startsWith('16'),
+      (_code, line) => resolveCashFlowCategory(line.accounts) === 'INVESTING',
+    ])
+  }
+
+  if (category === 'FINANCING') {
+    return findPreferredCashFlowLine(candidateLines, [
+      (code) => code === '2102',
+      (code) => code.startsWith('25') || code.startsWith('26'),
+      (code) => code.startsWith('3'),
+      (_code, line) => resolveCashFlowCategory(line.accounts) === 'FINANCING',
+    ])
+  }
+
+  if (cashAmount >= 0) {
+    return findPreferredCashFlowLine(candidateLines, [
+      (code) => isOperatingReceivableCode(code),
+      (code) => code === '2302',
+      (code) => isOperatingRevenueCode(code),
+      (code) => code.startsWith('22'),
+      (code) => code.startsWith('24'),
+      (code) => isOperatingPrepaidCode(code),
+      (code) => isOperatingInventoryCode(code),
+      (code) => isOperatingExpenseCode(code),
+    ])
+  }
+
+  return findPreferredCashFlowLine(candidateLines, [
+    (code) => code === '2101',
+    (code) => isOperatingInventoryCode(code),
+    (code) => code === '1403',
+    (code) => code.startsWith('24'),
+    (code) => code.startsWith('22'),
+    (code) => code.startsWith('23'),
+    (code) => isOperatingPrepaidCode(code),
+    (code) => isOperatingExpenseCode(code),
+    (code) => isOperatingRevenueCode(code),
+    (code) => isOperatingReceivableCode(code),
+  ])
+}
+
+function formatDirectCashFlowItemName(line: CashFlowLine | null, category: CashFlowCategory, cashAmount: number) {
+  const code = String(line?.accounts?.code || '').trim()
+  const baseName = String(line?.accounts?.name || 'Tanpa Nama Akun').trim() || 'Tanpa Nama Akun'
+  const referenceType = String(line?.journal_entries?.reference_type || '').trim().toUpperCase()
+  const description = String(line?.journal_entries?.description || '').trim().toLowerCase()
+  const notes = String(line?.journal_entries?.notes || '').trim().toLowerCase()
+  const isInflow = cashAmount >= 0
+
+  const isGl1201Adjustment =
+    referenceType === 'ADJUSTMENT' ||
+    description.includes('gl-1201-adj') ||
+    description.includes('penyesuaian piutang') ||
+    notes.includes('gl-1201-adj') ||
+    notes.includes('penyesuaian piutang')
+
+  if (category === 'INVESTING') {
+    if (code.startsWith('15') || code.startsWith('16')) {
+      return isInflow ? `Penerimaan dari Pelepasan ${baseName}` : `Pembelian ${baseName}`
+    }
+
+    return isInflow ? 'Penerimaan Kas Investasi' : 'Pengeluaran Kas Investasi'
+  }
+
+  if (category === 'FINANCING') {
+    if (code.startsWith('3')) {
+      return isInflow ? 'Setoran Modal Pemilik' : 'Penarikan Modal / Dividen'
+    }
+
+    if (code === '2102' || code.startsWith('25') || code.startsWith('26')) {
+      return isInflow ? `Penerimaan ${baseName}` : `Pembayaran ${baseName}`
+    }
+
+    return isInflow ? 'Penerimaan Kas Pendanaan' : 'Pengeluaran Kas Pendanaan'
+  }
+
+  if (code === '1201') {
+    if (isGl1201Adjustment) {
+      return isInflow
+        ? 'Penerimaan Rekonsiliasi Piutang Usaha (GL 1201)'
+        : 'Pengembalian / Koreksi Rekonsiliasi Piutang Usaha (GL 1201)'
+    }
+
+    return isInflow ? 'Penerimaan Piutang Usaha' : 'Pengembalian / Koreksi Piutang Usaha'
+  }
+
+  if (code === '2101') {
+    return isInflow ? 'Pengembalian dari Supplier / Hutang Usaha' : 'Pembayaran Hutang Usaha'
+  }
+
+  if (code === '2201') {
+    return isInflow ? 'Penerimaan / Restitusi PPN Keluaran' : 'Pembayaran PPN Keluaran'
+  }
+
+  if (code === '2202') {
+    return isInflow ? 'Penerimaan / Restitusi PPh 21' : 'Pembayaran PPh 21'
+  }
+
+  if (code === '2203') {
+    return isInflow ? 'Penerimaan / Restitusi PPh 23' : 'Pembayaran PPh 23'
+  }
+
+  if (code === '2204') {
+    return isInflow ? 'Penerimaan / Restitusi PPh Badan' : 'Pembayaran PPh Badan'
+  }
+
+  if (code === '2301') {
+    return isInflow ? 'Penerimaan Pendapatan Diterima di Muka' : 'Pengembalian Pendapatan Diterima di Muka'
+  }
+
+  if (code === '2302') {
+    return isInflow ? 'Penerimaan Uang Muka Penjualan' : 'Pengembalian Uang Muka Penjualan'
+  }
+
+  if (code === '2401') {
+    return isInflow ? 'Pengembalian Hutang Gaji' : 'Pembayaran Hutang Gaji'
+  }
+
+  if (code === '4001') {
+    return isInflow ? 'Penerimaan dari Pelanggan / Penjualan' : 'Refund / Koreksi Penjualan Tunai'
+  }
+
+  if (code === '1301') {
+    return isInflow ? 'Penerimaan terkait Persediaan Barang Dagangan' : 'Pembayaran Persediaan Barang Dagangan'
+  }
+
+  if (code === '1302') {
+    return isInflow ? 'Penerimaan terkait Persediaan Barang Dalam Proses' : 'Pembayaran Persediaan Barang Dalam Proses'
+  }
+
+  if (code === '1303') {
+    return isInflow ? 'Penerimaan terkait Persediaan Bahan Baku' : 'Pembayaran Persediaan Bahan Baku'
+  }
+
+  if (code === '1304') {
+    return isInflow ? 'Penerimaan terkait Persediaan Barang Jadi' : 'Pembayaran Persediaan Barang Jadi'
+  }
+
+  if (code === '1402') {
+    return isInflow ? 'Pengembalian Biaya Dibayar Dimuka' : 'Pembayaran Biaya Dibayar Dimuka'
+  }
+
+  if (code === '1403') {
+    return isInflow ? 'Pengembalian Uang Muka Pembelian' : 'Pembayaran Uang Muka Pembelian'
+  }
+
+  if (code.startsWith('12') && code !== '1203') {
+    return isInflow ? `Penerimaan ${baseName}` : `Pengembalian ${baseName}`
+  }
+
+  if (code.startsWith('13') || code.startsWith('14')) {
+    return isInflow ? `Penerimaan terkait ${baseName}` : `Pembayaran ${baseName}`
+  }
+
+  if (code.startsWith('22') || code.startsWith('23') || code.startsWith('24')) {
+    return isInflow ? `Penerimaan / Pengembalian ${baseName}` : `Pembayaran ${baseName}`
+  }
+
+  if (code.startsWith('4')) {
+    return isInflow ? `Penerimaan ${baseName}` : `Refund / Koreksi ${baseName}`
+  }
+
+  if (code.startsWith('5') || code.startsWith('6') || code.startsWith('9')) {
+    return isInflow ? `Pengembalian ${baseName}` : `Pembayaran ${baseName}`
+  }
+
+  return isInflow ? `Penerimaan ${baseName}` : `Pembayaran ${baseName}`
 }
 
 async function getJournalLinesForEntries(
@@ -199,7 +538,7 @@ async function getJournalLinesForEntries(
 
   let query = db
     .from('journal_lines')
-    .select('entry_id, debit, credit, accounts!inner(id, code, name, type, normal_balance, parent_id, cash_flow_category)')
+    .select('entry_id, debit, credit, accounts!inner(id, code, name, type, normal_balance, parent_id, cash_flow_category), journal_entries!inner(description, notes, reference_type)')
     .in('entry_id', entryIds) as any
 
   if (Array.isArray(cashAccountCodes) && cashAccountCodes.length > 0) {
@@ -245,31 +584,31 @@ function summarizeCashFlowFromLines(lines: CashFlowLine[], cashAccountCodes: str
     const nonCashLines = entryLines.filter((line) => !cashAccountCodes.includes(String(line?.accounts?.code || '')))
     if (nonCashLines.length === 0) continue
 
-    nonCashLines.forEach((line) => {
-      const account = line.accounts
-      const code = String(account?.code || '').trim()
-      if (!code) return
+    const cashAmount = cashLines.reduce(
+      (sum, line) => sum + Number(line.debit || 0) - Number(line.credit || 0),
+      0
+    )
+    if (Math.abs(cashAmount) < 0.01) continue
 
-      const amount = Number(line.credit || 0) - Number(line.debit || 0)
-      if (Math.abs(amount) < 0.01) return
+    const category = resolveEntryCashFlowCategory(nonCashLines)
+    const primaryLine = resolvePrimaryCashFlowLine(nonCashLines, cashAccountCodes, category, cashAmount)
+    const code = String(primaryLine?.accounts?.code || category.slice(0, 3)).trim() || category.slice(0, 3)
+    const itemName = formatDirectCashFlowItemName(primaryLine, category, cashAmount)
+    const itemKey = `${category}:${code}:${itemName}`
+    const existingItem = itemMap.get(itemKey)
+    if (existingItem) {
+      existingItem.amount += cashAmount
+    } else {
+      itemMap.set(itemKey, {
+        code,
+        name: itemName,
+        amount: cashAmount,
+      })
+    }
 
-      const category = resolveCashFlowCategory(account)
-      const itemKey = `${category}:${code}`
-      const existingItem = itemMap.get(itemKey)
-      if (existingItem) {
-        existingItem.amount += amount
-      } else {
-        itemMap.set(itemKey, {
-          code,
-          name: String(account?.name || 'Tanpa Nama Akun'),
-          amount,
-        })
-      }
-
-      if (category === 'OPERATING') ocf += amount
-      else if (category === 'INVESTING') icf += amount
-      else fcf += amount
-    })
+    if (category === 'OPERATING') ocf += cashAmount
+    else if (category === 'INVESTING') icf += cashAmount
+    else fcf += cashAmount
   }
 
   const toSortedItems = (category: CashFlowCategory) =>

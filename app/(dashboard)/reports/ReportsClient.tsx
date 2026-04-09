@@ -411,11 +411,11 @@ export default function ReportsClient({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 { 
-                  title: 'Operating (OCF)', 
+                  title: 'Operating (OCF - Direct)', 
                   value: cashFlow.ocf, 
                   icon: TrendingUp, 
                   color: 'text-emerald-500', 
-                  hint: 'Kemampuan bisnis menghasilkan kas dari operasional inti.',
+                  hint: 'Arus kas operasional langsung dari jurnal kas/bank.',
                   metric: cashFlow.ocf > 0 ? 'Sehat' : 'Perlu Perhatian',
                   items: cashFlow.ocfItems
                 },
@@ -603,7 +603,7 @@ export default function ReportsClient({
               <div className="flex items-center justify-between mb-8">
                 <div>
                   <h3 className="text-2xl font-black text-slate-900">{detailModal.title}</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Rincian Akun Penyusun</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Rincian Arus Kas Langsung</p>
                 </div>
                 <button 
                    onClick={() => setDetailModal(prev => ({ ...prev, show: false }))}
@@ -618,7 +618,7 @@ export default function ReportsClient({
                   <div className="py-10 text-center text-slate-300 font-bold italic">Tidak ada data penyusun.</div>
                 ) : (
                   detailModal.items.sort((a,b) => Math.abs(b.amount) - Math.abs(a.amount)).map((it: any) => (
-                    <div key={it.code} className="flex justify-between items-center p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                    <div key={`${it.code}-${it.name}`} className="flex justify-between items-center p-4 rounded-2xl bg-slate-50 border border-slate-100">
                       <div className="space-y-0.5">
                         <p className="text-[10px] font-black text-slate-400 font-mono tracking-tighter">{it.code}</p>
                         <p className="text-xs font-bold text-slate-700">{it.name}</p>

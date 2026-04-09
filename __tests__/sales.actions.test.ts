@@ -26,6 +26,17 @@ vi.mock('@/modules/organization/lib/branch-access.server', () => ({
 import { processPosTransaction } from '@/modules/sales/actions/pos.actions'
 import { createSaleEntry, deliverSale, getSales, voidSale } from '@/modules/sales/actions/sales.actions'
 
+function createOrderedSalesLookup(rows: any[] = []) {
+  const builder: any = {
+    select: vi.fn(() => builder),
+    eq: vi.fn(() => builder),
+    neq: vi.fn(() => builder),
+    then: (resolve: (value: { data: any[]; error: null }) => unknown) => resolve({ data: rows, error: null }),
+  }
+
+  return builder
+}
+
 describe('Sales Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -219,6 +230,7 @@ describe('Sales Branch Context', () => {
     const saleInsert = vi.fn()
     const lineInsert = vi.fn()
     const approvalInsert = vi.fn()
+    const orderedSalesLookup = createOrderedSalesLookup([])
     const productsQuery = {
       select: vi.fn(() => productsQuery),
       eq: vi.fn(() => productsQuery),
@@ -249,7 +261,7 @@ describe('Sales Branch Context', () => {
       from: vi.fn((table: string) => {
         if (table === 'products') return productsQuery
         if (table === 'inventory_stocks') return inventoryStocksQuery
-        if (table === 'sales') return { insert: saleInsert }
+        if (table === 'sales') return { ...orderedSalesLookup, insert: saleInsert }
         if (table === 'sales_items') return { insert: lineInsert }
         if (table === 'approval_requests') return { insert: approvalInsert }
         throw new Error(`Unexpected table ${table}`)
@@ -268,6 +280,70 @@ describe('Sales Branch Context', () => {
     expect(result).toEqual({
       error:
         'Stok produk "Produk A" tidak mencukupi untuk invoice biasa. Dibutuhkan 5, tersedia 2. Ubah transaksi ke akad SALAM agar pesanan tetap bisa dicatat tanpa mengurangi stok saat ini.',
+    })
+    expect(saleInsert).not.toHaveBeenCalled()
+    expect(lineInsert).not.toHaveBeenCalled()
+    expect(approvalInsert).not.toHaveBeenCalled()
+  })
+
+  it('blocks non-SALAM invoice creation when stock is still physically available but already allocated to ordered SO lain', async () => {
+    const saleInsert = vi.fn()
+    const lineInsert = vi.fn()
+    const approvalInsert = vi.fn()
+    const orderedSalesLookup = createOrderedSalesLookup([
+      {
+        id: 'sale-ordered-1',
+        sales_items: [{ product_id: 'prod-1', quantity: 8 }],
+      },
+    ])
+    const productsQuery = {
+      select: vi.fn(() => productsQuery),
+      eq: vi.fn(() => productsQuery),
+      in: vi.fn().mockResolvedValue({
+        data: [{ id: 'prod-1', name: 'Produk A', type: 'INVENTORY' }],
+        error: null,
+      }),
+    }
+    const inventoryStocksQuery = {
+      select: vi.fn(() => inventoryStocksQuery),
+      eq: vi.fn(() => inventoryStocksQuery),
+      in: vi.fn().mockResolvedValue({
+        data: [{ product_id: 'prod-1', quantity: 10, warehouses: { branch_id: 'branch-1' } }],
+        error: null,
+      }),
+    }
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'products') return productsQuery
+        if (table === 'inventory_stocks') return inventoryStocksQuery
+        if (table === 'sales') return { ...orderedSalesLookup, insert: saleInsert }
+        if (table === 'sales_items') return { insert: lineInsert }
+        if (table === 'approval_requests') return { insert: approvalInsert }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const result = await createSaleEntry('org-1', {
+      customer_id: 'cust-1',
+      sale_date: '2026-04-06',
+      due_date: '2026-04-16',
+      payment_term: 'TEMPO',
+      shariah_mode: 'CASH',
+      lines: [{ product_id: 'prod-1', product_name: 'Produk A', quantity: 5, unit_price: 1000 }],
+    })
+
+    expect(result).toEqual({
+      error: 'Stok produk "Produk A" tidak cukup. Stok fisik 10, sudah dialokasikan ke SO lain 8, tersedia dijual 2, permintaan 5.',
     })
     expect(saleInsert).not.toHaveBeenCalled()
     expect(lineInsert).not.toHaveBeenCalled()
@@ -325,6 +401,73 @@ describe('Sales Branch Context', () => {
         shariah_mode: 'SALAM',
       })
     )
+  })
+
+  it('retries creating sales order without commission snapshot columns when schema cache is still old', async () => {
+    const saleSingle = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: 'PGRST204',
+          message: "Could not find the 'commission_type' column of 'sales' in the schema cache",
+        },
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'sale-legacy-1' },
+        error: null,
+      })
+    const saleInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: saleSingle,
+      })),
+    }))
+    const lineInsert = vi.fn().mockResolvedValue({ error: null })
+    const approvalInsert = vi.fn().mockResolvedValue({ error: null })
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'sales') return { insert: saleInsert }
+        if (table === 'sales_items') return { insert: lineInsert }
+        if (table === 'approval_requests') return { insert: approvalInsert }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const result = await createSaleEntry('org-1', {
+      customer_id: 'cust-1',
+      customer_name: 'PT Legacy Cache',
+      sale_date: '2026-04-08',
+      due_date: '2026-04-15',
+      payment_term: 'TEMPO',
+      lines: [{ product_name: 'Produk A', quantity: 1, unit_price: 1000 }],
+    })
+
+    expect(result).toEqual({ success: true, saleId: 'sale-legacy-1' })
+    expect(saleInsert).toHaveBeenCalledTimes(2)
+    const saleInsertCalls = saleInsert.mock.calls as unknown as Array<[Record<string, unknown>]>
+    const firstInsertPayload = saleInsertCalls[0]?.[0]
+    const secondInsertPayload = saleInsertCalls[1]?.[0]
+
+    expect(firstInsertPayload).toEqual(
+      expect.objectContaining({
+        commission_type: null,
+        commission_value: null,
+        reseller_id: null,
+      })
+    )
+    expect(secondInsertPayload).not.toHaveProperty('commission_type')
+    expect(secondInsertPayload).not.toHaveProperty('commission_value')
+    expect(secondInsertPayload).not.toHaveProperty('reseller_id')
   })
 
   it('filters sales list by branch when a unit is active', async () => {

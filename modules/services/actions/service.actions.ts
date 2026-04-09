@@ -1,8 +1,10 @@
 'use server'
 
+import type { LooseDb } from '@/lib/supabase/loose'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import type { ServiceOrderSeed } from '@/modules/services/lib/service-order'
 
 type BranchResult =
   | { branchId: string | null }
@@ -28,7 +30,7 @@ async function requireCreateBranchId(orgId: string): Promise<{ branchId: string 
 
 export async function getServiceOrders(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
-  const db = supabase as any
+  const db = supabase as unknown as LooseDb
   const branchSelection = await resolveServiceBranchSelection(orgId, branchId)
   if ('error' in branchSelection) return []
 
@@ -48,16 +50,31 @@ export async function getServiceOrders(orgId: string, branchId?: string | null) 
   const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) {
-    (console as any).error('Error fetching Service Orders:', error)
+    console.error('Error fetching Service Orders:', error)
     return []
   }
 
   return data
 }
 
+export async function getServiceOrderSeeds(orgId: string, branchId?: string | null): Promise<ServiceOrderSeed[]> {
+  const rows = await getServiceOrders(orgId, branchId)
+
+  return rows.map((row: Record<string, unknown>) => ({
+    id: String(row.id || ''),
+    jobNumber: String(row.job_number || ''),
+    description: String(row.description || ''),
+    notes: String(row.notes || ''),
+    estimatedCost: Number(row.estimated_cost || 0),
+    status: String(row.status || 'PENDING'),
+    branchName: String(((row.branch as { name?: unknown } | null)?.name) || ''),
+    startDate: typeof row.start_date === 'string' ? row.start_date : null,
+  }))
+}
+
 export async function createServiceOrder(orgId: string, formData: FormData) {
   const supabase = await createClient()
-  const db = supabase as any
+  const db = supabase as unknown as LooseDb
   const activeBranch = await requireCreateBranchId(orgId)
   if ('error' in activeBranch) return { error: activeBranch.error }
 
@@ -83,7 +100,7 @@ export async function createServiceOrder(orgId: string, formData: FormData) {
 
 export async function updateServiceStatus(orgId: string, orderId: string, status: string) {
   const supabase = await createClient()
-  const db = supabase as any
+  const db = supabase as unknown as LooseDb
   const { data: order, error: orderError } = await db
     .from('service_orders')
     .select('id, branch_id')

@@ -34,9 +34,28 @@ function isMissingDepartmentIdColumnError(error: any) {
   return msg.includes('department_id') && (msg.includes('schema cache') || msg.includes('column'))
 }
 
+function isMissingEmployeeRoleIdColumnError(error: any) {
+  const msg = String(error?.message || '').toLowerCase()
+  return msg.includes('role_id') && msg.includes('employees') && (msg.includes('schema cache') || msg.includes('column'))
+}
+
 function isMissingManagerEmployeeIdColumnError(error: any) {
   const msg = String(error?.message || '').toLowerCase()
   return msg.includes('manager_employee_id') && (msg.includes('schema cache') || msg.includes('column'))
+}
+
+function removeUnsupportedEmployeeColumns(payload: Record<string, unknown>, error: any) {
+  const nextPayload = { ...payload }
+
+  if (isMissingDepartmentIdColumnError(error)) {
+    delete nextPayload.department_id
+  }
+
+  if (isMissingEmployeeRoleIdColumnError(error)) {
+    delete nextPayload.role_id
+  }
+
+  return nextPayload
 }
 
 function parseManagedIdList(rawValue: FormDataEntryValue | null, label: string) {
@@ -143,6 +162,29 @@ async function clearManagedChildOrgAssignmentsForEmployee(db: any, employeeId: s
 
   if (error && !isMissingManagerEmployeeIdColumnError(error)) {
     return { warning: 'Penugasan PIC anak perusahaan belum sepenuhnya terlepas otomatis.' }
+  }
+
+  return { warning: null as string | null }
+}
+
+async function syncEmployeeMembershipRole(
+  db: any,
+  orgId: string,
+  userId: string | null | undefined,
+  roleId: string | null
+) {
+  const trimmedUserId = String(userId || '').trim()
+  if (!trimmedUserId) return { warning: null as string | null }
+
+  const { error } = await db
+    .from('org_members')
+    .update({ role_id: roleId })
+    .eq('org_id', orgId)
+    .eq('user_id', trimmedUserId)
+    .eq('is_active', true)
+
+  if (error) {
+    return { warning: 'Role akses pengguna belum tersinkron penuh.' }
   }
 
   return { warning: null as string | null }
@@ -843,17 +885,19 @@ export async function createEmployee(orgId: string, formData: FormData) {
   const firstName = formData.get('first_name') as string
   const lastName = formData.get('last_name') as string
   const jobTitle = formData.get('job_title') as string
+  const roleId = String(formData.get('role_id') || '').trim() || null
   const status = formData.get('employment_status') as string || 'FULL_TIME'
   const basicSalary = Number(formData.get('basic_salary') || 0)
   const joinDate = formData.get('join_date') as string || new Date().toISOString().split('T')[0]
 
-  const payload = {
+  let payload: Record<string, unknown> = {
     org_id: orgId,
     branch_id: activeBranch.branchId,
     nik,
     first_name: firstName,
     last_name: lastName,
     job_title: jobTitle,
+    role_id: roleId,
     employment_status: status,
     basic_salary: basicSalary,
     join_date: joinDate,
@@ -869,9 +913,12 @@ export async function createEmployee(orgId: string, formData: FormData) {
   }
 
   let { data: newEmp, error } = await db.from('employees').insert(payload).select('id').single()
-  if (error && isMissingDepartmentIdColumnError(error)) {
-    const { department_id: _ignoredDepartmentId, ...legacyPayload } = payload
-    const retry = await db.from('employees').insert(legacyPayload).select('id').single()
+  while (error && (isMissingDepartmentIdColumnError(error) || isMissingEmployeeRoleIdColumnError(error))) {
+    const legacyPayload = removeUnsupportedEmployeeColumns(payload, error)
+    if (Object.keys(legacyPayload).length === Object.keys(payload).length) break
+
+    payload = legacyPayload
+    const retry = await db.from('employees').insert(payload).select('id').single()
     error = retry.error
     newEmp = retry.data
   }
@@ -902,7 +949,7 @@ export async function updateEmployee(id: string, orgId: string, formData: FormDa
 
   const { data: existingEmployee, error: existingEmployeeError } = await db
     .from('employees')
-    .select('id, branch_id')
+    .select('id, branch_id, user_id')
     .eq('id', id)
     .eq('org_id', orgId)
     .maybeSingle()
@@ -920,15 +967,17 @@ export async function updateEmployee(id: string, orgId: string, formData: FormDa
   const firstName = formData.get('first_name') as string
   const lastName = formData.get('last_name') as string
   const jobTitle = formData.get('job_title') as string
+  const roleId = String(formData.get('role_id') || '').trim() || null
   const status = formData.get('employment_status') as string || 'FULL_TIME'
   const basicSalary = Number(formData.get('basic_salary') || 0)
   const joinDate = formData.get('join_date') as string
 
-  const updatePayload = {
+  let updatePayload: Record<string, unknown> = {
     nik,
     first_name: firstName,
     last_name: lastName,
     job_title: jobTitle,
+    role_id: roleId,
     employment_status: status,
     basic_salary: basicSalary,
     join_date: joinDate,
@@ -951,11 +1000,14 @@ export async function updateEmployee(id: string, orgId: string, formData: FormDa
     .eq('org_id', orgId)
     .eq('branch_id', accessibleEmployee.branchId)
 
-  if (error && isMissingDepartmentIdColumnError(error)) {
-    const { department_id: _ignoredDepartmentId, ...legacyPayload } = updatePayload
+  while (error && (isMissingDepartmentIdColumnError(error) || isMissingEmployeeRoleIdColumnError(error))) {
+    const legacyPayload = removeUnsupportedEmployeeColumns(updatePayload, error)
+    if (Object.keys(legacyPayload).length === Object.keys(updatePayload).length) break
+
+    updatePayload = legacyPayload
     const retry = await db
       .from('employees')
-      .update(legacyPayload)
+      .update(updatePayload)
       .eq('id', id)
       .eq('org_id', orgId)
       .eq('branch_id', accessibleEmployee.branchId)
@@ -963,6 +1015,12 @@ export async function updateEmployee(id: string, orgId: string, formData: FormDa
   }
 
   if (error) return { error: error.message }
+
+  const warnings: string[] = []
+  const roleSyncResult = await syncEmployeeMembershipRole(db, orgId, existingEmployee?.user_id, roleId)
+  if (roleSyncResult.warning) {
+    warnings.push(roleSyncResult.warning)
+  }
 
   const managedBranchesStr = String(formData.get('managed_branches') || '').trim()
   if (managedBranchesStr) {
@@ -984,7 +1042,10 @@ export async function updateEmployee(id: string, orgId: string, formData: FormDa
   }
 
   revalidatePath('/hris')
-  return { success: true }
+  return {
+    success: true,
+    ...(warnings.length > 0 ? { warning: warnings.join(' ') } : {}),
+  }
 }
 
 export async function deleteEmployee(id: string, orgId: string) {

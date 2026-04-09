@@ -1,78 +1,73 @@
-import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-import { getAccountBalances } from '@/modules/accounting/actions/coa.actions'
+import { canSelectAllBranches, getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
+import {
+  getBalanceSheet,
+  getCashFlow,
+  getProfitLoss,
+} from '@/modules/accounting/actions/reports.actions'
+import { getBankLiquidityTotal } from '@/modules/cash/actions/bank.actions'
+import { unstable_noStore as noStore } from 'next/cache'
 import { formatRupiah } from '@/lib/utils'
 import { redirect } from 'next/navigation'
-import { getActiveBranch } from '@/modules/organization/actions/org.actions'
-import { 
-  Wallet, 
-  TrendingUp, 
-  TrendingDown, 
-  ArrowUpRight, 
-  ArrowDownRight,
-} from 'lucide-react'
 import { DashboardClient } from './DashboardClient'
 import { getDashboardAnalytics } from '@/modules/accounting/actions/analytics.actions'
 
-export const revalidate = 3600 // CACHE FOR 1 HOUR TO TEST LOOP
-
 export default async function DashboardPage() {
+  noStore()
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
-  const activeBranch = await getActiveBranch(orgData.org.id)
+  const [activeBranch, canAccessAllBranches] = await Promise.all([
+    getActiveBranch(orgData.org.id),
+    canSelectAllBranches(orgData.org.id),
+  ])
+  const reportBranchId = canAccessAllBranches ? null : (activeBranch?.id ?? null)
 
-  const [balances, analytics] = await Promise.all([
-    getAccountBalances(orgData.org.id),
-    getDashboardAnalytics(orgData.org.id, activeBranch?.id)
+  const [cashBalance, balanceSheet, profitLoss, cashFlow, analytics] = await Promise.all([
+    getBankLiquidityTotal(orgData.org.id, reportBranchId),
+    getBalanceSheet(orgData.org.id, undefined, reportBranchId, false),
+    getProfitLoss(orgData.org.id, undefined, undefined, reportBranchId, false),
+    getCashFlow(orgData.org.id, reportBranchId, false),
+    getDashboardAnalytics(orgData.org.id, reportBranchId ?? undefined),
   ])
 
-  // Aggregate key metrics
-  const totalCash = balances
-    .filter((b) => b.code >= '1101' && b.code <= '1105')
-    .reduce((sum, b) => sum + (b.balance ?? 0), 0)
+  const assetRows = Array.isArray(balanceSheet?.assets) ? balanceSheet.assets : []
+  const liabilityRows = Array.isArray(balanceSheet?.liabilities) ? balanceSheet.liabilities : []
 
-  // 🔴 CEO Directive: Inclusive AR/AP (Trade + Tax + Accruals)
-  const totalReceivables = balances
-    .filter((b) => String(b.code).startsWith('12')) // Accounts Receivable (ALL)
-    .reduce((sum, b) => sum + (b.balance ?? 0), 0)
+  const totalCash = Number(cashBalance || 0)
 
-  const totalPayables = balances
-    .filter((b) => String(b.code).startsWith('21') || String(b.code).startsWith('22') || String(b.code).startsWith('23') || String(b.code).startsWith('24')) // Trade AP + Tax + Payroll + Other
-    .reduce((sum, b) => sum + (b.balance ?? 0), 0)
+  const totalReceivables = assetRows
+    .filter((account: any) => String(account?.code || '').startsWith('12') && String(account?.code || '') !== '1203')
+    .reduce((sum: number, account: any) => sum + Number(account?.balance || 0), 0)
 
-  const totalRevenue = balances
-    .filter((b) => b.type === 'REVENUE')
-    .reduce((sum, b) => sum + (b.balance ?? 0), 0)
+  const totalPayables = liabilityRows
+    .filter((account: any) => {
+      const code = String(account?.code || '').trim()
+      return code === '2101' || code.startsWith('22') || code.startsWith('23') || code.startsWith('24')
+    })
+    .reduce((sum: number, account: any) => sum + Number(account?.balance || 0), 0)
 
-  const totalExpense = balances
-    .filter((b) => b.type === 'EXPENSE')
-    .reduce((sum, b) => sum + (b.balance ?? 0), 0)
+  const totalNonCurrentLiabilities = liabilityRows
+    .filter((account: any) => {
+      const code = String(account?.code || '').trim()
+      return code.startsWith('25') || code.startsWith('26')
+    })
+    .reduce((sum: number, account: any) => sum + Number(account?.balance || 0), 0)
 
-  const totalInventory = balances
-    .filter((b) => String(b.code).startsWith('13')) // Persediaan Barang: Kode 13XX (Verified)
-    .reduce((sum, b) => sum + (b.balance ?? 0), 0)
+  const totalInventory = assetRows
+    .filter((account: any) => String(account?.code || '').startsWith('13'))
+    .reduce((sum: number, account: any) => sum + Number(account?.balance || 0), 0)
 
-  const totalOtherCurrentAssets = balances
-    .filter((b) => String(b.code).startsWith('14')) // PPN Masukan & Biaya Dimuka
-    .reduce((sum, b) => sum + (b.balance ?? 0), 0)
+  const totalOtherCurrentAssets = assetRows
+    .filter((account: any) => String(account?.code || '').startsWith('14'))
+    .reduce((sum: number, account: any) => sum + Number(account?.balance || 0), 0)
 
-  const totalOtherCurrentLiabilities = balances
-    .filter((b) => String(b.code).startsWith('25') || String(b.code).startsWith('26')) // Non-Current Liabilities (if any in short term, but let's keep it clean)
-    .reduce((sum, b) => sum + (b.balance ?? 0), 0)
+  const netProfit = Number(profitLoss?.netProfit || 0)
+  const operatingCashFlow = Number(cashFlow?.ocf || 0)
 
-  const netProfit = totalRevenue - totalExpense
-
-  // 🔴 CEO Directive: Real Operating Cash Flow (Indirect Method PSKAK)
-  // OCF = Net Profit - ΔAR - ΔInventory - ΔOtherCurrentAssets + ΔAP + ΔOtherCurrentLiabilities
-  // Logic: 344 - 331 - 401 - 88 + 888 + 82.5 = 494.5
-  const operatingCashFlow = netProfit 
-       - totalReceivables 
-       - totalInventory 
-       - totalOtherCurrentAssets 
-       + totalPayables 
-       + totalOtherCurrentLiabilities
-  
-  const runwayMonths = operatingCashFlow < 0 ? Math.abs(totalCash / operatingCashFlow) : 999
+  const runwayMonths = operatingCashFlow < 0 && totalCash > 0 ? Math.abs(totalCash / operatingCashFlow) : 999
   const runwayText = operatingCashFlow >= 0 ? 'Aman (OCF Positif)' : `${runwayMonths.toFixed(1)} Bulan tewas`
+
+  const workingCapitalSummary = `${formatRupiah(totalPayables)} / ${formatRupiah(totalReceivables)}`
+  const currentAssetPressureSummary = `${formatRupiah(totalInventory + totalOtherCurrentAssets)} / ${formatRupiah(totalNonCurrentLiabilities)}`
 
   const data = {
     orgName: String(orgData.org.name),
@@ -81,14 +76,14 @@ export default async function DashboardPage() {
         label: 'Total Kas & Bank',
         value: formatRupiah(totalCash),
         icon: 'wallet',
-        hint: 'Total saldo di semua rekening',
+        hint: 'Mengikuti saldo rekening aktif di menu Kas & Bank',
         href: '/cash'
       },
       {
         label: 'Operating Cash Flow',
         value: formatRupiah(operatingCashFlow),
         icon: operatingCashFlow >= 0 ? 'profit' : 'loss',
-        hint: 'Arus Kas Real dari Operasional',
+        hint: 'Sama dengan angka OCF pada menu laporan',
         danger: operatingCashFlow < 0,
         href: '/reports'
       },
@@ -102,16 +97,23 @@ export default async function DashboardPage() {
       },
       {
         label: 'Hutang & Piutang',
-        value: `${formatRupiah(totalPayables)} / ${formatRupiah(totalReceivables)}`,
+        value: workingCapitalSummary,
         icon: 'receivables',
-        hint: 'Rasio AP vs AR yang mengikat kas',
+        hint: 'Utang operasional vs piutang usaha',
         href: '/accounting/aging?view=AP'
+      },
+      {
+        label: 'Stok & Aset Lancar',
+        value: currentAssetPressureSummary,
+        icon: 'receivables',
+        hint: 'Persediaan + aset lancar lain vs liabilitas non-lancar',
+        href: '/reports'
       },
       {
         label: 'Laba Bersih (Accrual)',
         value: formatRupiah(netProfit),
         icon: netProfit >= 0 ? 'profit' : 'loss',
-        hint: 'Laba Kertas (AWAS ILUSI)',
+        hint: 'Diambil dari laporan laba rugi periode berjalan',
         href: '/reports'
       },
     ],

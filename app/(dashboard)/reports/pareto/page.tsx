@@ -1,13 +1,9 @@
 import { redirect } from 'next/navigation'
-import { getSession } from '@/modules/auth/actions/auth.actions'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getDashboardAnalytics } from '@/modules/accounting/actions/analytics.actions'
 import { ParetoClient } from './ParetoClient'
 
 export default async function ParetoPage() {
-  const session = await getSession()
-  if (!session) redirect('/login')
-
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
   const activeBranch = await getActiveBranch(orgData.org.id)

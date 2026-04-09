@@ -1,14 +1,23 @@
 'use client'
 
 import { formatRupiah, getInitials } from '@/lib/utils'
+import { scheduleIdleTask } from '@/lib/browser/idle'
+import { approvalRequestTouchesActiveBranch } from '@/lib/browser/approval-realtime'
+import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type DragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type FormEvent } from 'react'
 import Link from 'next/link'
 import type { Organization } from '@/types/database.types'
 import type { AiTokenHeaderSummary } from '@/modules/ai/lib/ai-token'
 import type { BSCDeckSummary } from '@/modules/accounting/actions/bsc.actions'
 import type { DeckCashSummary } from '@/modules/accounting/actions/reports.actions'
+import {
+  getHeaderNavigationData,
+  getHeaderPendingApprovals,
+  getHeaderTokenSummary,
+} from '@/modules/organization/actions/dashboard-shell.actions'
+import { getOrganizationDeckData, type OrganizationDeckData } from '@/modules/organization/actions/org-deck.actions'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import type {
   AccessibleOrganization,
@@ -27,14 +36,17 @@ interface AppHeaderProps {
   user: { fullName?: string; email: string }
   jobTitle?: string
   org: Organization
-  organizations: AccessibleOrganization[]
+  organizations?: AccessibleOrganization[]
   activeOrgId: string
-  branches: BranchSummary[]
+  branches?: BranchSummary[]
   activeBranchId: string | null
+  activeBranch?: BranchSummary | null
+  activeOrgRole?: string
+  activeOrgParentId?: string | null
+  activeOrgParentName?: string | null
   allowAllBranchSelection?: boolean
   canManageBranches?: boolean
   pendingApprovals?: number
-  cashFlow?: unknown
   aiTokens?: AiTokenHeaderSummary | null
   orgBscSummaries?: Record<string, BSCDeckSummary>
   orgBranchesByOrgId?: Record<string, BranchSummary[]>
@@ -64,6 +76,11 @@ const ORG_DECK_CARD_EXPANDED_HEIGHT = 430
 const ORG_DECK_BRANCH_CARD_WIDTH = 186
 const ORG_DECK_BRANCH_CARD_HEIGHT = 160
 const ORG_DECK_COLUMN_SPACING = 560
+const EMPTY_BSC_SUMMARIES: Record<string, BSCDeckSummary> = {}
+const EMPTY_BRANCH_MAP: Record<string, BranchSummary[]> = {}
+const EMPTY_CASH_SUMMARIES: Record<string, DeckCashSummary> = {}
+const EMPTY_ORGANIZATIONS: AccessibleOrganization[] = []
+const EMPTY_BRANCHES: BranchSummary[] = []
 
 type OrgDeckBranchNode = {
   key: string
@@ -182,18 +199,22 @@ export function AppHeader({
   user,
   jobTitle,
   org,
-  organizations,
+  organizations: initialOrganizations = EMPTY_ORGANIZATIONS,
   activeOrgId,
-  branches,
+  branches: initialBranches = EMPTY_BRANCHES,
   activeBranchId,
+  activeBranch: initialActiveBranch = null,
+  activeOrgRole,
+  activeOrgParentId = null,
+  activeOrgParentName = null,
   allowAllBranchSelection = true,
   canManageBranches = false,
-  pendingApprovals = 0,
-  aiTokens,
-  orgBscSummaries = {},
-  orgBranchesByOrgId = {},
-  orgCashSummaries = {},
-  branchCashSummaries = {},
+  pendingApprovals: initialPendingApprovals = 0,
+  aiTokens: initialAiTokens = null,
+  orgBscSummaries = EMPTY_BSC_SUMMARIES,
+  orgBranchesByOrgId = EMPTY_BRANCH_MAP,
+  orgCashSummaries = EMPTY_CASH_SUMMARIES,
+  branchCashSummaries = EMPTY_CASH_SUMMARIES,
 }: AppHeaderProps) {
   const router = useRouter()
   const [isCreatingBranch, startCreateBranchTransition] = useTransition()
@@ -207,8 +228,31 @@ export function AppHeader({
   const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false)
   const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false)
   const [branchFeedback, setBranchFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [isLoadingOrgDeckData, startOrgDeckDataTransition] = useTransition()
+  const [isLoadingNavigationContext, setIsLoadingNavigationContext] = useState(false)
+  const [isLoadingTokenSummary, setIsLoadingTokenSummary] = useState(false)
   const [expandedDeckOrgIds, setExpandedDeckOrgIds] = useState<Record<string, boolean>>({})
   const [orgDeckBranchOffsets, setOrgDeckBranchOffsets] = useState<Record<string, OrgDeckBranchOffset>>({})
+  const [organizations, setOrganizations] = useState<AccessibleOrganization[]>(initialOrganizations)
+  const [branches, setBranches] = useState<BranchSummary[]>(initialBranches)
+  const [headerPendingApprovals, setHeaderPendingApprovals] = useState(initialPendingApprovals)
+  const [aiTokens, setAiTokens] = useState<AiTokenHeaderSummary | null>(initialAiTokens)
+  const hasInitialOrgDeckData = Boolean(
+    Object.keys(orgBranchesByOrgId).length ||
+    Object.keys(orgBscSummaries).length ||
+    Object.keys(orgCashSummaries).length ||
+    Object.keys(branchCashSummaries).length
+  )
+  const [orgDeckData, setOrgDeckData] = useState<OrganizationDeckData>(() => ({
+    orgBscSummaries,
+    orgBranchesByOrgId,
+    orgCashSummaries,
+    branchCashSummaries,
+  }))
+  const [hasLoadedOrgDeckData, setHasLoadedOrgDeckData] = useState(hasInitialOrgDeckData)
+  const [hasLoadedNavigationContext, setHasLoadedNavigationContext] = useState(
+    initialOrganizations.length > 0 || initialBranches.length > 0
+  )
   const initialOrgDeckPositions = useMemo(
     () => buildInitialOrgDeckPositions(organizations, activeOrgId),
     [organizations, activeOrgId]
@@ -233,7 +277,7 @@ export function AppHeader({
     originY: number
   } | null>(null)
 
-  const activeBranch = branches.find((branch) => branch.id === activeBranchId) || null
+  const activeBranch = branches.find((branch) => branch.id === activeBranchId) || initialActiveBranch || null
   const isSwitchingContext = pendingContextSwitch !== null
   const bscPerspectiveMeta: Array<{
     key: keyof NonNullable<BSCDeckSummary['perspective_scores']>
@@ -251,6 +295,78 @@ export function AppHeader({
     { key: 'icf', label: 'ICF' },
     { key: 'fcf', label: 'FCF' },
   ]
+  const orgDeckBscSummaries = orgDeckData.orgBscSummaries
+  const orgDeckBranchesByOrgId = orgDeckData.orgBranchesByOrgId
+  const orgDeckCashSummaries = orgDeckData.orgCashSummaries
+  const orgDeckBranchCashSummaries = orgDeckData.branchCashSummaries
+
+  const loadNavigationContext = useCallback(async () => {
+    if (hasLoadedNavigationContext || isLoadingNavigationContext) return
+
+    setIsLoadingNavigationContext(true)
+    try {
+      const navigationData = await getHeaderNavigationData(activeOrgId)
+      setOrganizations(navigationData.organizations)
+      setBranches(navigationData.branches)
+      setHasLoadedNavigationContext(true)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Gagal memuat organisasi dan unit.'
+      setOrgFeedback({ type: 'error', message })
+    } finally {
+      setIsLoadingNavigationContext(false)
+    }
+  }, [activeOrgId, hasLoadedNavigationContext, isLoadingNavigationContext])
+
+  const loadTokenSummary = useCallback(async () => {
+    if (aiTokens || isLoadingTokenSummary) return
+
+    setIsLoadingTokenSummary(true)
+    try {
+      const tokenSummary = await getHeaderTokenSummary(activeOrgId)
+      setAiTokens(tokenSummary)
+    } catch (error) {
+      console.error('[AppHeader] Failed to load AI token summary:', error)
+    } finally {
+      setIsLoadingTokenSummary(false)
+    }
+  }, [activeOrgId, aiTokens, isLoadingTokenSummary])
+
+  const prewarmNavigationContext = useCallback(() => {
+    if (hasLoadedNavigationContext || isLoadingNavigationContext) return
+    void loadNavigationContext()
+  }, [hasLoadedNavigationContext, isLoadingNavigationContext, loadNavigationContext])
+
+  const prewarmTokenSummary = useCallback(() => {
+    if (aiTokens || isLoadingTokenSummary) return
+    void loadTokenSummary()
+  }, [aiTokens, isLoadingTokenSummary, loadTokenSummary])
+
+  const handleOrgMenuToggle = useCallback(() => {
+    setOrgFeedback(null)
+    const next = !isOrgMenuOpen
+    if (next) {
+      void loadNavigationContext()
+    }
+    setIsOrgMenuOpen(next)
+  }, [isOrgMenuOpen, loadNavigationContext])
+
+  const handleBranchMenuToggle = useCallback(() => {
+    setBranchFeedback(null)
+    setIsQuickCreateOpen(false)
+    const next = !isBranchMenuOpen
+    if (next) {
+      void loadNavigationContext()
+    }
+    setIsBranchMenuOpen(next)
+  }, [isBranchMenuOpen, loadNavigationContext])
+
+  const handleTokenPopupToggle = useCallback(() => {
+    const next = !isTokenPopupOpen
+    if (next) {
+      void loadTokenSummary()
+    }
+    setIsTokenPopupOpen(next)
+  }, [isTokenPopupOpen, loadTokenSummary])
 
   const handleOrgChange = async (orgId: string) => {
     if (orgId === activeOrgId) return
@@ -403,7 +519,7 @@ export function AppHeader({
   }
 
   const handleDeckBranchActivate = async (targetOrgId: string, targetBranchId: string) => {
-    const targetBranches = orgBranchesByOrgId[targetOrgId] || []
+    const targetBranches = orgDeckBranchesByOrgId[targetOrgId] || []
     const targetBranch = targetBranches.find((branch) => branch.id === targetBranchId)
 
     setPendingContextSwitch({
@@ -480,7 +596,7 @@ export function AppHeader({
   }
 
   const initials = getInitials(user.fullName || user.email)
-  const hasRequests = pendingApprovals > 0
+  const hasRequests = headerPendingApprovals > 0
   const isPlatformAdmin = isPlatformAdminEmail(user.email)
 
   const tokenSummary = useMemo(() => ({
@@ -491,6 +607,80 @@ export function AppHeader({
   }), [aiTokens])
 
   const isLowBalance = tokenSummary.threshold > 0 && tokenSummary.balance <= tokenSummary.threshold
+
+  const loadPendingApprovals = useCallback(async () => {
+    try {
+      const pendingCount = await getHeaderPendingApprovals(activeOrgId, activeBranchId)
+      setHeaderPendingApprovals(pendingCount)
+    } catch (error) {
+      console.error('[AppHeader] Failed to load approval badge:', error)
+    }
+  }, [activeBranchId, activeOrgId])
+
+  useEffect(() => {
+    setOrganizations(initialOrganizations)
+    setBranches(initialBranches)
+    setHasLoadedNavigationContext(initialOrganizations.length > 0 || initialBranches.length > 0)
+    setHeaderPendingApprovals(initialPendingApprovals)
+    setAiTokens(initialAiTokens)
+  }, [activeOrgId, activeBranchId, initialAiTokens, initialBranches, initialOrganizations, initialPendingApprovals])
+
+  useEffect(() => {
+    let isCancelled = false
+    const cancelIdleTask = scheduleIdleTask(() => {
+      void (async () => {
+        try {
+          const pendingCount = await getHeaderPendingApprovals(activeOrgId, activeBranchId)
+          if (!isCancelled) {
+            setHeaderPendingApprovals(pendingCount)
+          }
+        } catch (error) {
+          if (!isCancelled) {
+            console.error('[AppHeader] Failed to load approval badge:', error)
+          }
+        }
+      })()
+    })
+
+    return () => {
+      isCancelled = true
+      cancelIdleTask()
+    }
+  }, [activeBranchId, activeOrgId])
+
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient()
+    const channel = supabase
+      .channel(`nizam-approval-header:${activeOrgId}:${activeBranchId || 'all'}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'approval_requests', filter: `org_id=eq.${activeOrgId}` },
+        (payload) => {
+          if (!approvalRequestTouchesActiveBranch(payload, activeBranchId)) return
+          void loadPendingApprovals()
+        }
+      )
+      .subscribe()
+
+    const handleWindowFocus = () => {
+      void loadPendingApprovals()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void loadPendingApprovals()
+      }
+    }
+
+    window.addEventListener('focus', handleWindowFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      void supabase.removeChannel(channel)
+    }
+  }, [activeBranchId, activeOrgId, loadPendingApprovals])
 
   useEffect(() => {
     if (!isTokenPopupOpen) return
@@ -546,14 +736,15 @@ export function AppHeader({
         : 'Tidak ada unit aktif'
       : 'Transaksi butuh unit aktif'
   const activeOrganization = organizations.find((membership) => membership.orgId === activeOrgId) || null
-  const activeOrgParentName = activeOrganization?.org.parent_org_name || null
-  const activeOrgIsParent = !activeOrganization?.org.parent_org_id
-  const activeOrgHierarchyLabel = activeOrgParentName
-    ? `↳ ${activeOrgParentName}`
+  const effectiveActiveOrgRole = activeOrganization?.role || activeOrgRole || 'member'
+  const effectiveActiveOrgParentName = activeOrganization?.org.parent_org_name || activeOrgParentName
+  const effectiveActiveOrgParentId = activeOrganization?.org.parent_org_id || activeOrgParentId
+  const activeOrgIsParent = !effectiveActiveOrgParentId
+  const activeOrgHierarchyLabel = effectiveActiveOrgParentName
+    ? `↳ ${effectiveActiveOrgParentName}`
     : 'ROOT'
   const canManageAffiliates =
-    Boolean(activeOrganization) &&
-    (activeOrganization?.role === 'owner' || activeOrganization?.role === 'admin')
+    effectiveActiveOrgRole === 'owner' || effectiveActiveOrgRole === 'admin'
   const orgChildrenCount = useMemo(() => {
     const counts: Record<string, number> = {}
 
@@ -572,10 +763,37 @@ export function AppHeader({
     : null
 
   const openOrgDeck = useCallback(() => {
-    setIsOrgMenuOpen(false)
-    setOrgFeedback(null)
-    setIsOrgDeckOpen(true)
-  }, [])
+    void (async () => {
+      setIsOrgMenuOpen(false)
+      setOrgFeedback(null)
+      setIsOrgDeckOpen(true)
+
+      if (hasLoadedOrgDeckData) return
+
+      startOrgDeckDataTransition(async () => {
+        try {
+          const navigationData = hasLoadedNavigationContext
+            ? { organizations, branches }
+            : await getHeaderNavigationData(activeOrgId)
+
+          if (!hasLoadedNavigationContext) {
+            setOrganizations(navigationData.organizations)
+            setBranches(navigationData.branches)
+            setHasLoadedNavigationContext(true)
+          }
+
+          const deckData = await getOrganizationDeckData(
+            navigationData.organizations.map((membership) => membership.orgId)
+          )
+          setOrgDeckData(deckData)
+          setHasLoadedOrgDeckData(true)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Gagal memuat struktur lintas entitas.'
+          setOrgFeedback({ type: 'error', message })
+        }
+      })
+    })()
+  }, [activeOrgId, branches, hasLoadedNavigationContext, hasLoadedOrgDeckData, organizations])
 
   const closeOrgDeck = useCallback(() => {
     setIsOrgDeckOpen(false)
@@ -613,6 +831,22 @@ export function AppHeader({
   }, [initialOrgDeckPositions])
 
   useEffect(() => {
+    setOrgDeckData({
+      orgBscSummaries,
+      orgBranchesByOrgId,
+      orgCashSummaries,
+      branchCashSummaries,
+    })
+    setHasLoadedOrgDeckData(hasInitialOrgDeckData)
+  }, [
+    branchCashSummaries,
+    hasInitialOrgDeckData,
+    orgBscSummaries,
+    orgBranchesByOrgId,
+    orgCashSummaries,
+  ])
+
+  useEffect(() => {
     if (!isOrgDeckOpen) return
 
     const previousOverflow = document.body.style.overflow
@@ -643,10 +877,11 @@ export function AppHeader({
 
       if (event.shiftKey && event.key.toLowerCase() === 'd') {
         event.preventDefault()
-        setIsOrgMenuOpen(false)
-        setOrgFeedback(null)
-        setIsOrgDeckOpen((previous) => !previous)
-        orgDeckDragRef.current = null
+        if (isOrgDeckOpen) {
+          closeOrgDeck()
+        } else {
+          openOrgDeck()
+        }
       }
     }
 
@@ -736,10 +971,10 @@ export function AppHeader({
 
     organizations.forEach((membership) => {
       const orgPosition = orgDeckPositions[membership.orgId] || initialOrgDeckPositions[membership.orgId]
-      const branchesForOrg = orgBranchesByOrgId[membership.orgId] || []
+      const branchesForOrg = orgDeckBranchesByOrgId[membership.orgId] || []
       if (!orgPosition || branchesForOrg.length === 0) return
 
-      const bscSummary = orgBscSummaries[membership.orgId]
+      const bscSummary = orgDeckBscSummaries[membership.orgId]
       const bscIsReady = bscSummary?.status === 'ready'
       const isPerspectiveExpanded = Boolean(expandedDeckOrgIds[membership.orgId])
       const orgCardHeight = getOrgDeckCardHeight(isPerspectiveExpanded, bscIsReady)
@@ -760,14 +995,14 @@ export function AppHeader({
     })
 
     return nodes
-  }, [organizations, orgDeckPositions, initialOrgDeckPositions, orgBranchesByOrgId, orgBscSummaries, expandedDeckOrgIds, orgDeckBranchOffsets])
+  }, [organizations, orgDeckPositions, initialOrgDeckPositions, orgDeckBranchesByOrgId, orgDeckBscSummaries, expandedDeckOrgIds, orgDeckBranchOffsets])
 
   const deckCanvasSize = useMemo(() => {
     const orgMaxX = Object.values(orgDeckPositions).reduce((current, position) => Math.max(current, position.x + ORG_DECK_CARD_WIDTH), 0)
     const orgMaxY = organizations.reduce((current, membership) => {
       const position = orgDeckPositions[membership.orgId] || initialOrgDeckPositions[membership.orgId]
       if (!position) return current
-      const bscSummary = orgBscSummaries[membership.orgId]
+      const bscSummary = orgDeckBscSummaries[membership.orgId]
       const height = getOrgDeckCardHeight(Boolean(expandedDeckOrgIds[membership.orgId]), bscSummary?.status === 'ready')
       return Math.max(current, position.y + height)
     }, 0)
@@ -779,7 +1014,7 @@ export function AppHeader({
       width: Math.max(1120, Math.max(orgMaxX, branchMaxX) + 180),
       height: Math.max(720, Math.max(orgMaxY, branchMaxY) + 180),
     }
-  }, [organizations, orgDeckPositions, initialOrgDeckPositions, orgDeckBranchNodes, orgBscSummaries, expandedDeckOrgIds])
+  }, [organizations, orgDeckPositions, initialOrgDeckPositions, orgDeckBranchNodes, orgDeckBscSummaries, expandedDeckOrgIds])
 
   return (
     <>
@@ -804,10 +1039,11 @@ export function AppHeader({
             <button
               type="button"
               disabled={isSwitchingContext}
-              onClick={() => {
-                setOrgFeedback(null)
-                setIsOrgMenuOpen((prev) => !prev)
-              }}
+              onClick={handleOrgMenuToggle}
+              onMouseEnter={prewarmNavigationContext}
+              onFocus={prewarmNavigationContext}
+              onTouchStart={prewarmNavigationContext}
+              onPointerDown={prewarmNavigationContext}
               className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl shadow-sm hover:bg-slate-100/70 transition-all disabled:cursor-wait disabled:opacity-70"
             >
               <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[#003366] shrink-0 shadow-sm">
@@ -817,7 +1053,7 @@ export function AppHeader({
                 <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter leading-none mb-0.5">Organisasi Aktif</span>
                 <span className="text-xs font-black text-slate-900 leading-none truncate max-w-[140px]">{org.name}</span>
                 <span className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 mt-1 leading-none">
-                  {activeOrganization?.role || 'member'}
+                  {effectiveActiveOrgRole}
                 </span>
                 <span className="text-[9px] font-semibold text-slate-500 mt-1 leading-none truncate max-w-[170px]">
                   {activeOrgIsParent ? 'PARENT' : 'CHILD'} • {activeOrgHierarchyLabel}
@@ -1042,6 +1278,11 @@ export function AppHeader({
                       </div>
                     )
                   })}
+                  {isLoadingNavigationContext && organizations.length === 0 && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-4 text-[11px] font-bold text-slate-500">
+                      Memuat organisasi yang bisa Anda akses...
+                    </div>
+                  )}
                 </div>
 
                 {orgFeedback && (
@@ -1098,11 +1339,11 @@ export function AppHeader({
             <button
               type="button"
               disabled={isSwitchingContext}
-              onClick={() => {
-                setBranchFeedback(null)
-                setIsQuickCreateOpen(false)
-                setIsBranchMenuOpen((prev) => !prev)
-              }}
+              onClick={handleBranchMenuToggle}
+              onMouseEnter={prewarmNavigationContext}
+              onFocus={prewarmNavigationContext}
+              onTouchStart={prewarmNavigationContext}
+              onPointerDown={prewarmNavigationContext}
               className="flex items-center gap-2 px-3 py-1.5 bg-[#003366]/5/50 border border-[#003366]/10 rounded-xl hover:bg-[#003366]/5 transition-all shadow-sm disabled:cursor-wait disabled:opacity-70"
             >
               {pendingContextSwitch?.kind === 'branch'
@@ -1180,7 +1421,7 @@ export function AppHeader({
                 })}
                 {branches.length === 0 && (
                   <div className="px-3 py-4 rounded-2xl bg-amber-50 border border-amber-100 text-xs font-bold text-amber-700">
-                    Belum ada unit yang bisa diakses.
+                    {isLoadingNavigationContext ? 'Memuat unit yang bisa diakses...' : 'Belum ada unit yang bisa diakses.'}
                   </div>
                 )}
                 </div>
@@ -1269,7 +1510,11 @@ export function AppHeader({
         <div ref={tokenPopupRef} className="relative">
           <button
             type="button"
-            onClick={() => setIsTokenPopupOpen((prev) => !prev)}
+            onClick={handleTokenPopupToggle}
+            onMouseEnter={prewarmTokenSummary}
+            onFocus={prewarmTokenSummary}
+            onTouchStart={prewarmTokenSummary}
+            onPointerDown={prewarmTokenSummary}
             className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition-all ${
               isLowBalance
                 ? 'border-amber-300 bg-amber-50 text-amber-700'
@@ -1277,7 +1522,9 @@ export function AppHeader({
             }`}
           >
             <Coins size={14} />
-            <span>AI {tokenSummary.balance.toLocaleString('id-ID')}</span>
+            <span>
+              AI {isLoadingTokenSummary && !aiTokens ? '...' : tokenSummary.balance.toLocaleString('id-ID')}
+            </span>
           </button>
 
           {isTokenPopupOpen && (
@@ -1285,7 +1532,9 @@ export function AppHeader({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">AI Token Wallet</div>
-                  <div className="mt-1 text-xl font-black tracking-tight text-slate-900">{tokenSummary.balance.toLocaleString('id-ID')}</div>
+                  <div className="mt-1 text-xl font-black tracking-tight text-slate-900">
+                    {isLoadingTokenSummary && !aiTokens ? 'Memuat...' : tokenSummary.balance.toLocaleString('id-ID')}
+                  </div>
                 </div>
                 <div className={`rounded-full px-2 py-1 text-[9px] font-black uppercase ${isLowBalance ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
                   {isLowBalance ? 'Low' : 'Healthy'}
@@ -1295,11 +1544,15 @@ export function AppHeader({
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
                   <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Estimasi Generate</div>
-                  <div className="mt-1 text-sm font-black text-slate-900">{tokenSummary.generationLeft.toLocaleString('id-ID')}x</div>
+                  <div className="mt-1 text-sm font-black text-slate-900">
+                    {isLoadingTokenSummary && !aiTokens ? '...' : `${tokenSummary.generationLeft.toLocaleString('id-ID')}x`}
+                  </div>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
                   <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Total Terpakai</div>
-                  <div className="mt-1 text-sm font-black text-slate-900">{tokenSummary.used.toLocaleString('id-ID')}</div>
+                  <div className="mt-1 text-sm font-black text-slate-900">
+                    {isLoadingTokenSummary && !aiTokens ? '...' : tokenSummary.used.toLocaleString('id-ID')}
+                  </div>
                 </div>
               </div>
 
@@ -1322,9 +1575,9 @@ export function AppHeader({
         </div>
 
         <div className="flex items-center gap-2 pr-6 border-r border-slate-100">
-          <Link href="/accounting/approvals" className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${hasRequests ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-white border-slate-100 text-slate-400'}`}>
+          <Link href="/accounting/approvals" className={`relative w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${hasRequests ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-white border-slate-100 text-slate-400'}`}>
             <Bell size={16} />
-            {hasRequests && <div className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full bg-rose-500 border-2 border-white flex items-center justify-center text-[9px] font-black text-white">{pendingApprovals}</div>}
+            {hasRequests && <div className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full bg-rose-500 border-2 border-white flex items-center justify-center text-[9px] font-black text-white">{headerPendingApprovals}</div>}
           </Link>
         </div>
 
@@ -1418,6 +1671,14 @@ export function AppHeader({
                     height: `${deckCanvasSize.height}px`,
                   }}
                 >
+                  {isLoadingOrgDeckData && !hasLoadedOrgDeckData && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/78 backdrop-blur-sm">
+                      <div className="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 shadow-lg">
+                        <LoaderCircle size={14} className="animate-spin" />
+                        Memuat struktur lintas entitas...
+                      </div>
+                    </div>
+                  )}
                   <svg
                     className="pointer-events-none absolute inset-0"
                     width={deckCanvasSize.width}
@@ -1430,8 +1691,8 @@ export function AppHeader({
                       const childPosition = orgDeckPositions[link.childId]
                       if (!parentPosition || !childPosition) return null
 
-                      const parentBsc = orgBscSummaries[link.parentId]
-                      const childBsc = orgBscSummaries[link.childId]
+                      const parentBsc = orgDeckBscSummaries[link.parentId]
+                      const childBsc = orgDeckBscSummaries[link.childId]
                       const parentHeight = getOrgDeckCardHeight(Boolean(expandedDeckOrgIds[link.parentId]), parentBsc?.status === 'ready')
                       const childHeight = getOrgDeckCardHeight(Boolean(expandedDeckOrgIds[link.childId]), childBsc?.status === 'ready')
                       const startX = parentPosition.x + ORG_DECK_CARD_WIDTH
@@ -1454,7 +1715,7 @@ export function AppHeader({
                       const orgPosition = orgDeckPositions[node.orgId] || initialOrgDeckPositions[node.orgId]
                       if (!orgPosition) return null
 
-                      const bscSummary = orgBscSummaries[node.orgId]
+                      const bscSummary = orgDeckBscSummaries[node.orgId]
                       const orgCardHeight = getOrgDeckCardHeight(Boolean(expandedDeckOrgIds[node.orgId]), bscSummary?.status === 'ready')
                       const startX = orgPosition.x + ORG_DECK_CARD_WIDTH
                       const startY = orgPosition.y + orgCardHeight / 2
@@ -1480,12 +1741,12 @@ export function AppHeader({
                     const isPendingTarget = pendingContextSwitch?.kind === 'org' && pendingContextSwitch.orgId === membership.orgId
                     const childCount = orgChildrenCount[membership.orgId] || 0
                     const relationLabel = membership.org.parent_org_name ? `Child dari ${membership.org.parent_org_name}` : 'Root / Parent'
-                    const bscSummary = orgBscSummaries[membership.orgId]
+                    const bscSummary = orgDeckBscSummaries[membership.orgId]
                     const bscIsReady = bscSummary?.status === 'ready'
                     const bscHasError = bscSummary?.status === 'error'
                     const isPerspectiveExpanded = Boolean(expandedDeckOrgIds[membership.orgId])
                     const orgCardHeight = getOrgDeckCardHeight(isPerspectiveExpanded, bscIsReady)
-                    const orgCashSummary = orgCashSummaries[membership.orgId]
+                    const orgCashSummary = orgDeckCashSummaries[membership.orgId]
 
                     return (
                       <div
@@ -1730,7 +1991,7 @@ export function AppHeader({
                       pendingContextSwitch?.kind === 'branch' &&
                       pendingContextSwitch.orgId === node.orgId &&
                       pendingContextSwitch.branchId === node.branch.id
-                    const branchCashSummary = branchCashSummaries[`${node.orgId}:${node.branch.id}`]
+                    const branchCashSummary = orgDeckBranchCashSummaries[`${node.orgId}:${node.branch.id}`]
 
                     return (
                       <div

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { getResellerCommissionSnapshot } from '@/modules/sales/actions/commission.actions'
+import { ensureSellableBranchStockAvailability, shouldGuardOrderedSaleStock } from '@/modules/sales/lib/stock-guard.server'
 
 type ActiveBranchResult =
   | { branchId: string }
@@ -48,98 +49,11 @@ async function ensureCreateSaleStockAvailability(
   branchId: string,
   lines: Array<{ product_id?: string | null; product_name?: string | null; quantity?: number }>
 ): Promise<{ success: true } | { error: string }> {
-  const normalizedLines = (lines || []).map((line) => ({
-    productId: String(line?.product_id || ''),
-    productName: String(line?.product_name || ''),
-    quantity: Number(line?.quantity || 0),
-  }))
-
-  const productIds = [...new Set(normalizedLines.map((line) => line.productId).filter(Boolean))]
-  if (productIds.length === 0) return { success: true }
-
-  const { data: productRows, error: productError } = await (supabase as any)
-    .from('products')
-    .select('id, name, type')
-    .eq('org_id', orgId)
-    .in('id', productIds)
-
-  if (productError) {
-    return { error: 'Gagal memvalidasi stok saat membuat invoice: ' + productError.message }
-  }
-
-  const productById = new Map<string, { name: string; type: string }>()
-  for (const product of (productRows as any[]) || []) {
-    const id = String(product?.id || '')
-    if (!id) continue
-    productById.set(id, {
-      name: String(product?.name || id),
-      type: String(product?.type || 'INVENTORY').toUpperCase(),
-    })
-  }
-
-  const requirementByProduct = new Map<string, { name: string; requiredQty: number }>()
-  for (const line of normalizedLines) {
-    if (!line.productId || !Number.isFinite(line.quantity) || line.quantity <= 0) continue
-    const productMeta = productById.get(line.productId)
-    if (!productMeta || productMeta.type !== 'INVENTORY') continue
-
-    const current = requirementByProduct.get(line.productId)
-    if (current) {
-      current.requiredQty += line.quantity
-      continue
-    }
-
-    requirementByProduct.set(line.productId, {
-      name: productMeta.name || line.productName || line.productId,
-      requiredQty: line.quantity,
-    })
-  }
-
-  if (requirementByProduct.size === 0) return { success: true }
-
-  let stockQuery = (supabase as any)
-    .from('inventory_stocks')
-    .select('product_id, quantity, warehouses!inner(branch_id)')
-    .eq('org_id', orgId)
-
-  if (branchId) {
-    stockQuery = stockQuery.eq('warehouses.branch_id', branchId)
-  }
-
-  const { data: stockRows, error: stockError } = await stockQuery.in(
-    'product_id',
-    Array.from(requirementByProduct.keys())
-  )
-  if (stockError) {
-    return { error: 'Gagal membaca stok saat membuat invoice: ' + stockError.message }
-  }
-
-  const availableByProduct: Record<string, number> = {}
-  for (const row of (stockRows as any[]) || []) {
-    const productId = String((row as any).product_id || '')
-    if (!productId) continue
-    availableByProduct[productId] = (availableByProduct[productId] || 0) + Number((row as any).quantity || 0)
-  }
-
-  const firstShortage = Array.from(requirementByProduct.entries())
-    .map(([productId, requirement]) => {
-      const available = Number(availableByProduct[productId] || 0)
-      return {
-        name: requirement.name,
-        required: requirement.requiredQty,
-        available,
-        shortage: requirement.requiredQty - available,
-      }
-    })
-    .find((entry) => entry.shortage > STOCK_EPSILON)
-
-  if (!firstShortage) return { success: true }
-
-  return {
-    error: `Stok produk "${firstShortage.name}" tidak mencukupi untuk invoice biasa. Dibutuhkan ${formatQuantity(
-      firstShortage.required
-    )}, tersedia ${formatQuantity(Math.max(0, firstShortage.available))}. Ubah transaksi ke akad SALAM agar pesanan tetap bisa dicatat tanpa mengurangi stok saat ini.`,
-  }
+  return ensureSellableBranchStockAvailability(supabase, {
+    orgId,
+    branchId,
+    lines,
+  })
 }
 
 function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
@@ -164,6 +78,49 @@ function isRpcFunctionNotFound(
     message.includes(fn) &&
     (message.includes('schema cache') || message.includes('does not exist') || message.includes('undefined function'))
   )
+}
+
+function isSalesCommissionColumnSchemaCacheMiss(
+  error: { code?: string | null; message?: string | null } | null | undefined
+): boolean {
+  if (!error) return false
+
+  const code = String(error.code || '')
+  const message = String(error.message || '').toLowerCase()
+  const targets = ['reseller_id', 'commission_type', 'commission_value']
+  const touchesCommissionColumn = targets.some(
+    (column) => message.includes(`'${column}'`) || message.includes(column)
+  )
+
+  if (code === 'PGRST204' || code === '42703') {
+    return touchesCommissionColumn || message.includes('schema cache')
+  }
+
+  return (
+    touchesCommissionColumn &&
+    (
+      message.includes('schema cache')
+      || message.includes('column')
+      || message.includes('undefined column')
+    )
+  )
+}
+
+function omitSalesCommissionColumns<T extends Record<string, unknown>>(
+  payload: T
+): Omit<T, 'reseller_id' | 'commission_type' | 'commission_value'> {
+  const {
+    reseller_id: _resellerId,
+    commission_type: _commissionType,
+    commission_value: _commissionValue,
+    ...rest
+  } = payload
+
+  return rest
+}
+
+function getLegacySalesCommissionMigrationMessage() {
+  return 'Database penjualan belum sinkron untuk fitur komisi reseller. Jalankan migration 1157_reseller_commission_off_invoice.sql lalu reload schema Supabase.'
 }
 
 async function requireActiveBranchId(orgId: string, errorMessage: string): Promise<ActiveBranchResult> {
@@ -504,7 +461,7 @@ export async function createSaleEntry(orgId: string, payload: any) {
     return { error: 'Akad SALAM wajib dibayar lunas (tunai) di awal.' }
   }
 
-  if (createMode === 'PUBLISH' && !salamMode && shariahMode !== 'ISTISHNA') {
+  if (createMode === 'PUBLISH' && shouldGuardOrderedSaleStock(shariahMode)) {
     const createStockCheck = await ensureCreateSaleStockAvailability(
       supabase as any,
       orgId,
@@ -558,15 +515,31 @@ export async function createSaleEntry(orgId: string, payload: any) {
       return { error: 'Hanya dokumen SO berstatus DRAFT yang bisa diedit atau diterbitkan ulang.' }
     }
 
-    const { error: updateSaleError } = await (supabase as any)
+    const draftPayload = {
+      ...salePayload,
+      status: 'DRAFT',
+    }
+    let { error: updateSaleError } = await (supabase as any)
       .from('sales')
-      .update({
-        ...salePayload,
-        status: 'DRAFT',
-      })
+      .update(draftPayload)
       .eq('id', payload.draft_id)
       .eq('org_id', orgId)
       .eq('branch_id', activeBranchId)
+
+    if (updateSaleError && isSalesCommissionColumnSchemaCacheMiss(updateSaleError)) {
+      if (resellerSnapshot.resellerId) {
+        return { error: getLegacySalesCommissionMigrationMessage() }
+      }
+
+      const { error: fallbackUpdateError } = await (supabase as any)
+        .from('sales')
+        .update(omitSalesCommissionColumns(draftPayload))
+        .eq('id', payload.draft_id)
+        .eq('org_id', orgId)
+        .eq('branch_id', activeBranchId)
+
+      updateSaleError = fallbackUpdateError
+    }
 
     if (updateSaleError) return { error: updateSaleError.message }
     saleId = payload.draft_id
@@ -580,17 +553,33 @@ export async function createSaleEntry(orgId: string, payload: any) {
 
     if (deleteLinesError) return { error: deleteLinesError.message }
   } else {
-    const { data: sale, error: saleErr } = await (supabase as any)
+    const draftInsertPayload = {
+      org_id: orgId,
+      branch_id: activeBranchId,
+      ...salePayload,
+      created_by: user.id,
+      status: 'DRAFT',
+    }
+    let { data: sale, error: saleErr } = await (supabase as any)
       .from('sales')
-      .insert({
-        org_id: orgId,
-        branch_id: activeBranchId,
-        ...salePayload,
-        created_by: user.id,
-        status: 'DRAFT'
-      })
+      .insert(draftInsertPayload)
       .select('id')
       .single()
+
+    if (saleErr && isSalesCommissionColumnSchemaCacheMiss(saleErr)) {
+      if (resellerSnapshot.resellerId) {
+        return { error: getLegacySalesCommissionMigrationMessage() }
+      }
+
+      const fallbackInsertResult = await (supabase as any)
+        .from('sales')
+        .insert(omitSalesCommissionColumns(draftInsertPayload))
+        .select('id')
+        .single()
+
+      sale = fallbackInsertResult.data
+      saleErr = fallbackInsertResult.error
+    }
 
     if (saleErr || !sale?.id) return { error: saleErr?.message || 'Gagal membuat draft SO.' }
     saleId = sale.id
@@ -966,29 +955,45 @@ export async function createQuotation(orgId: string, payload: any) {
     return { error: resellerSnapshot.error }
   }
 
-  const { data: quote, error: quoteErr } = await (supabase as any)
+  const quoteInsertPayload = {
+    org_id: orgId,
+    branch_id: activeBranchId,
+    customer_id: payload.customer_id,
+    reseller_id: resellerSnapshot.resellerId,
+    commission_type: resellerSnapshot.commissionType,
+    commission_value: resellerSnapshot.commissionValue,
+    sale_date: payload.sale_date,
+    due_date: payload.due_date,
+    payment_term: payload.payment_term || 'TEMPO',
+    total_amount: total,
+    tax_amount: taxAmount,
+    discount_amount: headerDiscount,
+    grand_total: grandTotal,
+    shariah_mode: payload.shariah_mode || 'CASH',
+    notes: payload.notes,
+    created_by: user.id,
+    status: 'QUOTATION',
+  }
+  let { data: quote, error: quoteErr } = await (supabase as any)
     .from('sales')
-    .insert({
-      org_id: orgId,
-      branch_id: activeBranchId,
-      customer_id: payload.customer_id,
-      reseller_id: resellerSnapshot.resellerId,
-      commission_type: resellerSnapshot.commissionType,
-      commission_value: resellerSnapshot.commissionValue,
-      sale_date: payload.sale_date,
-      due_date: payload.due_date,
-      payment_term: payload.payment_term || 'TEMPO',
-      total_amount: total,
-      tax_amount: taxAmount,
-      discount_amount: headerDiscount,
-      grand_total: grandTotal,
-      shariah_mode: payload.shariah_mode || 'CASH',
-      notes: payload.notes,
-      created_by: user.id,
-      status: 'QUOTATION'
-    })
+    .insert(quoteInsertPayload)
     .select('id')
     .single()
+
+  if (quoteErr && isSalesCommissionColumnSchemaCacheMiss(quoteErr)) {
+    if (resellerSnapshot.resellerId) {
+      return { error: getLegacySalesCommissionMigrationMessage() }
+    }
+
+    const fallbackQuoteResult = await (supabase as any)
+      .from('sales')
+      .insert(omitSalesCommissionColumns(quoteInsertPayload))
+      .select('id')
+      .single()
+
+    quote = fallbackQuoteResult.data
+    quoteErr = fallbackQuoteResult.error
+  }
 
   if (quoteErr) return { error: quoteErr.message }
 

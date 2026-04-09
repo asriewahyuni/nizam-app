@@ -9,15 +9,39 @@ import {
   updateChildOrganization,
   deleteChildOrganization,
   createOrganizationQuick,
-  setActiveOrg,
 } from '@/modules/organization/actions/org.actions'
 import { formatDate } from '@/lib/utils'
 
+type ChildOrgRecord = {
+  id: string
+  name: string
+  slug: string
+  logo_url: string | null
+  created_at: string
+  is_active: boolean
+  manager_employee_id?: string | null
+}
+
+type UnlinkedOrgRecord = {
+  id: string
+  name: string
+  slug: string
+  logo_url: string | null
+  is_active?: boolean
+}
+
+type EmployeeOption = {
+  id: string
+  first_name: string
+  last_name: string | null
+  job_title: string | null
+}
+
 interface Props {
   orgId: string
-  childOrgs: any[]
-  unlinkedOrgs: any[]
-  employees: any[]
+  childOrgs: ChildOrgRecord[]
+  unlinkedOrgs: UnlinkedOrgRecord[]
+  employees: EmployeeOption[]
   canMutate?: boolean
   picFeatureEnabled?: boolean
   limits?: {
@@ -45,11 +69,25 @@ export default function SubOrgClient({
   const [deletingChildId, setDeletingChildId] = useState<string | null>(null)
   // Per-card PIC assignment loading + optimistic local value
   const [assigningPICChildId, setAssigningPICChildId] = useState<string | null>(null)
+  const [childOrgList, setChildOrgList] = useState<ChildOrgRecord[]>(() => childOrgs)
+  const [availableUnlinkedOrgs, setAvailableUnlinkedOrgs] = useState<UnlinkedOrgRecord[]>(() => unlinkedOrgs)
+  const [localLimits, setLocalLimits] = useState(limits)
   const [localManagerMap, setLocalManagerMap] = useState<Record<string, string>>(() => {
     const map: Record<string, string> = {}
-    childOrgs.forEach((c: any) => { if (c.id) map[c.id] = c.manager_employee_id || '' })
+    childOrgs.forEach((c) => { if (c.id) map[c.id] = c.manager_employee_id || '' })
     return map
   })
+
+  const canCreateMore = localLimits?.maxChildOrgs === null || localLimits?.maxChildOrgs === undefined
+    ? true
+    : localLimits.currentChildOrgs < localLimits.maxChildOrgs
+
+  const makeClientSlug = (value: string) =>
+    value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
 
   const handleLinkOrg = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -57,9 +95,32 @@ export default function SubOrgClient({
     const fd = new FormData(e.currentTarget)
     const childId = fd.get('child_id') as string
     if (childId) {
-      const res = await linkSubOrganization(orgId, childId) as any
-      if (res?.error) alert(res.error)
-      else window.location.reload()
+      const res: Awaited<ReturnType<typeof linkSubOrganization>> = await linkSubOrganization(orgId, childId)
+      if ('error' in res) alert(res.error)
+      else {
+        const linkedOrg = availableUnlinkedOrgs.find((org) => org.id === childId)
+        if (linkedOrg) {
+          setChildOrgList((current) => [
+            {
+              id: linkedOrg.id,
+              name: linkedOrg.name,
+              slug: linkedOrg.slug,
+              logo_url: linkedOrg.logo_url,
+              created_at: new Date().toISOString(),
+              is_active: linkedOrg.is_active ?? true,
+              manager_employee_id: null,
+            },
+            ...current,
+          ])
+          setAvailableUnlinkedOrgs((current) => current.filter((org) => org.id !== childId))
+          setLocalManagerMap((current) => ({ ...current, [linkedOrg.id]: '' }))
+          setLocalLimits((current) => current ? ({
+            ...current,
+            currentChildOrgs: current.currentChildOrgs + 1,
+          }) : current)
+        }
+        setIsLinkModalOpen(false)
+      }
     }
     setLoading(false)
   }
@@ -70,31 +131,44 @@ export default function SubOrgClient({
     setCreateError(null)
 
     const fd = new FormData(e.currentTarget)
+    const childName = String(fd.get('name') || '').trim()
     fd.set('parent_org_id', orgId)
+    fd.set('preserve_parent_context', 'true')
 
-    const res = await createOrganizationQuick(fd) as any
-    if (res?.error) {
+    const res: Awaited<ReturnType<typeof createOrganizationQuick>> = await createOrganizationQuick(fd)
+    if ('error' in res) {
       setCreateError(res.error)
       setCreateLoading(false)
       return
     }
 
-    const restoreParentContext = await setActiveOrg(orgId) as any
-    if (restoreParentContext?.error) {
-      setCreateError(restoreParentContext.error)
-      setCreateLoading(false)
-      return
+    const createdChild: ChildOrgRecord = res.organization ?? {
+      id: String(res.orgId || crypto.randomUUID()),
+      name: childName,
+      slug: makeClientSlug(childName),
+      logo_url: null,
+      created_at: new Date().toISOString(),
+      is_active: true,
+      manager_employee_id: null,
     }
 
+    setChildOrgList((current) => [createdChild, ...current])
+    setLocalManagerMap((current) => ({ ...current, [createdChild.id]: createdChild.manager_employee_id || '' }))
+    setLocalLimits((current) => current ? ({
+      ...current,
+      currentChildOrgs: current.currentChildOrgs + 1,
+    }) : current)
+
     setIsCreateModalOpen(false)
-    window.location.reload()
+    e.currentTarget.reset()
+    setCreateLoading(false)
   }
 
   const handleAssignPIC = async (childId: string, empId: string) => {
     if (assigningPICChildId === childId) return
     setAssigningPICChildId(childId)
-    const res = await assignSubOrgManager(childId, empId || null) as any
-    if (res?.error) {
+    const res: Awaited<ReturnType<typeof assignSubOrgManager>> = await assignSubOrgManager(childId, empId || null)
+    if ('error' in res) {
       alert(res.error)
       // rollback optimistic
       setLocalManagerMap(prev => ({ ...prev }))
@@ -113,15 +187,23 @@ export default function SubOrgClient({
     const fd = new FormData(e.currentTarget)
     const name = String(fd.get('name') || '').trim()
 
-    const res = await updateChildOrganization(editingChild.id, name) as any
-    if (res?.error) {
+    const res: Awaited<ReturnType<typeof updateChildOrganization>> = await updateChildOrganization(editingChild.id, name)
+    if ('error' in res) {
       alert(res.error)
       setEditLoading(false)
       return
     }
 
+    const nextSlug = makeClientSlug(name)
+    setChildOrgList((current) =>
+      current.map((child) =>
+        child.id === editingChild.id
+          ? { ...child, name, slug: nextSlug || child.slug }
+          : child
+      )
+    )
     setEditingChild(null)
-    window.location.reload()
+    setEditLoading(false)
   }
 
   const handleDeleteChild = async (childId: string, childName: string) => {
@@ -131,20 +213,30 @@ export default function SubOrgClient({
     if (!agreed) return
 
     setDeletingChildId(childId)
-    const res = await deleteChildOrganization(childId) as any
-    if (res?.error) {
+    const res: Awaited<ReturnType<typeof deleteChildOrganization>> = await deleteChildOrganization(childId)
+    if ('error' in res) {
       alert(res.error)
       setDeletingChildId(null)
       return
     }
 
-    window.location.reload()
+    setChildOrgList((current) => current.filter((child) => child.id !== childId))
+    setLocalManagerMap((current) => {
+      const next = { ...current }
+      delete next[childId]
+      return next
+    })
+    setLocalLimits((current) => current ? ({
+      ...current,
+      currentChildOrgs: Math.max(0, current.currentChildOrgs - 1),
+    }) : current)
+    setDeletingChildId(null)
   }
 
   const getManagerName = (childId: string) => {
     const empId = localManagerMap[childId]
     if (!empId) return null
-    const emp = employees.find((e: any) => e.id === empId)
+    const emp = employees.find((e) => e.id === empId)
     if (!emp) return null
     return `${emp.first_name} ${emp.last_name || ''}`.trim()
   }
@@ -162,7 +254,7 @@ export default function SubOrgClient({
          <div className="flex flex-col md:items-end gap-3 shrink-0">
            {limits && (
              <div className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-               Pemakaian Kuota: <span className="text-slate-800">{limits.currentChildOrgs}</span> / {limits.maxChildOrgs === null ? '∞' : limits.maxChildOrgs} Entitas
+               Pemakaian Kuota: <span className="text-slate-800">{localLimits?.currentChildOrgs ?? 0}</span> / {localLimits?.maxChildOrgs === null || localLimits?.maxChildOrgs === undefined ? '∞' : localLimits.maxChildOrgs} Entitas
              </div>
            )}
            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
@@ -173,19 +265,19 @@ export default function SubOrgClient({
                    setCreateError(null)
                    setIsCreateModalOpen(true)
                  }}
-                 disabled={limits?.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs}
-                 title={limits?.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs ? 'Batas entitas tercapai.' : ''}
+                 disabled={!canCreateMore}
+                 title={!canCreateMore ? 'Batas entitas tercapai.' : ''}
                  className="px-6 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 flex-1 shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
                >
                  <Plus size={16} /> Tambah Anak Perusahaan
                </button>
              )}
-             {canMutate && unlinkedOrgs.length > 0 && (
+             {canMutate && availableUnlinkedOrgs.length > 0 && (
                <button 
                  type="button"
                  onClick={() => setIsLinkModalOpen(true)}
-                 disabled={limits?.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs}
-                 title={limits?.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs ? 'Batas entitas tercapai.' : ''}
+                 disabled={!canCreateMore}
+                 title={!canCreateMore ? 'Batas entitas tercapai.' : ''}
                  className="px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-2 flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
                >
                  <LinkIcon size={16} /> Tautkan Entitas
@@ -196,7 +288,7 @@ export default function SubOrgClient({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {childOrgs.map((child: any) => {
+        {childOrgList.map((child) => {
           const isAssigning = assigningPICChildId === child.id
           const currentManagerId = localManagerMap[child.id] || ''
           const managerName = getManagerName(child.id)
@@ -208,6 +300,7 @@ export default function SubOrgClient({
                   <div className="flex items-center gap-4 min-w-0">
                     <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
                        {child.logo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={child.logo_url} alt={child.name} className="w-full h-full object-contain p-2" />
                        ) : (
                           <Building size={24} className="text-slate-400" />
@@ -279,7 +372,7 @@ export default function SubOrgClient({
                       onChange={(e) => handleAssignPIC(child.id, e.target.value)}
                     >
                       <option value="">-- Belum Ditentukan --</option>
-                      {employees.map((emp: any) => (
+                      {employees.map((emp) => (
                         <option key={emp.id} value={emp.id}>
                           {emp.first_name} {emp.last_name || ''} {emp.job_title ? `(${emp.job_title})` : ''}
                         </option>
@@ -314,7 +407,7 @@ export default function SubOrgClient({
             </div>
           )
         })}
-        {childOrgs.length === 0 && (
+        {childOrgList.length === 0 && (
           <div className="col-span-1 md:col-span-2 border-2 border-dashed border-slate-200 rounded-[32px] bg-slate-50 p-8 md:p-12">
             <div className="flex flex-col items-center justify-center text-center space-y-4">
               <Layers size={48} className="text-slate-300" />
@@ -331,7 +424,7 @@ export default function SubOrgClient({
                   setCreateError(null)
                   setIsCreateModalOpen(true)
                 }}
-                disabled={!canMutate || (limits?.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs)}
+                disabled={!canMutate || !canCreateMore}
                 className="rounded-[28px] border border-blue-200 bg-white p-6 text-left transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center justify-between gap-4">
@@ -351,7 +444,7 @@ export default function SubOrgClient({
               <button
                 type="button"
                 onClick={() => setIsLinkModalOpen(true)}
-                disabled={!canMutate || unlinkedOrgs.length === 0 || (limits?.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs)}
+                disabled={!canMutate || availableUnlinkedOrgs.length === 0 || !canCreateMore}
                 className="rounded-[28px] border border-slate-200 bg-white p-6 text-left transition hover:border-slate-300 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center justify-between gap-4">
@@ -362,8 +455,8 @@ export default function SubOrgClient({
                     <div>
                       <div className="text-sm font-black text-slate-900">Tautkan Entitas Yang Sudah Ada</div>
                       <div className="mt-1 text-xs font-medium text-slate-500">
-                        {unlinkedOrgs.length > 0
-                          ? `${unlinkedOrgs.length} organisasi siap ditautkan ke holding ini.`
+                        {availableUnlinkedOrgs.length > 0
+                          ? `${availableUnlinkedOrgs.length} organisasi siap ditautkan ke holding ini.`
                           : 'Belum ada organisasi mandiri milik Anda yang siap ditautkan.'}
                       </div>
                     </div>
@@ -444,7 +537,7 @@ export default function SubOrgClient({
                  <label className="text-[10px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Pilih Organisasi (Owner)</label>
                  <select required name="child_id" className="w-full px-5 py-4 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold bg-white text-slate-900">
                    <option value="">-- Pilih Organisasi --</option>
-                   {unlinkedOrgs.map(org => (
+                   {availableUnlinkedOrgs.map((org) => (
                      <option key={org.id} value={org.id}>{org.name}</option>
                    ))}
                  </select>

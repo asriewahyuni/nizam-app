@@ -1,15 +1,73 @@
 'use server'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { diffDateOnlyStrings, getDateInTimeZone } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
 
 type BranchFilter = string | null | undefined
+const AGING_BUCKETS = ['Current', '0-30 Days', '31-60 Days', '61-90 Days', '> 90 Days'] as const
+
+export type AgingBucket = (typeof AGING_BUCKETS)[number]
+
+export type AgingReportRow = {
+  id: string
+  contact_id: string | null
+  contact_name: string
+  doc_number: string
+  doc_href: string | null
+  due_date: string
+  grand_total: number
+  paid_amount: number
+  returned_amount: number
+  outstanding: number
+  days_overdue: number
+  aging_bucket: AgingBucket
+  source_type: string
+  source_label: string
+  source_account_code: string | null
+  settlement_account_id?: string | null
+}
+
+export type AgingQuickBillCustomer = {
+  contact_id: string
+  contact_name: string
+  invoice_count: number
+  overdue_invoice_count: number
+  total_outstanding: number
+  oldest_due_date: string | null
+  max_days_overdue: number
+  worst_bucket: AgingBucket
+}
+
+export type ArQuickBillDocumentSnapshot = {
+  docNumber: string
+  issuedAt: string
+  customer: {
+    id: string
+    name: string
+    email: string | null
+    phone: string | null
+    address: string | null
+  }
+  totals: {
+    invoiceCount: number
+    overdueInvoiceCount: number
+    totalOutstanding: number
+    oldestDueDate: string | null
+    maxDaysOverdue: number
+  }
+  bucketBreakdown: Array<{
+    bucket: AgingBucket
+    amount: number
+  }>
+  invoices: AgingReportRow[]
+}
 
 function getBusinessToday() {
   return getDateInTimeZone('Asia/Jakarta')
 }
 
-function agingBucket(dueDateStr: string, today: string): string {
+function agingBucket(dueDateStr: string, today: string): AgingBucket {
   if (!dueDateStr) return '> 90 Days'
   const days = diffDateOnlyStrings(today, dueDateStr)
   if (days <= 0) return 'Current'
@@ -25,6 +83,68 @@ function isSalamMode(value: unknown) {
 
 function isIstishnaMode(value: unknown) {
   return String(value || '').trim().toUpperCase() === 'ISTISHNA'
+}
+
+function getBucketRank(bucket: string): number {
+  const rank = AGING_BUCKETS.indexOf(bucket as AgingBucket)
+  return rank >= 0 ? rank : AGING_BUCKETS.length
+}
+
+function getTradeArQuickBillRows(rows: AgingReportRow[]): AgingReportRow[] {
+  return rows.filter((row) => (
+    row.source_type === 'SALES'
+    && Boolean(row.contact_id)
+    && Number(row.outstanding || 0) > 0.01
+  ))
+}
+
+function buildArQuickBillCustomers(rows: AgingReportRow[]): AgingQuickBillCustomer[] {
+  const grouped = new Map<string, AgingQuickBillCustomer>()
+
+  for (const row of getTradeArQuickBillRows(rows)) {
+    const contactId = String(row.contact_id || '').trim()
+    if (!contactId) continue
+
+    const existing = grouped.get(contactId)
+    const normalizedOutstanding = Number(row.outstanding || 0)
+    const normalizedDaysOverdue = Math.max(0, Number(row.days_overdue || 0))
+    const normalizedDueDate = row.due_date || null
+    const isOverdue = normalizedDaysOverdue > 0
+
+    if (!existing) {
+      grouped.set(contactId, {
+        contact_id: contactId,
+        contact_name: row.contact_name || 'Pelanggan',
+        invoice_count: 1,
+        overdue_invoice_count: isOverdue ? 1 : 0,
+        total_outstanding: normalizedOutstanding,
+        oldest_due_date: normalizedDueDate,
+        max_days_overdue: normalizedDaysOverdue,
+        worst_bucket: row.aging_bucket,
+      })
+      continue
+    }
+
+    existing.contact_name = existing.contact_name || row.contact_name || 'Pelanggan'
+    existing.invoice_count += 1
+    existing.overdue_invoice_count += isOverdue ? 1 : 0
+    existing.total_outstanding += normalizedOutstanding
+    existing.max_days_overdue = Math.max(existing.max_days_overdue, normalizedDaysOverdue)
+
+    if (!existing.oldest_due_date || (normalizedDueDate && normalizedDueDate < existing.oldest_due_date)) {
+      existing.oldest_due_date = normalizedDueDate
+    }
+
+    if (getBucketRank(row.aging_bucket) > getBucketRank(existing.worst_bucket)) {
+      existing.worst_bucket = row.aging_bucket
+    }
+  }
+
+  return Array.from(grouped.values()).sort((a, b) => {
+    if (b.max_days_overdue !== a.max_days_overdue) return b.max_days_overdue - a.max_days_overdue
+    if (b.total_outstanding !== a.total_outstanding) return b.total_outstanding - a.total_outstanding
+    return a.contact_name.localeCompare(b.contact_name, 'id-ID')
+  })
 }
 
 async function getPostedEntryIds(
@@ -107,7 +227,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
   const today = getBusinessToday()
   const settlementAccounts = await getSettlementAccounts(db, orgId, ['1201', '1205', '1404', '2101', '2201', '2301', '2401', '2602', '2603'])
 
-  let results: any[] = []
+  let results: AgingReportRow[] = []
 
   if (type === 'AR') {
     // 1. Trade AR from Sales Module
@@ -159,6 +279,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
           const isSalamSale = isSalamMode(s.shariah_mode)
           return {
             id: s.id,
+            contact_id: s.customer_id || null,
             contact_name: s.contacts?.name || 'Unknown',
             doc_number: s.sale_number,
             doc_href: `/sales?pay=${s.id}`,
@@ -172,9 +293,9 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             source_type: 'SALES',
             source_label: isSalamSale ? 'Tagihan Sales SALAM (SO)' : (isIstishnaMode(s.shariah_mode) ? 'Tagihan Sales ISTISHNA (SO)' : 'Piutang Usaha (1201)'),
             source_account_code: isSalamSale ? null : (isIstishnaMode(s.shariah_mode) ? null : '1201'),
-          }
+          } satisfies AgingReportRow
         })
-        .filter((r: any) => r.outstanding > 0.01)
+        .filter((r: AgingReportRow) => r.outstanding > 0.01)
     }
 
     // 2. SALAM vendor receivable from Purchase module (1404)
@@ -195,7 +316,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     if (salamPurchasesFiltered.length > 0) {
       const purchaseIds = salamPurchasesFiltered.map((p: any) => p.id)
 
-      let salamPaymentsQuery = db
+      const salamPaymentsQuery = db
         .from('purchase_payments')
         .select('purchase_id, amount, discount_amount')
         .in('purchase_id', purchaseIds)
@@ -206,7 +327,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
         paidByPurchase[payment.purchase_id] = (paidByPurchase[payment.purchase_id] || 0) + Number(payment.amount || 0) + Number(payment.discount_amount || 0)
       }
 
-      let salamReturnsQuery = db
+      const salamReturnsQuery = db
         .from('purchase_returns')
         .select('purchase_id, total_amount, status')
         .in('purchase_id', purchaseIds)
@@ -224,6 +345,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
           const finalDueDate = purchase.due_date || purchase.purchase_date
           return {
             id: purchase.id,
+            contact_id: purchase.vendor_id || null,
             contact_name: purchase.contacts?.name || 'Unknown',
             doc_number: purchase.purchase_number,
             doc_href: `/purchasing?pay=${purchase.id}`,
@@ -237,9 +359,9 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             source_type: isSalamMode(purchase.shariah_mode) ? 'SALAM_VENDOR_RECEIVABLE' : 'ISTISHNA_VENDOR_RECEIVABLE',
             source_label: isSalamMode(purchase.shariah_mode) ? 'Piutang Salam Vendor (1404)' : 'Piutang Barang Istishna (1205)',
             source_account_code: isSalamMode(purchase.shariah_mode) ? '1404' : '1205',
-          }
+          } satisfies AgingReportRow
         })
-        .filter((row: any) => row.outstanding > 0.01)
+        .filter((row: AgingReportRow) => row.outstanding > 0.01)
 
       results.push(...salamRows)
     }
@@ -248,15 +370,17 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     const balances = await getAccountCodeBalances(db, orgId, ['1201', '1404', '1205'], branchId)
     const tradeArGlBalance = Number(balances['1201'] || 0)
     const tradeArModuleTotal = results
-      .filter((row: any) => row.source_type === 'SALES')
-      .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+      .filter((row: AgingReportRow) => row.source_type === 'SALES')
+      .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const tradeArDiff = tradeArGlBalance - tradeArModuleTotal
 
     if (Math.abs(tradeArDiff) > 10) {
       results.push({
         id: 'manual-ar-adj',
+        contact_id: null,
         contact_name: 'Unallocated (Buku Besar)',
         doc_number: 'GL-1201-ADJ',
+        doc_href: null,
         due_date: today,
         grand_total: tradeArDiff,
         paid_amount: 0,
@@ -268,20 +392,22 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
         source_label: 'Penyesuaian Piutang Usaha (1201)',
         source_account_code: '1201',
         settlement_account_id: settlementAccounts['1201'] || null,
-      });
+      })
     }
 
     const salamReceivableGlBalance = Number(balances['1404'] || 0)
     const salamReceivableModuleTotal = results
-      .filter((row: any) => row.source_type === 'SALAM_VENDOR_RECEIVABLE')
-      .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+      .filter((row: AgingReportRow) => row.source_type === 'SALAM_VENDOR_RECEIVABLE')
+      .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const salamReceivableDiff = salamReceivableGlBalance - salamReceivableModuleTotal
 
     if (Math.abs(salamReceivableDiff) > 10) {
       results.push({
         id: 'manual-salam-ar-adj',
+        contact_id: null,
         contact_name: 'Unallocated (Buku Besar)',
         doc_number: 'GL-1404-ADJ',
+        doc_href: null,
         due_date: today,
         grand_total: salamReceivableDiff,
         paid_amount: 0,
@@ -298,15 +424,17 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
 
     const istishnaReceivableGlBalance = Number(balances['1205'] || 0)
     const istishnaReceivableModuleTotal = results
-      .filter((row: any) => row.source_type === 'ISTISHNA_VENDOR_RECEIVABLE')
-      .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+      .filter((row: AgingReportRow) => row.source_type === 'ISTISHNA_VENDOR_RECEIVABLE')
+      .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const istishnaReceivableDiff = istishnaReceivableGlBalance - istishnaReceivableModuleTotal
 
     if (Math.abs(istishnaReceivableDiff) > 10) {
       results.push({
         id: 'manual-istishna-ar-adj',
+        contact_id: null,
         contact_name: 'Unallocated (Buku Besar)',
         doc_number: 'GL-1205-ADJ',
+        doc_href: null,
         due_date: today,
         grand_total: istishnaReceivableDiff,
         paid_amount: 0,
@@ -338,7 +466,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
 
     if (purchases && purchases.length > 0) {
       const purchaseIds = purchases.map((p: any) => p.id)
-      let paymentsQuery = db
+      const paymentsQuery = db
         .from('purchase_payments')
         .select('purchase_id, amount, discount_amount')
         .in('purchase_id', purchaseIds)
@@ -347,7 +475,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       for (const p of payments || []) {
         paidByPurchase[p.purchase_id] = (paidByPurchase[p.purchase_id] || 0) + Number(p.amount) + Number(p.discount_amount || 0)
       }
-      let returnsQuery = db
+      const returnsQuery = db
         .from('purchase_returns')
         .select('purchase_id, total_amount, status')
         .in('purchase_id', purchaseIds)
@@ -364,6 +492,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
           const finalDueDate = p.due_date || p.purchase_date
           return {
             id: p.id,
+            contact_id: p.vendor_id || null,
             contact_name: p.contacts?.name || 'Unknown',
             doc_number: p.purchase_number,
             doc_href: `/purchasing?pay=${p.id}`,
@@ -377,9 +506,9 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             source_type: 'PURCHASING',
             source_label: isSalamMode(p.shariah_mode) ? 'Hutang Pembelian SALAM' : (isIstishnaMode(p.shariah_mode) ? 'Hutang Pembelian ISTISHNA' : 'Hutang Usaha (2101)'),
             source_account_code: isSalamMode(p.shariah_mode) || isIstishnaMode(p.shariah_mode) ? null : '2101',
-          }
+          } satisfies AgingReportRow
         })
-        .filter((r: any) => r.outstanding > 0.01)
+        .filter((r: AgingReportRow) => r.outstanding > 0.01)
     }
 
     // 2. SALAM liability (2602) from undelivered SALAM sales
@@ -435,6 +564,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
           const finalDueDate = sale.due_date || sale.sale_date
           return {
             id: sale.id,
+            contact_id: sale.customer_id || null,
             contact_name: sale.contacts?.name || 'Unknown',
             doc_number: sale.sale_number,
             doc_href: `/sales?pay=${sale.id}`,
@@ -448,9 +578,9 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
             source_type: isSalamMode(sale.shariah_mode) ? 'SALAM_SALES_LIABILITY' : 'ISTISHNA_SALES_LIABILITY',
             source_label: isSalamMode(sale.shariah_mode) ? 'Hutang Salam (2602)' : 'Hutang Istishna (2603)',
             source_account_code: isSalamMode(sale.shariah_mode) ? '2602' : '2603',
-          }
+          } satisfies AgingReportRow
         })
-        .filter((row: any) => row.outstanding > 0.01)
+        .filter((row: AgingReportRow) => row.outstanding > 0.01)
 
       results.push(...salamLiabilityRows)
     }
@@ -459,15 +589,17 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     const balances = await getAccountCodeBalances(db, orgId, ['2101', '2201', '2301', '2401', '2602', '2603'], branchId)
 
     const tradeApModuleTotal = results
-      .filter((row: any) => row.source_type === 'PURCHASING')
-      .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+      .filter((row: AgingReportRow) => row.source_type === 'PURCHASING')
+      .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const tradeApDiff = Number(balances['2101'] || 0) - tradeApModuleTotal
 
     if (Math.abs(tradeApDiff) > 10) {
       results.push({
         id: `gl-2101-manual`,
+        contact_id: null,
         contact_name: 'Unallocated (Buku Besar)',
         doc_number: 'GL-2101-ADJ',
+        doc_href: null,
         due_date: today,
         grand_total: tradeApDiff,
         paid_amount: 0,
@@ -483,15 +615,17 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     }
 
     const salamLiabilityModuleTotal = results
-      .filter((row: any) => row.source_type === 'SALAM_SALES_LIABILITY')
-      .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+      .filter((row: AgingReportRow) => row.source_type === 'SALAM_SALES_LIABILITY')
+      .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const salamLiabilityDiff = Number(balances['2602'] || 0) - salamLiabilityModuleTotal
 
     if (Math.abs(salamLiabilityDiff) > 10) {
       results.push({
         id: 'gl-2602-adj',
+        contact_id: null,
         contact_name: 'Unallocated (Buku Besar)',
         doc_number: 'GL-2602-ADJ',
+        doc_href: null,
         due_date: today,
         grand_total: salamLiabilityDiff,
         paid_amount: 0,
@@ -507,15 +641,17 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     }
 
     const istishnaLiabilityModuleTotal = results
-      .filter((row: any) => row.source_type === 'ISTISHNA_SALES_LIABILITY')
-      .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+      .filter((row: AgingReportRow) => row.source_type === 'ISTISHNA_SALES_LIABILITY')
+      .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const istishnaLiabilityDiff = Number(balances['2603'] || 0) - istishnaLiabilityModuleTotal
 
     if (Math.abs(istishnaLiabilityDiff) > 10) {
       results.push({
         id: 'gl-2603-adj',
+        contact_id: null,
         contact_name: 'Unallocated (Buku Besar)',
         doc_number: 'GL-2603-ADJ',
+        doc_href: null,
         due_date: today,
         grand_total: istishnaLiabilityDiff,
         paid_amount: 0,
@@ -534,8 +670,10 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     if (Math.abs(taxOutstanding) > 0.01) {
       results.push({
         id: `gl-tax-2201`,
+        contact_id: null,
         contact_name: 'Pajak / Negara (PDI)',
         doc_number: `PPN-OUTSTANDING`,
+        doc_href: null,
         due_date: today,
         grand_total: taxOutstanding,
         paid_amount: 0,
@@ -561,8 +699,10 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
 
       results.push({
         id: `gl-${liability.code}-out`,
+        contact_id: null,
         contact_name: 'Unallocated (Buku Besar)',
         doc_number: `GL-${liability.code}-OUT`,
+        doc_href: null,
         due_date: today,
         grand_total: balance,
         paid_amount: 0,
@@ -578,7 +718,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     }
   }
 
-  return results.sort((a: any, b: any) => b.days_overdue - a.days_overdue)
+  return results.sort((a, b) => b.days_overdue - a.days_overdue)
 }
 
 
@@ -586,16 +726,14 @@ export async function getAgingSummary(orgId: string, branchId?: BranchFilter) {
   const ar = await getAgingReport(orgId, 'AR', branchId)
   const ap = await getAgingReport(orgId, 'AP', branchId)
 
-  const buckets = ['Current', '0-30 Days', '31-60 Days', '61-90 Days', '> 90 Days']
-
-  const arSummary = buckets.map((b: any) => ({
+  const arSummary = AGING_BUCKETS.map((b) => ({
     bucket: b,
-    amount: ar.filter((x: any) => x.aging_bucket === b).reduce((s: number, x: any) => s + Number(x.outstanding), 0)
+    amount: ar.filter((x) => x.aging_bucket === b).reduce((s, x) => s + Number(x.outstanding), 0)
   }))
 
-  const apSummary = buckets.map((b: any) => ({
+  const apSummary = AGING_BUCKETS.map((b) => ({
     bucket: b,
-    amount: ap.filter((x: any) => x.aging_bucket === b).reduce((s: number, x: any) => s + Number(x.outstanding), 0)
+    amount: ap.filter((x) => x.aging_bucket === b).reduce((s, x) => s + Number(x.outstanding), 0)
   }))
 
   return {
@@ -603,7 +741,68 @@ export async function getAgingSummary(orgId: string, branchId?: BranchFilter) {
     ap,
     arSummary,
     apSummary,
-    totalAR: ar.reduce((s: number, x: any) => s + Number(x.outstanding), 0),
-    totalAP: ap.reduce((s: number, x: any) => s + Number(x.outstanding), 0)
+    arQuickBillCustomers: buildArQuickBillCustomers(ar),
+    totalAR: ar.reduce((s, x) => s + Number(x.outstanding), 0),
+    totalAP: ap.reduce((s, x) => s + Number(x.outstanding), 0)
+  }
+}
+
+export async function getArQuickBillDocument(
+  orgId: string,
+  customerId: string,
+  branchId?: BranchFilter
+): Promise<ArQuickBillDocumentSnapshot | null> {
+  const trimmedCustomerId = String(customerId || '').trim()
+  if (!trimmedCustomerId) return null
+
+  const ar = await getAgingReport(orgId, 'AR', branchId)
+  const invoices = getTradeArQuickBillRows(ar)
+    .filter((row) => row.contact_id === trimmedCustomerId)
+    .sort((a, b) => {
+      if (b.days_overdue !== a.days_overdue) return b.days_overdue - a.days_overdue
+      if (a.due_date !== b.due_date) return a.due_date.localeCompare(b.due_date)
+      return a.doc_number.localeCompare(b.doc_number, 'id-ID')
+    })
+
+  if (invoices.length === 0) return null
+
+  const supabase = await createClient()
+  const db = supabase as any
+  const { data: customerRow } = await db
+    .from('contacts')
+    .select('id, name, email, phone, address')
+    .eq('org_id', orgId)
+    .eq('id', trimmedCustomerId)
+    .maybeSingle()
+
+  const customerSummary = buildArQuickBillCustomers(invoices)[0]
+  if (!customerSummary) return null
+
+  const issuedAt = getBusinessToday()
+
+  return {
+    docNumber: `QB-${issuedAt.replace(/-/g, '')}-${trimmedCustomerId.replace(/-/g, '').slice(0, 6).toUpperCase()}`,
+    issuedAt,
+    customer: {
+      id: trimmedCustomerId,
+      name: String(customerRow?.name || customerSummary.contact_name || 'Pelanggan'),
+      email: customerRow?.email ? String(customerRow.email) : null,
+      phone: customerRow?.phone ? String(customerRow.phone) : null,
+      address: customerRow?.address ? String(customerRow.address) : null,
+    },
+    totals: {
+      invoiceCount: customerSummary.invoice_count,
+      overdueInvoiceCount: customerSummary.overdue_invoice_count,
+      totalOutstanding: customerSummary.total_outstanding,
+      oldestDueDate: customerSummary.oldest_due_date,
+      maxDaysOverdue: customerSummary.max_days_overdue,
+    },
+    bucketBreakdown: AGING_BUCKETS.map((bucket) => ({
+      bucket,
+      amount: invoices
+        .filter((row) => row.aging_bucket === bucket)
+        .reduce((sum, row) => sum + Number(row.outstanding || 0), 0),
+    })).filter((item) => item.amount > 0.01),
+    invoices,
   }
 }

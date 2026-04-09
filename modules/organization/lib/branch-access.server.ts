@@ -1,5 +1,7 @@
 import { cookies } from 'next/headers'
-import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { cache } from 'react'
+import { getServerAuthContext } from '@/lib/supabase/auth.server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { ACTIVE_BRANCH_COOKIE, type BranchSummary } from './org-context'
 
 const FULL_BRANCH_ACCESS_ROLES = new Set(['owner', 'admin'])
@@ -149,17 +151,14 @@ async function ensureUsableBranchesForPrivilegedMember(admin: any, orgId: string
   return normalizeBranchRows([insertedBranch])
 }
 
-export async function getBranchAccessScope(orgId: string): Promise<BranchAccessScope> {
+const getBranchAccessScopeCached = cache(async (orgId: string): Promise<BranchAccessScope> => {
   const trimmedOrgId = orgId.trim()
   if (!trimmedOrgId) return emptyScope()
 
-  const supabase = await createClient()
+  const { supabase, user } = await getServerAuthContext()
   const db = supabase as any
   const adminClient = await createAdminClient()
   const admin = adminClient as any
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
 
   if (!user) return emptyScope()
 
@@ -240,6 +239,12 @@ export async function getBranchAccessScope(orgId: string): Promise<BranchAccessS
     hasPersistedSelection: Boolean(membership.last_active_at),
     storedBranchId: membership.last_active_branch_id ? String(membership.last_active_branch_id) : null,
   }
+})
+
+export async function getBranchAccessScope(orgId: string): Promise<BranchAccessScope> {
+  // Cache org/branch scope for the current request to avoid repeating the
+  // same auth + membership + branch queries across multiple page loaders.
+  return getBranchAccessScopeCached(orgId)
 }
 
 export async function getCurrentAccessibleBranch(orgId: string): Promise<BranchSummary | null> {

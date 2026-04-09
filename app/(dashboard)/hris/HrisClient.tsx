@@ -327,6 +327,7 @@ export default function HrisClient({
     else {
       if (editingEmp) {
         setIsAddModalOpen(false)
+        showToast('Data karyawan berhasil diperbarui!', 'success')
       } else {
         const formTarget = e.target as HTMLFormElement;
         formTarget.reset();
@@ -336,6 +337,7 @@ export default function HrisClient({
         // Alert non-intrusif memberitahu berhasil
         showToast('Data Karyawan berhasil disimpan!', 'success')
       }
+      if (res.warning) showToast(res.warning, 'info')
     }
     setLoading(false)
   }
@@ -2273,6 +2275,14 @@ export default function HrisClient({
                         value={(() => {
                           const role = rolesList.find((r: any) => r.name === (selectedRole || editingEmp?.job_title))
                           return role?.department_ids?.[0] || role?.department_id || ''
+                        })()}
+                      />
+                      <input
+                        type="hidden"
+                        name="role_id"
+                        value={(() => {
+                          const role = rolesList.find((r: any) => r.name === (selectedRole || editingEmp?.job_title))
+                          return role?.id || editingEmp?.role_id || ''
                         })()}
                       />
                     </div>

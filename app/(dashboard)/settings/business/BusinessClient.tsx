@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import Link from 'next/link'
 import { Settings, Save, Fingerprint, Building, Receipt, FileText, Upload, Check, AlertCircle, Plus, Trash2, Link as LinkIcon, Copy, X, Key, ShieldCheck, Clock, Zap, RotateCcw } from 'lucide-react'
 import { updateOrgSettings, uploadLogo, checkSlugAvailability } from '@/modules/organization/actions/org.actions'
 import { resetOrganizationData, type ResetOrganizationMode } from '@/modules/settings/actions/audit.actions'
@@ -114,6 +115,35 @@ export default function BusinessClient({
           PROFIL BISNIS
         </h1>
         <p className="text-sm text-slate-500 font-medium">Konfigurasi profile bisnis and system-wide identification formats.</p>
+      </div>
+
+      <div className="rounded-[32px] border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-slate-50 p-6 shadow-lg shadow-blue-100/40">
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-2">
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-700">Migrasi & Onboarding</div>
+            <h2 className="text-xl font-black tracking-tight text-slate-900">Butuh panduan migrasi client dari Excel atau aplikasi lama?</h2>
+            <p className="text-sm font-medium leading-6 text-slate-600">
+              Buka pusat migrasi untuk melihat urutan cut-off, checklist onboarding, dan download template Excel yang siap dibagikan ke client.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/settings/business/migration"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-white transition hover:bg-black"
+            >
+              <FileText size={16} />
+              Buka Pusat Migrasi
+            </Link>
+            <a
+              href="/templates/migrasi/NIZAM_Migration_Template.xlsx"
+              download
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+            >
+              <Upload size={16} />
+              Download Template
+            </a>
+          </div>
+        </div>
       </div>
 
       <form onSubmit={handleSave} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-12">

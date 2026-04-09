@@ -8,9 +8,14 @@ import {
   getAiTokenPolicyFromDb,
 } from '@/modules/ai/lib/ai-token.server'
 import {
+  DEFAULT_SALES_PAGE_AI_PROFILE,
   buildSalesPagePayload,
+  buildSalesPageGeneratorBrief,
+  hasSalesPageAiContext,
+  mapSalesPageAiProfileRecord,
   mapSalesPageLead,
   mapSalesPageRecord,
+  mergeSalesPageGeneratorInputWithProfile,
   normalizeSalesPageCtaUrl,
   normalizeMetaPixelId,
   normalizeSalesPageSlug,
@@ -19,6 +24,9 @@ import {
   serializeFeatures,
   serializeProofPoints,
   serializeTestimonials,
+  type SalesPageAiProfilePayload,
+  type SalesPageAiProfileRecord,
+  type SalesPageAiProfileView,
   type SalesPageGeneratorInput,
   type SalesPageLead,
   type SalesPageLeadRecord,
@@ -177,6 +185,46 @@ function toInsertPayload(payload: SalesPagePayload) {
   }
 }
 
+function toAiProfileInsertPayload(payload: SalesPageAiProfilePayload) {
+  return {
+    brand_positioning: payload.brandPositioning.trim(),
+    default_audience: payload.defaultAudience.trim(),
+    default_tone_style: payload.defaultToneStyle,
+    default_primary_cta_label: payload.defaultPrimaryCtaLabel.trim(),
+    default_primary_cta_url: normalizeSalesPageCtaUrl(payload.defaultPrimaryCtaUrl, ''),
+    default_hero_image_url: payload.defaultHeroImageUrl.trim(),
+    default_hero_image_alt: payload.defaultHeroImageAlt.trim(),
+    key_benefits: payload.keyBenefits.trim(),
+    proof_assets: payload.proofAssets.trim(),
+    objection_handling: payload.objectionHandling.trim(),
+    ai_rules: payload.aiRules.trim(),
+  }
+}
+
+function buildDefaultAiProfile(orgId: string): SalesPageAiProfileView {
+  return {
+    id: '',
+    orgId,
+    ...DEFAULT_SALES_PAGE_AI_PROFILE,
+    createdBy: null,
+    updatedBy: null,
+    createdAt: '',
+    updatedAt: '',
+  }
+}
+
+async function getStoredSalesPageAiProfile(db: LooseDb, orgId: string): Promise<SalesPageAiProfileView | null> {
+  const { data, error } = await db
+    .from('sales_page_ai_profiles')
+    .select('*')
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!data) return null
+  return mapSalesPageAiProfileRecord(data as SalesPageAiProfileRecord)
+}
+
 function normalizeStatus(value: string | null | undefined): SalesPageStatus {
   return value === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT'
 }
@@ -215,8 +263,7 @@ async function generateSalesPageAiDraft(
   input: SalesPageGeneratorInput,
   orgName: string,
 ): Promise<Partial<SalesPagePayload> | null> {
-  const aiPrompt = cleanAiText(input.aiPrompt, 1200)
-  if (!aiPrompt) return null
+  if (!hasSalesPageAiContext(input)) return null
 
   const aiStudioKey = process.env.GOOGLE_AI_STUDIO_KEY
   if (!aiStudioKey) return null
@@ -236,18 +283,12 @@ async function generateSalesPageAiDraft(
     const genAI = new GoogleGenerativeAI(aiStudioKey)
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
     const template = resolveSalesPageTemplate(input.templateId)
+    const structuredBrief = buildSalesPageGeneratorBrief(input)
 
     const brief = [
       `Organization: ${orgName}`,
       `Template: ${template.label}`,
-      `Campaign title: ${input.title}`,
-      `Product/Offer: ${input.productName}`,
-      `Audience: ${input.audience || '-'}`,
-      `Promise/Hook: ${input.promise || '-'}`,
-      `Price label: ${input.priceLabel || '-'}`,
-      `Primary CTA: ${input.primaryCtaLabel || '-'} (${input.primaryCtaUrl || '-'})`,
-      `Secondary CTA: ${input.secondaryCtaLabel || '-'} (${input.secondaryCtaUrl || '-'})`,
-      `Additional brief: ${aiPrompt}`,
+      structuredBrief || 'No additional structured brief.',
     ].join('\n')
 
     const prompt = `You are an expert direct-response copywriter for Indonesian B2B landing pages.
@@ -435,11 +476,42 @@ export async function getSalesPageLeadsForOrg(orgId: string, salesPageId?: strin
   return (data || []).map((row: SalesPageLeadRecord) => mapSalesPageLead(row))
 }
 
+export async function getSalesPageAiProfileForOrg(orgId: string): Promise<SalesPageAiProfileView> {
+  const { db } = await getAuthedContext()
+  await getMemberOrg(orgId)
+  return (await getStoredSalesPageAiProfile(db, orgId)) || buildDefaultAiProfile(orgId)
+}
+
+export async function upsertSalesPageAiProfileForOrg(
+  orgId: string,
+  payload: SalesPageAiProfilePayload,
+): Promise<SalesPageAiProfileView> {
+  const { db } = await getAuthedContext()
+  const { userId } = await getMemberOrg(orgId)
+  const existing = await getStoredSalesPageAiProfile(db, orgId)
+
+  const { data, error } = await db
+    .from('sales_page_ai_profiles')
+    .upsert({
+      org_id: orgId,
+      created_by: existing?.createdBy || userId,
+      updated_by: userId,
+      ...toAiProfileInsertPayload(payload),
+    }, { onConflict: 'org_id' })
+    .select('*')
+    .single()
+
+  if (error) throw new Error(error.message)
+  return mapSalesPageAiProfileRecord(data as SalesPageAiProfileRecord)
+}
+
 export async function createGeneratedSalesPage(orgId: string, input: SalesPageGeneratorInput): Promise<SalesPageView> {
   const { db } = await getAuthedContext()
   const { userId, org } = await getMemberOrg(orgId)
-  const initialPayload = buildSalesPagePayload(input, org.name)
-  const aiPatch = await generateSalesPageAiDraft(db, orgId, userId, input, org.name)
+  const aiProfile = await getStoredSalesPageAiProfile(db, orgId)
+  const resolvedInput = mergeSalesPageGeneratorInputWithProfile(input, aiProfile)
+  const initialPayload = buildSalesPagePayload(resolvedInput, org.name)
+  const aiPatch = await generateSalesPageAiDraft(db, orgId, userId, resolvedInput, org.name)
   const payload = mergeGeneratedPayload(initialPayload, aiPatch)
   const slug = await ensureUniqueSlug(db, orgId, payload.slug)
 

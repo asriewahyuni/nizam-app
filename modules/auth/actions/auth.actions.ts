@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getServerAuthContext } from '@/lib/supabase/auth.server'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
@@ -239,6 +240,7 @@ async function deactivateStaleStaffMemberships(
 
 async function resolveRoleIdForEmployee(adminClient: Awaited<ReturnType<typeof createAdminClient>>, inviteRoleId: string | null | undefined, emp: any) {
   if (inviteRoleId) return inviteRoleId
+  if (emp?.role_id) return emp.role_id
 
   const { data: allRoles } = await (adminClient as any)
     .from('roles')
@@ -781,8 +783,7 @@ export async function signOut() {
 }
 
 export async function getSession() {
-  const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
+  const { user, error } = await getServerAuthContext()
   if (error || !user) return null
   return user
 }

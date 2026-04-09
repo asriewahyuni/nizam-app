@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Plus, BookOpen, X, Trash2, Download, FileText, Filter, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus } from 'lucide-react'
+import { Plus, X, Trash2, Download, FileText, Filter, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
-import { createJournalEntry, postJournalEntry, voidJournalEntry, deleteJournalEntry, hardDeleteDraftJournal } from '@/modules/accounting/actions/journal.actions'
+import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal } from '@/modules/accounting/actions/journal.actions'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { motion, AnimatePresence } from 'framer-motion'
 import { formatRupiah } from '@/lib/utils'
@@ -12,6 +12,7 @@ interface JournalClientProps {
   orgId: string
   initialEntries: any[]
   accounts: any[]
+  fiscalPeriods: any[]
   userRole: string
   activeBranchId: string | null
   activeBranchName: string | null
@@ -21,11 +22,12 @@ export default function JournalClient({
   orgId,
   initialEntries,
   accounts,
+  fiscalPeriods,
   userRole,
   activeBranchId,
   activeBranchName,
 }: JournalClientProps) {
-  const [entries, setEntries] = useState<any[]>(initialEntries)
+  const [entries] = useState<any[]>(initialEntries)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [filterStatus, setFilterStatus] = useState<'POSTED' | 'VOIDED' | 'DRAFT'>('POSTED')
@@ -41,10 +43,23 @@ export default function JournalClient({
     { id: 2, account_id: '', debit: 0, credit: 0, memo: '' }
   ])
   const canCreateManualJournal = Boolean(activeBranchId)
+  const closedFiscalPeriods = (fiscalPeriods || []).filter((period: any) => period?.is_closed)
 
   const totalDebit = lines.reduce((sum: number, line: any) => sum + (line.debit || 0), 0)
   const totalCredit = lines.reduce((sum: number, line: any) => sum + (line.credit || 0), 0)
   const isBalanced = totalDebit === totalCredit && totalDebit > 0
+
+  const getClosedPeriodForDate = (date?: string | null) => {
+    const normalizedDate = String(date || '').trim()
+    if (!normalizedDate) return null
+
+    return closedFiscalPeriods.find((period: any) =>
+      String(period?.start_date || '') <= normalizedDate &&
+      String(period?.end_date || '') >= normalizedDate
+    ) || null
+  }
+
+  const selectedClosedPeriod = getClosedPeriodForDate(entryDate)
 
   const stats = {
     postedCount: entries.filter((e: any) => e.status === 'POSTED').length,
@@ -115,6 +130,9 @@ export default function JournalClient({
     if (!description || !entryDate) return alert("Deskripsi dan tanggal wajib diisi.")
     if (!isBalanced) return alert("Jurnal tidak seimbang (Balance)!")
     if (lines.some(l => !l.account_id)) return alert("Semua baris harus memilih akun (CoA).")
+    if (selectedClosedPeriod) {
+      return alert(`Periode fiskal ${selectedClosedPeriod.name} sudah ditutup. Jurnal tanggal ${entryDate} tidak dapat dibuat.`)
+    }
 
     setIsSubmitting(true)
     try {
@@ -220,15 +238,21 @@ export default function JournalClient({
         }
       />
 
-      {!canCreateManualJournal ? (
+	      {!canCreateManualJournal ? (
         <div className="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-900 shadow-sm">
           Pilih unit aktif terlebih dahulu untuk membuat jurnal manual. Buku besar saat ini masih menampilkan data level organisasi.
         </div>
-      ) : (
-        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-semibold text-emerald-900 shadow-sm">
-          Jurnal manual baru akan dicatat ke unit aktif: <span className="font-black">{activeBranchName}</span>.
-        </div>
-      )}
+	      ) : (
+	        <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-semibold text-emerald-900 shadow-sm">
+	          Jurnal manual baru akan dicatat ke unit aktif: <span className="font-black">{activeBranchName}</span>.
+	        </div>
+	      )}
+
+        {selectedClosedPeriod && (
+          <div className="rounded-3xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-semibold text-rose-900 shadow-sm">
+            Periode fiskal <span className="font-black">{selectedClosedPeriod.name}</span> sudah ditutup. Jurnal manual bertanggal <span className="font-black">{entryDate}</span> tidak dapat disimpan.
+          </div>
+        )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
@@ -294,11 +318,17 @@ export default function JournalClient({
               {entries.filter((e: any) => e.status === filterStatus).length === 0 ? (
                 <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Tidak ada data jurnal {filterStatus.toLowerCase()}.</td></tr>
               ) : (
-                entries.filter((e: any) => e.status === filterStatus).map((entry: any) => (
-                  <tr key={entry.id} className="group hover:bg-slate-50 transition-colors">
-                    <td className="px-8 py-6 align-top">
-                       <div className="text-sm font-black text-slate-900 tracking-tight">{entry.entry_date}</div>
-                       <div className="text-[10px] font-bold text-slate-400 mt-1 font-mono uppercase tracking-tighter">{entry.entry_number}</div>
+	                entries.filter((e: any) => e.status === filterStatus).map((entry: any) => {
+                      const lockedPeriod = getClosedPeriodForDate(entry.entry_date)
+                      const lockMessage = lockedPeriod
+                        ? `Periode fiskal ${lockedPeriod.name} sudah ditutup.`
+                        : null
+
+                      return (
+	                  <tr key={entry.id} className="group hover:bg-slate-50 transition-colors">
+	                    <td className="px-8 py-6 align-top">
+	                       <div className="text-sm font-black text-slate-900 tracking-tight">{entry.entry_date}</div>
+	                       <div className="text-[10px] font-bold text-slate-400 mt-1 font-mono uppercase tracking-tighter">{entry.entry_number}</div>
                     </td>
                     <td className="px-6 py-6 align-top">
                        <div className="text-sm font-black text-slate-800 leading-tight">{entry.description}</div>
@@ -329,59 +359,72 @@ export default function JournalClient({
                         ))}
                        </div>
                     </td>
-                    <td className="px-6 py-6 align-top">
-                       <StatusBadge 
-                         label={entry.status}
-                         variant={
-                           entry.status === 'POSTED' ? 'success' :
-                           entry.status === 'VOIDED' ? 'error' : 'warning'
-                         }
-                       />
-                    </td>
-                    <td className="px-8 py-6 align-top text-right">
-                       <div className="flex flex-col gap-2 items-end">
-                          {entry.status === 'DRAFT' && (
-                            <>
-                              <SafeButton 
-                                variant="emerald" 
-                                size="sm" 
-                                icon={<CheckCircle2 size={14}/>}
-                                onClick={() => handlePost(entry.id)}
-                              >
-                                POSTING
-                              </SafeButton>
-                              <button 
-                                onClick={async () => {
-                                  if (!confirm("Hapus draft jurnal ini secara permanen?")) return
-                                  const res = await hardDeleteDraftJournal(entry.id, orgId)
-                                  if (res.error) alert(res.error)
-                                  else window.location.reload()
-                                }} 
-                                className="text-[9px] font-black text-rose-400 hover:text-rose-600 px-2 py-1 uppercase tracking-widest transition-colors"
-                              >
-                                Delete Draft
-                              </button>
-                            </>
-                          )}
-                          {(entry.status === 'POSTED') && isOwner && (
-                            <SafeButton 
-                              variant="ghost" 
-                              size="sm" 
-                              className="text-amber-600 hover:bg-amber-50 border-amber-100"
-                              onClick={() => handleVoid(entry.id)}
-                            >
-                              VOID
-                            </SafeButton>
-                          )}
+	                    <td className="px-6 py-6 align-top">
+                           <div className="space-y-2">
+	                       <StatusBadge 
+	                         label={entry.status}
+	                         variant={
+	                           entry.status === 'POSTED' ? 'success' :
+	                           entry.status === 'VOIDED' ? 'error' : 'warning'
+	                         }
+	                       />
+                             {lockMessage && (
+                               <div className="text-[9px] font-black uppercase tracking-widest text-rose-500">
+                                 Periode Terkunci
+                               </div>
+                             )}
+                           </div>
+	                    </td>
+	                    <td className="px-8 py-6 align-top text-right">
+	                       <div className="flex flex-col gap-2 items-end">
+	                          {entry.status === 'DRAFT' && (
+	                            <>
+	                              <SafeButton 
+	                                variant="emerald" 
+	                                size="sm" 
+	                                icon={<CheckCircle2 size={14}/>}
+                                    disabled={Boolean(lockedPeriod)}
+                                    title={lockMessage || undefined}
+	                                onClick={() => handlePost(entry.id)}
+	                              >
+	                                POSTING
+	                              </SafeButton>
+	                              <button 
+	                                onClick={async () => {
+	                                  if (!confirm("Hapus draft jurnal ini secara permanen?")) return
+	                                  const res = await hardDeleteDraftJournal(entry.id, orgId)
+	                                  if (res.error) alert(res.error)
+	                                  else window.location.reload()
+	                                }} 
+                                    disabled={Boolean(lockedPeriod)}
+	                                className="text-[9px] font-black text-rose-400 hover:text-rose-600 px-2 py-1 uppercase tracking-widest transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-rose-400"
+                                    title={lockMessage || undefined}
+	                              >
+	                                Delete Draft
+	                              </button>
+	                            </>
+	                          )}
+	                          {(entry.status === 'POSTED') && isOwner && (
+	                            <SafeButton 
+	                              variant="ghost" 
+	                              size="sm" 
+	                              className="text-amber-600 hover:bg-amber-50 border-amber-100"
+                                  disabled={Boolean(lockedPeriod)}
+                                  title={lockMessage || undefined}
+	                              onClick={() => handleVoid(entry.id)}
+	                            >
+	                              VOID
+	                            </SafeButton>
+	                          )}
                           {entry.status === 'VOIDED' && (
                             <span className="text-[10px] font-black text-rose-300 uppercase italic tracking-[0.2em] px-3 py-1 border border-rose-100 rounded-lg">Voided</span>
                           )}
-                       </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
+	                       </div>
+	                    </td>
+	                  </tr>
+	                )})
+	              )}
+	            </tbody>
           </table>
         </div>
       </SectionCard>
@@ -487,20 +530,20 @@ export default function JournalClient({
                    </div>
                 </div>
 
-                <div className="px-10 py-8 bg-slate-50 border-t border-slate-100 shrink-0 flex items-center justify-between">
-                   <div className="flex items-center gap-3 text-slate-400 italic text-[10px] font-medium">
-                      <ListChecks size={16} /> Entry will be saved as DRAFT before manual posting.
-                   </div>
-                   <div className="flex items-center gap-4">
+	                <div className="px-10 py-8 bg-slate-50 border-t border-slate-100 shrink-0 flex items-center justify-between">
+	                   <div className="flex items-center gap-3 text-slate-400 italic text-[10px] font-medium">
+	                      <ListChecks size={16} /> Entry will be saved as DRAFT before manual posting.
+	                   </div>
+	                   <div className="flex items-center gap-4">
                       <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-4 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors">Cancel</button>
-                      <SafeButton 
-                        variant="primary" 
-                        size="lg" 
-                        isLoading={isSubmitting} 
-                        disabled={!isBalanced} 
-                        className="min-w-[200px]"
-                        onClick={handleSubmit}
-                      >
+	                      <SafeButton 
+	                        variant="primary" 
+	                        size="lg" 
+	                        isLoading={isSubmitting} 
+	                        disabled={!isBalanced || Boolean(selectedClosedPeriod)} 
+	                        className="min-w-[200px]"
+	                        onClick={handleSubmit}
+	                      >
                         SAVE DRAFT ENTRY
                       </SafeButton>
                    </div>

@@ -29,6 +29,13 @@ NIZAM adalah ERP multi-tenant berbasis Next.js + Supabase untuk operasi bisnis I
 
 Dokumentasi lengkap proyek ada di [DOCUMENTATION.md](./DOCUMENTATION.md).
 
+Dokumen operasional tambahan:
+
+- [PLAYBOOK_MIGRASI_KE_NIZAM.md](./PLAYBOOK_MIGRASI_KE_NIZAM.md) untuk panduan onboarding user pindahan dari Excel atau aplikasi lain.
+- [CHECKLIST_ONBOARDING_MIGRASI_NIZAM.md](./CHECKLIST_ONBOARDING_MIGRASI_NIZAM.md) untuk checklist internal tim onboarding saat menangani migrasi client.
+- [templates/migrasi/README.md](./templates/migrasi/README.md) untuk paket template CSV migrasi yang bisa dibagikan ke client.
+- [templates/migrasi/NIZAM_Migration_Template.xlsx](./templates/migrasi/NIZAM_Migration_Template.xlsx) untuk workbook Excel multi-sheet yang siap diberikan ke client.
+
 Isi utamanya mencakup:
 
 - arsitektur aplikasi dan struktur folder

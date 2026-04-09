@@ -18,7 +18,7 @@ vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
 }))
 
-import { createInventoryAdjustment, createInventoryTransfer } from '@/modules/inventory/actions/inventory.actions'
+import { createInventoryAdjustment, createInventoryTransfer, getWarehouseStocks } from '@/modules/inventory/actions/inventory.actions'
 import { createWarehouse, deleteWarehouseBin, getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 
 function createWarehouseListQuery(result: any[] = []) {
@@ -232,6 +232,58 @@ describe('Inventory Branch Context', () => {
     expect(result).toEqual({
       error: 'Gudang transfer tidak tersedia pada unit aktif.',
     })
+  })
+
+  it('aggregates warehouse stock rows before showing transfer and opname quantities', async () => {
+    const inventoryStocksQuery = {
+      data: [
+        {
+          warehouse_id: 'wh-1',
+          quantity: 100,
+          warehouses: { name: 'Gudang A', branch_id: 'branch-1' },
+        },
+        {
+          warehouse_id: 'wh-1',
+          quantity: -10,
+          warehouses: { name: 'Gudang A', branch_id: 'branch-1' },
+        },
+        {
+          warehouse_id: 'wh-2',
+          quantity: 25,
+          warehouses: { name: 'Gudang B', branch_id: 'branch-1' },
+        },
+      ],
+      error: null,
+      select: vi.fn(() => inventoryStocksQuery),
+      eq: vi.fn(() => inventoryStocksQuery),
+    }
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table !== 'inventory_stocks') throw new Error(`Unexpected table ${table}`)
+        return inventoryStocksQuery
+      }),
+    })
+
+    const result = await getWarehouseStocks('org-1', 'prod-1')
+
+    expect(inventoryStocksQuery.eq).toHaveBeenCalledWith('warehouses.branch_id', 'branch-1')
+    expect(result).toEqual([
+      {
+        warehouse_id: 'wh-1',
+        warehouse_name: 'Gudang A',
+        quantity: 90,
+      },
+      {
+        warehouse_id: 'wh-2',
+        warehouse_name: 'Gudang B',
+        quantity: 25,
+      },
+    ])
   })
 
   it('rejects deleting warehouse bin outside the active branch', async () => {

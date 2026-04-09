@@ -120,6 +120,18 @@ type RecordMeasurementInput = {
   note?: string | null
 }
 
+type EnsureActiveCycleSuccess = {
+  cycle: BSCCycle
+  branchId: string | null
+  cycleKey: string
+  startDate: string
+  endDate: string
+}
+
+type EnsureActiveCycleResult =
+  | EnsureActiveCycleSuccess
+  | { error: string }
+
 const PERSPECTIVES: BSCPerspective[] = ['FINANCIAL', 'CUSTOMER', 'INTERNAL_PROCESS', 'LEARNING_GROWTH']
 
 const DEFAULT_PERSPECTIVE_WEIGHTS: BSCWeightMap = {
@@ -498,15 +510,19 @@ async function findCycleByScope(db: any, orgId: string, cycleKey: string, branch
   return { cycle: data as BSCCycle | null }
 }
 
-async function ensureActiveCycle(orgId: string, branchId?: string | null) {
+async function ensureActiveCycle(orgId: string, branchId?: string | null): Promise<EnsureActiveCycleResult> {
   const supabase = await createClient()
   const db = supabase as any
   const branchSelection = await resolveBSCBranchId(orgId, branchId)
-  if ('error' in branchSelection) return { error: branchSelection.error }
+  if ('error' in branchSelection) {
+    return { error: String(branchSelection.error || 'Gagal menentukan cakupan BSC.') }
+  }
 
   const { cycleKey, cycleName, startDate, endDate } = getCurrentCycleRange()
   const cycleLookup = await findCycleByScope(db, orgId, cycleKey, branchSelection.branchId)
-  if ('error' in cycleLookup) return cycleLookup
+  if ('error' in cycleLookup) {
+    return { error: String(cycleLookup.error || 'Gagal memuat siklus BSC.') }
+  }
 
   let cycle = cycleLookup.cycle
 
@@ -533,6 +549,10 @@ async function ensureActiveCycle(orgId: string, branchId?: string | null) {
     }
 
     cycle = createdCycle as BSCCycle
+  }
+
+  if (!cycle) {
+    return { error: 'Gagal memastikan siklus BSC aktif.' }
   }
 
   const defaultWeightRows = PERSPECTIVES.map((perspective) => ({

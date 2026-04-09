@@ -11,17 +11,15 @@ export default async function ProfilSayaPage() {
   if (!orgData) return redirect('/onboarding')
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const userId = String(orgData.user?.id || '').trim()
 
-  // Find this user's employee record
-  const { data: employee } = await (supabase as any)
-    .from('employees')
-    .select('*, branch:branches!employees_branch_id_fkey(id, name, code)')
-    .eq('org_id', orgData.org.id)
-    .eq('user_id', user?.id)
-    .maybeSingle()
-
-  const [attendanceRecords, leaveRequests, expenseClaims] = await Promise.all([
+  const [{ data: employee }, attendanceRecords, leaveRequests, expenseClaims] = await Promise.all([
+    supabase
+      .from('employees')
+      .select('*, branch:branches!employees_branch_id_fkey(id, name, code)')
+      .eq('org_id', orgData.org.id)
+      .eq('user_id', userId)
+      .maybeSingle(),
     getMyAttendanceRecords(orgData.org.id),
     getMyLeaveRequests(orgData.org.id),
     getMyExpenseClaims(orgData.org.id),

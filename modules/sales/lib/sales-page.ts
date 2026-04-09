@@ -198,6 +198,95 @@ export type SalesPageGeneratorInput = {
   aiPrompt?: string
   heroImageUrl?: string
   heroImageAlt?: string
+  context?: SalesPageGeneratorContext
+}
+
+export type SalesPageCampaignObjectiveId =
+  | 'COLLECT_LEADS'
+  | 'BOOK_CALL'
+  | 'GET_WHATSAPP'
+  | 'REGISTER_EVENT'
+  | 'SELL_PRODUCT'
+
+export type SalesPageTrafficSourceId =
+  | 'META_ADS'
+  | 'GOOGLE_ADS'
+  | 'WHATSAPP'
+  | 'EMAIL'
+  | 'SEO'
+  | 'PARTNER'
+  | 'DIRECT'
+
+export type SalesPageToneStyleId =
+  | 'TEGAS_FRIENDLY'
+  | 'KONSULTATIF'
+  | 'EKSEKUTIF'
+  | 'EDUKATIF'
+  | 'ASSERTIVE'
+
+export type SalesPageGeneratorContext = {
+  serviceSeedId?: string
+  serviceSeedLabel?: string
+  campaignObjective?: SalesPageCampaignObjectiveId
+  trafficSource?: SalesPageTrafficSourceId
+  toneStyle?: SalesPageToneStyleId
+  brandPositioning?: string
+  brandGuardrails?: string
+  targetPainPoints?: string
+  keyBenefits?: string
+  deliverables?: string
+  proofAssets?: string
+  objectionHandling?: string
+  urgencyOffer?: string
+}
+
+export type SalesPageAiProfilePayload = {
+  brandPositioning: string
+  defaultAudience: string
+  defaultToneStyle: SalesPageToneStyleId
+  defaultPrimaryCtaLabel: string
+  defaultPrimaryCtaUrl: string
+  defaultHeroImageUrl: string
+  defaultHeroImageAlt: string
+  keyBenefits: string
+  proofAssets: string
+  objectionHandling: string
+  aiRules: string
+}
+
+export type SalesPageAiProfileRecord = {
+  id: string
+  org_id: string
+  brand_positioning: string | null
+  default_audience: string | null
+  default_tone_style: string | null
+  default_primary_cta_label: string | null
+  default_primary_cta_url: string | null
+  default_hero_image_url: string | null
+  default_hero_image_alt: string | null
+  key_benefits: string | null
+  proof_assets: string | null
+  objection_handling: string | null
+  ai_rules: string | null
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type SalesPageAiProfileView = SalesPageAiProfilePayload & {
+  id: string
+  orgId: string
+  createdBy: string | null
+  updatedBy: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+type SalesPageContextOption<T extends string> = {
+  id: T
+  label: string
+  description: string
 }
 
 export type SalesPageTemplateId = 'LEAD_CAPTURE' | 'WEBINAR' | 'PRODUCT_LAUNCH' | 'CONSULTING'
@@ -255,6 +344,114 @@ export const SALES_PAGE_TEMPLATE_OPTIONS: SalesPageTemplateOption[] = [
     defaultSecondaryCtaUrl: '#benefits',
   },
 ]
+
+export const SALES_PAGE_CAMPAIGN_OBJECTIVE_OPTIONS: SalesPageContextOption<SalesPageCampaignObjectiveId>[] = [
+  {
+    id: 'COLLECT_LEADS',
+    label: 'Kumpulkan Lead',
+    description: 'Arahkan visitor untuk isi form dan masuk ke pipeline follow-up.',
+  },
+  {
+    id: 'BOOK_CALL',
+    label: 'Booking Call',
+    description: 'Cocok untuk konsultasi, demo, atau discovery call.',
+  },
+  {
+    id: 'GET_WHATSAPP',
+    label: 'Masuk WhatsApp',
+    description: 'Dorong visitor pindah ke obrolan WA secepat mungkin.',
+  },
+  {
+    id: 'REGISTER_EVENT',
+    label: 'Daftar Event',
+    description: 'Untuk webinar, workshop, atau live demo.',
+  },
+  {
+    id: 'SELL_PRODUCT',
+    label: 'Jual Produk',
+    description: 'Fokus ke pembelian, trial, atau penawaran launch.',
+  },
+]
+
+export const SALES_PAGE_TRAFFIC_SOURCE_OPTIONS: SalesPageContextOption<SalesPageTrafficSourceId>[] = [
+  {
+    id: 'META_ADS',
+    label: 'Meta Ads',
+    description: 'Traffic dingin yang butuh hook kuat dan CTA cepat.',
+  },
+  {
+    id: 'GOOGLE_ADS',
+    label: 'Google Ads',
+    description: 'Visitor intent tinggi yang sensitif pada relevansi pesan.',
+  },
+  {
+    id: 'WHATSAPP',
+    label: 'WhatsApp',
+    description: 'Cocok untuk follow-up broadcast atau chat pribadi.',
+  },
+  {
+    id: 'EMAIL',
+    label: 'Email Blast',
+    description: 'Biasanya datang dari audience yang sudah kenal brand.',
+  },
+  {
+    id: 'SEO',
+    label: 'SEO / Organic',
+    description: 'Butuh edukasi, trust, dan struktur halaman yang informatif.',
+  },
+  {
+    id: 'PARTNER',
+    label: 'Partner / Referral',
+    description: 'Traffic hangat dari rekomendasi atau partner channel.',
+  },
+  {
+    id: 'DIRECT',
+    label: 'Direct / Manual',
+    description: 'Untuk link proposal, presentasi, atau follow-up internal.',
+  },
+]
+
+export const SALES_PAGE_TONE_STYLE_OPTIONS: SalesPageContextOption<SalesPageToneStyleId>[] = [
+  {
+    id: 'TEGAS_FRIENDLY',
+    label: 'Tegas Friendly',
+    description: 'Jelas, meyakinkan, tapi tetap hangat dan mudah dicerna.',
+  },
+  {
+    id: 'KONSULTATIF',
+    label: 'Konsultatif',
+    description: 'Cocok untuk jasa, audit, dan solusi yang perlu edukasi.',
+  },
+  {
+    id: 'EKSEKUTIF',
+    label: 'Eksekutif',
+    description: 'Ringkas, rapi, dan terasa premium untuk decision maker.',
+  },
+  {
+    id: 'EDUKATIF',
+    label: 'Edukatif',
+    description: 'Menjelaskan value dengan gaya yang lebih sabar dan informatif.',
+  },
+  {
+    id: 'ASSERTIVE',
+    label: 'Agresif Closing',
+    description: 'Lebih direct-response untuk promo atau launch yang tegas.',
+  },
+]
+
+export const DEFAULT_SALES_PAGE_AI_PROFILE: SalesPageAiProfilePayload = {
+  brandPositioning: '',
+  defaultAudience: '',
+  defaultToneStyle: 'TEGAS_FRIENDLY',
+  defaultPrimaryCtaLabel: '',
+  defaultPrimaryCtaUrl: '',
+  defaultHeroImageUrl: '',
+  defaultHeroImageAlt: '',
+  keyBenefits: '',
+  proofAssets: '',
+  objectionHandling: '',
+  aiRules: '',
+}
 
 const SALES_PAGE_THEMES: SalesPageTheme[] = [
   {
@@ -325,6 +522,47 @@ function normalizeTemplateId(value: unknown): SalesPageTemplateId {
 
 function cleanText(value: string | null | undefined): string {
   return (value || '').trim()
+}
+
+function normalizeSalesPageToneStyle(value: unknown): SalesPageToneStyleId {
+  if (typeof value !== 'string') return DEFAULT_SALES_PAGE_AI_PROFILE.defaultToneStyle
+  return SALES_PAGE_TONE_STYLE_OPTIONS.some((option) => option.id === value)
+    ? (value as SalesPageToneStyleId)
+    : DEFAULT_SALES_PAGE_AI_PROFILE.defaultToneStyle
+}
+
+function listTextToItems(value: string | null | undefined, max = 4): string[] {
+  return cleanText(value)
+    .replace(/[;,]+/g, '\n')
+    .split('\n')
+    .map((line) => line.replace(/^[\-\*\d\.\)\s]+/, '').trim())
+    .filter(Boolean)
+    .slice(0, max)
+}
+
+function resolveContextOptionLabel<T extends string>(
+  options: SalesPageContextOption<T>[],
+  value: T | string | undefined,
+): string {
+  return options.find((option) => option.id === value)?.label || ''
+}
+
+function hasStructuredContext(context?: SalesPageGeneratorContext): boolean {
+  if (!context) return false
+  return Boolean(
+    cleanText(context.serviceSeedLabel)
+    || cleanText(context.brandPositioning)
+    || cleanText(context.brandGuardrails)
+    || cleanText(context.targetPainPoints)
+    || cleanText(context.keyBenefits)
+    || cleanText(context.deliverables)
+    || cleanText(context.proofAssets)
+    || cleanText(context.objectionHandling)
+    || cleanText(context.urgencyOffer)
+    || context.campaignObjective
+    || context.trafficSource
+    || context.toneStyle,
+  )
 }
 
 function sanitizeTheme(value: unknown, fallback: SalesPageTheme): SalesPageTheme {
@@ -418,6 +656,81 @@ export function sanitizeArray<T>(
   }, [])
 }
 
+export function hasSalesPageAiContext(input: SalesPageGeneratorInput): boolean {
+  return Boolean(cleanText(input.aiPrompt) || hasStructuredContext(input.context))
+}
+
+export function mergeSalesPageGeneratorInputWithProfile(
+  input: SalesPageGeneratorInput,
+  profile?: Partial<SalesPageAiProfilePayload> | null,
+): SalesPageGeneratorInput {
+  if (!profile) return input
+
+  const resolvedProfile: SalesPageAiProfilePayload = {
+    ...DEFAULT_SALES_PAGE_AI_PROFILE,
+    ...profile,
+    defaultToneStyle: normalizeSalesPageToneStyle(profile.defaultToneStyle),
+  }
+
+  const mergedContext: SalesPageGeneratorContext = {
+    ...input.context,
+    toneStyle: input.context?.toneStyle || resolvedProfile.defaultToneStyle,
+    brandPositioning: cleanText(input.context?.brandPositioning) || cleanText(resolvedProfile.brandPositioning),
+    brandGuardrails: cleanText(input.context?.brandGuardrails) || cleanText(resolvedProfile.aiRules),
+    keyBenefits: cleanText(input.context?.keyBenefits) || cleanText(resolvedProfile.keyBenefits),
+    proofAssets: cleanText(input.context?.proofAssets) || cleanText(resolvedProfile.proofAssets),
+    objectionHandling: cleanText(input.context?.objectionHandling) || cleanText(resolvedProfile.objectionHandling),
+  }
+
+  return {
+    ...input,
+    audience: cleanText(input.audience) || cleanText(resolvedProfile.defaultAudience),
+    primaryCtaLabel: cleanText(input.primaryCtaLabel) || cleanText(resolvedProfile.defaultPrimaryCtaLabel),
+    primaryCtaUrl: normalizeSalesPageCtaUrl(input.primaryCtaUrl, cleanText(resolvedProfile.defaultPrimaryCtaUrl) || '#lead-form'),
+    heroImageUrl: cleanText(input.heroImageUrl) || cleanText(resolvedProfile.defaultHeroImageUrl),
+    heroImageAlt: cleanText(input.heroImageAlt) || cleanText(resolvedProfile.defaultHeroImageAlt),
+    context: mergedContext,
+  }
+}
+
+export function buildSalesPageGeneratorBrief(input: SalesPageGeneratorInput): string {
+  const context = input.context
+  const lines = [
+    cleanText(input.title) ? `Campaign title: ${cleanText(input.title)}` : '',
+    cleanText(input.productName) ? `Product/Offer: ${cleanText(input.productName)}` : '',
+    cleanText(input.audience) ? `Audience: ${cleanText(input.audience)}` : '',
+    cleanText(input.promise) ? `Promise/Hook: ${cleanText(input.promise)}` : '',
+    cleanText(input.priceLabel) ? `Price label: ${cleanText(input.priceLabel)}` : '',
+    cleanText(context?.serviceSeedLabel) ? `Source seed: ${cleanText(context?.serviceSeedLabel)}` : '',
+    cleanText(context?.brandPositioning) ? `Brand positioning: ${cleanText(context?.brandPositioning)}` : '',
+    context?.campaignObjective
+      ? `Campaign objective: ${resolveContextOptionLabel(SALES_PAGE_CAMPAIGN_OBJECTIVE_OPTIONS, context.campaignObjective)}`
+      : '',
+    context?.trafficSource
+      ? `Traffic source: ${resolveContextOptionLabel(SALES_PAGE_TRAFFIC_SOURCE_OPTIONS, context.trafficSource)}`
+      : '',
+    context?.toneStyle
+      ? `Tone style: ${resolveContextOptionLabel(SALES_PAGE_TONE_STYLE_OPTIONS, context.toneStyle)}`
+      : '',
+    cleanText(context?.targetPainPoints) ? `Main pain points: ${cleanText(context?.targetPainPoints)}` : '',
+    cleanText(context?.keyBenefits) ? `Key benefits: ${cleanText(context?.keyBenefits)}` : '',
+    cleanText(context?.deliverables) ? `Offer stack / deliverables: ${cleanText(context?.deliverables)}` : '',
+    cleanText(context?.proofAssets) ? `Proof assets: ${cleanText(context?.proofAssets)}` : '',
+    cleanText(context?.objectionHandling) ? `Objection handling: ${cleanText(context?.objectionHandling)}` : '',
+    cleanText(context?.urgencyOffer) ? `Urgency / promo: ${cleanText(context?.urgencyOffer)}` : '',
+    cleanText(context?.brandGuardrails) ? `Brand guardrails: ${cleanText(context?.brandGuardrails)}` : '',
+    cleanText(input.primaryCtaLabel)
+      ? `Primary CTA: ${cleanText(input.primaryCtaLabel)} (${normalizeSalesPageCtaUrl(input.primaryCtaUrl, '#lead-form')})`
+      : '',
+    cleanText(input.secondaryCtaLabel)
+      ? `Secondary CTA: ${cleanText(input.secondaryCtaLabel)} (${normalizeSalesPageCtaUrl(input.secondaryCtaUrl, '#benefits')})`
+      : '',
+    cleanText(input.aiPrompt) ? `Additional notes: ${cleanText(input.aiPrompt)}` : '',
+  ]
+
+  return lines.filter(Boolean).join('\n')
+}
+
 export function buildSalesPagePayload(input: SalesPageGeneratorInput, orgName: string): SalesPagePayload {
   const title = cleanText(input.title)
   const productName = cleanText(input.productName) || title
@@ -425,6 +738,7 @@ export function buildSalesPagePayload(input: SalesPageGeneratorInput, orgName: s
   const promise = cleanText(input.promise)
   const template = resolveSalesPageTemplate(input.templateId)
   const promptHint = cleanText(input.aiPrompt)
+  const context = input.context
   const slug = normalizeSalesPageSlug(title || productName || `${orgName}-sales-page`)
   const theme = pickTheme(`${orgName}-${productName}`)
 
@@ -442,8 +756,39 @@ export function buildSalesPagePayload(input: SalesPageGeneratorInput, orgName: s
     CONSULTING: 'owner dan manajer yang butuh arahan strategis',
   }
 
-  const promptSentence = promptHint ? ` Brief campaign: ${promptHint.slice(0, 220)}.` : ''
+  const hasNarrativeContext = Boolean(
+    promptHint
+    || cleanText(context?.brandPositioning)
+    || cleanText(context?.brandGuardrails)
+    || cleanText(context?.serviceSeedLabel)
+    || cleanText(context?.targetPainPoints)
+    || cleanText(context?.keyBenefits)
+    || cleanText(context?.deliverables)
+    || cleanText(context?.proofAssets)
+    || cleanText(context?.objectionHandling)
+    || cleanText(context?.urgencyOffer),
+  )
+  const promptSentence = hasNarrativeContext ? buildSalesPageGeneratorBrief(input) : ''
+  const promptSentenceSuffix = promptSentence ? ` Brief campaign: ${promptSentence.slice(0, 260)}.` : ''
   const resolvedPromise = promise || promiseFallbackMap[template.id]
+  const objectiveLabel = resolveContextOptionLabel(SALES_PAGE_CAMPAIGN_OBJECTIVE_OPTIONS, context?.campaignObjective)
+  const trafficLabel = resolveContextOptionLabel(SALES_PAGE_TRAFFIC_SOURCE_OPTIONS, context?.trafficSource)
+  const brandPositioning = cleanText(context?.brandPositioning)
+  const painPoints = listTextToItems(context?.targetPainPoints, 3)
+  const benefitItems = listTextToItems(context?.keyBenefits, 3)
+  const deliverableItems = listTextToItems(context?.deliverables, 4)
+  const proofItems = listTextToItems(context?.proofAssets, 3)
+  const objectionItems = listTextToItems(context?.objectionHandling, 2)
+  const urgencyOffer = cleanText(context?.urgencyOffer)
+  const leadingPainPoint = painPoints[0]
+  const benefitSummary = benefitItems[0]
+  const proofSummary = proofItems[0]
+  const audienceLabel = audience || audienceFallbackMap[template.id]
+  const formTitleFallback = context?.campaignObjective === 'BOOK_CALL'
+    ? `Siap diskusikan kebutuhan ${productName} dengan tim kami?`
+    : context?.campaignObjective === 'REGISTER_EVENT'
+      ? `Amankan slot Anda untuk ${productName}`
+      : `Mau lihat bagaimana ${productName} cocok untuk bisnis Anda?`
 
   return {
     templateId: template.id,
@@ -451,9 +796,9 @@ export function buildSalesPagePayload(input: SalesPageGeneratorInput, orgName: s
     slug,
     status: 'DRAFT',
     offerBadge: `${template.offerBadge} ${new Date().getFullYear()}`,
-    headline: `${productName} untuk ${audience || audienceFallbackMap[template.id]}`,
+    headline: `${productName} untuk ${audienceLabel}`,
     subheadline: resolvedPromise,
-    description: `${productName} membantu ${audience || 'tim Anda'} bergerak lebih cepat dengan penawaran yang jelas, positioning yang tegas, dan ajakan aksi yang tidak membingungkan calon buyer.${promptSentence}`,
+    description: `${productName} membantu ${audience || 'tim Anda'} bergerak lebih cepat dengan penawaran yang jelas, positioning yang tegas, dan ajakan aksi yang tidak membingungkan calon buyer.${brandPositioning ? ` Arah positioning utama brand: ${brandPositioning}.` : ''}${leadingPainPoint ? ` Fokus utama campaign ini adalah mengatasi ${leadingPainPoint}.` : ''}${benefitSummary ? ` Benefit terkuat yang ditonjolkan: ${benefitSummary}.` : ''}${trafficLabel ? ` Kanal traffic utama: ${trafficLabel}.` : ''}${promptSentenceSuffix}`,
     targetAudience: audience,
     priceLabel: cleanText(input.priceLabel) || 'Mulai dari penawaran spesial hari ini',
     bonusText: template.id === 'WEBINAR'
@@ -462,9 +807,9 @@ export function buildSalesPagePayload(input: SalesPageGeneratorInput, orgName: s
     guaranteeText: template.id === 'CONSULTING'
       ? 'Sesi discovery untuk memetakan kebutuhan sebelum eksekusi.'
       : 'Konsultasi kebutuhan dan mapping solusi sebelum deal.',
-    urgencyText: template.id === 'PRODUCT_LAUNCH'
+    urgencyText: urgencyOffer || (template.id === 'PRODUCT_LAUNCH'
       ? 'Akses early-batch terbatas untuk periode launch ini.'
-      : 'Slot onboarding promo terbatas untuk batch bulan ini.',
+      : 'Slot onboarding promo terbatas untuk batch bulan ini.'),
     heroImageUrl: cleanText(input.heroImageUrl),
     heroImageAlt: cleanText(input.heroImageAlt) || `${productName} visual`,
     primaryCtaLabel: cleanText(input.primaryCtaLabel) || template.defaultPrimaryCtaLabel,
@@ -472,47 +817,62 @@ export function buildSalesPagePayload(input: SalesPageGeneratorInput, orgName: s
     secondaryCtaLabel: cleanText(input.secondaryCtaLabel) || template.defaultSecondaryCtaLabel,
     secondaryCtaUrl: normalizeSalesPageCtaUrl(input.secondaryCtaUrl, template.defaultSecondaryCtaUrl),
     metaTitle: `${productName} | Solusi untuk ${audience || orgName}`,
-    metaDescription: `${productName} membantu ${audience || 'bisnis Anda'} mendapatkan hasil lebih cepat dengan proses yang lebih rapi, penawaran yang lebih kuat, dan CTA yang lebih jelas.`,
+    metaDescription: `${productName} membantu ${audience || 'bisnis Anda'} mendapatkan hasil lebih cepat dengan proses yang lebih rapi, penawaran yang lebih kuat, dan CTA yang lebih jelas.${leadingPainPoint ? ` Cocok untuk yang ingin mengatasi ${leadingPainPoint}.` : ''}`,
     metaPixelId: normalizeMetaPixelId(input.metaPixelId),
     theme,
-    proofPoints: [
-      { label: 'Positioning', value: 'Pesan utama langsung jelas' },
-      { label: 'CTA', value: 'Arahkan visitor ke aksi inti' },
-      { label: 'Tracking', value: 'Siap Meta Pixel & lead capture' },
-    ],
-    benefits: [
-      {
-        title: 'Pesan penjualan lebih tajam',
-        description: `Konten halaman langsung menekankan nilai ${productName} untuk ${audience || 'buyer Anda'}.`,
-      },
-      {
-        title: 'Meyakinkan sejak layar pertama',
-        description: 'Hero section, social proof, offer stack, dan FAQ ditata agar visitor cepat paham dan percaya.',
-      },
-      {
-        title: 'Siap dipakai untuk iklan',
-        description: 'Tracking Meta Pixel dan formulir lead sudah disiapkan agar campaign bisa langsung jalan.',
-      },
-    ],
-    offerItems: [
-      {
-        title: productName,
-        description: promise || 'Solusi inti yang membantu calon customer bergerak dari tertarik ke yakin membeli.',
-      },
-      {
-        title: 'Bonus implementasi',
-        description: 'Checklist eksekusi, template SOP, dan arahan follow-up tim sales.',
-      },
-      {
-        title: 'Pendampingan awal',
-        description: 'Sesi singkat untuk membantu tim memahami skenario penggunaan paling relevan.',
-      },
-    ],
+    proofPoints: proofItems.length
+      ? proofItems.map((item, index) => ({
+          label: index === 0 ? 'Proof' : index === 1 ? 'Trust' : 'Angle',
+          value: item,
+        }))
+      : [
+          { label: 'Positioning', value: 'Pesan utama langsung jelas' },
+          { label: 'CTA', value: objectiveLabel || 'Arahkan visitor ke aksi inti' },
+          { label: 'Tracking', value: trafficLabel ? `Siap untuk ${trafficLabel}` : 'Siap Meta Pixel & lead capture' },
+        ],
+    benefits: benefitItems.length
+      ? benefitItems.map((item, index) => ({
+          title: index === 0 ? 'Benefit Utama' : index === 1 ? 'Value Tambahan' : 'Dampak untuk Buyer',
+          description: item,
+        }))
+      : [
+          {
+            title: 'Pesan penjualan lebih tajam',
+            description: `Konten halaman langsung menekankan nilai ${productName} untuk ${audience || 'buyer Anda'}.`,
+          },
+          {
+            title: 'Meyakinkan sejak layar pertama',
+            description: 'Hero section, social proof, offer stack, dan FAQ ditata agar visitor cepat paham dan percaya.',
+          },
+          {
+            title: 'Siap dipakai untuk iklan',
+            description: 'Tracking Meta Pixel dan formulir lead sudah disiapkan agar campaign bisa langsung jalan.',
+          },
+        ],
+    offerItems: deliverableItems.length
+      ? deliverableItems.map((item, index) => ({
+          title: index === 0 ? productName : `Deliverable ${index + 1}`,
+          description: item,
+        }))
+      : [
+          {
+            title: productName,
+            description: promise || 'Solusi inti yang membantu calon customer bergerak dari tertarik ke yakin membeli.',
+          },
+          {
+            title: 'Bonus implementasi',
+            description: 'Checklist eksekusi, template SOP, dan arahan follow-up tim sales.',
+          },
+          {
+            title: 'Pendampingan awal',
+            description: 'Sesi singkat untuk membantu tim memahami skenario penggunaan paling relevan.',
+          },
+        ],
     testimonials: [
       {
         name: 'Calon Case Study #1',
         role: 'Owner / Founder',
-        quote: `Setelah memakai pendekatan ini, penyampaian value ${productName} jadi jauh lebih jelas dan closing terasa lebih cepat.`,
+        quote: `Setelah memakai pendekatan ini, penyampaian value ${productName} jadi jauh lebih jelas dan closing terasa lebih cepat.${proofSummary ? ` Bukti yang paling menenangkan buyer juga terasa lebih konkret: ${proofSummary}.` : ''}`,
       },
       {
         name: 'Calon Case Study #2',
@@ -523,7 +883,7 @@ export function buildSalesPagePayload(input: SalesPageGeneratorInput, orgName: s
     faqItems: [
       {
         question: `Apakah ${productName} cocok untuk bisnis saya?`,
-        answer: `Jika Anda ingin solusi yang membantu ${audience || 'tim Anda'} bergerak lebih cepat dan lebih terukur, halaman ini sudah disusun untuk memvalidasi kebutuhan itu.`,
+        answer: `Jika Anda ingin solusi yang membantu ${audience || 'tim Anda'} bergerak lebih cepat dan lebih terukur, halaman ini sudah disusun untuk memvalidasi kebutuhan itu.${leadingPainPoint ? ` Terutama bila tantangan utama Anda adalah ${leadingPainPoint}.` : ''}`,
       },
       {
         question: 'Bagaimana proses follow-up setelah visitor isi form?',
@@ -533,11 +893,44 @@ export function buildSalesPagePayload(input: SalesPageGeneratorInput, orgName: s
         question: 'Apakah Meta Pixel bisa disisipkan per halaman?',
         answer: 'Bisa. Setiap sales page memiliki pengaturan Pixel ID sendiri dan event lead akan dipicu setelah form berhasil dikirim.',
       },
+      ...(objectionItems[0]
+        ? [
+            {
+              question: 'Bagaimana jika saya masih ragu sebelum memulai?',
+              answer: objectionItems[0],
+            },
+          ]
+        : []),
     ],
     formSettings: {
       ...DEFAULT_FORM_SETTINGS,
-      title: `Mau lihat bagaimana ${productName} cocok untuk bisnis Anda?`,
+      title: formTitleFallback,
+      subtitle: objectiveLabel
+        ? `${DEFAULT_FORM_SETTINGS.subtitle} Fokus campaign: ${objectiveLabel}.`
+        : DEFAULT_FORM_SETTINGS.subtitle,
     },
+  }
+}
+
+export function mapSalesPageAiProfileRecord(row: SalesPageAiProfileRecord): SalesPageAiProfileView {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    brandPositioning: cleanText(row.brand_positioning),
+    defaultAudience: cleanText(row.default_audience),
+    defaultToneStyle: normalizeSalesPageToneStyle(row.default_tone_style),
+    defaultPrimaryCtaLabel: cleanText(row.default_primary_cta_label),
+    defaultPrimaryCtaUrl: normalizeSalesPageCtaUrl(row.default_primary_cta_url, ''),
+    defaultHeroImageUrl: cleanText(row.default_hero_image_url),
+    defaultHeroImageAlt: cleanText(row.default_hero_image_alt),
+    keyBenefits: cleanText(row.key_benefits),
+    proofAssets: cleanText(row.proof_assets),
+    objectionHandling: cleanText(row.objection_handling),
+    aiRules: cleanText(row.ai_rules),
+    createdBy: row.created_by,
+    updatedBy: row.updated_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   }
 }
 

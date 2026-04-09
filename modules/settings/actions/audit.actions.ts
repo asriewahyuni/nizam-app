@@ -122,13 +122,15 @@ async function clearTablesByOrg(db: AdminDbClient, orgId: string, tables: readon
  * because accounts.managed_branch_id is required and guarded by a FK.
  */
 async function collapseOperationalBranches(db: AdminDbClient, orgId: string) {
-  const { data: existingBranch, error: branchLookupError } = await db
+  const adminDb = db as any
+  const { data: existingBranchRow, error: branchLookupError } = await adminDb
     .from('branches')
     .select('id')
     .eq('org_id', orgId)
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle()
+  const existingBranch = (existingBranchRow as { id?: string } | null) ?? null
 
   if (branchLookupError) {
     if (isSkippableMissingObjectError(branchLookupError)) {
@@ -141,7 +143,7 @@ async function collapseOperationalBranches(db: AdminDbClient, orgId: string) {
   const preservedBranchId = existingBranch?.id || crypto.randomUUID()
 
   if (!existingBranch?.id) {
-    const { error: createBranchError } = await db
+    const { error: createBranchError } = await adminDb
       .from('branches')
       .insert({
         id: preservedBranchId,
@@ -157,7 +159,7 @@ async function collapseOperationalBranches(db: AdminDbClient, orgId: string) {
     }
   }
 
-  const { error: rebindAccountsError } = await db
+  const { error: rebindAccountsError } = await adminDb
     .from('accounts')
     .update({ managed_branch_id: preservedBranchId })
     .eq('org_id', orgId)
@@ -166,7 +168,7 @@ async function collapseOperationalBranches(db: AdminDbClient, orgId: string) {
     return { success: false, error: `Error memindahkan CoA ke branch default: ${rebindAccountsError.message}` }
   }
 
-  const { error: deleteExtraBranchesError } = await db
+  const { error: deleteExtraBranchesError } = await adminDb
     .from('branches')
     .delete()
     .eq('org_id', orgId)
@@ -176,7 +178,7 @@ async function collapseOperationalBranches(db: AdminDbClient, orgId: string) {
     return { success: false, error: `Error merapikan cabang saat reset: ${deleteExtraBranchesError.message}` }
   }
 
-  const { error: normalizeBranchError } = await db
+  const { error: normalizeBranchError } = await adminDb
     .from('branches')
     .update({
       name: RESET_DEFAULT_BRANCH_NAME,

@@ -1,36 +1,29 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import POSClient from './POSClient'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getProducts } from '@/modules/inventory/actions/inventory.actions'
 import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 
 export default async function POSPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return null
-
   const orgData = await getActiveOrg()
-  if (!orgData) return null
+  if (!orgData) redirect('/onboarding')
 
+  const supabase = await createClient()
   const orgId = orgData.org.id
   const activeBranch = await getActiveBranch(orgId)
-  const products = activeBranch ? await getProducts(orgId, activeBranch.id) : []
-  const warehouses = activeBranch ? await getWarehouses(orgId, activeBranch.id) : []
+  const [products, warehouses, { data: customers }, { data: accounts }] = await Promise.all([
+    activeBranch ? getProducts(orgId, activeBranch.id) : Promise.resolve([]),
+    activeBranch ? getWarehouses(orgId, activeBranch.id) : Promise.resolve([]),
+    supabase.from('contacts').select('id, name, phone').eq('org_id', orgId).eq('type', 'CUSTOMER'),
+    supabase.from('accounts').select('id, name, code').eq('org_id', orgId).eq('is_active', true),
+  ])
   const productsWithStock = (products || [])
-    .filter((product: any) => product.is_active)
-    .map((product: any) => ({
+    .filter((product) => product.is_active)
+    .map((product) => ({
       ...product,
       stock: Number(product.stock_available || 0),
     }))
-
-  // Fetch customers
-  const { data: customers } = await supabase.from('contacts').select('id, name, phone')
-    .eq('org_id', orgId).eq('type', 'CUSTOMER')
-
-  // Fetch cash accounts for payment
-  const { data: accounts } = await supabase.from('accounts').select('id, name, code')
-    .eq('org_id', orgId).eq('is_active', true)
     
   return (
     <POSClient
@@ -40,7 +33,7 @@ export default async function POSPage() {
       customers={customers || []}
       accounts={accounts || []}
       warehouses={warehouses || []}
-      currentUser={user}
+      currentUser={orgData.user}
       activeBranchId={activeBranch?.id || null}
       activeBranchName={activeBranch?.name || null}
     />

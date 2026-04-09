@@ -28,6 +28,10 @@ type StandardCoATemplate = {
 
 const CORE_PSAK_CODES = ['1000', '2000', '3000', '4000', '5000', '6000'] as const
 
+type SeedInitialCoAOptions = {
+  revalidate?: boolean
+}
+
 const STANDARD_PSAK_COA_TEMPLATE: StandardCoATemplate[] = [
   { code: '1000', name: 'Aset', type: 'ASSET', normal_balance: 'DEBIT' },
   { code: '1100', name: 'Aset Lancar', type: 'ASSET', normal_balance: 'DEBIT', parent_code: '1000' },
@@ -727,10 +731,11 @@ export async function getAccountBalances(orgId: string): Promise<AccountBalance[
 // ─────────────────────────────────────────────────────────────
 // seedInitialCoA — Manual trigger to seed default PSAK CoA if empty
 // ─────────────────────────────────────────────────────────────
-export async function seedInitialCoA(orgId: string) {
+export async function seedInitialCoA(orgId: string, options?: SeedInitialCoAOptions) {
   const supabase = await createClient()
   const trimmedOrgId = String(orgId || '').trim()
   if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
+  const shouldRevalidate = options?.revalidate !== false
 
   const { data: orgRow } = await (supabase as any)
     .from('organizations')
@@ -749,7 +754,9 @@ export async function seedInitialCoA(orgId: string) {
     if ((syncResult.syncedCount ?? 0) <= 0) {
       return { error: 'CoA parent belum aktif. Aktifkan CoA di organisasi induk terlebih dahulu.' }
     }
-    revalidatePath('/settings/accounts')
+    if (shouldRevalidate) {
+      revalidatePath('/settings/accounts')
+    }
     return { success: true, mode: 'sync_parent', syncedCount: syncResult.syncedCount }
   }
 
@@ -776,7 +783,9 @@ export async function seedInitialCoA(orgId: string) {
   if (existingCodes.size === 0) {
     const { error } = await (supabase as any).rpc('seed_default_coa', { p_org_id: trimmedOrgId })
     if (!error) {
-      revalidatePath('/settings/accounts')
+      if (shouldRevalidate) {
+        revalidatePath('/settings/accounts')
+      }
       return { success: true, mode: 'seed_psak' }
     }
 
@@ -797,7 +806,9 @@ export async function seedInitialCoA(orgId: string) {
     return { error: backfillResult.error || 'Gagal melengkapi CoA standar PSAK.' }
   }
 
-  revalidatePath('/settings/accounts')
+  if (shouldRevalidate) {
+    revalidatePath('/settings/accounts')
+  }
   return {
     success: true,
     mode: 'backfill_psak',

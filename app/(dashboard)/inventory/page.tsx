@@ -1,7 +1,11 @@
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
-import { getProducts } from '@/modules/inventory/actions/inventory.actions'
+import {
+  getInventoryMutations,
+  getInventoryWarehouseSnapshot,
+  getProducts,
+} from '@/modules/inventory/actions/inventory.actions'
 import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 import InventoryClient from './InventoryClient'
 
@@ -10,8 +14,12 @@ export default async function InventoryPage() {
   if (!orgData) redirect('/onboarding')
 
   const activeBranch = await getActiveBranch(orgData.org.id)
-  const products = await getProducts(orgData.org.id, activeBranch?.id)
-  const warehouses = await getWarehouses(orgData.org.id, activeBranch?.id)
+  const [products, warehouses, warehouseSnapshot, recentMutations] = await Promise.all([
+    getProducts(orgData.org.id, activeBranch?.id),
+    getWarehouses(orgData.org.id, activeBranch?.id),
+    getInventoryWarehouseSnapshot(orgData.org.id, activeBranch?.id),
+    getInventoryMutations(orgData.org.id, activeBranch?.id),
+  ])
 
   return (
     <Suspense fallback={<div className="p-10 text-center font-black animate-pulse">Loading Inventory Data...</div>}>
@@ -19,7 +27,9 @@ export default async function InventoryPage() {
         orgId={orgData.org.id} 
         activeBranchId={activeBranch?.id ?? null}
         activeBranchName={activeBranch?.name ?? null}
-        initialProducts={products} 
+        initialProducts={products}
+        warehouseSnapshot={warehouseSnapshot}
+        recentMutations={recentMutations}
         warehouses={warehouses}
       />
     </Suspense>

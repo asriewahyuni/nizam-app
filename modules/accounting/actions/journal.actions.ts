@@ -45,6 +45,70 @@ async function resolveJournalBranchId(input: CreateJournalEntryInput) {
   return { branchId: branchSelection.branchId }
 }
 
+async function getClosedFiscalPeriodName(
+  supabase: any,
+  orgId: string,
+  entryDate?: string | null
+): Promise<string | null> {
+  const normalizedEntryDate = String(entryDate || '').trim()
+  if (!normalizedEntryDate) return null
+
+  const { data, error } = await (supabase as any)
+    .from('fiscal_periods')
+    .select('name')
+    .eq('org_id', orgId)
+    .eq('is_closed', true)
+    .lte('start_date', normalizedEntryDate)
+    .gte('end_date', normalizedEntryDate)
+    .order('start_date', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error || !data) return null
+  return String(data.name || '').trim() || null
+}
+
+function buildClosedPeriodMessage(entryDate: string, actionLabel: string, fiscalPeriodName?: string | null) {
+  if (fiscalPeriodName) {
+    return `Jurnal tanggal ${entryDate} berada pada periode fiskal "${fiscalPeriodName}" yang sudah ditutup. Jurnal tidak dapat ${actionLabel}.`
+  }
+
+  return `Jurnal tanggal ${entryDate} berada pada periode fiskal yang sudah ditutup. Jurnal tidak dapat ${actionLabel}.`
+}
+
+async function getClosedPeriodMessageForJournalDate(
+  supabase: any,
+  orgId: string,
+  entryDate?: string | null,
+  actionLabel = 'diubah'
+) {
+  const normalizedEntryDate = String(entryDate || '').trim()
+  if (!normalizedEntryDate) return null
+
+  const fiscalPeriodName = await getClosedFiscalPeriodName(supabase, orgId, normalizedEntryDate)
+  if (!fiscalPeriodName) return null
+
+  return buildClosedPeriodMessage(normalizedEntryDate, actionLabel, fiscalPeriodName)
+}
+
+async function getClosedPeriodMessageForJournalEntry(
+  supabase: any,
+  orgId: string,
+  entryId: string,
+  actionLabel = 'diubah'
+) {
+  const { data: entry, error } = await (supabase as any)
+    .from('journal_entries')
+    .select('entry_date')
+    .eq('id', entryId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (error || !entry?.entry_date) return null
+
+  return getClosedPeriodMessageForJournalDate(supabase, orgId, String(entry.entry_date), actionLabel)
+}
+
 export async function getUnpostedJournalsCount(orgId: string, branchId?: string | null): Promise<number> {
   const supabase = await createClient()
   let query = (supabase as any)
@@ -90,6 +154,16 @@ export async function createJournalEntry(input: CreateJournalEntryInput) {
 
   const resolvedBranch = await resolveJournalBranchId(input)
   if ('error' in resolvedBranch) return resolvedBranch
+
+  const closedPeriodMessage = await getClosedPeriodMessageForJournalDate(
+    supabase,
+    input.org_id,
+    input.entry_date,
+    'dibuat'
+  )
+  if (closedPeriodMessage) {
+    return { error: closedPeriodMessage }
+  }
 
   // Insert header
   const { data: entry, error: entryError } = await (supabase as any)
@@ -148,6 +222,16 @@ export async function createJournalEntry(input: CreateJournalEntryInput) {
 export async function postJournalEntry(entryId: string, orgId: string) {
   const supabase = await createClient()
 
+  const closedPeriodMessage = await getClosedPeriodMessageForJournalEntry(
+    supabase,
+    orgId,
+    entryId,
+    'diposting'
+  )
+  if (closedPeriodMessage) {
+    return { error: closedPeriodMessage }
+  }
+
   const { error } = await (supabase as any)
     .from('journal_entries')
     .update({ status: 'POSTED' })
@@ -175,6 +259,16 @@ export async function voidJournalEntry(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
 
+  const closedPeriodMessage = await getClosedPeriodMessageForJournalEntry(
+    supabase,
+    orgId,
+    entryId,
+    'di-void'
+  )
+  if (closedPeriodMessage) {
+    return { error: closedPeriodMessage }
+  }
+
   // 1. Fetch info for potential sync before voiding
   const { data: entry } = await (supabase as any)
     .from('journal_entries')
@@ -195,7 +289,7 @@ export async function voidJournalEntry(
     .eq('org_id', orgId)
     .eq('status', 'POSTED')
 
-  if (error) return { error: 'Gagal membatalkan jurnal.' }
+  if (error) return { error: error.message || 'Gagal membatalkan jurnal.' }
 
   // 3. THE ENTERPRISE INTEGRITY: Two-Way Sync (Syncing GL to Modules)
   if (entry?.reference_id) {
@@ -263,6 +357,16 @@ export async function deleteJournalEntry(entryId: string, orgId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
 
+  const closedPeriodMessage = await getClosedPeriodMessageForJournalEntry(
+    supabase,
+    orgId,
+    entryId,
+    'disembunyikan'
+  )
+  if (closedPeriodMessage) {
+    return { error: closedPeriodMessage }
+  }
+
   const { error } = await (supabase as any)
     .from('journal_entries')
     .update({ 
@@ -287,6 +391,16 @@ export async function hardDeleteDraftJournal(entryId: string, orgId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
+
+  const closedPeriodMessage = await getClosedPeriodMessageForJournalEntry(
+    supabase,
+    orgId,
+    entryId,
+    'dihapus'
+  )
+  if (closedPeriodMessage) {
+    return { error: closedPeriodMessage }
+  }
 
   // We explicitly check for DRAFT status to prevent deleting posted data
   // Using .select() to verify if any rows were actually affected (RLS check)

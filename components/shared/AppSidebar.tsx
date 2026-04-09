@@ -1,11 +1,14 @@
 'use client'
 
-import { useEffect, useState, useSyncExternalStore, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { approvalRequestTouchesActiveBranch } from '@/lib/browser/approval-realtime'
+import { scheduleIdleTask } from '@/lib/browser/idle'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import { saasModuleMatches, normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
+import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard,
   BookOpen,
@@ -39,10 +42,13 @@ import {
   Clock,
   Megaphone,
   LifeBuoy,
+  Upload,
   type LucideIcon
 } from 'lucide-react'
 import { signOut } from '@/modules/auth/actions/auth.actions'
 import { signOutDemo } from '@/modules/demo/actions/demo.actions'
+import { getSidebarChromeMetrics } from '@/modules/organization/actions/dashboard-shell.actions'
+import { getPendingApprovalsCount } from '@/modules/organization/actions/approval.actions'
 
 interface NavGroup {
   group: string
@@ -128,8 +134,8 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Anak Perusahaan', href: '/settings/sub-orgs', icon: Layers, permission_key: 'business', module_key: 'Consolidation' },
       { label: 'Cabang', href: '/settings/branches', icon: MapPin, permission_key: 'branch' },
       { label: 'Pengaturan Bisnis', href: '/settings/business', icon: Settings, permission_key: 'business', module_key: 'Config' },
-      { label: 'Ticketing', href: '/settings/ticketing', icon: LifeBuoy, permission_key: 'business', module_key: 'Config' },
-      { label: 'Doc Update Ticketing', href: '/settings/ticketing/doc-update', icon: FileText, permission_key: 'business', module_key: 'Config' },
+      { label: 'Migrasi Data', href: '/settings/business/migration', icon: Upload, permission_key: 'business', module_key: 'Config' },
+      { label: 'Support Ticket', href: '/settings/ticketing', icon: LifeBuoy, permission_key: 'business', module_key: 'Config' },
     ]
   }
 ]
@@ -139,13 +145,14 @@ const SAAS_OPERATOR_GROUP: NavGroup = {
   items: [
     { label: 'Penawaran SaaS', href: '/saas/penawaran', icon: FileText, permission_key: 'sales' },
     { label: 'Penjualan SaaS', href: '/saas/penjualan', icon: TrendingUp, permission_key: 'sales' },
-    { label: 'Ticketing SaaS', href: '/saas/ticketing', icon: LifeBuoy, permission_key: 'sales' },
+    { label: 'Support Ticket SaaS', href: '/saas/ticketing', icon: LifeBuoy, permission_key: 'sales' },
   ],
 }
 
 const SIDEBAR_COLLAPSED_KEY = 'nizam_sidebar_collapsed'
 const SIDEBAR_STATE_EVENT = 'nizam_sidebar_state_change'
 const SIDEBAR_TOGGLE_EVENT = 'nizam_sidebar_toggle'
+const ROUTE_LOADING_START_EVENT = 'nizam_route_loading_start'
 
 function getSidebarCollapsedSnapshot() {
   if (typeof window === 'undefined') return false
@@ -182,7 +189,30 @@ function subscribeHydration(onStoreChange: () => void) {
   return () => {}
 }
 
+function isSidebarItemActive(pathname: string, fullPath: string, href: string, hasTabQuery: boolean) {
+  if (href === '/dashboard') {
+    return pathname === '/dashboard'
+  }
+
+  if (href.includes('?')) {
+    return fullPath === href
+  }
+
+  if (href === '/settings/business') {
+    return pathname === href
+  }
+
+  return pathname.startsWith(href) && (!href.startsWith('/hris') || !hasTabQuery)
+}
+
+function notifyRouteLoadingStart() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event(ROUTE_LOADING_START_EVENT))
+}
+
 interface AppSidebarProps {
+  orgId: string
+  activeBranchId?: string | null
   userRole: string
   jobTitle?: string
   user?: { fullName?: string; email: string }
@@ -199,6 +229,8 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ 
+  orgId,
+  activeBranchId = null,
   userRole, 
   jobTitle,
   user,
@@ -213,13 +245,22 @@ export function AppSidebar({
   planName = 'Trial',
   canManageSubOrganizations = true,
 }: AppSidebarProps) {
+  const router = useRouter()
   const [isSigningOut, startSignOutTransition] = useTransition()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const tabQuery = searchParams?.get('tab')
   const fullPath = pathname + (tabQuery ? `?tab=${tabQuery}` : '')
+  const prefetchedRoutesRef = useRef<Set<string>>(new Set())
 
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const [badgeMetrics, setBadgeMetrics] = useState(() => ({
+    pendingApprovals,
+    unpostedJournals,
+    pendingPurchaseRequests,
+    hrisNotifications,
+    pendingCoaRequests,
+  }))
 
   useEffect(() => {
     const handleMobileToggle = () => setIsMobileOpen((prev) => !prev)
@@ -240,9 +281,42 @@ export function AppSidebar({
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
   const isPlatformAdmin = isPlatformAdminEmail(user?.email)
   const showSaasOperatorGroup = isHydrated && isPlatformAdmin
-  const navGroups = showSaasOperatorGroup
-    ? [...NAV_GROUPS, SAAS_OPERATOR_GROUP]
-    : NAV_GROUPS
+  const navGroups = useMemo(() => (
+    showSaasOperatorGroup
+      ? [...NAV_GROUPS, SAAS_OPERATOR_GROUP]
+      : NAV_GROUPS
+  ), [showSaasOperatorGroup])
+
+  const loadSidebarMetrics = useCallback(async () => {
+    try {
+      const metrics = await getSidebarChromeMetrics(orgId, activeBranchId)
+      setBadgeMetrics(metrics)
+    } catch (error) {
+      console.error('[AppSidebar] Failed to load badge metrics:', error)
+    }
+  }, [activeBranchId, orgId])
+
+  const refreshPendingApprovalBadge = useCallback(async () => {
+    try {
+      const pendingApprovals = await getPendingApprovalsCount(orgId, activeBranchId)
+      setBadgeMetrics((current) => ({
+        ...current,
+        pendingApprovals,
+      }))
+    } catch (error) {
+      console.error('[AppSidebar] Failed to refresh approval badge:', error)
+    }
+  }, [activeBranchId, orgId])
+
+  const prefetchRoute = useCallback((href: string) => {
+    const normalizedHref = String(href || '').trim()
+    if (!normalizedHref || normalizedHref === fullPath || prefetchedRoutesRef.current.has(normalizedHref)) {
+      return
+    }
+
+    prefetchedRoutesRef.current.add(normalizedHref)
+    void router.prefetch(normalizedHref)
+  }, [fullPath, router])
 
   const handleClientSignOut = () => {
     startSignOutTransition(async () => {
@@ -255,16 +329,64 @@ export function AppSidebar({
     })
   }
 
+  useEffect(() => {
+    let isCancelled = false
+    const cancelIdleTask = scheduleIdleTask(() => {
+      void (async () => {
+        try {
+          const metrics = await getSidebarChromeMetrics(orgId, activeBranchId)
+          if (isCancelled) return
+          setBadgeMetrics(metrics)
+        } catch (error) {
+          if (!isCancelled) {
+            console.error('[AppSidebar] Failed to load badge metrics:', error)
+          }
+        }
+      })()
+    })
+
+    return () => {
+      isCancelled = true
+      cancelIdleTask()
+    }
+  }, [activeBranchId, orgId])
+
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient()
+    const channel = supabase
+      .channel(`nizam-approval-sidebar:${orgId}:${activeBranchId || 'all'}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'approval_requests', filter: `org_id=eq.${orgId}` },
+        (payload) => {
+          if (!approvalRequestTouchesActiveBranch(payload, activeBranchId)) return
+          void refreshPendingApprovalBadge()
+        }
+      )
+      .subscribe()
+
+    const handleWindowFocus = () => {
+      void loadSidebarMetrics()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void loadSidebarMetrics()
+      }
+    }
+
+    window.addEventListener('focus', handleWindowFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      void supabase.removeChannel(channel)
+    }
+  }, [activeBranchId, loadSidebarMetrics, orgId, refreshPendingApprovalBadge])
+
   const isNavItemActive = (href: string) => {
-    if (href === '/dashboard') {
-      return pathname === '/dashboard'
-    }
-
-    if (href.includes('?')) {
-      return fullPath === href
-    }
-
-    return pathname.startsWith(href) && (!href.startsWith('/hris') || !tabQuery)
+    return isSidebarItemActive(pathname, fullPath, href, Boolean(tabQuery))
   }
 
   const getFilteredItems = (group: NavGroup) => {
@@ -287,7 +409,7 @@ export function AppSidebar({
       if (isDemo) return true
 
       // 1. SaaS Module Check
-      if (item.module_key) {
+      if (item.module_key && enabledModules.length > 0) {
         const matches = enabledModules.some((moduleName) => {
           const enabledLower = moduleName.trim().toLowerCase()
 
@@ -327,6 +449,100 @@ export function AppSidebar({
     window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next.toString())
     window.dispatchEvent(new Event(SIDEBAR_STATE_EVENT))
   }
+
+  const warmupHrefs = useMemo(() => {
+    const getWarmableItems = (group: NavGroup) => {
+      return group.items.filter((item) => {
+        if (item.href === '/settings/sub-orgs') {
+          return canManageSubOrganizations
+        }
+
+        if (item.href === '/settings/branches') {
+          return isOwnerOrAdmin
+        }
+
+        if (showSaasOperatorGroup && group.group === 'SaaS Operator') return true
+        if (isDemo) return true
+
+        if (item.module_key && enabledModules.length > 0) {
+          const matches = enabledModules.some((moduleName) => {
+            const enabledLower = moduleName.trim().toLowerCase()
+
+            if (enabledLower === item.label.trim().toLowerCase()) return true
+
+            const normalizedEnabled = normalizeSaasEntitlementName(moduleName)
+            if (normalizedEnabled.trim().toLowerCase() === enabledLower) {
+              if (saasModuleMatches(moduleName, item.module_key!)) return true
+            }
+
+            return false
+          })
+          if (!matches) return false
+        }
+
+        if (isOwnerOrAdmin) return true
+        if (!item.permission_key) return true
+
+        const reqPerms = item.permission_key.split(',').map((key) => key.trim().toLowerCase())
+        return permissions.some((permission) => {
+          const normalizedPermission = permission.toLowerCase()
+          return reqPerms.some((requiredPermission) => normalizedPermission.includes(requiredPermission))
+        })
+      })
+    }
+
+    const topRoutes = navGroups
+      .map((group) => getWarmableItems(group)[0]?.href)
+      .filter((href): href is string => Boolean(href))
+
+    const activeGroup = navGroups.find((group) =>
+      getWarmableItems(group).some((item) =>
+        isSidebarItemActive(pathname, fullPath, item.href, Boolean(tabQuery))
+      )
+    )
+
+    const activeGroupRoutes = activeGroup ? getWarmableItems(activeGroup).map((item) => item.href) : []
+    const profileRoute = isOwnerOrAdmin ? '/settings/business' : '/profil-saya'
+
+    return Array.from(new Set([
+      '/dashboard',
+      ...topRoutes,
+      ...activeGroupRoutes,
+      profileRoute,
+      '/billing',
+    ])).filter((href) => href !== fullPath)
+  }, [
+    canManageSubOrganizations,
+    enabledModules,
+    fullPath,
+    isDemo,
+    isOwnerOrAdmin,
+    navGroups,
+    pathname,
+    permissions,
+    showSaasOperatorGroup,
+    tabQuery,
+  ])
+
+  useEffect(() => {
+    if (!isHydrated || warmupHrefs.length === 0) return
+
+    const timeoutIds: number[] = []
+    const kickoffId = window.setTimeout(() => {
+      warmupHrefs.slice(0, 10).forEach((href, index) => {
+        const timeoutId = window.setTimeout(() => {
+          prefetchRoute(href)
+        }, index * 160)
+        timeoutIds.push(timeoutId)
+      })
+    }, 180)
+
+    timeoutIds.push(kickoffId)
+
+    return () => {
+      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId))
+    }
+  }, [isHydrated, prefetchRoute, warmupHrefs])
 
   return (
     <>
@@ -404,17 +620,25 @@ export function AppSidebar({
 
                       // Define Notification Badges Mapping
                       let badgeCount = 0
-                      if (item.href === '/accounting/audit') badgeCount = pendingApprovals
-                      if (item.href === '/accounting/journal') badgeCount = unpostedJournals
-                      if (item.href === '/purchasing') badgeCount = pendingPurchaseRequests
-                      if (item.href === '/hris') badgeCount = hrisNotifications
-                      if (item.href === '/cash') badgeCount = pendingCoaRequests
+                      if (item.href === '/accounting/audit') badgeCount = badgeMetrics.pendingApprovals
+                      if (item.href === '/accounting/journal') badgeCount = badgeMetrics.unpostedJournals
+                      if (item.href === '/purchasing') badgeCount = badgeMetrics.pendingPurchaseRequests
+                      if (item.href === '/hris') badgeCount = badgeMetrics.hrisNotifications
+                      if (item.href === '/cash') badgeCount = badgeMetrics.pendingCoaRequests
 
                       return (
                         <li key={item.href}>
                           <Link
                             href={item.href}
-                            onClick={() => setIsMobileOpen(false)}
+                            onMouseEnter={() => prefetchRoute(item.href)}
+                            onFocus={() => prefetchRoute(item.href)}
+                            onTouchStart={() => prefetchRoute(item.href)}
+                            onPointerDown={() => prefetchRoute(item.href)}
+                            onClick={() => {
+                              prefetchRoute(item.href)
+                              notifyRouteLoadingStart()
+                              setIsMobileOpen(false)
+                            }}
                             title={isCollapsed ? item.label : ''}
                             className={`flex items-center rounded-2xl text-sm font-bold transition-all duration-200 group/item relative
                               ${isCollapsed ? 'justify-center p-3' : 'justify-between px-4 py-3'}
@@ -469,17 +693,25 @@ export function AppSidebar({
                     const isActive = isNavItemActive(item.href)
 
                     let badgeCount = 0
-                    if (item.href === '/accounting/audit') badgeCount = pendingApprovals
-                    if (item.href === '/accounting/journal') badgeCount = unpostedJournals
-                    if (item.href === '/purchasing') badgeCount = pendingPurchaseRequests
-                    if (item.href === '/hris') badgeCount = hrisNotifications
-                    if (item.href === '/cash') badgeCount = pendingCoaRequests
+                    if (item.href === '/accounting/audit') badgeCount = badgeMetrics.pendingApprovals
+                    if (item.href === '/accounting/journal') badgeCount = badgeMetrics.unpostedJournals
+                    if (item.href === '/purchasing') badgeCount = badgeMetrics.pendingPurchaseRequests
+                    if (item.href === '/hris') badgeCount = badgeMetrics.hrisNotifications
+                    if (item.href === '/cash') badgeCount = badgeMetrics.pendingCoaRequests
 
                     return (
                       <li key={item.href}>
                         <Link
                           href={item.href}
-                          onClick={() => setIsMobileOpen(false)}
+                          onMouseEnter={() => prefetchRoute(item.href)}
+                          onFocus={() => prefetchRoute(item.href)}
+                          onTouchStart={() => prefetchRoute(item.href)}
+                          onPointerDown={() => prefetchRoute(item.href)}
+                          onClick={() => {
+                            prefetchRoute(item.href)
+                            notifyRouteLoadingStart()
+                            setIsMobileOpen(false)
+                          }}
                           title={item.label}
                           className={`flex items-center justify-center rounded-2xl p-3 text-sm font-bold transition-all duration-200 group/item relative
                             ${isActive
@@ -514,7 +746,11 @@ export function AppSidebar({
       <div className={`p-4 border-t border-slate-50 bg-slate-50/30 ${isCollapsed ? 'items-center' : ''}`}>
         <div className={`flex items-center ${isCollapsed ? 'flex-col gap-4' : 'justify-between'}`}>
           <div className="flex items-center gap-3">
-          <Link href="/profil-saya" onClick={() => setIsMobileOpen(false)} className="w-10 h-10 shrink-0 rounded-2xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center text-xs font-black text-slate-800 shadow-sm relative hover:ring-2 hover:ring-blue-400 transition-all" title="Edit Profil Saya">
+          <Link href="/profil-saya" onMouseEnter={() => prefetchRoute('/profil-saya')} onFocus={() => prefetchRoute('/profil-saya')} onTouchStart={() => prefetchRoute('/profil-saya')} onPointerDown={() => prefetchRoute('/profil-saya')} onClick={() => {
+            prefetchRoute('/profil-saya')
+            notifyRouteLoadingStart()
+            setIsMobileOpen(false)
+          }} className="w-10 h-10 shrink-0 rounded-2xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center text-xs font-black text-slate-800 shadow-sm relative hover:ring-2 hover:ring-blue-400 transition-all" title="Edit Profil Saya">
               {userRole?.slice(0, 1).toUpperCase()}
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#003366] border-2 border-white" />
             </Link>
@@ -530,7 +766,15 @@ export function AppSidebar({
           <div className={`flex items-center ${isCollapsed ? 'flex-col gap-1' : 'gap-1'}`}>
             <Link 
               href={isOwnerOrAdmin ? '/settings/business' : '/profil-saya'} 
-              onClick={() => setIsMobileOpen(false)}
+              onMouseEnter={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/profil-saya')}
+              onFocus={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/profil-saya')}
+              onTouchStart={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/profil-saya')}
+              onPointerDown={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/profil-saya')}
+              onClick={() => {
+                prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/profil-saya')
+                notifyRouteLoadingStart()
+                setIsMobileOpen(false)
+              }}
               title={isOwnerOrAdmin ? 'Pengaturan Bisnis' : 'Profil & Password Saya'}
               className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
             >
@@ -549,7 +793,11 @@ export function AppSidebar({
         </div>
       {isCollapsed && (
         <div className="px-3 pb-3">
-          <Link href="/billing" onClick={() => setIsMobileOpen(false)} title="Langganan & Billing" className="flex items-center justify-center w-full p-2.5 rounded-xl bg-[#003366]/5 text-[#003366] hover:bg-[#003366] hover:text-white transition-all shadow-sm">
+          <Link href="/billing" onMouseEnter={() => prefetchRoute('/billing')} onFocus={() => prefetchRoute('/billing')} onTouchStart={() => prefetchRoute('/billing')} onPointerDown={() => prefetchRoute('/billing')} onClick={() => {
+            prefetchRoute('/billing')
+            notifyRouteLoadingStart()
+            setIsMobileOpen(false)
+          }} title="Langganan & Billing" className="flex items-center justify-center w-full p-2.5 rounded-xl bg-[#003366]/5 text-[#003366] hover:bg-[#003366] hover:text-white transition-all shadow-sm">
             <Zap size={16} />
           </Link>
         </div>

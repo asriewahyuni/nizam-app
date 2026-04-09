@@ -7,8 +7,8 @@ import { Plus, Package, X, Edit, Trash2, AlertTriangle, Calendar, Info, Shopping
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createProduct, updateProduct, deleteProduct, createInventoryAdjustment, createInventoryTransfer, getWarehouseStocks, getProductByBarcode } from '@/modules/inventory/actions/inventory.actions'
 import { BarcodeScanner } from '@/components/shared/BarcodeScanner'
-import type { ProductWithStock } from '@/modules/inventory/actions/inventory.actions'
-import { formatRupiah } from '@/lib/utils'
+import type { InventoryMutationRow, InventoryWarehouseStockRow, ProductWithStock } from '@/modules/inventory/actions/inventory.actions'
+import { formatDate, formatRupiah } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeftRight, ArrowRight, CheckCircle2, ChevronDown, ListChecks, Printer, Barcode as BarcodeIcon } from 'lucide-react'
 import { BarcodeLabel } from '@/components/shared/BarcodeLabel'
@@ -18,7 +18,146 @@ interface InventoryClientProps {
   activeBranchId: string | null
   activeBranchName?: string | null
   initialProducts: ProductWithStock[]
+  warehouseSnapshot: InventoryWarehouseStockRow[]
+  recentMutations: InventoryMutationRow[]
   warehouses: any[]
+}
+
+type InventoryCategoryFilter = 'ALL' | 'RAW' | 'WIP' | 'FG' | 'OTHER'
+
+function getInventoryCategoryMeta(category?: string | null) {
+  if (category === 'Bahan') {
+    return {
+      filter: 'RAW' as InventoryCategoryFilter,
+      label: 'Bahan Baku',
+      description: 'Komponen utama produksi',
+      badgeClass: 'border-amber-200 bg-amber-50 text-amber-700',
+    }
+  }
+
+  if (category === 'Setengah Jadi') {
+    return {
+      filter: 'WIP' as InventoryCategoryFilter,
+      label: 'Setengah Jadi',
+      description: 'Produk antar-proses',
+      badgeClass: 'border-indigo-200 bg-indigo-50 text-indigo-700',
+    }
+  }
+
+  if (category === 'Siap Jual') {
+    return {
+      filter: 'FG' as InventoryCategoryFilter,
+      label: 'Barang Jadi',
+      description: 'Siap dijual atau dikirim',
+      badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    }
+  }
+
+  if (category === 'Pelengkap') {
+    return {
+      filter: 'OTHER' as InventoryCategoryFilter,
+      label: 'Pelengkap',
+      description: 'Bahan pendukung dan kemasan',
+      badgeClass: 'border-cyan-200 bg-cyan-50 text-cyan-700',
+    }
+  }
+
+  if (category === 'Layanan') {
+    return {
+      filter: 'OTHER' as InventoryCategoryFilter,
+      label: 'Layanan',
+      description: 'Jasa dan tenaga kerja',
+      badgeClass: 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700',
+    }
+  }
+
+  return {
+    filter: 'OTHER' as InventoryCategoryFilter,
+    label: category || 'Lainnya',
+    description: 'Kategori pendukung',
+    badgeClass: 'border-slate-200 bg-slate-100 text-slate-700',
+  }
+}
+
+function matchesInventoryCategoryFilter(product: ProductWithStock, filter: InventoryCategoryFilter) {
+  return matchesInventoryCategoryValue(product.category, filter)
+}
+
+function matchesInventoryCategoryValue(category: string | null | undefined, filter: InventoryCategoryFilter) {
+  if (filter === 'ALL') return true
+  return getInventoryCategoryMeta(category).filter === filter
+}
+
+function matchesInventorySearch(values: Array<string | null | undefined>, normalizedSearchTerm: string) {
+  if (!normalizedSearchTerm) return true
+  return values.some((value) => String(value || '').toLowerCase().includes(normalizedSearchTerm))
+}
+
+function formatInventoryQuantity(quantity: number) {
+  const absolute = Math.abs(quantity)
+  const hasFraction = Math.abs(absolute - Math.trunc(absolute)) > 0.0001
+  const formatter = new Intl.NumberFormat('id-ID', {
+    minimumFractionDigits: hasFraction ? 2 : 0,
+    maximumFractionDigits: hasFraction ? 2 : 0,
+  })
+
+  return `${quantity > 0 ? '+' : quantity < 0 ? '-' : ''}${formatter.format(absolute)}`
+}
+
+function getInventoryMutationTypeMeta(referenceType: string) {
+  switch (referenceType) {
+    case 'PURCHASE':
+      return {
+        label: 'Pembelian',
+        badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      }
+    case 'PURCHASE_RETURN':
+      return {
+        label: 'Retur Pembelian',
+        badgeClass: 'border-orange-200 bg-orange-50 text-orange-700',
+      }
+    case 'SALE':
+      return {
+        label: 'Penjualan',
+        badgeClass: 'border-rose-200 bg-rose-50 text-rose-700',
+      }
+    case 'SALES_RETURN':
+      return {
+        label: 'Retur Penjualan',
+        badgeClass: 'border-cyan-200 bg-cyan-50 text-cyan-700',
+      }
+    case 'ADJUSTMENT':
+      return {
+        label: 'Adjustment',
+        badgeClass: 'border-violet-200 bg-violet-50 text-violet-700',
+      }
+    default:
+      return {
+        label: referenceType || 'Mutasi',
+        badgeClass: 'border-slate-200 bg-slate-100 text-slate-700',
+      }
+  }
+}
+
+function getInventoryMovementDirectionMeta(quantity: number) {
+  if (quantity > 0) {
+    return {
+      label: 'Masuk',
+      badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    }
+  }
+
+  if (quantity < 0) {
+    return {
+      label: 'Keluar',
+      badgeClass: 'border-rose-200 bg-rose-50 text-rose-700',
+    }
+  }
+
+  return {
+    label: 'Netral',
+    badgeClass: 'border-slate-200 bg-slate-100 text-slate-600',
+  }
 }
 
 export default function InventoryClient({
@@ -26,6 +165,8 @@ export default function InventoryClient({
   activeBranchId,
   activeBranchName,
   initialProducts,
+  warehouseSnapshot,
+  recentMutations,
   warehouses = [],
 }: InventoryClientProps) {
   const [products, setProducts] = useState<ProductWithStock[]>(initialProducts)
@@ -38,6 +179,8 @@ export default function InventoryClient({
   const [printQty, setPrintQty] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<InventoryCategoryFilter>('ALL')
   
   // Real-time stocks per warehouse
   const [whStocks, setWhStocks] = useState<{warehouse_id: string, quantity: number, warehouse_name?: string}[]>([])
@@ -103,7 +246,7 @@ export default function InventoryClient({
   
   const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false)
   
-  const UNIT_OPTIONS = ['Pcs', 'Unit', 'Kg', 'Gram', 'Liter', 'Ml', 'Box', 'Pack', 'Roll', 'Lembar', 'Set', 'Lusin', 'Meter', 'Cm', 'Pasang', 'Rim', 'Karton', 'Botol', 'Galon', 'Lainnya']
+  const UNIT_OPTIONS = ['Pcs', 'Unit', 'Kg', 'Gram', 'Liter', 'Ml', 'Box', 'Pack', 'Roll', 'Lembar', 'Set', 'Lusin', 'Meter', 'Cm', 'Pasang', 'Rim', 'Karton', 'Botol', 'Galon', 'Ekor', 'Lainnya']
   const [formData, setFormData] = useState({
     name: '',
     sku: '',
@@ -320,6 +463,133 @@ export default function InventoryClient({
     activeWarehouses: warehouses.length
   }
 
+  const categoryFilterOptions: Array<{
+    value: InventoryCategoryFilter
+    label: string
+    hint: string
+    count: number
+    assetValue: number
+  }> = [
+    {
+      value: 'ALL',
+      label: 'Semua',
+      hint: 'Seluruh katalog',
+      count: products.length,
+      assetValue: products.reduce((sum, product) => sum + (product.stock_value || 0), 0),
+    },
+    {
+      value: 'RAW',
+      label: 'Bahan Baku',
+      hint: 'Material utama',
+      count: products.filter((product) => matchesInventoryCategoryFilter(product, 'RAW')).length,
+      assetValue: products
+        .filter((product) => matchesInventoryCategoryFilter(product, 'RAW'))
+        .reduce((sum, product) => sum + (product.stock_value || 0), 0),
+    },
+    {
+      value: 'WIP',
+      label: 'Setengah Jadi',
+      hint: 'Produk antar-proses',
+      count: products.filter((product) => matchesInventoryCategoryFilter(product, 'WIP')).length,
+      assetValue: products
+        .filter((product) => matchesInventoryCategoryFilter(product, 'WIP'))
+        .reduce((sum, product) => sum + (product.stock_value || 0), 0),
+    },
+    {
+      value: 'FG',
+      label: 'Barang Jadi',
+      hint: 'Siap jual',
+      count: products.filter((product) => matchesInventoryCategoryFilter(product, 'FG')).length,
+      assetValue: products
+        .filter((product) => matchesInventoryCategoryFilter(product, 'FG'))
+        .reduce((sum, product) => sum + (product.stock_value || 0), 0),
+    },
+    {
+      value: 'OTHER',
+      label: 'Lainnya',
+      hint: 'Pelengkap & jasa',
+      count: products.filter((product) => matchesInventoryCategoryFilter(product, 'OTHER')).length,
+      assetValue: products
+        .filter((product) => matchesInventoryCategoryFilter(product, 'OTHER'))
+        .reduce((sum, product) => sum + (product.stock_value || 0), 0),
+    },
+  ]
+
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase()
+  const filteredProducts = products.filter((product) => {
+    const categoryMeta = getInventoryCategoryMeta(product.category)
+    const matchesCategory = matchesInventoryCategoryFilter(product, activeCategoryFilter)
+    if (!matchesCategory) return false
+
+    return matchesInventorySearch([
+      product.name,
+      product.sku,
+      product.category,
+      product.unit,
+      categoryMeta.label,
+    ], normalizedSearchTerm)
+  })
+
+  const filteredWarehouseSnapshot = warehouseSnapshot.filter((row) => {
+    const categoryMeta = getInventoryCategoryMeta(row.product_category)
+    const matchesCategory = matchesInventoryCategoryValue(row.product_category, activeCategoryFilter)
+    if (!matchesCategory) return false
+
+    return matchesInventorySearch([
+      row.product_name,
+      row.product_sku,
+      row.product_category,
+      row.product_unit,
+      categoryMeta.label,
+      row.warehouse_name,
+      row.warehouse_code,
+    ], normalizedSearchTerm)
+  })
+
+  const filteredMutations = recentMutations.filter((row) => {
+    const categoryMeta = getInventoryCategoryMeta(row.product_category)
+    const referenceTypeMeta = getInventoryMutationTypeMeta(row.reference_type)
+    const matchesCategory = matchesInventoryCategoryValue(row.product_category, activeCategoryFilter)
+    if (!matchesCategory) return false
+
+    return matchesInventorySearch([
+      row.product_name,
+      row.product_sku,
+      row.product_category,
+      row.product_unit,
+      categoryMeta.label,
+      row.warehouse_name,
+      row.warehouse_code,
+      row.notes,
+      row.reference_type,
+      referenceTypeMeta.label,
+    ], normalizedSearchTerm)
+  })
+
+  const filteredStats = {
+    totalSku: filteredProducts.length,
+    totalValue: filteredProducts.reduce((acc, product) => acc + (product.stock_value || 0), 0),
+    lowStock: filteredProducts.filter((product) => product.type === 'INVENTORY' && product.stock_available <= 5).length,
+  }
+
+  const warehouseSnapshotStats = {
+    totalRows: filteredWarehouseSnapshot.length,
+    totalValue: filteredWarehouseSnapshot.reduce((sum, row) => sum + (row.stock_value || 0), 0),
+    uniqueWarehouses: new Set(filteredWarehouseSnapshot.map((row) => row.warehouse_id)).size,
+  }
+
+  const mutationStats = {
+    totalRows: filteredMutations.length,
+    totalIn: filteredMutations
+      .filter((row) => row.quantity > 0)
+      .reduce((sum, row) => sum + row.quantity, 0),
+    totalOut: filteredMutations
+      .filter((row) => row.quantity < 0)
+      .reduce((sum, row) => sum + Math.abs(row.quantity), 0),
+  }
+
+  const activeFilterLabel = categoryFilterOptions.find((option) => option.value === activeCategoryFilter)?.label || 'Semua'
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto space-y-12 pb-24">
       <PageHeader
@@ -400,14 +670,77 @@ export default function InventoryClient({
       <SectionCard>
         <SectionHeader 
           title="Daftar Inventori"
-          subtitle="Manajemen persediaan barang dan nilai aset real-time."
+          subtitle={`Manajemen persediaan barang dan nilai aset real-time. Scope aktif: ${activeFilterLabel.toLowerCase()}${normalizedSearchTerm ? `, pencarian "${searchTerm.trim()}"` : ''}.`}
           actions={
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input placeholder="Cari nama produk atau SKU..." className="pl-9 pr-4 py-2 text-[10px] font-bold border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-100 transition-all outline-none w-64" />
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Cari nama produk, SKU, kategori..."
+                className="pl-9 pr-4 py-2 text-[10px] font-bold border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-100 transition-all outline-none w-64"
+              />
             </div>
           }
         />
+
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {categoryFilterOptions.map((option) => {
+            const isActive = activeCategoryFilter === option.value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setActiveCategoryFilter(option.value)}
+                className={`h-full rounded-[28px] border px-5 py-4 text-left transition-all ${
+                  isActive
+                    ? 'border-blue-200 bg-blue-50 shadow-md shadow-blue-100 ring-1 ring-blue-100'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex h-full flex-col justify-between gap-4">
+                  <div>
+                    <div className={`text-[10px] font-black uppercase tracking-[0.18em] ${isActive ? 'text-blue-700' : 'text-slate-400'}`}>
+                      {option.label}
+                    </div>
+                    <div className={`mt-3 text-[15px] font-black leading-none ${isActive ? 'text-slate-900' : 'text-slate-700'}`}>
+                      {option.count} item
+                    </div>
+                    <div className="mt-2 text-[10px] font-bold text-slate-400">
+                      {option.hint}
+                    </div>
+                  </div>
+                  <div className={`rounded-2xl border px-3.5 py-3 ${isActive ? 'border-blue-200 bg-white/80' : 'border-slate-100 bg-slate-50'}`}>
+                    <div className={`text-[9px] font-black uppercase tracking-[0.18em] ${isActive ? 'text-blue-500' : 'text-slate-400'}`}>
+                      Nilai Aset
+                    </div>
+                    <div className={`mt-1 text-[13px] font-black leading-tight ${isActive ? 'text-blue-900' : 'text-slate-700'}`}>
+                      {formatRupiah(option.assetValue)}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Produk Tampil</div>
+            <div className="mt-2 text-2xl font-black text-slate-900">{filteredStats.totalSku}</div>
+            <div className="text-[11px] font-bold text-slate-500">Daftar yang sedang Anda telusuri</div>
+          </div>
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-600">Nilai Stok Tampil</div>
+            <div className="mt-2 text-2xl font-black text-emerald-700">{formatRupiah(filteredStats.totalValue)}</div>
+            <div className="text-[11px] font-bold text-emerald-700/70">Nilai aset pada hasil filter saat ini</div>
+          </div>
+          <div className="rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Stok Tipis Tampil</div>
+            <div className="mt-2 text-2xl font-black text-amber-700">{filteredStats.lowStock}</div>
+            <div className="text-[11px] font-bold text-amber-700/70">Memudahkan penelusuran per kategori</div>
+          </div>
+        </div>
         
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -421,10 +754,12 @@ export default function InventoryClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {products.length === 0 ? (
-                <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Belum ada data inventori.</td></tr>
+              {filteredProducts.length === 0 ? (
+                <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">{products.length === 0 ? 'Belum ada data inventori.' : 'Tidak ada produk yang cocok dengan filter saat ini.'}</td></tr>
               ) : (
-                products.map((product) => (
+                filteredProducts.map((product) => {
+                  const categoryMeta = getInventoryCategoryMeta(product.category)
+                  return (
                   <tr key={product.id} className="group hover:bg-slate-50 transition-colors">
                     <td className="px-8 py-6">
                        <div className="text-sm font-black text-slate-900 tracking-tight">{product.name}</div>
@@ -432,6 +767,12 @@ export default function InventoryClient({
                          <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{product.sku || 'TANPA SKU'}</span>
                          <span>•</span>
                          <span className="uppercase tracking-widest">{product.type}</span>
+                       </div>
+                       <div className="mt-2 flex items-center gap-2">
+                         <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${categoryMeta.badgeClass}`}>
+                           {categoryMeta.label}
+                         </span>
+                         <span className="text-[10px] font-bold text-slate-400">{categoryMeta.description}</span>
                        </div>
                     </td>
                     <td className="px-6 py-6 text-right">
@@ -532,7 +873,239 @@ export default function InventoryClient({
                        </div>
                     </td>
                   </tr>
-                ))
+                )})
+              )}
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
+
+      <SectionCard>
+        <SectionHeader
+          title="Peta Stok per Gudang"
+          subtitle={`Posisi stok saat ini per gudang untuk scope ${activeFilterLabel.toLowerCase()}${normalizedSearchTerm ? `, pencarian "${searchTerm.trim()}"` : ''}.`}
+          actions={
+            <div className="flex items-center gap-3 text-right">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <div className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Baris Aktif</div>
+                <div className="mt-1 text-sm font-black text-slate-900">{warehouseSnapshotStats.totalRows}</div>
+              </div>
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                <div className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-600">Nilai Aset</div>
+                <div className="mt-1 text-sm font-black text-emerald-700">{formatRupiah(warehouseSnapshotStats.totalValue)}</div>
+              </div>
+            </div>
+          }
+        />
+
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Gudang Aktif</div>
+            <div className="mt-2 text-2xl font-black text-slate-900">{warehouseSnapshotStats.uniqueWarehouses}</div>
+            <div className="text-[11px] font-bold text-slate-500">Lokasi dengan stok tersedia</div>
+          </div>
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-5 py-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600">Baris Snapshot</div>
+            <div className="mt-2 text-2xl font-black text-blue-700">{warehouseSnapshotStats.totalRows}</div>
+            <div className="text-[11px] font-bold text-blue-700/70">Kombinasi produk dan gudang</div>
+          </div>
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-600">Total Nilai Tampil</div>
+            <div className="mt-2 text-2xl font-black text-emerald-700">{formatRupiah(warehouseSnapshotStats.totalValue)}</div>
+            <div className="text-[11px] font-bold text-emerald-700/70">Berdasarkan HPP rata-rata produk</div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/60 border-b border-slate-100">
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Gudang</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Produk</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right text-blue-600">Qty</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right text-slate-400">HPP</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right text-emerald-600">Nilai Aset</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right text-slate-400">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filteredWarehouseSnapshot.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-20 text-center text-slate-400 font-bold text-xs uppercase italic">
+                    Belum ada stok per gudang yang cocok dengan filter saat ini.
+                  </td>
+                </tr>
+              ) : (
+                filteredWarehouseSnapshot.map((row) => {
+                  const categoryMeta = getInventoryCategoryMeta(row.product_category)
+                  return (
+                    <tr key={`${row.product_id}:${row.warehouse_id}`} className="group hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-5">
+                        <div className="text-sm font-black text-slate-900">{row.warehouse_name}</div>
+                        <div className="mt-1 text-[10px] font-bold text-slate-400 uppercase tracking-[0.18em]">
+                          {row.warehouse_code || 'Tanpa Kode'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="text-sm font-black text-slate-900">{row.product_name}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-bold text-slate-400">
+                          <span className="font-mono rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5">
+                            {row.product_sku || 'TANPA SKU'}
+                          </span>
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${categoryMeta.badgeClass}`}>
+                            {categoryMeta.label}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 text-right">
+                        <div className={`text-sm font-black font-mono ${row.quantity < 0 ? 'text-rose-600' : 'text-blue-600'}`}>
+                          {formatInventoryQuantity(row.quantity)}
+                        </div>
+                        <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                          {row.product_unit || 'Unit'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 text-right text-sm font-black text-slate-700 font-mono">
+                        {formatRupiah(row.unit_cost)}
+                      </td>
+                      <td className="px-6 py-5 text-right text-sm font-black text-emerald-700 font-mono">
+                        {formatRupiah(row.stock_value)}
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center justify-end">
+                          <Link
+                            href={`/inventory/ledger/${row.product_id}`}
+                            className="inline-flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-blue-700 transition-all hover:bg-blue-500 hover:text-white"
+                          >
+                            <HistoryIcon size={14} />
+                            Ledger
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
+
+      <SectionCard>
+        <SectionHeader
+          title="Mutasi Inventori Terkini"
+          subtitle={`Ringkasan arus stok terbaru agar kita bisa telusuri barang masuk dan keluar per referensi transaksi${normalizedSearchTerm ? `, pencarian "${searchTerm.trim()}"` : ''}.`}
+          actions={
+            <div className="flex items-center gap-3 text-right">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <div className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Baris Mutasi</div>
+                <div className="mt-1 text-sm font-black text-slate-900">{mutationStats.totalRows}</div>
+              </div>
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                <div className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-600">Masuk</div>
+                <div className="mt-1 text-sm font-black text-emerald-700">{formatInventoryQuantity(mutationStats.totalIn)}</div>
+              </div>
+              <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3">
+                <div className="text-[9px] font-black uppercase tracking-[0.18em] text-rose-600">Keluar</div>
+                <div className="mt-1 text-sm font-black text-rose-700">{formatInventoryQuantity(-mutationStats.totalOut)}</div>
+              </div>
+            </div>
+          }
+        />
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/60 border-b border-slate-100">
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Tanggal</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Produk</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Gudang</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-center text-slate-400">Jenis</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right text-blue-600">Qty</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right text-slate-400">HPP</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right text-slate-400">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filteredMutations.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-20 text-center text-slate-400 font-bold text-xs uppercase italic">
+                    Belum ada mutasi inventori yang cocok dengan filter saat ini.
+                  </td>
+                </tr>
+              ) : (
+                filteredMutations.map((row) => {
+                  const categoryMeta = getInventoryCategoryMeta(row.product_category)
+                  const directionMeta = getInventoryMovementDirectionMeta(row.quantity)
+                  const referenceTypeMeta = getInventoryMutationTypeMeta(row.reference_type)
+
+                  return (
+                    <tr key={row.id} className="group hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-5">
+                        <div className="text-sm font-black text-slate-900">{formatDate(row.movement_date, 'short')}</div>
+                        <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                          Ref {row.reference_id.slice(0, 8) || '-'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="text-sm font-black text-slate-900">{row.product_name}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-bold text-slate-400">
+                          <span className="font-mono rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5">
+                            {row.product_sku || 'TANPA SKU'}
+                          </span>
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${categoryMeta.badgeClass}`}>
+                            {categoryMeta.label}
+                          </span>
+                        </div>
+                        {row.notes && (
+                          <div className="mt-2 line-clamp-2 text-[11px] font-bold text-slate-500">
+                            {row.notes}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="text-sm font-black text-slate-900">
+                          {row.warehouse_name || 'Belum dipetakan'}
+                        </div>
+                        <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                          {row.warehouse_code || (row.warehouse_id ? 'Gudang aktif' : 'Perlu telusur referensi')}
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex flex-col items-center gap-2">
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${referenceTypeMeta.badgeClass}`}>
+                            {referenceTypeMeta.label}
+                          </span>
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${directionMeta.badgeClass}`}>
+                            {directionMeta.label}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 text-right">
+                        <div className={`text-sm font-black font-mono ${row.quantity < 0 ? 'text-rose-600' : row.quantity > 0 ? 'text-emerald-600' : 'text-slate-600'}`}>
+                          {formatInventoryQuantity(row.quantity)}
+                        </div>
+                        <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                          {row.product_unit || 'Unit'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 text-right text-sm font-black text-slate-700 font-mono">
+                        {formatRupiah(row.unit_price)}
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center justify-end">
+                          <Link
+                            href={`/inventory/ledger/${row.product_id}`}
+                            className="inline-flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-blue-700 transition-all hover:bg-blue-500 hover:text-white"
+                          >
+                            <HistoryIcon size={14} />
+                            Ledger
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>

@@ -30,6 +30,8 @@ function buildEmployeeForm(overrides: Record<string, string> = {}) {
   formData.set('first_name', overrides.first_name || 'Salsa')
   formData.set('last_name', overrides.last_name || 'Pratama')
   formData.set('job_title', overrides.job_title || 'Staff Gudang')
+  if (overrides.role_id) formData.set('role_id', overrides.role_id)
+  if (overrides.department_id) formData.set('department_id', overrides.department_id)
   formData.set('employment_status', overrides.employment_status || 'FULL_TIME')
   formData.set('basic_salary', overrides.basic_salary || '4500000')
   formData.set('join_date', overrides.join_date || '2026-04-03')
@@ -94,6 +96,30 @@ describe('Employee Actions', () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/hris')
   })
 
+  it('persists selected role_id when creating an employee', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        employees: [
+          {
+            singleResult: success({ id: 'emp-1' }),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
+
+    const result = await createEmployee('org-1', buildEmployeeForm({ role_id: 'role-warehouse' }))
+    const insertPayload = supabase.calls[0]?.operations.find((operation) => operation.method === 'insert')?.args[0] as Record<string, string>
+
+    expect(result).toEqual({ success: true })
+    expect(insertPayload.role_id).toBe('role-warehouse')
+  })
+
   it('updates employees only inside their own branch', async () => {
     const supabase = createSupabaseMock({
       tables: {
@@ -127,6 +153,49 @@ describe('Employee Actions', () => {
     expect(branchFilter?.args[1]).toBe('branch-1')
   })
 
+  it('syncs linked org member role_id when employee role is updated', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        employees: [
+          {
+            maybeSingleResult: success({
+              id: 'emp-1',
+              branch_id: 'branch-1',
+              user_id: 'user-1',
+            }),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        org_members: [
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
+
+    const result = await updateEmployee('emp-1', 'org-1', buildEmployeeForm({ role_id: 'role-finance' }))
+    const roleSyncCall = supabase.calls.find((call) => call.table === 'org_members')
+
+    expect(result).toEqual({ success: true })
+    expect(roleSyncCall?.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ method: 'update', args: [expect.objectContaining({ role_id: 'role-finance' })] }),
+        expect.objectContaining({ method: 'eq', args: ['org_id', 'org-1'] }),
+        expect.objectContaining({ method: 'eq', args: ['user_id', 'user-1'] }),
+        expect.objectContaining({ method: 'eq', args: ['is_active', true] }),
+      ])
+    )
+  })
+
   it('retries create without department_id when legacy schema does not have the column', async () => {
     const supabase = createSupabaseMock({
       tables: {
@@ -154,6 +223,35 @@ describe('Employee Actions', () => {
     expect(result).toEqual({ success: true })
     expect(firstInsert).toHaveProperty('department_id')
     expect(secondInsert).not.toHaveProperty('department_id')
+  })
+
+  it('retries create without role_id when legacy schema does not have the column', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        employees: [
+          {
+            singleResult: failure("Could not find the 'role_id' column of 'employees' in the schema cache"),
+          },
+          {
+            singleResult: success({ id: 'emp-1' }),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
+
+    const result = await createEmployee('org-1', buildEmployeeForm({ role_id: 'role-legacy' }))
+    const firstInsert = supabase.calls[0]?.operations.find((operation) => operation.method === 'insert')?.args[0] as Record<string, unknown>
+    const secondInsert = supabase.calls[1]?.operations.find((operation) => operation.method === 'insert')?.args[0] as Record<string, unknown>
+
+    expect(result).toEqual({ success: true })
+    expect(firstInsert).toHaveProperty('role_id')
+    expect(secondInsert).not.toHaveProperty('role_id')
   })
 
   it('retries update without department_id when legacy schema does not have the column', async () => {

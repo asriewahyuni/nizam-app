@@ -1,16 +1,19 @@
 'use server'
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { getServerAuthContext } from '@/lib/supabase/auth.server'
 import { normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
 import { generateSlug } from '@/lib/utils'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 import { seedDemoData, type DemoBusinessType } from '@/modules/demo/actions/demo.actions'
 import {
   ACTIVE_BRANCH_COOKIE,
   ACTIVE_ORG_COOKIE,
   type AccessibleOrganization,
+  type BranchSummary,
 } from '@/modules/organization/lib/org-context'
 import {
   persistMembershipActiveContext,
@@ -28,6 +31,27 @@ const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 const DEFAULT_BRANCH_NAME = 'Unit Utama'
 const DEFAULT_BRANCH_CODE = 'MAIN'
 const DEMO_ACCOUNT_EMAIL = 'demo@nizam.app'
+const FULL_ORG_ACCESS_ROLES = new Set(['owner', 'admin'])
+
+type OrgMembershipBranchScope = {
+  accessibleBranches: BranchSummary[]
+  canAccessAllBranches: boolean
+}
+
+type OrganizationMembershipRow = {
+  id: string
+  org_id: string
+  role: string | null
+}
+
+type OrganizationBranchRow = {
+  id: string
+  org_id: string
+  name: string
+  code: string | null
+  address: string | null
+  is_active: boolean | null
+}
 
 function getActiveContextCookieOptions() {
   return {
@@ -40,7 +64,7 @@ function getActiveContextCookieOptions() {
 }
 
 function resolvePersistedBranchIdForOrgSwitch(
-  branchAccessScope: Awaited<ReturnType<typeof getBranchAccessScope>>
+  branchAccessScope: OrgMembershipBranchScope
 ) {
   if (branchAccessScope.accessibleBranches.length === 1) {
     return branchAccessScope.accessibleBranches[0]?.id ?? null
@@ -53,10 +77,161 @@ function resolvePersistedBranchIdForOrgSwitch(
   return null
 }
 
+function normalizeOrganizationBranches(rows: OrganizationBranchRow[]): BranchSummary[] {
+  return rows.map((branch) => ({
+    id: String(branch.id),
+    org_id: String(branch.org_id),
+    name: String(branch.name),
+    code: String(branch.code || ''),
+    address: branch.address ? String(branch.address) : null,
+    is_active: Boolean(branch.is_active),
+  }))
+}
+
+function groupBranchesByOrgId(rows: BranchSummary[]) {
+  return rows.reduce<Record<string, BranchSummary[]>>((acc, branch) => {
+    const bucket = acc[branch.org_id] || []
+    bucket.push(branch)
+    acc[branch.org_id] = bucket
+    return acc
+  }, {})
+}
+
+function normalizeRoleName(value: string | null | undefined) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function getLegacyRoleLabel(role: string | null | undefined) {
+  const normalizedRole = normalizeRoleName(role)
+  if (normalizedRole === 'manager') return 'Manager'
+  if (normalizedRole === 'staff') return 'Staff'
+  if (normalizedRole === 'viewer') return 'Viewer'
+  return null
+}
+
+async function resolveFallbackMembershipRole(
+  db: any,
+  orgId: string,
+  input: {
+    membershipRoleId?: string | null
+    employeeRoleId?: string | null
+    employeeJobTitle?: string | null
+    membershipRole?: string | null
+  }
+) {
+  const { data: roleRows, error } = await db
+    .from('roles')
+    .select('id, name, permissions')
+    .eq('org_id', orgId)
+
+  if (error || !Array.isArray(roleRows) || roleRows.length === 0) {
+    return null
+  }
+
+  const orderedRoleIds = [
+    String(input.membershipRoleId || '').trim(),
+    String(input.employeeRoleId || '').trim(),
+  ].filter(Boolean)
+
+  const fallbackById = orderedRoleIds
+    .map((roleId) => roleRows.find((role: any) => String(role?.id || '').trim() === roleId))
+    .find(Boolean)
+  if (fallbackById) return fallbackById
+
+  const normalizedJobTitle = normalizeRoleName(input.employeeJobTitle)
+  if (normalizedJobTitle) {
+    const fallbackByJobTitle = roleRows.find(
+      (role: any) => normalizeRoleName(role?.name) === normalizedJobTitle
+    )
+    if (fallbackByJobTitle) return fallbackByJobTitle
+  }
+
+  const legacyRoleLabel = getLegacyRoleLabel(input.membershipRole)
+  if (legacyRoleLabel) {
+    const fallbackLegacyRole = roleRows.find(
+      (role: any) => normalizeRoleName(role?.name) === legacyRoleLabel.toLowerCase()
+    )
+    if (fallbackLegacyRole) return fallbackLegacyRole
+  }
+
+  return null
+}
+
+async function resolveAccessibleBranchesForMembership(
+  admin: any,
+  membership: OrganizationMembershipRow
+): Promise<OrgMembershipBranchScope> {
+  const { data: branchRows, error: branchesError } = await admin
+    .from('branches')
+    .select('id, org_id, name, code, address, is_active')
+    .eq('org_id', membership.org_id)
+    .eq('is_active', true)
+    .order('name', { ascending: true })
+
+  if (branchesError || !Array.isArray(branchRows)) {
+    return {
+      accessibleBranches: [],
+      canAccessAllBranches: false,
+    }
+  }
+
+  const activeBranches = normalizeOrganizationBranches(branchRows as OrganizationBranchRow[])
+  if (activeBranches.length === 0) {
+    return {
+      accessibleBranches: [],
+      canAccessAllBranches: false,
+    }
+  }
+
+  if (FULL_ORG_ACCESS_ROLES.has(String(membership.role || '').toLowerCase())) {
+    return {
+      accessibleBranches: activeBranches,
+      canAccessAllBranches: true,
+    }
+  }
+
+  const { data: assignmentRows, error: assignmentsError } = await admin
+    .from('org_member_units')
+    .select('branch_id')
+    .eq('org_id', membership.org_id)
+    .eq('org_member_id', membership.id)
+
+  if (assignmentsError || !Array.isArray(assignmentRows)) {
+    return {
+      accessibleBranches: [],
+      canAccessAllBranches: false,
+    }
+  }
+
+  const assignedBranchIds = new Set(
+    assignmentRows
+      .map((assignment) => String(assignment?.branch_id || '').trim())
+      .filter(Boolean)
+  )
+  const accessibleBranches = activeBranches.filter((branch) => assignedBranchIds.has(branch.id))
+
+  return {
+    accessibleBranches,
+    canAccessAllBranches:
+      accessibleBranches.length > 0 && accessibleBranches.length === activeBranches.length,
+  }
+}
+
 type CreateOrganizationSuccess = {
   success: true
   orgId: string
   branchId: string
+  preservedContext: boolean
+  organization: {
+    id: string
+    name: string
+    slug: string
+    logo_url: string | null
+    settings: Record<string, unknown>
+    is_active: boolean
+    created_at: string
+    manager_employee_id: string | null
+  }
 }
 
 type CreateOrganizationFailure = {
@@ -66,7 +241,6 @@ type CreateOrganizationFailure = {
 type CreateOrganizationActionResult = CreateOrganizationSuccess | CreateOrganizationFailure
 
 type HoldingContextSuccess = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any
   userId: string
   activeOrgId: string
@@ -378,6 +552,7 @@ async function createOrganizationRecord(
     const slug = generateSlug(name)
     const orgId = crypto.randomUUID()
     let defaultBranchId = crypto.randomUUID()
+    const createdAt = new Date().toISOString()
 
     // POPULATE OWNER EMAIL FROM SESSION
     const ownerEmail = user.email
@@ -386,6 +561,9 @@ async function createOrganizationRecord(
     const requestedDemoPlan = planParam === 'demo'
     const parentOrgIdRaw = String(formData.get('parent_org_id') || '').trim()
     const parentOrgId = parentOrgIdRaw || null
+    const preserveParentContext = parentOrgId
+      ? String(formData.get('preserve_parent_context') || 'true').trim().toLowerCase() !== 'false'
+      : false
     const accountIsDemo = isDemoAccountUser(user as { email?: string | null; user_metadata?: Record<string, unknown> | null })
     let parentOrgIsDemo = false
     let parentPackageState: { plan: string | null; isDemo: boolean } | null = null
@@ -394,19 +572,22 @@ async function createOrganizationRecord(
       const holdingContext = await getHoldingManagementContext(parentOrgId, { ownerOnly: true })
       if ('error' in holdingContext) return { error: holdingContext.error }
 
-      // ── Enforce child org limit ───────────────────────────────────
-      const limits = await getOrgLimits(parentOrgId)
+      const [limits, packageState] = await Promise.all([
+        getOrgLimits(parentOrgId),
+        getOrganizationPackageState(db, parentOrgId),
+      ])
       if (limits.maxChildOrgs !== null && limits.currentChildOrgs >= limits.maxChildOrgs) {
         return {
           error: `Batas anak perusahaan tercapai (${limits.currentChildOrgs}/${limits.maxChildOrgs}). Upgrade paket SaaS Anda untuk menambah lebih banyak entitas.`,
         }
       }
 
-      parentPackageState = await getOrganizationPackageState(db, parentOrgId)
+      parentPackageState = packageState
       parentOrgIsDemo = parentPackageState.isDemo
     }
 
     const isDemo = accountIsDemo || requestedDemoPlan || parentOrgIsDemo
+    const shouldSkipCoaSeed = parentOrgId ? true : !isDemo
     const shouldAutoApplyAbsVoucher = !parentOrgId && !isDemo && planParam === 'abs'
     let selectedPlan = isDemo ? 'Demo' : 'Trial'
     if (parentPackageState?.plan) {
@@ -425,8 +606,9 @@ async function createOrganizationRecord(
         plan: selectedPlan, // Default plan for new orgs
         is_demo: isDemo,
         business_type: businessType,
-        // Delay CoA trigger seeding until Unit Utama exists to satisfy governance checks.
-        skip_coa_seed: true,
+        // Demo root orgs should be ready-to-explore immediately, while regular orgs
+        // and child entities keep the manual/sync-first CoA activation behavior.
+        skip_coa_seed: shouldSkipCoaSeed,
       },
     }
     if (ownerEmail) {
@@ -504,24 +686,35 @@ async function createOrganizationRecord(
       }
     }
 
-    if (parentOrgId) {
-      const coaSync = await syncParentCoAToChildOrg(parentOrgId, orgId)
-      if (!coaSync.success) {
-        ;(console as any).warn('CreateOrganization: CoA parent sync warning', coaSync.error)
-      }
-
-      const roleSync = await syncParentRolesToChildOrg(privilegedDb, parentOrgId, orgId)
-      if (!roleSync.success) {
-        const roleSyncError = 'error' in roleSync ? roleSync.error : 'Unknown role sync error.'
-        ;(console as any).warn('CreateOrganization: role parent sync warning', roleSyncError)
-      }
-    }
-
     await persistMembershipActiveContext(privilegedDb, {
       userId: user.id,
       orgId,
       branchId: defaultBranchId,
     })
+
+    if (parentOrgId) {
+      const [coaSyncResult, roleSyncResult] = await Promise.allSettled([
+        syncParentCoAToChildOrg(parentOrgId, orgId),
+        syncParentRolesToChildOrg(privilegedDb, parentOrgId, orgId),
+      ])
+
+      if (coaSyncResult.status === 'fulfilled') {
+        if (!coaSyncResult.value.success) {
+          ;(console as any).warn('CreateOrganization: CoA parent sync warning', coaSyncResult.value.error)
+        }
+      } else {
+        ;(console as any).warn('CreateOrganization: CoA parent sync failed unexpectedly', coaSyncResult.reason)
+      }
+
+      if (roleSyncResult.status === 'fulfilled') {
+        if (!roleSyncResult.value.success) {
+          const roleSyncError = 'error' in roleSyncResult.value ? roleSyncResult.value.error : 'Unknown role sync error.'
+          ;(console as any).warn('CreateOrganization: role parent sync warning', roleSyncError)
+        }
+      } else {
+        ;(console as any).warn('CreateOrganization: role parent sync failed unexpectedly', roleSyncResult.reason)
+      }
+    }
 
     // IF DEMO, SEED DATA
     if (isDemo) {
@@ -541,13 +734,26 @@ async function createOrganizationRecord(
       }
     }
 
-    cookieStore.set(ACTIVE_ORG_COOKIE, orgId, getActiveContextCookieOptions())
-    cookieStore.set(ACTIVE_BRANCH_COOKIE, defaultBranchId, getActiveContextCookieOptions())
+    if (!preserveParentContext) {
+      cookieStore.set(ACTIVE_ORG_COOKIE, orgId, getActiveContextCookieOptions())
+      cookieStore.set(ACTIVE_BRANCH_COOKIE, defaultBranchId, getActiveContextCookieOptions())
+    }
 
     return {
       success: true,
       orgId,
       branchId: defaultBranchId,
+      preservedContext: preserveParentContext,
+      organization: {
+        id: orgId,
+        name,
+        slug,
+        logo_url: null,
+        settings: isPlainObject(orgInsertPayload.settings) ? orgInsertPayload.settings : {},
+        is_active: true,
+        created_at: createdAt,
+        manager_employee_id: null,
+      },
     }
   } catch (error) {
     const message = extractErrorMessage(error)
@@ -996,15 +1202,18 @@ export async function createOrganizationQuick(formData: FormData) {
   const result = await createOrganizationRecord(formData)
   if ('error' in result) return result
 
-  revalidatePath('/', 'layout')
-  revalidatePath('/dashboard')
+  revalidatePath('/settings/sub-orgs')
+  revalidatePath('/reports')
+  if (!result.preservedContext) {
+    revalidatePath('/', 'layout')
+    revalidatePath('/dashboard')
+  }
   return result
 }
 
-export async function getActiveOrg() {
-  const supabase = await createClient()
+const getActiveOrgCached = cache(async () => {
+  const { supabase, user } = await getServerAuthContext()
   const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
   const cookieStore = await cookies()
@@ -1061,26 +1270,52 @@ export async function getActiveOrg() {
   // Fetch Job Title from employees table
   const { data: empData } = await db
     .from('employees')
-    .select('job_title')
+    .select('job_title, role_id')
     .eq('org_id', activeOrgId)
     .eq('user_id', user.id)
     .maybeSingle()
 
+  let resolvedRoleId = String(memberData.role_id || empData?.role_id || '').trim() || null
+  let resolvedPermissions = Array.isArray((memberData.roles as any)?.permissions)
+    ? (memberData.roles as any).permissions.filter((permission: unknown): permission is string => typeof permission === 'string')
+    : []
+
+  if (!resolvedPermissions.length) {
+    const fallbackRole = await resolveFallbackMembershipRole(db, activeOrgId, {
+      membershipRoleId: memberData.role_id,
+      employeeRoleId: empData?.role_id,
+      employeeJobTitle: empData?.job_title,
+      membershipRole: memberData.role,
+    })
+
+    if (fallbackRole) {
+      resolvedRoleId = String(resolvedRoleId || fallbackRole.id || '').trim() || null
+      resolvedPermissions = Array.isArray(fallbackRole.permissions)
+        ? fallbackRole.permissions.filter((permission: unknown): permission is string => typeof permission === 'string')
+        : []
+    }
+  }
+
   return {
     org,
     role: memberData.role as string,
-    roleId: memberData.role_id,
+    roleId: resolvedRoleId,
     jobTitle: empData?.job_title || memberData.role,
-    permissions: (memberData.roles as any)?.permissions || [],
+    permissions: resolvedPermissions,
     enabledModules,
     user
   }
+})
+
+export async function getActiveOrg() {
+  // Cache the active org lookup per request because many dashboard pages
+  // and helpers ask for the same org/user context during a single render.
+  return getActiveOrgCached()
 }
 
-export async function getMyOrganizations(): Promise<AccessibleOrganization[]> {
-  const supabase = await createClient()
+const getMyOrganizationsCached = cache(async (): Promise<AccessibleOrganization[]> => {
+  const { supabase, user } = await getServerAuthContext()
   const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
   const { data, error } = await db
@@ -1147,10 +1382,14 @@ export async function getMyOrganizations(): Promise<AccessibleOrganization[]> {
     } satisfies AccessibleOrganization
   })
   return mapped.filter((m): m is AccessibleOrganization => m !== null)
+})
+
+export async function getMyOrganizations(): Promise<AccessibleOrganization[]> {
+  return getMyOrganizationsCached()
 }
 
 export async function setActiveOrg(orgId: string) {
-  const supabase = await createClient()
+  const { supabase, user } = await getServerAuthContext()
   const admin = (await createAdminClient()) as any
   const db = supabase as any
   const cookieStore = await cookies()
@@ -1160,12 +1399,11 @@ export async function setActiveOrg(orgId: string) {
     return { error: 'Organisasi tidak valid.' }
   }
 
-  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Tidak terautentikasi.' }
 
   const { data: membership, error } = await db
     .from('org_members')
-    .select('org_id')
+    .select('id, org_id, role')
     .eq('user_id', user.id)
     .eq('org_id', trimmedOrgId)
     .eq('is_active', true)
@@ -1177,7 +1415,10 @@ export async function setActiveOrg(orgId: string) {
 
   cookieStore.delete('nizam_demo_org_id')
   cookieStore.set(ACTIVE_ORG_COOKIE, trimmedOrgId, getActiveContextCookieOptions())
-  const branchAccessScope = await getBranchAccessScope(trimmedOrgId)
+  const branchAccessScope = await resolveAccessibleBranchesForMembership(
+    admin,
+    membership as OrganizationMembershipRow
+  )
   const persistedBranchId = resolvePersistedBranchIdForOrgSwitch(branchAccessScope)
 
   if (persistedBranchId) {
@@ -1258,6 +1499,7 @@ export async function getOrgMembers(orgId: string) {
     .from('org_members')
     .select(`
       *,
+      custom_role:roles(name),
       organizations(name),
       user:user_id (
         email
@@ -1374,12 +1616,83 @@ export async function getBranchesByOrganizations(orgIds: string[]) {
     return {} as Record<string, BranchSummary[]>
   }
 
-  const entries = await Promise.all(
-    normalizedOrgIds.map(async (orgId) => {
-      const branches = await getBranches(orgId)
-      return [orgId, branches] as const
-    })
+  const { user } = await getServerAuthContext()
+  if (!user) {
+    return Object.fromEntries(normalizedOrgIds.map((orgId) => [orgId, []])) as Record<string, BranchSummary[]>
+  }
+
+  const admin = (await createAdminClient()) as any
+  const { data: membershipRows, error: membershipsError } = await admin
+    .from('org_members')
+    .select('id, org_id, role')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .in('org_id', normalizedOrgIds)
+
+  if (membershipsError || !Array.isArray(membershipRows) || membershipRows.length === 0) {
+    return Object.fromEntries(normalizedOrgIds.map((orgId) => [orgId, []])) as Record<string, BranchSummary[]>
+  }
+
+  const typedMemberships = (membershipRows as OrganizationMembershipRow[]).filter(
+    (membership) => normalizedOrgIds.includes(String(membership.org_id || '').trim())
   )
+  const membershipByOrgId = new Map(
+    typedMemberships.map((membership) => [String(membership.org_id), membership] as const)
+  )
+  const { data: branchRows, error: branchesError } = await admin
+    .from('branches')
+    .select('id, org_id, name, code, address, is_active')
+    .in('org_id', Array.from(membershipByOrgId.keys()))
+    .eq('is_active', true)
+    .order('name', { ascending: true })
+
+  const normalizedBranches = !branchesError && Array.isArray(branchRows)
+    ? normalizeOrganizationBranches(branchRows as OrganizationBranchRow[])
+    : []
+  const branchesByOrgId = groupBranchesByOrgId(normalizedBranches)
+
+  const restrictedMemberships = typedMemberships.filter(
+    (membership) => !FULL_ORG_ACCESS_ROLES.has(String(membership.role || '').toLowerCase())
+  )
+  let assignedBranchIdsByMembershipId = new Map<string, Set<string>>()
+  if (restrictedMemberships.length > 0) {
+    const { data: assignmentRows, error: assignmentsError } = await admin
+      .from('org_member_units')
+      .select('org_member_id, branch_id')
+      .in('org_member_id', restrictedMemberships.map((membership) => membership.id))
+
+    if (!assignmentsError && Array.isArray(assignmentRows)) {
+      assignedBranchIdsByMembershipId = assignmentRows.reduce((acc, assignment) => {
+        const membershipId = String(assignment?.org_member_id || '').trim()
+        const branchId = String(assignment?.branch_id || '').trim()
+        if (!membershipId || !branchId) return acc
+        const bucket = acc.get(membershipId) || new Set<string>()
+        bucket.add(branchId)
+        acc.set(membershipId, bucket)
+        return acc
+      }, new Map<string, Set<string>>())
+    }
+  }
+
+  const entries = normalizedOrgIds.map((orgId) => {
+    const membership = membershipByOrgId.get(orgId)
+    if (!membership) return [orgId, []] as const
+
+    const orgBranches = branchesByOrgId[orgId] || []
+    if (orgBranches.length === 0) {
+      return [orgId, []] as const
+    }
+
+    if (FULL_ORG_ACCESS_ROLES.has(String(membership.role || '').toLowerCase())) {
+      return [orgId, orgBranches] as const
+    }
+
+    const assignedBranchIds = assignedBranchIdsByMembershipId.get(membership.id) || new Set<string>()
+    return [
+      orgId,
+      orgBranches.filter((branch) => assignedBranchIds.has(branch.id)),
+    ] as const
+  })
 
   return Object.fromEntries(entries) as Record<string, BranchSummary[]>
 }

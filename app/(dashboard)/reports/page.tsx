@@ -9,8 +9,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const params = await searchParams
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
-  const activeBranch = await getActiveBranch(orgData.org.id)
-  const canAccessAllBranches = await canSelectAllBranches(orgData.org.id)
+  const [activeBranch, canAccessAllBranches] = await Promise.all([
+    getActiveBranch(orgData.org.id),
+    canSelectAllBranches(orgData.org.id),
+  ])
   const activeOrgWithParent = orgData.org as typeof orgData.org & { parent_org_id?: string | null }
   const isParentOrg = !activeOrgWithParent.parent_org_id
 

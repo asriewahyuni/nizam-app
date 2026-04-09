@@ -4,39 +4,70 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { 
-  Building2, 
-  UserCircle, 
-  Calendar, 
   ArrowRight,
   TrendingDown,
   TrendingUp,
-  AlertCircle,
   Clock,
-  Briefcase,
   History,
   CreditCard,
   Wallet,
   ArrowUpRight,
   Filter,
-  CheckCircle2
+  CheckCircle2,
+  FileText
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { formatRupiah, formatDate } from '@/lib/utils'
 
+type AgingQuickBillCustomer = {
+  contact_id: string
+  contact_name: string
+  invoice_count: number
+  overdue_invoice_count: number
+  total_outstanding: number
+  oldest_due_date: string | null
+  max_days_overdue: number
+  worst_bucket: string
+}
+
+type AgingSummaryBucket = {
+  bucket: string
+  amount: number
+}
+
+type AgingRow = {
+  id: string
+  contact_name: string
+  doc_number: string
+  doc_href: string | null
+  due_date: string
+  grand_total: number
+  paid_amount: number
+  returned_amount: number
+  outstanding: number
+  aging_bucket: string
+  source_type: string
+  source_label: string
+  source_account_code: string | null
+  settlement_account_id?: string | null
+}
+
 interface AgingClientProps {
-  orgId: string
-  initialData: any
+  initialData: {
+    totalAR: number
+    totalAP: number
+    ar: AgingRow[]
+    ap: AgingRow[]
+    arSummary: AgingSummaryBucket[]
+    apSummary: AgingSummaryBucket[]
+    arQuickBillCustomers?: AgingQuickBillCustomer[]
+  }
   initialView?: 'AR' | 'AP'
 }
 
-export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingClientProps) {
+export function AgingClient({ initialData, initialView = 'AR' }: AgingClientProps) {
   const router = useRouter()
   const [activeView, setActiveView] = useState<'AR' | 'AP'>(initialView)
-
-  const container = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.05 } }
-  }
 
   const highlightClass = (bucket: string) => {
     if (bucket === 'Current') return 'text-emerald-500 bg-emerald-50'
@@ -46,20 +77,21 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
 
   const netPosition = initialData.totalAR - initialData.totalAP
   const arSalamReceivable = (initialData.ar || [])
-    .filter((row: any) => row.source_account_code === '1404' || row.source_type === 'SALAM_VENDOR_RECEIVABLE')
-    .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+    .filter((row) => row.source_account_code === '1404' || row.source_type === 'SALAM_VENDOR_RECEIVABLE')
+    .reduce((sum, row) => sum + Number(row.outstanding || 0), 0)
   const arIstishnaReceivable = (initialData.ar || [])
-    .filter((row: any) => row.source_account_code === '1205' || row.source_type === 'ISTISHNA_VENDOR_RECEIVABLE')
-    .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+    .filter((row) => row.source_account_code === '1205' || row.source_type === 'ISTISHNA_VENDOR_RECEIVABLE')
+    .reduce((sum, row) => sum + Number(row.outstanding || 0), 0)
 
   const apSalamLiability = (initialData.ap || [])
-    .filter((row: any) => row.source_account_code === '2602' || row.source_type === 'SALAM_SALES_LIABILITY')
-    .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+    .filter((row) => row.source_account_code === '2602' || row.source_type === 'SALAM_SALES_LIABILITY')
+    .reduce((sum, row) => sum + Number(row.outstanding || 0), 0)
   const apIstishnaLiability = (initialData.ap || [])
-    .filter((row: any) => row.source_account_code === '2603' || row.source_type === 'ISTISHNA_SALES_LIABILITY')
-    .reduce((sum: number, row: any) => sum + Number(row.outstanding || 0), 0)
+    .filter((row) => row.source_account_code === '2603' || row.source_type === 'ISTISHNA_SALES_LIABILITY')
+    .reduce((sum, row) => sum + Number(row.outstanding || 0), 0)
+  const quickBillCustomers = initialData.arQuickBillCustomers || []
 
-  const openRowAction = (row: any) => {
+  const openRowAction = (row: AgingRow) => {
     if (row.source_type === 'TAX') {
       router.push('/accounting/tax')
       return
@@ -93,7 +125,7 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
     else router.push('/accounting/journal')
   }
 
-  const actionLabel = (row: any) => {
+  const actionLabel = (row: AgingRow) => {
     if (row.source_type === 'TAX') return 'Buka Pajak'
     if (row.source_type === 'JOURNAL') return activeView === 'AR' ? 'Terima Bayar' : 'Bayar Tagihan'
     return 'Buka Dokumen'
@@ -145,7 +177,7 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
                {activeView === 'AR' && <CheckCircle2 size={24} className="text-emerald-500" />}
             </div>
             <div className="space-y-4">
-               {initialData.arSummary.map((s: any) => (
+               {initialData.arSummary.map((s) => (
                   <div key={s.bucket} className="flex items-center gap-4 group">
                      <div className="w-24 text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.bucket}</div>
                      <div className="flex-1 h-3 bg-slate-50 rounded-full overflow-hidden">
@@ -186,7 +218,7 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
                {activeView === 'AP' && <CheckCircle2 size={24} className="text-rose-500" />}
             </div>
             <div className="space-y-4">
-               {initialData.apSummary.map((s: any) => (
+               {initialData.apSummary.map((s) => (
                   <div key={s.bucket} className="flex items-center gap-4 group">
                      <div className="w-24 text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.bucket}</div>
                      <div className="flex-1 h-3 bg-slate-50 rounded-full overflow-hidden">
@@ -215,6 +247,85 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
             </div>
          </div>
       </div>
+
+      {activeView === 'AR' && (
+        <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
+          <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-2">
+              <h3 className="font-black text-slate-900 text-xl flex items-center gap-3">
+                <FileText size={18} className="text-emerald-500" />
+                Quick Bill Penagihan
+              </h3>
+              <p className="text-sm font-medium text-slate-500">
+                Satu dokumen penagihan ringkas per customer dengan lampiran rincian invoice AR yang masih terbuka.
+              </p>
+            </div>
+            <div className="inline-flex w-fit items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-emerald-700">
+              <History size={14} />
+              Customer siap ditagih: {quickBillCustomers.length}
+            </div>
+          </div>
+
+          {quickBillCustomers.length === 0 ? (
+            <div className="px-8 py-12 text-center">
+              <p className="text-sm font-black text-slate-700">Belum ada customer trade AR yang bisa dibuatkan Quick Bill.</p>
+              <p className="mt-2 text-xs font-medium text-slate-400">Quick Bill hanya dibuat dari invoice sales yang masih outstanding dan punya customer yang terdaftar.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50/50 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-100">
+                  <tr>
+                    <th className="px-10 py-5">Pelanggan</th>
+                    <th className="px-6 py-5 text-right">Invoice Terbuka</th>
+                    <th className="px-6 py-5 text-right">Jatuh Tempo Terlama</th>
+                    <th className="px-6 py-5 text-right">Outstanding</th>
+                    <th className="px-6 py-5 text-center">Risiko Aging</th>
+                    <th className="px-10 py-5 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 font-medium">
+                  {quickBillCustomers.map((customer) => (
+                    <tr key={customer.contact_id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-10 py-6">
+                        <p className="text-xs font-black text-slate-900">{customer.contact_name}</p>
+                        <p className="mt-1 text-[10px] uppercase tracking-widest text-slate-400">
+                          {customer.overdue_invoice_count} invoice overdue dari {customer.invoice_count} invoice
+                        </p>
+                      </td>
+                      <td className="px-6 py-6 text-right text-sm font-black text-slate-700">{customer.invoice_count}</td>
+                      <td className="px-6 py-6 text-right">
+                        <p className="text-xs font-black text-slate-900">{customer.oldest_due_date ? formatDate(customer.oldest_due_date) : '-'}</p>
+                        <p className="mt-1 text-[10px] uppercase tracking-widest text-slate-400">
+                          {customer.max_days_overdue > 0 ? `${customer.max_days_overdue} hari` : 'Belum jatuh tempo'}
+                        </p>
+                      </td>
+                      <td className="px-6 py-6 text-right text-lg font-black tracking-tighter text-slate-900">
+                        {formatRupiah(customer.total_outstanding)}
+                      </td>
+                      <td className="px-6 py-6 text-center">
+                        <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase shadow-sm ${highlightClass(customer.worst_bucket)}`}>
+                          {customer.worst_bucket}
+                        </span>
+                      </td>
+                      <td className="px-10 py-6 text-right">
+                        <Link
+                          href={`/accounting/aging/quick-bill/${customer.contact_id}`}
+                          target="_blank"
+                          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-[10px] font-black uppercase text-white shadow-sm transition-all hover:bg-emerald-600"
+                        >
+                          Buka Quick Bill
+                          <ArrowRight size={14} />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Detailed List */}
       <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
@@ -245,7 +356,7 @@ export function AgingClient({ orgId, initialData, initialView = 'AR' }: AgingCli
                   </tr>
                </thead>
                <tbody className="divide-y divide-slate-50 font-medium">
-                  {(activeView === 'AR' ? initialData.ar : initialData.ap).map((row: any, idx: number) => (
+                  {(activeView === 'AR' ? initialData.ar : initialData.ap).map((row, idx) => (
                     <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                        <td className="px-10 py-6 font-black text-slate-900 text-xs">
                           {row.contact_name}
