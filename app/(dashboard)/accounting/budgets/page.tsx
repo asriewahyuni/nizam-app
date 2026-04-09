@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getBudgets, getBudgetPeriodStatus, getBudgetVsActual } from '@/modules/accounting/actions/budget.actions'
 import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
 import { BudgetClient } from '@/app/(dashboard)/accounting/budgets/BudgetClient'
+import { ensureBlankDemoBudgetingSetup } from '@/modules/demo/actions/demo.actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,8 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
   const params = await searchParams
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
+
+  await ensureBlankDemoBudgetingSetup(orgData.org.id)
   const activeBranch = await getActiveBranch(orgData.org.id)
 
   // Set default period: This month (YYYY-MM-01)

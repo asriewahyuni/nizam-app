@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { seedInitialCoA } from '@/modules/accounting/actions/coa.actions'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -13,6 +14,21 @@ import { cookies } from 'next/headers'
 
 const DEMO_EMAIL = 'demo@nizam.app'
 const DEMO_PASSWORD = 'demo-nizam-2026!'
+const DEMO_ACCOUNT_WAIT_RETRIES = 5
+const DEMO_ACCOUNT_WAIT_MS = 1000
+const BLANK_DEMO_BUDGET_TEMPLATES = [
+  { code: '4001', budgetAmount: 250000000 },
+  { code: '5001', budgetAmount: 95000000 },
+  { code: '6001', budgetAmount: 38000000 },
+  { code: '6002', budgetAmount: 12000000 },
+  { code: '6003', budgetAmount: 4500000 },
+  { code: '6005', budgetAmount: 7500000 },
+] as const
+
+type DemoSeedAccount = {
+  id: string
+  code: string
+}
 
 /**
  * Start a demo session:
@@ -106,7 +122,8 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
         plan: 'Demo', // Paket Demo: Full Access + Auto-Destroy saat logout
         is_demo: true,
         business_type: demoType,
-        skip_coa_seed: demoType === 'BLANK' // For BLANK demo, we want to show the "Manual Seed" button
+        // Demo blank tetap butuh CoA agar contoh budgeting bisa langsung dipakai.
+        skip_coa_seed: false,
       },
     })
 
@@ -244,12 +261,137 @@ async function ensureDemoBranch(supabase: any, orgId: string) {
   return branch?.id ? String(branch.id) : null
 }
 
+function getCurrentBudgetPeriod() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+
+  return `${year}-${month}-01`
+}
+
+async function waitForDemoAccounts(supabase: any, orgId: string): Promise<DemoSeedAccount[]> {
+  let accounts: DemoSeedAccount[] = []
+
+  for (let attempt = 0; attempt < DEMO_ACCOUNT_WAIT_RETRIES; attempt += 1) {
+    const { data } = await supabase
+      .from('accounts')
+      .select('id, code')
+      .eq('org_id', orgId)
+
+    if (data && data.length > 20) {
+      accounts = data as DemoSeedAccount[]
+      break
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, DEMO_ACCOUNT_WAIT_MS))
+  }
+
+  return accounts
+}
+
+async function seedBlankDemoBudgeting(supabase: any, orgId: string, branchId: string) {
+  const accounts = await waitForDemoAccounts(supabase, orgId)
+
+  if (accounts.length === 0) {
+    ;(console as any).warn('Blank demo budgeting seed skipped: CoA accounts are not ready yet.', { orgId })
+    return
+  }
+
+  const period = getCurrentBudgetPeriod()
+  const { data: existingBudgets } = await supabase
+    .from('budgets')
+    .select('account_id')
+    .eq('org_id', orgId)
+    .eq('branch_id', branchId)
+    .eq('period', period)
+
+  const existingAccountIds = new Set(
+    ((existingBudgets ?? []) as Array<{ account_id?: string | null }>)
+      .map((row) => String(row.account_id || '').trim())
+      .filter(Boolean)
+  )
+
+  const budgetRows = BLANK_DEMO_BUDGET_TEMPLATES
+    .map(({ code, budgetAmount }) => {
+      const accountId = accounts.find((account) => account.code === code)?.id
+      if (!accountId || existingAccountIds.has(accountId)) return null
+
+      return {
+        org_id: orgId,
+        branch_id: branchId,
+        account_id: accountId,
+        period,
+        budget_amount: budgetAmount,
+        updated_at: new Date().toISOString(),
+      }
+    })
+    .filter((row): row is {
+      org_id: string
+      branch_id: string
+      account_id: string
+      period: string
+      budget_amount: number
+      updated_at: string
+    } => row !== null)
+
+  if (budgetRows.length === 0) {
+    ;(console as any).warn('Blank demo budgeting seed skipped: no budgetable demo accounts matched.', { orgId })
+    return
+  }
+
+  const { error } = await supabase.from('budgets').insert(budgetRows)
+  if (error) {
+    ;(console as any).warn('Blank demo budgeting seed failed.', error)
+  }
+}
+
+export async function ensureBlankDemoBudgetingSetup(orgId: string, preferredBranchId?: string | null) {
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) return { branchId: null, didSeed: false }
+
+  const supabase = await createClient()
+  const { data: orgRow } = await (supabase as any)
+    .from('organizations')
+    .select('is_demo, settings')
+    .eq('id', trimmedOrgId)
+    .maybeSingle()
+
+  const settings = (orgRow?.settings ?? {}) as Record<string, unknown>
+  const businessType = String(settings.business_type || '').trim().toUpperCase()
+  const isDemoOrg =
+    Boolean(orgRow?.is_demo) ||
+    settings.is_demo === true ||
+    String(settings.plan || '').trim().toLowerCase() === 'demo'
+
+  if (!isDemoOrg || businessType !== 'BLANK') {
+    return { branchId: null, didSeed: false }
+  }
+
+  const normalizedBranchId = String(preferredBranchId || '').trim()
+  const branchId = normalizedBranchId || await ensureDemoBranch(supabase, trimmedOrgId)
+  if (!branchId) return { branchId: null, didSeed: false }
+
+  const coaResult = await seedInitialCoA(trimmedOrgId)
+  if (coaResult && typeof coaResult === 'object' && 'error' in coaResult) {
+    const message = String(coaResult.error || '')
+    if (message && !/sudah aktif/i.test(message)) {
+      ;(console as any).warn('Blank demo CoA self-heal warning:', message)
+    }
+  }
+
+  await seedBlankDemoBudgeting(supabase, trimmedOrgId, branchId)
+  return { branchId, didSeed: true }
+}
+
 export async function seedDemoData(supabase: any, orgId: string, demoType: DemoBusinessType) {
   const branchId = await ensureDemoBranch(supabase, orgId)
   if (!branchId) return null
 
-  // 🔴 AUTHENTIC BLANK DEMO: No products, no warehouses, no contacts.
-  if (demoType === 'BLANK') return branchId
+  // Blank demo tetap minim data operasional, tetapi punya CoA + budget contoh.
+  if (demoType === 'BLANK') {
+    await seedBlankDemoBudgeting(supabase, orgId, branchId)
+    return branchId
+  }
 
   // --- WAREHOUSES & CONTACTS & PRODUCTS BY TYPE ---
   let warehousesData: any[] = []
@@ -330,16 +472,7 @@ export async function seedDemoData(supabase: any, orgId: string, demoType: DemoB
     ]
   }
 
-  // wait for accounts to be generated by trigger (retry up to 5 times)
-  let accounts: any[] = []
-  for (let i = 0; i < 5; i++) {
-    const { data } = await supabase.from('accounts').select('id, code').eq('org_id', orgId)
-    if (data && data.length > 20) {
-      accounts = data
-      break
-    }
-    await new Promise(resolve => setTimeout(resolve, 1000))
-  }
+  const accounts = await waitForDemoAccounts(supabase, orgId)
 
   const invAccId = accounts?.find((a: any) => a.code === '1301')?.id
   const incomeAccId = accounts?.find((a: any) => a.code === '4001')?.id

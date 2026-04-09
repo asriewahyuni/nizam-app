@@ -42,6 +42,7 @@ function OnboardingContent() {
   const plan = searchParams.get('plan')
   const type = searchParams.get('type')
   const businessName = searchParams.get('businessName') || ''
+  const isDemoSetup = (plan || '').trim().toLowerCase() === 'demo'
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -150,8 +151,14 @@ function OnboardingContent() {
                       <Wallet size={16} />
                     </div>
                     <div>
-                      <h4 className="text-[9px] font-black text-slate-900 uppercase leading-none">Aktivasi CoA PSAK</h4>
-                      <p className="text-[9px] text-slate-400 font-bold mt-1">Aktifkan dari menu CoA setelah organisasi dibuat.</p>
+                      <h4 className="text-[9px] font-black text-slate-900 uppercase leading-none">
+                        {isDemoSetup ? 'CoA & Demo Budget' : 'Aktivasi CoA PSAK'}
+                      </h4>
+                      <p className="text-[9px] text-slate-400 font-bold mt-1">
+                        {isDemoSetup
+                          ? 'Untuk akun demo, CoA dan contoh budgeting disiapkan otomatis.'
+                          : 'Aktifkan dari menu CoA setelah organisasi dibuat.'}
+                      </p>
                     </div>
                   </div>
                   <div className="p-4 bg-slate-50/50 rounded-[20px] border border-slate-100 flex items-center gap-3">

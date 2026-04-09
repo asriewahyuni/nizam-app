@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Play, Sparkles, Building2, ArrowRight, Zap, Shield, BarChart3, Package, Factory, Users, Utensils, Store, Truck, Laptop } from 'lucide-react'
-import { startDemoSession, type DemoBusinessType } from '@/modules/demo/actions/demo.actions'
+import type { DemoBusinessType } from '@/modules/demo/actions/demo.actions'
 
 const BUSINESS_TYPES: { id: DemoBusinessType; label: string; icon: any; description: string; color: string }[] = [
   { 
@@ -36,9 +36,9 @@ const BUSINESS_TYPES: { id: DemoBusinessType; label: string; icon: any; descript
   },
   { 
     id: 'BLANK', 
-    label: 'Kosongan (Manual)', 
+    label: 'Kosongan (Budget Dasar)', 
     icon: Building2, 
-    description: 'Mulai dari awal tanpa data sampel. Cocok untuk demo setup mandiri.',
+    description: 'Minim data operasional, tetapi sudah ada CoA dan dummy budgeting untuk eksplorasi modul anggaran.',
     color: 'from-slate-400 to-slate-600'
   },
 ]
