@@ -4,10 +4,14 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence, Reorder } from 'framer-motion'
 import { ShieldAlert, Check, X, Shield, Users, Plus, Trash2, Edit2, ChevronRight, Settings2, Lock, GripVertical, CornerDownRight, AlertCircle, Sparkles } from 'lucide-react'
 import { PageHeader, SectionCard, SafeButton, ConfirmDialog } from '@/components/ui/NizamUI'
-import { createClient } from '@/lib/supabase/client'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
-
-const supabase = createClient()
+import {
+  deleteOrganizationRole,
+  getRolesForOrganization,
+  reorderOrganizationRoles,
+  saveOrganizationRole,
+  updateOrganizationRolePermissions,
+} from '@/modules/organization/actions/roles.actions'
 
 const MODULE_CATEGORIES = [
   {
@@ -87,7 +91,6 @@ const MODULE_CATEGORIES = [
 export default function RolesManagementPage() {
   const { orgId: resolvedOrgId } = useActiveOrgId()
   const [org, setOrg] = useState<{ org_id: string } | null>(null)
-  const [userId, setUserId] = useState<string | null>(null)
   const [roles, setRoles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeRoleId, setActiveRoleId] = useState<string | null>(null)
@@ -105,14 +108,6 @@ export default function RolesManagementPage() {
     setLoading(true)
     setErrorMsg(null)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setErrorMsg('Sesi tidak ditemukan. Silakan login ulang.')
-        return
-      }
-      setUserId(session.user.id)
-
-      // Use resolvedOrgId from hook (consistent with getActiveOrg server logic)
       const activeOrgId = resolvedOrgId
       if (!activeOrgId) {
         setErrorMsg('Organisasi belum terdeteksi. Silakan tunggu atau refresh halaman.')
@@ -122,14 +117,10 @@ export default function RolesManagementPage() {
 
       setOrg({ org_id: activeOrgId })
 
-      const { data: rolesData, error: rolesError } = await (supabase as any)
-        .from('roles')
-        .select('*')
-        .eq('org_id', activeOrgId)
-        .order('name')
+      const { data: rolesData, error: rolesError } = await getRolesForOrganization(activeOrgId)
 
       if (rolesError) {
-        setErrorMsg('Gagal memuat daftar jabatan: ' + rolesError.message)
+        setErrorMsg(rolesError)
       } else if (rolesData) {
         setRoles(rolesData)
         if (shouldSelectFirst || !activeRoleId) {
@@ -181,16 +172,18 @@ export default function RolesManagementPage() {
     const updatedRoles = roles.map(r => r.id === activeRoleId ? { ...r, permissions: updatedPerms } : r)
     setRoles(updatedRoles)
 
-    const { error } = await (supabase as any).from('roles').update({ permissions: updatedPerms }).eq('id', activeRoleId)
-    if (error) alert('Gagal update izin: ' + error.message)
+    const { error } = await updateOrganizationRolePermissions(org.org_id, activeRoleId, updatedPerms)
+    if (error) alert('Gagal update izin: ' + error)
   }
 
   const updateRolesOrder = async (newOrder: any[]) => {
     setRoles(newOrder)
-    const promises = newOrder.map((role, index) => 
-      (supabase as any).from('roles').update({ priority: index }).eq('id', role.id)
-    )
-    await Promise.all(promises)
+    if (!org?.org_id) return
+    const { error } = await reorderOrganizationRoles(org.org_id, newOrder.map((role) => role.id))
+    if (error) {
+      setErrorMsg('Gagal menyimpan urutan jabatan: ' + error)
+      loadData()
+    }
   }
 
   const resetModal = () => {
@@ -225,23 +218,15 @@ export default function RolesManagementPage() {
       parent_id: newRoleParent,
     }
 
-    let result
-    if (editingInfo) {
-      result = await (supabase as any).from('roles').update(payload).eq('id', editingInfo.id)
-    } else {
-      result = await (supabase as any).from('roles').insert([{
-        ...payload,
-        permissions: [],
-        is_system: false,
-        priority: roles.length
-      }])
-    }
+    const result = await saveOrganizationRole(org.org_id, {
+      id: editingInfo?.id || null,
+      name: payload.name,
+      departmentIds: payload.department_ids,
+      parentId: payload.parent_id,
+    })
     
     if (result.error) {
-       const msg = result.error.message.includes('roles_org_id_name_key') 
-         ? 'Nama jabatan ini sudah ada di organisasi Anda.' 
-         : result.error.message
-       setErrorMsg('Gagal simpan: ' + msg)
+       setErrorMsg('Gagal simpan: ' + result.error)
     } else {
        resetModal()
        loadData()
@@ -249,9 +234,9 @@ export default function RolesManagementPage() {
   }
 
   const deleteRole = async () => {
-    if (!confirmDelete.id) return
-    const { error } = await (supabase as any).from('roles').delete().eq('id', confirmDelete.id)
-    if (error) alert('Gagal hapus: ' + error.message)
+    if (!confirmDelete.id || !org?.org_id) return
+    const { error } = await deleteOrganizationRole(org.org_id, confirmDelete.id)
+    if (error) alert('Gagal hapus: ' + error)
     setConfirmDelete({ open: false, id: '', name: '' })
     loadData(true)
   }

@@ -36,12 +36,16 @@ import {
   MessageCircle
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { createClient } from '@/lib/supabase/client'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
 import { createEmployee, deleteEmployee, resignEmployee, transferEmployeeToChildOrg, updateEmployee } from '@/modules/hris/actions/employee.actions'
 import { createPayrollComponent, deletePayrollComponent, generatePayrollRun, payPayrollRun, fixEmptyPayrollJournals, getPayrollRunDetails, deletePayrollRun, voidPayrollRun } from '@/modules/hris/actions/payroll.actions'
 import { upsertAttendanceRecord } from '@/modules/hris/actions/attendance.actions'
 import { approveLeaveRequest, createLeaveRequest, rejectLeaveRequest } from '@/modules/hris/actions/leave.actions'
+import {
+  deleteOrganizationRole,
+  getRolesForOrganization,
+  saveOrganizationRole,
+} from '@/modules/organization/actions/roles.actions'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import {
@@ -97,7 +101,6 @@ export default function HrisClient({
   defaultTab?: string
 }) {
   const router = useRouter()
-  const supabase = createClient()
   const [employees, setEmployees] = useState(initialEmployees)
   const [payrollComponents, setPayrollComponents] = useState(initialPayrollComponents)
   const [payrollRuns, setPayrollRuns] = useState(initialPayrollRuns || [])
@@ -217,14 +220,11 @@ export default function HrisClient({
   // Sync roles whenever activeOrgId resolves
   useEffect(() => {
     if (!activeOrgId) return
-    ;(supabase as any)
-      .from('roles')
-      .select('*')
-      .eq('org_id', activeOrgId)
-      .order('name')
-      .then(({ data }: any) => {
-        if (data && data.length > 0) setRolesList(data)
-      })
+    getRolesForOrganization(activeOrgId).then(({ data, error }) => {
+      if (!error && Array.isArray(data)) {
+        setRolesList(data)
+      }
+    })
   }, [activeOrgId])
 
   // Basic Form State
@@ -375,8 +375,10 @@ export default function HrisClient({
   }
 
   const fetchRoles = async () => {
-    const { data } = await (supabase as any).from('roles').select('*').eq('org_id', activeOrgId).order('name')
-    if (data) setRolesList(data)
+    const targetOrgId = activeOrgId || orgId
+    if (!targetOrgId) return
+    const { data, error } = await getRolesForOrganization(targetOrgId)
+    if (!error && Array.isArray(data)) setRolesList(data)
   }
 
   const handleSavePosition = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -386,12 +388,21 @@ export default function HrisClient({
     const name = formData.get('name') as string
 
     if (editingPosition) {
-       const { error } = await (supabase as any).from('roles').update({ name }).eq('id', editingPosition.id)
-       if (error) showToast(error.message, 'error')
+       const { error } = await saveOrganizationRole(orgId, {
+         id: editingPosition.id,
+         name,
+         departmentIds: editingPosition.department_ids || [],
+         parentId: editingPosition.parent_id || null,
+       })
+       if (error) showToast(error, 'error')
        else { setIsPositionModalOpen(false); fetchRoles(); }
     } else {
-       const { error } = await (supabase as any).from('roles').insert({ org_id: orgId, name, permissions: [], priority: rolesList.length })
-       if (error) showToast(error.message, 'error')
+       const { error } = await saveOrganizationRole(orgId, {
+         name,
+         departmentIds: [],
+         parentId: null,
+       })
+       if (error) showToast(error, 'error')
        else { setIsPositionModalOpen(false); fetchRoles(); }
     }
     setLoading(false)
@@ -400,8 +411,8 @@ export default function HrisClient({
   const handleDeletePosition = async (id: string, isSystem: boolean) => {
     if (isSystem) return showToast('Role sistem ini tidak dapat dihapus.', 'error')
     if (!confirm('Yakin ingin menghapus Posisi/Jabatan ini?')) return
-    const { error } = await (supabase as any).from('roles').delete().eq('id', id)
-    if (error) showToast(error.message, 'error')
+    const { error } = await deleteOrganizationRole(orgId, id)
+    if (error) showToast(error, 'error')
     else fetchRoles()
   }
 
