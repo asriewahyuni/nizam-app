@@ -1,11 +1,36 @@
 'use client'
 
-import { usePathname, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const ROUTE_LOADING_START_EVENT = 'nizam_route_loading_start'
 const PROGRESS_HIDE_DELAY_MS = 180
 const DURATION_BADGE_HIDE_DELAY_MS = 1800
+
+function getInternalNavigationHref(anchor: HTMLAnchorElement | null) {
+  if (!anchor) return null
+  if (anchor.target && anchor.target !== '_self') return null
+  if (anchor.hasAttribute('download')) return null
+  if (anchor.getAttribute('data-route-loading') === 'false') return null
+
+  const rawHref = anchor.getAttribute('href')
+  if (!rawHref || rawHref.startsWith('#')) return null
+
+  let url: URL
+  try {
+    url = new URL(rawHref, window.location.href)
+  } catch {
+    return null
+  }
+
+  if (url.origin !== window.location.origin) return null
+
+  const currentPath = `${window.location.pathname}${window.location.search}`
+  const nextPath = `${url.pathname}${url.search}`
+  if (nextPath === currentPath) return null
+
+  return nextPath
+}
 
 function formatDurationMs(durationMs: number) {
   return `${Math.max(0, Math.round(durationMs))} ms`
@@ -22,6 +47,7 @@ function getInitialNavigationDuration() {
 }
 
 export function RouteProgressBar() {
+  const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const routeKey = useMemo(() => {
@@ -41,6 +67,14 @@ export function RouteProgressBar() {
   const lastElapsedMsRef = useRef<number | null>(null)
   const lastRouteKeyRef = useRef(routeKey)
   const hasMountedRef = useRef(false)
+  const prefetchedRoutesRef = useRef<Set<string>>(new Set())
+
+  const prefetchInternalRoute = useCallback((href: string | null) => {
+    if (!href || prefetchedRoutesRef.current.has(href)) return
+
+    prefetchedRoutesRef.current.add(href)
+    void router.prefetch(href)
+  }, [router])
 
   useEffect(() => {
     const clearProgressInterval = () => {
@@ -162,6 +196,41 @@ export function RouteProgressBar() {
       clearTransientState()
     }
   }, [routeKey])
+
+  useEffect(() => {
+    const getAnchorFromEvent = (event: Event) => {
+      const target = event.target
+      return target instanceof Element ? target.closest('a[href]') as HTMLAnchorElement | null : null
+    }
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (event.defaultPrevented) return
+      if (event.button !== 0) return
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+
+      const href = getInternalNavigationHref(getAnchorFromEvent(event))
+      if (!href) return
+
+      window.dispatchEvent(new Event(ROUTE_LOADING_START_EVENT))
+      prefetchInternalRoute(href)
+    }
+
+    const handleDocumentWarmup = (event: Event) => {
+      prefetchInternalRoute(getInternalNavigationHref(getAnchorFromEvent(event)))
+    }
+
+    document.addEventListener('click', handleDocumentClick, true)
+    document.addEventListener('pointerover', handleDocumentWarmup, true)
+    document.addEventListener('focusin', handleDocumentWarmup, true)
+    document.addEventListener('touchstart', handleDocumentWarmup, true)
+
+    return () => {
+      document.removeEventListener('click', handleDocumentClick, true)
+      document.removeEventListener('pointerover', handleDocumentWarmup, true)
+      document.removeEventListener('focusin', handleDocumentWarmup, true)
+      document.removeEventListener('touchstart', handleDocumentWarmup, true)
+    }
+  }, [prefetchInternalRoute])
 
   const durationLabel = elapsedMs === null ? null : formatDurationMs(elapsedMs)
 
