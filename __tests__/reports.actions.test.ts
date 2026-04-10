@@ -281,6 +281,82 @@ describe('Reports Branch Context', () => {
     })
   })
 
+  it('counts 11xx cash accounts even when bank_accounts mapping is empty', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        bank_accounts: [
+          {
+            result: success([]),
+          },
+        ],
+        accounts: [
+          {
+            result: success([
+              { code: '1109' },
+              { code: '1201' },
+            ]),
+          },
+        ],
+        journal_entries: [
+          {
+            result: success([{ id: 'je-pos' }]),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        journal_lines: [
+          {
+            result: success([
+              {
+                entry_id: 'je-pos',
+                debit: 175000,
+                credit: 0,
+                accounts: {
+                  id: 'acc-cash-custom',
+                  code: '1109',
+                  name: 'Kas Outlet',
+                  type: 'ASSET',
+                  normal_balance: 'DEBIT',
+                  cash_flow_category: null,
+                },
+              },
+              {
+                entry_id: 'je-pos',
+                debit: 0,
+                credit: 175000,
+                accounts: {
+                  id: 'acc-rev',
+                  code: '4001',
+                  name: 'Penjualan',
+                  type: 'REVENUE',
+                  normal_balance: 'CREDIT',
+                  cash_flow_category: 'OPERATING',
+                },
+              },
+            ]),
+          },
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+
+    const result = await getCashFlow('org-1', 'branch-1', false, {
+      startDate: '2026-04-01',
+      endDate: '2026-04-30',
+    })
+
+    expect(result.ocf).toBe(175000)
+    expect(result.netChange).toBe(175000)
+    expect(result.ocfItems).toEqual([
+      { code: '4001', name: 'Penerimaan dari Pelanggan / Penjualan', amount: 175000 },
+    ])
+  })
+
   it('splits retained earnings and current earnings on the balance sheet', async () => {
     const supabase = createSupabaseMock({
       tables: {

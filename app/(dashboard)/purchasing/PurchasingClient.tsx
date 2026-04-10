@@ -569,6 +569,20 @@ export default function PurchasingClient({
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount)
   }
 
+  const formatApprovalOfficer = (approval: any) => {
+    if (!approval) return ''
+    if (String(approval?.approver_id || '').trim().toUpperCase() === 'SYSTEM') {
+      return 'Otomasi Sistem'
+    }
+
+    const name = String(approval?.approver_name || '').trim()
+    const jobTitle = String(approval?.approver_job_title || '').trim()
+    const unitName = String(approval?.approver_unit_name || '').trim()
+    const parts = [name, jobTitle, unitName].filter(Boolean)
+
+    return parts.join(', ')
+  }
+
   const stats = {
     totalMonth: purchases.filter((p: any) => p.status !== 'VOIDED' && p.purchase_date.startsWith(new Date().toISOString().slice(0, 7))).reduce((sum: number, p: any) => sum + p.grand_total, 0),
     totalDebt: purchases.filter((p: any) => p.status === 'RECEIVED' && p.payment_status !== 'PAID').reduce((sum: number, p: any) => {
@@ -1694,7 +1708,14 @@ export default function PurchasingClient({
                          <div className="w-48 border-b-2 border-slate-400 mx-auto mt-2"></div>
                          <p className="text-xs text-slate-500 mt-2">Otorisasi Pembelian</p>
                          {approvalData?.decided_at && approvalData.status === 'APPROVED' && (
-                           <p className="text-[10px] text-slate-400 mt-1">TS: {formatDate(approvalData.decided_at, 'long')}</p>
+                           <>
+                             {formatApprovalOfficer(approvalData) && (
+                               <p className="text-[10px] text-slate-500 mt-1">
+                                 {formatApprovalOfficer(approvalData)}
+                               </p>
+                             )}
+                             <p className="text-[10px] text-slate-400 mt-1">TS: {formatDate(approvalData.decided_at, 'long')}</p>
+                           </>
                          )}
                       </div>
                    </div>

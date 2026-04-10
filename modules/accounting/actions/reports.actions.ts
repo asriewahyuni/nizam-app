@@ -162,6 +162,22 @@ async function getCashAccountCodes(
   }
 
   const { data: linkedAccounts } = await linkedAccountsQuery
+
+  const { data: activeAccounts } = await (supabase as any)
+    .from('accounts')
+    .select('code')
+    .in('org_id', orgIdsToSearch)
+    .eq('is_active', true)
+
+  const cashLikeAccountCodes = (Array.isArray(activeAccounts) ? activeAccounts : []).reduce<string[]>(
+    (codes, account: { code?: unknown }) => {
+      const code = typeof account.code === 'string' ? account.code.trim() : ''
+      if (code.startsWith('11')) codes.push(code)
+      return codes
+    },
+    []
+  )
+
   const cashAccountCodes = (Array.isArray(linkedAccounts) ? linkedAccounts : []).reduce<string[]>(
     (codes, linkedAccount: { accounts?: { code?: unknown } | null }) => {
       const code = typeof linkedAccount.accounts?.code === 'string'
@@ -174,6 +190,7 @@ async function getCashAccountCodes(
     []
   )
 
+  cashAccountCodes.push(...cashLikeAccountCodes)
   cashAccountCodes.push(...fallbackCashAccountCodes)
 
   return Array.from(new Set(cashAccountCodes))

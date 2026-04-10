@@ -139,9 +139,15 @@ describe('Payroll Actions', () => {
     const branchFilter = supabase.calls[1]?.operations.find(
       (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
     )
+    const updatePayload = supabase.calls[1]?.operations.find(
+      (operation) => operation.method === 'update'
+    )?.args[0] as Record<string, unknown>
 
     expect(result).toEqual({ success: true })
     expect(branchFilter?.args[1]).toBe('branch-2')
+    expect(updatePayload.disbursement_account_id).toBe('acc-bank')
+    expect(typeof updatePayload.payment_date).toBe('string')
+    expect(String(updatePayload.payment_date)).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
   it('filters payroll run details by accessible branch', async () => {

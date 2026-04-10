@@ -29,31 +29,43 @@ export type HeaderNavigationData = {
   branches: BranchSummary[]
 }
 
-function resolveSettledValue<T>(result: PromiseSettledResult<T>, fallback: T): T {
-  if (result.status === 'fulfilled') return result.value
-
-  console.error('[dashboard-shell.actions] Lazy chrome fetch failed:', result.reason)
-  return fallback
+async function resolveWithFallback<T>(
+  label: string,
+  fallback: T,
+  load: () => Promise<T>
+): Promise<T> {
+  try {
+    return await load()
+  } catch (error) {
+    console.error(`[dashboard-shell.actions] ${label} failed:`, error)
+    return fallback
+  }
 }
 
 export async function getSidebarChromeMetrics(
   orgId: string,
   branchId?: string | null
 ): Promise<SidebarChromeMetrics> {
-  const results = await Promise.allSettled([
-    getPendingApprovalsCount(orgId, branchId),
-    getUnpostedJournalsCount(orgId, branchId),
-    getPendingPurchaseRequestsCount(orgId, branchId),
-    getResetRequestsCount(orgId),
-    getPendingCoaRequestCount(orgId),
+  const [
+    pendingApprovals,
+    unpostedJournals,
+    pendingPurchaseRequests,
+    hrisNotifications,
+    pendingCoaRequests,
+  ] = await Promise.all([
+    resolveWithFallback('pending approvals', 0, () => getPendingApprovalsCount(orgId, branchId)),
+    resolveWithFallback('unposted journals', 0, () => getUnpostedJournalsCount(orgId, branchId)),
+    resolveWithFallback('pending purchase requests', 0, () => getPendingPurchaseRequestsCount(orgId, branchId)),
+    resolveWithFallback('hris reset requests', 0, () => getResetRequestsCount(orgId)),
+    resolveWithFallback('pending coa requests', 0, () => getPendingCoaRequestCount(orgId)),
   ])
 
   return {
-    pendingApprovals: resolveSettledValue(results[0], 0),
-    unpostedJournals: resolveSettledValue(results[1], 0),
-    pendingPurchaseRequests: resolveSettledValue(results[2], 0),
-    hrisNotifications: resolveSettledValue(results[3], 0),
-    pendingCoaRequests: resolveSettledValue(results[4], 0),
+    pendingApprovals,
+    unpostedJournals,
+    pendingPurchaseRequests,
+    hrisNotifications,
+    pendingCoaRequests,
   }
 }
 
@@ -61,23 +73,21 @@ export async function getHeaderPendingApprovals(
   orgId: string,
   branchId?: string | null
 ): Promise<number> {
-  const result = await Promise.allSettled([getPendingApprovalsCount(orgId, branchId)])
-  return resolveSettledValue(result[0], 0)
+  return resolveWithFallback('header pending approvals', 0, () => getPendingApprovalsCount(orgId, branchId))
 }
 
 export async function getHeaderTokenSummary(orgId: string): Promise<AiTokenHeaderSummary | null> {
-  const result = await Promise.allSettled([getAiTokenHeaderSummary(orgId)])
-  return resolveSettledValue(result[0], null)
+  return resolveWithFallback('header token summary', null, () => getAiTokenHeaderSummary(orgId))
 }
 
 export async function getHeaderNavigationData(orgId: string): Promise<HeaderNavigationData> {
-  const results = await Promise.allSettled([
-    getMyOrganizations(),
-    getBranches(orgId),
+  const [organizations, branches] = await Promise.all([
+    resolveWithFallback('header organizations', [], () => getMyOrganizations()),
+    resolveWithFallback('header branches', [], () => getBranches(orgId)),
   ])
 
   return {
-    organizations: resolveSettledValue(results[0], []),
-    branches: resolveSettledValue(results[1], []),
+    organizations,
+    branches,
   }
 }

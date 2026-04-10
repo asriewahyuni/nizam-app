@@ -1,8 +1,9 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getActiveBranch } from '@/modules/organization/actions/org.actions'
+import { getDateInTimeZone } from '@/lib/utils'
 
 type PosStockRequirement = {
   productId: string
@@ -108,6 +109,75 @@ async function ensurePosStockAvailability(
       0,
       first.availableQty
     ))}. Penjualan tidak boleh melebihi stok (kecuali akad SALAM).`,
+  }
+}
+
+async function trySyncMembershipRoleFromEmployee(
+  admin: any,
+  orgId: string,
+  userId: string
+) {
+  const { data: memberRow, error: memberErr } = await (admin as any)
+    .from('org_members')
+    .select('id, role_id')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (memberErr || !memberRow?.id) {
+    return { synced: false as const, hint: null as string | null }
+  }
+
+  const currentRoleId = String(memberRow.role_id || '').trim()
+  if (currentRoleId) {
+    return { synced: false as const, hint: null as string | null }
+  }
+
+  const { data: employeeRow } = await (admin as any)
+    .from('employees')
+    .select('role_id, job_title')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  let nextRoleId = String(employeeRow?.role_id || '').trim()
+
+  if (!nextRoleId) {
+    const fallbackRoleName = String(employeeRow?.job_title || '').trim()
+    if (fallbackRoleName) {
+      const { data: fallbackRole } = await (admin as any)
+        .from('roles')
+        .select('id')
+        .eq('org_id', orgId)
+        .ilike('name', fallbackRoleName)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      nextRoleId = String(fallbackRole?.id || '').trim()
+    }
+  }
+
+  if (!nextRoleId) {
+    return {
+      synced: false as const,
+      hint: 'Role user belum tertaut ke membership. Buka HRIS > Edit Karyawan, lalu pilih Role/Jabatan yang benar.',
+    }
+  }
+
+  const { error: syncErr } = await (admin as any)
+    .from('org_members')
+    .update({ role_id: nextRoleId })
+    .eq('id', memberRow.id)
+
+  if (syncErr) {
+    return { synced: false as const, hint: null as string | null }
+  }
+
+  return {
+    synced: true as const,
+    hint: 'Role membership berhasil disinkronkan otomatis. Coba simpan transaksi lagi.',
   }
 }
 
@@ -257,22 +327,93 @@ export async function processPosTransaction(orgId: string, payload: any) {
 
   if (saleErr) return { error: saleErr.message }
 
-  const { error: linesErr } = await (supabase as any)
+  const salesItemPayload = payload.lines.map((l: any) => ({
+    org_id: orgId,
+    branch_id: activeBranch.id,
+    sale_id: sale.id,
+    product_id: l.product_id,
+    description: l.product_name,
+    quantity: l.quantity,
+    unit_price: l.unit_price,
+    discount_amount: 0,
+    tax_amount: 0
+  }))
+
+  const cleanupDraftSale = async () => {
+    const { error: deleteErr } = await (supabase as any).from('sales').delete().eq('id', sale.id)
+    if (!deleteErr) return
+
+    // Fallback cleanup for transitional environments with stricter legacy RLS.
+    try {
+      const admin = await createAdminClient()
+      await (admin as any).from('sales').delete().eq('id', sale.id)
+    } catch (_cleanupError) {
+      // Ignore cleanup fallback errors to preserve original action response.
+    }
+  }
+
+  let { error: linesErr } = await (supabase as any)
     .from('sales_items' as any)
-    .insert(payload.lines.map((l: any) => ({
-      org_id: orgId,
-      branch_id: activeBranch.id,
-      sale_id: sale.id,
-      product_id: l.product_id,
-      description: l.product_name,
-      quantity: l.quantity,
-      unit_price: l.unit_price,
-      discount_amount: 0,
-      tax_amount: 0
-    })))
+    .insert(salesItemPayload)
+
+  if (linesErr && /row-level security policy/i.test(String(linesErr.message || '')) && /sales_items/i.test(String(linesErr.message || ''))) {
+    const checkPosOrSalesWritePermission = async () => {
+      const [salesCheck, posCheck] = await Promise.all([
+        (supabase as any).rpc('nizam_has_permission', {
+          p_permission: 'sales:write',
+          p_org_id: orgId,
+        }),
+        (supabase as any).rpc('nizam_has_permission', {
+          p_permission: 'pos:write',
+          p_org_id: orgId,
+        }),
+      ])
+
+      const hasSalesWrite = salesCheck.data === true
+      const hasPosWrite = posCheck.data === true
+      const bothChecksErrored = Boolean(salesCheck.error) && Boolean(posCheck.error)
+      return {
+        hasWrite: hasSalesWrite || hasPosWrite,
+        bothChecksErrored,
+      }
+    }
+
+    let permissionCheck = await checkPosOrSalesWritePermission()
+    let permissionHint: string | null = null
+
+    if (!permissionCheck.hasWrite) {
+      try {
+        const admin = await createAdminClient()
+        const syncResult = await trySyncMembershipRoleFromEmployee(admin as any, orgId, user.id)
+        permissionHint = syncResult.hint
+
+        if (syncResult.synced) {
+          permissionCheck = await checkPosOrSalesWritePermission()
+        }
+      } catch (_syncError) {
+        // Keep original permission result when admin fallback is unavailable.
+      }
+    }
+
+    if (!permissionCheck.hasWrite) {
+      await cleanupDraftSale()
+      const baseMessage = 'Akun tidak punya izin pos:write atau sales:write untuk unit aktif. Minta admin aktifkan permission tersebut pada role Anda.'
+      const extraHint = permissionHint ? ` ${permissionHint}` : ' Pastikan role user di HRIS sudah sinkron ke membership (org_members.role_id).'
+      const debugHint = permissionCheck.bothChecksErrored
+        ? ' Sistem gagal memverifikasi permission karena RPC permission check bermasalah.'
+        : ''
+      return { error: `${baseMessage}${extraHint}${debugHint}` }
+    }
+
+    const admin = await createAdminClient()
+    const { error: adminLinesErr } = await (admin as any)
+      .from('sales_items' as any)
+      .insert(salesItemPayload)
+    linesErr = adminLinesErr || null
+  }
 
   if (linesErr) {
-    await (supabase as any).from('sales').delete().eq('id', sale.id)
+    await cleanupDraftSale()
     return { error: linesErr.message }
   }
 
@@ -283,20 +424,47 @@ export async function processPosTransaction(orgId: string, payload: any) {
     p_warehouse_id: resolvedWarehouseId,
   })
 
+  if (deliverErr) {
+    await cleanupDraftSale()
+    const rawMessage = String(deliverErr.message || '').trim()
+    if (/insufficient permission/i.test(rawMessage)) {
+      return {
+        error:
+          'POS gagal finalisasi stok/jurnal karena permission delivery belum memenuhi syarat. Pastikan role kasir punya pos:write (atau sales:write jika DB belum update migration 1174).',
+      }
+    }
+    return { error: `Gagal memproses delivery POS: ${rawMessage || 'Unknown delivery error.'}` }
+  }
+
   // Auto-pay (create journal entry)
-  if (!deliverErr && payload.account_id) {
-    await (supabase as any).rpc('process_sales_payment_atomic', {
+  if (payload.account_id) {
+    const paymentDate = getDateInTimeZone('Asia/Jakarta')
+    const { data: paymentResult, error: paymentErr } = await (supabase as any).rpc('process_sales_payment_atomic', {
       p_org_id: orgId, 
       p_sale_id: sale.id, 
       p_account_id: payload.account_id,
       p_amount: grandTotal, 
       p_discount: 0,
-      p_payment_date: new Date().toISOString().split('T')[0],
+      p_payment_date: paymentDate,
       p_notes: 'POS Payment',
       p_user_id: user.id
     })
-  } else if (deliverErr) {
-      (console as any).error("Delivery error:", deliverErr)
+
+    if (paymentErr) {
+      return {
+        success: true,
+        saleId: sale.id,
+        warning: `Penjualan selesai, tetapi pembayaran otomatis gagal: ${paymentErr.message}`,
+      }
+    }
+
+    if (paymentResult && paymentResult.success === false) {
+      return {
+        success: true,
+        saleId: sale.id,
+        warning: `Penjualan selesai, tetapi pembayaran otomatis gagal: ${String(paymentResult.error || 'Unknown payment error.')}`,
+      }
+    }
   }
 
   revalidatePath('/pos')

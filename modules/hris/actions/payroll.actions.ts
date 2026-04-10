@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { getDateInTimeZone } from '@/lib/utils'
 
 type BranchSelectionResult =
   | { branchId: string | null }
@@ -149,6 +150,7 @@ export async function generatePayrollRun(orgId: string, formData: FormData) {
 export async function payPayrollRun(runId: string, orgId: string, accountId: string) {
   const supabase = await createClient()
   const db = supabase as any
+  const disbursementDate = getDateInTimeZone('Asia/Jakarta')
   
   const { data: { user } } = await db.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
@@ -170,12 +172,20 @@ export async function payPayrollRun(runId: string, orgId: string, accountId: str
   if ('error' in accessibleRun) return { error: accessibleRun.error }
 
   // 1. Update the run with selected bank account before processing
-  await db
+  const { error: accountUpdateError } = await db
     .from('payroll_runs')
-    .update({ disbursement_account_id: accountId })
+    .update({
+      disbursement_account_id: accountId,
+      // Disburse means cash leaves today, so reports should reflect today's date.
+      payment_date: disbursementDate,
+    })
     .eq('id', runId)
     .eq('org_id', orgId)
     .eq('branch_id', accessibleRun.branchId)
+
+  if (accountUpdateError) {
+    return { error: 'Gagal menyimpan akun sumber pembayaran: ' + accountUpdateError.message }
+  }
 
   // 2. Execute SQL payment/journalizing function
   const { error } = await db.rpc('process_payroll_payment', {

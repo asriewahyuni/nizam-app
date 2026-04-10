@@ -21,6 +21,7 @@ export default function POSClient({
    accounts,
    warehouses = [],
    currentUser,
+   currentUserDisplayName,
    activeBranchId,
    activeBranchName,
 }: any) {
@@ -398,7 +399,7 @@ export default function POSClient({
             </div>
             <div className="flex items-center gap-2 md:gap-4">
                <div className="px-3 py-1.5 bg-white/10 rounded-lg md:rounded-xl text-[10px] md:text-xs font-bold border border-white/10 flex items-center gap-2">
-                  <User size={12} className="md:w-[14px]" /> <span className="hidden sm:inline">{currentUser?.email?.split('@')[0]}</span>
+                  <User size={12} className="md:w-[14px]" /> <span className="hidden sm:inline">{currentUserDisplayName || currentUser?.email?.split('@')[0]}</span>
                </div>
                <a href="/dashboard" className="px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg md:rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-colors shadow-sm cursor-pointer block">
                   <span className="md:hidden">EXIT</span>
