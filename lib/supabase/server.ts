@@ -1,7 +1,14 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { getSupabaseAdminConfig, getSupabasePublicConfig } from '@/lib/supabase/config'
+import { isInternalAuthProvider } from '@/lib/auth/provider'
+import { getInternalAuthSession, signOutInternalAuth } from '@/lib/auth/internal-auth.server'
+import { INTERNAL_AUTH_SESSION_MAX_AGE } from '@/lib/auth/internal-auth.shared'
 import type { Database } from '@/types/database.types'
+
+type MutableServerClient = {
+  auth?: Record<string, unknown>
+}
 
 /**
  * Supabase client for use in:
@@ -13,7 +20,7 @@ export async function createClient() {
   const cookieStore = await cookies()
   const { url, anonKey } = getSupabasePublicConfig()
 
-  return createServerClient<Database>(
+  const client = createServerClient<Database>(
     url,
     anonKey,
     {
@@ -34,6 +41,51 @@ export async function createClient() {
       },
     }
   )
+
+  if (isInternalAuthProvider()) {
+    const mutableClient = client as unknown as MutableServerClient
+    const auth = mutableClient.auth || {}
+
+    mutableClient.auth = {
+      ...auth,
+      async getUser() {
+        const internalSession = await getInternalAuthSession()
+        return {
+          data: {
+            user: (internalSession?.user || null) as unknown,
+          },
+          error: null,
+        }
+      },
+      async getSession() {
+        const internalSession = await getInternalAuthSession()
+        if (!internalSession?.user) {
+          return { data: { session: null }, error: null }
+        }
+
+        const nowEpoch = Math.floor(Date.now() / 1000)
+        return {
+          data: {
+            session: {
+              access_token: `internal:${internalSession.sessionId}`,
+              refresh_token: `internal:${internalSession.sessionId}`,
+              token_type: 'bearer',
+              expires_in: INTERNAL_AUTH_SESSION_MAX_AGE,
+              expires_at: nowEpoch + INTERNAL_AUTH_SESSION_MAX_AGE,
+              user: internalSession.user as unknown,
+            },
+          },
+          error: null,
+        }
+      },
+      async signOut() {
+        await signOutInternalAuth()
+        return { error: null }
+      },
+    }
+  }
+
+  return client
 }
 
 export async function createAdminClient() {

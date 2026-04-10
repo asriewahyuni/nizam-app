@@ -16,6 +16,7 @@ const ORIGINAL_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const ORIGINAL_TARGET = process.env.NEXT_PUBLIC_SUPABASE_TARGET
 const ORIGINAL_LOCAL_URL = process.env.NEXT_PUBLIC_SUPABASE_LOCAL_URL
 const ORIGINAL_LOCAL_KEY = process.env.NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY
+const ORIGINAL_AUTH_PROVIDER = process.env.AUTH_PROVIDER
 
 function restoreEnv(name: string, value: string | undefined) {
   if (value === undefined) {
@@ -29,6 +30,7 @@ function restoreEnv(name: string, value: string | undefined) {
 describe('Supabase Middleware', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    delete process.env.AUTH_PROVIDER
     delete process.env.NEXT_PUBLIC_SUPABASE_TARGET
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-key'
@@ -37,6 +39,7 @@ describe('Supabase Middleware', () => {
   })
 
   afterEach(() => {
+    restoreEnv('AUTH_PROVIDER', ORIGINAL_AUTH_PROVIDER)
     restoreEnv('NEXT_PUBLIC_SUPABASE_TARGET', ORIGINAL_TARGET)
     restoreEnv('NEXT_PUBLIC_SUPABASE_URL', ORIGINAL_URL)
     restoreEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', ORIGINAL_KEY)
@@ -153,5 +156,21 @@ describe('Supabase Middleware', () => {
       'local-anon-key',
       expect.any(Object)
     )
+  })
+
+  it('uses internal session cookie when AUTH_PROVIDER=internal', async () => {
+    process.env.AUTH_PROVIDER = 'internal'
+
+    const request = new NextRequest('http://localhost:3000/fleet', {
+      headers: {
+        cookie: 'nizam_internal_session=internal-token',
+      },
+    })
+
+    const response = await updateSession(request)
+
+    expect(mocks.createServerClient).not.toHaveBeenCalled()
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
   })
 })

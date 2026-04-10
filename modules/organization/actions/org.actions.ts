@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { cache } from 'react'
 import { seedDemoData, type DemoBusinessType } from '@/modules/demo/actions/demo.actions'
+import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import {
   ACTIVE_BRANCH_COOKIE,
   ACTIVE_ORG_COOKIE,
@@ -31,6 +32,25 @@ const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 const DEFAULT_BRANCH_NAME = 'Unit Utama'
 const DEFAULT_BRANCH_CODE = 'MAIN'
 const DEMO_ACCOUNT_EMAIL = 'demo@nizam.app'
+
+async function getAuthenticatedUserFromSupabaseOrInternal(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (user?.id) {
+    return user as { id: string; email?: string | null; user_metadata?: Record<string, unknown> | null }
+  }
+
+  const internalSession = await getInternalAuthSession()
+  if (!internalSession?.user?.id) return null
+
+  return {
+    id: internalSession.user.id,
+    email: internalSession.user.email,
+    user_metadata: internalSession.user.user_metadata as Record<string, unknown> | null,
+  }
+}
 const FULL_ORG_ACCESS_ROLES = new Set(['owner', 'admin'])
 
 type OrgMembershipBranchScope = {
@@ -489,9 +509,7 @@ async function getHoldingManagementContext(
 ): Promise<HoldingContextResult> {
   const supabase = await createClient()
   const db = supabase
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
 
   if (!user) return { error: 'Tidak terautentikasi.' }
 
@@ -544,7 +562,7 @@ async function createOrganizationRecord(
     }
     const privilegedDb = admin ?? db
     const cookieStore = await cookies()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
     if (!user) return { error: 'Tidak terautentikasi' }
 
     const name = (formData.get('name') as string).trim()
@@ -1074,9 +1092,7 @@ export async function deleteChildOrganization(childOrgId: string) {
 export async function setOrganizationParent(childOrgId: string, parentOrgId: string | null) {
   const supabase = await createClient()
   const db = supabase as any
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
 
   if (!user) return { error: 'Tidak terautentikasi.' }
 
@@ -1460,7 +1476,7 @@ export async function checkSlugAvailability(orgId: string, slug: string) {
 export async function uploadLogo(orgId: string, formData: FormData) {
   const supabase = await createClient()
   const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
   if (!user) return { success: false, error: 'Auth failed' }
 
   const file = formData.get('file') as File
@@ -1477,9 +1493,7 @@ export async function uploadLogo(orgId: string, formData: FormData) {
 export async function getOrgMembers(orgId: string) {
   const supabase = await createClient()
   const db = supabase as any
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
 
   if (!user) return []
 
@@ -1596,7 +1610,7 @@ export async function getChildOrgs(parentOrgId: string) {
 export async function destroyOrganization(orgId: string) {
   const supabase = await createClient()
   const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
   if (!user) return { error: 'Unauthorized' }
   const { data: member } = await db.from('org_members').select('role').eq('org_id', orgId).eq('user_id', user.id).single()
   if (member?.role !== 'owner') return { error: 'Hanya OWNER yang bisa menghapus.' }
@@ -1705,7 +1719,7 @@ export async function setActiveBranch(orgId: string, branchId: string | null) {
   const supabase = await createClient()
   const admin = (await createAdminClient()) as any
   const cookieStore = await cookies()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
   if (!user) return { error: 'Tidak terautentikasi.' }
 
   const trimmedOrgId = orgId.trim()
@@ -1755,9 +1769,7 @@ export async function createBranch(orgId: string, formData: FormData) {
   const admin = (await createAdminClient()) as any
   const db = supabase as any
   const cookieStore = await cookies()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
 
   if (!user) return { error: 'Tidak terautentikasi.' }
 
@@ -1848,7 +1860,7 @@ export async function createBranch(orgId: string, formData: FormData) {
 export async function updateBranch(orgId: string, branchId: string, formData: FormData) {
   const supabase = await createClient()
   const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
   if (!user) return { error: 'Tidak terautentikasi.' }
 
   const trimmedOrgId = String(orgId || '').trim()
@@ -1911,7 +1923,7 @@ export async function updateBranch(orgId: string, branchId: string, formData: Fo
 export async function deleteBranch(orgId: string, branchId: string) {
   const supabase = await createClient()
   const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
   if (!user) return { error: 'Tidak terautentikasi.' }
 
   const trimmedOrgId = String(orgId || '').trim()
@@ -2003,7 +2015,7 @@ export async function deleteBranch(orgId: string, branchId: string) {
 export async function assignBranchPIC(orgId: string, branchId: string, employeeId: string | null) {
   const supabase = await createClient()
   const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
   if (!user) return { error: 'Tidak terautentikasi.' }
 
   const trimmedOrgId = String(orgId || '').trim()
@@ -2050,9 +2062,7 @@ export async function assignBranchPIC(orgId: string, branchId: string, employeeI
 export async function updateMemberUnitAccess(orgId: string, memberId: string, branchIds: string[]) {
   const supabase = await createClient()
   const db = supabase as any
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
 
   if (!user) return { error: 'Tidak terautentikasi.' }
 
@@ -2168,7 +2178,7 @@ export async function getInvitations(orgId: string) {
 export async function createInvitationToken(orgId: string, formData: FormData) {
   const supabase = await createClient()
   const db = supabase as any
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
   if (!user) return { error: 'Unauthorized' }
 
   const code = Math.random().toString(36).substring(2, 10).toUpperCase()

@@ -1,6 +1,8 @@
 import type { AuthError, User } from '@supabase/supabase-js'
 import { cache } from 'react'
 import { createClient } from './server'
+import { isInternalAuthProvider } from '@/lib/auth/provider'
+import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 
 export type ServerAuthContext = {
   supabase: Awaited<ReturnType<typeof createClient>>
@@ -10,6 +12,16 @@ export type ServerAuthContext = {
 
 const getServerAuthContextCached = cache(async (): Promise<ServerAuthContext> => {
   const supabase = await createClient()
+
+  if (isInternalAuthProvider()) {
+    const internalSession = await getInternalAuthSession()
+    return {
+      supabase,
+      user: (internalSession?.user || null) as unknown as User | null,
+      error: null,
+    }
+  }
+
   const {
     data: { user },
     error,

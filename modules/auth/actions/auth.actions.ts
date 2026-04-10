@@ -3,6 +3,13 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getServerAuthContext } from '@/lib/supabase/auth.server'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
+import { isInternalAuthProvider } from '@/lib/auth/provider'
+import {
+  createInternalAuthUser,
+  getInternalAuthSession,
+  signInWithInternalAuth,
+  signOutInternalAuth,
+} from '@/lib/auth/internal-auth.server'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -79,6 +86,16 @@ function normalizeEmail(value: unknown) {
   if (typeof value !== 'string') return null
   const normalized = value.trim().toLowerCase()
   return normalized || null
+}
+
+function normalizeUuid(value: unknown) {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) return null
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(normalized)) {
+    return null
+  }
+  return normalized
 }
 
 function isDuplicateAuthRegistrationError(message: unknown) {
@@ -435,17 +452,32 @@ async function resolveExistingStaffIdentity(
 // signUp — Create a new Business Owner account
 // ─────────────────────────────────────────────────────────────
 export async function signUp(formData: FormData) {
-  const supabase = await createClient()
-
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const fullName = formData.get('fullName') as string
   const planParam = String(formData.get('plan') || '').trim().toLowerCase()
   const isDemoSignup = planParam === 'demo'
 
+  if (isInternalAuthProvider()) {
+    const internalUser = await createInternalAuthUser({
+      email,
+      password,
+      fullName,
+      userType: isPlatformAdminEmail(email) ? 'admin' : 'owner',
+    })
+
+    if ('error' in internalUser) {
+      return { error: internalUser.error }
+    }
+
+    return { success: true, email }
+  }
+
+  const supabase = await createClient()
+
   // Use regular signUp for owners so they get logged in automatically
   // and are prompted for email confirmation if enabled in dashboard.
-  const { data, error } = await supabase.auth.signUp({
+  const { error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -474,11 +506,33 @@ export async function signUp(formData: FormData) {
 // signIn — Regular Business Owner/Admin login via email
 // ─────────────────────────────────────────────────────────────
 export async function signIn(formData: FormData) {
-  const supabase = await createClient()
-
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const redirectTo = formData.get('redirectTo') as string | null
+
+  if (isInternalAuthProvider()) {
+    const cookieStore = await cookies()
+    const activeOrgIdPreference = normalizeUuid(cookieStore.get(ACTIVE_ORG_COOKIE)?.value)
+    const result = await signInWithInternalAuth({
+      email,
+      password,
+      preferredOrgId: activeOrgIdPreference,
+    })
+
+    if ('error' in result) {
+      const msg = encodeURIComponent('Email atau password salah.')
+      redirect(`/login?error=${msg}`)
+    }
+
+    if (result.resolvedOrgId) {
+      setActiveOrganizationCookie(cookieStore, result.resolvedOrgId)
+    }
+
+    revalidatePath('/', 'layout')
+    redirect(redirectTo || '/dashboard')
+  }
+
+  const supabase = await createClient()
 
   const { error } = await supabase.auth.signInWithPassword({ email, password })
 
@@ -495,6 +549,10 @@ export async function signIn(formData: FormData) {
 // registerEmployeeAccount — Converts employee to auth user
 // ─────────────────────────────────────────────────────────────
 export async function registerEmployeeAccount(formData: FormData) {
+  if (isInternalAuthProvider()) {
+    return { error: 'Aktivasi akun karyawan belum didukung di mode auth internal.' }
+  }
+
   const adminClient = await createAdminClient()
   const publicClient = await createClient()
   const cookieStore = await cookies()
@@ -658,17 +716,46 @@ export async function registerEmployeeAccount(formData: FormData) {
 // signInWithNik — Standard login for staff
 // ─────────────────────────────────────────────────────────────
 export async function signInWithNik(formData: FormData) {
-  const adminClient = await createAdminClient()
-  const publicClient = await createClient()
-  const cookieStore = await cookies()
-
   let nik = (formData.get('nik') as string)?.trim()
   const password = (formData.get('password') as string)
   const redirectTo = (formData.get('redirectTo') as string)
+  const explicitOrgIdPreference = normalizeUuid(formData.get('orgId'))
 
   if (!nik || !password) {
      return redirect(`/login?error=${encodeURIComponent('NIK dan Password wajib diisi.')}&tab=karyawan`)
   }
+
+  if (isInternalAuthProvider()) {
+    const cookieStore = await cookies()
+    const cookieOrgIdPreference = normalizeUuid(cookieStore.get(ACTIVE_ORG_COOKIE)?.value)
+    const preferredOrgId = explicitOrgIdPreference || cookieOrgIdPreference
+
+    const result = await signInWithInternalAuth({
+      nik,
+      password,
+      preferredOrgId,
+    })
+
+    if ('error' in result) {
+      const normalizedMessage = String(result.error || '').trim()
+      const loweredMessage = normalizedMessage.toLowerCase()
+      const redirectMessage = loweredMessage.includes('lebih dari satu') || loweredMessage.includes('organisasi')
+        ? normalizedMessage
+        : 'NIK atau password salah.'
+      return redirect(`/login?error=${encodeURIComponent(redirectMessage)}&tab=karyawan`)
+    }
+
+    if (result.resolvedOrgId) {
+      setActiveOrganizationCookie(cookieStore, result.resolvedOrgId)
+    }
+
+    revalidatePath('/', 'layout')
+    return redirect(redirectTo || '/dashboard')
+  }
+
+  const adminClient = await createAdminClient()
+  const publicClient = await createClient()
+  const cookieStore = await cookies()
 
   nik = nik.toUpperCase()
   const activeOrgIdPreference = cookieStore.get(ACTIVE_ORG_COOKIE)?.value?.trim() || null
@@ -765,24 +852,36 @@ export async function signInWithNik(formData: FormData) {
 
 // REST REMAINING (signOut, verifyEmployeeNikByToken, etc.)
 export async function signOut() {
-  const supabase = await createClient()
   const cookieStore = await cookies()
-  const { data: { user } } = await supabase.auth.getUser()
+  const internalProvider = isInternalAuthProvider()
 
-  if (isDemoAccountUser(user)) {
-    await deleteOwnedOrganizationsForDemoUser(String(user?.id || ''), supabase as any)
+  if (!internalProvider) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (isDemoAccountUser(user)) {
+      await deleteOwnedOrganizationsForDemoUser(String(user?.id || ''), supabase as any)
+    }
+
+    await supabase.auth.signOut()
+  } else {
+    await signOutInternalAuth()
   }
 
   cookieStore.delete('nizam_demo_org_id')
   cookieStore.delete(ACTIVE_ORG_COOKIE)
   cookieStore.delete(ACTIVE_BRANCH_COOKIE)
   cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
-  await supabase.auth.signOut()
   revalidatePath('/', 'layout')
   redirect('/')
 }
 
 export async function getSession() {
+  if (isInternalAuthProvider()) {
+    const session = await getInternalAuthSession()
+    return session?.user || null
+  }
+
   const { user, error } = await getServerAuthContext()
   if (error || !user) return null
   return user
@@ -801,6 +900,10 @@ export async function getAdminImpersonationState() {
 }
 
 export async function deleteInactiveTenantByPlatformAdmin(orgId: string) {
+  if (isInternalAuthProvider()) {
+    return { error: 'Mode auth internal belum mendukung fitur ini. Gunakan AUTH_PROVIDER=supabase sementara.' }
+  }
+
   const supabase = await createClient()
   const adminClient = await createAdminClient()
   const trimmedOrgId = String(orgId || '').trim()
@@ -853,6 +956,10 @@ export async function deleteInactiveTenantByPlatformAdmin(orgId: string) {
 }
 
 export async function signInAsTenantOwner(orgId: string) {
+  if (isInternalAuthProvider()) {
+    return { error: 'Login as tenant owner belum didukung di mode auth internal.' }
+  }
+
   const supabase = await createClient()
   const adminClient = await createAdminClient()
   const cookieStore = await cookies()
@@ -977,6 +1084,10 @@ export async function signInAsTenantOwner(orgId: string) {
 }
 
 export async function restorePlatformAdminSession() {
+  if (isInternalAuthProvider()) {
+    return { error: 'Restore session admin belum didukung di mode auth internal.' }
+  }
+
   const supabase = await createClient()
   const cookieStore = await cookies()
   const payload = decodeAdminImpersonation(cookieStore.get(ADMIN_IMPERSONATION_COOKIE)?.value)
@@ -1144,6 +1255,10 @@ export async function requestPasswordReset(nik: string) {
 }
 
 export async function resetEmployeePassword(employeeId: string, newPassword: string) {
+  if (isInternalAuthProvider()) {
+    return { error: 'Reset password karyawan belum didukung di mode auth internal.' }
+  }
+
   const adminClient = await createAdminClient()
   
   const { data: emp, error: empErr } = await (adminClient as any)
@@ -1173,6 +1288,10 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
 }
 
 export async function sendPasswordResetEmail(formData: FormData) {
+  if (isInternalAuthProvider()) {
+    return { error: 'Reset password via email belum didukung di mode auth internal.' }
+  }
+
   const supabase = await createClient()
   const email = formData.get('email') as string
   

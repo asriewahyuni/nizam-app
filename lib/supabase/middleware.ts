@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getSupabasePublicConfig } from '@/lib/supabase/config'
+import { getAuthProvider } from '@/lib/auth/provider'
+import { INTERNAL_AUTH_SESSION_COOKIE } from '@/lib/auth/internal-auth.shared'
 import type { Database } from '@/types/database.types'
 
 const AUTH_PAGE_PREFIXES = ['/login', '/register']
@@ -91,6 +93,39 @@ export async function updateSession(request: NextRequest) {
 
   // Avoid expensive auth lookup on public routes.
   if (!authPage && !protectedPage) {
+    return supabaseResponse
+  }
+
+  if (getAuthProvider() === 'internal') {
+    const hasInternalSession = Boolean(
+      request.cookies.get(INTERNAL_AUTH_SESSION_COOKIE)?.value?.trim()
+    )
+
+    if (authPage && hasInternalSession) {
+      const redirectFromQuery = normalizeRedirectTarget(request.nextUrl.searchParams.get('redirectTo'))
+      let redirectFromReferer: string | null = null
+
+      const referer = request.headers.get('referer')
+      if (referer) {
+        try {
+          const refererUrl = new URL(referer)
+          if (refererUrl.origin === request.nextUrl.origin) {
+            redirectFromReferer = normalizeRedirectTarget(`${refererUrl.pathname}${refererUrl.search}`)
+          }
+        } catch {
+          // Ignore malformed referer
+        }
+      }
+
+      return NextResponse.redirect(new URL(redirectFromQuery || redirectFromReferer || '/dashboard', request.url))
+    }
+
+    if (protectedPage && !hasInternalSession) {
+      const redirectUrl = new URL('/login', request.url)
+      redirectUrl.searchParams.set('redirectTo', `${pathname}${search}`)
+      return NextResponse.redirect(redirectUrl)
+    }
+
     return supabaseResponse
   }
 

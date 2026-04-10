@@ -182,6 +182,17 @@ function LoginForm() {
                 />
               </div>
 
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID Organisasi (Opsional)</label>
+                <input
+                  name="orgId"
+                  type="text"
+                  defaultValue={searchParams.get('orgId') || ''}
+                  placeholder="UUID organisasi, isi jika NIK dipakai di >1 org"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-900 bg-slate-50 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
+                />
+              </div>
+
                <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Password</label>

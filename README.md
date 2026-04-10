@@ -33,6 +33,7 @@ Dokumen operasional tambahan:
 
 - [PLAYBOOK_MIGRASI_KE_NIZAM.md](./PLAYBOOK_MIGRASI_KE_NIZAM.md) untuk panduan onboarding user pindahan dari Excel atau aplikasi lain.
 - [CHECKLIST_ONBOARDING_MIGRASI_NIZAM.md](./CHECKLIST_ONBOARDING_MIGRASI_NIZAM.md) untuk checklist internal tim onboarding saat menangani migrasi client.
+- [RAILWAY_DECOUPLING_PLAN.md](./RAILWAY_DECOUPLING_PLAN.md) untuk roadmap migrasi ke Railway dan pelepasan dependency runtime Supabase.
 - [templates/migrasi/README.md](./templates/migrasi/README.md) untuk paket template CSV migrasi yang bisa dibagikan ke client.
 - [templates/migrasi/NIZAM_Migration_Template.xlsx](./templates/migrasi/NIZAM_Migration_Template.xlsx) untuk workbook Excel multi-sheet yang siap diberikan ke client.
 
@@ -71,6 +72,8 @@ npm run supabase:db:reset
 npm run supabase:migrate-local-data
 npm run db:railway:sync
 npm run db:railway:sync:apply
+npm run db:railway:data:sync
+npm run db:railway:data:sync:apply
 npm run db:railway:parity
 ```
 
@@ -95,6 +98,67 @@ Catatan:
 - `db:railway:sync` default **dry-run** agar tidak ada perubahan tidak sengaja.
 - Script otomatis mencoba ambil DB URL dari Railway CLI (`Postgres` service).
 - Untuk source Supabase via linked project, pastikan `supabase login`/`SUPABASE_ACCESS_TOKEN` tersedia.
+
+### Sinkronisasi Data Supabase -> Railway
+
+Gunakan flow ini untuk meng-copy isi tabel SQL setelah schema Railway siap.
+
+1. Simulasikan dump (aman, tidak apply):
+   ```bash
+   npm run db:railway:data:sync
+   ```
+2. Jika dry-run sesuai, apply ke Railway:
+   ```bash
+   npm run db:railway:data:sync:apply
+   ```
+
+Catatan:
+- Script ini fokus migrasi **data tabel SQL** (default schema `public`).
+- Script ini **tidak** memindahkan Supabase Auth users dan Supabase Storage objects.
+- Untuk source linked Supabase, pastikan `supabase login`/`SUPABASE_ACCESS_TOKEN` tersedia.
+- Untuk override source DB URL, gunakan `SUPABASE_SOURCE_DB_URL` atau `--source-db-url`.
+
+### Backfill `auth.users` di Railway
+
+Jika hasil sinkronisasi data membuat relasi `user_id` ke `auth.users` kosong/orphan, jalankan:
+
+```bash
+npm run db:railway:auth:backfill
+npm run db:railway:auth:backfill:apply
+```
+
+Command ini membuat/menyelaraskan baris `auth.users` dari data `public.org_members` dan `public.employees` agar FK tetap valid di Railway.
+
+### Bootstrap `internal_auth_users` di Railway
+
+Untuk menyiapkan akun login mode `AUTH_PROVIDER=internal` dari data user existing:
+
+```bash
+npm run db:railway:internal-auth:bootstrap
+INTERNAL_AUTH_BOOTSTRAP_PASSWORD='temporary-password' npm run db:railway:internal-auth:bootstrap:apply
+```
+
+Catatan:
+- `legacy_user_id` akan dipetakan ke `auth.users.id` agar kompatibel dengan data lama.
+- `--apply` butuh password sementara (`INTERNAL_AUTH_BOOTSTRAP_PASSWORD` atau `--password`).
+
+### Health Check Railway DB (Direct)
+
+Untuk verifikasi koneksi Postgres direct dari runtime app (tanpa Supabase client), gunakan endpoint:
+
+```bash
+GET /api/healthz-db
+```
+
+Endpoint ini membaca `DATABASE_URL`/`RAILWAY_DATABASE_URL`/`DATABASE_PUBLIC_URL`.
+
+## Mode Auth Runtime
+
+- `AUTH_PROVIDER=supabase` (default): login tetap memakai Supabase Auth.
+- `AUTH_PROVIDER=internal`: login membaca tabel `public.internal_auth_users` + `public.internal_auth_sessions`.
+- Saat mode `internal`, isi `INTERNAL_AUTH_SESSION_SECRET`.
+
+Catatan: mode `internal` saat ini baru fondasi untuk cutover bertahap dan belum menutup semua flow lanjutan (misalnya login-as tenant owner dan reset password email).
 
 ## Mode Supabase Saat Development
 
