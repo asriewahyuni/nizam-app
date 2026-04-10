@@ -1,9 +1,59 @@
-import { createClient } from '@/lib/supabase/server'
+import { isInternalAuthProvider } from '@/lib/auth/provider'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns'
 
+function buildEmptyAnalytics() {
+  return {
+    chartData: [],
+    topExpenses: [],
+    topProducts: [],
+    paretoAnalysis: {
+      totalProducts: 0,
+      top20Count: 0,
+      top20Revenue: 0,
+      top20Profit: 0,
+      totalRevenue: 0,
+      totalProfit: 0,
+      paretoProducts: [],
+    },
+    customerPareto: {
+      totalCustomers: 0,
+      top20Count: 0,
+      top20Revenue: 0,
+      top20Profit: 0,
+      totalRevenue: 0,
+      totalProfit: 0,
+      paretoCustomers: [],
+    },
+  }
+}
+
 export async function getDashboardAnalytics(orgId: string, branchId?: string) {
-  const supabase = await createClient()
-  const db = supabase as any
+  const sessionClient = await createClient()
+  let supabase = sessionClient as any
+  let db = sessionClient as any
+
+  if (isInternalAuthProvider()) {
+    const {
+      data: { user },
+    } = await sessionClient.auth.getUser()
+
+    if (!user) return buildEmptyAnalytics()
+
+    const admin = await createAdminClient()
+    const { data: membership } = await (admin as any)
+      .from('org_members')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (!membership?.id) return buildEmptyAnalytics()
+
+    supabase = admin as any
+    db = admin as any
+  }
 
   const startDate = format(subMonths(new Date(), 5), 'yyyy-MM-01')
 

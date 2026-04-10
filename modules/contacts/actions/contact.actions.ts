@@ -1,6 +1,7 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { isInternalAuthProvider } from '@/lib/auth/provider'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 type ContactType = 'CUSTOMER' | 'SUPPLIER'
@@ -53,13 +54,47 @@ function revalidateContactPages() {
   revalidatePath('/dashboard')
 }
 
-export async function getContacts(orgId: string, type?: 'CUSTOMER' | 'SUPPLIER') {
+async function getContactDbContext(orgId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  if (!user) return []
+  if (!user) {
+    return { error: 'Unauthorized' as const }
+  }
 
-  let query = supabase.from('contacts' as any).select('*').eq('org_id', orgId).eq('is_active', true)
+  if (!isInternalAuthProvider()) {
+    return {
+      user,
+      db: supabase as any,
+    }
+  }
+
+  const admin = await createAdminClient()
+  const { data: membership } = await (admin as any)
+    .from('org_members')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!membership?.id) {
+    return { error: 'Unauthorized' as const }
+  }
+
+  return {
+    user,
+    db: admin as any,
+  }
+}
+
+export async function getContacts(orgId: string, type?: 'CUSTOMER' | 'SUPPLIER') {
+  const context = await getContactDbContext(orgId)
+  if ('error' in context) return []
+
+  let query = context.db.from('contacts' as any).select('*').eq('org_id', orgId).eq('is_active', true)
   if (type) query = query.eq('type', type)
 
   const { data, error } = await (query.order('name', { ascending: true }) as any)
@@ -68,15 +103,13 @@ export async function getContacts(orgId: string, type?: 'CUSTOMER' | 'SUPPLIER')
 }
 
 export async function createContact(orgId: string, formData: FormData): Promise<ContactMutationResult> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: 'Unauthorized' }
+  const context = await getContactDbContext(orgId)
+  if ('error' in context) return { error: context.error }
 
   const payload = parseContactFormData(formData)
   if ('error' in payload) return payload
 
-  const { data, error } = await (supabase as any).from('contacts').insert({
+  const { data, error } = await context.db.from('contacts').insert({
     org_id: orgId,
     ...payload,
     is_active: true
@@ -89,15 +122,13 @@ export async function createContact(orgId: string, formData: FormData): Promise<
 }
 
 export async function updateContact(orgId: string, contactId: string, formData: FormData): Promise<ContactMutationResult> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: 'Unauthorized' }
+  const context = await getContactDbContext(orgId)
+  if ('error' in context) return { error: context.error }
 
   const payload = parseContactFormData(formData)
   if ('error' in payload) return payload
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await context.db
     .from('contacts')
     .update({
       ...payload,
@@ -116,12 +147,10 @@ export async function updateContact(orgId: string, contactId: string, formData: 
 }
 
 export async function deleteContact(orgId: string, contactId: string): Promise<DeleteContactResult> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const context = await getContactDbContext(orgId)
+  if ('error' in context) return { error: context.error }
 
-  if (!user) return { error: 'Unauthorized' }
-
-  const { error } = await (supabase as any)
+  const { error } = await context.db
     .from('contacts')
     .update({
       is_active: false,
