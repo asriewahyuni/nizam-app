@@ -6,6 +6,7 @@ import { getAttendanceRecords } from '@/modules/hris/actions/attendance.actions'
 import { getLeaveRequests } from '@/modules/hris/actions/leave.actions'
 import { getAccountBalances } from '@/modules/accounting/actions/coa.actions'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { isInternalAuthProvider } from '@/lib/auth/provider'
 import HrisClient from './HrisClient'
 
 type SiblingOrgRow = {
@@ -43,8 +44,9 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
 
   const supabase = await createClient()
   const admin = await createAdminClient()
-  const { data: roles } = await supabase.from('roles').select('*').eq('org_id', orgData.org.id).order('name')
-  const { data: branches } = await supabase.from('branches').select('id, name, code, pic_employee_id').eq('org_id', orgData.org.id).eq('is_active', true).order('name')
+  const readClient = (isInternalAuthProvider() ? admin : supabase) as any
+  const { data: roles } = await readClient.from('roles').select('*').eq('org_id', orgData.org.id).order('name')
+  const { data: branches } = await readClient.from('branches').select('id, name, code, pic_employee_id').eq('org_id', orgData.org.id).eq('is_active', true).order('name')
 
   let transferTargets: TransferTarget[] = []
   let transferDisabledReason: string | null = null
@@ -96,7 +98,7 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
     if (userId) {
       let canTransferAcrossHolding = !isChildOrg
       if (isChildOrg) {
-        const { data: parentMembership } = await supabase
+        const { data: parentMembership } = await readClient
           .from('org_members')
           .select('role')
           .eq('org_id', holdingOrgId)

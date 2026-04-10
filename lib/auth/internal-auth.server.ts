@@ -2,6 +2,7 @@ import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypt
 import { cookies, headers } from 'next/headers'
 import { queryPostgres } from '@/lib/db/postgres'
 import { INTERNAL_AUTH_SESSION_COOKIE, INTERNAL_AUTH_SESSION_MAX_AGE } from './internal-auth.shared'
+import { getSupabasePublicConfig } from '@/lib/supabase/config'
 
 const SCRYPT_KEY_LENGTH = 64
 const SCRYPT_SALT_BYTES = 16
@@ -42,6 +43,11 @@ type InternalCredentialRow = {
   is_active: boolean
 }
 
+type InternalAuthUserRow = {
+  id: string
+  is_active: boolean
+}
+
 function normalizeInput(value: unknown) {
   return String(value || '').trim()
 }
@@ -54,6 +60,11 @@ function normalizeEmail(value: unknown) {
 function normalizeNik(value: unknown) {
   const normalized = normalizeInput(value).toUpperCase()
   return normalized || null
+}
+
+function isLegacySupabasePasswordFallbackEnabled() {
+  const value = normalizeInput(process.env.INTERNAL_AUTH_SUPABASE_PASSWORD_FALLBACK || 'true').toLowerCase()
+  return value !== 'false' && value !== '0' && value !== 'off'
 }
 
 function getErrorMessage(error: unknown) {
@@ -128,6 +139,56 @@ function hashPasswordWithScrypt(password: string, saltBuffer?: Buffer) {
   return `scrypt$${salt.toString('base64url')}$${derivedKey.toString('base64url')}`
 }
 
+function normalizeInternalUserType(value: unknown) {
+  const normalized = normalizeInput(value).toLowerCase()
+  if (normalized === 'owner' || normalized === 'admin' || normalized === 'staff') return normalized
+  return 'staff'
+}
+
+async function findInternalAuthUserByIdentity(input: {
+  userId?: string | null
+  email?: string | null
+  nik?: string | null
+}) {
+  const normalizedUserId = normalizeUuid(input.userId)
+  const normalizedEmail = normalizeEmail(input.email)
+  const normalizedNik = normalizeNik(input.nik)
+
+  if (!normalizedUserId && !normalizedEmail && !normalizedNik) {
+    return null as InternalAuthUserRow | null
+  }
+
+  const lookup = await queryPostgres<InternalAuthUserRow>(
+    `
+      select id::text as id, is_active
+      from public.internal_auth_users
+      where
+        (
+          $1::uuid is not null
+          and (
+            id = $1::uuid
+            or legacy_user_id = $1::uuid
+          )
+        )
+        or ($2::text is not null and lower(login_email) = $2::text)
+        or ($3::text is not null and upper(login_nik) = $3::text)
+      order by
+        case
+          when $1::uuid is not null and id = $1::uuid then 0
+          when $1::uuid is not null and legacy_user_id = $1::uuid then 1
+          when $2::text is not null and lower(login_email) = $2::text then 2
+          when $3::text is not null and upper(login_nik) = $3::text then 3
+          else 4
+        end,
+        created_at asc
+      limit 1
+    `,
+    [normalizedUserId, normalizedEmail, normalizedNik]
+  )
+
+  return lookup.rows[0] || null
+}
+
 function verifyScryptPassword(password: string, storedHash: string) {
   const [scheme, saltPart, hashPart] = String(storedHash || '').split('$')
   if (scheme !== 'scrypt' || !saltPart || !hashPart) return false
@@ -138,6 +199,60 @@ function verifyScryptPassword(password: string, storedHash: string) {
 
   if (actualHash.length !== expectedHash.length) return false
   return timingSafeEqual(actualHash, expectedHash)
+}
+
+let legacySupabaseAuthClientPromise: Promise<{
+  auth: {
+    signInWithPassword: (input: { email: string; password: string }) => Promise<{
+      data: { user: { id: string } | null }
+      error: { message?: string } | null
+    }>
+    signOut: () => Promise<unknown>
+  }
+}> | null = null
+
+async function getLegacySupabaseAuthClient() {
+  if (!legacySupabaseAuthClientPromise) {
+    legacySupabaseAuthClientPromise = (async () => {
+      const { createClient } = await import('@supabase/supabase-js')
+      const { url, anonKey } = getSupabasePublicConfig()
+      return createClient(url, anonKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      })
+    })()
+  }
+
+  return legacySupabaseAuthClientPromise
+}
+
+async function verifyPasswordWithLegacySupabaseAuth(email: string | null, password: string) {
+  const normalizedEmail = normalizeEmail(email)
+  if (!normalizedEmail || !password || !isLegacySupabasePasswordFallbackEnabled()) return false
+
+  try {
+    const supabase = await getLegacySupabaseAuthClient()
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    })
+
+    if (error || !data?.user?.id) return false
+
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // no-op: this temporary bridge client is stateless
+    }
+
+    return true
+  } catch (error) {
+    console.warn('Legacy Supabase auth fallback unavailable:', getErrorMessage(error))
+    return false
+  }
 }
 
 function toInternalSessionUser(row: InternalAuthSessionRow): InternalAuthSessionUser {
@@ -202,6 +317,201 @@ async function createSession(userId: string) {
   })
 
   return sessionId
+}
+
+export async function createInternalAuthSessionByUserId(internalUserId: string) {
+  const normalizedUserId = normalizeUuid(internalUserId)
+  if (!normalizedUserId) {
+    return { error: 'User internal tidak valid.' as const }
+  }
+
+  const result = await queryPostgres<{ id: string; is_active: boolean }>(
+    `
+      select id::text as id, is_active
+      from public.internal_auth_users
+      where id = $1::uuid
+      limit 1
+    `,
+    [normalizedUserId]
+  )
+
+  const userRow = result.rows[0]
+  if (!userRow || !userRow.is_active) {
+    return { error: 'Akun internal tidak ditemukan atau nonaktif.' as const }
+  }
+
+  const sessionId = await createSession(normalizedUserId)
+  await queryPostgres(
+    `
+      update public.internal_auth_users
+      set last_login_at = now()
+      where id = $1::uuid
+    `,
+    [normalizedUserId]
+  )
+
+  return {
+    success: true as const,
+    sessionId,
+    userId: normalizedUserId,
+  }
+}
+
+export async function ensureInternalAuthUserRecord(input: {
+  userId?: string | null
+  email?: string | null
+  nik?: string | null
+  fullName?: string | null
+  userType?: string | null
+}) {
+  const normalizedUserId = normalizeUuid(input.userId)
+  const normalizedEmail = normalizeEmail(input.email)
+  const normalizedNik = normalizeNik(input.nik)
+  const normalizedFullName = normalizeInput(input.fullName) || null
+  const normalizedUserType = normalizeInternalUserType(input.userType || 'staff')
+
+  if (!normalizedUserId && !normalizedEmail && !normalizedNik) {
+    return { error: 'Identitas akun internal tidak valid.' as const }
+  }
+
+  try {
+    const existing = await findInternalAuthUserByIdentity({
+      userId: normalizedUserId,
+      email: normalizedEmail,
+      nik: normalizedNik,
+    })
+
+    if (existing?.id) {
+      await queryPostgres(
+        `
+          update public.internal_auth_users
+          set
+            is_active = true,
+            updated_at = now()
+          where id = $1::uuid
+        `,
+        [existing.id]
+      )
+
+      // Best effort metadata fill; ignored if uniqueness prevents update.
+      try {
+        await queryPostgres(
+          `
+            update public.internal_auth_users
+            set
+              legacy_user_id = case
+                when legacy_user_id is null and $2::uuid is not null then $2::uuid
+                else legacy_user_id
+              end,
+              login_email = case
+                when login_email is null and $3::text is not null then $3::text
+                else login_email
+              end,
+              login_nik = case
+                when login_nik is null and $4::text is not null then $4::text
+                else login_nik
+              end,
+              display_name = case
+                when nullif(trim(coalesce(display_name, '')), '') is null and $5::text is not null then $5::text
+                else display_name
+              end,
+              user_type = case
+                when nullif(trim(coalesce(user_type, '')), '') is null then $6::text
+                else user_type
+              end,
+              updated_at = now()
+            where id = $1::uuid
+          `,
+          [
+            existing.id,
+            normalizedUserId,
+            normalizedEmail,
+            normalizedNik,
+            normalizedFullName,
+            normalizedUserType,
+          ]
+        )
+      } catch (updateError) {
+        console.warn('ensureInternalAuthUserRecord metadata fill skipped:', getErrorMessage(updateError))
+      }
+
+      return {
+        success: true as const,
+        userId: existing.id,
+      }
+    }
+
+    const fallbackEmail =
+      normalizedEmail ||
+      (normalizedUserId ? `${normalizedUserId}@owners.nizam.local` : null)
+
+    const randomBootstrapPassword = randomBytes(32).toString('base64url')
+    const passwordHash = hashPasswordWithScrypt(randomBootstrapPassword)
+
+    const inserted = await queryPostgres<{ id: string }>(
+      `
+        insert into public.internal_auth_users (
+          legacy_user_id,
+          login_email,
+          login_nik,
+          password_hash,
+          display_name,
+          user_type,
+          is_active
+        )
+        values (
+          $1::uuid,
+          $2::text,
+          $3::text,
+          $4::text,
+          $5::text,
+          $6::text,
+          true
+        )
+        returning id::text as id
+      `,
+      [
+        normalizedUserId,
+        fallbackEmail,
+        normalizedNik,
+        passwordHash,
+        normalizedFullName,
+        normalizedUserType,
+      ]
+    )
+
+    const insertedId = normalizeUuid(inserted.rows[0]?.id)
+    if (!insertedId) {
+      return { error: 'Gagal menyiapkan akun internal owner.' as const }
+    }
+
+    return {
+      success: true as const,
+      userId: insertedId,
+    }
+  } catch (error) {
+    const duplicate = getErrorMessage(error).toLowerCase().includes('duplicate key')
+    if (duplicate) {
+      const recovered = await findInternalAuthUserByIdentity({
+        userId: normalizedUserId,
+        email: normalizedEmail,
+        nik: normalizedNik,
+      })
+
+      const recoveredId = normalizeUuid(recovered?.id)
+      if (recoveredId) {
+        return {
+          success: true as const,
+          userId: recoveredId,
+        }
+      }
+    }
+
+    console.error('ensureInternalAuthUserRecord failed:', getErrorMessage(error))
+    return {
+      error: resolveInternalAuthDatabaseError(error, 'Gagal menyiapkan akun internal.'),
+    }
+  }
 }
 
 export async function createInternalAuthUser(input: {
@@ -366,9 +676,17 @@ export async function signInWithInternalAuth(input: {
     if (candidates.length === 0) return { error: 'Email/NIK atau password salah.' as const }
 
     const passwordMatched: InternalCredentialRow[] = []
+    const passwordMatchedViaLegacyFallback = new Set<string>()
     for (const candidate of candidates) {
       if (verifyScryptPassword(password, candidate.password_hash)) {
         passwordMatched.push(candidate)
+        continue
+      }
+
+      const legacyPasswordMatched = await verifyPasswordWithLegacySupabaseAuth(candidate.login_email, password)
+      if (legacyPasswordMatched) {
+        passwordMatched.push(candidate)
+        passwordMatchedViaLegacyFallback.add(candidate.id)
       }
     }
     if (passwordMatched.length === 0) return { error: 'Email/NIK atau password salah.' as const }
@@ -396,6 +714,19 @@ export async function signInWithInternalAuth(input: {
     }
 
     if (!matched) return { error: 'Email/NIK atau password salah.' as const }
+
+    if (passwordMatchedViaLegacyFallback.has(matched.id)) {
+      await queryPostgres(
+        `
+          update public.internal_auth_users
+          set
+            password_hash = $2::text,
+            updated_at = now()
+          where id = $1::uuid
+        `,
+        [matched.id, hashPasswordWithScrypt(password)]
+      )
+    }
 
     const sessionId = await createSession(matched.id)
     await queryPostgres(

@@ -5,11 +5,14 @@ import { getServerAuthContext } from '@/lib/supabase/auth.server'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import { isInternalAuthProvider } from '@/lib/auth/provider'
 import {
+  createInternalAuthSessionByUserId,
   createInternalAuthUser,
+  ensureInternalAuthUserRecord,
   getInternalAuthSession,
   signInWithInternalAuth,
   signOutInternalAuth,
 } from '@/lib/auth/internal-auth.server'
+import { INTERNAL_AUTH_SESSION_COOKIE, INTERNAL_AUTH_SESSION_MAX_AGE } from '@/lib/auth/internal-auth.shared'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -24,12 +27,20 @@ const ADMIN_IMPERSONATION_MAX_AGE = 60 * 60 * 4
 const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 const DEMO_ACCOUNT_EMAIL = 'demo@nizam.app'
 
-type AdminImpersonationPayload = {
-  accessToken: string
-  refreshToken: string
-  email: string
-  activeOrgId: string | null
-}
+type AdminImpersonationPayload =
+  | {
+      provider?: 'supabase'
+      accessToken: string
+      refreshToken: string
+      email: string
+      activeOrgId: string | null
+    }
+  | {
+      provider: 'internal'
+      internalSessionToken: string
+      email: string
+      activeOrgId: string | null
+    }
 
 function encodeAdminImpersonation(payload: AdminImpersonationPayload) {
   return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
@@ -40,20 +51,33 @@ function decodeAdminImpersonation(raw?: string | null): AdminImpersonationPayloa
 
   try {
     const parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as Partial<AdminImpersonationPayload>
+    const email = typeof parsed.email === 'string' ? parsed.email : null
+    if (!email) return null
 
-    if (
-      typeof parsed.accessToken !== 'string' ||
-      typeof parsed.refreshToken !== 'string' ||
-      typeof parsed.email !== 'string'
-    ) {
-      return null
+    const provider = parsed.provider === 'internal' ? 'internal' : 'supabase'
+    const activeOrgId = typeof parsed.activeOrgId === 'string' ? parsed.activeOrgId : null
+
+    if (provider === 'internal') {
+      const internalSessionToken = (parsed as { internalSessionToken?: unknown }).internalSessionToken
+      if (typeof internalSessionToken !== 'string' || !internalSessionToken.trim()) return null
+      return {
+        provider: 'internal',
+        internalSessionToken,
+        email,
+        activeOrgId,
+      }
     }
 
+    const accessToken = (parsed as { accessToken?: unknown }).accessToken
+    const refreshToken = (parsed as { refreshToken?: unknown }).refreshToken
+    if (typeof accessToken !== 'string' || typeof refreshToken !== 'string') return null
+
     return {
-      accessToken: parsed.accessToken,
-      refreshToken: parsed.refreshToken,
-      email: parsed.email,
-      activeOrgId: typeof parsed.activeOrgId === 'string' ? parsed.activeOrgId : null,
+      provider: 'supabase',
+      accessToken,
+      refreshToken,
+      email,
+      activeOrgId,
     }
   } catch {
     return null
@@ -108,6 +132,12 @@ function isDuplicateAuthRegistrationError(message: unknown) {
     lowered.includes('email address has already been registered') ||
     (/already.*registered/.test(lowered))
   )
+}
+
+function isAuthUserNotFoundError(message: unknown) {
+  if (typeof message !== 'string') return false
+  const lowered = message.toLowerCase()
+  return lowered.includes('not found') || lowered.includes('no user')
 }
 
 function isDemoAccountUser(user: { email?: string | null; user_metadata?: Record<string, unknown> | null } | null | undefined) {
@@ -956,11 +986,7 @@ export async function deleteInactiveTenantByPlatformAdmin(orgId: string) {
 }
 
 export async function signInAsTenantOwner(orgId: string) {
-  if (isInternalAuthProvider()) {
-    return { error: 'Login as tenant owner belum didukung di mode auth internal.' }
-  }
-
-  const supabase = await createClient()
+  const internalProvider = isInternalAuthProvider()
   const adminClient = await createAdminClient()
   const cookieStore = await cookies()
   const trimmedOrgId = orgId.trim()
@@ -968,6 +994,158 @@ export async function signInAsTenantOwner(orgId: string) {
   if (!trimmedOrgId) {
     return { error: 'Tenant tidak valid.' }
   }
+
+  if (internalProvider) {
+    const internalSession = await getInternalAuthSession()
+    const adminUser = internalSession?.user || null
+    const adminEmail = normalizeEmail(adminUser?.email) || ''
+    const backupInternalSessionToken = String(cookieStore.get(INTERNAL_AUTH_SESSION_COOKIE)?.value || '').trim()
+
+    if (!adminUser?.id || !backupInternalSessionToken) {
+      return { error: 'Sesi admin internal tidak ditemukan. Silakan login ulang.' }
+    }
+
+    if (!isPlatformAdminEmail(adminEmail)) {
+      return { error: 'Akses ditolak. Hanya platform admin yang bisa login sebagai tenant.' }
+    }
+
+    const { data: org, error: orgError } = await (adminClient as any)
+      .from('organizations')
+      .select('id, name, owner_email')
+      .eq('id', trimmedOrgId)
+      .maybeSingle()
+
+    if (orgError) {
+      return { error: `Gagal memuat tenant: ${orgError.message}` }
+    }
+
+    if (!org) {
+      return { error: 'Tenant tidak ditemukan.' }
+    }
+
+    const { data: ownerMembership, error: ownerMembershipError } = await (adminClient as any)
+      .from('org_members')
+      .select('user_id')
+      .eq('org_id', trimmedOrgId)
+      .eq('role', 'owner')
+      .eq('is_active', true)
+      .order('joined_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (ownerMembershipError) {
+      return { error: `Gagal memuat owner tenant: ${ownerMembershipError.message}` }
+    }
+
+    const tenantOwnerLegacyUserId = String(ownerMembership?.user_id || '').trim() || null
+    let tenantEmail = normalizeEmail(org.owner_email) || null
+
+    if (tenantOwnerLegacyUserId) {
+      const { data: ownerUserData, error: ownerUserError } = await adminClient.auth.admin.getUserById(tenantOwnerLegacyUserId)
+      if (ownerUserError && !isAuthUserNotFoundError(ownerUserError.message)) {
+        return { error: `Gagal membaca akun owner tenant: ${ownerUserError.message}` }
+      }
+      if (ownerUserData.user?.email) {
+        tenantEmail = normalizeEmail(ownerUserData.user.email)
+      }
+    }
+
+    let internalOwnerUserId: string | null = null
+
+    if (tenantOwnerLegacyUserId) {
+      const { data: internalById } = await (adminClient as any)
+        .from('internal_auth_users')
+        .select('id')
+        .eq('id', tenantOwnerLegacyUserId)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle()
+
+      internalOwnerUserId = normalizeUuid(internalById?.id) || null
+    }
+
+    if (!internalOwnerUserId && tenantOwnerLegacyUserId) {
+      const { data: internalByLegacy } = await (adminClient as any)
+        .from('internal_auth_users')
+        .select('id')
+        .eq('legacy_user_id', tenantOwnerLegacyUserId)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle()
+
+      internalOwnerUserId = normalizeUuid(internalByLegacy?.id) || null
+    }
+
+    if (!internalOwnerUserId && tenantEmail) {
+      const { data: internalByEmail } = await (adminClient as any)
+        .from('internal_auth_users')
+        .select('id')
+        .ilike('login_email', tenantEmail)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle()
+
+      internalOwnerUserId = normalizeUuid(internalByEmail?.id) || null
+    }
+
+    if (!internalOwnerUserId) {
+      const ownerDisplayName = String(org.name || '').trim()
+      const ensuredOwner = await ensureInternalAuthUserRecord({
+        userId: tenantOwnerLegacyUserId,
+        email: tenantEmail || (tenantOwnerLegacyUserId ? `${tenantOwnerLegacyUserId}@owners.nizam.local` : null),
+        fullName: ownerDisplayName ? `${ownerDisplayName} Owner` : 'Tenant Owner',
+        userType: 'owner',
+      })
+
+      if ('error' in ensuredOwner) {
+        return { error: `Tenant belum memiliki akun owner internal yang dapat dipakai untuk Login As. (${ensuredOwner.error})` }
+      }
+
+      internalOwnerUserId = ensuredOwner.userId
+    }
+
+    if (!internalOwnerUserId) {
+      return { error: 'Tenant belum memiliki akun owner internal yang dapat dipakai untuk Login As.' }
+    }
+
+    cookieStore.set(
+      ADMIN_IMPERSONATION_COOKIE,
+      encodeAdminImpersonation({
+        provider: 'internal',
+        internalSessionToken: backupInternalSessionToken,
+        email: adminEmail,
+        activeOrgId: cookieStore.get(ACTIVE_ORG_COOKIE)?.value || null,
+      }),
+      {
+        maxAge: ADMIN_IMPERSONATION_MAX_AGE,
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+      }
+    )
+
+    const switched = await createInternalAuthSessionByUserId(internalOwnerUserId)
+    if ('error' in switched) {
+      cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
+      return { error: `Gagal mengganti sesi internal ke owner tenant: ${switched.error}` }
+    }
+
+    cookieStore.delete('nizam_demo_org_id')
+    cookieStore.set(ACTIVE_ORG_COOKIE, org.id, {
+      maxAge: ADMIN_IMPERSONATION_MAX_AGE,
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    })
+    cookieStore.delete(ACTIVE_BRANCH_COOKIE)
+
+    revalidatePath('/', 'layout')
+    redirect('/dashboard')
+  }
+
+  const supabase = await createClient()
 
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
   const adminSession = sessionData.session
@@ -1026,12 +1204,12 @@ export async function signInAsTenantOwner(orgId: string) {
     return { error: 'Tenant belum memiliki akun owner yang dapat dipakai untuk Login As.' }
   }
 
-  cookieStore.set(
-    ADMIN_IMPERSONATION_COOKIE,
-    encodeAdminImpersonation({
-      accessToken: adminSession.access_token,
-      refreshToken: adminSession.refresh_token,
-      email: adminEmail,
+    cookieStore.set(
+      ADMIN_IMPERSONATION_COOKIE,
+      encodeAdminImpersonation({
+        accessToken: adminSession.access_token,
+        refreshToken: adminSession.refresh_token,
+        email: adminEmail,
       activeOrgId: cookieStore.get(ACTIVE_ORG_COOKIE)?.value || null,
     }),
     {
@@ -1084,16 +1262,56 @@ export async function signInAsTenantOwner(orgId: string) {
 }
 
 export async function restorePlatformAdminSession() {
-  if (isInternalAuthProvider()) {
-    return { error: 'Restore session admin belum didukung di mode auth internal.' }
-  }
-
-  const supabase = await createClient()
   const cookieStore = await cookies()
   const payload = decodeAdminImpersonation(cookieStore.get(ADMIN_IMPERSONATION_COOKIE)?.value)
 
   if (!payload) {
     return { error: 'Sesi admin cadangan tidak ditemukan atau sudah kadaluarsa.' }
+  }
+
+  if (isInternalAuthProvider()) {
+    if (payload.provider !== 'internal') {
+      return { error: 'Sesi admin cadangan internal tidak valid.' }
+    }
+
+    cookieStore.set(INTERNAL_AUTH_SESSION_COOKIE, payload.internalSessionToken, {
+      maxAge: INTERNAL_AUTH_SESSION_MAX_AGE,
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    })
+
+    const restoredSession = await getInternalAuthSession()
+    const restoredAdminEmail = normalizeEmail(restoredSession?.user?.email) || ''
+    if (!restoredSession?.user?.id || !isPlatformAdminEmail(restoredAdminEmail)) {
+      cookieStore.delete(INTERNAL_AUTH_SESSION_COOKIE)
+      cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
+      return { error: 'Sesi admin internal cadangan tidak valid atau sudah berakhir.' }
+    }
+
+    cookieStore.delete('nizam_demo_org_id')
+    if (payload.activeOrgId) {
+      cookieStore.set(ACTIVE_ORG_COOKIE, payload.activeOrgId, {
+        maxAge: ADMIN_IMPERSONATION_MAX_AGE,
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+      })
+    } else {
+      cookieStore.delete(ACTIVE_ORG_COOKIE)
+    }
+    cookieStore.delete(ACTIVE_BRANCH_COOKIE)
+    cookieStore.delete(ADMIN_IMPERSONATION_COOKIE)
+
+    revalidatePath('/', 'layout')
+    redirect('/admin')
+  }
+
+  const supabase = await createClient()
+  if (payload.provider !== 'supabase') {
+    return { error: 'Sesi admin cadangan tidak valid untuk mode Supabase.' }
   }
 
   const { error } = await supabase.auth.setSession({

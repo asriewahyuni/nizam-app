@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { cache } from 'react'
 import { getServerAuthContext } from '@/lib/supabase/auth.server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { isInternalAuthProvider } from '@/lib/auth/provider'
 import { ACTIVE_BRANCH_COOKIE, type BranchSummary } from './org-context'
 
 const FULL_BRANCH_ACCESS_ROLES = new Set(['owner', 'admin'])
@@ -156,9 +157,9 @@ const getBranchAccessScopeCached = cache(async (orgId: string): Promise<BranchAc
   if (!trimmedOrgId) return emptyScope()
 
   const { supabase, user } = await getServerAuthContext()
-  const db = supabase as any
   const adminClient = await createAdminClient()
   const admin = adminClient as any
+  const db = isInternalAuthProvider() ? admin : (supabase as any)
 
   if (!user) return emptyScope()
 

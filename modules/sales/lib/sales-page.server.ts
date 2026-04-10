@@ -1,6 +1,7 @@
 import { cache } from 'react'
 import type { LooseDb } from '@/lib/supabase/loose'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { isInternalAuthProvider } from '@/lib/auth/provider'
 import {
   consumeAiTokensForGeneration,
   ensureAiTokenWallet,
@@ -96,7 +97,7 @@ async function resolvePublicOrg(admin: LooseDb, orgIdentifier: string): Promise<
 
 async function getAuthedContext() {
   const supabase = await createClient()
-  const db = supabase as unknown as LooseDb
+  let db = supabase as unknown as LooseDb
 
   const {
     data: { user },
@@ -104,6 +105,10 @@ async function getAuthedContext() {
 
   if (!user) {
     throw new Error('Tidak terautentikasi')
+  }
+
+  if (isInternalAuthProvider()) {
+    db = (await createAdminClient()) as unknown as LooseDb
   }
 
   return { supabase, db, user }
@@ -450,6 +455,7 @@ function mergeGeneratedPayload(base: SalesPagePayload, patch: Partial<SalesPageP
 
 export async function getSalesPagesForOrg(orgId: string): Promise<SalesPageView[]> {
   const { db } = await getAuthedContext()
+  await getMemberOrg(orgId)
   const { data, error } = await db
     .from('sales_pages')
     .select('*')
@@ -462,6 +468,7 @@ export async function getSalesPagesForOrg(orgId: string): Promise<SalesPageView[
 
 export async function getSalesPageLeadsForOrg(orgId: string, salesPageId?: string): Promise<SalesPageLead[]> {
   const { db } = await getAuthedContext()
+  await getMemberOrg(orgId)
   let query = db
     .from('sales_page_leads')
     .select('*')
