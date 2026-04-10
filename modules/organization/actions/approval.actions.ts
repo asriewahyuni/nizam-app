@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { ensureSellableBranchStockAvailability, shouldGuardOrderedSaleStock } from '@/modules/sales/lib/stock-guard.server'
@@ -10,8 +10,324 @@ async function resolveApprovalBranchId(orgId: string, branchId?: string | null) 
   return branchSelection
 }
 
+async function resolveMetadataReadClient(sessionClient: any) {
+  try {
+    return await createAdminClient()
+  } catch {
+    return sessionClient
+  }
+}
+
+function toTrimmedString(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function toTitleWords(input: string): string {
+  return input
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
+}
+
+function mapLegacyRoleLabel(role: string | null): string | null {
+  if (!role) return null
+  const normalized = role.trim().toLowerCase()
+  if (!normalized) return null
+
+  if (normalized === 'owner') return 'Owner'
+  if (normalized === 'admin') return 'Admin'
+  if (normalized === 'manager') return 'Manager'
+  if (normalized === 'staff') return 'Staff'
+  if (normalized === 'viewer') return 'Viewer'
+  if (normalized === 'hr') return 'HR'
+  return toTitleWords(normalized.replace(/[_-]+/g, ' '))
+}
+
+function deriveNameFromEmail(email: string | null): string | null {
+  if (!email) return null
+  const localPart = String(email).split('@')[0]?.trim()
+  if (!localPart) return null
+  const withSpaces = localPart.replace(/[._-]+/g, ' ').trim()
+  if (!withSpaces) return null
+  return toTitleWords(withSpaces)
+}
+
+async function getOrgMemberIdentityByUserIds(supabase: any, orgId: string, userIds: string[]) {
+  const result = new Map<string, { roleName: string | null; email: string | null }>()
+  if (!Array.isArray(userIds) || userIds.length === 0) return result
+
+  const { data: memberRows } = await (supabase as any)
+    .from('org_members')
+    .select(`
+      user_id,
+      role,
+      custom_role:roles(name),
+      user:user_id(email)
+    `)
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .in('user_id', userIds)
+
+  for (const row of (memberRows as any[]) || []) {
+    const userId = toTrimmedString(row?.user_id)
+    if (!userId || result.has(userId)) continue
+
+    const customRoleName = toTrimmedString((row as any)?.custom_role?.name)
+    const legacyRoleName = mapLegacyRoleLabel(toTrimmedString(row?.role))
+    const roleName = customRoleName || legacyRoleName || null
+    const email = toTrimmedString((row as any)?.user?.email)
+
+    result.set(userId, { roleName, email })
+  }
+
+  return result
+}
+
+async function getAuthDisplayNameByUserIds(supabase: any, userIds: string[]) {
+  const result = new Map<string, string>()
+  if (!Array.isArray(userIds) || userIds.length === 0) return result
+
+  const adminApi = (supabase as any)?.auth?.admin
+  if (!adminApi || typeof adminApi.getUserById !== 'function') return result
+
+  await Promise.all(
+    userIds.map(async (userId) => {
+      try {
+        const { data, error } = await adminApi.getUserById(userId)
+        if (error || !data?.user) return
+
+        const user = data.user as any
+        const metadata = (user.user_metadata || {}) as Record<string, unknown>
+        const rawMetadata = (user.raw_user_meta_data || {}) as Record<string, unknown>
+        const displayName =
+          toTrimmedString(metadata.full_name) ||
+          toTrimmedString(metadata.name) ||
+          toTrimmedString(metadata.display_name) ||
+          toTrimmedString(rawMetadata.full_name) ||
+          toTrimmedString(rawMetadata.name) ||
+          toTrimmedString(rawMetadata.display_name) ||
+          null
+
+        if (displayName) {
+          result.set(userId, displayName)
+        }
+      } catch {
+        // noop: fallback handled by caller
+      }
+    })
+  )
+
+  return result
+}
+
+async function enrichApproverMetadata(supabase: any, orgId: string, rows: any[]) {
+  const list = Array.isArray(rows) ? rows : []
+  if (list.length === 0) return list
+
+  const approverIds = Array.from(
+    new Set(
+      list
+        .map((row: any) => toTrimmedString(row?.approver_id))
+        .filter((id: string | null): id is string => Boolean(id) && id.toUpperCase() !== 'SYSTEM')
+    )
+  )
+
+  if (approverIds.length === 0) {
+    return list.map((row: any) => ({
+      ...row,
+      approver_name: toTrimmedString(row?.approver_id)?.toUpperCase() === 'SYSTEM' ? 'Otomasi Sistem' : null,
+      approver_job_title: toTrimmedString(row?.approver_id)?.toUpperCase() === 'SYSTEM' ? 'Sistem' : null,
+      approver_unit_name: null,
+    }))
+  }
+
+  const { data: employeeRows } = await (supabase as any)
+    .from('employees')
+    .select('user_id, first_name, last_name, job_title, branches(name)')
+    .eq('org_id', orgId)
+    .in('user_id', approverIds)
+
+  const orgMemberByUserId = await getOrgMemberIdentityByUserIds(supabase, orgId, approverIds)
+  const authNameByUserId = await getAuthDisplayNameByUserIds(supabase, approverIds)
+
+  const employeeByUserId = new Map<string, { name: string | null; jobTitle: string | null; unitName: string | null }>()
+  for (const employee of (employeeRows as any[]) || []) {
+    const userId = toTrimmedString(employee?.user_id)
+    if (!userId || employeeByUserId.has(userId)) continue
+
+    const firstName = toTrimmedString(employee?.first_name)
+    const lastName = toTrimmedString(employee?.last_name)
+    const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || null
+    const unitName = toTrimmedString((employee as any)?.branches?.name)
+    const jobTitle = toTrimmedString(employee?.job_title)
+
+    employeeByUserId.set(userId, {
+      name: fullName,
+      jobTitle,
+      unitName,
+    })
+  }
+
+  return list.map((row: any) => {
+    const approverId = toTrimmedString(row?.approver_id)
+    if (!approverId) {
+      return {
+        ...row,
+        approver_name: null,
+        approver_job_title: null,
+        approver_unit_name: null,
+      }
+    }
+
+    if (approverId.toUpperCase() === 'SYSTEM') {
+      return {
+        ...row,
+        approver_name: 'Otomasi Sistem',
+        approver_job_title: 'Sistem',
+        approver_unit_name: null,
+      }
+    }
+
+    const employee = employeeByUserId.get(approverId)
+    const memberIdentity = orgMemberByUserId.get(approverId)
+    const fallbackNameFromAuth = authNameByUserId.get(approverId) || null
+    const fallbackNameFromEmail = deriveNameFromEmail(memberIdentity?.email || null)
+    return {
+      ...row,
+      approver_name: employee?.name || fallbackNameFromAuth || fallbackNameFromEmail || null,
+      approver_job_title: employee?.jobTitle || memberIdentity?.roleName || null,
+      approver_unit_name: employee?.unitName || null,
+    }
+  })
+}
+
+async function enrichRequesterMetadata(supabase: any, orgId: string, rows: any[]) {
+  const list = Array.isArray(rows) ? rows : []
+  if (list.length === 0) return list
+
+  const requesterIds = Array.from(
+    new Set(
+      list
+        .map((row: any) => toTrimmedString(row?.requester_id))
+        .filter((id: string | null): id is string => Boolean(id) && id.toUpperCase() !== 'SYSTEM')
+    )
+  )
+
+  const requestBranchIds = Array.from(
+    new Set(
+      list
+        .map((row: any) => toTrimmedString(row?.branch_id))
+        .filter((id: string | null): id is string => Boolean(id))
+    )
+  )
+
+  const branchNameById = new Map<string, string>()
+  if (requestBranchIds.length > 0) {
+    const { data: branchRows } = await (supabase as any)
+      .from('branches')
+      .select('id, name')
+      .eq('org_id', orgId)
+      .in('id', requestBranchIds)
+
+    for (const branch of (branchRows as Array<{ id?: string; name?: string | null }> | null) || []) {
+      const branchId = toTrimmedString(branch?.id)
+      const branchName = toTrimmedString(branch?.name)
+      if (!branchId || !branchName) continue
+      branchNameById.set(branchId, branchName)
+    }
+  }
+
+  if (requesterIds.length === 0) {
+    return list.map((row: any) => {
+      const requesterId = toTrimmedString(row?.requester_id)
+      const branchName = toTrimmedString(row?.branch_id) ? branchNameById.get(String(row.branch_id)) || null : null
+      if (requesterId?.toUpperCase() === 'SYSTEM') {
+        return {
+          ...row,
+          requester_name: 'Otomasi Sistem',
+          requester_job_title: 'Sistem',
+          requester_unit_name: branchName,
+        }
+      }
+
+      return {
+        ...row,
+        requester_name: null,
+        requester_job_title: null,
+        requester_unit_name: branchName,
+      }
+    })
+  }
+
+  const { data: employeeRows } = await (supabase as any)
+    .from('employees')
+    .select('user_id, first_name, last_name, job_title, branches(name)')
+    .eq('org_id', orgId)
+    .in('user_id', requesterIds)
+
+  const orgMemberByUserId = await getOrgMemberIdentityByUserIds(supabase, orgId, requesterIds)
+  const authNameByUserId = await getAuthDisplayNameByUserIds(supabase, requesterIds)
+
+  const employeeByUserId = new Map<string, { name: string | null; jobTitle: string | null; unitName: string | null }>()
+  for (const employee of (employeeRows as any[]) || []) {
+    const userId = toTrimmedString(employee?.user_id)
+    if (!userId || employeeByUserId.has(userId)) continue
+
+    const firstName = toTrimmedString(employee?.first_name)
+    const lastName = toTrimmedString(employee?.last_name)
+    const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || null
+    const unitName = toTrimmedString((employee as any)?.branches?.name)
+    const jobTitle = toTrimmedString(employee?.job_title)
+
+    employeeByUserId.set(userId, {
+      name: fullName,
+      jobTitle,
+      unitName,
+    })
+  }
+
+  return list.map((row: any) => {
+    const requesterId = toTrimmedString(row?.requester_id)
+    const requestBranchId = toTrimmedString(row?.branch_id)
+    const fallbackUnitName = requestBranchId ? branchNameById.get(requestBranchId) || null : null
+
+    if (!requesterId) {
+      return {
+        ...row,
+        requester_name: null,
+        requester_job_title: null,
+        requester_unit_name: fallbackUnitName,
+      }
+    }
+
+    if (requesterId.toUpperCase() === 'SYSTEM') {
+      return {
+        ...row,
+        requester_name: 'Otomasi Sistem',
+        requester_job_title: 'Sistem',
+        requester_unit_name: fallbackUnitName,
+      }
+    }
+
+    const employee = employeeByUserId.get(requesterId)
+    const memberIdentity = orgMemberByUserId.get(requesterId)
+    const fallbackNameFromAuth = authNameByUserId.get(requesterId) || null
+    const fallbackNameFromEmail = deriveNameFromEmail(memberIdentity?.email || null)
+    return {
+      ...row,
+      requester_name: employee?.name || fallbackNameFromAuth || fallbackNameFromEmail || null,
+      requester_job_title: employee?.jobTitle || memberIdentity?.roleName || null,
+      requester_unit_name: employee?.unitName || fallbackUnitName,
+    }
+  })
+}
+
 export async function getPendingApprovals(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
+  const metadataClient = await resolveMetadataReadClient(supabase)
   const branchSelection = await resolveApprovalBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
   const effectiveBranchId = branchSelection.branchId
@@ -32,12 +348,13 @@ export async function getPendingApprovals(orgId: string, branchId?: string | nul
     (console as any).error('Error fetching approvals:', error)
     return []
   }
-  
-  return data
+
+  return enrichRequesterMetadata(metadataClient, orgId, data || [])
 }
 
 export async function getApprovalHistory(orgId: string, branchId?: string | null) {
   const supabase = await createClient()
+  const metadataClient = await resolveMetadataReadClient(supabase)
   const branchSelection = await resolveApprovalBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
   const effectiveBranchId = branchSelection.branchId
@@ -60,11 +377,13 @@ export async function getApprovalHistory(orgId: string, branchId?: string | null
     (console as any).error('Error fetching approval history:', error)
     return []
   }
-  
-  return data
+
+  const withApprover = await enrichApproverMetadata(metadataClient, orgId, data || [])
+  return enrichRequesterMetadata(metadataClient, orgId, withApprover)
 }
 export async function getApprovalDetail(orgId: string, sourceId: string, sourceType: string, branchId?: string | null) {
   const supabase = await createClient()
+  const metadataClient = await resolveMetadataReadClient(supabase)
   const branchSelection = await resolveApprovalBranchId(orgId, branchId)
   if ('error' in branchSelection) return { data: null, error: branchSelection.error }
   const effectiveBranchId = branchSelection.branchId
@@ -126,7 +445,10 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
     ? (logs || []).filter((log: any) => log.branch_id === effectiveBranchId)
     : (logs || [])
 
-  return { data: dataRes.data, logs: scopedLogs, error: null }
+  const logsWithApprover = await enrichApproverMetadata(metadataClient, orgId, scopedLogs)
+  const enrichedLogs = await enrichRequesterMetadata(metadataClient, orgId, logsWithApprover)
+
+  return { data: dataRes.data, logs: enrichedLogs, error: null }
 }
 
 export async function getPendingApprovalsCount(orgId: string, branchId?: string | null) {
@@ -297,6 +619,7 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
 
 export async function getApprovalForSource(orgId: string, sourceId: string, sourceType: string, branchId?: string | null) {
   const supabase = await createClient()
+  const metadataClient = await resolveMetadataReadClient(supabase)
   const branchSelection = await resolveApprovalBranchId(orgId, branchId)
   if ('error' in branchSelection) return null
   const effectiveBranchId = branchSelection.branchId
@@ -315,5 +638,6 @@ export async function getApprovalForSource(orgId: string, sourceId: string, sour
   const { data, error } = await query.single()
 
   if (error || !data) return null;
-  return data;
+  const enriched = await enrichApproverMetadata(metadataClient, orgId, [data])
+  return enriched[0] || data
 }

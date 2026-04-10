@@ -33,6 +33,47 @@ function getSourceTypeTone(sourceType: string) {
   }
 }
 
+function getApproverDisplayText(req: any) {
+  if (String(req?.approver_id || '').trim().toUpperCase() === 'SYSTEM') {
+    return 'Otomasi Sistem'
+  }
+
+  const name = String(req?.approver_name || '').trim()
+  const jobTitle = String(req?.approver_job_title || '').trim()
+  const unitName = String(req?.approver_unit_name || '').trim()
+  const detail = [name, jobTitle, unitName].filter(Boolean)
+
+  if (detail.length > 0) return detail.join(', ')
+
+  const fallbackName = String(req?.requester_name || '').trim()
+  const fallbackJobTitle = String(req?.requester_job_title || '').trim()
+  const fallbackUnitName = String(req?.requester_unit_name || '').trim()
+  const fallbackDetail = [fallbackName, fallbackJobTitle, fallbackUnitName].filter(Boolean)
+
+  if (fallbackDetail.length > 0) return fallbackDetail.join(', ')
+  return 'Akun Internal'
+}
+
+function getRequesterDisplayText(req: any) {
+  if (String(req?.requester_id || '').trim().toUpperCase() === 'SYSTEM') {
+    return 'Otomasi Sistem'
+  }
+
+  const name = String(req?.requester_name || '').trim()
+  const jobTitle = String(req?.requester_job_title || '').trim()
+  const unitName = String(req?.requester_unit_name || '').trim()
+  const detail = [name, jobTitle, unitName].filter(Boolean)
+
+  if (detail.length > 0) return detail.join(', ')
+  return String(req?.requester?.email || '').trim() || 'Staf Internal'
+}
+
+function getLogActorDisplayText(log: any) {
+  const status = String(log?.status || '').trim().toUpperCase()
+  if (status === 'PENDING') return getRequesterDisplayText(log)
+  return getApproverDisplayText(log)
+}
+
 export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps) {
   const [approvals, setApprovals] = useState(initialApprovals)
   const [history, setHistory] = useState<any[]>([])
@@ -164,7 +205,7 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                        <span className="text-slate-400 text-xs font-mono">• {formatDate(req.requested_at)}</span>
                     </div>
                     <h3 className="text-lg font-bold text-slate-900">{req.reason || 'Permintaan Persetujuan Operasional'}</h3>
-                    <p className="text-sm text-slate-500">Oleh: <span className="font-bold text-slate-700">{req.requester?.email || 'Staf Internal'}</span></p>
+                    <p className="text-sm text-slate-500">Oleh: <span className="font-bold text-slate-700">{getRequesterDisplayText(req)}</span></p>
                  </div>
               </div>
 
@@ -209,7 +250,7 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                            <span className="text-slate-400 text-xs font-mono">• {formatDate(req.decided_at || req.updated_at)}</span>
                         </div>
                         <h3 className="text-lg font-bold text-slate-900">{req.reason || req.source_type}</h3>
-                        <p className="text-sm text-slate-500">Oleh: <span className="font-bold text-slate-700">{req.approver_id === 'SYSTEM' ? 'Otomasi Sistem' : 'Pejabat Berwenang'}</span></p>
+                        <p className="text-sm text-slate-500">Oleh: <span className="font-bold text-slate-700">{getApproverDisplayText(req)}</span></p>
                      </div>
                   </div>
                   <button onClick={() => handleDetail(req)}
@@ -521,6 +562,9 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                                 {log.status === 'PENDING' ? 'Dokumen diterbitkan untuk persetujuan' : 
                                  log.status === 'APPROVED' ? 'Dokumen telah disetujui & ditandatangani' : 
                                  'Dokumen ditolak/dikembalikan'}
+                              </p>
+                              <p className="text-[11px] text-slate-500">
+                                Oleh: <span className="font-bold text-slate-700">{getLogActorDisplayText(log)}</span>
                               </p>
                               {log.notes && (
                                 <div className="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 italic">
