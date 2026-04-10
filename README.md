@@ -75,6 +75,9 @@ npm run db:railway:sync:apply
 npm run db:railway:data:sync
 npm run db:railway:data:sync:apply
 npm run db:railway:parity
+npm run db:railway:readiness
+npm run db:railway:cutover
+npm run db:railway:cutover:apply
 ```
 
 ### Sinkronisasi Supabase -> Railway (Staging/Prod)
@@ -141,6 +144,32 @@ INTERNAL_AUTH_BOOTSTRAP_PASSWORD='temporary-password' npm run db:railway:interna
 Catatan:
 - `legacy_user_id` akan dipetakan ke `auth.users.id` agar kompatibel dengan data lama.
 - `--apply` butuh password sementara (`INTERNAL_AUTH_BOOTSTRAP_PASSWORD` atau `--password`).
+
+### Cutover SQL/Auth Supabase -> Railway
+
+Jika ingin menjalankan jalur cutover database dan auth dalam satu command, gunakan:
+
+```bash
+npm run db:railway:cutover
+INTERNAL_AUTH_BOOTSTRAP_PASSWORD='temporary-password' npm run db:railway:cutover:apply
+```
+
+Command ini mengorkestrasi:
+- schema sync ke Railway
+- public SQL data sync dari Supabase ke Railway
+- backfill `auth.users` di Railway
+- bootstrap `public.internal_auth_users`
+- readiness check SQL/auth antara Supabase dan Railway
+
+Untuk verifikasi tanpa write, gunakan:
+
+```bash
+npm run db:railway:readiness
+```
+
+Catatan:
+- flow ini fokus ke SQL data + auth di Railway
+- Supabase Storage objects masih perlu dipindah terpisah sebelum runtime benar-benar lepas dari Supabase
 
 ### Health Check Railway DB (Direct)
 

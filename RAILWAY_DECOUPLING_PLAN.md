@@ -6,6 +6,7 @@ Dokumen ini adalah jalur eksekusi bertahap untuk pindah dari Supabase ke Railway
 
 1. Schema migration ke Railway sudah didukung (`db:railway:sync`).
 2. Data table SQL ke Railway sudah didukung (`db:railway:data:sync`).
+3. Jalur orkestrasi cutover SQL/auth sudah didukung (`db:railway:cutover` + `db:railway:readiness`).
 3. App runtime masih bergantung pada:
    - Supabase Auth (`auth.*` di banyak server action)
    - Supabase Storage (`storage.from(...)`)
@@ -19,9 +20,14 @@ Dokumen ini adalah jalur eksekusi bertahap untuk pindah dari Supabase ke Railway
 2. Migrasikan data SQL:
    - `npm run db:railway:data:sync`
    - `npm run db:railway:data:sync:apply`
+   - atau jalankan orkestrasi:
+     - `npm run db:railway:cutover`
+     - `INTERNAL_AUTH_BOOTSTRAP_PASSWORD=... npm run db:railway:cutover:apply`
 3. Verifikasi parity schema:
    - `npm run db:railway:parity`
-4. Tambahkan jalur koneksi Postgres langsung di aplikasi (non-breaking):
+4. Verifikasi readiness SQL/auth:
+   - `npm run db:railway:readiness`
+5. Tambahkan jalur koneksi Postgres langsung di aplikasi (non-breaking):
    - `lib/db/postgres.ts`
    - `GET /api/healthz-db`
 

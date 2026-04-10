@@ -19,6 +19,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import nextEnv from '@next/env'
 import { createClient } from '@supabase/supabase-js'
 
@@ -27,6 +28,12 @@ loadEnvConfig(process.cwd())
 
 const PAGE_SIZE = Number(process.env.SUPABASE_MIGRATION_PAGE_SIZE || 500)
 const INSERT_CHUNK = Number(process.env.RAILWAY_DATA_SYNC_INSERT_CHUNK || 200)
+const REST_RETRY_ATTEMPTS = Number(process.env.SUPABASE_MIGRATION_RETRY_ATTEMPTS || 3)
+const REST_RETRY_DELAY_MS = Number(process.env.SUPABASE_MIGRATION_RETRY_DELAY_MS || 500)
+const DEFAULT_EXCLUDES = [
+  'public.internal_auth_users',
+  'public.internal_auth_sessions',
+]
 const ENUM_FALLBACKS = {
   nizam_department: 'CONFIG',
 }
@@ -44,6 +51,10 @@ function printHelp() {
       '  --exclude <schema.table>     Exclude table(s), repeatable or CSV',
       '  --keep-files                 Keep temporary SQL files',
       '  --help                       Show this help',
+      '',
+      'Default excludes:',
+      '  public.internal_auth_users',
+      '  public.internal_auth_sessions',
       '',
       'Source env required:',
       '  NEXT_PUBLIC_SUPABASE_URL',
@@ -110,6 +121,7 @@ function parseArgs(argv) {
   }
 
   if (args.schemas.length === 0) args.schemas = ['public']
+  args.excludes = Array.from(new Set([...DEFAULT_EXCLUDES, ...args.excludes]))
   return args
 }
 
@@ -233,12 +245,20 @@ function resolveRailwayDbUrlCandidates(serviceName) {
 
   if (envUrl) candidates.push({ source: 'env', url: envUrl })
 
-  const stdout = runCommand('npx', ['@railway/cli', 'variables', '--service', serviceName, '--json'])
-  const parsed = JSON.parse(stdout)
-  const fromRailway =
-    String(parsed?.DATABASE_PUBLIC_URL || '').trim() || String(parsed?.DATABASE_URL || '').trim()
-  if (fromRailway && !candidates.some((item) => item.url === fromRailway)) {
-    candidates.push({ source: 'railway-cli', url: fromRailway })
+  try {
+    const stdout = runCommand('npx', ['@railway/cli', 'variables', '--service', serviceName, '--json'])
+    const parsed = JSON.parse(stdout)
+    const fromRailway =
+      String(parsed?.DATABASE_PUBLIC_URL || '').trim() || String(parsed?.DATABASE_URL || '').trim()
+    if (fromRailway && !candidates.some((item) => item.url === fromRailway)) {
+      candidates.push({ source: 'railway-cli', url: fromRailway })
+    }
+  } catch (error) {
+    if (!envUrl) {
+      throw error
+    }
+
+    console.warn(`Railway CLI lookup skipped: ${String(error?.message || error)}`)
   }
 
   if (candidates.length === 0) {
@@ -446,6 +466,160 @@ function sanitizeRowsForEnums(rows, tableEnumInfo, tableName) {
   })
 }
 
+function sanitizeRowsForTimestamps(rows, columns, tableName) {
+  if (rows.length === 0) {
+    return rows
+  }
+
+  const hasCreatedAt = columns.includes('created_at')
+  const hasUpdatedAt = columns.includes('updated_at')
+  if (!hasCreatedAt && !hasUpdatedAt) {
+    return rows
+  }
+
+  const warningCounts = new Map()
+
+  return rows.map((row) => {
+    const next = { ...row }
+    const fallbackNow = new Date().toISOString()
+
+    if (hasCreatedAt && next.created_at == null) {
+      const fallbackCreatedAt =
+        (hasUpdatedAt && next.updated_at != null ? next.updated_at : null) || fallbackNow
+      next.created_at = fallbackCreatedAt
+
+      const warningKey = `${tableName}.created_at`
+      const currentCount = warningCounts.get(warningKey) || 0
+      if (currentCount < 3) {
+        console.log(
+          `  warning: filled missing timestamp for ${warningKey} (${JSON.stringify(row.created_at)} -> ${JSON.stringify(fallbackCreatedAt)})`
+        )
+      }
+      warningCounts.set(warningKey, currentCount + 1)
+    }
+
+    if (hasUpdatedAt && next.updated_at == null) {
+      const fallbackUpdatedAt =
+        (hasCreatedAt && next.created_at != null ? next.created_at : null) || fallbackNow
+      next.updated_at = fallbackUpdatedAt
+
+      const warningKey = `${tableName}.updated_at`
+      const currentCount = warningCounts.get(warningKey) || 0
+      if (currentCount < 3) {
+        console.log(
+          `  warning: filled missing timestamp for ${warningKey} (${JSON.stringify(row.updated_at)} -> ${JSON.stringify(fallbackUpdatedAt)})`
+        )
+      }
+      warningCounts.set(warningKey, currentCount + 1)
+    }
+
+    return next
+  })
+}
+
+async function fetchSalesReturnParents(sourceClient, returnIds) {
+  const rows = []
+
+  for (const ids of chunk(Array.from(new Set(returnIds)), PAGE_SIZE)) {
+    if (ids.length === 0) continue
+
+    for (let attempt = 1; attempt <= REST_RETRY_ATTEMPTS; attempt += 1) {
+      const { data, error } = await sourceClient
+        .schema('public')
+        .from('sales_returns')
+        .select('id, org_id, created_at')
+        .in('id', ids)
+
+      if (!error) {
+        rows.push(...(data || []))
+        break
+      }
+
+      const text = String(error.message || '')
+      if (attempt === REST_RETRY_ATTEMPTS) {
+        throw new Error(`Failed to fetch parent sales_returns rows: ${text}`)
+      }
+
+      console.warn(
+        `Retrying parent fetch for public.sales_return_items (${attempt}/${REST_RETRY_ATTEMPTS - 1} retries used): ${text}`
+      )
+      await delay(REST_RETRY_DELAY_MS * attempt)
+    }
+  }
+
+  return rows
+}
+
+async function enrichRowsForTargetCompatibility(sourceClient, { schema, table, columns, rows }) {
+  if (rows.length === 0) {
+    return rows
+  }
+
+  const key = tableKey(schema, table)
+  if (key !== 'public.sales_return_items') {
+    return rows
+  }
+
+  const needsOrgId = columns.includes('org_id') && rows.some((row) => row.org_id == null && row.return_id != null)
+  const needsCreatedAt = columns.includes('created_at') && rows.some((row) => row.created_at == null && row.return_id != null)
+  if (!needsOrgId && !needsCreatedAt) {
+    return rows
+  }
+
+  const parentRows = await fetchSalesReturnParents(
+    sourceClient,
+    rows
+      .map((row) => row.return_id)
+      .filter((value) => value != null)
+      .map((value) => String(value))
+  )
+
+  const parentById = new Map(
+    parentRows.map((row) => [
+      String(row.id || '').trim(),
+      {
+        orgId: row.org_id ?? null,
+        createdAt: row.created_at ?? null,
+      },
+    ])
+  )
+
+  const warningCounts = new Map()
+
+  return rows.map((row) => {
+    const parent = parentById.get(String(row.return_id || '').trim())
+    if (!parent) return row
+
+    const next = { ...row }
+
+    if (needsOrgId && next.org_id == null && parent.orgId != null) {
+      next.org_id = parent.orgId
+      const warningKey = `${key}.org_id`
+      const currentCount = warningCounts.get(warningKey) || 0
+      if (currentCount < 3) {
+        console.log(
+          `  warning: derived missing value for ${warningKey} (${JSON.stringify(row.org_id)} -> ${JSON.stringify(parent.orgId)})`
+        )
+      }
+      warningCounts.set(warningKey, currentCount + 1)
+    }
+
+    if (needsCreatedAt && next.created_at == null && parent.createdAt != null) {
+      next.created_at = parent.createdAt
+      const warningKey = `${key}.created_at`
+      const currentCount = warningCounts.get(warningKey) || 0
+      if (currentCount < 3) {
+        console.log(
+          `  warning: derived missing value for ${warningKey} (${JSON.stringify(row.created_at)} -> ${JSON.stringify(parent.createdAt)})`
+        )
+      }
+      warningCounts.set(warningKey, currentCount + 1)
+    }
+
+    return next
+  })
+}
+
 function topologicalSort(tableKeys, foreignKeys) {
   const known = new Set(tableKeys)
   const incoming = new Map(tableKeys.map((key) => [key, new Set()]))
@@ -523,13 +697,32 @@ async function fetchAllRows(sourceClient, { schema, table, columns }) {
       query = query.order(orderColumn, { ascending: true })
     }
 
-    const { data, error } = await query
-    if (error) {
+    let data = null
+    let error = null
+
+    for (let attempt = 1; attempt <= REST_RETRY_ATTEMPTS; attempt += 1) {
+      const response = await query
+      data = response.data
+      error = response.error
+      if (!error) break
+
       const text = String(error.message || '')
       if (text.includes(`Could not find the table '${schema}.${table}'`)) {
         return []
       }
-      throw new Error(`Failed to fetch source table ${schema}.${table}: ${text}`)
+
+      if (attempt === REST_RETRY_ATTEMPTS) {
+        throw new Error(`Failed to fetch source table ${schema}.${table}: ${text}`)
+      }
+
+      console.warn(
+        `Retrying source fetch for ${schema}.${table} page ${from}-${from + PAGE_SIZE - 1} (${attempt}/${REST_RETRY_ATTEMPTS - 1} retries used): ${text}`
+      )
+      await delay(REST_RETRY_DELAY_MS * attempt)
+      query = sourceClient.schema(schema).from(table).select('*').range(from, from + PAGE_SIZE - 1)
+      if (orderColumn) {
+        query = query.order(orderColumn, { ascending: true })
+      }
     }
 
     const batch = (data || []).map((row) => filterRow(row, columns))
@@ -690,11 +883,14 @@ async function main() {
         table: table.table,
         columns,
       })
-      const sanitizedRows = sanitizeRowsForEnums(
+      const enrichedRows = await enrichRowsForTargetCompatibility(sourceClient, {
+        schema: table.schema,
+        table: table.table,
+        columns,
         rows,
-        enumsByTable.get(key),
-        key
-      )
+      })
+      const timestampSanitizedRows = sanitizeRowsForTimestamps(enrichedRows, columns, key)
+      const sanitizedRows = sanitizeRowsForEnums(timestampSanitizedRows, enumsByTable.get(key), key)
 
       if (sanitizedRows.length === 0) {
         console.log(`- ${key}: 0 rows`)

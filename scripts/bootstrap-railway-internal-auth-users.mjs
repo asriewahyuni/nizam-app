@@ -4,6 +4,10 @@ import process from 'node:process'
 import { existsSync, readFileSync } from 'node:fs'
 import { randomBytes, scryptSync } from 'node:crypto'
 import { Client } from 'pg'
+import nextEnv from '@next/env'
+
+const { loadEnvConfig } = nextEnv
+loadEnvConfig(process.cwd())
 
 const SCRYPT_KEY_LENGTH = 64
 const SCRYPT_SALT_BYTES = 16
@@ -64,7 +68,8 @@ Usage:
 Notes:
   - Default mode is dry-run preview.
   - --apply writes data to public.internal_auth_users.
-  - --password (or INTERNAL_AUTH_BOOTSTRAP_PASSWORD env) is required for --apply.
+  - --password (or INTERNAL_AUTH_BOOTSTRAP_PASSWORD env) is required only when inserting new users
+    or when --reset-passwords is enabled.
   - --reset-passwords forces existing internal users to receive the new password hash.
 `)
 }
@@ -240,11 +245,6 @@ async function main() {
     throw new Error('Missing Railway DB URL. Use --db-url or set RAILWAY_DATABASE_URL / DATABASE_PUBLIC_URL / DATABASE_URL.')
   }
 
-  const password = normalizeInput(args.password || process.env.INTERNAL_AUTH_BOOTSTRAP_PASSWORD)
-  if (args.apply && password.length < 8) {
-    throw new Error('Password bootstrap wajib diisi minimal 8 karakter (--password atau INTERNAL_AUTH_BOOTSTRAP_PASSWORD).')
-  }
-
   const client = new Client({ connectionString: dbUrl, ssl: resolveSslConfig(dbUrl) })
   await client.connect()
 
@@ -299,7 +299,15 @@ async function main() {
       return
     }
 
-    const passwordHash = hashPassword(password)
+    const password = normalizeInput(args.password || process.env.INTERNAL_AUTH_BOOTSTRAP_PASSWORD)
+    const requiresPassword = previewNewRows > 0 || args.resetPasswords
+    if (requiresPassword && password.length < 8) {
+      throw new Error(
+        'Password bootstrap wajib diisi minimal 8 karakter (--password atau INTERNAL_AUTH_BOOTSTRAP_PASSWORD).'
+      )
+    }
+
+    const passwordHash = requiresPassword ? hashPassword(password) : null
 
     let inserted = 0
     let updated = 0

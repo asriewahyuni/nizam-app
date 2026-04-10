@@ -18,11 +18,15 @@ type MutableServerClient = {
  */
 export async function createClient() {
   const cookieStore = await cookies()
-  const { url, anonKey } = getSupabasePublicConfig()
+  const internalProvider = isInternalAuthProvider()
+  const publicConfig = getSupabasePublicConfig()
+  const adminConfig = internalProvider ? getSupabaseAdminConfig() : null
+  const url = internalProvider ? adminConfig!.url : publicConfig.url
+  const apiKey = internalProvider ? adminConfig!.serviceRoleKey : publicConfig.anonKey
 
   const client = createServerClient<Database>(
     url,
-    anonKey,
+    apiKey,
     {
       db: { schema: 'public' },
       cookies: {
@@ -42,7 +46,7 @@ export async function createClient() {
     }
   )
 
-  if (isInternalAuthProvider()) {
+  if (internalProvider) {
     const mutableClient = client as unknown as MutableServerClient
     const auth = mutableClient.auth || {}
 

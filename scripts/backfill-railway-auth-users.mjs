@@ -3,6 +3,10 @@
 import process from 'node:process'
 import { existsSync, readFileSync } from 'node:fs'
 import { Client } from 'pg'
+import nextEnv from '@next/env'
+
+const { loadEnvConfig } = nextEnv
+loadEnvConfig(process.cwd())
 
 const HELP_TEXT = `
 Backfill auth.users in Railway Postgres from existing public data.

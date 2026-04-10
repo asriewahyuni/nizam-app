@@ -35,6 +35,7 @@ type InternalCredentialRow = {
   legacy_user_id: string | null
   preferred_org_match: boolean
   active_org_ids: string[] | null
+  stored_active_org_id: string | null
   login_email: string | null
   login_nik: string | null
   password_hash: string
@@ -630,6 +631,15 @@ export async function signInWithInternalAuth(input: {
               om.user_id = coalesce(legacy_user_id, id)
               and om.is_active = true
           ) as active_org_ids,
+          (
+            select om.org_id::text
+            from public.org_members om
+            where
+              om.user_id = coalesce(legacy_user_id, id)
+              and om.is_active = true
+            order by om.last_active_at desc nulls last, om.joined_at asc, om.org_id asc
+            limit 1
+          ) as stored_active_org_id,
           login_email,
           login_nik,
           password_hash,
@@ -741,9 +751,10 @@ export async function signInWithInternalAuth(input: {
     const resolvedOrgId =
       preferredOrgId && matched.preferred_org_match
         ? preferredOrgId
-        : (Array.isArray(matched.active_org_ids) && matched.active_org_ids.length === 1
+        : (normalizeInput(matched.stored_active_org_id) ||
+          (Array.isArray(matched.active_org_ids) && matched.active_org_ids.length === 1
             ? normalizeInput(matched.active_org_ids[0])
-            : null)
+            : null))
 
     return {
       success: true as const,

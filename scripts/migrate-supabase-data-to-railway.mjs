@@ -171,22 +171,30 @@ function resolveRailwayDbUrlCandidates(serviceName) {
     candidates.push({ source: 'env', url: envUrl })
   }
 
-  const stdout = runCommand('npx', ['@railway/cli', 'variables', '--service', serviceName, '--json'])
-  let parsed
   try {
-    parsed = JSON.parse(stdout)
-  } catch (error) {
-    throw new Error(`Failed to parse Railway variables JSON: ${String(error)}`)
-  }
-
-  const fromRailway =
-    String(parsed?.DATABASE_PUBLIC_URL || '').trim() || String(parsed?.DATABASE_URL || '').trim()
-
-  if (fromRailway) {
-    const alreadyExists = candidates.some((candidate) => candidate.url === fromRailway)
-    if (!alreadyExists) {
-      candidates.push({ source: 'railway-cli', url: fromRailway })
+    const stdout = runCommand('npx', ['@railway/cli', 'variables', '--service', serviceName, '--json'])
+    let parsed
+    try {
+      parsed = JSON.parse(stdout)
+    } catch (error) {
+      throw new Error(`Failed to parse Railway variables JSON: ${String(error)}`)
     }
+
+    const fromRailway =
+      String(parsed?.DATABASE_PUBLIC_URL || '').trim() || String(parsed?.DATABASE_URL || '').trim()
+
+    if (fromRailway) {
+      const alreadyExists = candidates.some((candidate) => candidate.url === fromRailway)
+      if (!alreadyExists) {
+        candidates.push({ source: 'railway-cli', url: fromRailway })
+      }
+    }
+  } catch (error) {
+    if (!envUrl) {
+      throw error
+    }
+
+    console.warn(`Railway CLI lookup skipped: ${String(error?.message || error)}`)
   }
 
   if (candidates.length === 0) {
