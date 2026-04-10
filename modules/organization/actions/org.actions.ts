@@ -2,6 +2,7 @@
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { getServerAuthContext } from '@/lib/supabase/auth.server'
+import { isInternalAuthProvider } from '@/lib/auth/provider'
 import { normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
 import { generateSlug } from '@/lib/utils'
 import { revalidatePath } from 'next/cache'
@@ -466,6 +467,10 @@ function mapCreateOrganizationError(
     return 'Nama atau slug organisasi ini sudah digunakan.'
   }
 
+  if (error.code === 'PGRST301') {
+    return 'Sesi login tidak valid untuk operasi database. Coba login ulang lalu ulangi.'
+  }
+
   const message = String(error.message || '').trim()
   const missingColumn = extractMissingColumnName(error)
   if (missingColumn === 'parent_org_id') {
@@ -554,6 +559,7 @@ async function createOrganizationRecord(
   try {
     const supabase = await createClient()
     const db = supabase as any
+    const internalProvider = isInternalAuthProvider()
     let admin: any = null
     try {
       admin = (await createAdminClient()) as any
@@ -561,9 +567,14 @@ async function createOrganizationRecord(
       ;(console as any).warn('CreateOrganization: admin client unavailable, fallback to session client', adminInitError)
     }
     const privilegedDb = admin ?? db
+    const organizationWriteDb = internalProvider ? admin : db
     const cookieStore = await cookies()
     const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
     if (!user) return { error: 'Tidak terautentikasi' }
+
+    if (internalProvider && !organizationWriteDb) {
+      return { error: 'Konfigurasi service role Supabase belum diisi. Lengkapi environment lalu coba lagi.' }
+    }
 
     const name = (formData.get('name') as string).trim()
     if (!name) return { error: 'Nama organisasi wajib diisi' }
@@ -636,7 +647,7 @@ async function createOrganizationRecord(
       orgInsertPayload.parent_org_id = parentOrgId
     }
 
-    let { error: orgError } = await db.from('organizations').insert(orgInsertPayload)
+    let { error: orgError } = await organizationWriteDb.from('organizations').insert(orgInsertPayload)
     while (orgError) {
       const missingColumn = extractMissingColumnName(orgError)
       if (!missingColumn || !OPTIONAL_ORGANIZATION_COLUMNS.has(missingColumn)) break
@@ -644,7 +655,7 @@ async function createOrganizationRecord(
       if (!(missingColumn in orgInsertPayload)) break
 
       delete orgInsertPayload[missingColumn]
-      ;({ error: orgError } = await db.from('organizations').insert(orgInsertPayload))
+      ;({ error: orgError } = await organizationWriteDb.from('organizations').insert(orgInsertPayload))
     }
 
     if (orgError) {
@@ -1229,7 +1240,15 @@ export async function createOrganizationQuick(formData: FormData) {
 
 const getActiveOrgCached = cache(async () => {
   const { supabase, user } = await getServerAuthContext()
-  const db = supabase as any
+  let db = supabase as any
+  if (isInternalAuthProvider()) {
+    try {
+      db = (await createAdminClient()) as any
+    } catch (adminError) {
+      ;(console as any).error('GetActiveOrg: admin client unavailable in internal mode', adminError)
+      return null
+    }
+  }
   if (!user) return null
 
   const cookieStore = await cookies()
@@ -1331,7 +1350,15 @@ export async function getActiveOrg() {
 
 const getMyOrganizationsCached = cache(async (): Promise<AccessibleOrganization[]> => {
   const { supabase, user } = await getServerAuthContext()
-  const db = supabase as any
+  let db = supabase as any
+  if (isInternalAuthProvider()) {
+    try {
+      db = (await createAdminClient()) as any
+    } catch (adminError) {
+      ;(console as any).error('getMyOrganizations: admin client unavailable in internal mode', adminError)
+      return []
+    }
+  }
   if (!user) return []
 
   const { data, error } = await db
