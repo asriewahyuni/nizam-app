@@ -14,6 +14,16 @@
  *   3) npx @railway/cli variables --service <name> --json
  */
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
+
+const SUPABASE_CLI_CANDIDATES = [
+  process.env.SUPABASE_CLI_PATH,
+  '/Users/manbook/.npm/_npx/aa8e5c70f9d8d161/node_modules/supabase/bin/supabase',
+].filter(Boolean)
+const RAILWAY_CLI_CANDIDATES = [
+  process.env.RAILWAY_CLI_PATH,
+  '/Users/manbook/.npm/_npx/79fa66f96c8fdacf/node_modules/@railway/cli/bin/railway',
+].filter(Boolean)
 
 const CRITICAL_TABLES = [
   'organizations',
@@ -119,6 +129,21 @@ function runCommand(cmd, argv, options = {}) {
   return String(result.stdout || '')
 }
 
+function resolveCliBinary(candidates, fallback) {
+  const resolved = candidates.find((candidate) => existsSync(String(candidate)))
+  return resolved || fallback
+}
+
+function runSupabaseCommand(argv, options = {}) {
+  const binary = resolveCliBinary(SUPABASE_CLI_CANDIDATES, 'npx')
+  return runCommand(binary, binary === 'npx' ? ['supabase', ...argv] : argv, options)
+}
+
+function runRailwayCommand(argv, options = {}) {
+  const binary = resolveCliBinary(RAILWAY_CLI_CANDIDATES, 'npx')
+  return runCommand(binary, binary === 'npx' ? ['@railway/cli', ...argv] : argv, options)
+}
+
 function maskDbUrl(dbUrl) {
   try {
     const u = new URL(dbUrl)
@@ -137,7 +162,7 @@ function resolveRailwayDbUrl(serviceName) {
 
   if (envUrl) return envUrl
 
-  const stdout = runCommand('npx', ['@railway/cli', 'variables', '--service', serviceName, '--json'])
+  const stdout = runRailwayCommand(['variables', '--service', serviceName, '--json'])
   let parsed
   try {
     parsed = JSON.parse(stdout)
@@ -186,12 +211,12 @@ function parseDbQueryJson(raw) {
 }
 
 function runDbQuery({ sql, linked, dbUrl }) {
-  const args = ['supabase', 'db', 'query', '-o', 'json', '--agent', 'no']
+  const args = ['db', 'query', '-o', 'json', '--agent', 'no']
   if (linked) args.push('--linked')
   else args.push('--db-url', dbUrl)
   args.push(sql)
 
-  const stdout = runCommand('npx', args)
+  const stdout = runSupabaseCommand(args)
   return parseDbQueryJson(stdout)
 }
 

@@ -13,13 +13,22 @@
  * - This script does NOT migrate Supabase Auth users or Supabase Storage objects.
  */
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import nextEnv from '@next/env'
 
 const { loadEnvConfig } = nextEnv
 loadEnvConfig(process.cwd())
+
+const SUPABASE_CLI_CANDIDATES = [
+  process.env.SUPABASE_CLI_PATH,
+  '/Users/manbook/.npm/_npx/aa8e5c70f9d8d161/node_modules/supabase/bin/supabase',
+].filter(Boolean)
+const RAILWAY_CLI_CANDIDATES = [
+  process.env.RAILWAY_CLI_PATH,
+  '/Users/manbook/.npm/_npx/79fa66f96c8fdacf/node_modules/@railway/cli/bin/railway',
+].filter(Boolean)
 
 function printHelp() {
   console.log(
@@ -150,6 +159,21 @@ function runCommand(cmd, argv, options = {}) {
   return String(result.stdout || '')
 }
 
+function resolveCliBinary(candidates, fallback) {
+  const resolved = candidates.find((candidate) => existsSync(String(candidate)))
+  return resolved || fallback
+}
+
+function runSupabaseCommand(argv, options = {}) {
+  const binary = resolveCliBinary(SUPABASE_CLI_CANDIDATES, 'npx')
+  return runCommand(binary, binary === 'npx' ? ['supabase', ...argv] : argv, options)
+}
+
+function runRailwayCommand(argv, options = {}) {
+  const binary = resolveCliBinary(RAILWAY_CLI_CANDIDATES, 'npx')
+  return runCommand(binary, binary === 'npx' ? ['@railway/cli', ...argv] : argv, options)
+}
+
 function maskDbUrl(dbUrl) {
   try {
     const u = new URL(dbUrl)
@@ -172,7 +196,7 @@ function resolveRailwayDbUrlCandidates(serviceName) {
   }
 
   try {
-    const stdout = runCommand('npx', ['@railway/cli', 'variables', '--service', serviceName, '--json'])
+    const stdout = runRailwayCommand(['variables', '--service', serviceName, '--json'])
     let parsed
     try {
       parsed = JSON.parse(stdout)
@@ -274,19 +298,17 @@ function parseCsv(raw) {
 }
 
 function runDbQueryCsv({ sql, linked, dbUrl }) {
-  const args = ['supabase', 'db', 'query', '-o', 'csv', '--agent', 'no']
+  const args = ['db', 'query', '-o', 'csv', '--agent', 'no']
   if (linked) args.push('--linked')
   else args.push('--db-url', dbUrl)
   args.push(sql)
-  return runCommand('npx', args)
+  return runSupabaseCommand(args)
 }
 
 function runDbQueryFile({ filePath, dbUrl }) {
-  runCommand(
-    'npx',
-    ['supabase', 'db', 'query', '--db-url', dbUrl, '--file', filePath, '--agent', 'no'],
-    { inherit: true }
-  )
+  runSupabaseCommand(['db', 'query', '--db-url', dbUrl, '--file', filePath, '--agent', 'no'], {
+    inherit: true,
+  })
 }
 
 function listTargetTables({ targetDbUrl, schemas }) {
@@ -327,7 +349,7 @@ function writeSqlFile(filePath, statements) {
 }
 
 function buildDumpArgs({ sourceDbUrl, schemas, excludes, filePath, dryRun }) {
-  const args = ['supabase', 'db', 'dump', '--data-only', '--use-copy', '--file', filePath, '--yes']
+  const args = ['db', 'dump', '--data-only', '--use-copy', '--file', filePath, '--yes']
 
   if (sourceDbUrl) args.push('--db-url', sourceDbUrl)
   else args.push('--linked')
@@ -443,8 +465,7 @@ function main() {
   try {
     console.log('\nStep 1/3: Dump preview...')
     try {
-      runCommand(
-        'npx',
+      runSupabaseCommand(
         buildDumpArgs({
           sourceDbUrl: args.sourceDbUrl,
           schemas: args.schemas,
@@ -467,8 +488,7 @@ function main() {
 
     console.log('\nStep 2/3: Create data dump...')
     try {
-      runCommand(
-        'npx',
+      runSupabaseCommand(
         buildDumpArgs({
           sourceDbUrl: args.sourceDbUrl,
           schemas: args.schemas,

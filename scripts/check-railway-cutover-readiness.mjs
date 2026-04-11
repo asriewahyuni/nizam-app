@@ -19,6 +19,7 @@
  */
 import process from 'node:process'
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Client as PgClient } from 'pg'
 import nextEnv from '@next/env'
@@ -31,6 +32,10 @@ const DEFAULT_EXCLUDES = [
   'public.internal_auth_users',
   'public.internal_auth_sessions',
 ]
+const RAILWAY_CLI_CANDIDATES = [
+  process.env.RAILWAY_CLI_PATH,
+  '/Users/manbook/.npm/_npx/79fa66f96c8fdacf/node_modules/@railway/cli/bin/railway',
+].filter(Boolean)
 const REST_RETRY_ATTEMPTS = Number(process.env.SUPABASE_MIGRATION_RETRY_ATTEMPTS || 3)
 const REST_RETRY_DELAY_MS = Number(process.env.SUPABASE_MIGRATION_RETRY_DELAY_MS || 500)
 
@@ -173,6 +178,16 @@ function runCommand(cmd, argv) {
   return String(result.stdout || '')
 }
 
+function resolveCliBinary(candidates, fallback) {
+  const resolved = candidates.find((candidate) => existsSync(String(candidate)))
+  return resolved || fallback
+}
+
+function runRailwayCommand(argv) {
+  const binary = resolveCliBinary(RAILWAY_CLI_CANDIDATES, 'npx')
+  return runCommand(binary, binary === 'npx' ? ['@railway/cli', ...argv] : argv)
+}
+
 function resolveRailwayDbUrlCandidates(serviceName) {
   const candidates = []
   const envUrl =
@@ -185,7 +200,7 @@ function resolveRailwayDbUrlCandidates(serviceName) {
   }
 
   try {
-    const stdout = runCommand('npx', ['@railway/cli', 'variables', '--service', serviceName, '--json'])
+    const stdout = runRailwayCommand(['variables', '--service', serviceName, '--json'])
     const parsed = JSON.parse(stdout)
     const fromRailway =
       String(parsed?.DATABASE_PUBLIC_URL || '').trim() ||

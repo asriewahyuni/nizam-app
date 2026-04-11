@@ -16,7 +16,7 @@
  * - railway CLI variables lookup.
  */
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -34,6 +34,14 @@ const DEFAULT_EXCLUDES = [
   'public.internal_auth_users',
   'public.internal_auth_sessions',
 ]
+const SUPABASE_CLI_CANDIDATES = [
+  process.env.SUPABASE_CLI_PATH,
+  '/Users/manbook/.npm/_npx/aa8e5c70f9d8d161/node_modules/supabase/bin/supabase',
+].filter(Boolean)
+const RAILWAY_CLI_CANDIDATES = [
+  process.env.RAILWAY_CLI_PATH,
+  '/Users/manbook/.npm/_npx/79fa66f96c8fdacf/node_modules/@railway/cli/bin/railway',
+].filter(Boolean)
 const ENUM_FALLBACKS = {
   nizam_department: 'CONFIG',
 }
@@ -188,9 +196,23 @@ function runCommand(cmd, argv, options = {}) {
   return stdout
 }
 
+function resolveCliBinary(candidates, fallback) {
+  const resolved = candidates.find((candidate) => existsSync(String(candidate)))
+  return resolved || fallback
+}
+
+function runSupabaseCommand(argv, options = {}) {
+  const binary = resolveCliBinary(SUPABASE_CLI_CANDIDATES, 'npx')
+  return runCommand(binary, binary === 'npx' ? ['supabase', ...argv] : argv, options)
+}
+
+function runRailwayCommand(argv, options = {}) {
+  const binary = resolveCliBinary(RAILWAY_CLI_CANDIDATES, 'npx')
+  return runCommand(binary, binary === 'npx' ? ['@railway/cli', ...argv] : argv, options)
+}
+
 function runDbQueryJson({ sql, dbUrl }) {
-  const stdout = runCommand('npx', [
-    'supabase',
+  const stdout = runSupabaseCommand([
     'db',
     'query',
     '-o',
@@ -205,19 +227,15 @@ function runDbQueryJson({ sql, dbUrl }) {
 }
 
 function runDbQuerySql({ sql, dbUrl }) {
-  runCommand(
-    'npx',
-    ['supabase', 'db', 'query', '--agent', 'no', '--db-url', dbUrl, sql],
-    { inherit: true }
-  )
+  runSupabaseCommand(['db', 'query', '--agent', 'no', '--db-url', dbUrl, sql], {
+    inherit: true,
+  })
 }
 
 function runDbQueryFile({ dbUrl, filePath }) {
-  runCommand(
-    'npx',
-    ['supabase', 'db', 'query', '--agent', 'no', '--db-url', dbUrl, '--file', filePath],
-    { inherit: true }
-  )
+  runSupabaseCommand(['db', 'query', '--agent', 'no', '--db-url', dbUrl, '--file', filePath], {
+    inherit: true,
+  })
 }
 
 function quoteIdent(name) {
@@ -246,7 +264,7 @@ function resolveRailwayDbUrlCandidates(serviceName) {
   if (envUrl) candidates.push({ source: 'env', url: envUrl })
 
   try {
-    const stdout = runCommand('npx', ['@railway/cli', 'variables', '--service', serviceName, '--json'])
+    const stdout = runRailwayCommand(['variables', '--service', serviceName, '--json'])
     const parsed = JSON.parse(stdout)
     const fromRailway =
       String(parsed?.DATABASE_PUBLIC_URL || '').trim() || String(parsed?.DATABASE_URL || '').trim()
