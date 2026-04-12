@@ -1597,41 +1597,102 @@ export async function uploadLogo(orgId: string, formData: FormData) {
 
 export async function getOrgMembers(orgId: string) {
   const supabase = await createClient()
-  const db = supabase as any
   const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
 
   if (!user) return []
 
-  const { data: actorMembership } = await db
-    .from('org_members')
-    .select('role')
-    .eq('org_id', orgId)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
+  const { queryPostgres: qp } = await import('@/lib/db/postgres')
 
-  if (!actorMembership || !['owner', 'admin'].includes(String(actorMembership.role || ''))) {
-    return []
+  // Verify actor is owner or admin
+  const authCheck = await qp<{ role: string }>(`
+    SELECT role FROM public.org_members
+    WHERE org_id = $1 AND user_id = $2 AND is_active = true
+    LIMIT 1
+  `, [orgId, user.id])
+
+  const actorRole = authCheck.rows[0]?.role || ''
+  if (!['owner', 'admin'].includes(actorRole)) return []
+
+  // Fetch members with role and email
+  const membersResult = await qp<{
+    id: string
+    org_id: string
+    user_id: string
+    role: string
+    role_id: string | null
+    is_active: boolean
+    joined_at: string | null
+    last_active_at: string | null
+    last_active_branch_id: string | null
+    custom_role_name: string | null
+    user_email: string | null
+  }>(`
+    SELECT
+      m.id,
+      m.org_id,
+      m.user_id,
+      m.role,
+      m.role_id,
+      m.is_active,
+      m.joined_at,
+      m.last_active_at,
+      m.last_active_branch_id,
+      r.name AS custom_role_name,
+      u.email AS user_email
+    FROM public.org_members m
+    LEFT JOIN public.roles r ON r.id = m.role_id
+    LEFT JOIN public.users u ON u.id = m.user_id
+    WHERE m.org_id = $1 AND m.is_active = true
+    ORDER BY m.joined_at ASC
+  `, [orgId])
+
+  if (membersResult.rows.length === 0) return []
+
+  // Fetch unit assignments for all members in one query
+  const memberIds = membersResult.rows.map((m) => m.id)
+  const unitsResult = await qp<{
+    org_member_id: string
+    branch_id: string
+    branch_name: string | null
+    branch_code: string | null
+  }>(`
+    SELECT
+      mu.org_member_id,
+      mu.branch_id,
+      b.name AS branch_name,
+      b.code AS branch_code
+    FROM public.org_member_units mu
+    LEFT JOIN public.branches b ON b.id = mu.branch_id
+    WHERE mu.org_member_id = ANY($1::uuid[])
+  `, [memberIds])
+
+  // Group unit assignments by member id
+  const unitsByMemberId = new Map<string, { branch_id: string; branch: { id: string; name: string | null; code: string | null } | null }[]>()
+  for (const unit of unitsResult.rows) {
+    const memberId = unit.org_member_id
+    if (!unitsByMemberId.has(memberId)) unitsByMemberId.set(memberId, [])
+    unitsByMemberId.get(memberId)!.push({
+      branch_id: unit.branch_id,
+      branch: unit.branch_name ? { id: unit.branch_id, name: unit.branch_name, code: unit.branch_code } : null,
+    })
   }
 
-  const { data } = await db
-    .from('org_members')
-    .select(`
-      *,
-      custom_role:roles(name),
-      organizations(name),
-      user:user_id (
-        email
-      ),
-      unit_assignments:org_member_units(
-        branch_id,
-        branch:branches(id, name, code)
-      )
-    `)
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .order('joined_at', { ascending: true })
-  return data || []
+  // Assemble the result in the shape the UI expects
+  return membersResult.rows.map((m) => ({
+    id: m.id,
+    org_id: m.org_id,
+    user_id: m.user_id,
+    role: m.role,
+    role_id: m.role_id,
+    is_active: m.is_active,
+    joined_at: m.joined_at,
+    last_active_at: m.last_active_at,
+    last_active_branch_id: m.last_active_branch_id,
+    custom_role: m.custom_role_name ? { name: m.custom_role_name } : null,
+    organizations: null,
+    user: m.user_email ? { email: m.user_email } : null,
+    unit_assignments: unitsByMemberId.get(m.id) || [],
+  }))
 }
 
 export async function isSubOrgManagerFeatureEnabled() {
@@ -2274,10 +2335,18 @@ export async function updateMemberUnitAccess(orgId: string, memberId: string, br
 
 // INVITATION TOKENS
 export async function getInvitations(orgId: string) {
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data } = await db.from('org_invitations').select('*, roles(name)').eq('org_id', orgId).order('created_at', { ascending: false })
-  return data || []
+  const { queryPostgres: qp } = await import('@/lib/db/postgres')
+  const result = await qp<Record<string, unknown>>(`
+    SELECT i.*, r.name AS role_name
+    FROM public.org_invitations i
+    LEFT JOIN public.roles r ON r.id = i.role_id
+    WHERE i.org_id = $1
+    ORDER BY i.created_at DESC
+  `, [orgId])
+  return result.rows.map((row) => ({
+    ...row,
+    roles: row.role_name ? { name: row.role_name } : null,
+  }))
 }
 
 export async function createInvitationToken(orgId: string, formData: FormData) {
@@ -2309,11 +2378,11 @@ export async function createInvitationToken(orgId: string, formData: FormData) {
   const { data, error } = await db
     .from('org_invitations')
     .insert(payload)
-    .select('*, roles(name)')
+    .select('*')
     .single()
 
   if (error) return { error: error.message }
-  
+
   revalidatePath('/settings/business')
   revalidatePath('/settings/users')
   revalidatePath('/hris')
@@ -2331,17 +2400,40 @@ export async function deleteInvitation(id: string) {
 }
 
 export async function getInvitationByCode(code: string) {
-  const supabase = await createClient()
-  const db = supabase as any
-  const { data, error } = await db
-    .from('org_invitations')
-    .select('*, organizations(*), roles(*)')
-    .eq('invitation_code', code.toUpperCase().trim())
-    .eq('is_active', true)
-    .maybeSingle()
-  
-  if (error) return { error: error.message }
-  if (!data) return { error: 'Link tidak valid atau telah non-aktif.' }
-  
-  return { success: true, invitation: data }
+  const { queryPostgres: qp } = await import('@/lib/db/postgres')
+  const result = await qp<Record<string, unknown>>(`
+    SELECT
+      i.*,
+      o.id AS org_id_ref, o.name AS org_name, o.slug AS org_slug,
+      o.logo_url AS org_logo_url, o.settings AS org_settings, o.is_active AS org_is_active,
+      r.id AS role_id_ref, r.name AS role_name, r.permissions AS role_permissions
+    FROM public.org_invitations i
+    LEFT JOIN public.organizations o ON o.id = i.org_id
+    LEFT JOIN public.roles r ON r.id = i.role_id
+    WHERE i.invitation_code = $1 AND i.is_active = true
+    LIMIT 1
+  `, [code.toUpperCase().trim()])
+
+  const row = result.rows[0]
+  if (!row) return { error: 'Link tidak valid atau telah non-aktif.' }
+
+  return {
+    success: true,
+    invitation: {
+      ...row,
+      organizations: row.org_name ? {
+        id: row.org_id_ref,
+        name: row.org_name,
+        slug: row.org_slug,
+        logo_url: row.org_logo_url,
+        settings: row.org_settings,
+        is_active: row.org_is_active,
+      } : null,
+      roles: row.role_name ? {
+        id: row.role_id_ref,
+        name: row.role_name,
+        permissions: row.role_permissions,
+      } : null,
+    }
+  }
 }
