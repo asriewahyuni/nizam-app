@@ -365,6 +365,12 @@ export function AppSidebar({
     window.addEventListener('focus', handleWindowFocus)
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadSidebarMetrics()
+      }
+    }, 15000)
+
     const supabase = createOptionalBrowserSupabaseClient()
     const channel = supabase
       ? supabase
@@ -381,6 +387,7 @@ export function AppSidebar({
       : null
 
     return () => {
+      clearInterval(pollInterval)
       window.removeEventListener('focus', handleWindowFocus)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       if (supabase && channel) {

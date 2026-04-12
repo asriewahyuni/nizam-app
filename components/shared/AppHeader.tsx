@@ -662,6 +662,12 @@ export function AppHeader({
     window.addEventListener('focus', handleWindowFocus)
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadPendingApprovals()
+      }
+    }, 15000)
+
     const supabase = createOptionalBrowserSupabaseClient()
     const channel = supabase
       ? supabase
@@ -678,6 +684,7 @@ export function AppHeader({
       : null
 
     return () => {
+      clearInterval(pollInterval)
       window.removeEventListener('focus', handleWindowFocus)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       if (supabase && channel) {
