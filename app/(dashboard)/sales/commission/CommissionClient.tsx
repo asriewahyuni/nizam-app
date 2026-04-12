@@ -544,8 +544,9 @@ export default function CommissionClient({
       {showFormModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeFormModal} />
-          <div className="relative w-full max-w-2xl rounded-[32px] bg-white p-8 shadow-2xl">
-            <div className="mb-6 flex items-start justify-between gap-4">
+          <div className="relative w-full max-w-2xl rounded-[32px] bg-white shadow-2xl flex flex-col max-h-[90dvh]">
+            {/* Header — tidak ikut scroll */}
+            <div className="px-8 pt-8 pb-4 flex items-start justify-between gap-4 shrink-0">
               <div>
                 <h3 className="text-2xl font-black text-slate-900">
                   {editingReseller ? 'Edit Reseller' : 'Tambah Reseller Baru'}
@@ -557,152 +558,156 @@ export default function CommissionClient({
               <button
                 type="button"
                 onClick={closeFormModal}
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-black text-slate-500 transition-all hover:bg-slate-100"
+                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-black text-slate-500 transition-all hover:bg-slate-100 shrink-0"
               >
                 Tutup
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tipe Reseller</label>
-                  <select
-                    value={formState.resellerType}
-                    onChange={(event) => setFormState((current) => ({ ...current, resellerType: event.target.value === 'COMPANY' ? 'COMPANY' : 'PERSONAL' }))}
-                    className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-black text-slate-900 outline-none transition-all focus:border-blue-500"
-                  >
-                    <option value="PERSONAL">Reseller Personal</option>
-                    <option value="COMPANY">Perusahaan Mitra</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    {formState.resellerType === 'COMPANY' ? 'Nama Tampilan / Kode Partner' : 'Nama Reseller'}
-                  </label>
-                  <input
-                    required
-                    value={formState.name}
-                    onChange={(event) => setFormState((current) => ({ ...current, name: event.target.value }))}
-                    className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
-                    placeholder={formState.resellerType === 'COMPANY' ? 'Contoh: PT Sukses Jaya' : 'Contoh: Ahmad Fauzi'}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Perusahaan Mitra</label>
-                  <input
-                    value={formState.companyName}
-                    onChange={(event) => setFormState((current) => ({ ...current, companyName: event.target.value }))}
-                    className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
-                    placeholder="Opsional, terutama untuk reseller personal"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">PIC / Contact Person</label>
-                  <input
-                    value={formState.contactPerson}
-                    onChange={(event) => setFormState((current) => ({ ...current, contactPerson: event.target.value }))}
-                    className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
-                    placeholder="Nama PIC jika perusahaan"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email</label>
-                  <input
-                    type="email"
-                    value={formState.email}
-                    onChange={(event) => setFormState((current) => ({ ...current, email: event.target.value }))}
-                    className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
-                    placeholder="email@mitra.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">No. Telepon / WA</label>
-                  <input
-                    value={formState.phone}
-                    onChange={(event) => setFormState((current) => ({ ...current, phone: event.target.value }))}
-                    className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
-                    placeholder="08xxxxxxxxxx"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target Bulanan (Rp)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formState.targetAmount}
-                    onChange={(event) => setFormState((current) => ({ ...current, targetAmount: event.target.value }))}
-                    className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tipe Komisi</label>
-                  <select
-                    value={formState.commissionType}
-                    onChange={(event) => setFormState((current) => ({ ...current, commissionType: event.target.value === 'FIXED' ? 'FIXED' : 'PERCENT' }))}
-                    className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-black text-slate-900 outline-none transition-all focus:border-blue-500"
-                  >
-                    <option value="PERCENT">Persentase dari net invoice</option>
-                    <option value="FIXED">Nominal tetap per invoice</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    {formState.commissionType === 'PERCENT' ? 'Nilai Komisi (%)' : 'Nominal Komisi / Invoice'}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formState.commissionValue}
-                    onChange={(event) => setFormState((current) => ({ ...current, commissionValue: event.target.value }))}
-                    className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
-                  />
-                </div>
-                <div className="rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-blue-500">Ringkasan Skema</div>
-                  <div className="mt-2 text-sm font-black text-slate-900">
-                    {getCommissionSchemeLabel(formState.commissionType, Number(formState.commissionValue || 0))}
+            {/* Body Form — bisa di-scroll */}
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 overflow-y-auto px-8 py-2 space-y-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tipe Reseller</label>
+                    <select
+                      value={formState.resellerType}
+                      onChange={(event) => setFormState((current) => ({ ...current, resellerType: event.target.value === 'COMPANY' ? 'COMPANY' : 'PERSONAL' }))}
+                      className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-black text-slate-900 outline-none transition-all focus:border-blue-500"
+                    >
+                      <option value="PERSONAL">Reseller Personal</option>
+                      <option value="COMPANY">Perusahaan Mitra</option>
+                    </select>
                   </div>
-                  <p className="mt-2 text-[11px] font-bold text-blue-900/70">
-                    Berlaku untuk invoice baru setelah reseller dipilih saat pembuatan Sales Order.
-                  </p>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      {formState.resellerType === 'COMPANY' ? 'Nama Tampilan / Kode Partner' : 'Nama Reseller'}
+                    </label>
+                    <input
+                      required
+                      value={formState.name}
+                      onChange={(event) => setFormState((current) => ({ ...current, name: event.target.value }))}
+                      className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
+                      placeholder={formState.resellerType === 'COMPANY' ? 'Contoh: PT Sukses Jaya' : 'Contoh: Ahmad Fauzi'}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Perusahaan Mitra</label>
+                    <input
+                      value={formState.companyName}
+                      onChange={(event) => setFormState((current) => ({ ...current, companyName: event.target.value }))}
+                      className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
+                      placeholder="Opsional, terutama untuk reseller personal"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">PIC / Contact Person</label>
+                    <input
+                      value={formState.contactPerson}
+                      onChange={(event) => setFormState((current) => ({ ...current, contactPerson: event.target.value }))}
+                      className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
+                      placeholder="Nama PIC jika perusahaan"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email</label>
+                    <input
+                      type="email"
+                      value={formState.email}
+                      onChange={(event) => setFormState((current) => ({ ...current, email: event.target.value }))}
+                      className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
+                      placeholder="email@mitra.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">No. Telepon / WA</label>
+                    <input
+                      value={formState.phone}
+                      onChange={(event) => setFormState((current) => ({ ...current, phone: event.target.value }))}
+                      className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
+                      placeholder="08xxxxxxxxxx"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target Bulanan (Rp)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formState.targetAmount}
+                      onChange={(event) => setFormState((current) => ({ ...current, targetAmount: event.target.value }))}
+                      className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tipe Komisi</label>
+                    <select
+                      value={formState.commissionType}
+                      onChange={(event) => setFormState((current) => ({ ...current, commissionType: event.target.value === 'FIXED' ? 'FIXED' : 'PERCENT' }))}
+                      className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-black text-slate-900 outline-none transition-all focus:border-blue-500"
+                    >
+                      <option value="PERCENT">Persentase dari net invoice</option>
+                      <option value="FIXED">Nominal tetap per invoice</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      {formState.commissionType === 'PERCENT' ? 'Nilai Komisi (%)' : 'Nominal Komisi / Invoice'}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formState.commissionValue}
+                      onChange={(event) => setFormState((current) => ({ ...current, commissionValue: event.target.value }))}
+                      className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-blue-500">Ringkasan Skema</div>
+                    <div className="mt-2 text-sm font-black text-slate-900">
+                      {getCommissionSchemeLabel(formState.commissionType, Number(formState.commissionValue || 0))}
+                    </div>
+                    <p className="mt-2 text-[11px] font-bold text-blue-900/70">
+                      Berlaku untuk invoice baru setelah reseller dipilih saat pembuatan Sales Order.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Alamat</label>
+                  <textarea
+                    value={formState.address}
+                    onChange={(event) => setFormState((current) => ({ ...current, address: event.target.value }))}
+                    className="min-h-[72px] w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
+                    placeholder="Alamat reseller atau perusahaan mitra"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Catatan Internal</label>
+                  <textarea
+                    value={formState.notes}
+                    onChange={(event) => setFormState((current) => ({ ...current, notes: event.target.value }))}
+                    className="min-h-[72px] w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
+                    placeholder="Contoh: komisi dibayar tiap akhir bulan atau setelah invoice lunas"
+                  />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Alamat</label>
-                <textarea
-                  value={formState.address}
-                  onChange={(event) => setFormState((current) => ({ ...current, address: event.target.value }))}
-                  className="min-h-[84px] w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
-                  placeholder="Alamat reseller atau perusahaan mitra"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Catatan Internal</label>
-                <textarea
-                  value={formState.notes}
-                  onChange={(event) => setFormState((current) => ({ ...current, notes: event.target.value }))}
-                  className="min-h-[84px] w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
-                  placeholder="Contoh: komisi dibayar tiap akhir bulan atau setelah invoice lunas"
-                />
-              </div>
-
-              <div className="flex gap-3 border-t border-slate-100 pt-4">
+              {/* Footer tombol — tidak ikut scroll */}
+              <div className="flex gap-3 border-t border-slate-100 px-8 py-5 shrink-0">
                 <button
                   type="button"
                   onClick={closeFormModal}
