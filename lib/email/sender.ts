@@ -71,3 +71,35 @@ export async function sendPromoBroadcast(toEmail: string, promoTitle: string) {
     return { error: getErrorMessage(error) };
   }
 }
+
+/**
+ * Utilitas untuk mengirim link reset password ke pengguna (Internal Auth)
+ */
+export async function sendPasswordResetEmailInternal(toEmail: string, resetLink: string) {
+  try {
+    const resend = getResendClient()
+    const data = await resend.emails.send({
+      from: 'Nizam Security <team-noreply@nizam.xales.id>',
+      to: [toEmail],
+      subject: `[NIZAM] Permintaan Reset Password`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px;">
+          <h2 style="color: #0F172A; text-align: center;">Reset Password Anda</h2>
+          <p style="text-align: center; color: #475569;">Kami menerima permintaan untuk melakukan reset password pada akun Anda di ekosistem <strong>NIZAM</strong>.</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetLink}" style="display: inline-block; padding: 14px 28px; background-color: #2563EB; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+              Ubah Password Sekarang
+            </a>
+          </div>
+          <p style="font-size: 14px; color: #64748B;">Jika tombol di atas tidak berfungsi, *copy-paste* link berikut ke browser Anda:</p>
+          <p style="font-size: 12px; color: #3B82F6; word-break: break-all;">${resetLink}</p>
+          <hr style="border: 0; height: 1px; background: #E2E8F0; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #94A3B8; text-align: center;">Jika Anda tidak merasa meminta reset password ini, abaikan saja email ini. Link ini akan kadaluarsa dalam 1 jam.</p>
+        </div>
+      `,
+    });
+    return { success: true, data };
+  } catch (error) {
+    return { error: getErrorMessage(error) };
+  }
+}

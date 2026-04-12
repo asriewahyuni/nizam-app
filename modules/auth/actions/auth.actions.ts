@@ -1498,10 +1498,6 @@ export async function requestPasswordReset(nik: string) {
 }
 
 export async function resetEmployeePassword(employeeId: string, newPassword: string) {
-  if (isInternalAuthProvider()) {
-    return { error: 'Reset password karyawan belum didukung di mode auth internal.' }
-  }
-
   const adminClient = await createAdminClient()
   
   const { data: emp, error: empErr } = await (adminClient as any)
@@ -1512,11 +1508,16 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
 
   if (empErr || !emp.user_id) return { error: 'User tidak ditemukan.' }
 
-  const { error: authErr } = await adminClient.auth.admin.updateUserById(emp.user_id, {
-    password: newPassword
-  })
-
-  if (authErr) return { error: 'Gagal mereset: ' + authErr.message }
+  if (isInternalAuthProvider()) {
+    const { resetInternalAuthPasswordById } = await import('@/lib/auth/internal-auth.server')
+    const { error: internalErr } = await resetInternalAuthPasswordById(emp.user_id, newPassword)
+    if (internalErr) return { error: internalErr }
+  } else {
+    const { error: authErr } = await adminClient.auth.admin.updateUserById(emp.user_id, {
+      password: newPassword
+    })
+    if (authErr) return { error: 'Gagal mereset: ' + authErr.message }
+  }
 
   await (adminClient as any)
     .from('employees')
@@ -1531,16 +1532,32 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
 }
 
 export async function sendPasswordResetEmail(formData: FormData) {
-  if (isInternalAuthProvider()) {
-    return { error: 'Reset password via email belum didukung di mode auth internal.' }
-  }
-
-  const supabase = await createClient()
   const email = formData.get('email') as string
-  
   const origin = process.env.NEXT_PUBLIC_SITE_URL || 
                  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
 
+  if (isInternalAuthProvider()) {
+    const { createInternalAuthResetTokenByEmail } = await import('@/lib/auth/internal-auth.server')
+    const tokenResult = await createInternalAuthResetTokenByEmail(email)
+    
+    if (tokenResult.error || !tokenResult.token) {
+      return { error: tokenResult.error || 'Terjadi kesalahan sistem.' }
+    }
+
+    const { sendPasswordResetEmailInternal } = await import('@/lib/email/sender')
+    const resetLink = `${origin}/update-password?token=${tokenResult.token}`
+    
+    // We send asynchronously so we don't slow down the UI
+    const emailResult = await sendPasswordResetEmailInternal(email, resetLink)
+    if (emailResult.error) {
+      return { error: 'Gagal mengirim email: ' + emailResult.error }
+    }
+
+    return { success: true }
+  }
+
+  // Supabase Legacy Fallback
+  const supabase = await createClient()
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/update-password`,
   })
@@ -1550,4 +1567,15 @@ export async function sendPasswordResetEmail(formData: FormData) {
   }
 
   return { success: true }
+}
+
+export async function resetPasswordWithToken(token: string, newPassword: string) {
+  if (isInternalAuthProvider()) {
+    const { verifyAndResetInternalAuthPassword } = await import('@/lib/auth/internal-auth.server')
+    const result = await verifyAndResetInternalAuthPassword(token, newPassword)
+    return result
+  }
+  
+  // Untungnya Supabase secara otomatis mengenali session di sisi Client saat URL ?code=...
+  return { error: 'Supabase menggunakan flow form client-side tanpa mengirim raw token.' }
 }

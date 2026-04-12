@@ -4,24 +4,30 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ShieldCheck, Lock, AlertCircle, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { resetPasswordWithToken } from '@/modules/auth/actions/auth.actions'
 
 export default function UpdatePasswordPage() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const token = searchParams.get('token')
   const supabase = createClient()
 
-  // Ensure they only see this page if they have a session (handled by the magic link)
+  // Ensure they only see this page if they have a session (handled by the magic link for Supabase)
+  // Or if they provided a token parameter in URL (for Internal Auth)
   useEffect(() => {
+    if (token) return // Internal Auth Flow - Has token
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         setErrorMsg('Sesi tidak valid atau telah kedaluwarsa. Silakan ajukan Lupa Password kembali.')
       }
     })
-  }, [supabase.auth])
+  }, [supabase.auth, token])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -39,19 +45,31 @@ export default function UpdatePasswordPage() {
     }
 
     try {
-      const { error } = await supabase.auth.updateUser({ password })
-      
-      if (error) {
-        setErrorMsg(error.message)
+      if (token) {
+        // Internal Auth custom flow
+        const result = await resetPasswordWithToken(token, password)
+        if (result.error) {
+          setErrorMsg(result.error)
+          setLoading(false)
+          return
+        }
       } else {
-        setSuccess(true)
-        setTimeout(() => {
-          router.push('/dashboard')
-        }, 3000)
+        // Legacy Supabase flow
+        const { error } = await supabase.auth.updateUser({ password })
+        if (error) {
+          setErrorMsg(error.message)
+          setLoading(false)
+          return
+        }
       }
+
+      setSuccess(true)
+      setErrorMsg('')
+      setTimeout(() => {
+        router.push('/dashboard')
+      }, 3000)
     } catch (err: any) {
       setErrorMsg("Gagal menghubungi server.")
-    } finally {
       setLoading(false)
     }
   }
