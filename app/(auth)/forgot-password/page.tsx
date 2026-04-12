@@ -68,7 +68,7 @@ export default function ForgotPasswordPage() {
               </div>
               <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">EMAIL TERKIRIM!</h3>
               <p className="text-slate-500 text-sm font-medium leading-relaxed max-w-xs mx-auto">
-                Silakan periksa kotak masuk (atau folder spam) email Anda untuk tautan reset password rahasia dari NIZAM.
+                Silakan periksa kotak masuk <strong>(atau folder spam/junk)</strong> email Anda untuk tautan reset password rahasia dari NIZAM.
               </p>
               <div className="pt-6">
                  <Link href="/login" className="block w-full py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-xs uppercase tracking-[0.3em] rounded-2xl transition-all">

@@ -29,7 +29,7 @@ function LoginForm() {
     setResetLoading(false)
 
     if (res.success) {
-      setResetMsg({ type: 'success', text: `Permintaan reset terkirim. Silakan hubungi Admin HRD untuk mendapatkan sandi baru.` })
+      setResetMsg({ type: 'success', text: `Permintaan reset terkirim. Silakan hubungi Admin HRD untuk mendapatkan sandi baru (Ingatkan mereka untuk mengecek Inbox atau Spam).` })
     } else {
       setResetMsg({ type: 'error', text: res.error || 'Gagal mengirim permintaan.' })
     }
