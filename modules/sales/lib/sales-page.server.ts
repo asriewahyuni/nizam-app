@@ -115,23 +115,37 @@ async function getAuthedContext() {
 }
 
 async function getMemberOrg(orgId: string) {
-  const { db, user } = await getAuthedContext()
-  const { data: member, error } = await db
-    .from('org_members')
-    .select('role, organizations(id, name, slug, logo_url)')
-    .eq('org_id', orgId)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle()
+  const { user } = await getAuthedContext()
+  const { queryPostgres } = await import('@/lib/db/postgres')
 
-  if (error || !member?.organizations) {
+  const result = await queryPostgres<{
+    role: string
+    org_id: string
+    org_name: string | null
+    org_slug: string | null
+    org_logo_url: string | null
+  }>(`
+    SELECT m.role, o.id AS org_id, o.name AS org_name, o.slug AS org_slug, o.logo_url AS org_logo_url
+    FROM public.org_members m
+    JOIN public.organizations o ON o.id = m.org_id
+    WHERE m.org_id = $1 AND m.user_id = $2 AND m.is_active = true
+    LIMIT 1
+  `, [orgId, user.id])
+
+  const row = result.rows[0]
+  if (!row) {
     throw new Error('Akses organisasi tidak ditemukan')
   }
 
   return {
     userId: user.id,
-    role: String(member.role || 'staff'),
-    org: member.organizations as OrgSummary,
+    role: String(row.role || 'staff'),
+    org: {
+      id: orgId,
+      name: String(row.org_name || ''),
+      slug: String(row.org_slug || orgId),
+      logo_url: (row.org_logo_url as string | null) ?? null,
+    } as OrgSummary,
   }
 }
 
