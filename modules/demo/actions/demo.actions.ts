@@ -66,7 +66,7 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
     }
     userId = signUpResult.userId
   } else {
-    userId = signInResult.userId
+    userId = signInResult.userId!
   }
 
   // ─────────────────────────────────────────────────────────────────
@@ -306,7 +306,7 @@ async function seedBlankDemoBudgeting(supabase: any, orgId: string, branchId: st
         branch_id: branchId,
         account_id: accountId,
         period,
-        budget_amount: budgetAmount,
+        budget_amount: Number(budgetAmount),
         updated_at: new Date().toISOString(),
       }
     })
