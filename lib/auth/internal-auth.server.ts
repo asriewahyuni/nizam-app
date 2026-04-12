@@ -138,69 +138,71 @@ export async function createInternalAuthResetTokenByEmail(email: string) {
   const normalizedEmail = normalizeEmail(email)
   if (!normalizedEmail) return { error: 'Email tidak valid.' }
 
-  const { rows, error } = await queryPostgres<{ id: string, display_name: string }>(
-    `select id::text as id, display_name from public.internal_auth_users where login_email = $1 and is_active = true limit 1`,
-    [normalizedEmail]
-  )
+  try {
+    const { rows } = await queryPostgres<{ id: string, display_name: string }>(
+      `select id::text as id, display_name from public.internal_auth_users where login_email = $1 and is_active = true limit 1`,
+      [normalizedEmail]
+    )
 
-  if (error || !rows || rows.length === 0) {
-    return { error: 'Akun dengan email tersebut tidak ditemukan atau sedang tidak aktif.' }
+    if (!rows || rows.length === 0) {
+      return { error: 'Akun dengan email tersebut tidak ditemukan atau sedang tidak aktif.' }
+    }
+
+    const user = rows[0]
+    const rawToken = randomBytes(32).toString('hex')
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex')
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+
+    await queryPostgres(
+      `insert into public.internal_auth_password_resets (user_id, token_hash, expires_at) values ($1, $2, $3)`,
+      [user.id, tokenHash, expiresAt]
+    )
+
+    return { success: true, token: rawToken, name: user.display_name }
+  } catch (error) {
+    return { error: resolveInternalAuthDatabaseError(error, 'Gagal membuat sandi reset. Hubungi tim IT.') }
   }
-
-  const user = rows[0]
-  const rawToken = randomBytes(32).toString('hex')
-  const tokenHash = createHash('sha256').update(rawToken).digest('hex')
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
-
-  const { error: insertErr } = await queryPostgres(
-    `insert into public.internal_auth_password_resets (user_id, token_hash, expires_at) values ($1, $2, $3)`,
-    [user.id, tokenHash, expiresAt]
-  )
-
-  if (insertErr) {
-    return { error: 'Tabel internal password reset belum siap. Admin perlu menjalankan migrasi database 1177.' }
-  }
-
-  return { success: true, token: rawToken, name: user.display_name }
 }
 
 export async function verifyAndResetInternalAuthPassword(token: string, newPassword: string) {
   if (newPassword.length < 8) return { error: 'Password minimal 8 karakter.' }
   
-  const tokenHash = createHash('sha256').update(token.trim()).digest('hex')
-  
-  const { rows, error } = await queryPostgres<{ id: string, user_id: string }>(
-    `select id::text as id, user_id::text as user_id from public.internal_auth_password_resets where token_hash = $1 and used_at is null and expires_at > now() limit 1`,
-    [tokenHash]
-  )
-  
-  if (error || !rows || rows.length === 0) {
-    return { error: 'Link reset password tidak valid atau sudah kadaluarsa.' }
+  try {
+    const tokenHash = createHash('sha256').update(token.trim()).digest('hex')
+    
+    const { rows } = await queryPostgres<{ id: string, user_id: string }>(
+      `select id::text as id, user_id::text as user_id from public.internal_auth_password_resets where token_hash = $1 and used_at is null and expires_at > now() limit 1`,
+      [tokenHash]
+    )
+    
+    if (!rows || rows.length === 0) {
+      return { error: 'Link reset password tidak valid atau sudah kadaluarsa.' }
+    }
+    
+    const resetRow = rows[0]
+    const newHash = hashPasswordWithScrypt(newPassword)
+    
+    await queryPostgres(
+      `
+        with upd_user as (
+          update public.internal_auth_users 
+          set password_hash = $1, updated_at = now() 
+          where id = $2::uuid
+        )
+        update public.internal_auth_password_resets 
+        set used_at = now() 
+        where id = $3::uuid
+      `,
+      [newHash, resetRow.user_id, resetRow.id]
+    )
+
+    // Auto-login user after successful password reset
+    const sessionId = await createSession(resetRow.user_id)
+
+    return { success: true, sessionId }
+  } catch (error) {
+    return { error: resolveInternalAuthDatabaseError(error, 'Gagal mengubah pengaturan password di database.') }
   }
-  
-  const resetRow = rows[0]
-  const newHash = hashPasswordWithScrypt(newPassword)
-  
-  const { error: updErr } = await queryPostgres(
-    `
-      with upd_user as (
-        update public.internal_auth_users 
-        set password_hash = $1, updated_at = now() 
-        where id = $2::uuid
-      )
-      update public.internal_auth_password_resets 
-      set used_at = now() 
-      where id = $3::uuid
-    `,
-    [newHash, resetRow.user_id, resetRow.id]
-  )
-
-  if (updErr) return { error: 'Gagal mengubah pengaturan password di database.' }
-  
-  // Auto-login user after successful password reset
-  const sessionId = await createSession(resetRow.user_id)
-
-  return { success: true, sessionId }
 }
 
 export async function resetInternalAuthPasswordById(userId: string, newPassword: string) {
@@ -209,12 +211,15 @@ export async function resetInternalAuthPasswordById(userId: string, newPassword:
   const normId = normalizeUuid(userId)
   if (!normId) return { error: 'ID Anggota tidak valid untuk mereset sandi.' }
 
-  const { error } = await queryPostgres(
-    `update public.internal_auth_users set password_hash = $1, updated_at = now() where legacy_user_id = $2::uuid or id = $2::uuid`,
-    [newHash, normId]
-  )
-  if (error) return { error: 'Gagal menjalankan pergantian sandi massal internal.' }
-  return { success: true }
+  try {
+    await queryPostgres(
+      `update public.internal_auth_users set password_hash = $1, updated_at = now() where legacy_user_id = $2::uuid or id = $2::uuid`,
+      [newHash, normId]
+    )
+    return { success: true }
+  } catch (error) {
+    return { error: resolveInternalAuthDatabaseError(error, 'Gagal menjalankan pergantian sandi massal internal.') }
+  }
 }
 
 function normalizeInternalUserType(value: unknown) {
