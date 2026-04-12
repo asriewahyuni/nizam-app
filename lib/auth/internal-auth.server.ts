@@ -358,6 +358,42 @@ export async function createInternalAuthSessionByUserId(internalUserId: string) 
   }
 }
 
+export async function setInternalAuthLegacyUserId(input: {
+  internalUserId: string
+  legacyUserId: string
+}) {
+  const normalizedInternalUserId = normalizeUuid(input.internalUserId)
+  const normalizedLegacyUserId = normalizeUuid(input.legacyUserId)
+
+  if (!normalizedInternalUserId || !normalizedLegacyUserId) {
+    return { error: 'Identitas user legacy internal tidak valid.' as const }
+  }
+
+  try {
+    await queryPostgres(
+      `
+        update public.internal_auth_users
+        set
+          legacy_user_id = $2::uuid,
+          updated_at = now()
+        where id = $1::uuid
+      `,
+      [normalizedInternalUserId, normalizedLegacyUserId]
+    )
+
+    return {
+      success: true as const,
+      internalUserId: normalizedInternalUserId,
+      legacyUserId: normalizedLegacyUserId,
+    }
+  } catch (error) {
+    console.error('setInternalAuthLegacyUserId failed:', getErrorMessage(error))
+    return {
+      error: resolveInternalAuthDatabaseError(error, 'Gagal menautkan akun internal ke auth user legacy.'),
+    }
+  }
+}
+
 export async function ensureInternalAuthUserRecord(input: {
   userId?: string | null
   email?: string | null
@@ -540,6 +576,33 @@ export async function createInternalAuthUser(input: {
   const passwordHash = hashPasswordWithScrypt(normalizedPassword)
 
   try {
+    // Tentukan legacy_user_id agar org_members.user_id langsung cocok saat query.
+    // Priority: (1) input legacyUserId, (2) auth.users existing by email, (3) buat entry baru.
+    let resolvedLegacyUserId = normalizeUuid(normalizedLegacyUserId)
+
+    if (!resolvedLegacyUserId && normalizedEmail) {
+      const authUserLookup = await queryPostgres<{ id: string }>(
+        `SELECT id::text as id FROM auth.users WHERE lower(email) = $1::text LIMIT 1`,
+        [normalizedEmail.toLowerCase()]
+      )
+      if (authUserLookup.rows[0]?.id) {
+        resolvedLegacyUserId = normalizeUuid(authUserLookup.rows[0].id)
+      }
+    }
+
+    if (!resolvedLegacyUserId) {
+      const newAuthUserId = crypto.randomUUID()
+      await queryPostgres(
+        `
+          INSERT INTO auth.users (id, email, aud, role, created_at, updated_at)
+          VALUES ($1::uuid, $2::text, 'authenticated', 'authenticated', now(), now())
+          ON CONFLICT (id) DO NOTHING
+        `,
+        [newAuthUserId, normalizedEmail]
+      )
+      resolvedLegacyUserId = newAuthUserId
+    }
+
     const result = await queryPostgres<{ id: string }>(
       `
         insert into public.internal_auth_users (
@@ -563,7 +626,7 @@ export async function createInternalAuthUser(input: {
         returning id
       `,
       [
-        normalizedLegacyUserId,
+        resolvedLegacyUserId,
         normalizedEmail,
         normalizedNik,
         passwordHash,
@@ -577,11 +640,14 @@ export async function createInternalAuthUser(input: {
       return { error: 'Gagal membuat user internal.' as const }
     }
 
+    // Session dibuat dengan internal user id; toInternalSessionUser() akan menggunakan
+    // legacy_user_id sebagai user.id — cocok dengan org_members.user_id.
     await createSession(userId)
 
     return {
       success: true as const,
-      userId,
+      userId: resolvedLegacyUserId ?? userId,
+      internalUserId: userId,
       email: normalizedEmail,
       nik: normalizedNik,
     }
@@ -592,7 +658,6 @@ export async function createInternalAuthUser(input: {
     }
   }
 }
-
 export async function signInWithInternalAuth(input: {
   email?: string | null
   nik?: string | null
@@ -803,7 +868,8 @@ export async function getInternalAuthSession(): Promise<InternalAuthSession | nu
 
   const row = result.rows[0]
   if (!row) {
-    cookieStore.delete(INTERNAL_AUTH_SESSION_COOKIE)
+    // Session expired or not found — return null without touching cookies
+    // (cookies can only be modified in Server Actions, not Server Components)
     return null
   }
 

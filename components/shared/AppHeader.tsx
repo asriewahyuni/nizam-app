@@ -3,7 +3,7 @@
 import { formatRupiah, getInitials } from '@/lib/utils'
 import { scheduleIdleTask } from '@/lib/browser/idle'
 import { approvalRequestTouchesActiveBranch } from '@/lib/browser/approval-realtime'
-import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { createOptionalClient as createOptionalBrowserSupabaseClient } from '@/lib/supabase/client'
 import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type FormEvent } from 'react'
@@ -649,19 +649,6 @@ export function AppHeader({
   }, [activeBranchId, activeOrgId])
 
   useEffect(() => {
-    const supabase = createBrowserSupabaseClient()
-    const channel = supabase
-      .channel(`nizam-approval-header:${activeOrgId}:${activeBranchId || 'all'}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'approval_requests', filter: `org_id=eq.${activeOrgId}` },
-        (payload) => {
-          if (!approvalRequestTouchesActiveBranch(payload, activeBranchId)) return
-          void loadPendingApprovals()
-        }
-      )
-      .subscribe()
-
     const handleWindowFocus = () => {
       void loadPendingApprovals()
     }
@@ -675,10 +662,27 @@ export function AppHeader({
     window.addEventListener('focus', handleWindowFocus)
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
+    const supabase = createOptionalBrowserSupabaseClient()
+    const channel = supabase
+      ? supabase
+          .channel(`nizam-approval-header:${activeOrgId}:${activeBranchId || 'all'}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'approval_requests', filter: `org_id=eq.${activeOrgId}` },
+            (payload) => {
+              if (!approvalRequestTouchesActiveBranch(payload, activeBranchId)) return
+              void loadPendingApprovals()
+            }
+          )
+          .subscribe()
+      : null
+
     return () => {
       window.removeEventListener('focus', handleWindowFocus)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
-      void supabase.removeChannel(channel)
+      if (supabase && channel) {
+        void supabase.removeChannel(channel)
+      }
     }
   }, [activeBranchId, activeOrgId, loadPendingApprovals])
 

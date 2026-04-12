@@ -11,6 +11,7 @@ import { cookies } from 'next/headers'
 import { cache } from 'react'
 import { seedDemoData, type DemoBusinessType } from '@/modules/demo/actions/demo.actions'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
+import { ensureShadowAuthUserForInternalUser } from '@/lib/auth/internal-auth-shadow.server'
 import {
   ACTIVE_BRANCH_COOKIE,
   ACTIVE_ORG_COOKIE,
@@ -572,6 +573,35 @@ async function createOrganizationRecord(
     const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
     if (!user) return { error: 'Tidak terautentikasi' }
 
+    let memberUserId = String(user.id || '').trim()
+    if (internalProvider) {
+      const shadowAuthResult = await ensureShadowAuthUserForInternalUser({
+        internalUserId:
+          typeof user.user_metadata?.internal_user_id === 'string'
+            ? user.user_metadata.internal_user_id
+            : memberUserId,
+        currentAuthUserId:
+          typeof user.user_metadata?.legacy_user_id === 'string'
+            ? user.user_metadata.legacy_user_id
+            : memberUserId,
+        email: user.email,
+        fullName:
+          typeof user.user_metadata?.full_name === 'string'
+            ? user.user_metadata.full_name
+            : null,
+        loginType:
+          typeof user.user_metadata?.login_type === 'string'
+            ? user.user_metadata.login_type
+            : 'owner',
+      })
+
+      if ('error' in shadowAuthResult) {
+        return { error: shadowAuthResult.error }
+      }
+
+      memberUserId = shadowAuthResult.authUserId
+    }
+
     if (internalProvider && !organizationWriteDb) {
       return { error: 'Konfigurasi service role Supabase belum diisi. Lengkapi environment lalu coba lagi.' }
     }
@@ -667,7 +697,7 @@ async function createOrganizationRecord(
 
     const { error: memberError } = await privilegedDb
       .from('org_members')
-      .insert({ org_id: orgId, user_id: user.id, role: 'owner' })
+      .insert({ org_id: orgId, user_id: memberUserId, role: 'owner' })
 
     if (memberError) {
       ;(console as any).error('CreateOrganization: org_members insert failed', memberError)
@@ -716,7 +746,7 @@ async function createOrganizationRecord(
     }
 
     await persistMembershipActiveContext(privilegedDb, {
-      userId: user.id,
+      userId: memberUserId,
       orgId,
       branchId: defaultBranchId,
     })

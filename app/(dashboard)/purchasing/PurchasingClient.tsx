@@ -583,16 +583,20 @@ export default function PurchasingClient({
     return parts.join(', ')
   }
 
-  const stats = {
-    totalMonth: purchases.filter((p: any) => p.status !== 'VOIDED' && p.purchase_date.startsWith(new Date().toISOString().slice(0, 7))).reduce((sum: number, p: any) => sum + p.grand_total, 0),
-    totalDebt: purchases.filter((p: any) => p.status === 'RECEIVED' && p.payment_status !== 'PAID').reduce((sum: number, p: any) => {
-      const paid = (p.purchase_payments || []).reduce((s: number, pay: any) => s + (Number(pay.amount) + Number(pay.discount_amount)), 0)
-      const returned = (p.purchase_returns || []).reduce((s: number, ret: any) => s + Number(ret.total_amount), 0)
-      return sum + (p.grand_total - paid - returned)
-    }, 0),
-    pendingOrders: purchases.filter((p: any) => p.status === 'ORDERED' || p.status === 'DRAFT').length,
-    vendorCount: vendors.length
-  }
+    const stats = {
+      totalMonth: purchases.filter((p: any) => {
+        if (p.status === 'VOIDED') return false;
+        const dateStr = p.purchase_date ? new Date(p.purchase_date).toISOString().slice(0, 7) : '';
+        return dateStr === new Date().toISOString().slice(0, 7);
+      }).reduce((sum: number, p: any) => sum + p.grand_total, 0),
+      totalDebt: purchases.filter((p: any) => p.status === 'RECEIVED' && p.payment_status !== 'PAID').reduce((sum: number, p: any) => {
+        const paid = (p.purchase_payments || []).reduce((s: number, pay: any) => s + (Number(pay.amount) + Number(pay.discount_amount)), 0)
+        const returned = (p.purchase_returns || []).reduce((s: number, ret: any) => s + Number(ret.total_amount), 0)
+        return sum + (p.grand_total - paid - returned)
+      }, 0),
+      pendingOrders: purchases.filter((p: any) => p.status === 'ORDERED' || p.status === 'DRAFT').length,
+      vendorCount: vendors.length
+    }
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto space-y-12 pb-24">
@@ -709,7 +713,7 @@ export default function PurchasingClient({
                   <tr key={p.id} className="group hover:bg-slate-50 transition-colors">
                     <td className="px-8 py-6">
                        <div className="text-xs font-black text-rose-600 tracking-tighter">{p.purchase_number}</div>
-                       <div className="text-[10px] font-bold text-slate-400 mt-1">{p.purchase_date}</div>
+                       <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(p.purchase_date)}</div>
                     </td>
                     <td className="px-8 py-6">
                        <div className="text-sm font-bold text-slate-900">{p.contacts?.name || 'Unknown Vendor'}</div>

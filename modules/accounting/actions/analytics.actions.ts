@@ -88,23 +88,26 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
       const monthlyData: Record<string, { revenue: number; expense: number }> = {}
       const expenseBreakdown: Record<string, number> = {}
 
-      lines.forEach((line: any) => {
-        const entryDate = entryDateMap[line.entry_id]
-        if (!entryDate) return
+lines.forEach((line: any) => {
+          const entryDate = entryDateMap[line.entry_id]
+          if (!entryDate) return
 
-        const month = format(new Date(entryDate), 'MMM yyyy')
-        if (!monthlyData[month]) monthlyData[month] = { revenue: 0, expense: 0 }
+          const month = format(new Date(entryDate), 'MMM yyyy')
+          if (!monthlyData[month]) monthlyData[month] = { revenue: 0, expense: 0 }
 
-        if (line.accounts.type === 'REVENUE') {
-          monthlyData[month].revenue += (Number(line.credit) - Number(line.debit))
-        }
-        if (line.accounts.type === 'EXPENSE') {
-          const val = (Number(line.debit) - Number(line.credit))
-          monthlyData[month].expense += val
-          const name = line.accounts.name || line.accounts.code
-          expenseBreakdown[name] = (expenseBreakdown[name] || 0) + val
-        }
-      })
+          // Guard against missing account data
+          if (!line.accounts) return
+
+          if (line.accounts.type === 'REVENUE') {
+            monthlyData[month].revenue += (Number(line.credit) - Number(line.debit))
+          }
+          if (line.accounts.type === 'EXPENSE') {
+            const val = (Number(line.debit) - Number(line.credit))
+            monthlyData[month].expense += val
+            const name = line.accounts.name || line.accounts.code
+            expenseBreakdown[name] = (expenseBreakdown[name] || 0) + val
+          }
+        })
 
       chartData = Object.entries(monthlyData)
         .map(([name, vals]) => ({ name, revenue: vals.revenue, expense: vals.expense, profit: vals.revenue - vals.expense }))

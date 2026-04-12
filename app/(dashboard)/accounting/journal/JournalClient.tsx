@@ -7,6 +7,7 @@ import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraft
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { motion, AnimatePresence } from 'framer-motion'
 import { formatRupiah } from '@/lib/utils'
+import { format } from 'date-fns'
 
 interface JournalClientProps {
   orgId: string
@@ -327,7 +328,7 @@ export default function JournalClient({
                       return (
 	                  <tr key={entry.id} className="group hover:bg-slate-50 transition-colors">
 	                    <td className="px-8 py-6 align-top">
-	                       <div className="text-sm font-black text-slate-900 tracking-tight">{entry.entry_date}</div>
+	                       <div className="text-sm font-black text-slate-900 tracking-tight">{entry.entry_date ? format(new Date(entry.entry_date), 'yyyy-MM-dd') : ''}</div>
 	                       <div className="text-[10px] font-bold text-slate-400 mt-1 font-mono uppercase tracking-tighter">{entry.entry_number}</div>
                     </td>
                     <td className="px-6 py-6 align-top">

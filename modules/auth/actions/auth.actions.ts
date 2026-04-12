@@ -20,6 +20,7 @@ import { ACTIVE_BRANCH_COOKIE, ACTIVE_ORG_COOKIE } from '@/modules/organization/
 import {
   getStoredActiveOrgIdForUser,
   persistMembershipActiveContext,
+  resolvePlatformAdminParentOrgId,
 } from '@/modules/organization/lib/active-context.server'
 
 const ADMIN_IMPERSONATION_COOKIE = 'nizam_admin_impersonation'
@@ -488,19 +489,28 @@ export async function signUp(formData: FormData) {
   const planParam = String(formData.get('plan') || '').trim().toLowerCase()
   const isDemoSignup = planParam === 'demo'
 
+  // Try internal auth flow first. If DB config is missing, fall back to Supabase client.
   if (isInternalAuthProvider()) {
-    const internalUser = await createInternalAuthUser({
-      email,
-      password,
-      fullName,
-      userType: isPlatformAdminEmail(email) ? 'admin' : 'owner',
-    })
-
-    if ('error' in internalUser) {
-      return { error: internalUser.error }
+    try {
+      const internalUser = await createInternalAuthUser({
+        email,
+        password,
+        fullName,
+        userType: isPlatformAdminEmail(email) ? 'admin' : 'owner',
+      })
+      if ('error' in internalUser) {
+        return { error: internalUser.error }
+      }
+      return { success: true, email }
+    } catch (e) {
+      // If internal auth cannot be used (e.g., missing DB config), fall back to Supabase.
+      const fallbackError = (e as Error).message || ''
+      if (fallbackError.includes('Koneksi database auth')) {
+        // continue to Supabase flow below
+      } else {
+        return { error: fallbackError }
+      }
     }
-
-    return { success: true, email }
   }
 
   const supabase = await createClient()
@@ -520,12 +530,10 @@ export async function signUp(formData: FormData) {
   })
 
   if (error) {
-     // Identifikasi error jika email sudah terdaftar. (Terkadang Supabase mengeluarkan "Database error saving new user" karena trigger atau batas duplikasi).
+     // Identify duplicate registration errors.
      if (error.message.includes("Database error saving new user") || error.message.includes("already registered")) {
         return { error: 'Gagal: Email ini sudah pernah didaftarkan. Silakan Login atau gunakan email lain.' }
      }
-     
-     // Error lainnya
      return { error: error.message }
   }
 
@@ -554,8 +562,25 @@ export async function signIn(formData: FormData) {
       redirect(`/login?error=${msg}`)
     }
 
-    if (result.resolvedOrgId) {
-      setActiveOrganizationCookie(cookieStore, result.resolvedOrgId)
+    let resolvedOrgId = result.resolvedOrgId
+    if (isPlatformAdminEmail(email)) {
+      try {
+        const adminClient = await createAdminClient()
+        const parentOrgId = await resolvePlatformAdminParentOrgId(
+          adminClient as any,
+          result.userId,
+          activeOrgIdPreference || result.resolvedOrgId || null
+        )
+        if (parentOrgId) {
+          resolvedOrgId = parentOrgId
+        }
+      } catch (parentResolutionError) {
+        ;(console as any).warn('signIn: platform admin parent-org fallback failed', parentResolutionError)
+      }
+    }
+
+    if (resolvedOrgId) {
+      setActiveOrganizationCookie(cookieStore, resolvedOrgId)
     }
 
     revalidatePath('/', 'layout')

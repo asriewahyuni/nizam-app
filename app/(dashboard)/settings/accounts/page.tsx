@@ -39,6 +39,7 @@ export default async function ChartOfAccountsPage() {
     getChartOfAccounts(orgData.org.id),
     checkCanManageCoA(orgData.org.id),
   ])
+  const canCreateDirectAccount = isParentOrg && canManageDirect
   const isCoAEmpty = accounts.length === 0
   const hasCorePsaK = CORE_PSAK_CODES.every((code) => accounts.some((account) => account.code === code))
   const needsCoAActivation = !hasCorePsaK
@@ -77,14 +78,26 @@ export default async function ChartOfAccountsPage() {
               {isChildOrganization ? 'Sinkronkan CoA Parent' : 'Aktifkan CoA PSAK'}
             </button>
           </form>
-        ) : canManageDirect ? (
-          <a
-            href="/settings/accounts/new"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-all"
-            style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
-          >
-            + Tambah Akun
-          </a>
+        ) : isParentOrg ? (
+          canCreateDirectAccount ? (
+            <a
+              href="/settings/accounts/new"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-all"
+              style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
+            >
+              + Tambah Akun
+            </a>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white opacity-60 cursor-not-allowed"
+              style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
+              title="Pindah ke konteks Unit Utama parent untuk membuat rekening."
+            >
+              + Tambah Akun
+            </button>
+          )
         ) : (
           <div className="flex items-center gap-2">
             <a
@@ -137,6 +150,11 @@ export default async function ChartOfAccountsPage() {
           {!isParentOrg && (
             <p className="text-xs text-slate-400 mt-4">
               Pengajuan rekening baru tetap melalui menu Pengajuan CoA setelah sinkronisasi selesai.
+            </p>
+          )}
+          {isParentOrg && !canManageDirect && (
+            <p className="text-xs text-amber-600 mt-4">
+              Parent terdeteksi, namun pembuatan rekening dikunci karena konteks unit aktif bukan Unit Utama.
             </p>
           )}
         </div>

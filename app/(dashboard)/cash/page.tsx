@@ -434,6 +434,8 @@ export default async function CashPage({
 
   const orgId = orgData.org.id
   const orgName = orgData.org.name || 'Nizam'
+  const orgEntity = orgData.org as typeof orgData.org & { parent_org_id?: string | null }
+  const isParentOrgFromTree = !orgEntity.parent_org_id
   const [activeBranch, canAccessAllBranches, allAccounts, coaAccess, branches] = await Promise.all([
     getActiveBranch(orgId),
     canSelectAllBranches(orgId),
@@ -441,8 +443,8 @@ export default async function CashPage({
     checkCanManageCoA(orgId),
     getBranches(orgId),
   ])
-  const { canManageDirect, isParentOrg } = coaAccess
-  const canUseHoldingView = canManageDirect && isParentOrg
+  const { canManageDirect } = coaAccess
+  const canUseHoldingView = canManageDirect && isParentOrgFromTree
   const requestedCashView = params?.cash_view === 'holding' ? 'holding' : 'parent'
   const cashViewMode: CashViewMode = canUseHoldingView ? requestedCashView : 'parent'
 
@@ -458,7 +460,7 @@ export default async function CashPage({
     ChildOrgSummary[],
     CashBankAccount[],
     RecentTransactionOption[],
-  ] = canManageDirect && isParentOrg
+  ] = canManageDirect && isParentOrgFromTree
     ? await Promise.all([
         getPendingCoaRequestCount(orgId),
         getChildOrgs(orgId),
@@ -573,7 +575,7 @@ export default async function CashPage({
         activeBranchId={activeBranch?.id ?? null}
         activeBranchName={activeBranch?.name ?? null}
         canManageDirect={canManageDirect}
-        isParentOrg={isParentOrg}
+        isParentOrg={isParentOrgFromTree}
         pendingCoaRequests={pendingCoaRequests}
         branches={branches}
         placementNodes={placementNodes}
