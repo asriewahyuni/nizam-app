@@ -8,7 +8,7 @@ import { approvalRequestTouchesActiveBranch } from '@/lib/browser/approval-realt
 import { scheduleIdleTask } from '@/lib/browser/idle'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import { saasModuleMatches, normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
-import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { createOptionalClient as createOptionalBrowserSupabaseClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard,
   BookOpen,
@@ -352,19 +352,6 @@ export function AppSidebar({
   }, [activeBranchId, orgId])
 
   useEffect(() => {
-    const supabase = createBrowserSupabaseClient()
-    const channel = supabase
-      .channel(`nizam-approval-sidebar:${orgId}:${activeBranchId || 'all'}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'approval_requests', filter: `org_id=eq.${orgId}` },
-        (payload) => {
-          if (!approvalRequestTouchesActiveBranch(payload, activeBranchId)) return
-          void refreshPendingApprovalBadge()
-        }
-      )
-      .subscribe()
-
     const handleWindowFocus = () => {
       void loadSidebarMetrics()
     }
@@ -378,10 +365,27 @@ export function AppSidebar({
     window.addEventListener('focus', handleWindowFocus)
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
+    const supabase = createOptionalBrowserSupabaseClient()
+    const channel = supabase
+      ? supabase
+          .channel(`nizam-approval-sidebar:${orgId}:${activeBranchId || 'all'}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'approval_requests', filter: `org_id=eq.${orgId}` },
+            (payload) => {
+              if (!approvalRequestTouchesActiveBranch(payload, activeBranchId)) return
+              void refreshPendingApprovalBadge()
+            }
+          )
+          .subscribe()
+      : null
+
     return () => {
       window.removeEventListener('focus', handleWindowFocus)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
-      void supabase.removeChannel(channel)
+      if (supabase && channel) {
+        void supabase.removeChannel(channel)
+      }
     }
   }, [activeBranchId, loadSidebarMetrics, orgId, refreshPendingApprovalBadge])
 

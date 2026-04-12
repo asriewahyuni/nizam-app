@@ -223,28 +223,69 @@ async function ensureEmployeeBranchAccess(orgId: string, branchId: string | null
 }
 
 export async function getEmployees(orgId: string, branchId?: string | null) {
-  const supabase = await createClient()
-  const db = supabase as any
   const branchSelection = await resolveEmployeeBranchSelection(orgId, branchId)
   if ('error' in branchSelection) {
     throw new Error('Branch Selection Error: ' + branchSelection.error)
   }
 
-  let query = db
-    .from('employees')
-    .select('*, branch:branches!employees_branch_id_fkey(id, name, code), managed_branches:branches!branches_pic_employee_id_fkey(id)')
-    .eq('org_id', orgId)
-    .order('first_name')
+  const { queryPostgres } = await import('@/lib/db/postgres')
 
-  if (branchSelection.branchId) {
-    query = query.eq('branch_id', branchSelection.branchId)
+  const baseParams: unknown[] = [orgId]
+  const branchFilter = branchSelection.branchId ? ` AND e.branch_id = $2` : ''
+  if (branchSelection.branchId) baseParams.push(branchSelection.branchId)
+
+  let employeeRows: any[] = []
+  try {
+    const result = await queryPostgres<Record<string, unknown>>(`
+      SELECT
+        e.*,
+        b.id   AS branch_id_val,
+        b.name AS branch_name,
+        b.code AS branch_code
+      FROM   public.employees e
+      LEFT JOIN public.branches b ON b.id = e.branch_id
+      WHERE  e.org_id = $1${branchFilter}
+      ORDER  BY e.first_name
+    `, baseParams)
+    employeeRows = result.rows
+  } catch (err) {
+    ;(console as any).error('[getEmployees] raw SQL error:', err)
+    return []
   }
 
-  const { data, error } = await query
+  if (employeeRows.length === 0) return []
 
-  if (error) return []
-  return data
+  // Fetch branches where each employee is PIC (managed_branches backref)
+  const employeeIds = employeeRows.map((r) => r.id)
+  let managedBranchesByEmployeeId: Record<string, { id: string }[]> = {}
+  try {
+    const picResult = await queryPostgres<Record<string, unknown>>(`
+      SELECT id, pic_employee_id
+      FROM   public.branches
+      WHERE  pic_employee_id = ANY($1::uuid[]) AND org_id = $2
+    `, [employeeIds, orgId])
+
+    for (const b of picResult.rows) {
+      const eid = String(b.pic_employee_id ?? '')
+      if (!managedBranchesByEmployeeId[eid]) managedBranchesByEmployeeId[eid] = []
+      managedBranchesByEmployeeId[eid].push({ id: String(b.id ?? '') })
+    }
+  } catch { /* managed_branches is optional — ignore errors */ }
+
+  return employeeRows.map((row) => {
+    const eid = String(row.id ?? '')
+    return {
+      ...row,
+      // UI expects emp.branch?.name
+      branch: (row.branch_name || row.branch_code)
+        ? { id: row.branch_id_val, name: row.branch_name, code: row.branch_code }
+        : null,
+      // UI expects emp.managed_branches?.map(b => b.id)
+      managed_branches: managedBranchesByEmployeeId[eid] ?? [],
+    }
+  })
 }
+
 
 /**
  * Mengambil riwayat mutasi antar entitas (parent/child) dalam satu holding.

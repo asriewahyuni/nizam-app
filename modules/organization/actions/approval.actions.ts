@@ -131,7 +131,7 @@ async function enrichApproverMetadata(supabase: any, orgId: string, rows: any[])
     new Set(
       list
         .map((row: any) => toTrimmedString(row?.approver_id))
-        .filter((id: string | null): id is string => Boolean(id) && id.toUpperCase() !== 'SYSTEM')
+        .filter((id: string | null): id is string => id !== null && id !== '' && id.toUpperCase() !== 'SYSTEM')
     )
   )
 
@@ -144,11 +144,18 @@ async function enrichApproverMetadata(supabase: any, orgId: string, rows: any[])
     }))
   }
 
-  const { data: employeeRows } = await (supabase as any)
-    .from('employees')
-    .select('user_id, first_name, last_name, job_title, branches(name)')
-    .eq('org_id', orgId)
-    .in('user_id', approverIds)
+  // Raw SQL JOIN: branches(name) via FK cache tidak dijamin; gunakan LEFT JOIN langsung
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  let employeeRows: any[] = []
+  try {
+    const empResult = await queryPostgres<Record<string, unknown>>(`
+      SELECT e.user_id, e.first_name, e.last_name, e.job_title, b.name AS branch_name
+      FROM   public.employees e
+      LEFT JOIN public.branches b ON b.id = e.branch_id
+      WHERE  e.org_id = $1 AND e.user_id = ANY($2)
+    `, [orgId, approverIds])
+    employeeRows = empResult.rows
+  } catch { employeeRows = [] }
 
   const orgMemberByUserId = await getOrgMemberIdentityByUserIds(supabase, orgId, approverIds)
   const authNameByUserId = await getAuthDisplayNameByUserIds(supabase, approverIds)
@@ -161,14 +168,10 @@ async function enrichApproverMetadata(supabase: any, orgId: string, rows: any[])
     const firstName = toTrimmedString(employee?.first_name)
     const lastName = toTrimmedString(employee?.last_name)
     const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || null
-    const unitName = toTrimmedString((employee as any)?.branches?.name)
+    const unitName = toTrimmedString(employee?.branch_name)
     const jobTitle = toTrimmedString(employee?.job_title)
 
-    employeeByUserId.set(userId, {
-      name: fullName,
-      jobTitle,
-      unitName,
-    })
+    employeeByUserId.set(userId, { name: fullName, jobTitle, unitName })
   }
 
   return list.map((row: any) => {
@@ -212,7 +215,7 @@ async function enrichRequesterMetadata(supabase: any, orgId: string, rows: any[]
     new Set(
       list
         .map((row: any) => toTrimmedString(row?.requester_id))
-        .filter((id: string | null): id is string => Boolean(id) && id.toUpperCase() !== 'SYSTEM')
+        .filter((id: string | null): id is string => id !== null && id !== '' && id.toUpperCase() !== 'SYSTEM')
     )
   )
 
@@ -262,31 +265,34 @@ async function enrichRequesterMetadata(supabase: any, orgId: string, rows: any[]
     })
   }
 
-  const { data: employeeRows } = await (supabase as any)
-    .from('employees')
-    .select('user_id, first_name, last_name, job_title, branches(name)')
-    .eq('org_id', orgId)
-    .in('user_id', requesterIds)
+  // Raw SQL JOIN: branches(name) via FK cache tidak dijamin; gunakan LEFT JOIN langsung
+  const { queryPostgres: qp } = await import('@/lib/db/postgres')
+  let employeeRowsReq: any[] = []
+  try {
+    const empResult = await qp<Record<string, unknown>>(`
+      SELECT e.user_id, e.first_name, e.last_name, e.job_title, b.name AS branch_name
+      FROM   public.employees e
+      LEFT JOIN public.branches b ON b.id = e.branch_id
+      WHERE  e.org_id = $1 AND e.user_id = ANY($2)
+    `, [orgId, requesterIds])
+    employeeRowsReq = empResult.rows
+  } catch { employeeRowsReq = [] }
 
   const orgMemberByUserId = await getOrgMemberIdentityByUserIds(supabase, orgId, requesterIds)
   const authNameByUserId = await getAuthDisplayNameByUserIds(supabase, requesterIds)
 
   const employeeByUserId = new Map<string, { name: string | null; jobTitle: string | null; unitName: string | null }>()
-  for (const employee of (employeeRows as any[]) || []) {
+  for (const employee of (employeeRowsReq as any[]) || []) {
     const userId = toTrimmedString(employee?.user_id)
     if (!userId || employeeByUserId.has(userId)) continue
 
     const firstName = toTrimmedString(employee?.first_name)
     const lastName = toTrimmedString(employee?.last_name)
     const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || null
-    const unitName = toTrimmedString((employee as any)?.branches?.name)
+    const unitName = toTrimmedString(employee?.branch_name)
     const jobTitle = toTrimmedString(employee?.job_title)
 
-    employeeByUserId.set(userId, {
-      name: fullName,
-      jobTitle,
-      unitName,
-    })
+    employeeByUserId.set(userId, { name: fullName, jobTitle, unitName })
   }
 
   return list.map((row: any) => {
@@ -389,38 +395,105 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
   const effectiveBranchId = branchSelection.branchId
 
   let dataRes: any = { data: null, error: null }
-  
-  if (sourceType === 'PURCHASE_ORDER') {
-    let query = (supabase as any).from('purchases' as any).select('*, purchase_items(*, products(name, unit))').eq('id', sourceId).eq('org_id', orgId)
-    if (effectiveBranchId) {
-      query = query.eq('branch_id', effectiveBranchId)
-    }
-    dataRes = await query.single()
-  } else if (sourceType === 'SALES_ORDER') {
-    let query = (supabase as any).from('sales' as any).select('*, contacts(name, phone, email), sales_items(*, products(name, sku, unit))').eq('id', sourceId).eq('org_id', orgId)
-    if (effectiveBranchId) {
-      query = query.eq('branch_id', effectiveBranchId)
-    }
-    dataRes = await query.single()
-  } else if (sourceType === 'REIMBURSEMENT') {
-    let query = (supabase as any)
-      .from('reimbursements')
-      .select('*, items:reimbursement_items(*, account:accounts(code, name))')
-      .eq('id', sourceId)
-      .eq('org_id', orgId)
+  const { queryPostgres } = await import('@/lib/db/postgres')
 
-    if (effectiveBranchId) {
-      query = query.eq('branch_id', effectiveBranchId)
-    }
-    dataRes = await query.single()
+  if (sourceType === 'PURCHASE_ORDER') {
+    try {
+      const purchaseParams: unknown[] = [sourceId, orgId]
+      let purchaseWhere = `p.id = $1 AND p.org_id = $2`
+      if (effectiveBranchId) { purchaseParams.push(effectiveBranchId); purchaseWhere += ` AND p.branch_id = $${purchaseParams.length}` }
+
+      const [poResult, itemsResult] = await Promise.all([
+        queryPostgres<Record<string, unknown>>(`
+          SELECT p.*, c.name AS vendor_name, b.name AS branch_name, b.code AS branch_code
+          FROM public.purchases p
+          LEFT JOIN public.contacts c ON c.id = p.vendor_id
+          LEFT JOIN public.branches b ON b.id = p.branch_id
+          WHERE ${purchaseWhere} LIMIT 1
+        `, purchaseParams),
+        queryPostgres<Record<string, unknown>>(`
+          SELECT pi.*, pr.name AS product_name, pr.unit AS product_unit
+          FROM public.purchase_items pi
+          LEFT JOIN public.products pr ON pr.id = pi.product_id
+          WHERE pi.purchase_id = $1
+        `, [sourceId]),
+      ])
+      if (poResult.rows.length === 0) { dataRes = { data: null, error: { message: 'Purchase order tidak ditemukan.' } } }
+      else {
+        const row = poResult.rows[0]
+        dataRes = { data: {
+          ...row,
+          contacts: row.vendor_name ? { name: row.vendor_name } : null,
+          branches: row.branch_name ? { name: row.branch_name, code: row.branch_code } : null,
+          purchase_items: itemsResult.rows.map((item) => ({
+            ...item, products: item.product_name ? { name: item.product_name, unit: item.product_unit } : null,
+          })),
+        }, error: null }
+      }
+    } catch (err: any) { dataRes = { data: null, error: { message: err?.message || 'Query error' } } }
+  } else if (sourceType === 'SALES_ORDER') {
+    try {
+      const soParams: unknown[] = [sourceId, orgId]
+      let soWhere = `s.id = $1 AND s.org_id = $2`
+      if (effectiveBranchId) { soParams.push(effectiveBranchId); soWhere += ` AND s.branch_id = $${soParams.length}` }
+
+      const [soResult, itemsResult] = await Promise.all([
+        queryPostgres<Record<string, unknown>>(`
+          SELECT s.*, c.name AS customer_name, c.phone AS customer_phone, c.email AS customer_email
+          FROM public.sales s
+          LEFT JOIN public.contacts c ON c.id = s.customer_id
+          WHERE ${soWhere} LIMIT 1
+        `, soParams),
+        queryPostgres<Record<string, unknown>>(`
+          SELECT si.*, p.name AS product_name, p.sku, p.unit AS product_unit
+          FROM public.sales_items si
+          LEFT JOIN public.products p ON p.id = si.product_id
+          WHERE si.sale_id = $1
+        `, [sourceId]),
+      ])
+      if (soResult.rows.length === 0) { dataRes = { data: null, error: { message: 'Sales order tidak ditemukan.' } } }
+      else {
+        const row = soResult.rows[0]
+        dataRes = { data: {
+          ...row,
+          contacts: row.customer_name ? { name: row.customer_name, phone: row.customer_phone, email: row.customer_email } : null,
+          sales_items: itemsResult.rows.map((item) => ({
+            ...item, products: item.product_name ? { name: item.product_name, sku: item.sku, unit: item.product_unit } : null,
+          })),
+        }, error: null }
+      }
+    } catch (err: any) { dataRes = { data: null, error: { message: err?.message || 'Query error' } } }
+  } else if (sourceType === 'REIMBURSEMENT') {
+    try {
+      const reimParams: unknown[] = [sourceId, orgId]
+      let reimWhere = `r.id = $1 AND r.org_id = $2`
+      if (effectiveBranchId) { reimParams.push(effectiveBranchId); reimWhere += ` AND r.branch_id = $${reimParams.length}` }
+
+      const [reimResult, itemsResult] = await Promise.all([
+        queryPostgres<Record<string, unknown>>(`
+          SELECT * FROM public.reimbursements r WHERE ${reimWhere} LIMIT 1
+        `, reimParams),
+        queryPostgres<Record<string, unknown>>(`
+          SELECT ri.*, a.code AS account_code, a.name AS account_name
+          FROM public.reimbursement_items ri
+          LEFT JOIN public.accounts a ON a.id = ri.category_account_id
+          WHERE ri.reimbursement_id = $1
+        `, [sourceId]),
+      ])
+      if (reimResult.rows.length === 0) { dataRes = { data: null, error: { message: 'Reimbursement tidak ditemukan.' } } }
+      else {
+        dataRes = { data: {
+          ...reimResult.rows[0],
+          items: itemsResult.rows.map((item) => ({
+            ...item, account: item.account_name ? { code: item.account_code, name: item.account_name } : null,
+          })),
+        }, error: null }
+      }
+    } catch (err: any) { dataRes = { data: null, error: { message: err?.message || 'Query error' } } }
   } else if (sourceType === 'LEAVE_REQUEST') {
     let query = (supabase as any)
       .from('leave_requests')
-      .select(`
-        *,
-        branch:branches(id, name, code),
-        employee:employee_id(id, first_name, last_name, nik, job_title, branch_id)
-      `)
+      .select('*, branch:branches(id, name, code)')
       .eq('id', sourceId)
       .eq('org_id', orgId)
 
@@ -428,6 +501,7 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
       query = query.eq('branch_id', effectiveBranchId)
     }
     dataRes = await query.single()
+
   }
 
   if ((dataRes as any).error) return { data: null, error: (dataRes as any).error.message }

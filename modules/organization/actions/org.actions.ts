@@ -11,6 +11,7 @@ import { cookies } from 'next/headers'
 import { cache } from 'react'
 import { seedDemoData, type DemoBusinessType } from '@/modules/demo/actions/demo.actions'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
+import { ensureShadowAuthUserForInternalUser } from '@/lib/auth/internal-auth-shadow.server'
 import {
   ACTIVE_BRANCH_COOKIE,
   ACTIVE_ORG_COOKIE,
@@ -572,6 +573,35 @@ async function createOrganizationRecord(
     const user = await getAuthenticatedUserFromSupabaseOrInternal(supabase)
     if (!user) return { error: 'Tidak terautentikasi' }
 
+    let memberUserId = String(user.id || '').trim()
+    if (internalProvider) {
+      const shadowAuthResult = await ensureShadowAuthUserForInternalUser({
+        internalUserId:
+          typeof user.user_metadata?.internal_user_id === 'string'
+            ? user.user_metadata.internal_user_id
+            : memberUserId,
+        currentAuthUserId:
+          typeof user.user_metadata?.legacy_user_id === 'string'
+            ? user.user_metadata.legacy_user_id
+            : memberUserId,
+        email: user.email,
+        fullName:
+          typeof user.user_metadata?.full_name === 'string'
+            ? user.user_metadata.full_name
+            : null,
+        loginType:
+          typeof user.user_metadata?.login_type === 'string'
+            ? user.user_metadata.login_type
+            : 'owner',
+      })
+
+      if ('error' in shadowAuthResult) {
+        return { error: shadowAuthResult.error }
+      }
+
+      memberUserId = shadowAuthResult.authUserId
+    }
+
     if (internalProvider && !organizationWriteDb) {
       return { error: 'Konfigurasi service role Supabase belum diisi. Lengkapi environment lalu coba lagi.' }
     }
@@ -667,7 +697,7 @@ async function createOrganizationRecord(
 
     const { error: memberError } = await privilegedDb
       .from('org_members')
-      .insert({ org_id: orgId, user_id: user.id, role: 'owner' })
+      .insert({ org_id: orgId, user_id: memberUserId, role: 'owner' })
 
     if (memberError) {
       ;(console as any).error('CreateOrganization: org_members insert failed', memberError)
@@ -716,7 +746,7 @@ async function createOrganizationRecord(
     }
 
     await persistMembershipActiveContext(privilegedDb, {
-      userId: user.id,
+      userId: memberUserId,
       orgId,
       branchId: defaultBranchId,
     })
@@ -1444,7 +1474,7 @@ export async function setActiveOrg(orgId: string) {
 
   if (!user) return { error: 'Tidak terautentikasi.' }
 
-  const { data: membership, error } = await db
+  let { data: membership, error } = await db
     .from('org_members')
     .select('id, org_id, role')
     .eq('user_id', user.id)
@@ -1453,6 +1483,54 @@ export async function setActiveOrg(orgId: string) {
     .maybeSingle()
 
   if (error || !membership) {
+    const { data: childOrg } = await admin
+      .from('organizations')
+      .select('id, parent_org_id')
+      .eq('id', trimmedOrgId)
+      .maybeSingle()
+
+    if (childOrg?.parent_org_id) {
+      const { data: parentMembership } = await admin
+        .from('org_members')
+        .select('id, role')
+        .eq('user_id', user.id)
+        .eq('org_id', childOrg.parent_org_id)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      const parentRole = String(parentMembership?.role || '').toLowerCase()
+      if (parentRole === 'owner' || parentRole === 'admin') {
+        const fallbackRole = parentRole === 'owner' ? 'owner' : 'admin'
+        const { error: upsertError } = await admin
+          .from('org_members')
+          .upsert(
+            {
+              org_id: trimmedOrgId,
+              user_id: user.id,
+              role: fallbackRole,
+              is_active: true,
+            },
+            { onConflict: 'org_id,user_id' }
+          )
+
+        if (upsertError) {
+          return { error: `Gagal menautkan ke organisasi anak: ${upsertError.message || 'unknown error'}` }
+        }
+
+        const { data: refreshedMembership } = await admin
+          .from('org_members')
+          .select('id, org_id, role')
+          .eq('user_id', user.id)
+          .eq('org_id', trimmedOrgId)
+          .eq('is_active', true)
+          .maybeSingle()
+
+        membership = refreshedMembership || membership
+      }
+    }
+  }
+
+  if (!membership) {
     return { error: 'Anda tidak memiliki akses ke organisasi tersebut.' }
   }
 

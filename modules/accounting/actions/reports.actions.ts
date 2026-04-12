@@ -112,33 +112,59 @@ async function getAccountBalancesFromEntries(
 ) {
   if (entryIds.length === 0) return []
 
-  let query = db
-    .from('journal_lines')
-    .select('debit, credit, accounts!inner(id, code, name, type, normal_balance, parent_id, cash_flow_category)')
-    .in('entry_id', entryIds) as any
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  let sql = `
+    SELECT
+      jl.debit,
+      jl.credit,
+      a.id AS account_id,
+      a.code AS account_code,
+      a.name AS account_name,
+      a.type AS account_type,
+      a.normal_balance AS account_normal_balance,
+      a.parent_id AS account_parent_id,
+      a.cash_flow_category AS account_cash_flow_category
+    FROM public.journal_lines jl
+    JOIN public.accounts a ON a.id = jl.account_id
+    WHERE jl.entry_id = ANY($1::uuid[])
+  `
+  const params: any[] = [entryIds]
 
   if (codeFilter && codeFilter.length > 0) {
-    query = query.in('accounts.code', codeFilter)
+    sql += ` AND a.code = ANY($2)`
+    params.push(codeFilter)
   }
 
-  const { data, error } = await query
-  if (error || !Array.isArray(data)) return []
+  let data: any[] = []
+  try {
+    const { rows } = await queryPostgres(sql, params)
+    data = rows
+  } catch (e) {
+    ;(console as any).error(e)
+    return []
+  }
 
   const accountMap: Record<string, any> = {}
   data.forEach((line: any) => {
-    const account = line.accounts
-    if (!account || !account.code) return
+    const code = line.account_code
+    if (!code) return
 
-    if (!accountMap[account.code]) {
-      accountMap[account.code] = {
-        ...account,
+    if (!accountMap[code]) {
+      accountMap[code] = {
+        id: line.account_id,
+        code: line.account_code,
+        name: line.account_name,
+        type: line.account_type,
+        normal_balance: line.account_normal_balance,
+        parent_id: line.account_parent_id,
+        cash_flow_category: line.account_cash_flow_category,
         total_debit: 0,
         total_credit: 0,
       }
     }
 
-    accountMap[account.code].total_debit += Number(line.debit || 0)
-    accountMap[account.code].total_credit += Number(line.credit || 0)
+    accountMap[code].total_debit += Number(line.debit || 0)
+    accountMap[code].total_credit += Number(line.credit || 0)
   })
 
   return Object.values(accountMap)
@@ -553,18 +579,60 @@ async function getJournalLinesForEntries(
 ): Promise<CashFlowLine[]> {
   if (entryIds.length === 0) return []
 
-  let query = db
-    .from('journal_lines')
-    .select('entry_id, debit, credit, accounts!inner(id, code, name, type, normal_balance, parent_id, cash_flow_category), journal_entries!inner(description, notes, reference_type)')
-    .in('entry_id', entryIds) as any
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  let sql = `
+    SELECT
+      jl.entry_id,
+      jl.debit,
+      jl.credit,
+      a.id AS account_id,
+      a.code AS account_code,
+      a.name AS account_name,
+      a.type AS account_type,
+      a.normal_balance AS account_normal_balance,
+      a.parent_id AS account_parent_id,
+      a.cash_flow_category AS account_cash_flow_category,
+      je.description AS je_description,
+      je.notes AS je_notes,
+      je.reference_type AS je_reference_type
+    FROM public.journal_lines jl
+    JOIN public.accounts a ON a.id = jl.account_id
+    JOIN public.journal_entries je ON je.id = jl.entry_id
+    WHERE jl.entry_id = ANY($1::uuid[])
+  `
+  const params: any[] = [entryIds]
 
   if (Array.isArray(cashAccountCodes) && cashAccountCodes.length > 0) {
-    query = query.in('accounts.code', cashAccountCodes)
+    sql += ` AND a.code = ANY($2)`
+    params.push(cashAccountCodes)
   }
 
-  const { data, error } = await query
-  if (error || !Array.isArray(data)) return []
-  return data as CashFlowLine[]
+  try {
+    const { rows } = await queryPostgres<Record<string, unknown>>(sql, params)
+    return rows.map(r => ({
+      entry_id: String(r.entry_id ?? ''),
+      debit: Number(r.debit || 0),
+      credit: Number(r.credit || 0),
+      accounts: r.account_code ? {
+        id: r.account_id ? String(r.account_id) : undefined,
+        code: String(r.account_code),
+        name: r.account_name ? String(r.account_name) : undefined,
+        type: r.account_type ? String(r.account_type) : undefined,
+        normal_balance: r.account_normal_balance ? String(r.account_normal_balance) : undefined,
+        parent_id: r.account_parent_id ? String(r.account_parent_id) : undefined,
+        cash_flow_category: r.account_cash_flow_category as CashFlowCategory | undefined
+      } : null,
+      journal_entries: {
+        description: r.je_description ? String(r.je_description) : undefined,
+        notes: r.je_notes ? String(r.je_notes) : undefined,
+        reference_type: r.je_reference_type ? String(r.je_reference_type) : undefined,
+      }
+    }))
+  } catch (err) {
+    ;(console as any).error('[getJournalLinesForEntries]', err)
+    return []
+  }
 }
 
 function summarizeCashFlowFromLines(lines: CashFlowLine[], cashAccountCodes: string[]) {
@@ -654,21 +722,58 @@ export async function getGeneralLedger(orgId: string, branchId?: BranchFilter, c
   const entryIds = await getPostedEntryIds(db, orgId, { branchId, consolidated })
   if (entryIds.length === 0) return []
 
-  const { data, error } = await db
-    .from('journal_entries')
-    .select(`
-      *,
-      journal_lines (
-        *,
-        accounts (code, name, type)
-      )
-    `)
-    .in('id', entryIds)
-    .order('entry_date', { ascending: true })
+  const { queryPostgres } = await import('@/lib/db/postgres')
 
-  if (error || !data) return []
-  return data
+  let entryRows: any[] = []
+  try {
+    const result = await queryPostgres<Record<string, unknown>>(`
+      SELECT *
+      FROM   public.journal_entries
+      WHERE  id = ANY($1::uuid[])
+      ORDER  BY entry_date ASC
+    `, [entryIds])
+    entryRows = result.rows
+  } catch (err) {
+    ;(console as any).error('[getGeneralLedger] raw SQL error:', err)
+    return []
+  }
+
+  // Fetch journal lines with account info
+  const linesByEntryId: Record<string, any[]> = {}
+  if (entryRows.length > 0) {
+    try {
+      const linesResult = await queryPostgres<Record<string, unknown>>(`
+        SELECT
+          jl.*,
+          a.code AS account_code,
+          a.name AS account_name,
+          a.type AS account_type
+        FROM   public.journal_lines jl
+        LEFT JOIN public.accounts a ON a.id = jl.account_id
+        WHERE  jl.entry_id = ANY($1::uuid[])
+      `, [entryIds])
+
+      for (const line of linesResult.rows) {
+        const eid = String(line.entry_id ?? '')
+        if (!linesByEntryId[eid]) linesByEntryId[eid] = []
+        linesByEntryId[eid].push({
+          ...line,
+          accounts: line.account_name
+            ? { code: line.account_code, name: line.account_name, type: line.account_type }
+            : null,
+        })
+      }
+    } catch (err) {
+      ;(console as any).error('[getGeneralLedger] lines SQL error:', err)
+    }
+  }
+
+  return entryRows.map((row) => ({
+    ...row,
+    journal_lines: linesByEntryId[String(row.id ?? '')] ?? []
+  }))
 }
+
 
 export async function getBalanceSheet(
   orgId: string,

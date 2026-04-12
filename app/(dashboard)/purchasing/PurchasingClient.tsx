@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Plus, 
@@ -24,7 +24,7 @@ import {
   Pencil
 } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
-import { createPurchaseEntry, receivePurchase, voidPurchase, createPurchasePayment, createPurchaseReturn } from '@/modules/purchasing/actions/purchasing.actions'
+import { createPurchaseEntry, receivePurchase, voidPurchase, createPurchasePayment, createPurchaseReturn, getPurchaseById } from '@/modules/purchasing/actions/purchasing.actions'
 import { createContact } from '@/modules/contacts/actions/contact.actions'
 import type { Product } from '@/types/database.types'
 
@@ -47,7 +47,9 @@ export default function PurchasingClient({
   coa,
   purchaseRequests = [],
 }: any) {
+   const router = useRouter()
    const [activeTab, setActiveTab] = useState<'PURCHASES' | 'REQUESTS'>('PURCHASES')
+   const [purchaseRows, setPurchaseRows] = useState<any[]>(() => purchases || [])
    const orgSettings = org?.settings || {}
    const companyProfile = {
      name: orgSettings.brand_name || orgName || 'Perusahaan',
@@ -64,13 +66,17 @@ export default function PurchasingClient({
    const payId = searchParams.get('pay')
 
    useEffect(() => {
-     if (payId && purchases.length > 0) {
-       const purchase = purchases.find((p: any) => p.id === payId)
+     if (payId && purchaseRows.length > 0) {
+       const purchase = purchaseRows.find((p: any) => p.id === payId)
        if (purchase) {
          handleOpenPayment(purchase)
        }
      }
-   }, [payId, purchases])
+   }, [payId, purchaseRows])
+
+   useEffect(() => {
+     setPurchaseRows(purchases || [])
+   }, [purchases])
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -405,13 +411,26 @@ export default function PurchasingClient({
 
       // Update linked purchase requests to ORDERED only after publish
       if (!isDraftSave) {
-        for (const line of usableLines) {
-          if ((line as any).requestId) {
-            await updatePurchaseRequestStatus(orgId, (line as any).requestId, 'ORDERED', activeBranchId || undefined)
-          }
+        await Promise.all(
+          usableLines
+            .filter((line) => Boolean((line as any).requestId))
+            .map((line) =>
+              updatePurchaseRequestStatus(orgId, (line as any).requestId, 'ORDERED', activeBranchId || undefined)
+            )
+        )
+      }
+
+      if (res.purchaseId) {
+        const latestPurchase = await getPurchaseById(orgId, res.purchaseId)
+        if (latestPurchase) {
+          setPurchaseRows((current) => {
+            const next = current.filter((purchase) => purchase.id !== latestPurchase.id)
+            return [latestPurchase, ...next]
+          })
         }
       }
 
+      router.refresh()
       setTimeout(() => setSuccess(null), 3500)
     }
     setLoading(false)
@@ -583,14 +602,40 @@ export default function PurchasingClient({
     return parts.join(', ')
   }
 
+  // Normalize purchase date to YYYY-MM so mixed payload types don't crash SSR.
+  const getMonthKey = (value: unknown): string => {
+    if (!value) return ''
+
+    if (typeof value === 'string') {
+      if (/^\d{4}-\d{2}/.test(value)) return value.slice(0, 7)
+      const parsed = new Date(value)
+      return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 7)
+    }
+
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? '' : value.toISOString().slice(0, 7)
+    }
+
+    if (typeof value === 'number') {
+      const parsed = new Date(value)
+      return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 7)
+    }
+
+    return ''
+  }
+
+  const currentMonthKey = new Date().toISOString().slice(0, 7)
+
   const stats = {
-    totalMonth: purchases.filter((p: any) => p.status !== 'VOIDED' && p.purchase_date.startsWith(new Date().toISOString().slice(0, 7))).reduce((sum: number, p: any) => sum + p.grand_total, 0),
-    totalDebt: purchases.filter((p: any) => p.status === 'RECEIVED' && p.payment_status !== 'PAID').reduce((sum: number, p: any) => {
-      const paid = (p.purchase_payments || []).reduce((s: number, pay: any) => s + (Number(pay.amount) + Number(pay.discount_amount)), 0)
-      const returned = (p.purchase_returns || []).reduce((s: number, ret: any) => s + Number(ret.total_amount), 0)
-      return sum + (p.grand_total - paid - returned)
+    totalMonth: purchaseRows
+      .filter((p: any) => p.status !== 'VOIDED' && getMonthKey(p.purchase_date) === currentMonthKey)
+      .reduce((sum: number, p: any) => sum + Number(p.grand_total || 0), 0),
+    totalDebt: purchaseRows.filter((p: any) => p.status === 'RECEIVED' && p.payment_status !== 'PAID').reduce((sum: number, p: any) => {
+      const paid = (p.purchase_payments || []).reduce((s: number, pay: any) => s + (Number(pay.amount || 0) + Number(pay.discount_amount || 0)), 0)
+      const returned = (p.purchase_returns || []).reduce((s: number, ret: any) => s + Number(ret.total_amount || 0), 0)
+      return sum + (Number(p.grand_total || 0) - paid - returned)
     }, 0),
-    pendingOrders: purchases.filter((p: any) => p.status === 'ORDERED' || p.status === 'DRAFT').length,
+    pendingOrders: purchaseRows.filter((p: any) => p.status === 'ORDERED' || p.status === 'DRAFT').length,
     vendorCount: vendors.length
   }
 
@@ -702,14 +747,14 @@ export default function PurchasingClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {purchases.length === 0 ? (
+              {purchaseRows.length === 0 ? (
                 <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Belum ada data pembelian.</td></tr>
               ) : (
-                purchases.map((p: any) => (
+                purchaseRows.map((p: any) => (
                   <tr key={p.id} className="group hover:bg-slate-50 transition-colors">
                     <td className="px-8 py-6">
                        <div className="text-xs font-black text-rose-600 tracking-tighter">{p.purchase_number}</div>
-                       <div className="text-[10px] font-bold text-slate-400 mt-1">{p.purchase_date}</div>
+                       <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(p.purchase_date)}</div>
                     </td>
                     <td className="px-8 py-6">
                        <div className="text-sm font-bold text-slate-900">{p.contacts?.name || 'Unknown Vendor'}</div>

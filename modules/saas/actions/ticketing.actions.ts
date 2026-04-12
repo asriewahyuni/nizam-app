@@ -146,11 +146,32 @@ export async function getOperatorTicketingSnapshot(limit = 120): Promise<Operato
   const db = admin as unknown as LooseDb
 
   const [ticketResult, updatesResult] = await Promise.all([
-    db
-      .from('support_tickets')
-      .select('id, org_id, ticket_no, title, description, severity, status, found_in_menu, found_during, found_at, screenshot_url, created_at, organization:organizations(name)')
-      .order('created_at', { ascending: false })
-      .limit(limit),
+    // Tickets: org name via raw SQL JOIN (organization:organizations alias won't resolve via FK cache)
+    (async () => {
+      try {
+        const { queryPostgres } = await import('@/lib/db/postgres')
+        const result = await queryPostgres<Record<string, unknown>>(`
+          SELECT
+            t.id, t.org_id, t.ticket_no, t.title, t.description,
+            t.severity, t.status, t.found_in_menu, t.found_during,
+            t.found_at, t.screenshot_url, t.created_at,
+            o.name AS org_name
+          FROM   public.support_tickets t
+          LEFT JOIN public.organizations o ON o.id = t.org_id
+          ORDER  BY t.created_at DESC
+          LIMIT  $1
+        `, [limit])
+        return {
+          data: result.rows.map((row) => ({
+            ...row,
+            organization: row.org_name ? { name: row.org_name } : null,
+          })) as OperatorSupportTicketRecord[],
+          error: null,
+        }
+      } catch (err: any) {
+        return { data: [] as OperatorSupportTicketRecord[], error: err }
+      }
+    })(),
     db
       .from('support_ticket_updates')
       .select('id, ticket_id, org_id, update_title, update_body, status_after, is_public, created_at, updated_by_user_id')
@@ -158,11 +179,12 @@ export async function getOperatorTicketingSnapshot(limit = 120): Promise<Operato
       .limit(limit * 2),
   ])
 
-  const tickets = ticketResult.error ? [] : ((ticketResult.data || []) as OperatorSupportTicketRecord[])
+  const tickets = ticketResult.error ? [] : (ticketResult.data || [])
   const updates = updatesResult.error ? [] : ((updatesResult.data || []) as OperatorSupportTicketUpdateRecord[])
 
   return { tickets, updates }
 }
+
 
 export async function createSupportTicket(formData: FormData): Promise<TicketMutationResult> {
   const orgData = await getActiveOrg()

@@ -2,7 +2,6 @@ import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypt
 import { cookies, headers } from 'next/headers'
 import { queryPostgres } from '@/lib/db/postgres'
 import { INTERNAL_AUTH_SESSION_COOKIE, INTERNAL_AUTH_SESSION_MAX_AGE } from './internal-auth.shared'
-import { getSupabasePublicConfig } from '@/lib/supabase/config'
 
 const SCRYPT_KEY_LENGTH = 64
 const SCRYPT_SALT_BYTES = 16
@@ -61,11 +60,6 @@ function normalizeEmail(value: unknown) {
 function normalizeNik(value: unknown) {
   const normalized = normalizeInput(value).toUpperCase()
   return normalized || null
-}
-
-function isLegacySupabasePasswordFallbackEnabled() {
-  const value = normalizeInput(process.env.INTERNAL_AUTH_SUPABASE_PASSWORD_FALLBACK || 'true').toLowerCase()
-  return value !== 'false' && value !== '0' && value !== 'off'
 }
 
 function getErrorMessage(error: unknown) {
@@ -202,60 +196,6 @@ function verifyScryptPassword(password: string, storedHash: string) {
   return timingSafeEqual(actualHash, expectedHash)
 }
 
-let legacySupabaseAuthClientPromise: Promise<{
-  auth: {
-    signInWithPassword: (input: { email: string; password: string }) => Promise<{
-      data: { user: { id: string } | null }
-      error: { message?: string } | null
-    }>
-    signOut: () => Promise<unknown>
-  }
-}> | null = null
-
-async function getLegacySupabaseAuthClient() {
-  if (!legacySupabaseAuthClientPromise) {
-    legacySupabaseAuthClientPromise = (async () => {
-      const { createClient } = await import('@supabase/supabase-js')
-      const { url, anonKey } = getSupabasePublicConfig()
-      return createClient(url, anonKey, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-        },
-      })
-    })()
-  }
-
-  return legacySupabaseAuthClientPromise
-}
-
-async function verifyPasswordWithLegacySupabaseAuth(email: string | null, password: string) {
-  const normalizedEmail = normalizeEmail(email)
-  if (!normalizedEmail || !password || !isLegacySupabasePasswordFallbackEnabled()) return false
-
-  try {
-    const supabase = await getLegacySupabaseAuthClient()
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password,
-    })
-
-    if (error || !data?.user?.id) return false
-
-    try {
-      await supabase.auth.signOut()
-    } catch {
-      // no-op: this temporary bridge client is stateless
-    }
-
-    return true
-  } catch (error) {
-    console.warn('Legacy Supabase auth fallback unavailable:', getErrorMessage(error))
-    return false
-  }
-}
-
 function toInternalSessionUser(row: InternalAuthSessionRow): InternalAuthSessionUser {
   const sessionUserId = normalizeInput(row.legacy_user_id) || row.user_id
   return {
@@ -355,6 +295,42 @@ export async function createInternalAuthSessionByUserId(internalUserId: string) 
     success: true as const,
     sessionId,
     userId: normalizedUserId,
+  }
+}
+
+export async function setInternalAuthLegacyUserId(input: {
+  internalUserId: string
+  legacyUserId: string
+}) {
+  const normalizedInternalUserId = normalizeUuid(input.internalUserId)
+  const normalizedLegacyUserId = normalizeUuid(input.legacyUserId)
+
+  if (!normalizedInternalUserId || !normalizedLegacyUserId) {
+    return { error: 'Identitas user legacy internal tidak valid.' as const }
+  }
+
+  try {
+    await queryPostgres(
+      `
+        update public.internal_auth_users
+        set
+          legacy_user_id = $2::uuid,
+          updated_at = now()
+        where id = $1::uuid
+      `,
+      [normalizedInternalUserId, normalizedLegacyUserId]
+    )
+
+    return {
+      success: true as const,
+      internalUserId: normalizedInternalUserId,
+      legacyUserId: normalizedLegacyUserId,
+    }
+  } catch (error) {
+    console.error('setInternalAuthLegacyUserId failed:', getErrorMessage(error))
+    return {
+      error: resolveInternalAuthDatabaseError(error, 'Gagal menautkan akun internal ke auth user legacy.'),
+    }
   }
 }
 
@@ -540,6 +516,33 @@ export async function createInternalAuthUser(input: {
   const passwordHash = hashPasswordWithScrypt(normalizedPassword)
 
   try {
+    // Tentukan legacy_user_id agar org_members.user_id langsung cocok saat query.
+    // Priority: (1) input legacyUserId, (2) auth.users existing by email, (3) buat entry baru.
+    let resolvedLegacyUserId = normalizeUuid(normalizedLegacyUserId)
+
+    if (!resolvedLegacyUserId && normalizedEmail) {
+      const authUserLookup = await queryPostgres<{ id: string }>(
+        `SELECT id::text as id FROM auth.users WHERE lower(email) = $1::text LIMIT 1`,
+        [normalizedEmail.toLowerCase()]
+      )
+      if (authUserLookup.rows[0]?.id) {
+        resolvedLegacyUserId = normalizeUuid(authUserLookup.rows[0].id)
+      }
+    }
+
+    if (!resolvedLegacyUserId) {
+      const newAuthUserId = crypto.randomUUID()
+      await queryPostgres(
+        `
+          INSERT INTO auth.users (id, email, aud, role, created_at, updated_at)
+          VALUES ($1::uuid, $2::text, 'authenticated', 'authenticated', now(), now())
+          ON CONFLICT (id) DO NOTHING
+        `,
+        [newAuthUserId, normalizedEmail]
+      )
+      resolvedLegacyUserId = newAuthUserId
+    }
+
     const result = await queryPostgres<{ id: string }>(
       `
         insert into public.internal_auth_users (
@@ -563,7 +566,7 @@ export async function createInternalAuthUser(input: {
         returning id
       `,
       [
-        normalizedLegacyUserId,
+        resolvedLegacyUserId,
         normalizedEmail,
         normalizedNik,
         passwordHash,
@@ -577,11 +580,14 @@ export async function createInternalAuthUser(input: {
       return { error: 'Gagal membuat user internal.' as const }
     }
 
+    // Session dibuat dengan internal user id; toInternalSessionUser() akan menggunakan
+    // legacy_user_id sebagai user.id — cocok dengan org_members.user_id.
     await createSession(userId)
 
     return {
       success: true as const,
-      userId,
+      userId: resolvedLegacyUserId ?? userId,
+      internalUserId: userId,
       email: normalizedEmail,
       nik: normalizedNik,
     }
@@ -592,7 +598,6 @@ export async function createInternalAuthUser(input: {
     }
   }
 }
-
 export async function signInWithInternalAuth(input: {
   email?: string | null
   nik?: string | null
@@ -686,17 +691,9 @@ export async function signInWithInternalAuth(input: {
     if (candidates.length === 0) return { error: 'Email/NIK atau password salah.' as const }
 
     const passwordMatched: InternalCredentialRow[] = []
-    const passwordMatchedViaLegacyFallback = new Set<string>()
     for (const candidate of candidates) {
       if (verifyScryptPassword(password, candidate.password_hash)) {
         passwordMatched.push(candidate)
-        continue
-      }
-
-      const legacyPasswordMatched = await verifyPasswordWithLegacySupabaseAuth(candidate.login_email, password)
-      if (legacyPasswordMatched) {
-        passwordMatched.push(candidate)
-        passwordMatchedViaLegacyFallback.add(candidate.id)
       }
     }
     if (passwordMatched.length === 0) return { error: 'Email/NIK atau password salah.' as const }
@@ -724,19 +721,6 @@ export async function signInWithInternalAuth(input: {
     }
 
     if (!matched) return { error: 'Email/NIK atau password salah.' as const }
-
-    if (passwordMatchedViaLegacyFallback.has(matched.id)) {
-      await queryPostgres(
-        `
-          update public.internal_auth_users
-          set
-            password_hash = $2::text,
-            updated_at = now()
-          where id = $1::uuid
-        `,
-        [matched.id, hashPasswordWithScrypt(password)]
-      )
-    }
 
     const sessionId = await createSession(matched.id)
     await queryPostgres(
@@ -803,7 +787,8 @@ export async function getInternalAuthSession(): Promise<InternalAuthSession | nu
 
   const row = result.rows[0]
   if (!row) {
-    cookieStore.delete(INTERNAL_AUTH_SESSION_COOKIE)
+    // Session expired or not found — return null without touching cookies
+    // (cookies can only be modified in Server Actions, not Server Components)
     return null
   }
 

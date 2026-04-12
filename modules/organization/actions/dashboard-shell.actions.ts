@@ -13,7 +13,7 @@ import { getResetRequestsCount } from '@/modules/organization/actions/hris.actio
 import { getUnpostedJournalsCount } from '@/modules/accounting/actions/journal.actions'
 import { getPendingPurchaseRequestsCount } from '@/modules/purchasing/actions/purchasing.actions'
 import { getPendingCoaRequestCount } from '@/modules/accounting/actions/coa-request.actions'
-import { getBranches, getMyOrganizations } from '@/modules/organization/actions/org.actions'
+import { getBranches, getChildOrgs, getMyOrganizations } from '@/modules/organization/actions/org.actions'
 import type { AccessibleOrganization, BranchSummary } from '@/modules/organization/lib/org-context'
 
 export type SidebarChromeMetrics = {
@@ -81,13 +81,34 @@ export async function getHeaderTokenSummary(orgId: string): Promise<AiTokenHeade
 }
 
 export async function getHeaderNavigationData(orgId: string): Promise<HeaderNavigationData> {
-  const [organizations, branches] = await Promise.all([
+  const [organizations, branches, childOrgs] = await Promise.all([
     resolveWithFallback('header organizations', [], () => getMyOrganizations()),
     resolveWithFallback('header branches', [], () => getBranches(orgId)),
+    resolveWithFallback('header child orgs', [], () => getChildOrgs(orgId)),
   ])
 
+  const knownOrgIds = new Set(organizations.map((membership) => membership.orgId))
+  const childOrganizations: AccessibleOrganization[] = childOrgs
+    .filter((child: { id?: string | null }) => Boolean(child?.id) && !knownOrgIds.has(String(child.id)))
+    .map((child: any) => ({
+      orgId: String(child.id),
+      role: 'admin',
+      roleId: null,
+      joinedAt: child.created_at || new Date(0).toISOString(),
+      org: {
+        id: String(child.id),
+        name: String(child.name || 'Organisasi'),
+        slug: String(child.slug || ''),
+        logo_url: child.logo_url ?? null,
+        settings: child.settings ?? {},
+        is_active: Boolean(child.is_active ?? true),
+        parent_org_id: orgId,
+        parent_org_name: null,
+      },
+    }))
+
   return {
-    organizations,
+    organizations: [...organizations, ...childOrganizations],
     branches,
   }
 }

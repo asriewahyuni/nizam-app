@@ -12,6 +12,7 @@
 import { revalidatePath } from 'next/cache'
 import type { Account, AccountType, NormalBalance, AccountBalance } from '@/types/database.types'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { isInternalAuthProvider } from '@/lib/auth/provider'
 
 type MirrorableAccount = Pick<
   Account,
@@ -496,10 +497,26 @@ export async function checkCanManageCoA(orgId: string): Promise<{
   isParentOrg: boolean
 }> {
   const supabase = await createClient()
+  const { data: orgRow, error: orgError } = await (supabase as any)
+    .from('organizations')
+    .select('parent_org_id')
+    .eq('id', orgId)
+    .maybeSingle()
+
+  const parentOrgId = String((orgRow as { parent_org_id?: string | null } | null)?.parent_org_id || '').trim() || null
+  const isParentOrgByTree = !parentOrgId
+
+  if (isInternalAuthProvider() && orgRow && !orgError) {
+    return {
+      canManageDirect: isParentOrgByTree,
+      isParentOrg: isParentOrgByTree,
+    }
+  }
+
   const rpc = (supabase as any)?.rpc
 
   if (typeof rpc !== 'function') {
-    return { canManageDirect: true, isParentOrg: true }
+    return { canManageDirect: isParentOrgByTree, isParentOrg: isParentOrgByTree }
   }
 
   const [manageResult, parentResult] = await Promise.all([
@@ -507,9 +524,47 @@ export async function checkCanManageCoA(orgId: string): Promise<{
     (supabase as any).rpc('is_main_organization', { p_org_id: orgId }),
   ])
 
+  const hasManageBoolean = typeof manageResult?.data === 'boolean'
+  const hasParentBoolean = typeof parentResult?.data === 'boolean'
+
+  if (hasManageBoolean && hasParentBoolean) {
+    return {
+      canManageDirect: manageResult.data === true,
+      isParentOrg: parentResult.data === true,
+    }
+  }
+
+  const fallbackIsParentOrg = isParentOrgByTree
+
+  if (orgError || !orgRow) {
+    ;(console as any).warn('checkCanManageCoA fallback warning:', {
+      orgId,
+      manageRpcError: manageResult?.error || null,
+      parentRpcError: parentResult?.error || null,
+      orgLookupError: orgError || null,
+    })
+    return {
+      canManageDirect: manageResult?.data === true,
+      isParentOrg: parentResult?.data === true,
+    }
+  }
+
+  // Internal auth memakai service role; fallback parent check lebih stabil bila RPC governance belum sinkron.
+  const fallbackCanManageDirect = isInternalAuthProvider()
+    ? fallbackIsParentOrg
+    : (hasManageBoolean ? manageResult.data === true : false)
+
+  ;(console as any).warn('checkCanManageCoA using fallback:', {
+    orgId,
+    isInternal: isInternalAuthProvider(),
+    fallbackIsParentOrg,
+    manageRpcError: manageResult?.error || null,
+    parentRpcError: parentResult?.error || null,
+  })
+
   return {
-    canManageDirect: manageResult.data === true,
-    isParentOrg: parentResult.data === true,
+    canManageDirect: fallbackCanManageDirect,
+    isParentOrg: fallbackIsParentOrg,
   }
 }
 

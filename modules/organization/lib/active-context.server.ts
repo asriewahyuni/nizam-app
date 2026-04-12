@@ -1,4 +1,5 @@
 import { ACTIVE_ORG_COOKIE } from './org-context'
+import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 
 const DEMO_EMAIL = 'demo@nizam.app'
 const DEFAULT_ACTIVE_MEMBERSHIP_SELECT =
@@ -20,6 +21,15 @@ type PersistMembershipActiveContextInput = {
   branchId: string | null
 }
 
+type MembershipPreferenceRow = {
+  org_id: string | null
+}
+
+type OrganizationParentRow = {
+  id: string | null
+  parent_org_id: string | null
+}
+
 async function findMembershipByOrg(db: any, userId: string, orgId: string, select: string) {
   const trimmedOrgId = String(orgId || '').trim()
   if (!trimmedOrgId) return null
@@ -33,6 +43,69 @@ async function findMembershipByOrg(db: any, userId: string, orgId: string, selec
     .maybeSingle()
 
   return data
+}
+
+export async function resolvePlatformAdminParentOrgId(
+  db: any,
+  userId: string,
+  preferredOrgId?: string | null
+) {
+  const trimmedUserId = String(userId || '').trim()
+  if (!trimmedUserId) return null
+
+  const normalizedPreferredOrgId = String(preferredOrgId || '').trim() || null
+  const { data: membershipRows, error: membershipsError } = await db
+    .from('org_members')
+    .select('org_id')
+    .eq('user_id', trimmedUserId)
+    .eq('is_active', true)
+    .order('last_active_at', { ascending: false, nullsFirst: false })
+    .order('joined_at', { ascending: true })
+    .order('org_id', { ascending: true })
+
+  if (membershipsError) {
+    console.error('resolvePlatformAdminParentOrgId memberships Error:', membershipsError)
+    return null
+  }
+
+  const membershipOrgIds = Array.from(
+    new Set(
+      (Array.isArray(membershipRows) ? (membershipRows as MembershipPreferenceRow[]) : [])
+        .map((membership) => String(membership?.org_id || '').trim())
+        .filter(Boolean)
+    )
+  )
+
+  if (membershipOrgIds.length === 0) {
+    return null
+  }
+
+  const { data: orgRows, error: organizationsError } = await db
+    .from('organizations')
+    .select('id, parent_org_id')
+    .in('id', membershipOrgIds)
+
+  if (organizationsError) {
+    console.error('resolvePlatformAdminParentOrgId organizations Error:', organizationsError)
+    return null
+  }
+
+  const parentOrgIds = new Set(
+    (Array.isArray(orgRows) ? (orgRows as OrganizationParentRow[]) : [])
+      .filter((org) => !String(org?.parent_org_id || '').trim())
+      .map((org) => String(org?.id || '').trim())
+      .filter(Boolean)
+  )
+
+  if (parentOrgIds.size === 0) {
+    return null
+  }
+
+  if (normalizedPreferredOrgId && parentOrgIds.has(normalizedPreferredOrgId)) {
+    return normalizedPreferredOrgId
+  }
+
+  return membershipOrgIds.find((orgId) => parentOrgIds.has(orgId)) || null
 }
 
 export async function getStoredActiveOrgIdForUser(
@@ -76,8 +149,8 @@ export async function getStoredActiveOrgIdForUser(
 
 /**
  * Resolves the active org membership with this priority:
- * 1. demo org cookie, 2. active org cookie, 3. persisted DB preference,
- * 4. oldest active membership as a legacy fallback.
+ * 1. demo org cookie, 2. parent org for platform admin,
+ * 3. active org cookie, 4. persisted DB preference, 5. oldest active membership.
  */
 export async function resolveActiveMembership(
   db: any,
@@ -86,6 +159,7 @@ export async function resolveActiveMembership(
   select: string = DEFAULT_ACTIVE_MEMBERSHIP_SELECT
 ) {
   const isDemoUser = user.email === DEMO_EMAIL || user.user_metadata?.is_demo
+  const isPlatformAdmin = isPlatformAdminEmail(user.email)
   const demoOrgId = cookieStore.get('nizam_demo_org_id')?.value
   const activeOrgIdCookie = cookieStore.get(ACTIVE_ORG_COOKIE)?.value
 
@@ -93,6 +167,13 @@ export async function resolveActiveMembership(
 
   if (isDemoUser && demoOrgId) {
     memberData = await findMembershipByOrg(db, user.id, demoOrgId, select)
+  }
+
+  if (!memberData && isPlatformAdmin) {
+    const parentOrgId = await resolvePlatformAdminParentOrgId(db, user.id, activeOrgIdCookie)
+    if (parentOrgId) {
+      memberData = await findMembershipByOrg(db, user.id, parentOrgId, select)
+    }
   }
 
   if (!memberData && activeOrgIdCookie) {

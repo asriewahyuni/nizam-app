@@ -429,54 +429,89 @@ export async function getJournalEntries(
   orgId: string,
   filters?: {
     status?: string
-    branch_id?: string // Filter by branch
+    branch_id?: string
     fromDate?: string
     toDate?: string
     limit?: number
   }
 ) {
-  const supabase = await createClient()
+  const { queryPostgres } = await import('@/lib/db/postgres')
 
-  let query = (supabase as any)
-    .from('journal_entries')
-    .select(`
-      *,
-      journal_lines (
-        *,
-        accounts (code, name, type)
-      )
-    `)
-    .eq('org_id', orgId)
-    .order('entry_date', { ascending: false })
-    .order('created_at', { ascending: false })
-
-  // Filter out the soft-deleted ones acting as hard-deletes
-  query = query.or('void_reason.is.null,void_reason.neq.HARD_DELETE_HIDDEN')
+  // Build parameterized query dynamically
+  const params: unknown[] = [orgId]
+  const whereClauses: string[] = [
+    `je.org_id = $1`,
+    `(je.void_reason IS NULL OR je.void_reason <> 'HARD_DELETE_HIDDEN')`,
+  ]
 
   if (filters?.status) {
-    query = query.eq('status', filters.status)
+    whereClauses.push(`je.status = $${params.push(filters.status)}`)
   }
   if (filters?.branch_id) {
-    query = query.eq('branch_id', filters.branch_id)
+    whereClauses.push(`je.branch_id = $${params.push(filters.branch_id)}`)
   }
   if (filters?.fromDate) {
-    query = query.gte('entry_date', filters.fromDate)
+    whereClauses.push(`je.entry_date >= $${params.push(filters.fromDate)}`)
   }
   if (filters?.toDate) {
-    query = query.lte('entry_date', filters.toDate)
+    whereClauses.push(`je.entry_date <= $${params.push(filters.toDate)}`)
   }
 
-  query = query.limit(filters?.limit || 50)
+  const limit = filters?.limit || 50
+  params.push(limit)
 
-  const { data, error } = await query
-  if (error || !data) return []
+  let entryRows: any[] = []
+  try {
+    const result = await queryPostgres<Record<string, unknown>>(`
+      SELECT je.*
+      FROM   public.journal_entries je
+      WHERE  ${whereClauses.join(' AND ')}
+      ORDER  BY je.entry_date DESC, je.created_at DESC
+      LIMIT  $${params.length}
+    `, params)
+    entryRows = result.rows
+  } catch (err) {
+    ;(console as any).error('[getJournalEntries] raw SQL error:', err)
+    return []
+  }
 
-  // Sort helper: Debit > 0 appears first, then Credit > 0
-  data.forEach((entry: any) => {
-    if (entry.journal_lines) {
-      entry.journal_lines.sort((a: any, b: any) => (b.debit || 0) - (a.debit || 0))
+  if (entryRows.length === 0) return []
+
+  // Fetch journal lines with account info in one query
+  const entryIds = entryRows.map((r) => r.id)
+  const linesByEntryId: Record<string, any[]> = {}
+  try {
+    const linesResult = await queryPostgres<Record<string, unknown>>(`
+      SELECT
+        jl.*,
+        a.code AS account_code,
+        a.name AS account_name,
+        a.type AS account_type
+      FROM   public.journal_lines jl
+      LEFT JOIN public.accounts a ON a.id = jl.account_id
+      WHERE  jl.entry_id = ANY($1::uuid[])
+    `, [entryIds])
+
+    for (const line of linesResult.rows) {
+      const eid = String(line.entry_id ?? '')
+      if (!linesByEntryId[eid]) linesByEntryId[eid] = []
+      linesByEntryId[eid].push({
+        ...line,
+        // UI expects line.accounts?.code, line.accounts?.name, line.accounts?.type
+        accounts: line.account_name
+          ? { code: line.account_code, name: line.account_name, type: line.account_type }
+          : null,
+      })
     }
-  })
+  } catch (err) {
+    ;(console as any).error('[getJournalEntries] lines SQL error:', err)
+  }
 
-  return data
+  return entryRows.map((row) => {
+    const eid = String(row.id ?? '')
+    const lines = (linesByEntryId[eid] ?? [])
+      .sort((a: any, b: any) => (Number(b.debit) || 0) - (Number(a.debit) || 0))
+    return { ...row, journal_lines: lines }
+  })
 }
+

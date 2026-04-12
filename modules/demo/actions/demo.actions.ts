@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { createInternalAuthUser, signInWithInternalAuth } from '@/lib/auth/internal-auth.server'
 import { seedInitialCoA } from '@/modules/accounting/actions/coa.actions'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -44,47 +45,36 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
   const adminClient = await createAdminClient()
 
   // 1. Sign up or sign in the demo user
-  const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+  const signInResult = await signInWithInternalAuth({
     email: DEMO_EMAIL,
     password: DEMO_PASSWORD,
   })
 
   let userId: string
-  let token: string
 
-  if (signInErr) {
+  if (signInResult.error) {
     // Demo user doesn't exist yet — create it
-    const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+    const signUpResult = await createInternalAuthUser({
       email: DEMO_EMAIL,
       password: DEMO_PASSWORD,
-      options: {
-        data: { full_name: 'Demo User', is_demo: true }
-      }
+      fullName: 'Demo User',
     })
 
-    if (signUpErr || !signUpData.user) {
-      (console as any).error('Demo signup failed:', signUpErr)
+    if (signUpResult.error || !signUpResult.userId) {
+      (console as any).error('Demo signup failed:', signUpResult.error)
       redirect('/login?error=' + encodeURIComponent('Gagal membuat akun demo. Coba lagi.'))
     }
-    userId = signUpData.user.id
-    token = signUpData.session?.access_token || ''
+    userId = signUpResult.userId
   } else {
-    userId = signInData.user!.id
-    token = signInData.session?.access_token || ''
+    userId = signInResult.userId
   }
 
   // ─────────────────────────────────────────────────────────────────
-  // CRITICAL FIX: Next.js Server Actions race condition.
-  // The token is written to cookies, but it doesn't immediately propagate 
-  // to RLS `auth.uid()` on the current server client instance.
-  // We explicitly instantiate a client with the new Bearer token:
-  const { createClient: createBrowserClient } = await import('@supabase/supabase-js')
-  const authedClient = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: `Bearer ${token}` } } }
-  )
+  // Karena kita sekarang menggunakan Railway PostgreSQL (PostgresNativeClient),
+  // kita tidak lagi dibatasi oleh RLS untuk operasi sistemis seperti ini.
+  // Gunakan adminClient yang mengakses DB langsung.
   // ─────────────────────────────────────────────────────────────────
+  const authedClient = adminClient as any
 
   // 2. Delete ALL previous demo orgs for this user — always start fresh
   const { data: existingMemberships } = await authedClient
@@ -182,14 +172,9 @@ export async function signOutDemo() {
   const { data: { session } } = await supabase.auth.getSession()
   const user = session?.user
 
-  if (user && (user.email === DEMO_EMAIL || user.user_metadata?.is_demo)) {
-    // Use authed client with Bearer token to bypass RLS for deletes
-    const { createClient: createBrowserClient } = await import('@supabase/supabase-js')
-    const authedClient = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { global: { headers: { Authorization: `Bearer ${session!.access_token}` } } }
-    )
+  if (user && (user.email === DEMO_EMAIL || (user.user_metadata as any)?.is_demo)) {
+    // Karena Railway dipakai, kita bisa langsung nge-delete lewat adminClient
+    const authedClient = (await createAdminClient()) as any
 
     if (demoOrgId) {
       // Delete specifically THE session org (cascade delete removes all related data)

@@ -141,8 +141,11 @@ export function CashClient({
   // Find currently active node to supply dynamic GL accounts
   const activePlacementNode = placementNodes.find(n => n.orgId === targetOrgId)
   const dynamicGlAccounts = activePlacementNode ? activePlacementNode.accounts : bankGlAccounts
+  const canWriteCash = Boolean(activeBranchId)
   const canUseHoldingView = canManageDirect && isParentOrg
   const isHoldingView = cashViewMode === 'holding'
+  const isParentButRestricted = isParentOrg && !canManageDirect
+  const canOpenParentAccountModal = isParentOrg && canManageDirect && canWriteCash
   const visibleBankAccounts = isHoldingView && canManageDirect && managedBankAccounts.length > 0
     ? managedBankAccounts
     : bankAccounts
@@ -204,7 +207,6 @@ export function CashClient({
     ? (hasSelectedTargetFinancingAccount ? txTargetCounterAccountId : preferredTargetFinancingAccount?.id || '')
     : txTargetCounterAccountId
   const isOwner = userRole === 'owner'
-  const canWriteCash = Boolean(activeBranchId)
   const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
   const hasSettlementPrefill = Boolean(searchParams.get('pay'))
   const hasCrossEntityAccounts = transferBankAccounts.some((account) => account.org_id !== orgId)
@@ -419,7 +421,7 @@ export function CashClient({
                  Rekonsiliasi
                </button>
             </div>
-            {canManageDirect ? (
+            {isParentOrg ? (
               /* Parent/Holding: bisa tambah rekening langsung */
               <div className="flex items-center gap-2">
                 <a
@@ -435,10 +437,15 @@ export function CashClient({
                 <SafeButton 
                   variant="white"
                   icon={<Building2 size={16} />}
-                  disabled={!canWriteCash}
+                  disabled={!canOpenParentAccountModal}
+                  title={
+                    !canManageDirect
+                      ? 'Pindah ke konteks Unit Utama parent untuk membuat rekening.'
+                      : (!canWriteCash ? 'Pilih unit aktif parent terlebih dahulu.' : undefined)
+                  }
                   onClick={() => setShowAccountModal(true)}
                 >
-                  Rekening
+                  Buat Rekening
                 </SafeButton>
               </div>
             ) : (
@@ -484,6 +491,10 @@ export function CashClient({
       {isHoldingView && hasCrossEntityAccounts ? (
         <div className="rounded-3xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-900 shadow-sm">
           Mode holding aktif: kartu rekening dan aktivitas terbaru menampilkan parent + child. Pencatatan transaksi baru dan rekonsiliasi tetap diproses dari unit aktif parent.
+        </div>
+      ) : isParentButRestricted ? (
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-900 shadow-sm">
+          Anda berada di Parent, tetapi pembuatan rekening hanya bisa dari konteks Unit Utama. Pindah unit aktif ke Unit Utama parent lalu coba lagi.
         </div>
       ) : canUseHoldingView && hasCrossEntityAccounts ? (
         <div className="rounded-3xl border border-slate-200 bg-slate-50 px-6 py-4 text-sm font-semibold text-slate-700 shadow-sm">

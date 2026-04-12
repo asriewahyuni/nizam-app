@@ -6,7 +6,8 @@
     "node": "20.19.x"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "PATH=/usr/local/bin:$PATH next dev",
+    "dev:webpack": "PATH=/usr/local/bin:$PATH next dev --no-turbopack",
     "build": "next build",
     "start": "node scripts/start-standalone.mjs",
     "perf:local": "npm run build && npm run start",

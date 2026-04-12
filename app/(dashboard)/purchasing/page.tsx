@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
+import { unstable_noStore as noStore } from 'next/cache'
 import { getPurchases, getPurchaseRequests } from '@/modules/purchasing/actions/purchasing.actions'
 import { getContacts } from '@/modules/contacts/actions/contact.actions'
 import { getProducts } from '@/modules/inventory/actions/inventory.actions'
@@ -9,6 +10,7 @@ import PurchasingClient from './PurchasingClient'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 export default async function PurchasingPage() {
+  noStore()
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
 

@@ -1,7 +1,7 @@
 'use server'
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, unstable_noStore as noStore } from 'next/cache'
 import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
 import { getBranchAccessScope, resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
@@ -217,90 +217,276 @@ async function syncInventoryStock(supabase: any, params: InventorySyncParams) {
 }
 
 export async function getPurchases(orgId: string, branchId?: string | null) {
+  noStore()
   const supabase = await createClient()
   const { data: { user } } = await (supabase as any).auth.getUser()
 
   if (!user) return []
+
+  // Create admin client once — used for all DB queries below.
+  const adminClient = await createAdminClient()
+
+  // Check membership role first (owner/admin always have purchasing:read access).
+  // This is more reliable than nizam_has_permission RPC which may deny access
+  // when plan permissions aren't configured on the org.
+  const { data: membership } = await (adminClient as any)
+    .from('org_members')
+    .select('role')
+    .eq('org_id', orgId)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  const memberRole = String(membership?.role || '').toLowerCase()
+  const isPrivileged = memberRole === 'owner' || memberRole === 'admin'
+
+  if (!isPrivileged) {
+    // Non-privileged roles still need explicit purchasing:read permission
+    const { data: canReadPurchasing, error: permissionError } = await (supabase as any).rpc('nizam_has_permission', {
+      p_permission: 'purchasing:read',
+      p_org_id: orgId,
+    })
+    if (permissionError || !canReadPurchasing) return []
+  }
+
+  const branchSelection = await resolvePurchasingBranchId(orgId, branchId)
+  if ('error' in branchSelection) return []
+
+  // Build org_ids array for the query
+  let orgIds: string[] = [orgId]
+  if (!branchSelection.branchId) {
+    // Parent/holding view: include purchases from all active child orgs
+    const { data: childOrgs } = await (adminClient as any)
+      .from('organizations')
+      .select('id')
+      .eq('parent_org_id', orgId)
+      .eq('is_active', true)
+    orgIds = [orgId, ...(childOrgs?.map((o: any) => o.id) || [])]
+  }
+
+  // Use direct SQL JOIN to reliably get vendor name, branch, and purchase_items.
+  // The postgres-client nested resolver does not work for purchases due to
+  // non-standard FK column naming (vendor_id → contacts) and deep sub-nesting.
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  const baseParams: unknown[] = []
+
+  let whereClause: string
+  if (branchSelection.branchId) {
+    baseParams.push(orgId, branchSelection.branchId)
+    whereClause = `p.org_id = $1 AND p.branch_id = $2`
+  } else {
+    baseParams.push(orgIds)
+    whereClause = `p.org_id = ANY($1::uuid[])`
+  }
+
+  const purchaseSql = `
+    SELECT
+      p.*,
+      c.name  AS vendor_name,
+      b.name  AS branch_name,
+      b.code  AS branch_code
+    FROM   public.purchases p
+    LEFT JOIN public.contacts c ON c.id = p.vendor_id
+    LEFT JOIN public.branches  b ON b.id = p.branch_id
+    WHERE  ${whereClause}
+    ORDER  BY p.purchase_date DESC, p.created_at DESC
+  `
+
+  let purchaseRows: any[] = []
+  try {
+    const purchaseResult = await queryPostgres<Record<string, unknown>>(purchaseSql, baseParams)
+    purchaseRows = purchaseResult.rows
+  } catch (err) {
+    ;(console as any).error('[getPurchases] raw SQL error:', err)
+    return []
+  }
+
+  if (purchaseRows.length === 0) return []
+
+  // Fetch purchase_items for all purchases in one query
+  const purchaseIds = purchaseRows.map((r) => r.id)
+  let itemsByPurchaseId: Record<string, any[]> = {}
+  try {
+    const itemsResult = await queryPostgres<Record<string, unknown>>(`
+      SELECT
+        pi.id,
+        pi.purchase_id,
+        pi.product_id,
+        pi.description,
+        pi.quantity,
+        pi.unit_price,
+        pi.total_amount,
+        pr.name  AS product_name,
+        pr.sku   AS product_sku,
+        pr.unit  AS product_unit
+      FROM   public.purchase_items pi
+      LEFT JOIN public.products pr ON pr.id = pi.product_id
+      WHERE  pi.purchase_id = ANY($1::uuid[])
+    `, [purchaseIds])
+
+    for (const item of itemsResult.rows) {
+      const pid = String(item.purchase_id ?? '')
+      if (!itemsByPurchaseId[pid]) itemsByPurchaseId[pid] = []
+      itemsByPurchaseId[pid].push({
+        ...item,
+        products: item.product_name ? {
+          name: item.product_name,
+          sku: item.product_sku,
+          unit: item.product_unit,
+        } : null,
+      })
+    }
+  } catch (err) {
+    ;(console as any).warn('[getPurchases] purchase_items fetch failed:', err)
+    // Continue without items rather than failing entirely
+  }
+
+  // Fetch purchase_payments for debt calculation
+  let paymentsByPurchaseId: Record<string, any[]> = {}
+  try {
+    const paymentsResult = await queryPostgres<Record<string, unknown>>(`
+      SELECT purchase_id, amount, discount_amount
+      FROM   public.purchase_payments
+      WHERE  purchase_id = ANY($1::uuid[])
+    `, [purchaseIds])
+    for (const pay of paymentsResult.rows) {
+      const pid = String(pay.purchase_id ?? '')
+      if (!paymentsByPurchaseId[pid]) paymentsByPurchaseId[pid] = []
+      paymentsByPurchaseId[pid].push(pay)
+    }
+  } catch { /* ignore — payments optional */ }
+
+  // Fetch purchase_returns for debt calculation
+  let returnsByPurchaseId: Record<string, any[]> = {}
+  try {
+    const returnsResult = await queryPostgres<Record<string, unknown>>(`
+      SELECT purchase_id, total_amount
+      FROM   public.purchase_returns
+      WHERE  purchase_id = ANY($1::uuid[])
+    `, [purchaseIds])
+    for (const ret of returnsResult.rows) {
+      const pid = String(ret.purchase_id ?? '')
+      if (!returnsByPurchaseId[pid]) returnsByPurchaseId[pid] = []
+      returnsByPurchaseId[pid].push(ret)
+    }
+  } catch { /* ignore — returns optional */ }
+
+  // Assemble final rows in the shape the UI expects
+  return purchaseRows.map((row) => {
+    const pid = String(row.id ?? '')
+    return {
+      ...row,
+      // UI expects p.contacts?.name for the vendor
+      contacts: row.vendor_name ? { name: row.vendor_name } : null,
+      branches: (row.branch_name || row.branch_code)
+        ? { name: row.branch_name, code: row.branch_code }
+        : null,
+      purchase_items: itemsByPurchaseId[pid] ?? [],
+      purchase_payments: paymentsByPurchaseId[pid] ?? [],
+      purchase_returns: returnsByPurchaseId[pid] ?? [],
+    }
+  })
+}
+
+export async function getPurchaseById(orgId: string, purchaseId: string) {
+  noStore()
+  const supabase = await createClient()
+  const { data: { user } } = await (supabase as any).auth.getUser()
+
+  if (!user) return null
+
+  const adminClient = await createAdminClient()
 
   const { data: canReadPurchasing, error: permissionError } = await (supabase as any).rpc('nizam_has_permission', {
     p_permission: 'purchasing:read',
     p_org_id: orgId,
   })
 
-  if (permissionError) {
-    ;(console as any).error('DEBUG: getPurchases permission check error:', permissionError)
-    return []
-  }
+  if (permissionError) return null
 
-  if (!canReadPurchasing) return []
-  const branchSelection = await resolvePurchasingBranchId(orgId, branchId)
-  if ('error' in branchSelection) return []
-
-  // Read with admin client after explicit permission check so server-rendered
-  // purchasing data is not dropped by mismatched line-item RLS policies.
-  const adminClient = await createAdminClient()
-
-  let query = (adminClient as any)
-    .from('purchases' as any)
-    .select(`
-      *,
-      branches (name, code),
-      contacts (name),
-      purchase_items (
-        id,
-        product_id,
-        description,
-        quantity,
-        unit_price,
-        total_amount,
-        products (name, sku, unit, category, selling_price)
-      ),
-      purchase_payments (amount, discount_amount),
-      purchase_returns (total_amount)
-    ` as any)
-    .eq('org_id', orgId)
-
-  if (branchSelection.branchId) {
-    query = query.eq('branch_id', branchSelection.branchId)
-  }
-
-  const { data, error } = await query
-    .order('purchase_date', { ascending: false })
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    (console as any).error("DEBUG: getPurchases error:", error)
-    // If it's a field error, try pulling without the new tables
-    let fallbackQuery = (adminClient as any)
-      .from('purchases' as any)
-      .select(`
-        *,
-        contacts (name),
-        purchase_items (
-          id,
-          product_id,
-          description,
-          quantity,
-          unit_price,
-          total_amount,
-          products (name, sku, unit, category, selling_price)
-        )
-      ` as any)
+  // Owner/admin fallback when RPC denies access
+  if (!canReadPurchasing) {
+    const { data: membership } = await (adminClient as any)
+      .from('org_members')
+      .select('role')
       .eq('org_id', orgId)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .maybeSingle()
 
-    if (branchSelection.branchId) {
-      fallbackQuery = fallbackQuery.eq('branch_id', branchSelection.branchId)
-    }
-
-    const { data: fallback, error: fallbackErr } = await fallbackQuery
-      .order('purchase_date', { ascending: false })
-      .order('created_at', { ascending: false })
-      
-    if (fallbackErr) return []
-    return fallback
+    const memberRole = String(membership?.role || '').toLowerCase()
+    if (memberRole !== 'owner' && memberRole !== 'admin') return null
   }
-  return data
+
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  try {
+    const result = await queryPostgres<Record<string, unknown>>(`
+      SELECT
+        p.*,
+        c.name  AS vendor_name,
+        b.name  AS branch_name,
+        b.code  AS branch_code
+      FROM   public.purchases p
+      LEFT JOIN public.contacts c ON c.id = p.vendor_id
+      LEFT JOIN public.branches  b ON b.id = p.branch_id
+      WHERE  p.org_id = $1 AND p.id = $2
+      LIMIT  1
+    `, [orgId, purchaseId])
+
+    if (result.rows.length === 0) return null
+    const row = result.rows[0]
+
+    // Fetch related sub-tables
+    const [itemsResult, paymentsResult, returnsResult] = await Promise.all([
+      queryPostgres<Record<string, unknown>>(`
+        SELECT
+          pi.id, pi.purchase_id, pi.product_id, pi.description,
+          pi.quantity, pi.unit_price, pi.total_amount,
+          pr.name AS product_name, pr.sku AS product_sku,
+          pr.unit AS product_unit, pr.category, pr.selling_price
+        FROM   public.purchase_items pi
+        LEFT JOIN public.products pr ON pr.id = pi.product_id
+        WHERE  pi.purchase_id = $1
+      `, [purchaseId]),
+      queryPostgres<Record<string, unknown>>(`
+        SELECT id, purchase_id, account_id, payment_date, amount, discount_amount, payment_number, notes, created_at
+        FROM   public.purchase_payments
+        WHERE  purchase_id = $1
+      `, [purchaseId]),
+      queryPostgres<Record<string, unknown>>(`
+        SELECT id, purchase_id, return_number, return_date, total_amount, notes
+        FROM   public.purchase_returns
+        WHERE  purchase_id = $1
+      `, [purchaseId]),
+    ])
+
+    return {
+      ...row,
+      contacts: row.vendor_name ? { name: row.vendor_name } : null,
+      branches: (row.branch_name || row.branch_code)
+        ? { name: row.branch_name, code: row.branch_code }
+        : null,
+      purchase_items: itemsResult.rows.map((item) => ({
+        ...item,
+        products: item.product_name ? {
+          name: item.product_name,
+          sku: item.product_sku,
+          unit: item.product_unit,
+          category: item.category,
+          selling_price: item.selling_price,
+        } : null,
+      })),
+      purchase_payments: paymentsResult.rows,
+      purchase_returns: returnsResult.rows,
+    }
+  } catch (err) {
+    ;(console as any).error('[getPurchaseById] raw SQL error:', err)
+    return null
+  }
 }
+
 
 export interface PurchaseLineData {
   product_id?: string
@@ -615,13 +801,13 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
       p_grand_total: headerGrand,
       p_notes: notesWithTerm,
       p_shariah_mode: shariahMode,
-      p_lines: processedLines,
+      p_lines: JSON.stringify(processedLines),
       p_user_id: user.id,
       p_branch_id: purchaseBranchId,
   })
 
   if (rpcError || !rpcRes?.success) {
-     return { error: 'Atomic Execution Failed: ' + (rpcRes?.error || rpcError?.message) }
+     return { error: 'Atomic Execution Failed: ' + String(rpcRes?.error || rpcError?.message || 'RPC returned no data') }
   }
 
   revalidatePath('/purchasing')
@@ -630,16 +816,36 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
 
 export async function receivePurchase(orgId: string, purchaseId: string) {
   const supabase = await createClient()
-  
-  // 1. Fetch info
-  const { data: purchase } = await (supabase as any)
-    .from('purchases' as any)
-    .select('*, purchase_items(*, products(asset_account_id, category))')
-    .eq('id', purchaseId)
-    .eq('org_id', orgId)
-    .single()
+  const { queryPostgres } = await import('@/lib/db/postgres')
 
-  if (!purchase) return { error: 'PO tidak ditemukan.' }
+  // Fetch purchase with items and products via raw SQL to avoid deep-nesting resolver failure
+  let purchase: any = null
+  try {
+    const poResult = await queryPostgres<Record<string, unknown>>(`
+      SELECT * FROM public.purchases WHERE id = $1 AND org_id = $2 LIMIT 1
+    `, [purchaseId, orgId])
+    if (poResult.rows.length === 0) return { error: 'PO tidak ditemukan.' }
+    purchase = poResult.rows[0]
+
+    // Fetch items with product data
+    const itemsResult = await queryPostgres<Record<string, unknown>>(`
+      SELECT pi.*, p.asset_account_id AS product_asset_account_id, p.category AS product_category
+      FROM   public.purchase_items pi
+      LEFT JOIN public.products p ON p.id = pi.product_id
+      WHERE  pi.purchase_id = $1
+    `, [purchaseId])
+    purchase.purchase_items = itemsResult.rows.map((item) => ({
+      ...item,
+      products: item.product_id ? {
+        asset_account_id: item.product_asset_account_id,
+        category: item.product_category,
+      } : null,
+    }))
+  } catch (err: any) {
+    return { error: 'Gagal membaca data PO: ' + (err?.message || 'unknown error') }
+  }
+
+
   const purchaseAccess = await ensurePurchaseDocumentAccess(orgId, purchase.branch_id)
   if ('error' in purchaseAccess) return { error: purchaseAccess.error }
   if (purchase.status === 'RECEIVED') return { success: true }
@@ -1055,6 +1261,7 @@ export async function createPurchaseReturn(orgId: string, payload: {
 }
 
 export async function getPurchaseRequests(orgId: string, branchId?: string | null) {
+  noStore()
   const supabase = await createClient()
   const branchSelection = await resolvePurchasingBranchId(orgId, branchId)
   if ('error' in branchSelection) return []

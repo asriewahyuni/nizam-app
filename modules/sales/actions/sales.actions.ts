@@ -408,24 +408,120 @@ async function fallbackVoidSaleWithoutRpc(
 }
 
 export async function getSales(orgId: string, branchId?: string | null) {
-  const supabase = await createClient()
   const branchSelection = await resolveActiveBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
   const effectiveBranchId = branchSelection.branchId
-  let query = supabase
-    .from('sales' as any)
-    .select('*, branches(name, code), contacts(name), sales_resellers(id, name, reseller_type, company_name, contact_person), sales_items(*, products(name, sku, unit, type)), sales_returns(status, grand_total, return_number), sales_payments(amount, discount_amount)' as any)
-    .eq('org_id', orgId)
 
-  if (effectiveBranchId) {
-    query = query.eq('branch_id', effectiveBranchId)
+  // Use direct SQL JOIN to reliably resolve customer name, branch, reseller, and sub-tables.
+  // The postgres-client nested resolver fails for non-standard FK names (customer_id → contacts).
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  const baseParams: unknown[] = [orgId]
+  const branchFilter = effectiveBranchId ? ` AND s.branch_id = $2` : ''
+  if (effectiveBranchId) baseParams.push(effectiveBranchId)
+
+  let saleRows: any[] = []
+  try {
+    const result = await queryPostgres<Record<string, unknown>>(`
+      SELECT
+        s.*,
+        c.name           AS customer_name,
+        b.name           AS branch_name,
+        b.code           AS branch_code,
+        sr.id            AS reseller_id_val,
+        sr.name          AS reseller_name,
+        sr.reseller_type AS reseller_type,
+        sr.company_name  AS reseller_company_name,
+        sr.contact_person AS reseller_contact_person
+      FROM   public.sales s
+      LEFT JOIN public.contacts       c  ON c.id  = s.customer_id
+      LEFT JOIN public.branches       b  ON b.id  = s.branch_id
+      LEFT JOIN public.sales_resellers sr ON sr.id = s.reseller_id
+      WHERE  s.org_id = $1${branchFilter}
+      ORDER  BY s.created_at DESC
+    `, baseParams)
+    saleRows = result.rows
+  } catch (err) {
+    ;(console as any).error('[getSales] raw SQL error:', err)
+    return []
   }
 
-  const { data, error } = await query.order('created_at', { ascending: false })
+  if (saleRows.length === 0) return []
 
-  if (error) return []
-  return data
+  const saleIds = saleRows.map((r) => r.id)
+
+  // Fetch related sub-tables in parallel
+  const [itemsResult, returnsResult, paymentsResult] = await Promise.allSettled([
+    queryPostgres<Record<string, unknown>>(`
+      SELECT si.*, p.name AS product_name, p.sku, p.unit, p.type AS product_type
+      FROM   public.sales_items si
+      LEFT JOIN public.products p ON p.id = si.product_id
+      WHERE  si.sale_id = ANY($1::uuid[])
+    `, [saleIds]),
+    queryPostgres<Record<string, unknown>>(`
+      SELECT sale_id, status, grand_total, return_number
+      FROM   public.sales_returns
+      WHERE  sale_id = ANY($1::uuid[])
+    `, [saleIds]),
+    queryPostgres<Record<string, unknown>>(`
+      SELECT sale_id, amount, discount_amount
+      FROM   public.sales_payments
+      WHERE  sale_id = ANY($1::uuid[])
+    `, [saleIds]),
+  ])
+
+  // Group sub-table rows by sale_id
+  const itemsBySaleId: Record<string, any[]> = {}
+  if (itemsResult.status === 'fulfilled') {
+    for (const item of itemsResult.value.rows) {
+      const sid = String(item.sale_id ?? '')
+      if (!itemsBySaleId[sid]) itemsBySaleId[sid] = []
+      itemsBySaleId[sid].push({
+        ...item,
+        products: item.product_name ? { name: item.product_name, sku: item.sku, unit: item.unit, type: item.product_type } : null,
+      })
+    }
+  }
+  const returnsBySaleId: Record<string, any[]> = {}
+  if (returnsResult.status === 'fulfilled') {
+    for (const ret of returnsResult.value.rows) {
+      const sid = String(ret.sale_id ?? '')
+      if (!returnsBySaleId[sid]) returnsBySaleId[sid] = []
+      returnsBySaleId[sid].push(ret)
+    }
+  }
+  const paymentsBySaleId: Record<string, any[]> = {}
+  if (paymentsResult.status === 'fulfilled') {
+    for (const pay of paymentsResult.value.rows) {
+      const sid = String(pay.sale_id ?? '')
+      if (!paymentsBySaleId[sid]) paymentsBySaleId[sid] = []
+      paymentsBySaleId[sid].push(pay)
+    }
+  }
+
+  return saleRows.map((row) => {
+    const sid = String(row.id ?? '')
+    return {
+      ...row,
+      // UI expects sale.contacts?.name for the customer
+      contacts: row.customer_name ? { name: row.customer_name } : null,
+      branches: (row.branch_name || row.branch_code)
+        ? { name: row.branch_name, code: row.branch_code }
+        : null,
+      sales_resellers: row.reseller_name ? {
+        id: row.reseller_id_val,
+        name: row.reseller_name,
+        reseller_type: row.reseller_type,
+        company_name: row.reseller_company_name,
+        contact_person: row.reseller_contact_person,
+      } : null,
+      sales_items: itemsBySaleId[sid] ?? [],
+      sales_returns: returnsBySaleId[sid] ?? [],
+      sales_payments: paymentsBySaleId[sid] ?? [],
+    }
+  })
 }
+
 
 export async function createSaleEntry(orgId: string, payload: any) {
   const supabase = await createClient()
@@ -905,25 +1001,79 @@ export async function processSalesPayment(orgId: string, payload: {
 }
 
 export async function getQuotations(orgId: string, branchId?: string | null) {
-  const supabase = await createClient()
   const branchSelection = await resolveActiveBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
   const effectiveBranchId = branchSelection.branchId
-  let query = supabase
-    .from('sales' as any)
-    .select('*, branches(name, code), contacts(name), sales_resellers(id, name, reseller_type, company_name, contact_person), sales_items(*, products(name, sku, unit, type))' as any)
-    .eq('org_id', orgId)
-    .eq('status', 'QUOTATION')
 
-  if (effectiveBranchId) {
-    query = query.eq('branch_id', effectiveBranchId)
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  const baseParams: unknown[] = [orgId]
+  let branchFilter = ''
+  if (effectiveBranchId) { branchFilter = ` AND s.branch_id = $${baseParams.push(effectiveBranchId)}` }
+
+  let quoteRows: any[] = []
+  try {
+    const result = await queryPostgres<Record<string, unknown>>(`
+      SELECT
+        s.*,
+        c.name           AS customer_name,
+        b.name           AS branch_name,
+        b.code           AS branch_code,
+        sr.id            AS reseller_id_val,
+        sr.name          AS reseller_name,
+        sr.reseller_type AS reseller_type,
+        sr.company_name  AS reseller_company_name,
+        sr.contact_person AS reseller_contact_person
+      FROM   public.sales s
+      LEFT JOIN public.contacts       c  ON c.id  = s.customer_id
+      LEFT JOIN public.branches       b  ON b.id  = s.branch_id
+      LEFT JOIN public.sales_resellers sr ON sr.id = s.reseller_id
+      WHERE  s.org_id = $1 AND s.status = 'QUOTATION'${branchFilter}
+      ORDER  BY s.created_at DESC
+    `, baseParams)
+    quoteRows = result.rows
+  } catch (err) {
+    ;(console as any).error('[getQuotations] raw SQL error:', err)
+    return []
   }
 
-  const { data, error } = await query.order('created_at', { ascending: false })
+  if (quoteRows.length === 0) return []
+  const saleIds = quoteRows.map((r) => r.id)
 
-  if (error) return []
-  return data
+  let itemsBySaleId: Record<string, any[]> = {}
+  try {
+    const itemsResult = await queryPostgres<Record<string, unknown>>(`
+      SELECT si.*, p.name AS product_name, p.sku, p.unit, p.type AS product_type
+      FROM   public.sales_items si
+      LEFT JOIN public.products p ON p.id = si.product_id
+      WHERE  si.sale_id = ANY($1::uuid[])
+    `, [saleIds])
+    for (const item of itemsResult.rows) {
+      const sid = String(item.sale_id ?? '')
+      if (!itemsBySaleId[sid]) itemsBySaleId[sid] = []
+      itemsBySaleId[sid].push({
+        ...item,
+        products: item.product_name ? { name: item.product_name, sku: item.sku, unit: item.unit, type: item.product_type } : null,
+      })
+    }
+  } catch { /* ignore */ }
+
+  return quoteRows.map((row) => {
+    const sid = String(row.id ?? '')
+    return {
+      ...row,
+      contacts: row.customer_name ? { name: row.customer_name } : null,
+      branches: row.branch_name ? { name: row.branch_name, code: row.branch_code } : null,
+      sales_resellers: row.reseller_name ? {
+        id: row.reseller_id_val, name: row.reseller_name,
+        reseller_type: row.reseller_type, company_name: row.reseller_company_name,
+        contact_person: row.reseller_contact_person,
+      } : null,
+      sales_items: itemsBySaleId[sid] ?? [],
+    }
+  })
 }
+
 
 export async function createQuotation(orgId: string, payload: any) {
   const supabase = await createClient()

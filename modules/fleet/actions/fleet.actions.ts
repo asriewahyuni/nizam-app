@@ -495,31 +495,82 @@ export async function createRoute(orgId: string, formData: FormData) {
 }
 
 export async function getSchedules(orgId: string, branchId?: string | null) {
-  const supabase = await createFleetDb()
   const branchSelection = await resolveFleetBranchSelection(orgId, branchId)
   if ('error' in branchSelection) return []
 
-  let query = supabase
-    .from('fleet_schedules')
-    .select(`
-      *,
-      route:fleet_routes(*),
-      asset:fleet_assets(*),
-      driver:employees!fleet_schedules_driver_id_fkey(first_name, last_name, phone),
-      helper:employees!fleet_schedules_helper_id_fkey(first_name, last_name, phone),
-      tickets:fleet_tickets(count)
-    `)
-    .eq('org_id', orgId)
+  const { queryPostgres } = await import('@/lib/db/postgres')
 
-  if (branchSelection.branchId) {
-    query = query.eq('branch_id', branchSelection.branchId)
+  const baseParams: unknown[] = [orgId]
+  const branchFilter = branchSelection.branchId ? ` AND s.branch_id = $${baseParams.push(branchSelection.branchId)}` : ''
+
+  let scheduleRows: any[] = []
+  try {
+    const result = await queryPostgres<Record<string, unknown>>(`
+      SELECT
+        s.*,
+        r.id AS route_id_val, r.name AS route_name, r.origin, r.destination,
+        r.distance_km, r.base_price, r.branch_id AS route_branch_id,
+        fa.id AS asset_id_val, fa.plate_number, fa.model, fa.brand,
+        fa.type AS asset_type, fa.status AS asset_status, fa.capacity,
+        fa.daily_rate, fa.odometer,
+        d.first_name AS driver_first_name, d.last_name AS driver_last_name, d.phone AS driver_phone,
+        h.first_name AS helper_first_name, h.last_name AS helper_last_name, h.phone AS helper_phone
+      FROM   public.fleet_schedules s
+      LEFT JOIN public.fleet_routes   r  ON r.id  = s.route_id
+      LEFT JOIN public.fleet_assets   fa ON fa.id = s.asset_id
+      LEFT JOIN public.employees      d  ON d.id  = s.driver_id
+      LEFT JOIN public.employees      h  ON h.id  = s.helper_id
+      WHERE  s.org_id = $1${branchFilter}
+      ORDER  BY s.departure_time ASC
+    `, baseParams)
+    scheduleRows = result.rows
+  } catch (err) {
+    ;(console as any).error('[getSchedules] raw SQL error:', err)
+    return []
   }
 
-  const { data, error } = await query.order('departure_time', { ascending: true })
-  
-  if (error) return []
-  return data
+  if (scheduleRows.length === 0) return []
+
+  // Fetch ticket counts per schedule
+  const scheduleIds = scheduleRows.map((r) => r.id)
+  const ticketCountByScheduleId: Record<string, number> = {}
+  try {
+    const ticketResult = await queryPostgres<{ schedule_id: string; count: string }>(`
+      SELECT schedule_id, COUNT(*) AS count
+      FROM   public.fleet_tickets
+      WHERE  schedule_id = ANY($1::uuid[])
+      GROUP  BY schedule_id
+    `, [scheduleIds])
+    for (const row of ticketResult.rows) {
+      ticketCountByScheduleId[String(row.schedule_id)] = Number(row.count || 0)
+    }
+  } catch { /* optional — ignore */ }
+
+  return scheduleRows.map((row) => {
+    const sid = String(row.id ?? '')
+    return {
+      ...row,
+      route: row.route_name ? {
+        id: row.route_id_val, name: row.route_name, origin: row.origin,
+        destination: row.destination, distance_km: row.distance_km,
+        base_price: row.base_price, branch_id: row.route_branch_id,
+      } : null,
+      asset: row.asset_id_val ? {
+        id: row.asset_id_val, plate_number: row.plate_number, model: row.model,
+        brand: row.brand, type: row.asset_type, status: row.asset_status,
+        capacity: row.capacity, daily_rate: row.daily_rate, odometer: row.odometer,
+      } : null,
+      driver: row.driver_first_name ? {
+        first_name: row.driver_first_name, last_name: row.driver_last_name, phone: row.driver_phone,
+      } : null,
+      helper: row.helper_first_name ? {
+        first_name: row.helper_first_name, last_name: row.helper_last_name, phone: row.helper_phone,
+      } : null,
+      tickets: { count: ticketCountByScheduleId[sid] ?? 0 },
+    }
+  })
 }
+
 
 export async function createSchedule(orgId: string, formData: FormData) {
   const supabase = await createFleetDb()
