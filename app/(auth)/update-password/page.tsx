@@ -6,9 +6,10 @@ import { ShieldCheck, Lock, AlertCircle, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Suspense } from 'react'
 import { resetPasswordWithToken } from '@/modules/auth/actions/auth.actions'
 
-export default function UpdatePasswordPage() {
+function UpdatePasswordContent() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
@@ -166,5 +167,20 @@ export default function UpdatePasswordPage() {
         </motion.div>
       </div>
     </div>
+  )
+}
+
+export default function UpdatePasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#F8FAFC] flex justify-center items-center">
+        <div className="animate-pulse flex flex-col items-center">
+           <div className="w-10 h-10 bg-slate-200 rounded-full mb-4"></div>
+           <div className="h-4 bg-slate-200 rounded w-24"></div>
+        </div>
+      </div>
+    }>
+      <UpdatePasswordContent />
+    </Suspense>
   )
 }
