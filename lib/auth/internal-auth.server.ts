@@ -196,7 +196,11 @@ export async function verifyAndResetInternalAuthPassword(token: string, newPassw
   )
 
   if (updErr) return { error: 'Gagal mengubah pengaturan password di database.' }
-  return { success: true }
+  
+  // Auto-login user after successful password reset
+  const sessionId = await createSession(resetRow.user_id)
+
+  return { success: true, sessionId }
 }
 
 export async function resetInternalAuthPasswordById(userId: string, newPassword: string) {
