@@ -782,6 +782,48 @@ export async function signInWithInternalAuth(input: {
     for (const candidate of candidates) {
       if (verifyScryptPassword(password, candidate.password_hash)) {
         passwordMatched.push(candidate)
+        continue
+      }
+
+      // Fallback: check legacy auth.users table using pgcrypto if it exists
+      if (candidate.legacy_user_id) {
+        try {
+          const legacyCheck = await queryPostgres<{ valid: boolean }>(
+            `select (encrypted_password = extensions.crypt($1::text, encrypted_password)) as valid from auth.users where id = $2::uuid limit 1`,
+            [password, candidate.legacy_user_id]
+          )
+          
+          if (legacyCheck.rows[0]?.valid) {
+            // Automatically upgrade password to new scrypt hash implementation
+            const newHash = hashPasswordWithScrypt(password)
+            await queryPostgres(
+              `update public.internal_auth_users set password_hash = $1::text, updated_at = now() where id = $2::uuid`,
+              [newHash, candidate.id]
+            )
+            candidate.password_hash = newHash
+            passwordMatched.push(candidate)
+          }
+        } catch (fallbackError) {
+          // If extensions.crypt fails (e.g. extension not in extensions schema), try plain crypt()
+          try {
+            const fallbackPlainCheck = await queryPostgres<{ valid: boolean }>(
+              `select (encrypted_password = crypt($1::text, encrypted_password)) as valid from auth.users where id = $2::uuid limit 1`,
+              [password, candidate.legacy_user_id]
+            )
+            
+            if (fallbackPlainCheck.rows[0]?.valid) {
+              const newHash = hashPasswordWithScrypt(password)
+              await queryPostgres(
+                `update public.internal_auth_users set password_hash = $1::text, updated_at = now() where id = $2::uuid`,
+                [newHash, candidate.id]
+              )
+              candidate.password_hash = newHash
+              passwordMatched.push(candidate)
+            }
+          } catch (plainFallbackError) {
+             console.error('Legacy user password fallback checks failed:', getErrorMessage(plainFallbackError))
+          }
+        }
       }
     }
     if (passwordMatched.length === 0) return { error: 'Email/NIK atau password salah.' as const }
