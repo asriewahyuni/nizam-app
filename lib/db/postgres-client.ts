@@ -195,7 +195,9 @@ class PostgresQueryBuilder {
   }
 
   select(columns?: string, options?: { count?: 'exact' | 'estimated'; head?: boolean }) {
-    this._operation = 'select'
+    if (!['insert', 'update', 'upsert', 'delete'].includes(this._operation)) {
+      this._operation = 'select'
+    }
     this._select = columns ?? '*'
     if (options?.count) this._countMode = options.count
     if (options?.head) this._headOnly = true

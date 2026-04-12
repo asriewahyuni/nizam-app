@@ -424,7 +424,7 @@ export default function PurchasingClient({
         const latestPurchase = await getPurchaseById(orgId, res.purchaseId)
         if (latestPurchase) {
           setPurchaseRows((current) => {
-            const next = current.filter((purchase) => purchase.id !== latestPurchase.id)
+            const next = current.filter((purchase) => purchase.id !== (latestPurchase as any).id)
             return [latestPurchase, ...next]
           })
         }

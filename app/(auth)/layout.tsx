@@ -72,7 +72,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
       </div>
       <p className="absolute bottom-6 text-slate-500 text-[11px] font-medium tracking-wide">
-        &copy; {new Date().getFullYear()} NIZAM ERP. Enterprise OS.
+        &copy; {new Date().getFullYear()} NIZAM ERP. Building Integrity.
       </p>
     </div>
   )
