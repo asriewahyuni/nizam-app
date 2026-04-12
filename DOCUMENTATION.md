@@ -1,6 +1,6 @@
 # NIZAM ERP — Comprehensive Codebase Documentation
 
-> **Last updated:** 7 April 2026 (rev 10) — updated with shariah CoA cleanup (`1151`) and BSC configuration + KPI scoring engine (`1152`), plus migration timeline up to `1152`.
+> **Last updated:** 12 April 2026 — updated with Railway PostgreSQL full decoupling, native SQL JOIN resolution, and Internal Auth completion (`1176`).
 
 ---
 
@@ -783,6 +783,7 @@ Core reusable components:
 | `1150` | Rebind trigger `trg_accounts_governance` ke `enforce_accounts_governance_v2()` + helper `ensure_main_branch_for_org()` agar race bootstrap lintas environment tertangani. |
 | `1151` | **Shariah CoA cleanup** — `inject_shariah_coa` tidak lagi membuat/mengaktifkan akun legacy `3100 Ekuitas Syariah`; menjaga akun Syirkah `3110`/`3120` tetap aktif di bawah parent `3000`; backfill menghapus/menonaktifkan `3100` lama secara aman. |
 | `1152` | **BSC configuration + KPI scoring engine** — tabel siklus/weight/KPI/measurement, helper function scoring (achievement %, score 100, score 4), trigger auto-fill score, view latest measurement per KPI, serta RLS berbasis permission `strategy:*`/`reports:read`. |
+| `1153`–`1176` | **Railway PostgreSQL Decoupling** — Migrasi data dan logika dari ekosistem Supabase Cloud ke *database* Railway secara penuh. Penggantian Supabase Auth dengan skema otentikasi internal mandiri (`internal_auth_users`), refaktor ekstensif pada *nested query builder* menjadi Native Postgres SQL JOIN dari modul kasir, pembelian hingga pembukuan agar visibilitas saldo & jurnal akurat. Pemutusan SDK _auth_ pada Demo Mode. Sistem ERP kini 100% otonom tanpa dependensi RLS Supabase eksternal. |
 
 ### 9.5 Storage Buckets
 
