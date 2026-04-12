@@ -1,4 +1,4 @@
-import type { NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 /**
@@ -16,8 +16,6 @@ export async function proxy(request: NextRequest) {
     url.host = 'brain.kliknizam.app'
     url.port = ''
     url.protocol = 'https:'
-    /* eslint-disable-next-line @next/next/no-server-import-in-page */
-    const { NextResponse } = await import('next/server')
     return NextResponse.redirect(url, 301)
   }
 
