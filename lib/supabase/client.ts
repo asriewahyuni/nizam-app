@@ -155,11 +155,11 @@ class BrowserAuthClient {
     }
   }
 
-  async updateUser(attrs: any) {
+  async updateUser(attrs: any): Promise<{ data: { user: any }, error: any }> {
     return { data: { user: null }, error: null }
   }
 
-  async signInWithPassword(_creds: any) {
+  async signInWithPassword(_creds: any): Promise<{ data: { user: any, session: any }, error: any }> {
     return { data: { user: null, session: null }, error: { message: 'Use internal auth login' } }
   }
 
@@ -183,12 +183,12 @@ class BrowserSupabaseClient {
     return Promise.resolve({ data: null, error: { message: 'RPC not available in browser mode' } })
   }
 
-  channel() {
+  channel(name: string) {
     const ch: any = { on() { return ch }, subscribe() { return ch } }
     return ch
   }
 
-  async removeChannel() { return 'ok' }
+  async removeChannel(channel: any) { return 'ok' }
 }
 
 // Singleton

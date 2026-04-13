@@ -776,6 +776,63 @@ export async function signInWithInternalAuth(input: {
     )
 
     const candidates = result.rows.filter((row) => row && row.is_active)
+    
+    // Auto-migration for legacy auth.users that haven't been copied into internal_auth_users
+    if (candidates.length === 0 && email) {
+      try {
+        const legacyLookup = await queryPostgres<{ id: string, email: string, login_type: string, full_name: string }>(
+          `select id::text as id, email, raw_user_meta_data->>'login_type' as login_type, raw_user_meta_data->>'full_name' as full_name from auth.users where lower(email) = $1::text limit 1`,
+          [email]
+        )
+        const legacyUser = legacyLookup.rows[0]
+        if (legacyUser) {
+          let isValid = false
+          try {
+            const legacyCheck = await queryPostgres<{ valid: boolean }>(
+              `select (encrypted_password = extensions.crypt($1::text, encrypted_password)) as valid from auth.users where id = $2::uuid limit 1`,
+              [password, legacyUser.id]
+            )
+            isValid = legacyCheck.rows[0]?.valid || false
+          } catch (e) {
+            try {
+              const fallbackPlainCheck = await queryPostgres<{ valid: boolean }>(
+                `select (encrypted_password = crypt($1::text, encrypted_password)) as valid from auth.users where id = $2::uuid limit 1`,
+                [password, legacyUser.id]
+              )
+              isValid = fallbackPlainCheck.rows[0]?.valid || false
+            } catch (err) {}
+          }
+
+          if (isValid) {
+            const newHash = hashPasswordWithScrypt(password)
+            const insertRes = await queryPostgres<{ id: string }>(
+              `insert into public.internal_auth_users (
+                legacy_user_id, login_email, password_hash, display_name, user_type, is_active
+              ) values ($1::uuid, $2::text, $3::text, $4::text, coalesce($5::text, 'owner'), true)
+              returning id::text as id`,
+              [legacyUser.id, legacyUser.email, newHash, legacyUser.full_name || null, legacyUser.login_type || null]
+            )
+            
+            candidates.push({
+              id: insertRes.rows[0].id,
+              legacy_user_id: legacyUser.id,
+              preferred_org_match: false,
+              active_org_ids: [],
+              stored_active_org_id: null,
+              login_email: legacyUser.email,
+              login_nik: null,
+              password_hash: newHash,
+              display_name: legacyUser.full_name || null,
+              user_type: legacyUser.login_type || 'owner',
+              is_active: true
+            })
+          }
+        }
+      } catch (err) {
+        console.error('legacy auto-migrate failed:', getErrorMessage(err))
+      }
+    }
+
     if (candidates.length === 0) return { error: 'Email/NIK atau password salah.' as const }
 
     const passwordMatched: InternalCredentialRow[] = []

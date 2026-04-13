@@ -216,7 +216,7 @@ async function findAuthUserByEmail(
     }
 
     const users = Array.isArray(data?.users) ? data.users : []
-    const matchedUser = users.find((user) => normalizeEmail(user?.email) === normalizedTargetEmail)
+    const matchedUser = users.find((user: any) => normalizeEmail(user?.email) === normalizedTargetEmail)
     if (matchedUser) {
       return { user: matchedUser, error: null }
     }

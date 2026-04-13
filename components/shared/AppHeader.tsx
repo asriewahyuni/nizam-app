@@ -675,7 +675,7 @@ export function AppHeader({
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'approval_requests', filter: `org_id=eq.${activeOrgId}` },
-            (payload) => {
+            (payload: any) => {
               if (!approvalRequestTouchesActiveBranch(payload, activeBranchId)) return
               void loadPendingApprovals()
             }

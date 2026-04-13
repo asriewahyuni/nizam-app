@@ -378,7 +378,7 @@ export function AppSidebar({
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'approval_requests', filter: `org_id=eq.${orgId}` },
-            (payload) => {
+            (payload: any) => {
               if (!approvalRequestTouchesActiveBranch(payload, activeBranchId)) return
               void refreshPendingApprovalBadge()
             }

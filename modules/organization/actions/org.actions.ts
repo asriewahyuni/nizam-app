@@ -584,7 +584,7 @@ async function createOrganizationRecord(
           typeof user.user_metadata?.legacy_user_id === 'string'
             ? user.user_metadata.legacy_user_id
             : memberUserId,
-        email: user.email,
+        email: user.email || '',
         fullName:
           typeof user.user_metadata?.full_name === 'string'
             ? user.user_metadata.full_name
@@ -596,7 +596,7 @@ async function createOrganizationRecord(
       })
 
       if ('error' in shadowAuthResult) {
-        return { error: shadowAuthResult.error }
+        return { error: shadowAuthResult.error || 'Terjadi kesalahan saat sinkronisasi akun' }
       }
 
       memberUserId = shadowAuthResult.authUserId
