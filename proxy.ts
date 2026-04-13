@@ -9,7 +9,7 @@ import { updateSession } from '@/lib/supabase/middleware'
  */
 export async function proxy(request: NextRequest) {
   const host = request.headers.get('host')
-  const legacyDomains = ['nizam.xales.id', 'nizam.up.railway.app']
+  const legacyDomains = ['nizam.xales.id', 'nizam.up.railway.app', 'nizam-staging.up.railway.app']
 
   if (host && legacyDomains.includes(host)) {
     const url = request.nextUrl.clone()
