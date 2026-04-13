@@ -143,14 +143,14 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
   cookieStore.delete('nizam_active_org_id') // Reset shared org cache for fresh demo
   cookieStore.delete('nizam_active_branch_id')
   cookieStore.set('nizam_demo_org_id', orgId, { 
-    maxAge: 60 * 60 * 6, // 6 hours
+    maxAge: 60 * 60 * 12, // 12 hours — demo session lifetime
     path: '/',
     httpOnly: true,
     sameSite: 'lax'
   })
   if (demoBranchId) {
     cookieStore.set('nizam_active_branch_id', demoBranchId, {
-      maxAge: 60 * 60 * 6,
+      maxAge: 60 * 60 * 12,
       path: '/',
       httpOnly: true,
       sameSite: 'lax',
@@ -207,9 +207,20 @@ export async function signOutDemo() {
 }
 
 /**
- * Check if current session is a demo account
+ * Check if current session is an active demo account.
+ * A demo session is considered active only if:
+ * 1. The authenticated user is the demo account, AND
+ * 2. The demo org cookie is still present (i.e. not expired yet).
+ * When the 12-hour cookie expires, this returns false and the
+ * DashboardLayout will redirect the user out of the dashboard.
  */
 export async function isDemoSession(): Promise<boolean> {
+  const cookieStore = await cookies()
+  const demoOrgId = cookieStore.get('nizam_demo_org_id')?.value
+
+  // If the demo cookie has expired, the session is over — treat as non-demo.
+  if (!demoOrgId) return false
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return false

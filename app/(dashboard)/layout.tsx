@@ -44,6 +44,14 @@ export default async function DashboardLayout({
   ])
   const effectivePlanName = isDemo ? 'Demo' : (orgData.org.settings?.plan || 'Trial')
 
+  // ── DEMO SESSION EXPIRY ENFORCEMENT ──────────────────────────────────────
+  // isDemoSession() returns false when the 12-hour cookie has expired.
+  // If the org is a demo org but the cookie is gone, force signout.
+  const isDemoOrg = orgData.org.settings?.is_demo === true || orgData.org.is_demo === true
+  if (isDemoOrg && !isDemo && !adminImpersonation) {
+    redirect('/auth/signout')
+  }
+
   // ── SUBSCRIPTION EXPIRY ENFORCEMENT ──────────────────────────────────────
   // Admins doing impersonation are always allowed through.
   // Demo sessions are also excluded (their plan is time-unlimited).
