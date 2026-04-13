@@ -65,7 +65,7 @@ export default function ExpiredPage() {
 
             <a
               id="btn-contact-sales"
-              href="https://wa.me/6281234567890?text=Halo%2C%20saya%20ingin%20upgrade%20paket%20Nizam%20MiniERP"
+              href="https://wa.me/6282234862235?text=Halo%20Tim%20Nizam%20%F0%9F%91%8B%0A%0ASaya%20ingin%20melanjutkan%20langganan%20Nizam%20MiniERP%20untuk%20organisasi%20saya.%0A%0AMohon%20bantuannya%20untuk%20proses%20upgrade%20%2F%20perpanjangan%20paket.%20Terima%20kasih!"
               target="_blank"
               rel="noopener noreferrer"
               className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-semibold text-sm py-3 px-5 transition-colors"
