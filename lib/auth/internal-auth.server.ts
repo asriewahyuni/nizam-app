@@ -805,12 +805,13 @@ export async function signInWithInternalAuth(input: {
 
           if (isValid) {
             const newHash = hashPasswordWithScrypt(password)
+            const normalizedType = normalizeInternalUserType(legacyUser.login_type)
             const insertRes = await queryPostgres<{ id: string }>(
               `insert into public.internal_auth_users (
                 legacy_user_id, login_email, password_hash, display_name, user_type, is_active
-              ) values ($1::uuid, $2::text, $3::text, $4::text, coalesce($5::text, 'owner'), true)
+              ) values ($1::uuid, $2::text, $3::text, $4::text, $5::text, true)
               returning id::text as id`,
-              [legacyUser.id, legacyUser.email, newHash, legacyUser.full_name || null, legacyUser.login_type || null]
+              [legacyUser.id, legacyUser.email, newHash, legacyUser.full_name || null, normalizedType]
             )
             
             candidates.push({
@@ -823,7 +824,7 @@ export async function signInWithInternalAuth(input: {
               login_nik: null,
               password_hash: newHash,
               display_name: legacyUser.full_name || null,
-              user_type: legacyUser.login_type || 'owner',
+              user_type: normalizedType,
               is_active: true
             })
           }
