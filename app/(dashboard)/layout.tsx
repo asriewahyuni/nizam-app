@@ -44,6 +44,13 @@ export default async function DashboardLayout({
   ])
   const effectivePlanName = isDemo ? 'Demo' : (orgData.org.settings?.plan || 'Trial')
 
+  // ── SUBSCRIPTION EXPIRY ENFORCEMENT ──────────────────────────────────────
+  // Admins doing impersonation are always allowed through.
+  // Demo sessions are also excluded (their plan is time-unlimited).
+  if (orgData.isSubscriptionExpired && !isDemo && !adminImpersonation) {
+    redirect('/expired')
+  }
+
   // ─────────────────────────────────────────────────────────────
   // 3. SAAS MODULE & RBAC GUARD (Protect direct URL access)
   // ─────────────────────────────────────────────────────────────

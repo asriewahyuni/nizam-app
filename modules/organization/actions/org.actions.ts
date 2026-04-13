@@ -653,6 +653,28 @@ async function createOrganizationRecord(
       selectedPlan = parentPackageState.plan
     }
 
+    // ── AUTO-SET subscription_end FOR TIME-LIMITED PLANS ──────────────────────
+    // Lookup duration from saas_packages and stamp an expiry on the org row.
+    // Only applies to non-Demo, non-inherited-plan root orgs (i.e. fresh Trials).
+    let subscriptionEndToSet: string | null = null
+    if (!isDemo && !parentOrgId) {
+      try {
+        const { data: pkgMeta } = await organizationWriteDb
+          .from('saas_packages')
+          .select('duration_days')
+          .eq('name', selectedPlan)
+          .eq('is_active', true)
+          .maybeSingle()
+        if (typeof pkgMeta?.duration_days === 'number' && pkgMeta.duration_days > 0) {
+          const expiry = new Date()
+          expiry.setDate(expiry.getDate() + pkgMeta.duration_days)
+          subscriptionEndToSet = expiry.toISOString()
+        }
+      } catch (_) {
+        // Non-fatal: if we can't fetch duration, we just leave subscription_end null
+      }
+    }
+
     const orgInsertPayload: Record<string, unknown> = {
       id: orgId,
       name,
@@ -669,6 +691,9 @@ async function createOrganizationRecord(
         // and child entities keep the manual/sync-first CoA activation behavior.
         skip_coa_seed: shouldSkipCoaSeed,
       },
+    }
+    if (subscriptionEndToSet) {
+      orgInsertPayload.subscription_end = subscriptionEndToSet
     }
     if (ownerEmail) {
       orgInsertPayload.owner_email = ownerEmail
@@ -1303,12 +1328,14 @@ const getActiveOrgCached = cache(async () => {
   const planName = org?.settings?.plan
   // Note: enabled_modules column may not exist in DB; rely on saas_packages + active_addons
   let enabledModules: string[] = []
+  let isSubscriptionExpired = false
+  let subscriptionEnd: Date | null = null
 
-  // DYNAMIC MODULE RESOLUTION FROM SaaS PACKAGE
+  // DYNAMIC MODULE RESOLUTION + SUBSCRIPTION EXPIRY CHECK FROM SaaS PACKAGE
   if (planName) {
     const { data: pkgData } = await db
       .from('saas_packages')
-      .select('modules')
+      .select('modules, duration_days')
       .eq('name', planName)
       .eq('is_active', true)
       .maybeSingle()
@@ -1320,6 +1347,24 @@ const getActiveOrgCached = cache(async () => {
       } catch (pkgError) {
         (console as any).error('GetActiveOrg: failed to parse package modules', pkgError)
       }
+    }
+
+    // ── SUBSCRIPTION EXPIRY CHECK ──────────────────────────────────────────
+    // Bypass for Demo, Enterprise, and permanently-active plans (null duration).
+    // For time-limited plans (e.g. Trial), check subscription_end.
+    // subscription_end = null means either: unlimited license OR the field has not
+    // been set yet (legacy org created before this feature). We treat null as valid
+    // (no enforcement) to avoid locking out existing paying customers.
+    const isTimeLimited = typeof pkgData?.duration_days === 'number' && pkgData.duration_days > 0
+    const isDemoPlan = planName === 'Demo'
+    if (isTimeLimited && !isDemoPlan) {
+      // Prefer the explicit subscription_end stored on the org row.
+      const rawEnd = (org as any).subscription_end
+      if (rawEnd) {
+        subscriptionEnd = new Date(rawEnd)
+        isSubscriptionExpired = subscriptionEnd < new Date()
+      }
+      // If subscription_end is null (legacy org), we do NOT force-expire.
     }
   }
 
@@ -1368,7 +1413,9 @@ const getActiveOrgCached = cache(async () => {
     jobTitle: empData?.job_title || memberData.role,
     permissions: resolvedPermissions,
     enabledModules,
-    user
+    user,
+    isSubscriptionExpired,
+    subscriptionEnd,
   }
 })
 
