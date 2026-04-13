@@ -504,7 +504,7 @@ export default function SaaSAdminPage() {
         price: Number(fd.get('price')),
         billing: fd.get('billing') as string,
         is_active: true,
-        modules: modules,
+        modules: JSON.stringify(modules), // PostgREST requires stringified array for jsonb column
         duration_days: Number(fd.get('duration_days') || 30),
         max_orgs: Number(fd.get('max_orgs') || 1),
         max_warehouses: Number(fd.get('max_warehouses') || 1),
