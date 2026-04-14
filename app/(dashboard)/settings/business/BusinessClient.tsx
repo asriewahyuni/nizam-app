@@ -146,6 +146,27 @@ export default function BusinessClient({
         </div>
       </div>
 
+      <div className="rounded-[32px] border border-violet-100 bg-gradient-to-r from-violet-50 via-white to-slate-50 p-6 shadow-lg shadow-violet-100/40">
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl space-y-2">
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-700">Open API & Webhook</div>
+            <h2 className="text-xl font-black tracking-tight text-slate-900">Integrasi dengan Sistem Eksternal?</h2>
+            <p className="text-sm font-medium leading-6 text-slate-600">
+              Akses endpoint API Nizam untuk transaksi kas otomatis, webhook, dan data flow ke aplikasi lain. Generate API Key Anda dari panel khusus ini.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/settings/api"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-white transition hover:bg-violet-700"
+            >
+              <Key size={16} />
+              Buka Panel Integrasi
+            </Link>
+          </div>
+        </div>
+      </div>
+
       <form onSubmit={handleSave} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-12">
         
         <div className="space-y-8">

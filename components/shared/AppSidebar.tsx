@@ -43,6 +43,7 @@ import {
   Megaphone,
   LifeBuoy,
   Upload,
+  Code2,
   type LucideIcon
 } from 'lucide-react'
 import { signOut } from '@/modules/auth/actions/auth.actions'
@@ -128,12 +129,19 @@ const NAV_GROUPS: NavGroup[] = [
     ]
   },
   {
+    group: 'Syirkah',
+    items: [
+      { label: 'Akad Syirkah', href: '/syirkah', icon: Briefcase },
+    ]
+  },
+  {
     group: 'Config',
     items: [
       { label: 'Audit Trail', href: '/settings/audit', icon: ShieldCheck, permission_key: 'audit_trail', module_key: 'Audit' },
       { label: 'Anak Perusahaan', href: '/settings/sub-orgs', icon: Layers, permission_key: 'business', module_key: 'Consolidation' },
       { label: 'Cabang', href: '/settings/branches', icon: MapPin, permission_key: 'branch' },
       { label: 'Pengaturan Bisnis', href: '/settings/business', icon: Settings, permission_key: 'business', module_key: 'Config' },
+      { label: 'API & Integrasi', href: '/settings/api', icon: Code2, permission_key: 'business', module_key: 'Config' },
       { label: 'Migrasi Data', href: '/settings/business/migration', icon: Upload, permission_key: 'business', module_key: 'Config' },
       { label: 'Support Ticket', href: '/settings/ticketing', icon: LifeBuoy, permission_key: 'business', module_key: 'Config' },
     ]
@@ -754,27 +762,26 @@ export function AppSidebar({
       </nav>
 
       {/* Footer / Role */}
-      <div className={`p-4 border-t border-slate-50 bg-slate-50/30 ${isCollapsed ? 'items-center' : ''}`}>
-        <div className={`flex items-center ${isCollapsed ? 'flex-col gap-4' : 'justify-between'}`}>
-          <div className="flex items-center gap-3">
+      <div className={`p-4 mt-auto border-t border-slate-200 bg-slate-100/80 hover:bg-slate-100 transition-colors ${isCollapsed ? 'flex flex-col items-center gap-4' : 'flex items-center justify-between w-full'}`}>
+        <div className={`flex items-center gap-3 ${isCollapsed ? '' : 'min-w-0 flex-1'}`}>
           <Link href="/profil-saya" onMouseEnter={() => prefetchRoute('/profil-saya')} onFocus={() => prefetchRoute('/profil-saya')} onTouchStart={() => prefetchRoute('/profil-saya')} onPointerDown={() => prefetchRoute('/profil-saya')} onClick={() => {
             prefetchRoute('/profil-saya')
             notifyRouteLoadingStart()
             setIsMobileOpen(false)
-          }} className="w-10 h-10 shrink-0 rounded-2xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center text-xs font-black text-slate-800 shadow-sm relative hover:ring-2 hover:ring-blue-400 transition-all" title="Edit Profil Saya">
-              {userRole?.slice(0, 1).toUpperCase()}
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#003366] border-2 border-white" />
+          }} className="w-10 h-10 shrink-0 rounded-full bg-slate-800 border border-slate-700 overflow-hidden flex items-center justify-center text-sm font-black text-white shadow-md relative hover:ring-2 hover:ring-blue-400 hover:scale-105 transition-all" title="Edit Profil Saya">
+              {user?.fullName?.slice(0, 1).toUpperCase() || userRole?.slice(0, 1).toUpperCase()}
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-800" />
             </Link>
             {!isCollapsed && (
-              <div className="flex flex-col overflow-hidden max-w-[120px]">
-                <p className="text-sm font-black text-slate-900 truncate mb-1 leading-tight tracking-tight">{user?.fullName || userRole}</p>
+              <div className="flex flex-col overflow-hidden min-w-0 flex-1">
+                <p className="text-sm font-black text-slate-900 truncate mb-0.5 leading-tight tracking-tight">{user?.fullName || userRole}</p>
                 <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest truncate">{jobTitle || userRole}</p>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em] truncate mt-1">{planName}</p>
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.18em] truncate mt-0.5">{planName}</p>
               </div>
             )}
           </div>
 
-          <div className={`flex items-center ${isCollapsed ? 'flex-col gap-1' : 'gap-1'}`}>
+          <div className={`flex items-center shrink-0 ${isCollapsed ? 'flex-col gap-2' : 'gap-1'}`}>
             <Link 
               href={isOwnerOrAdmin ? '/settings/business' : '/profil-saya'} 
               onMouseEnter={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/profil-saya')}
@@ -801,7 +808,6 @@ export function AppSidebar({
               <LogOut size={18} strokeWidth={2} className={isSigningOut ? 'animate-pulse' : ''} />
             </button>
           </div>
-        </div>
       {isCollapsed && (
         <div className="px-3 pb-3">
           <Link href="/billing" onMouseEnter={() => prefetchRoute('/billing')} onFocus={() => prefetchRoute('/billing')} onTouchStart={() => prefetchRoute('/billing')} onPointerDown={() => prefetchRoute('/billing')} onClick={() => {

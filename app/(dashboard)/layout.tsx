@@ -75,6 +75,7 @@ export default async function DashboardLayout({
     { path: '/settings/ticketing', requiredModule: 'Config', aliases: ['Config', 'Ticketing', 'Support Ticket', 'Doc Update Ticketing', 'Dokumen Update Support Ticket'], permissionKeys: ['business', 'support', 'ticketing'] },
     { path: '/settings/roles', requiredModule: 'HRIS', aliases: ['HRIS', 'Akses & Jabatan'], permissionKeys: ['business'] },
     { path: '/settings/branches', requiredModule: 'Config', aliases: ['Config', 'Cabang & Divisi'], permissionKeys: ['branch'] },
+    { path: '/settings/api', requiredModule: 'Config', aliases: ['Config', 'API & Integrasi'], permissionKeys: ['business'] },
     { path: '/settings/business', requiredModule: 'Config', aliases: ['Config', 'Pengaturan Bisnis'], permissionKeys: ['business'] },
     { path: '/settings/accounts', requiredModule: 'Finance', aliases: ['Finance', 'Akun (CoA)'], permissionKeys: ['coa'] },
     {
@@ -94,6 +95,7 @@ export default async function DashboardLayout({
     { path: '/hris', requiredModule: 'HRIS', aliases: ['HRIS', 'Karyawan (HRIS)', 'Attendance', 'Payroll'], permissionKeys: ['hris', 'employee', 'employees', 'attendance', 'payroll'] },
     { path: '/reports', requiredModule: 'Reports', aliases: ['Reports', 'Laporan', 'Insight'], permissionKeys: ['reports', 'strategy', 'forecast'] },
     { path: '/services', requiredModule: 'Job Order (Jasa)', aliases: ['Job Order (Jasa)', 'Industrial Job Order', 'Services'], permissionKeys: ['services', 'service', 'job_order'] },
+    { path: '/syirkah', requiredModule: 'Syirkah', aliases: ['Syirkah', 'Partnership'] },
   ]
 
   // Identify which module is being accessed
@@ -106,6 +108,7 @@ export default async function DashboardLayout({
     // 1. SAAS MODULE GUARD (Check for EVERYONE, including owner)
     const isModulePaid = !orgData.enabledModules || orgData.enabledModules.length === 0
       ? true  // If no modules are configured, allow access (e.g. during setup)
+      : requiredModule === 'Syirkah' ? true // Bypass SaaS guard for custom Syirkah module
       : orgData.enabledModules.some((m: string) => allNames.some((candidate) => moduleNameMatches(m, candidate)))
 
     if (!isModulePaid) {

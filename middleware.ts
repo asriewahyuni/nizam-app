@@ -7,7 +7,7 @@ import { updateSession } from '@/lib/supabase/middleware'
  * 1. Refreshing Supabase session (JWT refresh)
  * 2. RBAC / Protected Routes redirects
  */
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   // Legacy domain redirect dinonaktifkan — nizam.xales.id tidak lagi diredirect ke brain.kliknizam.app.
   // Aktifkan kembali blok di bawah jika redirect domain diperlukan:
   //
