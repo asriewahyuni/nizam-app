@@ -394,7 +394,7 @@ export function ManufacturingClient({
                                   )}
                                 </div>
                              </td>
-                             <td className="px-6 py-5 text-right font-black text-slate-900">{wo.quantity_planned} Unit</td>
+                             <td className="px-6 py-5 text-right font-black text-slate-900">{Number(wo.quantity_planned).toFixed(2)} Unit</td>
                              <td className="px-6 py-5">
                                 <span className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-tighter border ${
                                   wo.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
