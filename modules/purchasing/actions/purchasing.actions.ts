@@ -1165,12 +1165,18 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
       journalLines.push({ account_id: overheadAccId, debit: 0, credit: overheadCashAmount, memo: 'Pembayaran Tunai Freight/Logistics' })
     }
 
-    // Sanity check just to be safe
+    // Balancer untuk Diskon Global dan Pembulatan (Round-off)
     const totalDebit = journalLines.reduce((acc: any, l: any) => acc + l.debit, 0)
     const totalCredit = journalLines.reduce((acc: any, l: any) => acc + l.credit, 0)
     
-    if (Math.abs(totalDebit - totalCredit) > 0.01) {
-       (console as any).error("JOURNAL IMBALANCE IN PO:", { totalDebit, totalCredit, journalLines })
+    const diff = totalDebit - totalCredit
+    if (Math.abs(diff) > 0.001) {
+       journalLines.push({ 
+           account_id: accPersediaan || defaultAccHutang, 
+           debit: diff < 0 ? Math.abs(diff) : 0, 
+           credit: diff > 0 ? diff : 0, 
+           memo: 'Penyesuaian Pembulatan / Diskon Global PO' 
+       })
     }
 
     const journalResult = await createJournalEntry({
