@@ -434,14 +434,7 @@ export function ManufacturingClient({
                                     >
                                       Selesaikan
                                     </button>
-                                
-                                {wo.status === 'COMPLETED' && (
-                                  <button
-                                    onClick={() => router.push('/sales/orders')}
-                                    className="px-4 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-lg shadow-lg shadow-indigo-100 transition-all hover:bg-indigo-700"
-                                  >
-                                    Jual Sekarang
-                                  </button>
+                                  </>
                                 )}
                                 <button
                                   disabled={!activeBranchId}
