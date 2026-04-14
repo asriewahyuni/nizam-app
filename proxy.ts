@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from 'next/server'
+import { type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 /**
@@ -8,16 +8,17 @@ import { updateSession } from '@/lib/supabase/middleware'
  * 2. RBAC / Protected Routes redirects
  */
 export async function proxy(request: NextRequest) {
-  const host = request.headers.get('host')
-  const legacyDomains = ['nizam.xales.id', 'nizam.up.railway.app', 'nizam-staging.up.railway.app']
-
-  if (host && legacyDomains.includes(host)) {
-    const url = request.nextUrl.clone()
-    url.host = 'brain.kliknizam.app'
-    url.port = ''
-    url.protocol = 'https:'
-    return NextResponse.redirect(url, 301)
-  }
+  // Legacy domain redirect dinonaktifkan — nizam.xales.id tidak lagi diredirect ke brain.kliknizam.app.
+  // Aktifkan kembali blok di bawah jika redirect domain diperlukan:
+  //
+  // const legacyDomains = ['nizam.xales.id', 'nizam.up.railway.app', 'nizam-staging.up.railway.app']
+  // if (host && legacyDomains.includes(host)) {
+  //   const url = request.nextUrl.clone()
+  //   url.host = 'brain.kliknizam.app'
+  //   url.port = ''
+  //   url.protocol = 'https:'
+  //   return NextResponse.redirect(url, 301)
+  // }
 
   return updateSession(request)
 }

@@ -938,8 +938,19 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
   const inventoryDebitAllocations: Array<{ assetAccountId: string | null; assetFallbackCode: string; amount: number }> = []
 
   // 3. Process Items for WAC & Stock Card
+  const totalPurchaseItems = (purchase.purchase_items || []).length
+  let skippedItemCount = 0
+
   for (const item of purchase.purchase_items) {
-    if (!item.product_id) continue;
+    if (!item.product_id) {
+      // Item tanpa product_id tidak bisa disinkronkan ke inventaris.
+      // Ini terjadi jika produk baru gagal dibuat saat PO atau item diisi tanpa memilih produk dari master.
+      skippedItemCount++
+      ;(console as any).warn(
+        `[receivePurchase] purchase_item ${item.id} pada PO ${purchaseId} tidak memiliki product_id — dilewati dari sinkronisasi stok.`
+      )
+      continue
+    }
     
     // Landed Cost Calculation (Allocated based on Value)
     const itemSubtotal = (item.quantity * item.unit_price) - (item.discount_amount || 0)
@@ -959,6 +970,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     stockMovements.push({
       org_id: orgId,
       branch_id: movementBranchId,
+      warehouse_id: receiptWarehouse.id,
       product_id: item.product_id,
       quantity: item.quantity,
       unit_price: landedUnitPrice,
@@ -975,6 +987,17 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
       assetFallbackCode,
       amount: landedTotal,
     })
+  }
+
+  // Guard: jika semua purchase_items tidak memiliki product_id, blokir penerimaan
+  // agar user tidak mengira berhasil padahal stok tidak bertambah sama sekali.
+  if (totalPurchaseItems > 0 && skippedItemCount === totalPurchaseItems) {
+    return {
+      error:
+        'Semua item pada PO ini tidak terhubung ke produk master. ' +
+        'Buka form edit PO dan pastikan setiap baris produk dipilih dari daftar (bukan diketik manual tanpa memilih). ' +
+        'Atau buka Inventaris → Produk dan buat produk terlebih dahulu.'
+    }
   }
 
   // 4. Persistence: Stock Movements (Sub-Ledger) & WMS Sync (Physical Stock)
@@ -1342,4 +1365,184 @@ export async function getPendingPurchaseRequestsCount(orgId: string, branchId?: 
 
   if (error) return 0
   return count || 0
+}
+
+export async function repairReceivedPurchaseStock(orgId: string): Promise<{
+  fixed: number
+  skipped: number
+  errors: string[]
+  details: string[]
+}> {
+  const supabase = await createClient()
+  const adminClient = await createAdminClient()
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  const { data: { user } } = await (supabase as any).auth.getUser()
+  if (!user) return { fixed: 0, skipped: 0, errors: ['Tidak terautentikasi.'], details: [] }
+
+  // Hanya owner/admin yang boleh menjalankan repair ini
+  const { data: membership } = await (adminClient as any)
+    .from('org_members')
+    .select('role')
+    .eq('org_id', orgId)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  const memberRole = String(membership?.role || '').toLowerCase()
+  if (memberRole !== 'owner' && memberRole !== 'admin') {
+    return { fixed: 0, skipped: 0, errors: ['Hanya owner/admin yang dapat menjalankan repair stok.'], details: [] }
+  }
+
+  let fixedCount = 0
+  let skippedCount = 0
+  const errors: string[] = []
+  const details: string[] = []
+
+  // 1. Ambil semua PO berstatus RECEIVED untuk org ini
+  let receivedPurchases: any[] = []
+  try {
+    const result = await queryPostgres<Record<string, unknown>>(`
+      SELECT p.id, p.purchase_number, p.branch_id, p.warehouse_id,
+             p.total_amount, p.shipping_amount, p.insurance_amount
+      FROM   public.purchases p
+      WHERE  p.org_id = $1 AND p.status = 'RECEIVED'
+      ORDER  BY p.updated_at DESC
+    `, [orgId])
+    receivedPurchases = result.rows
+  } catch (err: any) {
+    return { fixed: 0, skipped: 0, errors: ['Gagal membaca daftar PO: ' + err?.message], details: [] }
+  }
+
+  if (receivedPurchases.length === 0) {
+    return { fixed: 0, skipped: 0, errors: [], details: ['Tidak ada PO berstatus RECEIVED.'] }
+  }
+
+  // 2. Ambil PO yang sudah memiliki stock_movements agar tidak double-post
+  let poWithMovements = new Set<string>()
+  try {
+    const movResult = await queryPostgres<{ reference_id: string }>(`
+      SELECT DISTINCT reference_id::text
+      FROM   public.stock_movements
+      WHERE  org_id = $1 AND reference_type = 'PURCHASE'
+    `, [orgId])
+    movResult.rows.forEach((r) => poWithMovements.add(String(r.reference_id)))
+  } catch { /* jika tabel tidak ada, lanjutkan */ }
+
+  // 3. Proses tiap PO yang belum punya stock_movements
+  for (const po of receivedPurchases) {
+    const poId = String(po.id)
+    const poNum = String(po.purchase_number || poId)
+
+    if (poWithMovements.has(poId)) {
+      skippedCount++
+      details.push(`[SKIP] ${poNum} — sudah memiliki stock_movements.`)
+      continue
+    }
+
+    // Ambil items untuk PO ini
+    let items: any[] = []
+    try {
+      const itemsResult = await queryPostgres<Record<string, unknown>>(`
+        SELECT pi.id, pi.product_id, pi.quantity, pi.unit_price, pi.discount_amount,
+               p.category AS product_category, p.asset_account_id AS product_asset_account_id
+        FROM   public.purchase_items pi
+        LEFT JOIN public.products p ON p.id = pi.product_id
+        WHERE  pi.purchase_id = $1
+      `, [poId])
+      items = itemsResult.rows
+    } catch (err: any) {
+      errors.push(`[ERROR] ${poNum}: Gagal baca items — ${err?.message}`)
+      continue
+    }
+
+    const validItems = items.filter((i) => Boolean(i.product_id))
+    if (validItems.length === 0) {
+      skippedCount++
+      details.push(`[SKIP] ${poNum} — tidak ada item dengan product_id valid (${items.length} item tanpa produk master).`)
+      continue
+    }
+
+    // Tentukan warehouse untuk PO ini
+    let warehouseId: string | null = po.warehouse_id || null
+    if (!warehouseId) {
+      try {
+        let wQuery = (supabase as any)
+          .from('warehouses')
+          .select('id')
+          .eq('org_id', orgId)
+          .eq('is_active', true)
+          .order('name', { ascending: true })
+          .limit(1)
+        if (po.branch_id) wQuery = wQuery.eq('branch_id', po.branch_id)
+        const { data: wData } = await wQuery.maybeSingle()
+        warehouseId = wData?.id || null
+      } catch { /* ignore */ }
+    }
+
+    if (!warehouseId) {
+      skippedCount++
+      details.push(`[SKIP] ${poNum} — tidak ada gudang aktif untuk PO ini.`)
+      continue
+    }
+
+    // Sync inventory_stocks untuk setiap item valid
+    const totalItemsValue = Number(po.total_amount) || 1
+    const totalLandedOverhead = (Number(po.shipping_amount) || 0) + (Number(po.insurance_amount) || 0)
+    let poHasError = false
+
+    const movementsToInsert: any[] = []
+
+    for (const item of validItems) {
+      const itemSubtotal = (Number(item.quantity) * Number(item.unit_price)) - (Number(item.discount_amount) || 0)
+      const allocatedOverhead = (itemSubtotal / totalItemsValue) * totalLandedOverhead
+      const landedTotal = itemSubtotal + allocatedOverhead
+      const landedUnitPrice = item.quantity > 0 ? landedTotal / Number(item.quantity) : Number(item.unit_price)
+
+      movementsToInsert.push({
+        org_id: orgId,
+        branch_id: po.branch_id || null,
+        warehouse_id: warehouseId,
+        product_id: item.product_id,
+        quantity: Number(item.quantity),
+        unit_price: landedUnitPrice,
+        reference_type: 'PURCHASE',
+        reference_id: poId,
+        notes: `[REPAIR] Penerimaan ${poNum}`,
+      })
+
+      // Sync physical inventory_stocks
+      const syncResult = await syncInventoryStock(supabase, {
+        orgId,
+        productId: String(item.product_id),
+        warehouseId: String(warehouseId),
+        diff: Number(item.quantity),
+      })
+
+      if ('error' in syncResult) {
+        errors.push(`[ERROR] ${poNum} item ${item.product_id}: ${syncResult.error}`)
+        poHasError = true
+        break
+      }
+    }
+
+    if (poHasError) continue
+
+    // Insert stock_movements agar idempotency guard berjalan benar di masa depan
+    if (movementsToInsert.length > 0) {
+      const { error: smErr } = await (supabase as any).from('stock_movements').insert(movementsToInsert)
+      if (smErr) {
+        // Jika gagal insert movement (misalnya sudah ada), tetap anggap sukses karena inventory_stocks sudah diupdate
+        ;(console as any).warn(`[repairReceivedPurchaseStock] Gagal insert stock_movements untuk ${poNum}:`, smErr.message)
+      }
+    }
+
+    fixedCount++
+    details.push(`[FIXED] ${poNum} — ${validItems.length} item berhasil disinkronkan ke gudang.`)
+  }
+
+  revalidatePath('/purchasing')
+  revalidatePath('/inventory')
+
+  return { fixed: fixedCount, skipped: skippedCount, errors, details }
 }

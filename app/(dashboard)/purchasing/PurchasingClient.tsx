@@ -21,10 +21,12 @@ import {
   FileText,
   Printer,
   X,
-  Pencil
+  Pencil,
+  Wrench,
+  ShieldCheck
 } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
-import { createPurchaseEntry, receivePurchase, voidPurchase, createPurchasePayment, createPurchaseReturn, getPurchaseById } from '@/modules/purchasing/actions/purchasing.actions'
+import { createPurchaseEntry, receivePurchase, voidPurchase, createPurchasePayment, createPurchaseReturn, getPurchaseById, repairReceivedPurchaseStock } from '@/modules/purchasing/actions/purchasing.actions'
 import { createContact } from '@/modules/contacts/actions/contact.actions'
 import type { Product } from '@/types/database.types'
 
@@ -79,6 +81,16 @@ export default function PurchasingClient({
    }, [purchases])
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  // Repair Stock Modal State
+  const [showRepairModal, setShowRepairModal] = useState(false)
+  const [repairLoading, setRepairLoading] = useState(false)
+  const [repairResult, setRepairResult] = useState<{
+    fixed: number
+    skipped: number
+    errors: string[]
+    details: string[]
+  } | null>(null)
 
   // PO Detail Modal State
   const [showDetailModal, setShowDetailModal] = useState(false)
@@ -463,12 +475,28 @@ export default function PurchasingClient({
     if (!confirm('Tandai bahwa barang sudah diterima (Status -> RECEIVED)?')) return
     setLoading(true)
     const res = await receivePurchase(orgId, id)
-    if (res?.error) setError(res.error)
-    else {
-      setSuccess('Status PO berhasil diubah menjadi RECEIVED!')
+    if (res?.error) {
+      setError(res.error)
+    } else {
+      setSuccess('Status PO berhasil diubah menjadi RECEIVED! Stok inventaris telah diperbarui.')
+      // Refresh halaman agar data stok di inventaris langsung sinkron
+      router.refresh()
       setTimeout(() => setSuccess(null), 3500)
     }
     setLoading(false)
+  }
+
+  const handleRepairStock = async () => {
+    setRepairLoading(true)
+    setRepairResult(null)
+    try {
+      const result = await repairReceivedPurchaseStock(orgId)
+      setRepairResult(result)
+      if (result.fixed > 0) router.refresh()
+    } catch (e: any) {
+      setRepairResult({ fixed: 0, skipped: 0, errors: [e?.message || 'Terjadi kesalahan.'], details: [] })
+    }
+    setRepairLoading(false)
   }
 
   const handleVoidPO = async (id: string) => {
@@ -648,6 +676,13 @@ export default function PurchasingClient({
         tag="Logistics Module"
         actions={
           <>
+            <SafeButton 
+              variant="white"
+              icon={<Wrench size={16} />}
+              onClick={() => { setRepairResult(null); setShowRepairModal(true) }}
+            >
+              Repair Stok
+            </SafeButton>
             <SafeButton 
               variant="white"
               icon={<Truck size={16} />}
@@ -1774,6 +1809,135 @@ export default function PurchasingClient({
              </motion.div>
            </div>
          )}
+      </AnimatePresence>
+
+      {/* Repair Stock Modal */}
+      <AnimatePresence>
+        {showRepairModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden"
+            >
+              <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center">
+                    <Wrench size={20} className="text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-white font-black text-lg">Repair Stok Inventaris</h2>
+                    <p className="text-amber-100 text-xs font-medium">Sinkronisasi ulang PO RECEIVED yang stoknya belum masuk</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowRepairModal(false)}
+                  className="w-8 h-8 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center text-white transition-all"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="p-8 space-y-6">
+                {!repairResult && !repairLoading && (
+                  <div className="space-y-4">
+                    <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                      <p className="font-bold text-amber-800 text-sm mb-2">⚠️ Apa yang akan dilakukan?</p>
+                      <ul className="space-y-1 text-xs font-medium list-disc list-inside text-amber-700">
+                        <li>Mencari semua PO berstatus <strong>RECEIVED</strong> yang stoknya belum masuk</li>
+                        <li>Mensinkronisasi ulang setiap item ke inventaris gudang</li>
+                        <li>PO yang sudah tersinkronisasi tidak akan diproses ulang (aman)</li>
+                        <li>Proses bisa memakan beberapa detik tergantung jumlah PO</li>
+                      </ul>
+                    </div>
+                    <button
+                      onClick={handleRepairStock}
+                      className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black rounded-2xl hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg shadow-amber-100 flex items-center justify-center gap-2"
+                    >
+                      <Wrench size={18} />
+                      Jalankan Repair Sekarang
+                    </button>
+                  </div>
+                )}
+
+                {repairLoading && (
+                  <div className="flex flex-col items-center gap-4 py-8">
+                    <div className="w-16 h-16 rounded-full border-4 border-amber-200 border-t-amber-500 animate-spin" />
+                    <p className="text-slate-600 font-bold text-sm">Sedang memproses semua PO RECEIVED...</p>
+                    <p className="text-slate-400 text-xs">Harap tunggu, jangan tutup halaman ini.</p>
+                  </div>
+                )}
+
+                {repairResult && !repairLoading && (
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-center">
+                        <div className="text-2xl font-black text-emerald-600">{repairResult.fixed}</div>
+                        <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mt-1">Diperbaiki</div>
+                      </div>
+                      <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center">
+                        <div className="text-2xl font-black text-slate-500">{repairResult.skipped}</div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Dilewati</div>
+                      </div>
+                      <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-center">
+                        <div className="text-2xl font-black text-red-500">{repairResult.errors.length}</div>
+                        <div className="text-[10px] font-bold text-red-400 uppercase tracking-widest mt-1">Error</div>
+                      </div>
+                    </div>
+
+                    {repairResult.fixed > 0 && (
+                      <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3">
+                        <ShieldCheck size={18} className="text-emerald-500 shrink-0" />
+                        <p className="text-emerald-700 text-sm font-bold">{repairResult.fixed} PO berhasil disinkronkan. Stok inventaris sudah diperbarui.</p>
+                      </div>
+                    )}
+
+                    {repairResult.errors.length > 0 && (
+                      <div className="bg-red-50 border border-red-100 rounded-2xl p-4 space-y-1">
+                        <p className="text-red-700 text-[10px] font-black uppercase tracking-widest mb-2">Error</p>
+                        {repairResult.errors.map((e, i) => (
+                          <p key={i} className="text-red-600 text-xs font-medium">{e}</p>
+                        ))}
+                      </div>
+                    )}
+
+                    {repairResult.details.length > 0 && (
+                      <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 max-h-48 overflow-y-auto space-y-1">
+                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Log Detail</p>
+                        {repairResult.details.map((d, i) => (
+                          <p key={i} className={`text-xs font-medium font-mono ${d.startsWith('[FIXED]') ? 'text-emerald-600' : d.startsWith('[ERROR]') ? 'text-red-500' : 'text-slate-400'}`}>{d}</p>
+                        ))}
+                      </div>
+                    )}
+
+                    {repairResult.fixed === 0 && repairResult.errors.length === 0 && (
+                      <div className="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3">
+                        <ShieldCheck size={18} className="text-blue-500 shrink-0" />
+                        <p className="text-blue-700 text-sm font-bold">Semua stok sudah tersinkronisasi dengan benar. Tidak ada yang perlu diperbaiki.</p>
+                      </div>
+                    )}
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setRepairResult(null)}
+                        className="flex-1 py-3 border border-slate-200 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition-all text-sm"
+                      >
+                        Jalankan Ulang
+                      </button>
+                      <button
+                        onClick={() => setShowRepairModal(false)}
+                        className="flex-1 py-3 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-700 transition-all text-sm"
+                      >
+                        Tutup
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
       {/* Floating Notifications */}
