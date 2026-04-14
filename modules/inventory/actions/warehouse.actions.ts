@@ -119,19 +119,33 @@ async function getAccessibleWarehouseBin(
   binId: string,
   branchId: string | null
 ): Promise<WarehouseBinAccessRecord | null> {
-  let query = (supabase as any)
-    .from('warehouse_bins')
-    .select('id, warehouse_id, warehouses!inner(branch_id)')
-    .eq('id', binId)
-    .eq('org_id', orgId)
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  let sql = `
+    SELECT wb.id, wb.warehouse_id, w.branch_id as warehouse_branch_id
+    FROM public.warehouse_bins wb
+    JOIN public.warehouses w ON w.id = wb.warehouse_id
+    WHERE wb.id = $1 AND wb.org_id = $2
+  `
+  const params: unknown[] = [binId, orgId]
 
   if (branchId) {
-    query = query.or(`branch_id.eq.${branchId}`, { foreignTable: 'warehouses' })
+    params.push(branchId)
+    sql += ` AND (w.branch_id = $${params.length} OR w.branch_id IS NULL)`
   }
 
-  const { data, error } = await query.maybeSingle()
-  if (error) return null
-  return (data as WarehouseBinAccessRecord | null) ?? null
+  try {
+    const { rows } = await queryPostgres<any>(sql, params)
+    if (rows.length === 0) return null
+    const r = rows[0]
+    return {
+      id: r.id,
+      warehouse_id: r.warehouse_id,
+      warehouses: { branch_id: r.warehouse_branch_id }
+    } as any
+  } catch {
+    return null
+  }
 }
 
 export async function getWarehouses(orgId: string, branchId?: string | null) {
@@ -158,26 +172,49 @@ export async function getWarehouses(orgId: string, branchId?: string | null) {
 }
 
 export async function getWarehouseBins(orgId: string, warehouseId?: string, branchId?: string | null) {
-  const supabase = await createClient()
   const branchSelection = await resolveActiveBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
   const effectiveBranchId = branchSelection.branchId
-  let query = supabase
-    .from('warehouse_bins')
-    .select('*, warehouses!inner(name, code, branch_id)')
-    .eq('org_id', orgId)
-  
+
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  let sql = `
+    SELECT wb.*, 
+           w.name as warehouse_name, 
+           w.code as warehouse_code, 
+           w.branch_id as warehouse_branch_id
+    FROM public.warehouse_bins wb
+    JOIN public.warehouses w ON w.id = wb.warehouse_id
+    WHERE wb.org_id = $1
+  `
+  const params: unknown[] = [orgId]
+
   if (warehouseId) {
-    query = query.eq('warehouse_id', warehouseId)
+    params.push(warehouseId)
+    sql += ` AND wb.warehouse_id = $${params.length}`
   }
 
   if (effectiveBranchId) {
-    query = (query as any).or(`branch_id.eq.${effectiveBranchId}`, { foreignTable: 'warehouses' })
+    params.push(effectiveBranchId)
+    sql += ` AND (w.branch_id = $${params.length} OR w.branch_id IS NULL)`
   }
 
-  const { data, error } = await query.order('warehouse_id', { ascending: true })
-  if (error) return []
-  return data
+  sql += ` ORDER BY wb.warehouse_id ASC`
+
+  try {
+    const { rows } = await queryPostgres<Record<string, unknown>>(sql, params)
+    return rows.map((r: any) => ({
+      ...r,
+      warehouses: {
+        name: r.warehouse_name,
+        code: r.warehouse_code,
+        branch_id: r.warehouse_branch_id
+      }
+    }))
+  } catch(err) {
+    console.error(err)
+    return []
+  }
 }
 
 export async function createWarehouseBin(orgId: string, payload: { warehouse_id: string; code: string; description?: string }) {
