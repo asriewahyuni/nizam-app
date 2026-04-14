@@ -225,6 +225,20 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
   const supabase = await createClient()
   const db = supabase as any
   const today = getBusinessToday()
+
+  // === DEBUG: trace raw query results ===
+  if (type === 'AP') {
+    const { data: rawPO, error: rawErr } = await db
+      .from('purchases')
+      .select('id, purchase_number, status, payment_status, grand_total')
+      .eq('org_id', orgId)
+      .limit(10)
+    console.log('[AGING-DEBUG] orgId:', orgId, 'branchId:', branchId)
+    console.log('[AGING-DEBUG] raw purchases (no filter):', rawPO?.length, rawErr?.message)
+    console.log('[AGING-DEBUG] sample:', JSON.stringify(rawPO?.slice(0, 3)))
+  }
+  // === END DEBUG ===
+
   const settlementAccounts = await getSettlementAccounts(db, orgId, ['1201', '1205', '1404', '2101', '2201', '2301', '2401', '2602', '2603'])
 
   const enrichWithContactNames = async (items: any[], idField: string) => {
@@ -243,6 +257,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
   }
 
   let results: AgingReportRow[] = []
+
 
   if (type === 'AR') {
     // 1. Trade AR from Sales Module
@@ -394,7 +409,9 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const tradeArDiff = tradeArGlBalance - tradeArModuleTotal
 
-    if (Math.abs(tradeArDiff) > 10) {
+    // Hanya tampilkan Unallocated jika GL punya lebih dari modul (ada jurnal manual)
+    // Jika modul > GL (jurnal belum terbentuk), jangan tambahkan baris negatif
+    if (tradeArDiff > 10) {
       results.push({
         id: 'manual-ar-adj',
         contact_id: null,
@@ -421,7 +438,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const salamReceivableDiff = salamReceivableGlBalance - salamReceivableModuleTotal
 
-    if (Math.abs(salamReceivableDiff) > 10) {
+    if (salamReceivableDiff > 10) {
       results.push({
         id: 'manual-salam-ar-adj',
         contact_id: null,
@@ -448,7 +465,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const istishnaReceivableDiff = istishnaReceivableGlBalance - istishnaReceivableModuleTotal
 
-    if (Math.abs(istishnaReceivableDiff) > 10) {
+    if (istishnaReceivableDiff > 10) {
       results.push({
         id: 'manual-istishna-ar-adj',
         contact_id: null,
@@ -618,7 +635,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const tradeApDiff = Number(balances['2101'] || 0) - tradeApModuleTotal
 
-    if (Math.abs(tradeApDiff) > 10) {
+    // Hanya tampilkan Unallocated jika GL punya lebih dari modul (ada jurnal manual)
+    if (tradeApDiff > 10) {
       results.push({
         id: `gl-2101-manual`,
         contact_id: null,
@@ -644,7 +662,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const salamLiabilityDiff = Number(balances['2602'] || 0) - salamLiabilityModuleTotal
 
-    if (Math.abs(salamLiabilityDiff) > 10) {
+    if (salamLiabilityDiff > 10) {
       results.push({
         id: 'gl-2602-adj',
         contact_id: null,
@@ -670,7 +688,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       .reduce((sum: number, row: AgingReportRow) => sum + Number(row.outstanding || 0), 0)
     const istishnaLiabilityDiff = Number(balances['2603'] || 0) - istishnaLiabilityModuleTotal
 
-    if (Math.abs(istishnaLiabilityDiff) > 10) {
+    if (istishnaLiabilityDiff > 10) {
       results.push({
         id: 'gl-2603-adj',
         contact_id: null,
