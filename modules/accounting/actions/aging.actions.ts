@@ -227,13 +227,28 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
   const today = getBusinessToday()
   const settlementAccounts = await getSettlementAccounts(db, orgId, ['1201', '1205', '1404', '2101', '2201', '2301', '2401', '2602', '2603'])
 
+  const enrichWithContactNames = async (items: any[], idField: string) => {
+    if (!items || items.length === 0) return items
+    const contactIds = [...new Set(items.map(i => i[idField]).filter(Boolean))]
+    if (contactIds.length === 0) return items
+    const { data: contacts } = await db.from('contacts').select('id, name').in('id', contactIds)
+    const contactMap: Record<string, string> = {}
+    if (contacts) {
+      contacts.forEach((c: any) => { contactMap[c.id] = c.name })
+    }
+    return items.map((item: any) => ({
+      ...item,
+      contacts: item[idField] ? { name: contactMap[item[idField]] } : null
+    }))
+  }
+
   let results: AgingReportRow[] = []
 
   if (type === 'AR') {
     // 1. Trade AR from Sales Module
     let salesQuery = db
       .from('sales')
-      .select('id, sale_number, sale_date, due_date, grand_total, shariah_mode, customer_id, contacts!customer_id(name)')
+      .select('id, sale_number, sale_date, due_date, grand_total, shariah_mode, customer_id')
       .eq('org_id', orgId)
       .not('status', 'in', '("DRAFT","VOIDED")')
       .neq('payment_status', 'PAID')
@@ -242,7 +257,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       salesQuery = salesQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
     }
 
-    const { data: sales } = await salesQuery
+    let { data: sales } = await salesQuery
+    if (sales) sales = await enrichWithContactNames(sales, 'customer_id')
 
     if (sales && sales.length > 0) {
       const saleIds = sales.map((s: any) => s.id)
@@ -301,7 +317,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     // 2. SALAM vendor receivable from Purchase module (1404)
     let salamPurchasesQuery = db
       .from('purchases')
-      .select('id, purchase_number, purchase_date, due_date, grand_total, status, payment_status, shariah_mode, vendor_id, contacts!vendor_id(name)')
+      .select('id, purchase_number, purchase_date, due_date, grand_total, status, payment_status, shariah_mode, vendor_id')
       .eq('org_id', orgId)
       .not('status', 'in', '("DRAFT","VOIDED","RECEIVED")')
 
@@ -309,7 +325,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       salamPurchasesQuery = salamPurchasesQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
     }
 
-    const { data: salamPurchases } = await salamPurchasesQuery
+    let { data: salamPurchases } = await salamPurchasesQuery
+    if (salamPurchases) salamPurchases = await enrichWithContactNames(salamPurchases, 'vendor_id')
 
     const salamPurchasesFiltered = (salamPurchases || []).filter((purchase: any) => isSalamMode(purchase.shariah_mode) || isIstishnaMode(purchase.shariah_mode))
 
@@ -453,7 +470,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     // 1. Trade AP from Purchases Module
     let purchasesQuery = db
       .from('purchases')
-      .select('id, purchase_number, purchase_date, due_date, grand_total, vendor_id, contacts!vendor_id(name)')
+      .select('id, purchase_number, purchase_date, due_date, grand_total, vendor_id')
       .eq('org_id', orgId)
       .not('status', 'in', '("DRAFT","VOIDED")')
       .neq('payment_status', 'PAID')
@@ -462,7 +479,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       purchasesQuery = purchasesQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
     }
 
-    const { data: purchases } = await purchasesQuery
+    let { data: purchases } = await purchasesQuery
+    if (purchases) purchases = await enrichWithContactNames(purchases, 'vendor_id')
 
     if (purchases && purchases.length > 0) {
       const purchaseIds = purchases.map((p: any) => p.id)
@@ -514,7 +532,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
     // 2. SALAM liability (2602) from undelivered SALAM sales
     let salamSalesQuery = db
       .from('sales')
-      .select('id, sale_number, sale_date, due_date, grand_total, shariah_mode, status, customer_id, contacts!customer_id(name)')
+      .select('id, sale_number, sale_date, due_date, grand_total, shariah_mode, status, customer_id')
       .eq('org_id', orgId)
       .not('status', 'in', '("DRAFT","VOIDED","FINISHED")')
 
@@ -522,7 +540,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       salamSalesQuery = salamSalesQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
     }
 
-    const { data: salamSales } = await salamSalesQuery
+    let { data: salamSales } = await salamSalesQuery
+    if (salamSales) salamSales = await enrichWithContactNames(salamSales, 'customer_id')
 
     const salamSalesFiltered = (salamSales || []).filter((sale: any) => isSalamMode(sale.shariah_mode) || isIstishnaMode(sale.shariah_mode))
 
