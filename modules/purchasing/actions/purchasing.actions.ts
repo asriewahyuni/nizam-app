@@ -1187,10 +1187,14 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
       reference_type: 'PURCHASE',
       reference_id: purchase.id,
       lines: journalLines,
-      auto_post: true
+      auto_post: true,
+      allow_org_scope: true
     })
+    
     const jErr = (journalResult as any).error
-    if (jErr) (console as any).error("Journal creation failed:", jErr)
+    if (jErr) {
+       return { error: 'Gagal menjurnal bukti penerimaan: ' + String(jErr) }
+    }
     
     // Auto-Lunas Payment trigger for Bank history & AP clearing
     if (LunasAccountId && vendorApAmount > 0 && String(purchase.shariah_mode || '').toUpperCase() !== 'SALAM') {
