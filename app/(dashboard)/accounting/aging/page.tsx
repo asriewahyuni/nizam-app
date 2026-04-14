@@ -5,13 +5,17 @@ import { AgingClient } from '@/app/(dashboard)/accounting/aging/AgingClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AgingPage({ searchParams }: { searchParams: { view?: string } }) {
+export default async function AgingPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
 
-  const activeBranch = await getActiveBranch(orgData.org.id)
+  const [activeBranch, resolvedParams] = await Promise.all([
+    getActiveBranch(orgData.org.id),
+    searchParams,
+  ])
+
   const summary = await getAgingSummary(orgData.org.id, activeBranch?.id)
-  const initialView = (searchParams.view as 'AR' | 'AP') || 'AR'
+  const initialView = (resolvedParams.view as 'AR' | 'AP') || 'AR'
 
   return (
     <div className="p-10 min-h-screen bg-slate-50/20">
@@ -22,3 +26,4 @@ export default async function AgingPage({ searchParams }: { searchParams: { view
     </div>
   )
 }
+
