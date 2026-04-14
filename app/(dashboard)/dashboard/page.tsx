@@ -19,7 +19,8 @@ export default async function DashboardPage() {
     getActiveBranch(orgData.org.id),
     canSelectAllBranches(orgData.org.id),
   ])
-  const reportBranchId = canAccessAllBranches ? null : (activeBranch?.id ?? null)
+  // Allow admins to filter dashboard by their selected branch
+  const reportBranchId = activeBranch?.id ?? null
 
   const [cashBalance, balanceSheet, profitLoss, cashFlow, analytics] = await Promise.all([
     getBankLiquidityTotal(orgData.org.id, reportBranchId),
