@@ -252,7 +252,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       .eq('org_id', orgId)
       .neq('status', 'DRAFT')
       .neq('status', 'VOIDED')
-      .neq('payment_status', 'PAID')
+      .or('payment_status.neq.PAID,payment_status.is.null')
 
     if (branchId) {
       salesQuery = salesQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
@@ -477,7 +477,7 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       .eq('org_id', orgId)
       .neq('status', 'DRAFT')
       .neq('status', 'VOIDED')
-      .neq('payment_status', 'PAID')
+      .or('payment_status.neq.PAID,payment_status.is.null')
 
     if (branchId) {
       purchasesQuery = purchasesQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
