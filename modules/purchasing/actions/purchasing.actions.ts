@@ -101,6 +101,52 @@ function isPurchaseWarehouseColumnSchemaCacheMiss(
   )
 }
 
+function isStockMovementsWarehouseColumnMissing(
+  error: { code?: string | null; message?: string | null } | null | undefined
+) {
+  if (!error) return false
+
+  const message = String(error.message || '')
+  const normalized = message.toLowerCase()
+
+  return (
+    error.code === '42703' ||
+    error.code === 'PGRST204' ||
+    (
+      normalized.includes('stock_movements') &&
+      normalized.includes('warehouse_id') &&
+      (
+        normalized.includes('does not exist') ||
+        normalized.includes('could not find')
+      )
+    )
+  )
+}
+
+async function insertStockMovementsCompat(supabase: any, movements: any[]) {
+  if (!Array.isArray(movements) || movements.length === 0) {
+    return { success: true as const }
+  }
+
+  const { error: insertError } = await (supabase as any).from('stock_movements').insert(movements)
+  if (!insertError) {
+    return { success: true as const }
+  }
+
+  if (!isStockMovementsWarehouseColumnMissing(insertError)) {
+    return { error: insertError.message }
+  }
+
+  const legacyCompatibleMovements = movements.map(({ warehouse_id: _warehouseId, ...movement }) => movement)
+  const { error: fallbackError } = await (supabase as any).from('stock_movements').insert(legacyCompatibleMovements)
+
+  if (fallbackError) {
+    return { error: fallbackError.message }
+  }
+
+  return { success: true as const }
+}
+
 async function markPurchaseAsReceived(
   supabase: any,
   {
@@ -1002,9 +1048,9 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 
   // 4. Persistence: Stock Movements (Sub-Ledger) & WMS Sync (Physical Stock)
   if (stockMovements.length > 0) {
-     const { error: smErr } = await (supabase as any).from('stock_movements').insert(stockMovements)
-     if (smErr) {
-       return { error: 'Gagal mencatat kartu stok pembelian: ' + smErr.message }
+     const stockMovementInsert = await insertStockMovementsCompat(supabase, stockMovements)
+     if ('error' in stockMovementInsert) {
+       return { error: 'Gagal mencatat kartu stok pembelian: ' + stockMovementInsert.error }
      }
      
      // CRITICAL: Sync with physical inventory (inventory_stocks)
@@ -1530,10 +1576,13 @@ export async function repairReceivedPurchaseStock(orgId: string): Promise<{
 
     // Insert stock_movements agar idempotency guard berjalan benar di masa depan
     if (movementsToInsert.length > 0) {
-      const { error: smErr } = await (supabase as any).from('stock_movements').insert(movementsToInsert)
-      if (smErr) {
+      const stockMovementInsert = await insertStockMovementsCompat(supabase, movementsToInsert)
+      if ('error' in stockMovementInsert) {
         // Jika gagal insert movement (misalnya sudah ada), tetap anggap sukses karena inventory_stocks sudah diupdate
-        ;(console as any).warn(`[repairReceivedPurchaseStock] Gagal insert stock_movements untuk ${poNum}:`, smErr.message)
+        ;(console as any).warn(
+          `[repairReceivedPurchaseStock] Gagal insert stock_movements untuk ${poNum}:`,
+          stockMovementInsert.error
+        )
       }
     }
 

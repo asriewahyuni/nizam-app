@@ -56,6 +56,40 @@ type WarehouseScopeRecord = {
   id: string
   branch_id: string | null
   is_active: boolean
+  name?: string | null
+  code?: string | null
+}
+
+function isSchemaColumnMissing(
+  error: { code?: string | null; message?: string | null } | null | undefined,
+  tableName: string,
+  columnName: string
+) {
+  if (!error) return false
+
+  const message = String(error.message || '')
+  const normalized = message.toLowerCase()
+
+  return (
+    error.code === '42703' ||
+    error.code === 'PGRST204' ||
+    (
+      normalized.includes(tableName.toLowerCase()) &&
+      normalized.includes(columnName.toLowerCase()) &&
+      (
+        normalized.includes('does not exist') ||
+        normalized.includes('could not find')
+      )
+    )
+  )
+}
+
+function isWarehousesBranchSchemaMissing(error: { code?: string | null; message?: string | null } | null | undefined) {
+  return isSchemaColumnMissing(error, 'warehouses', 'branch_id')
+}
+
+function isStockMovementsBranchSchemaMissing(error: { code?: string | null; message?: string | null } | null | undefined) {
+  return isSchemaColumnMissing(error, 'stock_movements', 'branch_id')
 }
 
 type ActiveBranchResult =
@@ -91,7 +125,7 @@ async function getScopedWarehouses(
 
   let query = supabase
     .from('warehouses')
-    .select('id, branch_id, is_active')
+    .select('id, branch_id, is_active, name, code')
     .eq('org_id', orgId)
     .eq('is_active', true)
     .in('id', uniqueIds)
@@ -101,8 +135,23 @@ async function getScopedWarehouses(
   }
 
   const { data, error } = await query
-  if (error) return []
-  return (data as WarehouseScopeRecord[]) || []
+  if (!error) return (data as WarehouseScopeRecord[]) || []
+
+  if (!isWarehousesBranchSchemaMissing(error)) return []
+
+  const { data: legacyData, error: legacyError } = await supabase
+    .from('warehouses')
+    .select('id, is_active, name, code')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .in('id', uniqueIds)
+
+  if (legacyError) return []
+
+  return ((legacyData as Array<{ id: string; is_active: boolean; name?: string | null; code?: string | null }>) || []).map((row) => ({
+    ...row,
+    branch_id: null,
+  }))
 }
 
 export async function getProducts(orgId: string, branchId?: string | null): Promise<ProductWithStock[]> {
@@ -127,10 +176,33 @@ export async function getProducts(orgId: string, branchId?: string | null): Prom
     stockQuery = stockQuery.eq('warehouses.branch_id', effectiveBranchId)
   }
 
-  const { data: stockRows } = await stockQuery
+  const { data: stockRows, error: stockError } = await stockQuery
+
+  let currentStocks = stockRows || []
+
+  if (stockError && isWarehousesBranchSchemaMissing(stockError)) {
+    const { data: legacyStockRows, error: legacyStockError } = await (supabase as any)
+      .from('inventory_stocks')
+      .select('product_id, quantity, warehouse_id')
+      .eq('org_id', orgId)
+
+    if (!legacyStockError && Array.isArray(legacyStockRows)) {
+      if (effectiveBranchId) {
+        const scopedWarehouses = await getScopedWarehouses(
+          supabase,
+          orgId,
+          legacyStockRows.map((row: any) => String(row?.warehouse_id || '')).filter(Boolean),
+          effectiveBranchId
+        )
+        const allowedWarehouseIds = new Set(scopedWarehouses.map((warehouse) => warehouse.id))
+        currentStocks = legacyStockRows.filter((row: any) => allowedWarehouseIds.has(String(row?.warehouse_id || '')))
+      } else {
+        currentStocks = legacyStockRows
+      }
+    }
+  }
 
   const products = (productsData as ProductInventoryFields[]) || []
-  const currentStocks = stockRows || []
 
   const stockByProduct: Record<string, number> = {}
 
@@ -515,12 +587,38 @@ export async function getWarehouseStocks(orgId: string, productId: string, branc
   }
 
   const { data, error } = await query
+  let rows = Array.isArray(data) ? data : []
 
-  if (error || !Array.isArray(data)) return []
+  if (error && isWarehousesBranchSchemaMissing(error)) {
+    const { data: legacyRows, error: legacyError } = await (supabase as any)
+      .from('inventory_stocks')
+      .select('warehouse_id, quantity')
+      .eq('org_id', orgId)
+      .eq('product_id', productId)
+
+    if (legacyError || !Array.isArray(legacyRows)) return []
+
+    const scopedWarehouses = await getScopedWarehouses(
+      supabase,
+      orgId,
+      legacyRows.map((row: any) => String(row?.warehouse_id || '')).filter(Boolean),
+      effectiveBranchId
+    )
+    const warehouseLookup = new Map(scopedWarehouses.map((warehouse) => [warehouse.id, warehouse]))
+
+    rows = legacyRows
+      .filter((row: any) => warehouseLookup.has(String(row?.warehouse_id || '')))
+      .map((row: any) => ({
+        ...row,
+        warehouses: warehouseLookup.get(String(row?.warehouse_id || '')) || null,
+      }))
+  } else if (error || !Array.isArray(data)) {
+    return []
+  }
 
   const stocksByWarehouse = new Map<string, { warehouse_id: string; warehouse_name?: string; quantity: number }>()
 
-  data.forEach((stock: any) => {
+  rows.forEach((stock: any) => {
     const warehouseId = String(stock?.warehouse_id || '').trim()
     if (!warehouseId) return
 
@@ -568,11 +666,51 @@ export async function getInventoryWarehouseSnapshot(orgId: string, branchId?: st
   }
 
   const { data, error } = await query
-  if (error || !Array.isArray(data)) return []
+  let rows = Array.isArray(data) ? data : []
+
+  if (error && isWarehousesBranchSchemaMissing(error)) {
+    const { data: legacyRows, error: legacyError } = await (supabase as any)
+      .from('inventory_stocks')
+      .select('product_id, warehouse_id, quantity')
+      .eq('org_id', orgId)
+
+    if (legacyError || !Array.isArray(legacyRows)) return []
+
+    const productIds = [...new Set(legacyRows.map((row: any) => String(row?.product_id || '')).filter(Boolean))]
+    const warehouseIds = [...new Set(legacyRows.map((row: any) => String(row?.warehouse_id || '')).filter(Boolean))]
+
+    const [{ data: productsData }, scopedWarehouses] = await Promise.all([
+      (supabase as any)
+        .from('products')
+        .select('id, name, sku, unit, category, purchase_price, average_cost')
+        .eq('org_id', orgId)
+        .in('id', productIds),
+      getScopedWarehouses(supabase, orgId, warehouseIds, effectiveBranchId),
+    ])
+
+    const productLookup = new Map(
+      ((productsData as Array<{ id: string; name: string; sku?: string | null; unit?: string | null; category?: string | null; purchase_price?: number | null; average_cost?: number | null }>) || [])
+        .map((product) => [product.id, product])
+    )
+    const warehouseLookup = new Map(scopedWarehouses.map((warehouse) => [warehouse.id, warehouse]))
+
+    rows = legacyRows
+      .filter((row: any) => {
+        const warehouseId = String(row?.warehouse_id || '')
+        return warehouseLookup.has(warehouseId)
+      })
+      .map((row: any) => ({
+        ...row,
+        products: productLookup.get(String(row?.product_id || '')) || null,
+        warehouses: warehouseLookup.get(String(row?.warehouse_id || '')) || null,
+      }))
+  } else if (error || !Array.isArray(data)) {
+    return []
+  }
 
   const snapshotByKey = new Map<string, InventoryWarehouseStockRow>()
 
-  data.forEach((row: any) => {
+  rows.forEach((row: any) => {
     const product = row?.products
     const warehouse = row?.warehouses
     const productId = String(row?.product_id || '').trim()
@@ -648,9 +786,32 @@ export async function getInventoryMutations(
   }
 
   const { data: movements, error } = await movementsQuery
-  if (error || !Array.isArray(movements) || movements.length === 0) return []
+  let movementRows = Array.isArray(movements) ? movements as any[] : []
 
-  const movementRows = movements as any[]
+  if (error && isStockMovementsBranchSchemaMissing(error)) {
+    const { data: legacyMovements, error: legacyMovementError } = await (supabase as any)
+      .from('stock_movements')
+      .select(`
+        id,
+        product_id,
+        movement_date,
+        quantity,
+        unit_price,
+        reference_type: referenceType,
+        reference_id,
+        notes,
+        products(name, sku, unit, category)
+      `)
+      .eq('org_id', orgId)
+      .order('movement_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (legacyMovementError || !Array.isArray(legacyMovements) || legacyMovements.length === 0) return []
+    movementRows = legacyMovements as any[]
+  } else if (error || movementRows.length === 0) {
+    return []
+  }
   const saleIds = [...new Set(movementRows.filter((row) => row.reference_type === 'SALE' || row.reference_type === 'SALES_RETURN').map((row) => row.reference_id).filter(Boolean))]
   const purchaseIds = [...new Set(movementRows.filter((row) => row.reference_type === 'PURCHASE' || row.reference_type === 'PURCHASE_RETURN').map((row) => row.reference_id).filter(Boolean))]
   const adjustmentIds = [...new Set(movementRows.filter((row) => row.reference_type === 'ADJUSTMENT').map((row) => row.reference_id).filter(Boolean))]

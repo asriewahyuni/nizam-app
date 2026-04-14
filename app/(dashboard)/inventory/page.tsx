@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
+import { unstable_noStore as noStore } from 'next/cache'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import {
   getInventoryMutations,
@@ -10,6 +11,7 @@ import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 import InventoryClient from './InventoryClient'
 
 export default async function InventoryPage() {
+  noStore()
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
 

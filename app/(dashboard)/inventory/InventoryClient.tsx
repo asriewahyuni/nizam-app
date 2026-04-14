@@ -325,7 +325,7 @@ export default function InventoryClient({
 
   const handleFetchWhStocks = async (productId: string) => {
     if (!productId) return
-    const stocks = await getWarehouseStocks(orgId, productId)
+    const stocks = await getWarehouseStocks(orgId, productId, activeBranchId)
     setWhStocks(stocks)
     return stocks
   }
