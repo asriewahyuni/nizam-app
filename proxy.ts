@@ -2,13 +2,13 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 /**
- * Next.js Proxy (formerly Middleware) — Runs on every request.
- * Renamed from middleware.ts to proxy.ts as required by Next.js 16+.
+ * Next.js Proxy — Runs on every request.
+ * Replaces the deprecated middleware.ts convention (Next.js 16+).
  * Used for:
  * 1. Domain Redirects (nizam.xales.id -> kliknizam.app)
  * 2. Refreshing Supabase session (JWT refresh)
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const host = request.headers.get('host')
 
   // Legacy domain redirect: nizam.xales.id ke kliknizam.app
@@ -39,3 +39,4 @@ export const config = {
     },
   ],
 }
+
