@@ -250,7 +250,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       .from('sales')
       .select('id, sale_number, sale_date, due_date, grand_total, shariah_mode, customer_id')
       .eq('org_id', orgId)
-      .not('status', 'in', '("DRAFT","VOIDED")')
+      .neq('status', 'DRAFT')
+      .neq('status', 'VOIDED')
       .neq('payment_status', 'PAID')
 
     if (branchId) {
@@ -319,7 +320,9 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       .from('purchases')
       .select('id, purchase_number, purchase_date, due_date, grand_total, status, payment_status, shariah_mode, vendor_id')
       .eq('org_id', orgId)
-      .not('status', 'in', '("DRAFT","VOIDED","RECEIVED")')
+      .neq('status', 'DRAFT')
+      .neq('status', 'VOIDED')
+      .neq('status', 'RECEIVED')
 
     if (branchId) {
       salamPurchasesQuery = salamPurchasesQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
@@ -472,7 +475,8 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       .from('purchases')
       .select('id, purchase_number, purchase_date, due_date, grand_total, vendor_id')
       .eq('org_id', orgId)
-      .not('status', 'in', '("DRAFT","VOIDED")')
+      .neq('status', 'DRAFT')
+      .neq('status', 'VOIDED')
       .neq('payment_status', 'PAID')
 
     if (branchId) {
@@ -534,7 +538,9 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
       .from('sales')
       .select('id, sale_number, sale_date, due_date, grand_total, shariah_mode, status, customer_id')
       .eq('org_id', orgId)
-      .not('status', 'in', '("DRAFT","VOIDED","FINISHED")')
+      .neq('status', 'DRAFT')
+      .neq('status', 'VOIDED')
+      .neq('status', 'FINISHED')
 
     if (branchId) {
       salamSalesQuery = salamSalesQuery.or(`branch_id.eq.${branchId},branch_id.is.null`)
