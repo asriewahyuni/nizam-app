@@ -8,10 +8,12 @@
 import { type NextRequest } from 'next/server'
 import {
   validateApiKey, requireScope, apiError, apiSuccess, extractApiKeyFromRequest,
+  logApiCall, extractIpFromRequest,
 } from '@/lib/api/validate-key'
 import { createAdminClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
+  const startTime = Date.now()
   const rawKey = extractApiKeyFromRequest(request)
   if (!rawKey) return apiError('API key diperlukan. Sertakan header x-api-key.', 401)
 
@@ -23,6 +25,8 @@ export async function GET(request: NextRequest) {
   }
 
   const { orgId } = validation.key
+
+  const response = await (async () => {
   const { searchParams } = new URL(request.url)
   const limitParam = Math.min(Number(searchParams.get('limit') ?? '100'), 500)
   const type = searchParams.get('type') // 'customer' | 'supplier' | null
@@ -46,4 +50,18 @@ export async function GET(request: NextRequest) {
   if (error) return apiError('Gagal mengambil data kontak.', 500)
 
   return apiSuccess(data ?? [], { org_id: orgId, count: (data ?? []).length })
+  })()
+
+  void logApiCall({
+    orgId: validation.key.orgId,
+    apiKeyId: validation.key.keyId,
+    method: 'GET',
+    endpoint: '/api/v1/contacts',
+    statusCode: response.status,
+    durationMs: Date.now() - startTime,
+    ipAddress: extractIpFromRequest(request),
+    userAgent: request.headers.get('user-agent'),
+  })
+
+  return response
 }

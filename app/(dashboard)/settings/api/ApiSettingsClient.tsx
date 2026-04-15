@@ -16,7 +16,7 @@ import {
   Key, Plus, Trash2, Copy, Check, X, Eye, EyeOff,
   Globe, Shield, Clock, Activity,
   ArrowDownCircle, ArrowUpCircle, Webhook, AlertCircle,
-  Code, Lock,
+  Code, Lock, History, CheckCircle2, XCircle,
 } from 'lucide-react'
 import {
   generateApiKey,
@@ -25,6 +25,7 @@ import {
   type ApiKeyRecord,
   type ApiConfigurationRecord,
   type GenerateApiKeyInput,
+  type ApiCallLogRecord,
 } from '@/modules/organization/actions/api-key.actions'
 import type { ApiScope } from '@/lib/api/validate-key'
 
@@ -120,6 +121,7 @@ interface Props {
   initialInventoryProducts: InventoryProductOption[]
   branches: Branch[]
   webhookDeliveries: WebhookDelivery[]
+  callLogs: ApiCallLogRecord[]
   baseUrl: string
 }
 
@@ -235,9 +237,10 @@ export function ApiSettingsClient({
   initialInventoryProducts,
   branches,
   webhookDeliveries,
+  callLogs,
   baseUrl,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<'keys' | 'cashin' | 'cashout' | 'webhook' | 'tryout'>('keys')
+  const [activeTab, setActiveTab] = useState<'keys' | 'cashin' | 'cashout' | 'webhook' | 'tryout' | 'history'>('keys')
   const [activeDoc, setActiveDoc] = useState<'cash-read' | 'inventory-read' | 'cash-create'>('cash-read')
   const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>(initialApiKeys)
   const [loading, setLoading] = useState(false)
@@ -1115,6 +1118,7 @@ export function ApiSettingsClient({
           { id: 'cashin', label: 'Cash In', icon: ArrowDownCircle },
           { id: 'cashout', label: 'Cash Out', icon: ArrowUpCircle },
           { id: 'webhook', label: 'Webhook', icon: Webhook },
+          { id: 'history', label: 'History', icon: History },
         ].map(tab => {
           const Icon = tab.icon
           return (
@@ -1918,6 +1922,79 @@ if (signature !== expected) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════ */}
+      {/* TAB: HISTORY                                  */}
+      {/* ══════════════════════════════════════════════ */}
+      {activeTab === 'history' && (
+        <div className="space-y-5">
+          <div className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-6">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
+              <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
+                <History size={20} className="text-slate-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Call History</h3>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                  Log setiap request ke Open API v1 — 50 request terakhir.
+                </p>
+              </div>
+            </div>
+
+            {callLogs.length === 0 ? (
+              <div className="py-16 flex flex-col items-center gap-3 text-slate-400">
+                <History size={32} strokeWidth={1} />
+                <p className="text-sm font-medium">Belum ada request tercatat.</p>
+                <p className="text-xs text-slate-400">Log akan muncul setelah ada API call dengan key yang valid.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {callLogs.map((log) => {
+                  const isSuccess = log.status_code < 400
+                  const isServerErr = log.status_code >= 500
+                  const methodColor =
+                    log.method === 'POST' ? 'bg-emerald-100 text-emerald-700' :
+                    log.method === 'GET'  ? 'bg-blue-100 text-blue-700' :
+                    'bg-slate-100 text-slate-600'
+                  const statusColor =
+                    isServerErr          ? 'bg-red-100 text-red-600' :
+                    !isSuccess           ? 'bg-amber-100 text-amber-700' :
+                    'bg-emerald-100 text-emerald-700'
+
+                  return (
+                    <div
+                      key={log.id}
+                      className="flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-all"
+                    >
+                      {isSuccess
+                        ? <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />
+                        : <XCircle size={15} className="text-red-400 shrink-0" />
+                      }
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg uppercase ${methodColor}`}>
+                        {log.method}
+                      </span>
+                      <span className="text-xs font-mono text-slate-700 flex-1 min-w-0 truncate">
+                        {log.endpoint}
+                      </span>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${statusColor}`}>
+                        {log.status_code}
+                      </span>
+                      {log.duration_ms != null && (
+                        <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                          {log.duration_ms}ms
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-400 shrink-0">
+                        {new Date(log.created_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -12,10 +12,13 @@ import {
   apiError,
   apiSuccess,
   extractApiKeyFromRequest,
+  logApiCall,
+  extractIpFromRequest,
 } from '@/lib/api/validate-key'
 import { createAdminClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
+  const startTime = Date.now()
   const rawKey = extractApiKeyFromRequest(request)
   if (!rawKey) return apiError('API key diperlukan. Sertakan header x-api-key.', 401)
 
@@ -27,6 +30,8 @@ export async function GET(request: NextRequest) {
   }
 
   const { orgId, branchId } = validation.key
+
+  const response = await (async () => {
   const { searchParams } = new URL(request.url)
   const limitParam = Math.min(Number(searchParams.get('limit') ?? '50'), 200)
   const status = searchParams.get('status')
@@ -61,4 +66,18 @@ export async function GET(request: NextRequest) {
     branch_scope: branchId ?? 'all',
     count: (data ?? []).length,
   })
+  })()
+
+  void logApiCall({
+    orgId: validation.key.orgId,
+    apiKeyId: validation.key.keyId,
+    method: 'GET',
+    endpoint: '/api/v1/sales',
+    statusCode: response.status,
+    durationMs: Date.now() - startTime,
+    ipAddress: extractIpFromRequest(request),
+    userAgent: request.headers.get('user-agent'),
+  })
+
+  return response
 }

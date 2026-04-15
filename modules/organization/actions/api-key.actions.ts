@@ -273,6 +273,37 @@ export async function saveApiConfiguration(
 }
 
 // ─────────────────────────────────────────────────────────────
+// Action: listApiCallLogs
+// ─────────────────────────────────────────────────────────────
+
+export type ApiCallLogRecord = {
+  id: string
+  api_key_id: string | null
+  method: string
+  endpoint: string
+  status_code: number
+  duration_ms: number | null
+  ip_address: string | null
+  user_agent: string | null
+  error_message: string | null
+  created_at: string
+}
+
+export async function listApiCallLogs(orgId: string, limit = 50): Promise<ApiCallLogRecord[]> {
+  const ctx = await getAdminOrgContext(orgId)
+  if ('error' in ctx) return []
+
+  const { data } = await (ctx.admin as any)
+    .from('api_call_logs')
+    .select('id, api_key_id, method, endpoint, status_code, duration_ms, ip_address, user_agent, error_message, created_at')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  return Array.isArray(data) ? data : []
+}
+
+// ─────────────────────────────────────────────────────────────
 // Action: listWebhookDeliveries
 // ─────────────────────────────────────────────────────────────
 

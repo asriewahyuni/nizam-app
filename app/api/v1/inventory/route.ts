@@ -11,6 +11,7 @@ export const revalidate = 0
 import { type NextRequest } from 'next/server'
 import {
   validateApiKey, requireScope, apiError, apiSuccess, extractApiKeyFromRequest,
+  logApiCall, extractIpFromRequest,
 } from '@/lib/api/validate-key'
 import { queryPostgres } from '@/lib/db/postgres'
 
@@ -43,6 +44,7 @@ function withNoStore(response: Response) {
 }
 
 export async function GET(request: NextRequest) {
+  const startTime = Date.now()
   const rawKey = extractApiKeyFromRequest(request)
   if (!rawKey) return withNoStore(apiError('API key diperlukan. Sertakan header x-api-key.', 401))
 
@@ -54,6 +56,8 @@ export async function GET(request: NextRequest) {
   }
 
   const { orgId, branchId } = validation.key
+
+  const response = await (async () => {
   const { searchParams } = new URL(request.url)
   const limitParam = normalizeLimit(searchParams.get('limit'))
   const search = searchParams.get('search')?.trim() ?? ''
@@ -130,4 +134,18 @@ export async function GET(request: NextRequest) {
     branch_scope: branchId ?? 'all',
     count: data.length,
   }))
+  })()
+
+  void logApiCall({
+    orgId: validation.key.orgId,
+    apiKeyId: validation.key.keyId,
+    method: 'GET',
+    endpoint: '/api/v1/inventory',
+    statusCode: response.status,
+    durationMs: Date.now() - startTime,
+    ipAddress: extractIpFromRequest(request),
+    userAgent: request.headers.get('user-agent'),
+  })
+
+  return response
 }

@@ -220,3 +220,51 @@ export function extractApiKeyFromRequest(request: Request): string | null {
 
   return null
 }
+
+export type ApiCallLogInput = {
+  orgId: string
+  apiKeyId: string | null
+  method: string
+  endpoint: string
+  statusCode: number
+  durationMs?: number
+  ipAddress?: string | null
+  userAgent?: string | null
+  errorMessage?: string | null
+}
+
+/**
+ * Log an API call to api_call_logs table (fire-and-forget).
+ * Always uses admin client so RLS does not block server-side INSERT.
+ */
+export async function logApiCall(input: ApiCallLogInput): Promise<void> {
+  try {
+    const admin = await createAdminClient()
+    await (admin as any)
+      .from('api_call_logs')
+      .insert({
+        org_id: input.orgId,
+        api_key_id: input.apiKeyId ?? null,
+        method: input.method,
+        endpoint: input.endpoint,
+        status_code: input.statusCode,
+        duration_ms: input.durationMs ?? null,
+        ip_address: input.ipAddress ?? null,
+        user_agent: input.userAgent ?? null,
+        error_message: input.errorMessage ?? null,
+      })
+  } catch {
+    // Non-fatal — logging must never break the API response
+  }
+}
+
+/**
+ * Extract caller IP from request headers.
+ */
+export function extractIpFromRequest(request: Request): string | null {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    null
+  )
+}

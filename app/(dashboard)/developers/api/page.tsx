@@ -12,6 +12,7 @@ import {
   listApiKeys,
   getApiConfiguration,
   listWebhookDeliveries,
+  listApiCallLogs,
 } from '@/modules/organization/actions/api-key.actions'
 import { ApiSettingsClient } from '@/app/(dashboard)/settings/api/ApiSettingsClient'
 
@@ -24,11 +25,12 @@ export default async function DeveloperApiPage() {
   const role = String(orgData.role || '').toLowerCase()
   if (role !== 'owner' && role !== 'admin') redirect('/dashboard')
 
-  const [apiKeys, branches, config, webhookDeliveries] = await Promise.all([
+  const [apiKeys, branches, config, webhookDeliveries, callLogs] = await Promise.all([
     listApiKeys(orgData.org.id),
     getBranches(orgData.org.id),
     getApiConfiguration(orgData.org.id),
     listWebhookDeliveries(orgData.org.id, 10),
+    listApiCallLogs(orgData.org.id, 50),
   ])
 
   // Fetch active CoA accounts for API mappings.
@@ -123,6 +125,7 @@ export default async function DeveloperApiPage() {
       initialInventoryProducts={inventoryProducts}
       branches={branches ?? []}
       webhookDeliveries={webhookDeliveries}
+      callLogs={callLogs}
       baseUrl={baseUrl}
     />
   )

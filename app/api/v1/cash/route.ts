@@ -23,6 +23,8 @@ import {
   apiError,
   apiSuccess,
   extractApiKeyFromRequest,
+  logApiCall,
+  extractIpFromRequest,
 } from '@/lib/api/validate-key'
 import { getPostgresPool, queryPostgres } from '@/lib/db/postgres'
 import { deliverWebhook } from '@/lib/api/webhook'
@@ -806,6 +808,7 @@ async function createManualJournalForCashTransaction(
 // GET /api/v1/cash — daftar rekening kas/bank aktif + saldo posted
 // ─────────────────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
+  const startTime = Date.now()
   const rawKey = extractApiKeyFromRequest(request)
   if (!rawKey) return withNoStore(apiError('API key diperlukan. Sertakan header x-api-key.', 401))
 
@@ -818,6 +821,7 @@ export async function GET(request: NextRequest) {
 
   const { orgId, branchId } = validation.key
 
+  const response = await (async () => {
   let rows: CashAccountApiRow[]
   try {
     const result = await queryPostgres<CashAccountApiRow>(
@@ -927,12 +931,27 @@ export async function GET(request: NextRequest) {
     branch_scope: branchId ?? 'all',
     count: data.length,
   }))
+  })()
+
+  void logApiCall({
+    orgId: validation.key.orgId,
+    apiKeyId: validation.key.keyId,
+    method: 'GET',
+    endpoint: '/api/v1/cash',
+    statusCode: response.status,
+    durationMs: Date.now() - startTime,
+    ipAddress: extractIpFromRequest(request),
+    userAgent: request.headers.get('user-agent'),
+  })
+
+  return response
 }
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/v1/cash — catat kas masuk/keluar ke bank_transactions
 // ─────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
+  const startTime = Date.now()
   const rawKey = extractApiKeyFromRequest(request)
   if (!rawKey) return withNoStore(apiError('API key diperlukan.', 401))
 
@@ -943,6 +962,7 @@ export async function POST(request: NextRequest) {
     return withNoStore(apiError('Scope tidak mencukupi. Diperlukan: cash:write', 403))
   }
 
+  const response = await (async () => {
   let body: JsonObject
   try {
     body = asObject(await request.json())
@@ -1208,4 +1228,18 @@ export async function POST(request: NextRequest) {
     auto_post: autoPost,
     settlement_type: counterResolution.settlementType,
   }))
+  })()
+
+  void logApiCall({
+    orgId: validation.key.orgId,
+    apiKeyId: validation.key.keyId,
+    method: 'POST',
+    endpoint: '/api/v1/cash',
+    statusCode: response.status,
+    durationMs: Date.now() - startTime,
+    ipAddress: extractIpFromRequest(request),
+    userAgent: request.headers.get('user-agent'),
+  })
+
+  return response
 }
