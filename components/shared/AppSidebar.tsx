@@ -161,6 +161,7 @@ const SIDEBAR_COLLAPSED_KEY = 'nizam_sidebar_collapsed'
 const SIDEBAR_STATE_EVENT = 'nizam_sidebar_state_change'
 const SIDEBAR_TOGGLE_EVENT = 'nizam_sidebar_toggle'
 const ROUTE_LOADING_START_EVENT = 'nizam_route_loading_start'
+const SIDEBAR_NAV_SKELETON_GROUPS = [3, 4, 3, 4] as const
 
 function getSidebarCollapsedSnapshot() {
   if (typeof window === 'undefined') return false
@@ -253,6 +254,7 @@ export function AppSidebar({
   const fullPath = pathname + (tabQuery ? `?tab=${tabQuery}` : '')
   const prefetchedRoutesRef = useRef<Set<string>>(new Set())
 
+  const [hasMounted, setHasMounted] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [badgeMetrics, setBadgeMetrics] = useState(() => ({
     pendingApprovals,
@@ -268,6 +270,10 @@ export function AppSidebar({
     return () => window.removeEventListener(SIDEBAR_TOGGLE_EVENT, handleMobileToggle)
   }, [])
 
+  useEffect(() => {
+    setHasMounted(true)
+  }, [])
+
   const isCollapsed = useSyncExternalStore(
     subscribeSidebarCollapsed,
     getSidebarCollapsedSnapshot,
@@ -276,6 +282,7 @@ export function AppSidebar({
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
   const isPlatformAdmin = isPlatformAdminEmail(user?.email)
   const showSaasOperatorGroup = isPlatformAdmin
+  const effectiveIsCollapsed = hasMounted ? isCollapsed : false
   const navGroups = useMemo(() => (
     showSaasOperatorGroup
       ? [...NAV_GROUPS, SAAS_OPERATOR_GROUP]
@@ -532,7 +539,7 @@ export function AppSidebar({
       )}
       
       <aside className={`
-        ${isCollapsed ? 'w-20' : 'w-64'} 
+        ${effectiveIsCollapsed ? 'w-20' : 'w-64'} 
         transition-all duration-300 ease-in-out flex-shrink-0 flex flex-col h-full bg-white border-r border-slate-100 group/sidebar z-50 print:hidden
         ${isMobileOpen ? 'fixed inset-y-0 left-0 shadow-2xl translate-x-0' : 'fixed inset-y-0 left-0 -translate-x-full md:relative md:translate-x-0 md:flex'}
       `}>
@@ -541,11 +548,11 @@ export function AppSidebar({
         onClick={toggleCollapse}
         className="absolute -right-3 top-24 w-6 h-6 bg-white border border-slate-200 rounded-full hidden md:flex items-center justify-center text-slate-400 hover:text-emerald-600 shadow-sm z-50 transition-transform hover:scale-110"
       >
-        <ChevronLeft size={14} className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
+        <ChevronLeft size={14} className={`transition-transform duration-300 ${effectiveIsCollapsed ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Logo Section */}
-      <div className={`h-20 flex items-center px-6 ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+      <div className={`h-20 flex items-center px-6 ${effectiveIsCollapsed ? 'justify-center' : 'gap-3'}`}>
         <>
           <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-md shrink-0 overflow-hidden group-hover:scale-110 transition-transform">
             <Image
@@ -556,7 +563,7 @@ export function AppSidebar({
               className="w-full h-full object-cover scale-[1.3]"
             />
           </div>
-          {!isCollapsed && (
+          {!effectiveIsCollapsed && (
             <div className="flex flex-col justify-center overflow-hidden animate-in fade-in duration-500">
               <span className="font-black text-slate-900 text-lg tracking-tighter leading-tight uppercase">NIZAM</span>
               <span className="text-[10px] text-slate-400 font-black tracking-[0.2em] uppercase opacity-80">Cloud ERP</span>
@@ -567,14 +574,30 @@ export function AppSidebar({
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 overflow-y-auto no-scrollbar scroll-smooth">
-        {visibleNavGroups.map((group) => {
+        {!hasMounted ? (
+          <div className="space-y-6" aria-hidden="true">
+            {SIDEBAR_NAV_SKELETON_GROUPS.map((itemCount, groupIndex) => (
+              <div key={`sidebar-skeleton-${groupIndex}`} className="mb-6">
+                <div className="mb-3 h-3 w-20 rounded-full bg-slate-100" />
+                <div className="space-y-1.5">
+                  {Array.from({ length: itemCount }).map((_, itemIndex) => (
+                    <div
+                      key={`sidebar-skeleton-item-${groupIndex}-${itemIndex}`}
+                      className="h-12 rounded-2xl bg-slate-100/80"
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : visibleNavGroups.map((group) => {
           const filteredItems = group.items
           const hasActiveItem = filteredItems.some((item) => isNavItemActive(item.href))
           const groupKey = `${group.group}-${fullPath}`
 
           return (
             <div key={group.group} className="mb-6">
-              {isCollapsed ? (
+              {effectiveIsCollapsed ? (
                 <p className="px-4 mb-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none flex items-center justify-center gap-2">
                   •••
                 </p>
@@ -613,9 +636,9 @@ export function AppSidebar({
                               notifyRouteLoadingStart()
                               setIsMobileOpen(false)
                             }}
-                            title={isCollapsed ? item.label : ''}
+                            title={effectiveIsCollapsed ? item.label : ''}
                             className={`flex items-center rounded-2xl text-sm font-bold transition-all duration-200 group/item relative
-                              ${isCollapsed ? 'justify-center p-3' : 'justify-between px-4 py-3'}
+                              ${effectiveIsCollapsed ? 'justify-center p-3' : 'justify-between px-4 py-3'}
                               ${isActive
                                 ? 'bg-[#003366] text-white shadow-lg shadow-[#003366]/20'
                                 : 'text-slate-500 hover:text-[#003366] hover:bg-[#003366]/5'
@@ -628,19 +651,19 @@ export function AppSidebar({
                                   strokeWidth={isActive ? 2.5 : 2}
                                   className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover/item:text-emerald-500'}`}
                                 />
-                                {isCollapsed && badgeCount > 0 && (
+                                {effectiveIsCollapsed && badgeCount > 0 && (
                                   <div className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-[#003366] border border-white flex items-center justify-center text-[7px] font-black text-white shrink-0">
                                     {badgeCount > 9 ? '9+' : badgeCount}
                                   </div>
                                 )}
                               </div>
 
-                              {!isCollapsed && (
+                              {!effectiveIsCollapsed && (
                                 <span className="tracking-tight truncate flex-1">{item.label}</span>
                               )}
                             </div>
 
-                            {!isCollapsed && (
+                            {!effectiveIsCollapsed && (
                               <div className="flex items-center gap-2">
                                 {badgeCount > 0 && (
                                   <div className={`px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-widest leading-none flex items-center justify-center animate-in fade-in zoom-in ${isActive ? 'bg-white text-[#003366] shadow-sm' : 'bg-[#003366] text-white shadow-sm shadow-[#003366]/10'}`}>
@@ -660,7 +683,7 @@ export function AppSidebar({
                   </ul>
                 </details>
               )}
-              {isCollapsed && (
+              {effectiveIsCollapsed && (
                 <ul className="space-y-1.5">
                   {filteredItems.map((item) => {
                     const Icon = item.icon
@@ -717,8 +740,8 @@ export function AppSidebar({
       </nav>
 
       {/* Footer / Role */}
-      <div className={`p-4 mt-auto border-t border-slate-200 bg-slate-100/80 hover:bg-slate-100 transition-colors ${isCollapsed ? 'flex flex-col items-center gap-4' : 'flex items-center justify-between w-full'}`}>
-        <div className={`flex items-center gap-3 ${isCollapsed ? '' : 'min-w-0 flex-1'}`}>
+      <div className={`p-4 mt-auto border-t border-slate-200 bg-slate-100/80 hover:bg-slate-100 transition-colors ${effectiveIsCollapsed ? 'flex flex-col items-center gap-4' : 'flex items-center justify-between w-full'}`}>
+        <div className={`flex items-center gap-3 ${effectiveIsCollapsed ? '' : 'min-w-0 flex-1'}`}>
           <Link href="/profil-saya" onMouseEnter={() => prefetchRoute('/profil-saya')} onFocus={() => prefetchRoute('/profil-saya')} onTouchStart={() => prefetchRoute('/profil-saya')} onPointerDown={() => prefetchRoute('/profil-saya')} onClick={() => {
             prefetchRoute('/profil-saya')
             notifyRouteLoadingStart()
@@ -727,7 +750,7 @@ export function AppSidebar({
               {user?.fullName?.slice(0, 1).toUpperCase() || userRole?.slice(0, 1).toUpperCase()}
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-800" />
             </Link>
-            {!isCollapsed && (
+            {!effectiveIsCollapsed && (
               <div className="flex flex-col overflow-hidden min-w-0 flex-1">
                 <p className="text-sm font-black text-slate-900 truncate mb-0.5 leading-tight tracking-tight">{user?.fullName || userRole}</p>
                 <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest truncate">{jobTitle || userRole}</p>
@@ -736,7 +759,7 @@ export function AppSidebar({
             )}
           </div>
 
-          <div className={`flex items-center shrink-0 ${isCollapsed ? 'flex-col gap-2' : 'gap-1'}`}>
+          <div className={`flex items-center shrink-0 ${effectiveIsCollapsed ? 'flex-col gap-2' : 'gap-1'}`}>
             <Link 
               href={isOwnerOrAdmin ? '/settings/business' : '/profil-saya'} 
               onMouseEnter={() => prefetchRoute(isOwnerOrAdmin ? '/settings/business' : '/profil-saya')}
@@ -763,7 +786,7 @@ export function AppSidebar({
               <LogOut size={18} strokeWidth={2} className={isSigningOut ? 'animate-pulse' : ''} />
             </button>
           </div>
-      {isCollapsed && (
+      {effectiveIsCollapsed && (
         <div className="px-3 pb-3">
           <Link href="/billing" onMouseEnter={() => prefetchRoute('/billing')} onFocus={() => prefetchRoute('/billing')} onTouchStart={() => prefetchRoute('/billing')} onPointerDown={() => prefetchRoute('/billing')} onClick={() => {
             prefetchRoute('/billing')
