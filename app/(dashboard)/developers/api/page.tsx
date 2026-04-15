@@ -60,9 +60,13 @@ export default async function DeveloperApiPage() {
     category: string | null
     asset_account_id: string | null
   }> = []
+  let accountBalances: Array<{
+    account_id: string | null
+    balance: number | string | null
+  }> = []
   try {
     const admin = await createAdminClient()
-    const [accountsResult, bankAccountsResult, inventoryProductsResult] = await Promise.all([
+    const [accountsResult, bankAccountsResult, inventoryProductsResult, accountBalancesResult] = await Promise.all([
       admin
         .from('accounts')
         .select('id, code, name, type')
@@ -83,11 +87,16 @@ export default async function DeveloperApiPage() {
         .eq('type', 'INVENTORY')
         .order('name', { ascending: true })
         .limit(20),
+      admin
+        .from('account_balances')
+        .select('account_id, balance')
+        .eq('org_id', orgData.org.id),
     ])
 
     accounts = Array.isArray(accountsResult.data) ? accountsResult.data : []
     bankAccounts = Array.isArray(bankAccountsResult.data) ? bankAccountsResult.data : []
     inventoryProducts = Array.isArray(inventoryProductsResult.data) ? inventoryProductsResult.data : []
+    accountBalances = Array.isArray(accountBalancesResult.data) ? accountBalancesResult.data : []
   } catch {
     // Non-fatal: portal tetap bisa dibuka tanpa daftar akun CoA.
   }
@@ -110,6 +119,7 @@ export default async function DeveloperApiPage() {
       initialConfig={config}
       initialAccounts={accounts}
       initialBankAccounts={bankAccounts}
+      initialAccountBalances={accountBalances}
       initialInventoryProducts={inventoryProducts}
       branches={branches ?? []}
       webhookDeliveries={webhookDeliveries}

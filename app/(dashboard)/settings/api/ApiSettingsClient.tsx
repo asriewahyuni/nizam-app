@@ -57,6 +57,10 @@ type InventoryProductOption = {
   category: string | null
   asset_account_id: string | null
 }
+type AccountBalanceOption = {
+  account_id: string | null
+  balance: number | string | null
+}
 type Branch = { id: string; name: string; code?: string }
 type WebhookDelivery = {
   id: string; event_type: string; status: string; http_status: number | null
@@ -112,6 +116,7 @@ interface Props {
   initialConfig: ApiConfigurationRecord | null
   initialAccounts: Account[]
   initialBankAccounts: BankAccountOption[]
+  initialAccountBalances: AccountBalanceOption[]
   initialInventoryProducts: InventoryProductOption[]
   branches: Branch[]
   webhookDeliveries: WebhookDelivery[]
@@ -226,6 +231,7 @@ export function ApiSettingsClient({
   initialConfig,
   initialAccounts,
   initialBankAccounts,
+  initialAccountBalances,
   initialInventoryProducts,
   branches,
   webhookDeliveries,
@@ -273,6 +279,15 @@ export function ApiSettingsClient({
   const [activeExampleId, setActiveExampleId] = useState('')
 
   const accountById = new Map(initialAccounts.map((account) => [account.id, account]))
+  const accountBalanceById = new Map(
+    initialAccountBalances
+      .map((row) => {
+        const accountId = String(row.account_id ?? '').trim()
+        if (!accountId) return null
+        return [accountId, toSafeAmount(row.balance, 0)] as const
+      })
+      .filter((entry): entry is readonly [string, number] => Boolean(entry))
+  )
   const bankBackedCashAccountIds = new Set(
     initialBankAccounts
       .map((bankAccount) => bankAccount.account_id)
@@ -283,6 +298,12 @@ export function ApiSettingsClient({
   const defaultCashAccount =
     cashAccounts.find((account) => bankBackedCashAccountIds.has(account.id))
     ?? cashAccounts[0]
+    ?? null
+  const tryoutCashAccount =
+    [...cashAccounts]
+      .sort((left, right) => (accountBalanceById.get(right.id) ?? 0) - (accountBalanceById.get(left.id) ?? 0))
+      .find((account) => (accountBalanceById.get(account.id) ?? 0) > 0)
+    ?? defaultCashAccount
     ?? null
   const preferredInventoryProduct =
     initialInventoryProducts.find((product) => String(product.name ?? '').toLowerCase().includes('buku'))
@@ -310,14 +331,18 @@ export function ApiSettingsClient({
 
   const exampleBranchId = defaultBranch?.id ?? 'branch-id'
   const exampleBranchLabel = defaultBranch?.name ?? 'Cabang Utama'
-  const exampleCashAccountId = defaultBankAccount?.account_id ?? defaultCashAccount?.id ?? 'cash-bank-11xx-account-id'
-  const exampleCashAccountLabel = defaultBankAccount?.bank_name ?? formatAccountOption(defaultCashAccount ?? {
+  const exampleCashAccountId = tryoutCashAccount?.id ?? defaultBankAccount?.account_id ?? defaultCashAccount?.id ?? 'cash-bank-11xx-account-id'
+  const exampleCashAccountLabel = formatAccountOption(tryoutCashAccount ?? defaultCashAccount ?? {
     id: 'cash-bank-11xx-account-id',
     code: '1101',
     name: 'Kas / Bank',
     type: 'ASSET',
   })
-  const exampleBankAccountId = defaultBankAccount?.id ?? 'bank-account-id'
+  const tryoutBankAccount =
+    initialBankAccounts.find((bankAccount) => bankAccount.account_id === exampleCashAccountId)
+    ?? null
+  const exampleBankAccountId = tryoutBankAccount?.id ?? defaultBankAccount?.id ?? 'generated-bank-account-id'
+  const exampleCashAvailableBalance = accountBalanceById.get(exampleCashAccountId) ?? 0
   const exampleBookProductName = String(preferredInventoryProduct?.name ?? 'BUKU MATEMATIKA SERIES 3')
   const exampleBookSku = String(preferredInventoryProduct?.sku ?? 'BMS3')
   const exampleBookUnit = String(preferredInventoryProduct?.unit ?? 'Pcs')
@@ -331,13 +356,23 @@ export function ApiSettingsClient({
     preferredInventoryProduct?.purchase_price ?? preferredInventoryProduct?.average_cost,
     9600
   )
-  const bookQuantity = 50
+  const bookQuantity = 2
   const bookInventoryAmount = Number((bookUnitCost * bookQuantity).toFixed(2))
   const bookTaxAmount = Number((bookInventoryAmount * 0.1).toFixed(2))
-  const bookFreightAmount = 12000
-  const bookDiscountAmount = 15000
+  const bookFreightAmount = 2000
+  const bookDiscountAmount = 1000
   const bookInvoiceTotal = Number((bookInventoryAmount + bookTaxAmount + bookFreightAmount - bookDiscountAmount).toFixed(2))
-  const bookCashPaidAmount = 350000
+  const maxCashPaidForExample =
+    exampleCashAvailableBalance > 0
+      ? Math.min(
+        bookInvoiceTotal - 1000,
+        Math.floor(exampleCashAvailableBalance * 100) / 100,
+        15000
+      )
+      : 15000
+  const bookCashPaidAmount = Number(
+    (maxCashPaidForExample > 0 ? maxCashPaidForExample : Math.min(bookInvoiceTotal, 1000)).toFixed(2)
+  )
   const bookPayableAmount = Number((bookInvoiceTotal - bookCashPaidAmount).toFixed(2))
 
   const receivableExampleBody = {
@@ -609,6 +644,7 @@ export function ApiSettingsClient({
         '`journal_lines` hanya dipakai ketika `auto_post` aktif; akun kas/bank utama akan ditambahkan sistem otomatis dari `amount` dan `type`.',
         'Pada mode split, `amount` harus sama dengan arus kas aktual. Sisa yang belum dibayar dicatat sebagai `credit` ke hutang atau `debit` ke piutang di `journal_lines`.',
         'Setiap line wajib punya tepat satu sisi `debit` atau `credit`, dan total semua line harus balance terhadap baris kas/bank.',
+        'Khusus `type = out`, akun kas/bank yang dipakai harus sudah punya saldo posted. Jika belum, lakukan cash-in atau opening balance lebih dulu.',
       ],
       examples: [
         {
@@ -646,7 +682,7 @@ export function ApiSettingsClient({
         {
           id: 'cash-create-online-book-purchase',
           label: 'Push Pembelian Buku',
-          description: `Simulasi push dari toko online untuk pembelian ${exampleBookSku} di ${exampleBranchLabel}, membagi persediaan, PPN, ongkir, diskon, kas ${exampleCashAccountLabel}, dan sisa hutang.`,
+          description: `Simulasi push dari toko online untuk pembelian ${exampleBookSku} di ${exampleBranchLabel}, memakai kas ${exampleCashAccountLabel} dengan saldo acuan ${exampleCashAvailableBalance.toLocaleString('id-ID')}, lalu membagi persediaan, PPN, ongkir, diskon, dan sisa hutang.`,
           body: formatJson(onlineBookPurchaseBody),
           curl: buildCurlExample({
             baseUrl,

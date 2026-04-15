@@ -184,7 +184,7 @@ export function buildOpenApiSpec(serverUrl: string) {
                     description: 'Kas keluar pembelian buku dari toko online dengan persediaan, PPN, ongkir masuk, diskon supplier, dan sisa hutang.',
                     value: {
                       type: 'out',
-                      amount: 350000,
+                      amount: 15000,
                       description: 'Push marketplace pembelian BMS3 - BUKU MATEMATIKA SERIES 3',
                       reference: 'PO-MP-BOOK-2026-0001',
                       branch_id: 'branch-id',
@@ -193,27 +193,27 @@ export function buildOpenApiSpec(serverUrl: string) {
                       journal_lines: [
                         {
                           account_id: 'inventory-account-id',
-                          debit: 480000,
-                          memo: 'Persediaan BMS3 50 Pcs',
+                          debit: 19200,
+                          memo: 'Persediaan BMS3 2 Pcs',
                         },
                         {
                           account_id: 'tax-account-id',
-                          debit: 48000,
+                          debit: 1920,
                           memo: 'PPN masukan pembelian marketplace',
                         },
                         {
                           account_id: 'other-charge-account-id',
-                          debit: 12000,
+                          debit: 2000,
                           memo: 'Ongkir masuk marketplace',
                         },
                         {
                           account_id: 'discount-account-id',
-                          credit: 15000,
+                          credit: 1000,
                           memo: 'Diskon supplier marketplace',
                         },
                         {
                           account_id: 'payable-account-id',
-                          credit: 175000,
+                          credit: 7120,
                           memo: 'Sisa hutang supplier marketplace',
                         },
                       ],
@@ -280,7 +280,7 @@ export function buildOpenApiSpec(serverUrl: string) {
                         data: {
                           id: 'cash-transaction-id',
                           reference_number: 'PO-MP-BOOK-2026-0001',
-                          amount: 350000,
+                          amount: 15000,
                           description: 'Push marketplace pembelian BMS3 - BUKU MATEMATIKA SERIES 3',
                           status: 'POSTED',
                           created_at: '2026-04-15T10:45:00.000Z',
