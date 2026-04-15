@@ -955,10 +955,6 @@ export async function getAdminImpersonationState() {
 }
 
 export async function deleteInactiveTenantByPlatformAdmin(orgId: string) {
-  if (isInternalAuthProvider()) {
-    return { error: 'Mode auth internal belum mendukung fitur ini. Gunakan AUTH_PROVIDER=supabase sementara.' }
-  }
-
   const supabase = await createClient()
   const adminClient = await createAdminClient()
   const trimmedOrgId = String(orgId || '').trim()
@@ -969,9 +965,9 @@ export async function deleteInactiveTenantByPlatformAdmin(orgId: string) {
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   const user = userData.user
-  const adminEmail = String(user?.email || '').trim().toLowerCase()
+  const adminEmail = normalizeEmail(user?.email) || ''
 
-  if (userError || !user) {
+  if (userError || !user?.id) {
     return { error: 'Sesi admin tidak ditemukan. Silakan login ulang.' }
   }
 
