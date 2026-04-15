@@ -35,6 +35,7 @@ import { createClient } from '@/lib/supabase/client'
 import { deleteInactiveTenantByPlatformAdmin, signInAsTenantOwner } from '@/modules/auth/actions/auth.actions'
 import { Organization } from '@/types/database.types'
 import Link from 'next/link'
+import { SAAS_SPECIALIZED_MODULES } from '@/lib/saas/module-catalog'
 import {
   calculateAiHppPerGeneration,
   calculateAiRecommendedSellPer1kTokens,
@@ -1407,6 +1408,7 @@ export default function SaaSAdminPage() {
                              { group: 'Marketing & Sales', items: ['Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward', 'Sales Page'] },
                              { group: 'HRIS', items: ['Karyawan (HRIS)', 'Absensi & Cuti', 'Payroll Components', 'Proses Penggajian', 'Akses & Jabatan'] },
                              { group: 'Insight', items: ['Laporan', 'Strategi (BSC)', 'Proyeksi Kas'] },
+                             { group: 'Ekstensi Khusus', items: [...SAAS_SPECIALIZED_MODULES] },
                              { group: 'Config', items: ['Audit Trail', 'Cabang & Divisi', 'Anak Perusahaan', 'Pengaturan Bisnis', 'Ticketing', 'Doc Update Ticketing'] }
                           ].map(cat => (
                              <div key={cat.group} className="space-y-2" data-module-group={cat.group}>

@@ -75,8 +75,8 @@ export default async function DashboardLayout({
     { path: '/settings/ticketing', requiredModule: 'Config', aliases: ['Config', 'Ticketing', 'Support Ticket', 'Doc Update Ticketing', 'Dokumen Update Support Ticket'], permissionKeys: ['business', 'support', 'ticketing'] },
     { path: '/settings/roles', requiredModule: 'HRIS', aliases: ['HRIS', 'Akses & Jabatan'], permissionKeys: ['business'] },
     { path: '/settings/branches', requiredModule: 'Config', aliases: ['Config', 'Cabang & Divisi'], permissionKeys: ['branch'] },
-    { path: '/developers/api', requiredModule: 'Config', aliases: ['Config', 'API & Integrasi', 'Developers'], permissionKeys: ['business'] },
-    { path: '/settings/api', requiredModule: 'Config', aliases: ['Config', 'API & Integrasi', 'Developers'], permissionKeys: ['business'] },
+    { path: '/developers/api', requiredModule: 'Integrasi API', aliases: ['Integrasi API', 'API & Integrasi', 'Developers', 'Open API'], permissionKeys: ['business'] },
+    { path: '/settings/api', requiredModule: 'Integrasi API', aliases: ['Integrasi API', 'API & Integrasi', 'Developers', 'Open API'], permissionKeys: ['business'] },
     { path: '/settings/business', requiredModule: 'Config', aliases: ['Config', 'Pengaturan Bisnis'], permissionKeys: ['business'] },
     { path: '/settings/accounts', requiredModule: 'Finance', aliases: ['Finance', 'Akun (CoA)'], permissionKeys: ['coa'] },
     {
@@ -109,7 +109,6 @@ export default async function DashboardLayout({
     // 1. SAAS MODULE GUARD (Check for EVERYONE, including owner)
     const isModulePaid = !orgData.enabledModules || orgData.enabledModules.length === 0
       ? true  // If no modules are configured, allow access (e.g. during setup)
-      : requiredModule === 'Syirkah' ? true // Bypass SaaS guard for custom Syirkah module
       : orgData.enabledModules.some((m: string) => allNames.some((candidate) => moduleNameMatches(m, candidate)))
 
     if (!isModulePaid) {

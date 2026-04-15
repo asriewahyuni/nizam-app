@@ -40,6 +40,7 @@ type PosClientProps = {
    warehouses?: any[]
    currentUser: any
    currentUserDisplayName?: string | null
+   currentOrgRole?: string | null
    activeBranchId?: string | null
    activeBranchName?: string | null
    posShiftConfig?: PosShiftConfig | null
@@ -138,6 +139,7 @@ export default function POSClient({
    warehouses = [],
    currentUser,
    currentUserDisplayName,
+   currentOrgRole,
    activeBranchId,
    activeBranchName,
    posShiftConfig,
@@ -249,6 +251,13 @@ export default function POSClient({
       String(activeShiftSession?.cashierDisplayName || '').trim(),
       activeShiftSession?.cashierNik ? `#${activeShiftSession.cashierNik}` : '',
    ].filter(Boolean).join(' • ')
+   const normalizedCurrentOrgRole = String(currentOrgRole || '').trim().toLowerCase()
+   const canUsePrivilegedCloseShiftOverride = Boolean(
+      activeShiftSession?.cashierUserId &&
+      currentUser?.id &&
+      String(activeShiftSession.cashierUserId).trim() === String(currentUser.id || '').trim() &&
+      ['owner', 'admin', 'manager'].includes(normalizedCurrentOrgRole)
+   )
    const availableSettlement = latestClosedShift?.totals.remainingByMethod || { CASH: 0, TRANSFER: 0, QRIS: 0 }
    const hasAnySettlementBalance = Object.values(availableSettlement).some((amount) => amount > 0)
    const fallbackCashAccountId = useMemo(() => resolveDefaultPosAccountId(accounts, 'CASH'), [accounts])
@@ -638,8 +647,12 @@ export default function POSClient({
          alert('Selesaikan atau kosongkan keranjang terlebih dahulu sebelum menutup shift.')
          return
       }
-      if (!closeShiftCashierNik.trim() || !closeShiftCashierPassword) {
-         alert('Isi login NIK kasir beserta sandinya untuk menutup shift.')
+      const hasCloseShiftNik = closeShiftCashierNik.trim().length > 0
+      const hasCloseShiftPassword = closeShiftCashierPassword.length > 0
+      if (hasCloseShiftNik !== hasCloseShiftPassword) {
+         alert(canUsePrivilegedCloseShiftOverride
+            ? 'Isi login NIK dan sandi kasir secara lengkap, atau kosongkan keduanya untuk memakai sesi owner/admin yang membuka shift ini.'
+            : 'Isi login NIK kasir beserta sandinya untuk menutup shift.')
          return
       }
 
@@ -1688,7 +1701,9 @@ export default function POSClient({
 
                      <div className="p-6 md:p-8 space-y-5">
                         <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800">
-                           Tutup shift harus memakai login NIK kasir yang membuka shift ini.
+                           {canUsePrivilegedCloseShiftOverride
+                              ? 'Shift ini dibuka oleh akun Anda. Sebagai owner/admin/manager, Anda boleh langsung menutup shift tanpa mengisi login NIK.'
+                              : 'Tutup shift harus memakai login NIK kasir yang membuka shift ini.'}
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -1720,7 +1735,7 @@ export default function POSClient({
                               value={closeShiftCashierNik}
                               onChange={(e) => setCloseShiftCashierNik(e.target.value.toUpperCase())}
                               className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
-                              placeholder="Contoh: K-0001"
+                              placeholder={canUsePrivilegedCloseShiftOverride ? 'Kosongkan jika pakai sesi owner/admin ini' : 'Contoh: K-0001'}
                            />
                         </div>
 
@@ -1731,7 +1746,7 @@ export default function POSClient({
                               value={closeShiftCashierPassword}
                               onChange={(e) => setCloseShiftCashierPassword(e.target.value)}
                               className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
-                              placeholder="••••••••"
+                              placeholder={canUsePrivilegedCloseShiftOverride ? 'Kosongkan jika pakai sesi owner/admin ini' : '••••••••'}
                            />
                         </div>
 

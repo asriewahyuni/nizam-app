@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence, Reorder } from 'framer-motion'
-import { ShieldAlert, Check, X, Shield, Users, Plus, Trash2, Edit2, ChevronRight, Settings2, Lock, GripVertical, CornerDownRight, AlertCircle, Sparkles } from 'lucide-react'
-import { PageHeader, SectionCard, SafeButton, ConfirmDialog } from '@/components/ui/NizamUI'
+import { ShieldAlert, Check, X, Shield, Users, Plus, Trash2, Edit2, GripVertical, CornerDownRight, AlertCircle, Sparkles } from 'lucide-react'
+import { SafeButton, ConfirmDialog } from '@/components/ui/NizamUI'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
 import {
   deleteOrganizationRole,
@@ -12,6 +12,11 @@ import {
   saveOrganizationRole,
   updateOrganizationRolePermissions,
 } from '@/modules/organization/actions/roles.actions'
+import {
+  normalizeDepartmentIds,
+  normalizePermissions,
+  normalizeRoleRecord,
+} from '@/modules/organization/lib/role-normalization'
 
 const MODULE_CATEGORIES = [
   {
@@ -88,71 +93,6 @@ const MODULE_CATEGORIES = [
   }
 ]
 
-const DEPARTMENT_VALUE_ALIASES: Record<string, string> = {
-  IT: 'CONFIG',
-}
-
-function normalizeStringArray(values: unknown): string[] {
-  if (Array.isArray(values)) {
-    return Array.from(
-      new Set(
-        values
-          .map((value) => String(value || '').trim())
-          .filter(Boolean)
-      )
-    )
-  }
-
-  if (typeof values === 'string') {
-    const trimmed = values.trim()
-    if (!trimmed) return []
-
-    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-      try {
-        return normalizeStringArray(JSON.parse(trimmed) as unknown)
-      } catch {
-        return trimmed
-          .split(',')
-          .map((value) => value.trim())
-          .filter(Boolean)
-      }
-    }
-
-    return trimmed
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean)
-  }
-
-  return []
-}
-
-function normalizeDepartmentValue(value: unknown): string {
-  const normalized = String(value || '')
-    .trim()
-    .toUpperCase()
-
-  return DEPARTMENT_VALUE_ALIASES[normalized] || normalized
-}
-
-function normalizeDepartmentIds(values: unknown): string[] {
-  return Array.from(
-    new Set(
-      normalizeStringArray(values)
-        .map((value) => normalizeDepartmentValue(value))
-        .filter(Boolean)
-    )
-  )
-}
-
-function normalizeRoleRecord(role: any) {
-  return {
-    ...role,
-    department_ids: normalizeDepartmentIds(role?.department_ids),
-    permissions: normalizeStringArray(role?.permissions),
-  }
-}
-
 export default function RolesManagementPage() {
   const { orgId: resolvedOrgId } = useActiveOrgId()
   const [org, setOrg] = useState<{ org_id: string } | null>(null)
@@ -221,7 +161,7 @@ export default function RolesManagementPage() {
 
   const activeRole = roles.find(r => r.id === activeRoleId)
   const activeRoleDepartmentIds = useMemo(() => normalizeDepartmentIds(activeRole?.department_ids), [activeRole])
-  const activeRolePermissions = useMemo(() => normalizeStringArray(activeRole?.permissions), [activeRole])
+  const activeRolePermissions = useMemo(() => normalizePermissions(activeRole?.permissions), [activeRole])
 
   // FILTERED MODULES
   const activeCategories = useMemo(() => {

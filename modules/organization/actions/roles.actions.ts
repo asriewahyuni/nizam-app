@@ -5,6 +5,11 @@ import { queryPostgres } from '@/lib/db/postgres'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { isInternalAuthProvider } from '@/lib/auth/provider'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import {
+  normalizeDepartmentIds,
+  normalizePermissions,
+  normalizeRoleRecord,
+} from '@/modules/organization/lib/role-normalization'
 
 type RoleMutationInput = {
   id?: string | null
@@ -15,86 +20,19 @@ type RoleMutationInput = {
 
 type OrganizationRoleRecord = Record<string, unknown> & {
   department_ids?: unknown
+  department_id?: unknown
   permissions?: unknown
 }
 
-const DEPARTMENT_VALUE_ALIASES: Record<string, string> = {
-  IT: 'CONFIG',
+type RoleDepartmentColumnKind = 'missing' | 'text_array' | 'enum_array' | 'enum' | 'text'
+
+type RoleDepartmentSchema = {
+  departmentIdsKind: RoleDepartmentColumnKind
+  departmentIdKind: RoleDepartmentColumnKind
 }
 
 function normalizeRoleName(value: string) {
   return String(value || '').trim()
-}
-
-function normalizeDepartmentValue(value: unknown): string {
-  const normalized = String(value || '')
-    .trim()
-    .toUpperCase()
-
-  return DEPARTMENT_VALUE_ALIASES[normalized] || normalized
-}
-
-function normalizeStringArray(values: unknown) {
-  if (Array.isArray(values)) {
-    return Array.from(
-      new Set(
-        values
-          .map((value) => String(value || '').trim())
-          .filter(Boolean)
-      )
-    )
-  }
-
-  if (typeof values === 'string') {
-    const trimmed = values.trim()
-    if (!trimmed) return []
-
-    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-      try {
-        return normalizeStringArray(JSON.parse(trimmed) as unknown)
-      } catch {
-        return trimmed
-          .split(',')
-          .map((value) => value.trim())
-          .filter(Boolean)
-      }
-    }
-
-    return trimmed
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean)
-  }
-
-  return []
-}
-
-function normalizeDepartmentIds(values: unknown) {
-  return Array.from(
-    new Set(
-      normalizeStringArray(values)
-        .map((value) => normalizeDepartmentValue(value))
-        .filter(Boolean)
-    )
-  )
-}
-
-function normalizePermissions(values: unknown) {
-  return Array.from(
-    new Set(
-      normalizeStringArray(values)
-        .map((value) => String(value || '').trim())
-        .filter(Boolean)
-    )
-  )
-}
-
-function normalizeRoleRecord(role: OrganizationRoleRecord) {
-  return {
-    ...role,
-    department_ids: normalizeDepartmentIds(role.department_ids),
-    permissions: normalizePermissions(role.permissions),
-  }
 }
 
 function isRoleNameConflictError(error: { code?: string | null; message?: string | null } | null | undefined) {
@@ -103,20 +41,104 @@ function isRoleNameConflictError(error: { code?: string | null; message?: string
   return code === '23505' || message.includes('roles_org_id_name_key')
 }
 
-async function getRolesDepartmentIdsCastType() {
-  const result = await queryPostgres<{ udt_name: string | null }>(`
-    SELECT udt_name
+function shouldRetryRoleSaveViaSql(message: string) {
+  return message.includes('could not convert type text[] to nizam_department[]')
+    || message.includes('COALESCE could not convert type text[] to nizam_department[]')
+    || message.includes('invalid input value for enum nizam_department')
+    || message.includes('malformed array literal')
+}
+
+function resolveRoleDepartmentColumnKind(column: {
+  data_type: string | null
+  udt_name: string | null
+} | undefined): RoleDepartmentColumnKind {
+  const udtName = String(column?.udt_name || '').trim().toLowerCase()
+  const dataType = String(column?.data_type || '').trim().toLowerCase()
+
+  if (!udtName && !dataType) return 'missing'
+  if (udtName === '_nizam_department') return 'enum_array'
+  if (udtName === 'nizam_department') return 'enum'
+  if (udtName.startsWith('_') || dataType === 'array') return 'text_array'
+  if (udtName === 'text' || dataType === 'text' || dataType.includes('character')) return 'text'
+  return 'missing'
+}
+
+async function getRolesDepartmentSchema(): Promise<RoleDepartmentSchema> {
+  const result = await queryPostgres<{
+    column_name: string
+    data_type: string | null
+    udt_name: string | null
+  }>(`
+    SELECT column_name, data_type, udt_name
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name = 'roles'
-      AND column_name = 'department_ids'
-    LIMIT 1
+      AND column_name IN ('department_ids', 'department_id')
   `)
 
-  const udtName = String(result.rows[0]?.udt_name || '').trim().toLowerCase()
-  return udtName === '_nizam_department'
-    ? 'public.nizam_department[]'
-    : 'text[]'
+  const byName = new Map(result.rows.map((row) => [row.column_name, row]))
+
+  return {
+    departmentIdsKind: resolveRoleDepartmentColumnKind(byName.get('department_ids')),
+    departmentIdKind: resolveRoleDepartmentColumnKind(byName.get('department_id')),
+  }
+}
+
+function getRoleDepartmentSqlValue(kind: RoleDepartmentColumnKind, paramIndex: number) {
+  switch (kind) {
+    case 'enum_array':
+      return `$${paramIndex}::public.nizam_department[]`
+    case 'text_array':
+      return `$${paramIndex}::text[]`
+    case 'enum':
+      return `NULLIF($${paramIndex}, '')::public.nizam_department`
+    case 'text':
+      return `NULLIF($${paramIndex}, '')`
+    default:
+      return null
+  }
+}
+
+function getRoleDepartmentSqlParam(kind: RoleDepartmentColumnKind, departmentIds: string[]) {
+  if (kind === 'enum_array' || kind === 'text_array') {
+    return departmentIds
+  }
+
+  return departmentIds[0] || ''
+}
+
+function appendDepartmentInsertColumn(args: {
+  columns: string[]
+  values: string[]
+  params: unknown[]
+  nextIndex: number
+  columnName: 'department_ids' | 'department_id'
+  kind: RoleDepartmentColumnKind
+  departmentIds: string[]
+}) {
+  const sqlValue = getRoleDepartmentSqlValue(args.kind, args.nextIndex)
+  if (!sqlValue) return args.nextIndex
+
+  args.columns.push(args.columnName)
+  args.values.push(sqlValue)
+  args.params.push(getRoleDepartmentSqlParam(args.kind, args.departmentIds))
+  return args.nextIndex + 1
+}
+
+function appendDepartmentUpdateAssignment(args: {
+  assignments: string[]
+  params: unknown[]
+  nextIndex: number
+  columnName: 'department_ids' | 'department_id'
+  kind: RoleDepartmentColumnKind
+  departmentIds: string[]
+}) {
+  const sqlValue = getRoleDepartmentSqlValue(args.kind, args.nextIndex)
+  if (!sqlValue) return args.nextIndex
+
+  args.assignments.push(`${args.columnName} = ${sqlValue}`)
+  args.params.push(getRoleDepartmentSqlParam(args.kind, args.departmentIds))
+  return args.nextIndex + 1
 }
 
 async function saveOrganizationRoleViaSql(args: {
@@ -126,20 +148,43 @@ async function saveOrganizationRoleViaSql(args: {
   departmentIds: string[]
   parentId: string | null
 }) {
-  const departmentIdsCastType = await getRolesDepartmentIdsCastType()
+  const departmentSchema = await getRolesDepartmentSchema()
 
   if (args.id) {
+    const assignments = ['name = $3']
+    const params: unknown[] = [args.id, args.orgId, args.name]
+    let nextIndex = 4
+
+    nextIndex = appendDepartmentUpdateAssignment({
+      assignments,
+      params,
+      nextIndex,
+      columnName: 'department_ids',
+      kind: departmentSchema.departmentIdsKind,
+      departmentIds: args.departmentIds,
+    })
+
+    nextIndex = appendDepartmentUpdateAssignment({
+      assignments,
+      params,
+      nextIndex,
+      columnName: 'department_id',
+      kind: departmentSchema.departmentIdKind,
+      departmentIds: args.departmentIds,
+    })
+
+    assignments.push(`parent_id = $${nextIndex}::uuid`)
+    params.push(args.parentId)
+
     await queryPostgres(
       `
         UPDATE public.roles
         SET
-          name = $3,
-          department_ids = $4::${departmentIdsCastType},
-          parent_id = $5::uuid
+          ${assignments.join(',\n          ')}
         WHERE id = $1::uuid
           AND org_id = $2::uuid
       `,
-      [args.id, args.orgId, args.name, args.departmentIds, args.parentId]
+      params
     )
     return
   }
@@ -153,36 +198,51 @@ async function saveOrganizationRoleViaSql(args: {
     [args.orgId]
   )
 
+  const columns = ['org_id', 'name']
+  const values = ['$1::uuid', '$2']
+  const params: unknown[] = [args.orgId, args.name]
+  let nextIndex = 3
+
+  nextIndex = appendDepartmentInsertColumn({
+    columns,
+    values,
+    params,
+    nextIndex,
+    columnName: 'department_ids',
+    kind: departmentSchema.departmentIdsKind,
+    departmentIds: args.departmentIds,
+  })
+
+  nextIndex = appendDepartmentInsertColumn({
+    columns,
+    values,
+    params,
+    nextIndex,
+    columnName: 'department_id',
+    kind: departmentSchema.departmentIdKind,
+    departmentIds: args.departmentIds,
+  })
+
+  columns.push('parent_id', 'permissions', 'is_system', 'priority')
+  values.push(
+    `$${nextIndex}::uuid`,
+    `$${nextIndex + 1}::text[]`,
+    `$${nextIndex + 2}`,
+    `$${nextIndex + 3}`
+  )
+  params.push(
+    args.parentId,
+    [],
+    false,
+    Number(countResult.rows[0]?.total || 0),
+  )
+
   await queryPostgres(
     `
-      INSERT INTO public.roles (
-        org_id,
-        name,
-        department_ids,
-        parent_id,
-        permissions,
-        is_system,
-        priority
-      )
-      VALUES (
-        $1::uuid,
-        $2,
-        $3::${departmentIdsCastType},
-        $4::uuid,
-        $5::text[],
-        $6,
-        $7
-      )
+      INSERT INTO public.roles (${columns.join(', ')})
+      VALUES (${values.join(', ')})
     `,
-    [
-      args.orgId,
-      args.name,
-      args.departmentIds,
-      args.parentId,
-      [],
-      false,
-      Number(countResult.rows[0]?.total || 0),
-    ]
+    params
   )
 }
 
@@ -269,8 +329,7 @@ export async function saveOrganizationRole(orgId: string, input: RoleMutationInp
       .eq('org_id', context.orgId)
 
     if (error) {
-      const shouldRetryWithSql = error.message.includes('could not convert type text[] to nizam_department[]')
-        || error.message.includes('COALESCE could not convert type text[] to nizam_department[]')
+      const shouldRetryWithSql = shouldRetryRoleSaveViaSql(error.message)
 
       if (shouldRetryWithSql) {
         try {
@@ -315,8 +374,7 @@ export async function saveOrganizationRole(orgId: string, input: RoleMutationInp
     })
 
   if (error) {
-    const shouldRetryWithSql = error.message.includes('could not convert type text[] to nizam_department[]')
-      || error.message.includes('COALESCE could not convert type text[] to nizam_department[]')
+    const shouldRetryWithSql = shouldRetryRoleSaveViaSql(error.message)
 
     if (shouldRetryWithSql) {
       try {

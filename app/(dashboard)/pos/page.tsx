@@ -79,6 +79,7 @@ export default async function POSPage() {
       warehouses={warehouses || []}
       currentUser={orgData.user}
       currentUserDisplayName={currentUserDisplayName}
+      currentOrgRole={orgData.role || null}
       activeBranchId={activeBranch?.id || null}
       activeBranchName={activeBranch?.name || null}
       posShiftConfig={posShiftConfig}

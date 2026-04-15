@@ -6,6 +6,22 @@ import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
 const EMPLOYEE_CHILD_TRANSFER_AUDIT_TABLE = 'EMPLOYEE_CHILD_TRANSFER'
+const EMPLOYEE_DATE_ONLY_FIELDS = ['date_of_birth', 'join_date', 'end_date', 'license_expiry'] as const
+const JS_DATE_STRING_PATTERN = /^[A-Za-z]{3}\s([A-Za-z]{3})\s(\d{1,2})\s(\d{4})\s/
+const MONTH_INDEX_BY_SHORT_NAME: Record<string, string> = {
+  jan: '01',
+  feb: '02',
+  mar: '03',
+  apr: '04',
+  may: '05',
+  jun: '06',
+  jul: '07',
+  aug: '08',
+  sep: '09',
+  oct: '10',
+  nov: '11',
+  dec: '12',
+}
 
 type BranchSelectionResult =
   | { branchId: string | null }
@@ -27,6 +43,45 @@ type EmployeeResignPayload = {
 function isEmployeeStatusActive(status: unknown) {
   const normalizedStatus = String(status || '').trim().toUpperCase()
   return normalizedStatus !== 'RESIGNED' && normalizedStatus !== 'TERMINATED'
+}
+
+function normalizeDateOnlyValue(value: unknown): string | null {
+  if (value == null) return null
+
+  const raw = String(value).trim()
+  if (!raw) return null
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw
+  }
+
+  const jsDateStringMatch = JS_DATE_STRING_PATTERN.exec(raw)
+  if (jsDateStringMatch) {
+    const month = MONTH_INDEX_BY_SHORT_NAME[jsDateStringMatch[1].toLowerCase()]
+    const day = jsDateStringMatch[2].padStart(2, '0')
+    const year = jsDateStringMatch[3]
+    if (month) {
+      return `${year}-${month}-${day}`
+    }
+  }
+
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) {
+    return null
+  }
+
+  return parsed.toISOString().split('T')[0]
+}
+
+function sanitizeEmployeeDateOnlyFields(payload: Record<string, unknown>) {
+  const nextPayload = { ...payload }
+
+  for (const field of EMPLOYEE_DATE_ONLY_FIELDS) {
+    if (!(field in nextPayload)) continue
+    nextPayload[field] = normalizeDateOnlyValue(nextPayload[field])
+  }
+
+  return nextPayload
 }
 
 function isMissingDepartmentIdColumnError(error: any) {
@@ -438,14 +493,14 @@ export async function transferEmployeeToChildOrg(orgId: string, payload: Employe
     return { error: 'Cabang tujuan tidak valid atau tidak aktif.' }
   }
 
-  const baseEmployeeData = { ...sourceEmployee }
+  const baseEmployeeData = sanitizeEmployeeDateOnlyFields({ ...sourceEmployee })
   delete baseEmployeeData.id
   delete baseEmployeeData.org_id
   delete baseEmployeeData.branch_id
   delete baseEmployeeData.created_at
   delete baseEmployeeData.updated_at
 
-  const transferJoinDate = String(sourceEmployee.join_date || new Date().toISOString().split('T')[0])
+  const transferJoinDate = normalizeDateOnlyValue(sourceEmployee.join_date) || new Date().toISOString().split('T')[0]
   const transferEmploymentStatus = ['TERMINATED', 'RESIGNED'].includes(String(sourceEmployee.employment_status || '').toUpperCase())
     ? 'FULL_TIME'
     : sourceEmployee.employment_status
@@ -488,7 +543,7 @@ export async function transferEmployeeToChildOrg(orgId: string, payload: Employe
     }
 
     const resolvedTargetUserId = existingTargetEmployee.user_id || sourceEmployee.user_id || null
-    const updatePayload = {
+    const updatePayload = sanitizeEmployeeDateOnlyFields({
       ...baseEmployeeData,
       branch_id: targetBranchId,
       employment_status: transferEmploymentStatus,
@@ -497,7 +552,7 @@ export async function transferEmployeeToChildOrg(orgId: string, payload: Employe
       updated_at: new Date().toISOString(),
       user_id: resolvedTargetUserId,
       registration_status: resolvedTargetUserId ? 'REGISTERED' : baseEmployeeData.registration_status || null,
-    }
+    })
 
     const { data: reactivatedEmployee, error: reactivateError } = await db
       .from('employees')
@@ -844,7 +899,7 @@ export async function resignEmployee(id: string, orgId: string, payload?: Employ
   const currentStatus = String(existingEmployee.employment_status || '').toUpperCase()
   const trimmedReason = String(payload?.reason || '').trim()
   const trimmedEffectiveDate = String(payload?.effectiveDate || '').trim()
-  const effectiveDate = trimmedEffectiveDate || new Date().toISOString().split('T')[0]
+  const effectiveDate = normalizeDateOnlyValue(trimmedEffectiveDate) || new Date().toISOString().split('T')[0]
   const note = trimmedReason || 'Resign diproses dari HRIS'
 
   if (currentStatus === 'RESIGNED') {
@@ -929,9 +984,9 @@ export async function createEmployee(orgId: string, formData: FormData) {
   const roleId = String(formData.get('role_id') || '').trim() || null
   const status = formData.get('employment_status') as string || 'FULL_TIME'
   const basicSalary = Number(formData.get('basic_salary') || 0)
-  const joinDate = formData.get('join_date') as string || new Date().toISOString().split('T')[0]
+  const joinDate = normalizeDateOnlyValue(formData.get('join_date')) || new Date().toISOString().split('T')[0]
 
-  let payload: Record<string, unknown> = {
+  let payload: Record<string, unknown> = sanitizeEmployeeDateOnlyFields({
     org_id: orgId,
     branch_id: activeBranch.branchId,
     nik,
@@ -951,7 +1006,7 @@ export async function createEmployee(orgId: string, formData: FormData) {
     bank_name: formData.get('bank_name') || null,
     bank_account_number: formData.get('bank_account_number') || null,
     tax_status: formData.get('tax_status') || null
-  }
+  })
 
   let { data: newEmp, error } = await db.from('employees').insert(payload).select('id').single()
   while (error && (isMissingDepartmentIdColumnError(error) || isMissingEmployeeRoleIdColumnError(error))) {
@@ -1011,9 +1066,9 @@ export async function updateEmployee(id: string, orgId: string, formData: FormDa
   const roleId = String(formData.get('role_id') || '').trim() || null
   const status = formData.get('employment_status') as string || 'FULL_TIME'
   const basicSalary = Number(formData.get('basic_salary') || 0)
-  const joinDate = formData.get('join_date') as string
+  const joinDate = normalizeDateOnlyValue(formData.get('join_date'))
 
-  let updatePayload: Record<string, unknown> = {
+  let updatePayload: Record<string, unknown> = sanitizeEmployeeDateOnlyFields({
     nik,
     first_name: firstName,
     last_name: lastName,
@@ -1032,7 +1087,7 @@ export async function updateEmployee(id: string, orgId: string, formData: FormDa
     bank_account_number: formData.get('bank_account_number') || null,
     tax_status: formData.get('tax_status') || null,
     updated_at: new Date().toISOString()
-  }
+  })
 
   let { error } = await db
     .from('employees')

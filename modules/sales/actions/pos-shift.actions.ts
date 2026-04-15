@@ -336,6 +336,92 @@ async function verifyPosCashierLogin(
   }
 }
 
+async function resolvePosMemberRole(
+  db: any,
+  orgId: string,
+  userId: string,
+) {
+  const normalizedUserId = String(userId || '').trim()
+  if (!normalizedUserId) return null
+
+  const { data: memberRow } = await db
+    .from('org_members')
+    .select('role')
+    .eq('org_id', orgId)
+    .eq('user_id', normalizedUserId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  return String(memberRow?.role || '').trim().toLowerCase() || null
+}
+
+async function verifyPosCloseShiftAuthorization(
+  db: any,
+  orgId: string,
+  branchId: string,
+  currentUserId: string,
+  sessionCashierUserId: string | null,
+  nik: string,
+  password: string
+) {
+  const normalizedNik = String(nik || '').trim().toUpperCase()
+  const normalizedPassword = String(password || '').trim()
+  const normalizedCurrentUserId = String(currentUserId || '').trim()
+  const normalizedSessionCashierUserId = String(sessionCashierUserId || '').trim()
+
+  const actorRole = await resolvePosMemberRole(db, orgId, normalizedCurrentUserId)
+  const canUseSessionOverride = (
+    normalizedCurrentUserId.length > 0 &&
+    normalizedCurrentUserId === normalizedSessionCashierUserId &&
+    ['owner', 'admin', 'manager'].includes(String(actorRole || ''))
+  )
+
+  if (!normalizedNik && !normalizedPassword) {
+    if (canUseSessionOverride) {
+      return {
+        sessionUserId: normalizedCurrentUserId,
+        displayName: null,
+        nik: null,
+        authorizationType: 'SELF_SESSION' as const,
+        authorizationRole: actorRole as 'owner' | 'admin' | 'manager',
+      }
+    }
+
+    return {
+      error: 'Isi login NIK kasir beserta sandinya untuk menutup shift. Owner/admin yang membuka shift ini sendiri boleh mengosongkan kolom login.',
+    } as const
+  }
+
+  if (!normalizedNik || !normalizedPassword) {
+    return {
+      error: canUseSessionOverride
+        ? 'Isi login NIK dan sandi kasir secara lengkap, atau kosongkan keduanya untuk memakai sesi owner/admin yang membuka shift ini.'
+        : 'Isi login NIK kasir beserta sandinya untuk menutup shift.',
+    } as const
+  }
+
+  const cashierLogin = await verifyPosCashierLogin(
+    db,
+    orgId,
+    branchId,
+    normalizedNik,
+    normalizedPassword
+  )
+  if ('error' in cashierLogin) {
+    return cashierLogin
+  }
+
+  if (normalizedSessionCashierUserId !== cashierLogin.sessionUserId) {
+    return { error: 'Gunakan login NIK kasir yang membuka shift ini untuk menutup shift.' } as const
+  }
+
+  return {
+    ...cashierLogin,
+    authorizationType: 'CASHIER' as const,
+    authorizationRole: 'cashier' as const,
+  }
+}
+
 async function verifyPosSettlementLogin(
   db: any,
   orgId: string,
@@ -1112,19 +1198,17 @@ export async function closePosShift(
     return { error: 'Tidak ada shift POS aktif yang bisa ditutup.' }
   }
 
-  const cashierLogin = await verifyPosCashierLogin(
+  const closeAuthorization = await verifyPosCloseShiftAuthorization(
     db,
     orgId,
     context.branchId,
+    context.userId,
+    String(currentSession.cashier_user_id || '').trim() || null,
     payload.cashierNik,
     payload.cashierPassword
   )
-  if ('error' in cashierLogin) {
-    return cashierLogin
-  }
-
-  if (String(currentSession.cashier_user_id || '') !== cashierLogin.sessionUserId) {
-    return { error: 'Gunakan login NIK kasir yang membuka shift ini untuk menutup shift.' }
+  if ('error' in closeAuthorization) {
+    return closeAuthorization
   }
 
   const summaryBeforeClose = await buildPosShiftSummary(db, orgId, currentSession, context.branchName)
@@ -1139,7 +1223,7 @@ export async function closePosShift(
       closing_cash: closingCash,
       variance_amount: varianceAmount,
       closing_notes: payload.closingNotes ? String(payload.closingNotes).trim() : null,
-      closed_by: cashierLogin.sessionUserId,
+      closed_by: closeAuthorization.sessionUserId,
       closed_at: new Date().toISOString(),
     })
     .eq('id', currentSession.id)

@@ -22,6 +22,11 @@ export const SAAS_ADDON_MODULES = [
   'Sales Page',
 ] as const
 
+export const SAAS_SPECIALIZED_MODULES = [
+  'Syirkah',
+  'Integrasi API',
+] as const
+
 export const SAAS_CAPACITY_ADDONS = [
   'Multi-Entity (PT/CV)',
 ] as const
@@ -117,6 +122,23 @@ const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
   {
     canonical: 'Sales Page',
     aliases: ['sales page', 'salespage', 'landing page'],
+  },
+  {
+    canonical: 'Syirkah',
+    aliases: ['syirkah', 'akad syirkah', 'partnership', 'partnership contract'],
+  },
+  {
+    canonical: 'Integrasi API',
+    aliases: [
+      'integrasi api',
+      'api & integrasi',
+      'api integration',
+      'developer api',
+      'developers',
+      'open api',
+      'webhook',
+      'api settings',
+    ],
   },
   {
     canonical: 'Multi-Entity (PT/CV)',

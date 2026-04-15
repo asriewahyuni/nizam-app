@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createAdminClient: vi.fn(),
   revalidatePath: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
+  queryPostgres: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -20,6 +21,10 @@ vi.mock('next/cache', () => ({
 
 vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
+}))
+
+vi.mock('@/lib/db/postgres', () => ({
+  queryPostgres: mocks.queryPostgres,
 }))
 
 import { createEmployee, deleteEmployee, getEmployees, updateEmployee } from '@/modules/hris/actions/employee.actions'
@@ -44,20 +49,26 @@ function buildEmployeeForm(overrides: Record<string, string> = {}) {
 describe('Employee Actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.queryPostgres.mockResolvedValue({ rows: [] })
   })
 
   it('filters employees by resolved branch selection', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
+    mocks.queryPostgres
+      .mockResolvedValueOnce({
+        rows: [
           {
-            result: success([]),
+            id: 'emp-1',
+            org_id: 'org-1',
+            branch_id: 'branch-1',
+            first_name: 'Salsa',
+            branch_id_val: 'branch-1',
+            branch_name: 'Main Branch',
+            branch_code: 'MB',
           },
         ],
-      },
-    })
+      })
+      .mockResolvedValueOnce({ rows: [] })
 
-    mocks.createClient.mockResolvedValue(supabase.client)
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-1'] },
       branchId: 'branch-1',
@@ -65,10 +76,10 @@ describe('Employee Actions', () => {
 
     await getEmployees('org-1')
 
-    const branchFilter = supabase.calls[0]?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
+    expect(mocks.queryPostgres).toHaveBeenCalledWith(
+      expect.stringContaining('AND e.branch_id = $2'),
+      ['org-1', 'branch-1']
     )
-    expect(branchFilter?.args[1]).toBe('branch-1')
   })
 
   it('stamps branch_id when creating an employee', async () => {
@@ -94,6 +105,32 @@ describe('Employee Actions', () => {
     expect(result).toEqual({ success: true })
     expect(insertPayload.branch_id).toBe('branch-1')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/hris')
+  })
+
+  it('normalizes browser-style date strings when creating an employee', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        employees: [
+          {
+            singleResult: success({ id: 'emp-1' }),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
+
+    const result = await createEmployee('org-1', buildEmployeeForm({
+      join_date: 'Tue Apr 16 2026 00:00:00 GMT+0700 (Western Indonesia Time)',
+    }))
+    const insertPayload = supabase.calls[0]?.operations.find((operation) => operation.method === 'insert')?.args[0] as Record<string, string>
+
+    expect(result).toEqual({ success: true })
+    expect(insertPayload.join_date).toBe('2026-04-16')
   })
 
   it('persists selected role_id when creating an employee', async () => {
@@ -151,6 +188,38 @@ describe('Employee Actions', () => {
 
     expect(result).toEqual({ success: true })
     expect(branchFilter?.args[1]).toBe('branch-1')
+  })
+
+  it('normalizes browser-style date strings when updating an employee', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        employees: [
+          {
+            maybeSingleResult: success({
+              id: 'emp-1',
+              branch_id: 'branch-1',
+            }),
+          },
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
+
+    const result = await updateEmployee('emp-1', 'org-1', buildEmployeeForm({
+      join_date: 'Tue Apr 16 2026 00:00:00 GMT+0700 (Western Indonesia Time)',
+    }))
+    const updatePayload = supabase.calls[1]?.operations.find((operation) => operation.method === 'update')?.args[0] as Record<string, string>
+
+    expect(result).toEqual({ success: true })
+    expect(updatePayload.join_date).toBe('2026-04-16')
   })
 
   it('syncs linked org member role_id when employee role is updated', async () => {

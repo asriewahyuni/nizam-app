@@ -9,6 +9,7 @@ import {
   createInternalAuthUser,
   ensureInternalAuthUserRecord,
   getInternalAuthSession,
+  resetInternalAuthPasswordById,
   signInWithInternalAuth,
   signOutInternalAuth,
 } from '@/lib/auth/internal-auth.server'
@@ -479,6 +480,70 @@ async function resolveExistingStaffIdentity(
   return { userId: existingEmployee.user_id, authEmail }
 }
 
+type InternalStaffAccountRecord = {
+  id?: string | null
+  legacy_user_id?: string | null
+  login_email?: string | null
+  login_nik?: string | null
+  is_active?: boolean | null
+}
+
+function resolveInternalStaffLinkedUserId(account: InternalStaffAccountRecord | null | undefined) {
+  return normalizeUuid(account?.legacy_user_id) || normalizeUuid(account?.id)
+}
+
+async function findInternalStaffAccount(
+  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
+  input: {
+    nik: string
+    internalEmail: string
+  }
+) {
+  const { data: nikMatch } = await (adminClient as any)
+    .from('internal_auth_users')
+    .select('id, legacy_user_id, login_email, login_nik, is_active')
+    .eq('login_nik', input.nik)
+    .limit(1)
+    .maybeSingle()
+
+  if (nikMatch) {
+    return nikMatch as InternalStaffAccountRecord
+  }
+
+  const { data: emailMatch } = await (adminClient as any)
+    .from('internal_auth_users')
+    .select('id, legacy_user_id, login_email, login_nik, is_active')
+    .ilike('login_email', input.internalEmail)
+    .limit(1)
+    .maybeSingle()
+
+  return (emailMatch || null) as InternalStaffAccountRecord | null
+}
+
+async function hasEstablishedInternalStaffAccount(
+  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
+  linkedUserId: string,
+) {
+  const [{ data: memberships }, { data: employees }] = await Promise.all([
+    (adminClient as any)
+      .from('org_members')
+      .select('org_id')
+      .eq('user_id', linkedUserId)
+      .eq('is_active', true)
+      .limit(1),
+    (adminClient as any)
+      .from('employees')
+      .select('id')
+      .eq('user_id', linkedUserId)
+      .limit(1),
+  ])
+
+  return Boolean(
+    (Array.isArray(memberships) && memberships.length > 0) ||
+    (Array.isArray(employees) && employees.length > 0)
+  )
+}
+
 // ─────────────────────────────────────────────────────────────
 // signUp — Create a new Business Owner account
 // ─────────────────────────────────────────────────────────────
@@ -604,12 +669,7 @@ export async function signIn(formData: FormData) {
 // registerEmployeeAccount — Converts employee to auth user
 // ─────────────────────────────────────────────────────────────
 export async function registerEmployeeAccount(formData: FormData) {
-  if (isInternalAuthProvider()) {
-    return { error: 'Aktivasi akun karyawan belum didukung di mode auth internal.' }
-  }
-
   const adminClient = await createAdminClient()
-  const publicClient = await createClient()
   const cookieStore = await cookies()
 
   const nik = (formData.get('nik') as string)?.trim().toUpperCase()
@@ -653,6 +713,98 @@ export async function registerEmployeeAccount(formData: FormData) {
 
   // 3. Map role
   const roleId = await resolveRoleIdForEmployee(adminClient, invite?.role_id, emp)
+
+  if (isInternalAuthProvider()) {
+    const staffFullName = `${String(emp.first_name || '').trim()} ${String(emp.last_name || '').trim()}`
+      .replace(/\s+/g, ' ')
+      .trim()
+    const internalEmail = buildInternalStaffEmail(emp.org_id, nik)
+
+    const existingInternalAccount = await findInternalStaffAccount(adminClient, {
+      nik,
+      internalEmail,
+    })
+
+    let linkedUserId: string | null = null
+
+    if (existingInternalAccount) {
+      linkedUserId = resolveInternalStaffLinkedUserId(existingInternalAccount)
+      if (!linkedUserId) {
+        return { error: 'Akun internal ditemukan, tetapi identitas user-nya tidak valid. Hubungi admin.' }
+      }
+
+      const ensuredInternalUser = await ensureInternalAuthUserRecord({
+        userId: linkedUserId,
+        email: existingInternalAccount.login_email || internalEmail,
+        nik,
+        fullName: staffFullName || nik,
+        userType: 'staff',
+      })
+
+      if ('error' in ensuredInternalUser) {
+        return { error: ensuredInternalUser.error }
+      }
+
+      const establishedAccount = await hasEstablishedInternalStaffAccount(adminClient, linkedUserId)
+      const existingLogin = await signInWithInternalAuth({
+        email: existingInternalAccount.login_email || internalEmail,
+        nik,
+        password,
+        preferredOrgId: emp.org_id,
+      })
+
+      if ('error' in existingLogin) {
+        if (establishedAccount) {
+          return {
+            error: 'Akun karyawan ini sudah pernah diaktivasi. Login dulu dengan password yang sudah aktif, lalu buka lagi link aktivasi ini.',
+          }
+        }
+
+        const resetResult = await resetInternalAuthPasswordById(ensuredInternalUser.userId, password)
+        if ('error' in resetResult) {
+          return { error: resetResult.error }
+        }
+
+        const sessionResult = await createInternalAuthSessionByUserId(ensuredInternalUser.userId)
+        if ('error' in sessionResult) {
+          return { error: `Akun internal ditemukan, tetapi sesi login gagal dibuat: ${sessionResult.error}` }
+        }
+      }
+    } else {
+      const internalUser = await createInternalAuthUser({
+        email: internalEmail,
+        nik,
+        password,
+        fullName: staffFullName || nik,
+        userType: 'staff',
+      })
+
+      if ('error' in internalUser) {
+        return { error: internalUser.error }
+      }
+
+      linkedUserId = normalizeUuid(internalUser.userId)
+      if (!linkedUserId) {
+        return { error: 'Akun internal berhasil dibuat, tetapi user ID tidak valid.' }
+      }
+    }
+
+    const linkResult = await linkEmployeeToUser(adminClient, emp, linkedUserId, roleId)
+    if ('error' in linkResult) return linkResult
+
+    await trackInvitationUsage(adminClient, invite)
+    await persistMembershipActiveContext(adminClient as any, {
+      userId: linkedUserId,
+      orgId: emp.org_id,
+      branchId: emp.branch_id ? String(emp.branch_id) : null,
+    })
+    setActiveOrganizationCookie(cookieStore, emp.org_id)
+
+    revalidatePath('/', 'layout')
+    return { success: true, redirectTo: '/dashboard' }
+  }
+
+  const publicClient = await createClient()
 
   // 4. Reuse an already-linked staff identity when possible.
   const existingIdentity = await resolveExistingStaffIdentity(adminClient, publicClient, emp, nik, password)

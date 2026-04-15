@@ -131,7 +131,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Syirkah',
     items: [
-      { label: 'Akad Syirkah', href: '/syirkah', icon: Briefcase },
+      { label: 'Akad Syirkah', href: '/syirkah', icon: Briefcase, module_key: 'Syirkah' },
     ]
   },
   {
@@ -141,7 +141,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Anak Perusahaan', href: '/settings/sub-orgs', icon: Layers, permission_key: 'business', module_key: 'Consolidation' },
       { label: 'Cabang', href: '/settings/branches', icon: MapPin, permission_key: 'branch' },
       { label: 'Pengaturan Bisnis', href: '/settings/business', icon: Settings, permission_key: 'business', module_key: 'Config' },
-      { label: 'API & Integrasi', href: '/developers/api', icon: Code2, permission_key: 'business', module_key: 'Config' },
+      { label: 'API & Integrasi', href: '/developers/api', icon: Code2, permission_key: 'business', module_key: 'Integrasi API' },
       { label: 'Migrasi Data', href: '/settings/business/migration', icon: Upload, permission_key: 'business', module_key: 'Config' },
       { label: 'Support Ticket', href: '/settings/ticketing', icon: LifeBuoy, permission_key: 'business', module_key: 'Config' },
     ]
@@ -187,14 +187,6 @@ function subscribeSidebarCollapsed(onStoreChange: () => void) {
     window.removeEventListener('storage', handleStorage)
     window.removeEventListener(SIDEBAR_STATE_EVENT, handleStateChange)
   }
-}
-
-function subscribeHydration(onStoreChange: () => void) {
-  if (typeof window === 'undefined') return () => {}
-
-  // Trigger exactly once after hydration to switch from server snapshot to client snapshot.
-  onStoreChange()
-  return () => {}
 }
 
 function isSidebarItemActive(pathname: string, fullPath: string, href: string, hasTabQuery: boolean) {
@@ -281,14 +273,9 @@ export function AppSidebar({
     getSidebarCollapsedSnapshot,
     () => false
   )
-  const isHydrated = useSyncExternalStore(
-    subscribeHydration,
-    () => true,
-    () => false
-  )
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
   const isPlatformAdmin = isPlatformAdminEmail(user?.email)
-  const showSaasOperatorGroup = isHydrated && isPlatformAdmin
+  const showSaasOperatorGroup = isPlatformAdmin
   const navGroups = useMemo(() => (
     showSaasOperatorGroup
       ? [...NAV_GROUPS, SAAS_OPERATOR_GROUP]
@@ -408,58 +395,74 @@ export function AppSidebar({
     return isSidebarItemActive(pathname, fullPath, href, Boolean(tabQuery))
   }
 
-  const getFilteredItems = (group: NavGroup) => {
-    return group.items.filter((item) => {
-      // Always show Sub-Org menu for eligible parent context (owner/admin on main org),
-      // regardless of paid-module mapping labels.
-      if (item.href === '/settings/sub-orgs') {
-        return canManageSubOrganizations
-      }
+  const isItemVisible = useCallback((group: NavGroup, item: NavGroup['items'][number]) => {
+    // Always show Sub-Org menu for eligible parent context (owner/admin on main org),
+    // regardless of paid-module mapping labels.
+    if (item.href === '/settings/sub-orgs') {
+      return canManageSubOrganizations
+    }
 
-      // Cabang adalah fitur core — selalu tampilkan untuk owner/admin
-      if (item.href === '/settings/branches') {
-        return isOwnerOrAdmin
-      }
+    // Cabang adalah fitur core — selalu tampilkan untuk owner/admin
+    if (item.href === '/settings/branches') {
+      return isOwnerOrAdmin
+    }
 
-      // Platform admin should always see SaaS operator shortcuts
-      if (showSaasOperatorGroup && group.group === 'SaaS Operator') return true
+    // Platform admin should always see SaaS operator shortcuts
+    if (group.group === SAAS_OPERATOR_GROUP.group) {
+      return showSaasOperatorGroup
+    }
 
-      // 0. DEMO BYPASS: Tampilkan SEMUA modul di mode Demo/Latihan agar klien bisa eksplorasi fitur penuh
-      if (isDemo) return true
+    // 0. DEMO BYPASS: Tampilkan SEMUA modul di mode Demo/Latihan agar klien bisa eksplorasi fitur penuh
+    if (isDemo) return true
 
-      // 1. SaaS Module Check
-      if (item.module_key && enabledModules.length > 0) {
-        const matches = enabledModules.some((moduleName) => {
-          const enabledLower = moduleName.trim().toLowerCase()
+    // 1. SaaS Module Check
+    if (item.module_key && enabledModules.length > 0) {
+      const matches = enabledModules.some((moduleName) => {
+        const enabledLower = moduleName.trim().toLowerCase()
 
-          // a. Exact label match — granular per-menu control
-          //    e.g. enabledModules has 'Akun (CoA)' → only shows 'Akun (CoA)', not 'Buku Besar'
-          if (enabledLower === item.label.trim().toLowerCase()) return true
+        // a. Exact label match — granular per-menu control
+        //    e.g. enabledModules has 'Akun (CoA)' → only shows 'Akun (CoA)', not 'Buku Besar'
+        if (enabledLower === item.label.trim().toLowerCase()) return true
 
-          // b. Canonical module match — backward compat with packages storing canonical names
-          //    Only applies when the enabledModule IS already a canonical name (normalizes to itself)
-          //    e.g. enabledModules has 'Purchasing' → matches item.module_key 'Purchasing'
-          const normalizedEnabled = normalizeSaasEntitlementName(moduleName)
-          if (normalizedEnabled.trim().toLowerCase() === enabledLower) {
-            if (saasModuleMatches(moduleName, item.module_key!)) return true
-          }
+        // b. Canonical module match — backward compat with packages storing canonical names
+        //    Only applies when the enabledModule IS already a canonical name (normalizes to itself)
+        //    e.g. enabledModules has 'Purchasing' → matches item.module_key 'Purchasing'
+        const normalizedEnabled = normalizeSaasEntitlementName(moduleName)
+        if (normalizedEnabled.trim().toLowerCase() === enabledLower) {
+          if (saasModuleMatches(moduleName, item.module_key!)) return true
+        }
 
-          return false
-        })
-        if (!matches) return false
-      }
-
-      // 2. RBAC Permission Check
-      if (isOwnerOrAdmin) return true
-      if (!item.permission_key) return true
-
-      const reqPerms = item.permission_key.split(',').map((key) => key.trim().toLowerCase())
-      return permissions.some((permission) => {
-        const normalizedPermission = permission.toLowerCase()
-        return reqPerms.some((requiredPermission) => normalizedPermission.includes(requiredPermission))
+        return false
       })
+      if (!matches) return false
+    }
+
+    // 2. RBAC Permission Check
+    if (isOwnerOrAdmin) return true
+    if (!item.permission_key) return true
+
+    const reqPerms = item.permission_key.split(',').map((key) => key.trim().toLowerCase())
+    return permissions.some((permission) => {
+      const normalizedPermission = permission.toLowerCase()
+      return reqPerms.some((requiredPermission) => normalizedPermission.includes(requiredPermission))
     })
-  }
+  }, [
+    canManageSubOrganizations,
+    enabledModules,
+    isDemo,
+    isOwnerOrAdmin,
+    permissions,
+    showSaasOperatorGroup,
+  ])
+
+  const visibleNavGroups = useMemo(() => {
+    return navGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => isItemVisible(group, item)),
+      }))
+      .filter((group) => group.items.length > 0)
+  }, [isItemVisible, navGroups])
 
   const toggleCollapse = () => {
     const next = !isCollapsed
@@ -470,57 +473,17 @@ export function AppSidebar({
   }
 
   const warmupHrefs = useMemo(() => {
-    const getWarmableItems = (group: NavGroup) => {
-      return group.items.filter((item) => {
-        if (item.href === '/settings/sub-orgs') {
-          return canManageSubOrganizations
-        }
-
-        if (item.href === '/settings/branches') {
-          return isOwnerOrAdmin
-        }
-
-        if (showSaasOperatorGroup && group.group === 'SaaS Operator') return true
-        if (isDemo) return true
-
-        if (item.module_key && enabledModules.length > 0) {
-          const matches = enabledModules.some((moduleName) => {
-            const enabledLower = moduleName.trim().toLowerCase()
-
-            if (enabledLower === item.label.trim().toLowerCase()) return true
-
-            const normalizedEnabled = normalizeSaasEntitlementName(moduleName)
-            if (normalizedEnabled.trim().toLowerCase() === enabledLower) {
-              if (saasModuleMatches(moduleName, item.module_key!)) return true
-            }
-
-            return false
-          })
-          if (!matches) return false
-        }
-
-        if (isOwnerOrAdmin) return true
-        if (!item.permission_key) return true
-
-        const reqPerms = item.permission_key.split(',').map((key) => key.trim().toLowerCase())
-        return permissions.some((permission) => {
-          const normalizedPermission = permission.toLowerCase()
-          return reqPerms.some((requiredPermission) => normalizedPermission.includes(requiredPermission))
-        })
-      })
-    }
-
-    const topRoutes = navGroups
-      .map((group) => getWarmableItems(group)[0]?.href)
+    const topRoutes = visibleNavGroups
+      .map((group) => group.items[0]?.href)
       .filter((href): href is string => Boolean(href))
 
-    const activeGroup = navGroups.find((group) =>
-      getWarmableItems(group).some((item) =>
+    const activeGroup = visibleNavGroups.find((group) =>
+      group.items.some((item) =>
         isSidebarItemActive(pathname, fullPath, item.href, Boolean(tabQuery))
       )
     )
 
-    const activeGroupRoutes = activeGroup ? getWarmableItems(activeGroup).map((item) => item.href) : []
+    const activeGroupRoutes = activeGroup ? activeGroup.items.map((item) => item.href) : []
     const profileRoute = isOwnerOrAdmin ? '/settings/business' : '/profil-saya'
 
     return Array.from(new Set([
@@ -531,20 +494,15 @@ export function AppSidebar({
       '/billing',
     ])).filter((href) => href !== fullPath)
   }, [
-    canManageSubOrganizations,
-    enabledModules,
     fullPath,
-    isDemo,
     isOwnerOrAdmin,
-    navGroups,
     pathname,
-    permissions,
-    showSaasOperatorGroup,
     tabQuery,
+    visibleNavGroups,
   ])
 
   useEffect(() => {
-    if (!isHydrated || warmupHrefs.length === 0) return
+    if (warmupHrefs.length === 0) return
 
     const timeoutIds: number[] = []
     const kickoffId = window.setTimeout(() => {
@@ -561,7 +519,7 @@ export function AppSidebar({
     return () => {
       timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId))
     }
-  }, [isHydrated, prefetchRoute, warmupHrefs])
+  }, [prefetchRoute, warmupHrefs])
 
   return (
     <>
@@ -609,11 +567,8 @@ export function AppSidebar({
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 overflow-y-auto no-scrollbar scroll-smooth">
-        {navGroups.map((group) => {
-          const filteredItems = getFilteredItems(group)
-
-          if (filteredItems.length === 0) return null
-
+        {visibleNavGroups.map((group) => {
+          const filteredItems = group.items
           const hasActiveItem = filteredItems.some((item) => isNavItemActive(item.href))
           const groupKey = `${group.group}-${fullPath}`
 
