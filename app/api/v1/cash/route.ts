@@ -1149,15 +1149,20 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       await client.query('ROLLBACK')
-      const message = error instanceof Error ? error.message : ''
+      const message = error instanceof Error ? error.message : String(error)
+      const detail = (error as any)?.detail ?? ''
+      const hint = (error as any)?.hint ?? ''
+      console.error('[POST /api/v1/cash] manual journal error:', message, detail, hint)
       if (message.toLowerCase().includes('saldo kas tidak mencukupi')) {
         return withNoStore(apiError(message, 422))
       }
+      const isDev = process.env.NODE_ENV !== 'production'
       return withNoStore(apiError(
         type === 'in'
           ? 'Gagal mencatat transaksi kas masuk.'
           : 'Gagal mencatat transaksi kas keluar.',
-        500
+        500,
+        isDev ? { debug: message, detail, hint } : undefined
       ))
     } finally {
       client.release()
@@ -1177,15 +1182,19 @@ export async function POST(request: NextRequest) {
         status,
       })
     } catch (error) {
-      const message = error instanceof Error ? error.message : ''
+      const message = error instanceof Error ? error.message : String(error)
+      const detail = (error as any)?.detail ?? ''
+      console.error('[POST /api/v1/cash] simple insert error:', message, detail)
       if (message.toLowerCase().includes('saldo kas tidak mencukupi')) {
         return withNoStore(apiError(message, 422))
       }
+      const isDev = process.env.NODE_ENV !== 'production'
       return withNoStore(apiError(
         type === 'in'
           ? 'Gagal mencatat transaksi kas masuk.'
           : 'Gagal mencatat transaksi kas keluar.',
-        500
+        500,
+        isDev ? { debug: message, detail } : undefined
       ))
     }
   }
