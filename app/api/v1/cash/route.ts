@@ -614,7 +614,7 @@ async function insertCashTransaction(payload: {
         $4::date,
         $5::text,
         $6::numeric,
-        $7::text,
+        $7::cash_transaction_type,
         $8::text,
         $9::uuid,
         $10::text
@@ -680,7 +680,7 @@ async function insertCashTransactionWithClient(
         $4::date,
         $5::text,
         $6::numeric,
-        $7::text,
+        $7::cash_transaction_type,
         $8::text,
         $9::uuid,
         $10::text
@@ -1156,13 +1156,11 @@ export async function POST(request: NextRequest) {
       if (message.toLowerCase().includes('saldo kas tidak mencukupi')) {
         return withNoStore(apiError(message, 422))
       }
-      const isDev = process.env.NODE_ENV !== 'production'
       return withNoStore(apiError(
         type === 'in'
           ? 'Gagal mencatat transaksi kas masuk.'
           : 'Gagal mencatat transaksi kas keluar.',
-        500,
-        isDev ? { debug: message, detail, hint } : undefined
+        500
       ))
     } finally {
       client.release()
@@ -1188,13 +1186,11 @@ export async function POST(request: NextRequest) {
       if (message.toLowerCase().includes('saldo kas tidak mencukupi')) {
         return withNoStore(apiError(message, 422))
       }
-      const isDev = process.env.NODE_ENV !== 'production'
       return withNoStore(apiError(
         type === 'in'
           ? 'Gagal mencatat transaksi kas masuk.'
           : 'Gagal mencatat transaksi kas keluar.',
-        500,
-        isDev ? { debug: message, detail } : undefined
+        500
       ))
     }
   }
