@@ -141,7 +141,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Anak Perusahaan', href: '/settings/sub-orgs', icon: Layers, permission_key: 'business', module_key: 'Consolidation' },
       { label: 'Cabang', href: '/settings/branches', icon: MapPin, permission_key: 'branch' },
       { label: 'Pengaturan Bisnis', href: '/settings/business', icon: Settings, permission_key: 'business', module_key: 'Config' },
-      { label: 'API & Integrasi', href: '/settings/api', icon: Code2, permission_key: 'business', module_key: 'Config' },
+      { label: 'API & Integrasi', href: '/developers/api', icon: Code2, permission_key: 'business', module_key: 'Config' },
       { label: 'Migrasi Data', href: '/settings/business/migration', icon: Upload, permission_key: 'business', module_key: 'Config' },
       { label: 'Support Ticket', href: '/settings/ticketing', icon: LifeBuoy, permission_key: 'business', module_key: 'Config' },
     ]

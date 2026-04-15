@@ -160,6 +160,7 @@ export async function generateApiKey(
     return { error: error?.message || 'Gagal membuat API key.' }
   }
 
+  revalidatePath('/developers/api')
   revalidatePath('/settings/api')
   return { success: true, fullKey, keyId: data.id }
 }
@@ -183,6 +184,7 @@ export async function revokeApiKey(
 
   if (error) return { error: error.message || 'Gagal menonaktifkan API key.' }
 
+  revalidatePath('/developers/api')
   revalidatePath('/settings/api')
   return { success: true }
 }
@@ -265,6 +267,7 @@ export async function saveApiConfiguration(
 
   if (error) return { error: error.message || 'Gagal menyimpan konfigurasi API.' }
 
+  revalidatePath('/developers/api')
   revalidatePath('/settings/api')
   return { success: true }
 }

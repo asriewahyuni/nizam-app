@@ -75,7 +75,8 @@ export default async function DashboardLayout({
     { path: '/settings/ticketing', requiredModule: 'Config', aliases: ['Config', 'Ticketing', 'Support Ticket', 'Doc Update Ticketing', 'Dokumen Update Support Ticket'], permissionKeys: ['business', 'support', 'ticketing'] },
     { path: '/settings/roles', requiredModule: 'HRIS', aliases: ['HRIS', 'Akses & Jabatan'], permissionKeys: ['business'] },
     { path: '/settings/branches', requiredModule: 'Config', aliases: ['Config', 'Cabang & Divisi'], permissionKeys: ['branch'] },
-    { path: '/settings/api', requiredModule: 'Config', aliases: ['Config', 'API & Integrasi'], permissionKeys: ['business'] },
+    { path: '/developers/api', requiredModule: 'Config', aliases: ['Config', 'API & Integrasi', 'Developers'], permissionKeys: ['business'] },
+    { path: '/settings/api', requiredModule: 'Config', aliases: ['Config', 'API & Integrasi', 'Developers'], permissionKeys: ['business'] },
     { path: '/settings/business', requiredModule: 'Config', aliases: ['Config', 'Pengaturan Bisnis'], permissionKeys: ['business'] },
     { path: '/settings/accounts', requiredModule: 'Finance', aliases: ['Finance', 'Akun (CoA)'], permissionKeys: ['coa'] },
     {

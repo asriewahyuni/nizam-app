@@ -10,12 +10,12 @@
  * + Webhook section di bawah konfigurasi
  */
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Key, Plus, Trash2, Copy, Check, X, Eye, EyeOff, Zap,
-  Settings, ChevronRight, Globe, Shield, Clock, Activity,
-  ArrowDownCircle, ArrowUpCircle, Webhook, RefreshCw, AlertCircle,
+  Key, Plus, Trash2, Copy, Check, X, Eye, EyeOff,
+  Globe, Shield, Clock, Activity,
+  ArrowDownCircle, ArrowUpCircle, Webhook, AlertCircle,
   Code, Lock,
 } from 'lucide-react'
 import {
@@ -31,12 +31,79 @@ import type { ApiScope } from '@/lib/api/validate-key'
 // ─────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────
-type Account = { id: string; code: string; name: string; type: string }
+type Account = {
+  id: string
+  code: string | null
+  name: string | null
+  type: string | null
+}
+type BankAccountOption = {
+  id: string
+  branch_id: string | null
+  account_id: string | null
+  bank_name: string | null
+  account_number: string | null
+  currency: string | null
+}
+type InventoryProductOption = {
+  id: string
+  sku: string | null
+  name: string | null
+  type: string | null
+  unit: string | null
+  purchase_price: number | string | null
+  selling_price: number | string | null
+  average_cost: number | string | null
+  category: string | null
+  asset_account_id: string | null
+}
 type Branch = { id: string; name: string; code?: string }
 type WebhookDelivery = {
   id: string; event_type: string; status: string; http_status: number | null
   target_url: string; attempt_count: number; delivered_at: string | null; created_at: string
 }
+type EndpointParameter = {
+  name: string
+  in: 'header' | 'query' | 'body'
+  required: boolean
+  schema: string
+  description: string
+}
+type EndpointResponse = {
+  status: string
+  description: string
+}
+type EndpointRequestBody = {
+  required: boolean
+  contentType: string
+  fields: string[]
+}
+type EndpointExample = {
+  id: string
+  label: string
+  description: string
+  query?: string
+  body?: string
+  curl: string
+  response: string
+}
+type EndpointDoc = {
+  id: 'cash-read' | 'inventory-read' | 'cash-create'
+  label: string
+  method: 'GET' | 'POST'
+  path: '/cash' | '/inventory'
+  summary: string
+  operationId: string
+  scope: ApiScope
+  description: string
+  auth: string[]
+  parameters: EndpointParameter[]
+  requestBody: EndpointRequestBody | null
+  responses: EndpointResponse[]
+  notes: string[]
+  examples: EndpointExample[]
+}
+type TryAuthMode = 'x-api-key' | 'bearer'
 
 interface Props {
   orgId: string
@@ -44,6 +111,8 @@ interface Props {
   initialApiKeys: ApiKeyRecord[]
   initialConfig: ApiConfigurationRecord | null
   initialAccounts: Account[]
+  initialBankAccounts: BankAccountOption[]
+  initialInventoryProducts: InventoryProductOption[]
   branches: Branch[]
   webhookDeliveries: WebhookDelivery[]
   baseUrl: string
@@ -58,6 +127,7 @@ const SCOPES: { value: ApiScope; label: string; desc: string; color: string }[] 
 ]
 
 const WEBHOOK_EVENTS = ['cash_in', 'cash_out', 'sale', 'purchase']
+const TRYOUT_INVISIBLE_CHARACTERS = /[\u200B-\u200D\u2060\uFEFF]/g
 
 function ScopeBadge({ scope }: { scope: string }) {
   const def = SCOPES.find(s => s.value === scope)
@@ -76,15 +146,96 @@ function ScopeBadge({ scope }: { scope: string }) {
   )
 }
 
+function normalizeTryApiKeyValue(value: string) {
+  return value
+    .normalize('NFKC')
+    .replace(TRYOUT_INVISIBLE_CHARACTERS, '')
+    .replace(/[\r\n\t]/g, '')
+    .trim()
+}
+
+function isBrowserSafeHeaderValue(value: string) {
+  for (const char of value) {
+    const codePoint = char.codePointAt(0) ?? 0
+    if (codePoint === 0 || codePoint === 10 || codePoint === 13 || codePoint > 0xFF) {
+      return false
+    }
+  }
+  return true
+}
+
+function isValidTryApiKeyFormat(value: string) {
+  return /^nzm_live_[A-Za-z0-9]{16,}$/.test(value)
+}
+
+function isLiquidCashAccount(account: Account) {
+  const accountType = String(account.type ?? '').toUpperCase()
+  const accountCode = String(account.code ?? '').trim()
+  return accountType === 'ASSET' && accountCode.startsWith('11') && !accountCode.endsWith('00')
+}
+
+function formatAccountOption(account: Account) {
+  const code = String(account.code ?? '').trim()
+  const name = String(account.name ?? '').trim()
+
+  if (code && name) return `${code} — ${name}`
+  if (name) return name
+  if (code) return code
+  return account.id
+}
+
+function toSafeAmount(value: number | string | null | undefined, fallback: number) {
+  const numeric = Number(value ?? fallback)
+  return Number.isFinite(numeric) ? numeric : fallback
+}
+
+function formatJson(value: unknown) {
+  return JSON.stringify(value, null, 2)
+}
+
+function buildCurlExample(args: {
+  baseUrl: string
+  method: 'GET' | 'POST'
+  path: string
+  query?: string
+  body?: unknown
+}) {
+  const normalizedQuery = args.query?.trim().replace(/^\?/, '')
+  const url = `${args.baseUrl}${args.path}${normalizedQuery ? `?${normalizedQuery}` : ''}`
+
+  if (args.method === 'GET') {
+    return `curl "${url}" \\
+  -H "x-api-key: nzm_live_<your-key>" \\
+  -H "Accept: application/json"`
+  }
+
+  return `curl ${args.baseUrl}${args.path} \\
+  -X ${args.method} \\
+  -H "x-api-key: nzm_live_<your-key>" \\
+  -H "Content-Type: application/json" \\
+  -d '${formatJson(args.body ?? {})}'`
+}
+
 // ─────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────
 export function ApiSettingsClient({
-  orgId, currentRole, initialApiKeys, initialConfig, initialAccounts, branches, webhookDeliveries, baseUrl,
+  orgId,
+  currentRole,
+  initialApiKeys,
+  initialConfig,
+  initialAccounts,
+  initialBankAccounts,
+  initialInventoryProducts,
+  branches,
+  webhookDeliveries,
+  baseUrl,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<'keys' | 'cashin' | 'cashout' | 'webhook'>('keys')
+  const [activeTab, setActiveTab] = useState<'keys' | 'cashin' | 'cashout' | 'webhook' | 'tryout'>('keys')
+  const [activeDoc, setActiveDoc] = useState<'cash-read' | 'inventory-read' | 'cash-create'>('cash-read')
   const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>(initialApiKeys)
   const [loading, setLoading] = useState(false)
+  const [resolvedBaseUrl, setResolvedBaseUrl] = useState(baseUrl)
 
   // ── Generate modal state ──
   const [showGenModal, setShowGenModal] = useState(false)
@@ -106,9 +257,454 @@ export function ApiSettingsClient({
     }
   )
   const [showWebhookSecret, setShowWebhookSecret] = useState(false)
+  const [tryApiKey, setTryApiKey] = useState('')
+  const [tryAuthMode, setTryAuthMode] = useState<TryAuthMode>('x-api-key')
+  const [tryPath, setTryPath] = useState('/api/v1/cash')
+  const [tryQuery, setTryQuery] = useState('')
+  const [tryBody, setTryBody] = useState('')
+  const [tryStatus, setTryStatus] = useState<number | null>(null)
+  const [tryResponse, setTryResponse] = useState('')
+  const [tryLoading, setTryLoading] = useState(false)
+  const [tryError, setTryError] = useState<string | null>(null)
 
-  const isOwner = currentRole === 'owner'
   const isAdmin = currentRole === 'owner' || currentRole === 'admin'
+  const cashAccounts = initialAccounts.filter(isLiquidCashAccount)
+  const counterAccounts = initialAccounts
+  const [activeExampleId, setActiveExampleId] = useState('')
+
+  const accountById = new Map(initialAccounts.map((account) => [account.id, account]))
+  const bankBackedCashAccountIds = new Set(
+    initialBankAccounts
+      .map((bankAccount) => bankAccount.account_id)
+      .filter((accountId): accountId is string => Boolean(accountId))
+  )
+  const defaultBranch = branches[0] ?? null
+  const defaultBankAccount = initialBankAccounts[0] ?? null
+  const defaultCashAccount =
+    cashAccounts.find((account) => bankBackedCashAccountIds.has(account.id))
+    ?? cashAccounts[0]
+    ?? null
+  const preferredInventoryProduct =
+    initialInventoryProducts.find((product) => String(product.name ?? '').toLowerCase().includes('buku'))
+    ?? initialInventoryProducts[0]
+    ?? null
+  const preferredInventoryAccount =
+    (preferredInventoryProduct?.asset_account_id ? accountById.get(preferredInventoryProduct.asset_account_id) : null)
+    ?? initialAccounts.find((account) => account.code === '1304')
+    ?? initialAccounts.find((account) => account.code === '1301')
+    ?? null
+  const payableAccount =
+    initialAccounts.find((account) => account.code === '2101')
+    ?? null
+  const taxInputAccount =
+    initialAccounts.find((account) => account.code === '1401')
+    ?? null
+  const freightInAccount =
+    initialAccounts.find((account) => account.code === '5002')
+    ?? initialAccounts.find((account) => account.code === '6099')
+    ?? null
+  const purchaseDiscountAccount =
+    initialAccounts.find((account) => account.code === '5003')
+    ?? initialAccounts.find((account) => account.code === '4002')
+    ?? null
+
+  const exampleBranchId = defaultBranch?.id ?? 'branch-id'
+  const exampleBranchLabel = defaultBranch?.name ?? 'Cabang Utama'
+  const exampleCashAccountId = defaultBankAccount?.account_id ?? defaultCashAccount?.id ?? 'cash-bank-11xx-account-id'
+  const exampleCashAccountLabel = defaultBankAccount?.bank_name ?? formatAccountOption(defaultCashAccount ?? {
+    id: 'cash-bank-11xx-account-id',
+    code: '1101',
+    name: 'Kas / Bank',
+    type: 'ASSET',
+  })
+  const exampleBankAccountId = defaultBankAccount?.id ?? 'bank-account-id'
+  const exampleBookProductName = String(preferredInventoryProduct?.name ?? 'BUKU MATEMATIKA SERIES 3')
+  const exampleBookSku = String(preferredInventoryProduct?.sku ?? 'BMS3')
+  const exampleBookUnit = String(preferredInventoryProduct?.unit ?? 'Pcs')
+  const exampleInventoryAccountId = preferredInventoryAccount?.id ?? 'inventory-account-id'
+  const exampleTaxAccountId = taxInputAccount?.id ?? 'tax-account-id'
+  const examplePayableAccountId = payableAccount?.id ?? 'payable-account-id'
+  const exampleFreightAccountId = freightInAccount?.id ?? 'other-charge-account-id'
+  const exampleDiscountAccountId = purchaseDiscountAccount?.id ?? 'discount-account-id'
+
+  const bookUnitCost = toSafeAmount(
+    preferredInventoryProduct?.purchase_price ?? preferredInventoryProduct?.average_cost,
+    9600
+  )
+  const bookQuantity = 50
+  const bookInventoryAmount = Number((bookUnitCost * bookQuantity).toFixed(2))
+  const bookTaxAmount = Number((bookInventoryAmount * 0.1).toFixed(2))
+  const bookFreightAmount = 12000
+  const bookDiscountAmount = 15000
+  const bookInvoiceTotal = Number((bookInventoryAmount + bookTaxAmount + bookFreightAmount - bookDiscountAmount).toFixed(2))
+  const bookCashPaidAmount = 350000
+  const bookPayableAmount = Number((bookInvoiceTotal - bookCashPaidAmount).toFixed(2))
+
+  const receivableExampleBody = {
+    type: 'in',
+    amount: 250000,
+    description: 'Pelunasan invoice INV-2026-001',
+    reference: 'INV-2026-001',
+    branch_id: exampleBranchId,
+    transaction_date: '2026-04-15',
+    account_id: exampleCashAccountId,
+    settlement_type: 'receivable',
+  }
+
+  const onlineBookPurchaseBody = {
+    type: 'out',
+    amount: bookCashPaidAmount,
+    description: `Push marketplace pembelian ${exampleBookSku} - ${exampleBookProductName}`,
+    reference: 'PO-MP-BOOK-2026-0001',
+    branch_id: exampleBranchId,
+    transaction_date: '2026-04-15',
+    account_id: exampleCashAccountId,
+    journal_lines: [
+      {
+        account_id: exampleInventoryAccountId,
+        debit: bookInventoryAmount,
+        memo: `Persediaan ${exampleBookSku} ${bookQuantity} ${exampleBookUnit}`,
+      },
+      {
+        account_id: exampleTaxAccountId,
+        debit: bookTaxAmount,
+        memo: 'PPN masukan pembelian marketplace',
+      },
+      {
+        account_id: exampleFreightAccountId,
+        debit: bookFreightAmount,
+        memo: 'Ongkir masuk marketplace',
+      },
+      {
+        account_id: exampleDiscountAccountId,
+        credit: bookDiscountAmount,
+        memo: 'Diskon supplier marketplace',
+      },
+      {
+        account_id: examplePayableAccountId,
+        credit: bookPayableAmount,
+        memo: 'Sisa hutang supplier marketplace',
+      },
+    ],
+  }
+
+  const endpointDocs: EndpointDoc[] = [
+    {
+      id: 'cash-read',
+      label: 'Read Cash',
+      method: 'GET',
+      path: '/cash',
+      summary: 'List active cash and bank accounts',
+      operationId: 'listCashAccounts',
+      scope: 'cash:read',
+      description: 'Ambil daftar rekening bank aktif plus akun kas/bank likuid CoA `11xx` yang belum punya bridge `bank_accounts`, lengkap dengan saldo posted dan branch scope untuk API key Anda.',
+      auth: ['ApiKeyAuth', 'BearerAuth'],
+      parameters: [
+        {
+          name: 'x-api-key',
+          in: 'header',
+          required: false,
+          schema: 'string',
+          description: 'Primary authentication header.',
+        },
+        {
+          name: 'Authorization',
+          in: 'header',
+          required: false,
+          schema: 'Bearer <api-key>',
+          description: 'Alternative bearer authentication using the same API key.',
+        },
+      ],
+      requestBody: null,
+      responses: [
+        { status: '200', description: 'Cash account list returned successfully.' },
+        { status: '401', description: 'API key missing, invalid, expired, or revoked.' },
+        { status: '403', description: 'API key does not include `cash:read` scope.' },
+        { status: '429', description: 'Per-key rate limit exceeded.' },
+      ],
+      notes: [
+        '`source = bank_account` berarti rekening berasal dari tabel `bank_accounts` dan `bank_account_id` akan terisi.',
+        '`source = gl_account` berarti akun kas/bank berasal langsung dari CoA `11xx`; `bank_account_id` bisa `null` sampai dipakai POST pertama kali.',
+        'Saldo berasal dari jurnal berstatus `POSTED`, bukan dari draft transaksi.',
+      ],
+      examples: [
+        {
+          id: 'cash-read-mixed-sources',
+          label: 'Mixed Cash Sources',
+          description: `Contoh daftar rekening untuk org aktif, termasuk rekening bridge ${exampleCashAccountLabel} dan akun CoA kas/bank lain yang belum punya bridge.`,
+          curl: buildCurlExample({
+            baseUrl,
+            method: 'GET',
+            path: '/api/v1/cash',
+          }),
+          response: formatJson({
+            success: true,
+            data: [
+              {
+                id: exampleBankAccountId,
+                bank_account_id: exampleBankAccountId,
+                source: 'bank_account',
+                name: exampleCashAccountLabel,
+                account_id: exampleCashAccountId,
+                account_code: defaultCashAccount?.code ?? '1105.1',
+                account_name: defaultCashAccount?.name ?? exampleCashAccountLabel,
+                account_number: defaultBankAccount?.account_number ?? '1',
+                bank_name: exampleCashAccountLabel,
+                balance: 3500000,
+                currency: defaultBankAccount?.currency ?? 'IDR',
+                branch_id: defaultBankAccount?.branch_id ?? exampleBranchId,
+                is_active: true,
+              },
+              {
+                id: cashAccounts.find((account) => !bankBackedCashAccountIds.has(account.id))?.id ?? 'gl-cash-account-id',
+                bank_account_id: null,
+                source: 'gl_account',
+                name: cashAccounts.find((account) => !bankBackedCashAccountIds.has(account.id))?.name ?? 'Kas Besar',
+                account_id: cashAccounts.find((account) => !bankBackedCashAccountIds.has(account.id))?.id ?? 'gl-cash-account-id',
+                account_code: cashAccounts.find((account) => !bankBackedCashAccountIds.has(account.id))?.code ?? '1101',
+                account_name: cashAccounts.find((account) => !bankBackedCashAccountIds.has(account.id))?.name ?? 'Kas Besar',
+                account_number: null,
+                bank_name: cashAccounts.find((account) => !bankBackedCashAccountIds.has(account.id))?.name ?? 'Kas Besar',
+                balance: 1250000,
+                currency: 'IDR',
+                branch_id: exampleBranchId,
+                is_active: true,
+              },
+            ],
+            meta: {
+              org_id: orgId,
+              branch_scope: exampleBranchId,
+              count: 2,
+            },
+          }),
+        },
+      ],
+    },
+    {
+      id: 'inventory-read',
+      label: 'Read Inventory',
+      method: 'GET',
+      path: '/inventory',
+      summary: 'List inventory items',
+      operationId: 'listInventoryItems',
+      scope: 'inventory:read',
+      description: 'Ambil daftar produk aktif dan stok inventori yang bisa difilter berdasarkan nama produk.',
+      auth: ['ApiKeyAuth', 'BearerAuth'],
+      parameters: [
+        {
+          name: 'limit',
+          in: 'query',
+          required: false,
+          schema: 'integer (1..500)',
+          description: 'Maximum records returned. Default 100, maximum 500.',
+        },
+        {
+          name: 'search',
+          in: 'query',
+          required: false,
+          schema: 'string',
+          description: 'Case-insensitive filter by product name.',
+        },
+      ],
+      requestBody: null,
+      responses: [
+        { status: '200', description: 'Inventory list returned successfully.' },
+        { status: '401', description: 'API key missing, invalid, expired, or revoked.' },
+        { status: '403', description: 'API key does not include `inventory:read` scope.' },
+        { status: '429', description: 'Per-key rate limit exceeded.' },
+      ],
+      notes: [
+        'Gunakan `limit` untuk pagination sederhana hingga maksimum 500 baris.',
+        'Field `search` memfilter nama produk secara case-insensitive.',
+      ],
+      examples: [
+        {
+          id: 'inventory-read-default',
+          label: 'Inventory List',
+          description: `Contoh pengecekan stok item buku di org aktif sebelum payload pembelian marketplace dikirim.`,
+          query: `limit=20&search=${encodeURIComponent(String(preferredInventoryProduct?.name ?? 'buku'))}`,
+          curl: buildCurlExample({
+            baseUrl,
+            method: 'GET',
+            path: '/api/v1/inventory',
+            query: `limit=20&search=${encodeURIComponent(String(preferredInventoryProduct?.name ?? 'buku'))}`,
+          }),
+          response: formatJson({
+            success: true,
+            data: [
+              {
+                id: preferredInventoryProduct?.id ?? 'product-id',
+                code: preferredInventoryProduct?.sku ?? 'BMS3',
+                name: preferredInventoryProduct?.name ?? 'BUKU MATEMATIKA SERIES 3',
+                unit: preferredInventoryProduct?.unit ?? 'Pcs',
+                category: preferredInventoryProduct?.category ?? 'Siap Jual',
+                selling_price: toSafeAmount(preferredInventoryProduct?.selling_price, 13333.33),
+                cost_price: toSafeAmount(preferredInventoryProduct?.purchase_price ?? preferredInventoryProduct?.average_cost, 9600),
+                stock_quantity: 3,
+                branch_id: null,
+                is_active: true,
+              },
+            ],
+            meta: {
+              org_id: orgId,
+              branch_scope: exampleBranchId,
+              count: 1,
+            },
+          }),
+        },
+      ],
+    },
+    {
+      id: 'cash-create',
+      label: 'Create Cash',
+      method: 'POST',
+      path: '/cash',
+      summary: 'Create a cash transaction',
+      operationId: 'createCashTransaction',
+      scope: 'cash:write',
+      description: 'Buat transaksi kas masuk atau kas keluar dari sistem eksternal dengan satu endpoint. `account_id` bisa langsung menunjuk akun kas/bank CoA `11xx`, dan `journal_lines` bisa dipakai untuk split jurnal inventory, pajak, diskon, hutang, piutang, atau biaya lain agar tetap masuk ke buku besar secara balance.',
+      auth: ['ApiKeyAuth', 'BearerAuth'],
+      parameters: [
+        {
+          name: 'x-api-key',
+          in: 'header',
+          required: false,
+          schema: 'string',
+          description: 'Primary authentication header.',
+        },
+        {
+          name: 'Authorization',
+          in: 'header',
+          required: false,
+          schema: 'Bearer <api-key>',
+          description: 'Alternative bearer authentication using the same API key.',
+        },
+      ],
+      requestBody: {
+        required: true,
+        contentType: 'application/json',
+        fields: [
+          '`type` enum: `in` | `out`',
+          '`amount` number > 0',
+          '`description` string',
+          '`reference` string, optional',
+          '`branch_id` UUID, required only when API key tidak branch-scoped',
+          '`transaction_date` date string (YYYY-MM-DD), optional',
+          '`bank_account_id` UUID, optional override untuk row `bank_accounts` spesifik',
+          '`account_id` UUID, optional akun kas/bank CoA `11xx`; bridge `bank_accounts` dibuat otomatis bila belum ada',
+          '`category_id` / `counter_account_id` UUID, optional override akun lawan untuk mode sederhana',
+          '`settlement_type` enum: `general` | `revenue` | `expense` | `receivable` | `payable` | `tax` | `discount` | `other_charge`',
+          '`journal_lines[]`, optional split jurnal tanpa baris kas/bank; tiap line pakai `account_id`/`category_id` dan tepat satu sisi `debit` atau `credit`',
+        ],
+      },
+      responses: [
+        { status: '200', description: 'Cash transaction created successfully.' },
+        { status: '400', description: 'Invalid JSON or missing required fields.' },
+        { status: '401', description: 'API key missing, invalid, expired, or revoked.' },
+        { status: '403', description: 'API key does not include `cash:write` scope.' },
+        { status: '422', description: 'Default cash account configuration is incomplete.' },
+        { status: '429', description: 'Per-key rate limit exceeded.' },
+      ],
+      notes: [
+        '`journal_lines` hanya dipakai ketika `auto_post` aktif; akun kas/bank utama akan ditambahkan sistem otomatis dari `amount` dan `type`.',
+        'Pada mode split, `amount` harus sama dengan arus kas aktual. Sisa yang belum dibayar dicatat sebagai `credit` ke hutang atau `debit` ke piutang di `journal_lines`.',
+        'Setiap line wajib punya tepat satu sisi `debit` atau `credit`, dan total semua line harus balance terhadap baris kas/bank.',
+      ],
+      examples: [
+        {
+          id: 'cash-create-receivable',
+          label: 'Pelunasan Piutang',
+          description: 'Kas masuk sederhana untuk pelunasan invoice ke akun piutang.',
+          body: formatJson(receivableExampleBody),
+          curl: buildCurlExample({
+            baseUrl,
+            method: 'POST',
+            path: '/api/v1/cash',
+            body: receivableExampleBody,
+          }),
+          response: formatJson({
+            success: true,
+            data: {
+              id: 'cash-transaction-id',
+              reference_number: 'INV-2026-001',
+              amount: 250000,
+              description: 'Pelunasan invoice INV-2026-001',
+              status: 'POSTED',
+              created_at: '2026-04-15T10:30:00.000Z',
+              journal_entry_id: 'journal-entry-id',
+              bank_account_id: exampleBankAccountId,
+              category_id: initialAccounts.find((account) => account.code === '1201')?.id ?? 'receivable-account-id',
+              transaction_date: '2026-04-15',
+            },
+            meta: {
+              type: 'cash_in',
+              auto_post: true,
+              settlement_type: 'receivable',
+            },
+          }),
+        },
+        {
+          id: 'cash-create-online-book-purchase',
+          label: 'Push Pembelian Buku',
+          description: `Simulasi push dari toko online untuk pembelian ${exampleBookSku} di ${exampleBranchLabel}, membagi persediaan, PPN, ongkir, diskon, kas ${exampleCashAccountLabel}, dan sisa hutang.`,
+          body: formatJson(onlineBookPurchaseBody),
+          curl: buildCurlExample({
+            baseUrl,
+            method: 'POST',
+            path: '/api/v1/cash',
+            body: onlineBookPurchaseBody,
+          }),
+          response: formatJson({
+            success: true,
+            data: {
+              id: 'cash-transaction-id',
+              reference_number: 'PO-MP-BOOK-2026-0001',
+              amount: bookCashPaidAmount,
+              description: `Push marketplace pembelian ${exampleBookSku} - ${exampleBookProductName}`,
+              status: 'POSTED',
+              created_at: '2026-04-15T10:45:00.000Z',
+              journal_entry_id: 'journal-entry-id',
+              bank_account_id: exampleBankAccountId,
+              category_id: exampleInventoryAccountId,
+              transaction_date: '2026-04-15',
+            },
+            meta: {
+              type: 'cash_out',
+              auto_post: true,
+              settlement_type: 'general',
+            },
+          }),
+        },
+      ],
+    },
+  ]
+
+  const activeEndpointDoc = endpointDocs.find((doc) => doc.id === activeDoc) ?? endpointDocs[0]
+  const defaultEndpointExampleId =
+    (activeEndpointDoc.id === 'cash-create'
+      ? activeEndpointDoc.examples.find((example) => example.id === 'cash-create-online-book-purchase')?.id
+      : null)
+    ?? activeEndpointDoc.examples[0]?.id
+    ?? ''
+  const activeEndpointExample =
+    activeEndpointDoc.examples.find((example) => example.id === activeExampleId)
+    ?? activeEndpointDoc.examples[0]
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setResolvedBaseUrl(window.location.origin)
+    }
+  }, [])
+
+  useEffect(() => {
+    setActiveExampleId(defaultEndpointExampleId)
+  }, [activeDoc, defaultEndpointExampleId])
+
+  useEffect(() => {
+    setTryPath(`/api/v1${activeEndpointDoc.path}`)
+    setTryQuery(activeEndpointExample?.query ?? '')
+    setTryBody(activeEndpointDoc.method === 'GET' ? '' : (activeEndpointExample?.body ?? ''))
+  }, [activeEndpointDoc.path, activeEndpointDoc.method, activeEndpointExample?.id, activeEndpointExample?.body, activeEndpointExample?.query])
 
   // ─────────────────────────────────────────────────────
   // Handlers
@@ -175,6 +771,97 @@ export function ApiSettingsClient({
     alert('Konfigurasi API berhasil disimpan!')
   }
 
+  const handleRunTryout = async () => {
+    const normalizedApiKey = normalizeTryApiKeyValue(tryApiKey)
+
+    if (!normalizedApiKey) {
+      setTryError('Masukkan API key terlebih dahulu.')
+      return
+    }
+
+    if (normalizedApiKey !== tryApiKey) {
+      setTryApiKey(normalizedApiKey)
+    }
+
+    if (!isValidTryApiKeyFormat(normalizedApiKey)) {
+      setTryError('API key harus memakai format `nzm_live_...` tanpa spasi, newline, smart quote, atau karakter khusus lain.')
+      return
+    }
+
+    const trimmedPath = tryPath.trim().startsWith('/') ? tryPath.trim() : `/${tryPath.trim()}`
+    const normalizedQuery = tryQuery.trim().replace(/^\?/, '')
+    const requestUrl = `${resolvedBaseUrl}${trimmedPath}${normalizedQuery ? `?${normalizedQuery}` : ''}`
+    const method = activeEndpointDoc.method
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+    }
+
+    if (tryAuthMode === 'bearer') {
+      headers.Authorization = `Bearer ${normalizedApiKey}`
+    } else {
+      headers['x-api-key'] = normalizedApiKey
+    }
+
+    const invalidHeaderEntry = Object.entries(headers).find(([, value]) => !isBrowserSafeHeaderValue(value))
+    if (invalidHeaderEntry) {
+      setTryError(`Header ${invalidHeaderEntry[0]} mengandung karakter non-standar. Gunakan API key plain-text tanpa karakter tersembunyi.`)
+      return
+    }
+
+    let body: string | undefined
+    if (method !== 'GET') {
+      if (!tryBody.trim()) {
+        setTryError('Request body wajib diisi untuk endpoint non-GET.')
+        return
+      }
+
+      try {
+        body = JSON.stringify(JSON.parse(tryBody))
+      } catch {
+        setTryError('Request body harus valid JSON.')
+        return
+      }
+
+      headers['Content-Type'] = 'application/json'
+    }
+
+    let requestHeaders: Headers
+    try {
+      requestHeaders = new Headers(headers)
+    } catch {
+      setTryError('Header request tidak valid. Pastikan API key tidak mengandung karakter non ISO-8859-1 seperti smart quote, en dash, atau zero-width space.')
+      return
+    }
+
+    setTryLoading(true)
+    setTryError(null)
+    setTryStatus(null)
+    setTryResponse('')
+
+    try {
+      const response = await fetch(requestUrl, {
+        method,
+        headers: requestHeaders,
+        body,
+      })
+      const rawText = await response.text()
+
+      let formatted = rawText
+      try {
+        formatted = JSON.stringify(JSON.parse(rawText), null, 2)
+      } catch {
+        // Keep raw body when response is not JSON.
+      }
+
+      setTryStatus(response.status)
+      setTryResponse(formatted)
+    } catch (error) {
+      setTryError(error instanceof Error ? error.message : 'Permintaan gagal dikirim.')
+    } finally {
+      setTryLoading(false)
+    }
+  }
+
   // ─────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────
@@ -197,7 +884,13 @@ export function ApiSettingsClient({
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-600 mb-1">Base URL API</p>
-            <code className="text-sm font-black text-slate-800">{baseUrl}/api/v1/</code>
+            <code className="text-sm font-black text-slate-800">{resolvedBaseUrl}/api/v1/</code>
+            <p className="mt-2 text-xs text-slate-500 font-medium">
+              Dokumentasi mesin-baca tersedia di{' '}
+              <a href={`${resolvedBaseUrl}/api/openapi`} target="_blank" rel="noreferrer" className="font-black text-violet-700 hover:text-violet-800">
+                {resolvedBaseUrl}/api/openapi
+              </a>
+            </p>
           </div>
           <div className="flex gap-2 flex-wrap">
             {['/cash', '/sales', '/inventory', '/contacts'].map(ep => (
@@ -209,10 +902,180 @@ export function ApiSettingsClient({
         </div>
       </div>
 
+      <div className="rounded-[32px] border border-slate-100 bg-white p-6 shadow-sm space-y-5">
+        <div className="flex flex-col gap-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">OpenAPI 3.1 Documentation</p>
+          <h2 className="text-xl font-black text-slate-900">International-Standard API Reference</h2>
+          <p className="text-sm text-slate-500 font-medium">
+            Referensi ini mengikuti struktur OpenAPI: operation summary, operationId, security scheme, parameters, request body, responses, dan contoh payload.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {endpointDocs.map((doc) => (
+            <button
+              key={doc.id}
+              type="button"
+              onClick={() => setActiveDoc(doc.id)}
+              className={`px-4 py-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+                activeDoc === doc.id
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-md'
+                  : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              {doc.path}
+              <span className="ml-2 opacity-80">{doc.method}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-5">
+          <div className="rounded-[28px] border border-slate-100 bg-slate-50 p-5 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="px-3 py-1 rounded-xl bg-white border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-700">
+                {activeEndpointDoc.method}
+              </div>
+              <code className="text-sm font-black text-slate-900">{activeEndpointDoc.path}</code>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-sm font-black text-slate-900">{activeEndpointDoc.summary}</p>
+              <p className="text-sm text-slate-600 leading-relaxed">{activeEndpointDoc.description}</p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-violet-100 text-violet-700 text-[10px] font-black uppercase tracking-widest">
+                <Shield size={12} /> Scope: {activeEndpointDoc.scope}
+              </span>
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-200 text-slate-700 text-[10px] font-black uppercase tracking-widest">
+                <Lock size={12} /> Security: {activeEndpointDoc.auth.join(' / ')}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Operation Metadata</p>
+              <div className="space-y-2">
+                <div className="rounded-2xl bg-white border border-slate-100 px-4 py-3 text-sm text-slate-600">
+                  <span className="font-black text-slate-800">operationId:</span> {activeEndpointDoc.operationId}
+                </div>
+                <div className="rounded-2xl bg-white border border-slate-100 px-4 py-3 text-sm text-slate-600">
+                  <span className="font-black text-slate-800">Security schemes:</span> {activeEndpointDoc.auth.join(', ')}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Parameters</p>
+              <div className="space-y-2">
+                {activeEndpointDoc.parameters.map((item: EndpointParameter) => (
+                  <div key={`${item.in}-${item.name}`} className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-black text-slate-900">{item.name}</span>
+                      <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">{item.in}</span>
+                      <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">{item.required ? 'required' : 'optional'}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">Schema: {item.schema}</p>
+                    <p className="mt-1">{item.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {activeEndpointDoc.requestBody && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Request Body</p>
+                <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
+                  <p><span className="font-black text-slate-900">Required:</span> {activeEndpointDoc.requestBody.required ? 'yes' : 'no'}</p>
+                  <p className="mt-1"><span className="font-black text-slate-900">Content-Type:</span> {activeEndpointDoc.requestBody.contentType}</p>
+                  <div className="mt-2 space-y-1">
+                    {activeEndpointDoc.requestBody.fields.map((field: string) => (
+                      <div key={field} className="text-sm text-slate-600">{field}</div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Responses</p>
+              <div className="space-y-2">
+                {activeEndpointDoc.responses.map((item: EndpointResponse) => (
+                  <div key={item.status} className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
+                    <span className="font-black text-slate-900">{item.status}</span> {item.description}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Implementation Notes</p>
+              <div className="space-y-2">
+                {activeEndpointDoc.notes.map((note) => (
+                  <div key={note} className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900/80">
+                    {note}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-[28px] border border-slate-100 bg-white p-5 space-y-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Example Templates</p>
+                <p className="text-sm text-slate-500 mt-1">
+                  Pilih contoh yang akan dipakai untuk dokumentasi visual dan prefill di tab Try API.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {activeEndpointDoc.examples.map((example) => (
+                  <button
+                    key={example.id}
+                    type="button"
+                    onClick={() => setActiveExampleId(example.id)}
+                    className={`px-4 py-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+                      activeEndpointExample.id === example.id
+                        ? 'bg-violet-600 text-white border-violet-600 shadow-md'
+                        : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-violet-300'
+                    }`}
+                  >
+                    {example.label}
+                  </button>
+                ))}
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <span className="font-black text-slate-900">Template aktif:</span> {activeEndpointExample.description}
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-slate-100 bg-slate-950 p-5">
+              <div className="flex items-center gap-2 mb-3 text-slate-300">
+                <Globe size={14} />
+                <p className="text-[10px] font-black uppercase tracking-widest">Contoh Request</p>
+              </div>
+              <pre className="text-[11px] text-emerald-300 font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap">
+{activeEndpointExample.curl}
+              </pre>
+            </div>
+
+            <div className="rounded-[28px] border border-slate-100 bg-white p-5">
+              <div className="flex items-center gap-2 mb-3 text-slate-500">
+                <Code size={14} />
+                <p className="text-[10px] font-black uppercase tracking-widest">Contoh Response</p>
+              </div>
+              <pre className="text-[11px] text-slate-700 font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap">
+{activeEndpointExample.response}
+              </pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── Tabs ── */}
-      <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl w-fit">
+      <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl w-fit flex-wrap">
         {[
           { id: 'keys', label: 'API Keys', icon: Key },
+          { id: 'tryout', label: 'Try API', icon: Globe },
           { id: 'cashin', label: 'Cash In', icon: ArrowDownCircle },
           { id: 'cashout', label: 'Cash Out', icon: ArrowUpCircle },
           { id: 'webhook', label: 'Webhook', icon: Webhook },
@@ -333,6 +1196,207 @@ export function ApiSettingsClient({
         </div>
       )}
 
+      {activeTab === 'tryout' && (
+        <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-5">
+          <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-6 space-y-5">
+            <div className="space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Interactive Console</p>
+              <h3 className="text-xl font-black text-slate-900">Try API with Real Key</h3>
+              <p className="text-sm text-slate-500 font-medium">
+                Gunakan API key yang baru dibuat untuk menguji endpoint langsung dari browser pada origin saat ini.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Endpoint</label>
+              <div className="flex flex-wrap gap-2">
+                {endpointDocs.map((doc) => (
+                  <button
+                    key={`try-${doc.id}`}
+                    type="button"
+                    onClick={() => setActiveDoc(doc.id)}
+                    className={`px-4 py-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+                      activeDoc === doc.id
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-md'
+                        : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {doc.method} {doc.path}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Template</label>
+              <div className="flex flex-wrap gap-2">
+                {activeEndpointDoc.examples.map((example) => (
+                  <button
+                    key={`try-example-${example.id}`}
+                    type="button"
+                    onClick={() => setActiveExampleId(example.id)}
+                    className={`px-4 py-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+                      activeEndpointExample.id === example.id
+                        ? 'bg-violet-600 text-white border-violet-600 shadow-md'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300'
+                    }`}
+                  >
+                    {example.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-400 font-medium">
+                Mengganti template akan mengisi `path`, `query`, dan `JSON body`, lalu Anda masih bisa edit manual sebelum run.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[0.75fr_1.25fr] gap-4">
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Auth Header</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['x-api-key', 'bearer'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setTryAuthMode(mode)}
+                      className={`px-4 py-3 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+                        tryAuthMode === mode
+                          ? 'bg-violet-600 text-white border-violet-600'
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300'
+                      }`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">API Key</label>
+                <input
+                  type="password"
+                  value={tryApiKey}
+                  onChange={(e) => setTryApiKey(e.target.value.replace(/[\r\n\t]/g, ''))}
+                  onBlur={() => setTryApiKey((prev) => normalizeTryApiKeyValue(prev))}
+                  placeholder="nzm_live_xxxxxxxxxxxxxxxxx"
+                  className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
+                />
+                <p className="text-[11px] text-slate-400 font-medium">
+                  Tempel API key plain-text saja. Karakter tersembunyi dari copy-paste akan dibersihkan otomatis.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Request URL</label>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-mono text-slate-600">
+                {activeEndpointDoc.method} {resolvedBaseUrl}{tryPath}{tryQuery.trim() ? `?${tryQuery.trim().replace(/^\?/, '')}` : ''}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Path</label>
+                <input
+                  value={tryPath}
+                  onChange={(e) => setTryPath(e.target.value)}
+                  className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Query String</label>
+                <input
+                  value={tryQuery}
+                  onChange={(e) => setTryQuery(e.target.value)}
+                  placeholder="limit=50&search=beras"
+                  className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
+                />
+              </div>
+            </div>
+
+            {activeEndpointDoc.method !== 'GET' && (
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">JSON Body</label>
+                <textarea
+                  value={tryBody}
+                  onChange={(e) => setTryBody(e.target.value)}
+                  rows={12}
+                  className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
+                />
+              </div>
+            )}
+
+            {tryError && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                {tryError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <p className="text-xs text-slate-400">
+                Tester ini memanggil endpoint live yang sama dengan integrasi eksternal Anda.
+              </p>
+              <button
+                type="button"
+                onClick={handleRunTryout}
+                disabled={tryLoading}
+                className="px-6 py-3 bg-violet-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50"
+              >
+                {tryLoading ? 'Menjalankan...' : 'Run Request'}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-5">
+            <div className="bg-slate-950 rounded-[32px] border border-slate-800 p-6 space-y-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Response</p>
+                  <h3 className="text-lg font-black text-white">Live Result</h3>
+                </div>
+                <div className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest ${
+                  tryStatus === null
+                    ? 'bg-slate-800 text-slate-300'
+                    : tryStatus < 300
+                      ? 'bg-emerald-500/20 text-emerald-300'
+                      : 'bg-red-500/20 text-red-300'
+                }`}>
+                  {tryStatus === null ? 'Not Run' : `HTTP ${tryStatus}`}
+                </div>
+              </div>
+              <pre className="min-h-[420px] whitespace-pre-wrap break-words rounded-2xl bg-black/30 p-4 text-[11px] leading-relaxed text-emerald-300 overflow-auto">
+                {tryResponse || 'Response akan muncul di sini setelah request dijalankan.'}
+              </pre>
+            </div>
+
+            <div className="bg-white rounded-[32px] border border-slate-100 p-6 space-y-3 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Current Operation</p>
+              <h4 className="text-lg font-black text-slate-900">{activeEndpointDoc.summary}</h4>
+              <p className="text-sm text-slate-500">{activeEndpointDoc.description}</p>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <span className="font-black text-slate-900">Template aktif:</span> {activeEndpointExample.label}
+                <p className="mt-1 text-slate-500">{activeEndpointExample.description}</p>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-violet-100 text-violet-700 text-[10px] font-black uppercase tracking-widest">
+                  <Shield size={12} /> Scope: {activeEndpointDoc.scope}
+                </span>
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-widest">
+                  <Code size={12} /> operationId: {activeEndpointDoc.operationId}
+                </span>
+              </div>
+              <div className="space-y-2 pt-1">
+                {activeEndpointDoc.notes.map((note) => (
+                  <div key={`try-note-${note}`} className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900/80">
+                    {note}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ══════════════════════════════════════════════ */}
       {/* TAB: CASH IN CONFIG                           */}
       {/* ══════════════════════════════════════════════ */}
@@ -357,9 +1421,9 @@ export function ApiSettingsClient({
                 onChange={e => setConfig(c => ({ ...c, cash_in_account_id: e.target.value || null }))}
                 className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 font-bold bg-white"
               >
-                <option value="">— Pilih Akun CoA —</option>
-                {initialAccounts.map(a => (
-                  <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+                <option value="">— Pilih Akun Kas/Bank 11xx —</option>
+                {cashAccounts.map(a => (
+                  <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
                 ))}
               </select>
             </div>
@@ -375,17 +1439,97 @@ export function ApiSettingsClient({
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Akun Pendapatan Counter (Kredit)</label>
+                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Akun Lawan Default (Kredit)</label>
+                <p className="text-xs text-slate-400 ml-1 mb-2">Dipakai saat request tidak mengirim `category_id` / `counter_account_id`. Bisa berupa pendapatan, piutang, hutang, pajak, diskon, atau biaya lain.</p>
                 <select
-                  value={String(config.cash_in_params?.revenue_account_id ?? '')}
-                  onChange={e => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, revenue_account_id: e.target.value || undefined } }))}
+                  value={String(config.cash_in_params?.counter_account_id ?? config.cash_in_params?.revenue_account_id ?? '')}
+                  onChange={e => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, counter_account_id: e.target.value || undefined } }))}
                   className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 font-bold bg-white"
                 >
-                  <option value="">— Pilih Akun Pendapatan —</option>
-                  {initialAccounts.filter(a => a.type === 'REVENUE').map(a => (
-                    <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+                  <option value="">— Pilih Akun Lawan —</option>
+                  {counterAccounts.map(a => (
+                    <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
                   ))}
                 </select>
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-emerald-100 bg-emerald-50/60 p-5 space-y-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">Mapping Settlement Lanjutan</p>
+                <p className="text-xs text-emerald-900/70 font-medium mt-1">Digunakan ketika request mengirim `settlement_type` agar kas masuk otomatis diarahkan ke akun piutang, hutang, pajak, diskon, atau biaya lain.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[9px] uppercase font-black text-emerald-700 tracking-[0.2em] ml-1">Piutang / Receivable</label>
+                  <select
+                    value={String(config.cash_in_params?.receivable_account_id ?? '')}
+                    onChange={e => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, receivable_account_id: e.target.value || undefined } }))}
+                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
+                  >
+                    <option value="">— Opsional —</option>
+                    {counterAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] uppercase font-black text-emerald-700 tracking-[0.2em] ml-1">Hutang / Payable</label>
+                  <select
+                    value={String(config.cash_in_params?.payable_account_id ?? '')}
+                    onChange={e => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, payable_account_id: e.target.value || undefined } }))}
+                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
+                  >
+                    <option value="">— Opsional —</option>
+                    {counterAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] uppercase font-black text-emerald-700 tracking-[0.2em] ml-1">Pajak</label>
+                  <select
+                    value={String(config.cash_in_params?.tax_account_id ?? '')}
+                    onChange={e => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, tax_account_id: e.target.value || undefined } }))}
+                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
+                  >
+                    <option value="">— Opsional —</option>
+                    {counterAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] uppercase font-black text-emerald-700 tracking-[0.2em] ml-1">Diskon / Potongan</label>
+                  <select
+                    value={String(config.cash_in_params?.discount_account_id ?? '')}
+                    onChange={e => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, discount_account_id: e.target.value || undefined } }))}
+                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
+                  >
+                    <option value="">— Opsional —</option>
+                    {counterAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] uppercase font-black text-emerald-700 tracking-[0.2em] ml-1">Biaya Lain-lain</label>
+                  <select
+                    value={String(config.cash_in_params?.other_charge_account_id ?? '')}
+                    onChange={e => setConfig(c => ({ ...c, cash_in_params: { ...c.cash_in_params, other_charge_account_id: e.target.value || undefined } }))}
+                    className="w-full px-4 py-3 text-sm border border-emerald-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 font-bold bg-white"
+                  >
+                    <option value="">— Opsional —</option>
+                    {counterAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -399,7 +1543,7 @@ export function ApiSettingsClient({
                 </div>
                 <div>
                   <p className="text-sm font-black text-slate-800">Auto-Post Jurnal</p>
-                  <p className="text-xs text-slate-400">Jika aktif, transaksi langsung POSTED tanpa perlu review manual.</p>
+                  <p className="text-xs text-slate-400">Jika aktif, transaksi langsung POSTED ke modul kas/bank dan jurnal akuntansi. Jika nonaktif, transaksi disimpan sebagai DRAFT.</p>
                 </div>
               </label>
             </div>
@@ -441,9 +1585,9 @@ export function ApiSettingsClient({
                 onChange={e => setConfig(c => ({ ...c, cash_out_account_id: e.target.value || null }))}
                 className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-50 focus:border-rose-400 font-bold bg-white"
               >
-                <option value="">— Pilih Akun CoA —</option>
-                {initialAccounts.map(a => (
-                  <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+                <option value="">— Pilih Akun Kas/Bank 11xx —</option>
+                {cashAccounts.map(a => (
+                  <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
                 ))}
               </select>
             </div>
@@ -459,17 +1603,97 @@ export function ApiSettingsClient({
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Akun Beban Counter (Debit)</label>
+                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Akun Lawan Default (Debit)</label>
+                <p className="text-xs text-slate-400 ml-1 mb-2">Dipakai saat request tidak mengirim `category_id` / `counter_account_id`. Bisa berupa beban, piutang, hutang, pajak, diskon, atau biaya lain.</p>
                 <select
-                  value={String(config.cash_out_params?.expense_account_id ?? '')}
-                  onChange={e => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, expense_account_id: e.target.value || undefined } }))}
+                  value={String(config.cash_out_params?.counter_account_id ?? config.cash_out_params?.expense_account_id ?? '')}
+                  onChange={e => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, counter_account_id: e.target.value || undefined } }))}
                   className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-50 focus:border-rose-400 font-bold bg-white"
                 >
-                  <option value="">— Pilih Akun Beban —</option>
-                  {initialAccounts.filter(a => a.type === 'EXPENSE').map(a => (
-                    <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+                  <option value="">— Pilih Akun Lawan —</option>
+                  {counterAccounts.map(a => (
+                    <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
                   ))}
                 </select>
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-rose-100 bg-rose-50/60 p-5 space-y-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-700">Mapping Settlement Lanjutan</p>
+                <p className="text-xs text-rose-900/70 font-medium mt-1">Digunakan ketika request mengirim `settlement_type` agar kas keluar otomatis diarahkan ke akun piutang, hutang, pajak, diskon, atau biaya lain.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[9px] uppercase font-black text-rose-700 tracking-[0.2em] ml-1">Piutang / Receivable</label>
+                  <select
+                    value={String(config.cash_out_params?.receivable_account_id ?? '')}
+                    onChange={e => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, receivable_account_id: e.target.value || undefined } }))}
+                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
+                  >
+                    <option value="">— Opsional —</option>
+                    {counterAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] uppercase font-black text-rose-700 tracking-[0.2em] ml-1">Hutang / Payable</label>
+                  <select
+                    value={String(config.cash_out_params?.payable_account_id ?? '')}
+                    onChange={e => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, payable_account_id: e.target.value || undefined } }))}
+                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
+                  >
+                    <option value="">— Opsional —</option>
+                    {counterAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] uppercase font-black text-rose-700 tracking-[0.2em] ml-1">Pajak</label>
+                  <select
+                    value={String(config.cash_out_params?.tax_account_id ?? '')}
+                    onChange={e => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, tax_account_id: e.target.value || undefined } }))}
+                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
+                  >
+                    <option value="">— Opsional —</option>
+                    {counterAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] uppercase font-black text-rose-700 tracking-[0.2em] ml-1">Diskon / Potongan</label>
+                  <select
+                    value={String(config.cash_out_params?.discount_account_id ?? '')}
+                    onChange={e => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, discount_account_id: e.target.value || undefined } }))}
+                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
+                  >
+                    <option value="">— Opsional —</option>
+                    {counterAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] uppercase font-black text-rose-700 tracking-[0.2em] ml-1">Biaya Lain-lain</label>
+                  <select
+                    value={String(config.cash_out_params?.other_charge_account_id ?? '')}
+                    onChange={e => setConfig(c => ({ ...c, cash_out_params: { ...c.cash_out_params, other_charge_account_id: e.target.value || undefined } }))}
+                    className="w-full px-4 py-3 text-sm border border-rose-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 font-bold bg-white"
+                  >
+                    <option value="">— Opsional —</option>
+                    {counterAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{formatAccountOption(a)}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -483,7 +1707,7 @@ export function ApiSettingsClient({
                 </div>
                 <div>
                   <p className="text-sm font-black text-slate-800">Auto-Post Jurnal</p>
-                  <p className="text-xs text-slate-400">Jika aktif, transaksi langsung POSTED tanpa perlu review manual.</p>
+                  <p className="text-xs text-slate-400">Jika aktif, transaksi langsung POSTED ke modul kas/bank dan jurnal akuntansi. Jika nonaktif, transaksi disimpan sebagai DRAFT.</p>
                 </div>
               </label>
             </div>

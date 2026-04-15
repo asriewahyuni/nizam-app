@@ -899,10 +899,22 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     return { error: 'Akad SALAM pembelian wajib lunas terlebih dahulu sebelum penerimaan barang.' }
   }
 
-  const shipping = purchase.shipping_amount || 0
-  const insurance = purchase.insurance_amount || 0
+  const shipping = Number(purchase.shipping_amount || 0)
+  const insurance = Number(purchase.insurance_amount || 0)
   const totalLandedOverhead = shipping + insurance
-  const totalItemsValue = purchase.total_amount || 1
+  const totalLineDiscount = (purchase.purchase_items || []).reduce(
+    (sum: number, item: any) => sum + Number(item.discount_amount || 0),
+    0
+  )
+  const globalDiscountRemainder = Math.max(Number(purchase.discount_amount || 0) - totalLineDiscount, 0)
+  const totalNetItemValue = Math.max(
+    (purchase.purchase_items || []).reduce((sum: number, item: any) => {
+      if (!item?.product_id) return sum
+      const grossValue = Number(item.quantity || 0) * Number(item.unit_price || 0)
+      return sum + Math.max(grossValue - Number(item.discount_amount || 0), 0)
+    }, 0),
+    1
+  )
   let receiptWarehouse: { id: string; branch_id: string | null } | null = null
 
   if (purchase.warehouse_id) {
@@ -999,10 +1011,19 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     }
     
     // Landed Cost Calculation (Allocated based on Value)
-    const itemSubtotal = (item.quantity * item.unit_price) - (item.discount_amount || 0)
-    const allocatedOverhead = (itemSubtotal / totalItemsValue) * totalLandedOverhead
-    const landedTotal = itemSubtotal + allocatedOverhead
-    const landedUnitPrice = landedTotal / item.quantity
+    const itemGrossValue = Number(item.quantity || 0) * Number(item.unit_price || 0)
+    const itemLineDiscount = Number(item.discount_amount || 0)
+    const itemNetValue = Math.max(itemGrossValue - itemLineDiscount, 0)
+    const allocatedGlobalDiscount = totalNetItemValue > 0
+      ? (itemNetValue / totalNetItemValue) * globalDiscountRemainder
+      : 0
+    const allocatedOverhead = totalNetItemValue > 0
+      ? (itemNetValue / totalNetItemValue) * totalLandedOverhead
+      : 0
+    const landedTotal = Math.max(itemNetValue - allocatedGlobalDiscount + allocatedOverhead, 0)
+    const landedUnitPrice = Number(item.quantity || 0) > 0
+      ? landedTotal / Number(item.quantity)
+      : Number(item.unit_price || 0)
 
     // A. Update Average Cost (HPP) in Master Data
     await (supabase as any).rpc('update_product_average_cost', {
@@ -1073,7 +1094,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
   // 5. GL Synchronization (Journal)
   const { data: accounts } = await (supabase as any)
     .from('accounts' as any)
-    .select('id, code')
+    .select('id, code, type')
     .eq('org_id', orgId)
     .in('code', ['1205', '1301', '1302', '1303', '1304', '1401', '1403', '1404', '2101'])
 
@@ -1089,10 +1110,34 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
  
   let finalAccCredit = defaultAccHutang
   const isLunas = purchase.notes?.includes('[TERMIN: LUNAS]')
-  let LunasAccountId = null;
+  let LunasAccountId: string | null = null
   if (isLunas) {
      const match = purchase.notes.match(/\[ACC: ([a-f0-9-]+)\]/)
      if (match && match[1]) LunasAccountId = match[1]
+  }
+
+  let validatedLunasAccountId: string | null = null
+  if (isLunas) {
+    if (!LunasAccountId) {
+      return { error: 'Pembelian LUNAS wajib memilih akun kas/bank pada form pembelian.' }
+    }
+
+    const { data: lunasAccount, error: lunasAccountError } = await (supabase as any)
+      .from('accounts')
+      .select('id, code, type')
+      .eq('id', LunasAccountId)
+      .eq('org_id', orgId)
+      .maybeSingle()
+
+    if (lunasAccountError || !lunasAccount?.id) {
+      return { error: 'Akun kas/bank untuk pembayaran lunas tidak ditemukan.' }
+    }
+
+    if (lunasAccount.type !== 'ASSET' || !String(lunasAccount.code || '').startsWith('11')) {
+      return { error: 'Akun pembayaran lunas harus akun kas/bank (kelompok 11xx).' }
+    }
+
+    validatedLunasAccountId = lunasAccount.id
   }
 
   // Syariah Mod:
@@ -1110,11 +1155,21 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
      } else if (accUangMuka) {
         finalAccCredit = accUangMuka
      }
+  } else if (isLunas && validatedLunasAccountId) {
+     finalAccCredit = validatedLunasAccountId
+  }
+
+  if (!finalAccCredit) {
+    return {
+      error: isLunas
+        ? 'Akun kredit pembelian lunas tidak ditemukan. Pastikan akun kas/bank aktif.'
+        : 'Akun Hutang Usaha (2101) tidak ditemukan untuk mencatat penerimaan pembelian.',
+    }
   }
 
   if (finalAccCredit) {
-    const pajakVal = purchase.tax_amount || 0
-    const grandVal = purchase.grand_total
+    const pajakVal = Number(purchase.tax_amount || 0)
+    const grandVal = Number(purchase.grand_total || 0)
 
     // Check if overhead was paid separately in cash!
     let vendorApAmount = grandVal
@@ -1170,19 +1225,22 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     const totalCredit = journalLines.reduce((acc: any, l: any) => acc + l.credit, 0)
     
     const diff = totalDebit - totalCredit
+    if (Math.abs(diff) > 0.05) {
+      return { error: `Jurnal pembelian tidak balance setelah alokasi diskon/biaya. Selisih ${diff.toFixed(2)}.` }
+    }
     if (Math.abs(diff) > 0.001) {
-       journalLines.push({ 
-           account_id: accPersediaan || defaultAccHutang, 
-           debit: diff < 0 ? Math.abs(diff) : 0, 
-           credit: diff > 0 ? diff : 0, 
-           memo: 'Penyesuaian Pembulatan / Diskon Global PO' 
+       journalLines.push({
+           account_id: finalAccCredit,
+           debit: diff < 0 ? Math.abs(diff) : 0,
+           credit: diff > 0 ? diff : 0,
+           memo: 'Penyesuaian Pembulatan PO'
        })
     }
 
     const journalResult = await createJournalEntry({
       org_id: orgId,
       branch_id: purchase.branch_id || undefined,
-      entry_date: new Date().toISOString().split('T')[0],
+      entry_date: String(purchase.purchase_date || new Date().toISOString()).slice(0, 10),
       description: 'Penerimaan Pembelian & Stok ' + (purchase.purchase_number || ''),
       reference_type: 'PURCHASE',
       reference_id: purchase.id,
@@ -1195,18 +1253,6 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     if (jErr) {
        return { error: 'Gagal menjurnal bukti penerimaan: ' + String(jErr) }
     }
-    
-    // Auto-Lunas Payment trigger for Bank history & AP clearing
-    if (LunasAccountId && vendorApAmount > 0 && String(purchase.shariah_mode || '').toUpperCase() !== 'SALAM') {
-       await createPurchasePayment(orgId, {
-          purchase_id: purchase.id,
-          account_id: LunasAccountId,
-          amount: vendorApAmount,
-          discount: 0,
-          payment_date: new Date().toISOString().split('T')[0],
-          notes: 'Auto-Lunas Saat Terima Barang'
-       });
-    }
   }
 
   const statusResult = await markPurchaseAsReceived(supabase as any, {
@@ -1216,6 +1262,21 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
   })
 
   if ('error' in statusResult) return { error: 'Gagal memperbarui status PO: ' + statusResult.error }
+
+  if (isLunas) {
+    const { error: paymentStatusError } = await (supabase as any)
+      .from('purchases')
+      .update({
+        payment_status: 'PAID',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', purchaseId)
+      .eq('org_id', orgId)
+
+    if (paymentStatusError) {
+      return { error: 'Jurnal pembelian berhasil, tetapi gagal menyinkronkan status pembayaran PO: ' + paymentStatusError.message }
+    }
+  }
 
   revalidatePath('/purchasing')
   revalidatePath('/inventory')

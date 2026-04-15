@@ -157,7 +157,7 @@ export default function BusinessClient({
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/settings/api"
+              href="/developers/api"
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-white transition hover:bg-violet-700"
             >
               <Key size={16} />
