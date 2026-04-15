@@ -2,10 +2,10 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Plus, Minus, Trash2, ShoppingCart, User, CreditCard, Banknote, QrCode, MonitorSmartphone, Receipt, MapPin, CheckCircle2, MessageCircle, UserPlus, X, Tag, Clock3, ShieldAlert, ArrowRightLeft, Wallet } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, ShoppingCart, User, CreditCard, Banknote, QrCode, MonitorSmartphone, Receipt, MapPin, CheckCircle2, MessageCircle, UserPlus, X, Tag, Clock3, ShieldAlert, ArrowRightLeft, Wallet, CalendarDays, ChevronDown, ChevronUp } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
 import { processPosTransaction } from '@/modules/sales/actions/pos.actions'
-import { closePosShift, openPosShift, settlePosShift, type PosShiftSnapshot } from '@/modules/sales/actions/pos-shift.actions'
+import { closePosShift, getPosShiftHistory, openPosShift, settlePosShift, type PosShiftHistoryResponse, type PosShiftSnapshot } from '@/modules/sales/actions/pos-shift.actions'
 import { buildPosWhatsappReceiptMessage, normalizeWhatsappPhone } from '@/modules/sales/lib/pos-whatsapp'
 import { resolveDefaultPosAccountId, type PosShiftConfig, type PosShiftMethod } from '@/modules/sales/lib/pos-shift'
 
@@ -43,6 +43,7 @@ type PosClientProps = {
    activeBranchName?: string | null
    posShiftConfig?: PosShiftConfig | null
    posShiftSnapshot?: PosShiftSnapshot | null
+   initialShiftHistory?: PosShiftHistoryResponse | null
 }
 
 function formatMoneyInput(value: number): string {
@@ -88,6 +89,45 @@ function formatShiftDuration(openedAt?: string | null, closedAt?: string | null)
    return `${hours}j ${minutes}m`
 }
 
+function formatShiftClock(value?: string | null): string {
+   if (!value) return '-'
+   const date = new Date(value)
+   if (Number.isNaN(date.getTime())) return '-'
+
+   return new Intl.DateTimeFormat('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Jakarta',
+   }).format(date)
+}
+
+function formatShiftDayLabel(dateKey?: string | null): string {
+   const normalized = String(dateKey || '').trim()
+   if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return 'Hari tidak valid'
+
+   const date = new Date(`${normalized}T00:00:00+07:00`)
+   if (Number.isNaN(date.getTime())) return normalized
+
+   return new Intl.DateTimeFormat('id-ID', {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'Asia/Jakarta',
+   }).format(date)
+}
+
+function createEmptyShiftHistory(snapshot: PosShiftSnapshot): PosShiftHistoryResponse {
+   return {
+      schemaReady: snapshot.schemaReady,
+      days: [],
+      hasMore: false,
+      nextBeforeDateKey: null,
+      message: snapshot.message,
+   }
+}
+
 export default function POSClient({
    orgId,
    org,
@@ -101,6 +141,7 @@ export default function POSClient({
    activeBranchName,
    posShiftConfig,
    posShiftSnapshot,
+   initialShiftHistory,
 }: PosClientProps) {
    const orgSettings = org?.settings || {}
    const logoUrl = org?.logo_url || ''
@@ -139,11 +180,20 @@ export default function POSClient({
    const [customWaMessage, setCustomWaMessage] = useState(defaultPosWaCustomMessage)
    const [shiftState, setShiftState] = useState<PosShiftSnapshot>(initialShiftSnapshot)
    const [shiftNotice, setShiftNotice] = useState<string | null>(initialShiftSnapshot.message)
+   const [showShiftHistory, setShowShiftHistory] = useState(true)
+   const [historyBusy, setHistoryBusy] = useState(false)
+   const [shiftHistory, setShiftHistory] = useState<PosShiftHistoryResponse>(
+      initialShiftHistory || createEmptyShiftHistory(initialShiftSnapshot)
+   )
    const [showOpenShiftModal, setShowOpenShiftModal] = useState(false)
    const [showCloseShiftModal, setShowCloseShiftModal] = useState(false)
    const [showSettlementModal, setShowSettlementModal] = useState(false)
    const [openingCashInput, setOpeningCashInput] = useState('')
    const [closingCashInput, setClosingCashInput] = useState('')
+   const [openShiftCashierNik, setOpenShiftCashierNik] = useState('')
+   const [openShiftCashierPassword, setOpenShiftCashierPassword] = useState('')
+   const [closeShiftCashierNik, setCloseShiftCashierNik] = useState('')
+   const [closeShiftCashierPassword, setCloseShiftCashierPassword] = useState('')
    const [shiftRegisterCode, setShiftRegisterCode] = useState(initialShiftSnapshot.config.defaultRegisterCode || 'REG-1')
    const [openShiftNotes, setOpenShiftNotes] = useState('')
    const [closeShiftNotes, setCloseShiftNotes] = useState('')
@@ -154,6 +204,8 @@ export default function POSClient({
    const [settlementTargetAccountId, setSettlementTargetAccountId] = useState('')
    const [settlementAmountInput, setSettlementAmountInput] = useState('')
    const [settlementNotes, setSettlementNotes] = useState('')
+   const [settlementAuthorizerNik, setSettlementAuthorizerNik] = useState('')
+   const [settlementAuthorizerPassword, setSettlementAuthorizerPassword] = useState('')
    
    // Promo States
    const [promoCode, setPromoCode] = useState('')
@@ -192,6 +244,10 @@ export default function POSClient({
    const activeShiftSession = shiftState.openSession
    const latestClosedShift = shiftState.latestClosedSession
    const shouldEnforceShift = Boolean(shiftState.enabled && shiftState.schemaReady && shiftState.requireOpenShift)
+   const activeShiftCashierLabel = [
+      String(activeShiftSession?.cashierDisplayName || '').trim(),
+      activeShiftSession?.cashierNik ? `#${activeShiftSession.cashierNik}` : '',
+   ].filter(Boolean).join(' • ')
    const availableSettlement = latestClosedShift?.totals.remainingByMethod || { CASH: 0, TRANSFER: 0, QRIS: 0 }
    const hasAnySettlementBalance = Object.values(availableSettlement).some((amount) => amount > 0)
    const fallbackCashAccountId = useMemo(() => resolveDefaultPosAccountId(accounts, 'CASH'), [accounts])
@@ -210,6 +266,10 @@ export default function POSClient({
       fallbackQrisAccountId,
    ])
    const settlementRemaining = latestClosedShift?.totals.remainingByMethod?.[settlementMethod] || 0
+   const historyShiftCount = useMemo(
+      () => shiftHistory.days.reduce((total, day) => total + day.totals.shiftCount, 0),
+      [shiftHistory.days]
+   )
 
    useEffect(() => {
       setCustomWaMessage(defaultPosWaCustomMessage)
@@ -220,6 +280,10 @@ export default function POSClient({
       setShiftNotice(initialShiftSnapshot.message)
       setShiftRegisterCode(initialShiftSnapshot.config.defaultRegisterCode || 'REG-1')
    }, [initialShiftSnapshot])
+
+   useEffect(() => {
+      setShiftHistory(initialShiftHistory || createEmptyShiftHistory(initialShiftSnapshot))
+   }, [initialShiftHistory, initialShiftSnapshot])
 
    useEffect(() => {
       if (!activeBranchId) {
@@ -276,7 +340,44 @@ export default function POSClient({
 
       setSettlementTargetAccountId(preferredTarget?.id || '')
       setSettlementAmountInput(formatMoneyInput(settlementRemaining))
+      setSettlementAuthorizerNik(latestClosedShift?.cashierNik || '')
+      setSettlementAuthorizerPassword('')
    }, [showSettlementModal, settlementMethod, settlementRemaining, latestClosedShift, accounts])
+
+   function resetPOS() {
+      setSuccessData(null)
+      setShowPayment(false)
+      setAppliedPromo(null)
+   }
+
+   async function refreshShiftHistory(mode: 'replace' | 'append' = 'replace') {
+      if (!shiftState.enabled || !shiftState.schemaReady) {
+         setShiftHistory(createEmptyShiftHistory(shiftState))
+         return
+      }
+
+      const beforeDateKey = mode === 'append' ? shiftHistory.nextBeforeDateKey : null
+      if (mode === 'append' && !beforeDateKey) return
+
+      setHistoryBusy(true)
+      const result = await getPosShiftHistory(orgId, {
+         beforeDateKey,
+         dayLimit: 7,
+      })
+      setHistoryBusy(false)
+
+      setShiftHistory((current) => {
+         if (mode === 'replace') return result
+
+         const mergedDays = [...current.days, ...result.days]
+         const dayMap = new Map(mergedDays.map((day) => [day.dateKey, day]))
+
+         return {
+            ...result,
+            days: Array.from(dayMap.values()).sort((left, right) => right.dateKey.localeCompare(left.dateKey)),
+         }
+      })
+   }
 
 
    // ─────────────────────────────────────────────────────────────
@@ -481,6 +582,10 @@ export default function POSClient({
          alert(branchGuardMessage)
          return
       }
+      if (!openShiftCashierNik.trim() || !openShiftCashierPassword) {
+         alert('Isi login NIK kasir beserta sandinya untuk membuka shift.')
+         return
+      }
 
       setShiftBusy(true)
       const result = await openPosShift(orgId, {
@@ -490,6 +595,8 @@ export default function POSClient({
          cashAccountId: shiftCashAccountId || null,
          transferAccountId: shiftTransferAccountId || null,
          qrisAccountId: shiftQrisAccountId || null,
+         cashierNik: openShiftCashierNik,
+         cashierPassword: openShiftCashierPassword,
       })
       setShiftBusy(false)
 
@@ -513,6 +620,8 @@ export default function POSClient({
       setShowOpenShiftModal(false)
       setOpeningCashInput('')
       setOpenShiftNotes('')
+      setOpenShiftCashierNik('')
+      setOpenShiftCashierPassword('')
       if (result?.session?.registerCode) {
          setShiftRegisterCode(result.session.registerCode)
       }
@@ -527,20 +636,27 @@ export default function POSClient({
          alert('Selesaikan atau kosongkan keranjang terlebih dahulu sebelum menutup shift.')
          return
       }
+      if (!closeShiftCashierNik.trim() || !closeShiftCashierPassword) {
+         alert('Isi login NIK kasir beserta sandinya untuk menutup shift.')
+         return
+      }
 
       setShiftBusy(true)
       const result = await closePosShift(orgId, {
          sessionId: activeShiftSession.id,
          closingCash: parseMoneyInput(closingCashInput),
          closingNotes: closeShiftNotes,
+         cashierNik: closeShiftCashierNik,
+         cashierPassword: closeShiftCashierPassword,
       })
-      setShiftBusy(false)
 
       if (result?.error) {
+         setShiftBusy(false)
          alert(result.error)
          return
       }
       if (!result?.session) {
+         setShiftBusy(false)
          alert('Shift POS berhasil ditutup, tetapi ringkasan sesi belum tersedia.')
          return
       }
@@ -556,6 +672,10 @@ export default function POSClient({
       setShowCloseShiftModal(false)
       setClosingCashInput('')
       setCloseShiftNotes('')
+      setCloseShiftCashierNik('')
+      setCloseShiftCashierPassword('')
+      await refreshShiftHistory('replace')
+      setShiftBusy(false)
    }
 
    const handleSettlement = async () => {
@@ -569,6 +689,10 @@ export default function POSClient({
          alert('Pilih akun tujuan settlement terlebih dahulu.')
          return
       }
+      if (!settlementAuthorizerNik.trim() || !settlementAuthorizerPassword) {
+         alert('Isi login NIK dan sandi kasir/otorisator untuk settlement.')
+         return
+      }
 
       setShiftBusy(true)
       const result = await settlePosShift(orgId, {
@@ -577,14 +701,17 @@ export default function POSClient({
          targetAccountId: settlementTargetAccountId,
          amount,
          notes: settlementNotes,
+         authorizerNik: settlementAuthorizerNik,
+         authorizerPassword: settlementAuthorizerPassword,
       })
-      setShiftBusy(false)
 
       if (result?.error) {
+         setShiftBusy(false)
          alert(result.error)
          return
       }
       if (!result?.session) {
+         setShiftBusy(false)
          alert('Settlement berhasil diposting, tetapi snapshot sesi belum tersedia.')
          return
       }
@@ -597,7 +724,11 @@ export default function POSClient({
       setShiftNotice('Settlement shift POS berhasil diposting ke jurnal.')
       setSettlementAmountInput('')
       setSettlementNotes('')
+      setSettlementAuthorizerNik('')
+      setSettlementAuthorizerPassword('')
       setShowSettlementModal(false)
+      await refreshShiftHistory('replace')
+      setShiftBusy(false)
    }
 
    const handlePay = async () => {
@@ -728,12 +859,6 @@ export default function POSClient({
       setLoading(false)
    }
 
-   const resetPOS = () => {
-      setSuccessData(null)
-      setShowPayment(false)
-      setAppliedPromo(null)
-   }
-
    const sendWaReceipt = () => {
       if (!successData) return
       const phone = successData.waPhone || ''
@@ -800,6 +925,12 @@ export default function POSClient({
                            Buka {formatShiftTimestamp(activeShiftSession.openedAt)}
                         </div>
                      )}
+                     {activeShiftCashierLabel && (
+                        <div className="px-3 py-2 rounded-2xl border border-sky-200 bg-sky-50 text-[10px] md:text-xs font-bold text-sky-700 flex items-center gap-2">
+                           <User size={14} className="text-sky-600" />
+                           Kasir {activeShiftCashierLabel}
+                        </div>
+                     )}
                      {!activeShiftSession && latestClosedShift && shiftState.enableSettlement && hasAnySettlementBalance && (
                         <div className="px-3 py-2 rounded-2xl border border-blue-200 bg-blue-50 text-[10px] md:text-xs font-bold text-blue-700 flex items-center gap-2">
                            <ArrowRightLeft size={14} />
@@ -817,11 +948,24 @@ export default function POSClient({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
+                     {shiftState.schemaReady && (
+                        <button
+                           type="button"
+                           onClick={() => setShowShiftHistory((current) => !current)}
+                           className="px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-600 hover:border-slate-300 hover:text-slate-900 transition-all shadow-sm flex items-center gap-2"
+                        >
+                           <CalendarDays size={14} />
+                           Histori {historyShiftCount > 0 ? `${historyShiftCount} Shift` : 'Harian'}
+                           {showShiftHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                     )}
                      {!activeShiftSession && shiftState.schemaReady && (
                         <button
                            type="button"
                            onClick={() => {
                               setShiftNotice(null)
+                              setOpenShiftCashierNik('')
+                              setOpenShiftCashierPassword('')
                               setShowOpenShiftModal(true)
                            }}
                            className="px-4 py-2.5 rounded-2xl bg-slate-900 text-white text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-sm"
@@ -834,6 +978,8 @@ export default function POSClient({
                            type="button"
                            onClick={() => {
                               setClosingCashInput(formatMoneyInput(activeShiftSession.expectedCash))
+                              setCloseShiftCashierNik(activeShiftSession.cashierNik || '')
+                              setCloseShiftCashierPassword('')
                               setShiftNotice(null)
                               setShowCloseShiftModal(true)
                            }}
@@ -848,6 +994,7 @@ export default function POSClient({
                            onClick={() => {
                               setShiftNotice(null)
                               setSettlementMethod('CASH')
+                              setSettlementNotes('')
                               setShowSettlementModal(true)
                            }}
                            className="px-4 py-2.5 rounded-2xl bg-blue-600 text-white text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-sm"
@@ -864,6 +1011,253 @@ export default function POSClient({
                   }`}>
                      <ShieldAlert size={14} className="mt-0.5 shrink-0" />
                      <span>{shiftNotice || 'Schema shift POS belum tersedia. Jalankan migration lebih dahulu agar shift/settlement aktif penuh.'}</span>
+                  </div>
+               )}
+
+               {shiftState.schemaReady && showShiftHistory && (
+                  <div className="px-4 md:px-6 pb-4">
+                     <div className="rounded-[28px] border border-slate-200 bg-slate-50/80 overflow-hidden">
+                        <div className="px-4 md:px-5 py-4 border-b border-slate-200 bg-white/80 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                           <div>
+                              <div className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Rekam Shift Per Hari</div>
+                              <div className="text-sm md:text-base font-black text-slate-900 mt-1">
+                                 {historyShiftCount > 0
+                                    ? `${historyShiftCount} shift terekam di unit ${activeBranchName || 'aktif'}`
+                                    : 'Belum ada histori shift tersimpan'}
+                              </div>
+                              <div className="text-[11px] text-slate-500 font-medium mt-1">
+                                 Riwayat harian menampilkan kasir, jam shift, penjualan, selisih kas, dan log settlement per sesi.
+                              </div>
+                           </div>
+                           <div className="flex flex-wrap items-center gap-2">
+                              {historyBusy && (
+                                 <div className="px-3 py-2 rounded-2xl border border-blue-200 bg-blue-50 text-[10px] md:text-xs font-bold text-blue-700">
+                                    Memuat histori...
+                                 </div>
+                              )}
+                              {!historyBusy && (
+                                 <button
+                                    type="button"
+                                    onClick={() => refreshShiftHistory('replace')}
+                                    className="px-3 py-2 rounded-2xl border border-slate-200 bg-white text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                                 >
+                                    Refresh
+                                 </button>
+                              )}
+                           </div>
+                        </div>
+
+                        <div className="max-h-[360px] overflow-y-auto px-4 md:px-5 py-4 space-y-4">
+                           {shiftHistory.message && (
+                              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-medium text-amber-800">
+                                 {shiftHistory.message}
+                              </div>
+                           )}
+
+                           {shiftHistory.days.length === 0 && !shiftHistory.message && (
+                              <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-5 py-8 text-center">
+                                 <div className="text-sm font-black text-slate-700">Belum ada shift tertutup</div>
+                                 <div className="text-[11px] font-medium text-slate-500 mt-2">
+                                    Setelah shift ditutup, histori hariannya akan muncul di sini lengkap dengan status settlement.
+                                 </div>
+                              </div>
+                           )}
+
+                           {shiftHistory.days.map((day) => (
+                              <div key={day.dateKey} className="rounded-[24px] border border-slate-200 bg-white overflow-hidden shadow-sm">
+                                 <div className="px-4 md:px-5 py-4 border-b border-slate-100 bg-slate-50/70 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                    <div>
+                                       <div className="text-sm md:text-base font-black text-slate-900">{formatShiftDayLabel(day.dateKey)}</div>
+                                       <div className="text-[11px] font-medium text-slate-500 mt-1">
+                                          {day.totals.shiftCount} shift • {day.totals.transactionCount} transaksi • sales bruto {formatRupiah(day.totals.grossSales)}
+                                       </div>
+                                    </div>
+                                    <div className={`px-3 py-2 rounded-2xl border text-[10px] md:text-xs font-black uppercase tracking-widest ${
+                                       day.totals.pendingSettlement > 0
+                                          ? 'border-blue-200 bg-blue-50 text-blue-700'
+                                          : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    }`}>
+                                       {day.totals.pendingSettlement > 0
+                                          ? `Pending ${formatRupiah(day.totals.pendingSettlement)}`
+                                          : 'Settlement Tuntas'}
+                                    </div>
+                                 </div>
+
+                                 <div className="p-4 md:p-5 space-y-3">
+                                    {day.sessions.map((session) => {
+                                       const sessionPendingSettlement = (
+                                          session.totals.remainingByMethod.CASH +
+                                          session.totals.remainingByMethod.TRANSFER +
+                                          session.totals.remainingByMethod.QRIS
+                                       )
+                                       const sessionCashierLabel = [
+                                          String(session.cashierDisplayName || '').trim(),
+                                          session.cashierNik ? `#${session.cashierNik}` : '',
+                                       ].filter(Boolean).join(' • ')
+
+                                       return (
+                                          <div key={session.id} className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4 space-y-4">
+                                             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                                <div>
+                                                   <div className="flex flex-wrap items-center gap-2">
+                                                      <div className="text-sm font-black text-slate-900">{session.registerCode}</div>
+                                                      <div className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                                                         sessionPendingSettlement > 0
+                                                            ? 'bg-blue-100 text-blue-700'
+                                                            : 'bg-emerald-100 text-emerald-700'
+                                                      }`}>
+                                                         {sessionPendingSettlement > 0 ? 'Belum Tuntas' : 'Tuntas'}
+                                                      </div>
+                                                   </div>
+                                                   <div className="text-[11px] font-medium text-slate-500 mt-1">
+                                                      {formatShiftClock(session.openedAt)} - {formatShiftClock(session.closedAt)} WIB • durasi {formatShiftDuration(session.openedAt, session.closedAt)}
+                                                   </div>
+                                                   {sessionCashierLabel && (
+                                                      <div className="text-[11px] font-semibold text-sky-700 mt-1">
+                                                         Kasir: {sessionCashierLabel}
+                                                      </div>
+                                                   )}
+                                                   <div className="text-[11px] font-medium text-slate-500 mt-1">
+                                                      Kas tutup {formatRupiah(session.closingCash ?? session.expectedCash)}
+                                                   </div>
+                                                </div>
+                                                <div className="text-left md:text-right">
+                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sales Bruto</div>
+                                                   <div className="text-sm md:text-base font-black text-slate-900">{formatRupiah(session.totals.grossSales)}</div>
+                                                </div>
+                                             </div>
+
+                                             <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                                                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Transaksi</div>
+                                                   <div className="mt-1 text-sm font-black text-slate-800">{session.totals.transactionCount}</div>
+                                                </div>
+                                                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tunai</div>
+                                                   <div className="mt-1 text-sm font-black text-slate-800">{formatRupiah(session.totals.byMethod.CASH)}</div>
+                                                </div>
+                                                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Transfer</div>
+                                                   <div className="mt-1 text-sm font-black text-slate-800">{formatRupiah(session.totals.byMethod.TRANSFER)}</div>
+                                                </div>
+                                                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">QRIS</div>
+                                                   <div className="mt-1 text-sm font-black text-slate-800">{formatRupiah(session.totals.byMethod.QRIS)}</div>
+                                                </div>
+                                                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
+                                                   <div className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Expected</div>
+                                                   <div className="mt-1 text-sm font-black text-emerald-700">{formatRupiah(session.expectedCash)}</div>
+                                                </div>
+                                                <div className={`rounded-2xl border p-3 ${
+                                                   (session.varianceAmount || 0) === 0
+                                                      ? 'border-slate-200 bg-white'
+                                                      : (session.varianceAmount || 0) > 0
+                                                         ? 'border-emerald-200 bg-emerald-50'
+                                                         : 'border-rose-200 bg-rose-50'
+                                                }`}>
+                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Selisih</div>
+                                                   <div className={`mt-1 text-sm font-black ${
+                                                      (session.varianceAmount || 0) === 0
+                                                         ? 'text-slate-800'
+                                                         : (session.varianceAmount || 0) > 0
+                                                            ? 'text-emerald-700'
+                                                            : 'text-rose-700'
+                                                   }`}>
+                                                      {formatRupiah(session.varianceAmount || 0)}
+                                                   </div>
+                                                </div>
+                                             </div>
+
+                                             {(session.openingNotes || session.closingNotes) && (
+                                                <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2">
+                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Catatan Shift</div>
+                                                   {session.openingNotes && (
+                                                      <div className="text-[11px] font-medium text-slate-600">
+                                                         Buka: {session.openingNotes}
+                                                      </div>
+                                                   )}
+                                                   {session.closingNotes && (
+                                                      <div className="text-[11px] font-medium text-slate-600">
+                                                         Tutup: {session.closingNotes}
+                                                      </div>
+                                                   )}
+                                                </div>
+                                             )}
+
+                                             <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+                                                <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Log Settlement</div>
+                                                   <div className={`text-[10px] font-black uppercase tracking-widest ${
+                                                      sessionPendingSettlement > 0 ? 'text-blue-600' : 'text-emerald-600'
+                                                   }`}>
+                                                      {sessionPendingSettlement > 0
+                                                         ? `Sisa ${formatRupiah(sessionPendingSettlement)}`
+                                                         : 'Sudah Tuntas'}
+                                                   </div>
+                                                </div>
+
+                                                {session.settlements.length === 0 ? (
+                                                   <div className="text-[11px] font-medium text-slate-500">
+                                                      Belum ada settlement tercatat untuk shift ini.
+                                                   </div>
+                                                ) : (
+                                                   <div className="space-y-2">
+                                                      {session.settlements.map((settlement, index) => {
+                                                         const settlementActorLabel = [
+                                                            String(settlement.settledByDisplayName || '').trim(),
+                                                            settlement.settledByNik ? `#${settlement.settledByNik}` : '',
+                                                         ].filter(Boolean).join(' • ')
+
+                                                         return (
+                                                            <div key={`${session.id}-${settlement.method}-${settlement.createdAt || index}`} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
+                                                               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                                                                  <div>
+                                                                     <div className="text-xs font-black text-slate-900">
+                                                                        {settlement.method} {formatRupiah(settlement.grossAmount)}
+                                                                     </div>
+                                                                     <div className="text-[11px] font-medium text-slate-500 mt-1">
+                                                                        {getAccountName(settlement.sourceAccountId)} → {getAccountName(settlement.targetAccountId)}
+                                                                     </div>
+                                                                     {settlement.notes && (
+                                                                        <div className="text-[11px] font-medium text-slate-500 mt-1">
+                                                                           Catatan: {settlement.notes}
+                                                                        </div>
+                                                                     )}
+                                                                  </div>
+                                                                  <div className="text-left md:text-right text-[11px] font-medium text-slate-500">
+                                                                     <div>{formatShiftTimestamp(settlement.createdAt)}</div>
+                                                                     {settlementActorLabel && <div className="mt-1">Oleh {settlementActorLabel}</div>}
+                                                                     {settlement.feeAmount > 0 && <div className="mt-1">Fee {formatRupiah(settlement.feeAmount)}</div>}
+                                                                     {settlement.journalEntryId && <div className="mt-1">Jurnal {settlement.journalEntryId.slice(0, 8)}</div>}
+                                                                  </div>
+                                                               </div>
+                                                            </div>
+                                                         )
+                                                      })}
+                                                   </div>
+                                                )}
+                                             </div>
+                                          </div>
+                                       )
+                                    })}
+                                 </div>
+                              </div>
+                           ))}
+                        </div>
+
+                        {shiftHistory.hasMore && shiftHistory.nextBeforeDateKey && (
+                           <div className="px-4 md:px-5 py-4 border-t border-slate-200 bg-white/90 flex justify-center">
+                              <button
+                                 type="button"
+                                 onClick={() => refreshShiftHistory('append')}
+                                 disabled={historyBusy}
+                                 className="px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-600 hover:text-slate-900 hover:border-slate-300 disabled:opacity-50"
+                              >
+                                 {historyBusy ? 'Memuat...' : 'Muat Hari Sebelumnya'}
+                              </button>
+                           </div>
+                        )}
+                     </div>
                   </div>
                )}
             </div>
@@ -1154,6 +1548,28 @@ export default function POSClient({
                      </div>
 
                      <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div className="md:col-span-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-800">
+                           Buka shift wajib otorisasi kasir dengan login NIK. Shift akan tercatat atas nama NIK yang lolos verifikasi.
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Login NIK Kasir</label>
+                           <input
+                              value={openShiftCashierNik}
+                              onChange={(e) => setOpenShiftCashierNik(e.target.value.toUpperCase())}
+                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              placeholder="Contoh: K-0001"
+                           />
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Sandi Kasir</label>
+                           <input
+                              type="password"
+                              value={openShiftCashierPassword}
+                              onChange={(e) => setOpenShiftCashierPassword(e.target.value)}
+                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              placeholder="••••••••"
+                           />
+                        </div>
                         <div className="space-y-2">
                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Kode Register</label>
                            <input
@@ -1223,7 +1639,15 @@ export default function POSClient({
                      </div>
 
                      <div className="px-6 md:px-8 py-5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
-                        <button onClick={() => setShowOpenShiftModal(false)} className="px-5 py-3 text-sm font-bold text-slate-500">Batal</button>
+                        <button
+                           onClick={() => {
+                              setShowOpenShiftModal(false)
+                              setOpenShiftCashierPassword('')
+                           }}
+                           className="px-5 py-3 text-sm font-bold text-slate-500"
+                        >
+                           Batal
+                        </button>
                         <button
                            onClick={handleOpenShift}
                            disabled={shiftBusy}
@@ -1251,6 +1675,9 @@ export default function POSClient({
                            <h3 className="text-lg md:text-xl font-black text-slate-900">Tutup Shift POS</h3>
                            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mt-1">{activeShiftSession.registerCode}</p>
                            <p className="text-xs font-semibold text-slate-500 mt-1">Buka Shift: {formatShiftTimestamp(activeShiftSession.openedAt)}</p>
+                           {activeShiftCashierLabel && (
+                              <p className="text-xs font-semibold text-slate-500 mt-0.5">Kasir Aktif: {activeShiftCashierLabel}</p>
+                           )}
                         </div>
                         <button onClick={() => setShowCloseShiftModal(false)} className="p-2 rounded-full hover:bg-white text-slate-400 hover:text-slate-700">
                            <X size={20} />
@@ -1258,6 +1685,10 @@ export default function POSClient({
                      </div>
 
                      <div className="p-6 md:p-8 space-y-5">
+                        <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800">
+                           Tutup shift harus memakai login NIK kasir yang membuka shift ini.
+                        </div>
+
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                               <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Modal Awal</div>
@@ -1282,6 +1713,27 @@ export default function POSClient({
                         </div>
 
                         <div className="space-y-2">
+                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Login NIK Kasir</label>
+                           <input
+                              value={closeShiftCashierNik}
+                              onChange={(e) => setCloseShiftCashierNik(e.target.value.toUpperCase())}
+                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              placeholder="Contoh: K-0001"
+                           />
+                        </div>
+
+                        <div className="space-y-2">
+                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Sandi Kasir</label>
+                           <input
+                              type="password"
+                              value={closeShiftCashierPassword}
+                              onChange={(e) => setCloseShiftCashierPassword(e.target.value)}
+                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              placeholder="••••••••"
+                           />
+                        </div>
+
+                        <div className="space-y-2">
                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Kas Fisik Saat Tutup Shift</label>
                            <input
                               value={closingCashInput}
@@ -1303,7 +1755,15 @@ export default function POSClient({
                      </div>
 
                      <div className="px-6 md:px-8 py-5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
-                        <button onClick={() => setShowCloseShiftModal(false)} className="px-5 py-3 text-sm font-bold text-slate-500">Batal</button>
+                        <button
+                           onClick={() => {
+                              setShowCloseShiftModal(false)
+                              setCloseShiftCashierPassword('')
+                           }}
+                           className="px-5 py-3 text-sm font-bold text-slate-500"
+                        >
+                           Batal
+                        </button>
                         <button
                            onClick={handleCloseShift}
                            disabled={shiftBusy}
@@ -1339,6 +1799,10 @@ export default function POSClient({
                      </div>
 
                      <div className="p-6 md:p-8 space-y-5">
+                        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-800">
+                           Settlement wajib memakai login NIK kasir shift ini atau otorisator owner/admin/manager agar jejak audit harian tetap lengkap.
+                        </div>
+
                         <div className="grid grid-cols-3 gap-2">
                            {(['CASH', 'QRIS', 'TRANSFER'] as PosShiftMethod[]).map((method) => (
                               <button
@@ -1393,6 +1857,28 @@ export default function POSClient({
                            />
                         </div>
 
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <div className="space-y-2">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Login NIK Otorisasi</label>
+                              <input
+                                 value={settlementAuthorizerNik}
+                                 onChange={(e) => setSettlementAuthorizerNik(e.target.value.toUpperCase())}
+                                 className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                                 placeholder="Contoh: K-0001"
+                              />
+                           </div>
+                           <div className="space-y-2">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Sandi Otorisasi</label>
+                              <input
+                                 type="password"
+                                 value={settlementAuthorizerPassword}
+                                 onChange={(e) => setSettlementAuthorizerPassword(e.target.value)}
+                                 className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                                 placeholder="••••••••"
+                              />
+                           </div>
+                        </div>
+
                         <div className="space-y-2">
                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Catatan Settlement</label>
                            <textarea
@@ -1405,7 +1891,15 @@ export default function POSClient({
                      </div>
 
                      <div className="px-6 md:px-8 py-5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
-                        <button onClick={() => setShowSettlementModal(false)} className="px-5 py-3 text-sm font-bold text-slate-500">Batal</button>
+                        <button
+                           onClick={() => {
+                              setShowSettlementModal(false)
+                              setSettlementAuthorizerPassword('')
+                           }}
+                           className="px-5 py-3 text-sm font-bold text-slate-500"
+                        >
+                           Batal
+                        </button>
                         <button
                            onClick={handleSettlement}
                            disabled={shiftBusy || settlementRemaining <= 0}

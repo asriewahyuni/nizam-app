@@ -17,7 +17,7 @@ vi.mock('next/headers', () => ({
 }))
 
 import { INTERNAL_AUTH_SESSION_COOKIE, INTERNAL_AUTH_SESSION_MAX_AGE } from '@/lib/auth/internal-auth.shared'
-import { signInWithInternalAuth } from '@/lib/auth/internal-auth.server'
+import { signInWithInternalAuth, verifyInternalAuthNikForOrg } from '@/lib/auth/internal-auth.server'
 
 function createPasswordHash(password: string) {
   const salt = Buffer.from('nizam-internal-auth-test-salt')
@@ -135,6 +135,38 @@ describe('internal auth server', () => {
     expect(result).toMatchObject({
       success: true,
       resolvedOrgId: preferredOrgId,
+    })
+  })
+
+  it('verifies cashier nik within the requested organization without creating a session', async () => {
+    mocks.queryPostgres.mockResolvedValueOnce({
+      rows: [{
+        id: internalUserId,
+        legacy_user_id: legacyUserId,
+        login_email: 'kasir@example.com',
+        login_nik: null,
+        password_hash: createPasswordHash('kasir123'),
+        display_name: 'Kasir Pagi',
+        is_active: true,
+        employee_nik: 'K-0001',
+        employee_first_name: 'Kasir',
+        employee_last_name: 'Depan',
+      }],
+    })
+
+    const result = await verifyInternalAuthNikForOrg({
+      orgId: preferredOrgId,
+      nik: 'K-0001',
+      password: 'kasir123',
+    })
+
+    expect(result).toMatchObject({
+      success: true,
+      internalUserId,
+      sessionUserId: legacyUserId,
+      nik: 'K-0001',
+      displayName: 'Kasir Depan',
+      email: 'kasir@example.com',
     })
   })
 })

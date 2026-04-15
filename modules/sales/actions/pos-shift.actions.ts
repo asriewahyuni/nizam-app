@@ -7,6 +7,8 @@
 
 import { revalidatePath } from 'next/cache'
 
+import { verifyInternalAuthNikForOrg } from '@/lib/auth/internal-auth.server'
+import { queryPostgres } from '@/lib/db/postgres'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { getDateInTimeZone } from '@/lib/utils'
 import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
@@ -49,6 +51,7 @@ type PosShiftSessionRow = {
 }
 
 type PosShiftSaleRow = {
+  pos_session_id?: string | null
   grand_total?: number | string | null
   total_amount?: number | string | null
   discount_amount?: number | string | null
@@ -58,8 +61,37 @@ type PosShiftSaleRow = {
 }
 
 type PosShiftSettlementRow = {
+  session_id?: string | null
   settlement_method?: string | null
+  source_account_id?: string | null
+  target_account_id?: string | null
   gross_amount?: number | string | null
+  fee_amount?: number | string | null
+  net_amount?: number | string | null
+  journal_entry_id?: string | null
+  notes?: string | null
+  settled_by?: string | null
+  created_at?: string | null
+}
+
+type PosShiftUserIdentity = {
+  displayName: string | null
+  nik: string | null
+}
+
+export type PosShiftSettlementSummary = {
+  method: PosShiftMethod
+  sourceAccountId: string | null
+  targetAccountId: string | null
+  grossAmount: number
+  feeAmount: number
+  netAmount: number
+  journalEntryId: string | null
+  notes: string | null
+  settledByUserId: string | null
+  settledByDisplayName: string | null
+  settledByNik: string | null
+  createdAt: string | null
 }
 
 export type PosShiftSummary = {
@@ -68,6 +100,9 @@ export type PosShiftSummary = {
   registerCode: string
   branchId: string
   branchName: string | null
+  cashierUserId: string | null
+  cashierDisplayName: string | null
+  cashierNik: string | null
   openingCash: number
   expectedCash: number
   closingCash: number | null
@@ -79,6 +114,7 @@ export type PosShiftSummary = {
   closedAt: string | null
   openingNotes: string | null
   closingNotes: string | null
+  settlements: PosShiftSettlementSummary[]
   totals: {
     transactionCount: number
     grossSales: number
@@ -103,6 +139,25 @@ export type PosShiftSnapshot = {
   message: string | null
 }
 
+export type PosShiftHistoryDay = {
+  dateKey: string
+  totals: {
+    shiftCount: number
+    transactionCount: number
+    grossSales: number
+    pendingSettlement: number
+  }
+  sessions: PosShiftSummary[]
+}
+
+export type PosShiftHistoryResponse = {
+  schemaReady: boolean
+  days: PosShiftHistoryDay[]
+  hasMore: boolean
+  nextBeforeDateKey: string | null
+  message: string | null
+}
+
 function parseNumber(value: unknown): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : 0
@@ -120,6 +175,207 @@ function emptyMethodTotals(): Record<PosShiftMethod, number> {
     CASH: 0,
     TRANSFER: 0,
     QRIS: 0,
+  }
+}
+
+function getJakartaDateKey(value?: string | null): string | null {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
+function getJakartaDayStartIso(dateKey?: string | null): string | null {
+  const normalized = String(dateKey || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null
+
+  const date = new Date(`${normalized}T00:00:00+07:00`)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toISOString()
+}
+
+async function resolvePosCashierIdentity(
+  orgId: string,
+  cashierUserId?: string | null
+): Promise<PosShiftUserIdentity> {
+  const normalizedCashierUserId = String(cashierUserId || '').trim()
+  if (!normalizedCashierUserId) {
+    return { displayName: null, nik: null }
+  }
+
+  try {
+    const result = await queryPostgres<{
+      employee_nik: string | null
+      employee_first_name: string | null
+      employee_last_name: string | null
+      internal_display_name: string | null
+      internal_login_nik: string | null
+      internal_login_email: string | null
+    }>(
+      `
+        select
+          emp.employee_nik,
+          emp.employee_first_name,
+          emp.employee_last_name,
+          auth.internal_display_name,
+          auth.internal_login_nik,
+          auth.internal_login_email
+        from (
+          select 1
+        ) seed
+        left join lateral (
+          select
+            upper(trim(coalesce(e.nik, ''))) as employee_nik,
+            e.first_name as employee_first_name,
+            e.last_name as employee_last_name
+          from public.employees e
+          where
+            e.org_id = $1::uuid
+            and e.user_id = $2::uuid
+          order by e.created_at asc nulls last, e.id asc
+          limit 1
+        ) emp on true
+        left join lateral (
+          select
+            nullif(trim(u.display_name), '') as internal_display_name,
+            upper(trim(coalesce(u.login_nik, ''))) as internal_login_nik,
+            lower(trim(coalesce(u.login_email, ''))) as internal_login_email
+          from public.internal_auth_users u
+          where
+            u.legacy_user_id = $2::uuid
+            or u.id = $2::uuid
+          order by
+            case when u.legacy_user_id = $2::uuid then 0 else 1 end,
+            u.created_at asc
+          limit 1
+        ) auth on true
+      `,
+      [orgId, normalizedCashierUserId]
+    )
+
+    const row = result.rows[0]
+    const employeeName = [
+      String(row?.employee_first_name || '').trim(),
+      String(row?.employee_last_name || '').trim(),
+    ].filter(Boolean).join(' ').trim()
+    const emailPrefix = String(row?.internal_login_email || '').split('@')[0]?.trim() || ''
+
+    return {
+      displayName: employeeName || String(row?.internal_display_name || '').trim() || emailPrefix || null,
+      nik: String(row?.employee_nik || row?.internal_login_nik || '').trim() || null,
+    }
+  } catch {
+    return { displayName: null, nik: null }
+  }
+}
+
+async function resolvePosUserIdentities(
+  orgId: string,
+  userIds: Array<string | null | undefined>
+): Promise<Map<string, PosShiftUserIdentity>> {
+  const uniqueUserIds = Array.from(new Set(
+    userIds
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+  ))
+
+  const resolvedEntries = await Promise.all(
+    uniqueUserIds.map(async (userId) => [userId, await resolvePosCashierIdentity(orgId, userId)] as const)
+  )
+
+  return new Map<string, PosShiftUserIdentity>(resolvedEntries)
+}
+
+async function verifyPosCashierLogin(
+  db: any,
+  orgId: string,
+  branchId: string,
+  nik: string,
+  password: string
+) {
+  const verified = await verifyInternalAuthNikForOrg({ orgId, nik, password })
+  if ('error' in verified) {
+    return verified
+  }
+
+  try {
+    const { data: employeeRow } = await db
+      .from('employees')
+      .select('branch_id, first_name, last_name, nik, employment_status')
+      .eq('org_id', orgId)
+      .eq('user_id', verified.sessionUserId)
+      .maybeSingle()
+
+    const employeeBranchId = String(employeeRow?.branch_id || '').trim()
+    const employmentStatus = String(employeeRow?.employment_status || '').trim().toUpperCase()
+    if (employmentStatus === 'RESIGNED' || employmentStatus === 'TERMINATED') {
+      return { error: 'NIK kasir ini sudah tidak aktif sebagai karyawan.' as const }
+    }
+    if (employeeBranchId && employeeBranchId !== branchId) {
+      return { error: 'NIK kasir ini terdaftar pada unit lain. Pindahkan unit aktif atau gunakan NIK kasir unit ini.' as const }
+    }
+
+    const employeeName = [
+      String(employeeRow?.first_name || '').trim(),
+      String(employeeRow?.last_name || '').trim(),
+    ].filter(Boolean).join(' ').trim()
+
+    return {
+      ...verified,
+      displayName: employeeName || verified.displayName,
+      nik: String(employeeRow?.nik || verified.nik || '').trim().toUpperCase() || verified.nik,
+    }
+  } catch {
+    return verified
+  }
+}
+
+async function verifyPosSettlementLogin(
+  db: any,
+  orgId: string,
+  branchId: string,
+  sessionCashierUserId: string | null,
+  nik: string,
+  password: string
+) {
+  const verified = await verifyPosCashierLogin(db, orgId, branchId, nik, password)
+  if ('error' in verified) {
+    return verified
+  }
+
+  if (verified.sessionUserId === String(sessionCashierUserId || '').trim()) {
+    return {
+      ...verified,
+      authorizationType: 'CASHIER' as const,
+      authorizationRole: 'cashier' as const,
+    }
+  }
+
+  const { data: memberRow } = await db
+    .from('org_members')
+    .select('role')
+    .eq('org_id', orgId)
+    .eq('user_id', verified.sessionUserId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  const normalizedRole = String(memberRow?.role || '').trim().toLowerCase()
+  if (['owner', 'admin', 'manager'].includes(normalizedRole)) {
+    return {
+      ...verified,
+      authorizationType: 'APPROVER' as const,
+      authorizationRole: normalizedRole as 'owner' | 'admin' | 'manager',
+    }
+  }
+
+  return {
+    error: 'Settlement harus memakai login NIK kasir shift ini atau otorisator owner/admin/manager.' as const,
   }
 }
 
@@ -198,37 +454,16 @@ async function getSingleSession(
   }
 }
 
-async function buildPosShiftSummary(
-  db: any,
-  orgId: string,
+function buildPosShiftSummaryFromData(
   sessionRow: PosShiftSessionRow,
-  branchName?: string | null
-): Promise<PosShiftSummary> {
+  branchName: string | null | undefined,
+  saleRows: PosShiftSaleRow[],
+  settlementRows: PosShiftSettlementRow[],
+  identityByUserId: Map<string, PosShiftUserIdentity>
+): PosShiftSummary {
   const sessionId = String(sessionRow.id || '')
   const openingCash = parseNumber(sessionRow.opening_cash)
-
-  let saleRows: PosShiftSaleRow[] = []
-  const { data: salesData, error: salesError } = await db
-    .from('sales')
-    .select('grand_total, total_amount, discount_amount, tax_amount, pos_payment_method, pos_change_amount')
-    .eq('org_id', orgId)
-    .eq('pos_session_id', sessionId)
-
-  if (!salesError && Array.isArray(salesData)) {
-    saleRows = salesData as PosShiftSaleRow[]
-  }
-
-  let settlementRows: PosShiftSettlementRow[] = []
-  const { data: settlementsData, error: settlementsError } = await db
-    .from('pos_shift_settlements')
-    .select('settlement_method, gross_amount')
-    .eq('org_id', orgId)
-    .eq('session_id', sessionId)
-
-  if (!settlementsError && Array.isArray(settlementsData)) {
-    settlementRows = settlementsData as PosShiftSettlementRow[]
-  }
-
+  const cashierUserId = String(sessionRow.cashier_user_id || '').trim() || null
   const byMethod = emptyMethodTotals()
   const settledByMethod = emptyMethodTotals()
 
@@ -254,15 +489,37 @@ async function buildPosShiftSummary(
     byMethod[method] += grandTotal
   }
 
-  for (const row of settlementRows) {
-    const method = normalizeMethod(row.settlement_method)
-    settledByMethod[method] += parseNumber(row.gross_amount)
-  }
+  const settlementLogs = settlementRows
+    .map((row) => {
+      const method = normalizeMethod(row.settlement_method)
+      const settledByUserId = String(row.settled_by || '').trim() || null
+      const settledByIdentity = settledByUserId ? identityByUserId.get(settledByUserId) : null
+      const grossAmount = parseNumber(row.gross_amount)
+
+      settledByMethod[method] += grossAmount
+
+      return {
+        method,
+        sourceAccountId: String(row.source_account_id || '').trim() || null,
+        targetAccountId: String(row.target_account_id || '').trim() || null,
+        grossAmount,
+        feeAmount: parseNumber(row.fee_amount),
+        netAmount: parseNumber(row.net_amount),
+        journalEntryId: String(row.journal_entry_id || '').trim() || null,
+        notes: row.notes ? String(row.notes).trim() : null,
+        settledByUserId,
+        settledByDisplayName: settledByIdentity?.displayName || null,
+        settledByNik: settledByIdentity?.nik || null,
+        createdAt: row.created_at ? String(row.created_at) : null,
+      } satisfies PosShiftSettlementSummary
+    })
+    .sort((left, right) => String(right.createdAt || '').localeCompare(String(left.createdAt || '')))
 
   const computedExpectedCash = openingCash + byMethod.CASH - totalChange
   const expectedCash = parseNumber(sessionRow.expected_cash) || computedExpectedCash
   const closingCash = sessionRow.closing_cash == null ? null : parseNumber(sessionRow.closing_cash)
   const cashBase = closingCash ?? expectedCash
+  const cashierIdentity = cashierUserId ? identityByUserId.get(cashierUserId) : null
 
   const remainingByMethod = {
     CASH: Math.max(0, cashBase - settledByMethod.CASH),
@@ -276,6 +533,9 @@ async function buildPosShiftSummary(
     registerCode: String(sessionRow.register_code || 'REG-1').trim() || 'REG-1',
     branchId: String(sessionRow.branch_id || '').trim(),
     branchName: branchName ? String(branchName).trim() : null,
+    cashierUserId,
+    cashierDisplayName: cashierIdentity?.displayName || null,
+    cashierNik: cashierIdentity?.nik || null,
     openingCash,
     expectedCash,
     closingCash,
@@ -287,6 +547,7 @@ async function buildPosShiftSummary(
     closedAt: sessionRow.closed_at ? String(sessionRow.closed_at) : null,
     openingNotes: sessionRow.opening_notes ? String(sessionRow.opening_notes) : null,
     closingNotes: sessionRow.closing_notes ? String(sessionRow.closing_notes) : null,
+    settlements: settlementLogs,
     totals: {
       transactionCount: saleRows.length,
       grossSales,
@@ -299,6 +560,150 @@ async function buildPosShiftSummary(
       remainingByMethod,
     },
   }
+}
+
+async function buildPosShiftSummary(
+  db: any,
+  orgId: string,
+  sessionRow: PosShiftSessionRow,
+  branchName?: string | null
+): Promise<PosShiftSummary> {
+  const sessionId = String(sessionRow.id || '')
+
+  let saleRows: PosShiftSaleRow[] = []
+  const { data: salesData, error: salesError } = await db
+    .from('sales')
+    .select('pos_session_id, grand_total, total_amount, discount_amount, tax_amount, pos_payment_method, pos_change_amount')
+    .eq('org_id', orgId)
+    .eq('pos_session_id', sessionId)
+
+  if (!salesError && Array.isArray(salesData)) {
+    saleRows = salesData as PosShiftSaleRow[]
+  }
+
+  let settlementRows: PosShiftSettlementRow[] = []
+  const { data: settlementsData, error: settlementsError } = await db
+    .from('pos_shift_settlements')
+    .select('session_id, settlement_method, source_account_id, target_account_id, gross_amount, fee_amount, net_amount, journal_entry_id, notes, settled_by, created_at')
+    .eq('org_id', orgId)
+    .eq('session_id', sessionId)
+
+  if (!settlementsError && Array.isArray(settlementsData)) {
+    settlementRows = settlementsData as PosShiftSettlementRow[]
+  }
+
+  const identityByUserId = await resolvePosUserIdentities(
+    orgId,
+    [sessionRow.cashier_user_id, ...settlementRows.map((row) => row.settled_by)]
+  )
+
+  return buildPosShiftSummaryFromData(sessionRow, branchName, saleRows, settlementRows, identityByUserId)
+}
+
+async function buildPosShiftSummaries(
+  db: any,
+  orgId: string,
+  sessionRows: PosShiftSessionRow[],
+  branchName?: string | null
+): Promise<PosShiftSummary[]> {
+  const normalizedRows = sessionRows.filter((row) => String(row.id || '').trim())
+  if (normalizedRows.length === 0) return []
+
+  const sessionIds = normalizedRows.map((row) => String(row.id || '').trim())
+
+  const [salesResult, settlementsResult] = await Promise.all([
+    db
+      .from('sales')
+      .select('pos_session_id, grand_total, total_amount, discount_amount, tax_amount, pos_payment_method, pos_change_amount')
+      .eq('org_id', orgId)
+      .in('pos_session_id', sessionIds),
+    db
+      .from('pos_shift_settlements')
+      .select('session_id, settlement_method, source_account_id, target_account_id, gross_amount, fee_amount, net_amount, journal_entry_id, notes, settled_by, created_at')
+      .eq('org_id', orgId)
+      .in('session_id', sessionIds),
+  ])
+
+  const saleRows = !salesResult.error && Array.isArray(salesResult.data)
+    ? salesResult.data as PosShiftSaleRow[]
+    : []
+  const settlementRows = !settlementsResult.error && Array.isArray(settlementsResult.data)
+    ? settlementsResult.data as PosShiftSettlementRow[]
+    : []
+
+  const saleRowsBySession = new Map<string, PosShiftSaleRow[]>()
+  for (const row of saleRows) {
+    const sessionId = String(row.pos_session_id || '').trim()
+    if (!sessionId) continue
+    const bucket = saleRowsBySession.get(sessionId) || []
+    bucket.push(row)
+    saleRowsBySession.set(sessionId, bucket)
+  }
+
+  const settlementRowsBySession = new Map<string, PosShiftSettlementRow[]>()
+  for (const row of settlementRows) {
+    const sessionId = String(row.session_id || '').trim()
+    if (!sessionId) continue
+    const bucket = settlementRowsBySession.get(sessionId) || []
+    bucket.push(row)
+    settlementRowsBySession.set(sessionId, bucket)
+  }
+
+  const identityByUserId = await resolvePosUserIdentities(
+    orgId,
+    [
+      ...normalizedRows.map((row) => row.cashier_user_id),
+      ...settlementRows.map((row) => row.settled_by),
+    ]
+  )
+
+  return normalizedRows.map((row) => (
+    buildPosShiftSummaryFromData(
+      row,
+      branchName,
+      saleRowsBySession.get(String(row.id || '').trim()) || [],
+      settlementRowsBySession.get(String(row.id || '').trim()) || [],
+      identityByUserId
+    )
+  ))
+}
+
+function buildPosShiftHistoryDays(sessions: PosShiftSummary[]): PosShiftHistoryDay[] {
+  const days = new Map<string, PosShiftHistoryDay>()
+
+  for (const session of sessions) {
+    const dateKey = getJakartaDateKey(session.closedAt || session.openedAt)
+    if (!dateKey) continue
+
+    const existingDay = days.get(dateKey)
+    const pendingSettlement = (
+      session.totals.remainingByMethod.CASH +
+      session.totals.remainingByMethod.TRANSFER +
+      session.totals.remainingByMethod.QRIS
+    )
+
+    if (!existingDay) {
+      days.set(dateKey, {
+        dateKey,
+        totals: {
+          shiftCount: 1,
+          transactionCount: session.totals.transactionCount,
+          grossSales: session.totals.grossSales,
+          pendingSettlement,
+        },
+        sessions: [session],
+      })
+      continue
+    }
+
+    existingDay.totals.shiftCount += 1
+    existingDay.totals.transactionCount += session.totals.transactionCount
+    existingDay.totals.grossSales += session.totals.grossSales
+    existingDay.totals.pendingSettlement += pendingSettlement
+    existingDay.sessions.push(session)
+  }
+
+  return Array.from(days.values()).sort((left, right) => right.dateKey.localeCompare(left.dateKey))
 }
 
 export async function getPosShiftSnapshot(orgId: string): Promise<PosShiftSnapshot> {
@@ -355,7 +760,6 @@ export async function getPosShiftSnapshot(orgId: string): Promise<PosShiftSnapsh
     `)
     .eq('org_id', orgId)
     .eq('branch_id', context.branchId)
-    .eq('cashier_user_id', context.userId)
     .eq('status', 'OPEN')
     .order('opened_at', { ascending: false })
     .limit(1)
@@ -397,7 +801,6 @@ export async function getPosShiftSnapshot(orgId: string): Promise<PosShiftSnapsh
     `)
     .eq('org_id', orgId)
     .eq('branch_id', context.branchId)
-    .eq('cashier_user_id', context.userId)
     .eq('status', 'CLOSED')
     .order('closed_at', { ascending: false })
     .limit(1)
@@ -417,6 +820,121 @@ export async function getPosShiftSnapshot(orgId: string): Promise<PosShiftSnapsh
   }
 }
 
+export async function getPosShiftHistory(
+  orgId: string,
+  payload?: {
+    beforeDateKey?: string | null
+    dayLimit?: number
+  }
+): Promise<PosShiftHistoryResponse> {
+  const context = await getPosShiftContext(orgId)
+  if ('error' in context) {
+    return {
+      schemaReady: false,
+      days: [],
+      hasMore: false,
+      nextBeforeDateKey: null,
+      message: context.error,
+    }
+  }
+
+  if (!isPosShiftFeatureEnabled(context.config)) {
+    return {
+      schemaReady: true,
+      days: [],
+      hasMore: false,
+      nextBeforeDateKey: null,
+      message: null,
+    }
+  }
+
+  const dayLimit = Math.max(1, Math.min(31, Math.floor(Number(payload?.dayLimit || 7)) || 7))
+  const beforeDayStartIso = getJakartaDayStartIso(payload?.beforeDateKey)
+  const db = await getPosShiftDbClient()
+  let query = db
+    .from('pos_shift_sessions')
+    .select(`
+      id,
+      org_id,
+      branch_id,
+      cashier_user_id,
+      register_code,
+      opening_cash,
+      expected_cash,
+      closing_cash,
+      variance_amount,
+      cash_account_id,
+      transfer_account_id,
+      qris_account_id,
+      opening_notes,
+      closing_notes,
+      status,
+      opened_at,
+      closed_at
+    `)
+    .eq('org_id', orgId)
+    .eq('branch_id', context.branchId)
+    .eq('status', 'CLOSED')
+    .order('closed_at', { ascending: false })
+    .limit(Math.max(120, dayLimit * 50))
+
+  if (beforeDayStartIso) {
+    query = query.lt('closed_at', beforeDayStartIso)
+  }
+
+  const { data, error } = await query
+
+  if (isPosShiftSchemaMissing(error)) {
+    return {
+      schemaReady: false,
+      days: [],
+      hasMore: false,
+      nextBeforeDateKey: null,
+      message: 'Schema POS shift belum tersedia. Histori harian akan aktif setelah migration selesai.',
+    }
+  }
+
+  const sessionRows = Array.isArray(data) ? data as PosShiftSessionRow[] : []
+  const selectedDays: string[] = []
+
+  for (const row of sessionRows) {
+    const dateKey = getJakartaDateKey(row.closed_at || row.opened_at)
+    if (!dateKey || selectedDays.includes(dateKey)) continue
+    selectedDays.push(dateKey)
+    if (selectedDays.length >= dayLimit) break
+  }
+
+  const includedSessions = sessionRows.filter((row) => {
+    const dateKey = getJakartaDateKey(row.closed_at || row.opened_at)
+    return Boolean(dateKey && selectedDays.includes(dateKey))
+  })
+
+  const oldestDateKey = selectedDays[selectedDays.length - 1] || null
+  const olderThanOldestDayIso = getJakartaDayStartIso(oldestDateKey)
+
+  let hasMore = false
+  if (olderThanOldestDayIso) {
+    const { data: olderRows } = await db
+      .from('pos_shift_sessions')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('branch_id', context.branchId)
+      .eq('status', 'CLOSED')
+      .lt('closed_at', olderThanOldestDayIso)
+      .limit(1)
+
+    hasMore = Array.isArray(olderRows) && olderRows.length > 0
+  }
+
+  return {
+    schemaReady: true,
+    days: buildPosShiftHistoryDays(await buildPosShiftSummaries(db, orgId, includedSessions, context.branchName)),
+    hasMore,
+    nextBeforeDateKey: hasMore ? oldestDateKey : null,
+    message: error ? String(error.message || 'Gagal memuat histori shift harian.') : null,
+  }
+}
+
 export async function openPosShift(
   orgId: string,
   payload: {
@@ -426,6 +944,8 @@ export async function openPosShift(
     cashAccountId?: string | null
     transferAccountId?: string | null
     qrisAccountId?: string | null
+    cashierNik: string
+    cashierPassword: string
   }
 ) {
   const context = await getPosShiftContext(orgId)
@@ -436,12 +956,22 @@ export async function openPosShift(
   }
 
   const db = await getPosShiftDbClient()
+  const cashierLogin = await verifyPosCashierLogin(
+    db,
+    orgId,
+    context.branchId,
+    payload.cashierNik,
+    payload.cashierPassword
+  )
+  if ('error' in cashierLogin) {
+    return cashierLogin
+  }
+
   const { data: existingSession, error: existingError } = await db
     .from('pos_shift_sessions')
     .select('id')
     .eq('org_id', orgId)
     .eq('branch_id', context.branchId)
-    .eq('cashier_user_id', context.userId)
     .eq('status', 'OPEN')
     .order('opened_at', { ascending: false })
     .limit(1)
@@ -454,6 +984,14 @@ export async function openPosShift(
   if (existingSession?.id) {
     const currentSession = await getSingleSession(db, orgId, String(existingSession.id))
     if (currentSession.session) {
+      if (String(currentSession.session.cashier_user_id || '') !== cashierLogin.sessionUserId) {
+        const existingSummary = await buildPosShiftSummary(db, orgId, currentSession.session, context.branchName)
+        const existingCashierLabel = existingSummary.cashierDisplayName || existingSummary.cashierNik || 'kasir lain'
+        return {
+          error: `Masih ada shift aktif ${existingSummary.registerCode} atas nama ${existingCashierLabel}. Tutup shift tersebut terlebih dahulu.`,
+        }
+      }
+
       return {
         success: true,
         session: await buildPosShiftSummary(db, orgId, currentSession.session, context.branchName),
@@ -469,8 +1007,8 @@ export async function openPosShift(
     .insert({
       org_id: orgId,
       branch_id: context.branchId,
-      cashier_user_id: context.userId,
-      opened_by: context.userId,
+      cashier_user_id: cashierLogin.sessionUserId,
+      opened_by: cashierLogin.sessionUserId,
       register_code: registerCode,
       opening_cash: openingCash,
       expected_cash: openingCash,
@@ -518,6 +1056,8 @@ export async function closePosShift(
     sessionId?: string | null
     closingCash: number
     closingNotes?: string
+    cashierNik: string
+    cashierPassword: string
   }
 ) {
   const context = await getPosShiftContext(orgId)
@@ -554,7 +1094,6 @@ export async function closePosShift(
         `)
         .eq('org_id', orgId)
         .eq('branch_id', context.branchId)
-        .eq('cashier_user_id', context.userId)
         .eq('status', 'OPEN')
         .order('opened_at', { ascending: false })
         .limit(1)
@@ -573,8 +1112,19 @@ export async function closePosShift(
     return { error: 'Tidak ada shift POS aktif yang bisa ditutup.' }
   }
 
-  if (String(currentSession.cashier_user_id || '') !== context.userId) {
-    return { error: 'Shift POS ini bukan milik user aktif.' }
+  const cashierLogin = await verifyPosCashierLogin(
+    db,
+    orgId,
+    context.branchId,
+    payload.cashierNik,
+    payload.cashierPassword
+  )
+  if ('error' in cashierLogin) {
+    return cashierLogin
+  }
+
+  if (String(currentSession.cashier_user_id || '') !== cashierLogin.sessionUserId) {
+    return { error: 'Gunakan login NIK kasir yang membuka shift ini untuk menutup shift.' }
   }
 
   const summaryBeforeClose = await buildPosShiftSummary(db, orgId, currentSession, context.branchName)
@@ -589,7 +1139,7 @@ export async function closePosShift(
       closing_cash: closingCash,
       variance_amount: varianceAmount,
       closing_notes: payload.closingNotes ? String(payload.closingNotes).trim() : null,
-      closed_by: context.userId,
+      closed_by: cashierLogin.sessionUserId,
       closed_at: new Date().toISOString(),
     })
     .eq('id', currentSession.id)
@@ -643,6 +1193,8 @@ export async function settlePosShift(
     feeAmount?: number
     feeAccountId?: string | null
     notes?: string
+    authorizerNik: string
+    authorizerPassword: string
   }
 ) {
   const context = await getPosShiftContext(orgId)
@@ -672,6 +1224,18 @@ export async function settlePosShift(
   }
 
   const summary = await buildPosShiftSummary(db, orgId, session, context.branchName)
+  const settlementAuthorizer = await verifyPosSettlementLogin(
+    db,
+    orgId,
+    context.branchId,
+    summary.cashierUserId,
+    payload.authorizerNik,
+    payload.authorizerPassword
+  )
+  if ('error' in settlementAuthorizer) {
+    return settlementAuthorizer
+  }
+
   const method = normalizeMethod(payload.settlementMethod)
   const sourceAccountId = method === 'CASH'
     ? summary.cashAccountId
@@ -769,7 +1333,7 @@ export async function settlePosShift(
       net_amount: netAmount,
       journal_entry_id: journalEntryId,
       notes: payload.notes ? String(payload.notes).trim() : null,
-      settled_by: context.userId,
+      settled_by: settlementAuthorizer.sessionUserId,
     })
 
   if (insertError) {
@@ -789,4 +1353,3 @@ export async function settlePosShift(
       : summary,
   }
 }
-

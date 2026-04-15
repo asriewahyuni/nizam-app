@@ -43,6 +43,19 @@ type InternalCredentialRow = {
   is_active: boolean
 }
 
+type InternalOrgNikCredentialRow = {
+  id: string
+  legacy_user_id: string | null
+  login_email: string | null
+  login_nik: string | null
+  password_hash: string
+  display_name: string | null
+  is_active: boolean
+  employee_nik: string | null
+  employee_first_name: string | null
+  employee_last_name: string | null
+}
+
 type InternalAuthUserRow = {
   id: string
   is_active: boolean
@@ -686,6 +699,149 @@ export async function createInternalAuthUser(input: {
     }
   }
 }
+
+export async function verifyInternalAuthNikForOrg(input: {
+  orgId: string
+  nik: string
+  password: string
+}) {
+  const orgId = normalizeUuid(input.orgId)
+  const nik = normalizeNik(input.nik)
+  const password = normalizeInput(input.password)
+
+  if (!orgId) {
+    return { error: 'Organisasi kasir tidak valid.' as const }
+  }
+  if (!nik || !password) {
+    return { error: 'NIK dan sandi kasir wajib diisi.' as const }
+  }
+
+  try {
+    const result = await queryPostgres<InternalOrgNikCredentialRow>(
+      `
+        select
+          u.id::text as id,
+          u.legacy_user_id::text,
+          u.login_email,
+          u.login_nik,
+          u.password_hash,
+          u.display_name,
+          u.is_active,
+          emp.employee_nik,
+          emp.employee_first_name,
+          emp.employee_last_name
+        from public.internal_auth_users u
+        join public.org_members om
+          on om.user_id = coalesce(u.legacy_user_id, u.id)
+         and om.org_id = $2::uuid
+         and om.is_active = true
+        left join lateral (
+          select
+            upper(trim(coalesce(e.nik, ''))) as employee_nik,
+            e.first_name as employee_first_name,
+            e.last_name as employee_last_name
+          from public.employees e
+          where
+            e.org_id = $2::uuid
+            and e.user_id = coalesce(u.legacy_user_id, u.id)
+          order by e.created_at asc nulls last, e.id asc
+          limit 1
+        ) emp on true
+        where
+          u.is_active = true
+          and (
+            upper(trim(coalesce(u.login_nik, ''))) = $1::text
+            or coalesce(emp.employee_nik, '') = $1::text
+          )
+        order by
+          case
+            when upper(trim(coalesce(u.login_nik, ''))) = $1::text then 0
+            when coalesce(emp.employee_nik, '') = $1::text then 1
+            else 2
+          end,
+          u.created_at asc
+        limit 10
+      `,
+      [nik, orgId]
+    )
+
+    const candidates = result.rows.filter((row) => row && row.is_active)
+    if (candidates.length === 0) {
+      return { error: 'NIK atau sandi kasir salah.' as const }
+    }
+
+    const passwordMatched: InternalOrgNikCredentialRow[] = []
+    for (const candidate of candidates) {
+      if (verifyScryptPassword(password, candidate.password_hash)) {
+        passwordMatched.push(candidate)
+        continue
+      }
+
+      if (candidate.legacy_user_id) {
+        try {
+          const legacyCheck = await queryPostgres<{ valid: boolean }>(
+            `select (encrypted_password = extensions.crypt($1::text, encrypted_password)) as valid from auth.users where id = $2::uuid limit 1`,
+            [password, candidate.legacy_user_id]
+          )
+
+          if (legacyCheck.rows[0]?.valid) {
+            passwordMatched.push(candidate)
+            continue
+          }
+        } catch {
+          try {
+            const legacyCheck = await queryPostgres<{ valid: boolean }>(
+              `select (encrypted_password = crypt($1::text, encrypted_password)) as valid from auth.users where id = $2::uuid limit 1`,
+              [password, candidate.legacy_user_id]
+            )
+
+            if (legacyCheck.rows[0]?.valid) {
+              passwordMatched.push(candidate)
+            }
+          } catch {
+            // noop
+          }
+        }
+      }
+    }
+
+    if (passwordMatched.length === 0) {
+      return { error: 'NIK atau sandi kasir salah.' as const }
+    }
+
+    const exactNikMatches = passwordMatched.filter((candidate) => (
+      normalizeNik(candidate.login_nik) === nik || normalizeNik(candidate.employee_nik) === nik
+    ))
+    const scopedMatches = exactNikMatches.length > 0 ? exactNikMatches : passwordMatched
+
+    if (scopedMatches.length !== 1) {
+      return { error: 'NIK kasir terhubung ke lebih dari satu akun pada organisasi ini. Hubungi admin.' as const }
+    }
+
+    const matched = scopedMatches[0]
+    const employeeName = [
+      normalizeInput(matched.employee_first_name),
+      normalizeInput(matched.employee_last_name),
+    ].filter(Boolean).join(' ').trim()
+    const emailPrefix = normalizeInput(matched.login_email).split('@')[0]?.trim() || ''
+    const displayName = employeeName || normalizeInput(matched.display_name) || emailPrefix || nik
+
+    return {
+      success: true as const,
+      internalUserId: matched.id,
+      sessionUserId: normalizeInput(matched.legacy_user_id) || matched.id,
+      displayName: displayName || null,
+      nik: normalizeNik(matched.employee_nik) || normalizeNik(matched.login_nik) || nik,
+      email: normalizeEmail(matched.login_email),
+    }
+  } catch (error) {
+    console.error('verifyInternalAuthNikForOrg failed:', getErrorMessage(error))
+    return {
+      error: resolveInternalAuthDatabaseError(error, 'Gagal memverifikasi login NIK kasir.'),
+    }
+  }
+}
+
 export async function signInWithInternalAuth(input: {
   email?: string | null
   nik?: string | null

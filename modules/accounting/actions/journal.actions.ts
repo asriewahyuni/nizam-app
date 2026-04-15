@@ -436,6 +436,10 @@ export async function getJournalEntries(
   }
 ) {
   const { queryPostgres } = await import('@/lib/db/postgres')
+  const toNumber = (value: unknown) => {
+    const parsed = Number(value ?? 0)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
 
   // Build parameterized query dynamically
   const params: unknown[] = [orgId]
@@ -497,6 +501,8 @@ export async function getJournalEntries(
       if (!linesByEntryId[eid]) linesByEntryId[eid] = []
       linesByEntryId[eid].push({
         ...line,
+        debit: toNumber(line.debit),
+        credit: toNumber(line.credit),
         // UI expects line.accounts?.code, line.accounts?.name, line.accounts?.type
         accounts: line.account_name
           ? { code: line.account_code, name: line.account_name, type: line.account_type }
@@ -514,4 +520,3 @@ export async function getJournalEntries(
     return { ...row, journal_lines: lines }
   })
 }
-

@@ -184,7 +184,6 @@ async function validatePosShiftSession(
   supabase: any,
   orgId: string,
   branchId: string,
-  userId: string,
   payloadSessionId?: string | null
 ) {
   const normalizedSessionId = String(payloadSessionId || '').trim()
@@ -203,12 +202,11 @@ async function validatePosShiftSession(
   }
 
   if (!normalizedSessionId) {
-    const { error } = await (supabase as any)
+    const { data: sessionRow, error } = await (supabase as any)
       .from('pos_shift_sessions')
       .select('id')
       .eq('org_id', orgId)
       .eq('branch_id', branchId)
-      .eq('cashier_user_id', userId)
       .eq('status', 'OPEN')
       .order('opened_at', { ascending: false })
       .limit(1)
@@ -218,7 +216,11 @@ async function validatePosShiftSession(
       return { sessionId: null as string | null }
     }
 
-    return { error: 'Buka shift POS terlebih dahulu sebelum checkout.' }
+    if (error || !sessionRow?.id) {
+      return { error: 'Buka shift POS terlebih dahulu sebelum checkout.' }
+    }
+
+    return { sessionId: String(sessionRow.id) }
   }
 
   const { data: sessionRow, error } = await (supabase as any)
@@ -244,10 +246,6 @@ async function validatePosShiftSession(
     return { error: 'Shift POS tidak berada pada unit aktif.' }
   }
 
-  if (String(sessionRow.cashier_user_id || '') !== userId) {
-    return { error: 'Shift POS aktif terdaftar untuk user lain.' }
-  }
-
   return { sessionId: normalizedSessionId }
 }
 
@@ -264,7 +262,6 @@ export async function processPosTransaction(orgId: string, payload: any) {
     supabase as any,
     orgId,
     activeBranch.id,
-    user.id,
     payload.pos_shift_session_id || null
   )
   if ('error' in posShiftValidation) {

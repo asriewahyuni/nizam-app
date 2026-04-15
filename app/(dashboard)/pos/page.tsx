@@ -5,7 +5,7 @@ import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/or
 import { getProducts } from '@/modules/inventory/actions/inventory.actions'
 import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 import type { ProductWithStock } from '@/modules/inventory/actions/inventory.actions'
-import { getPosShiftSnapshot } from '@/modules/sales/actions/pos-shift.actions'
+import { getPosShiftHistory, getPosShiftSnapshot } from '@/modules/sales/actions/pos-shift.actions'
 import { getPosShiftConfig, isPosShiftFeatureEnabled } from '@/modules/sales/lib/pos-shift'
 
 export default async function POSPage() {
@@ -16,7 +16,7 @@ export default async function POSPage() {
   const orgId = orgData.org.id
   const activeBranch = await getActiveBranch(orgId)
   const posShiftConfig = getPosShiftConfig(orgData.org.settings || {})
-  const [products, warehouses, { data: customers }, { data: accounts }, { data: employeeProfile }, posShiftSnapshot] = await Promise.all([
+  const [products, warehouses, { data: customers }, { data: accounts }, { data: employeeProfile }, posShiftSnapshot, posShiftHistory] = await Promise.all([
     activeBranch ? getProducts(orgId, activeBranch.id) : Promise.resolve([]),
     activeBranch ? getWarehouses(orgId, activeBranch.id) : Promise.resolve([]),
     supabase.from('contacts').select('id, name, phone').eq('org_id', orgId).eq('type', 'CUSTOMER'),
@@ -29,6 +29,9 @@ export default async function POSPage() {
       .maybeSingle(),
     isPosShiftFeatureEnabled(posShiftConfig)
       ? getPosShiftSnapshot(orgId)
+      : Promise.resolve(null),
+    isPosShiftFeatureEnabled(posShiftConfig)
+      ? getPosShiftHistory(orgId)
       : Promise.resolve(null),
   ])
 
@@ -80,6 +83,7 @@ export default async function POSPage() {
       activeBranchName={activeBranch?.name || null}
       posShiftConfig={posShiftConfig}
       posShiftSnapshot={posShiftSnapshot}
+      initialShiftHistory={posShiftHistory}
     />
   )
 }

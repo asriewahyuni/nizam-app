@@ -28,6 +28,11 @@ export default function JournalClient({
   activeBranchId,
   activeBranchName,
 }: JournalClientProps) {
+  const toAmount = (value: unknown) => {
+    const parsed = Number(value ?? 0)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+
   const [entries] = useState<any[]>(initialEntries)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -66,7 +71,7 @@ export default function JournalClient({
     postedCount: entries.filter((e: any) => e.status === 'POSTED').length,
     draftCount: entries.filter((e: any) => e.status === 'DRAFT').length,
     totalVolume: entries.filter((e: any) => e.status === 'POSTED').reduce((sum: number, e: any) => {
-        const debitSum = (e.journal_lines || []).reduce((acc: number, l: any) => acc + (l.debit || 0), 0)
+        const debitSum = (e.journal_lines || []).reduce((acc: number, l: any) => acc + toAmount(l.debit), 0)
         return sum + debitSum
     }, 0),
     voidedToday: entries.filter((e: any) => e.status === 'VOIDED' && e.entry_date === new Date().toISOString().split('T')[0]).length
@@ -345,19 +350,22 @@ export default function JournalClient({
                           <div className="col-span-3 text-right text-emerald-600/50">Debit</div>
                           <div className="col-span-3 text-right text-rose-600/50">Kredit</div>
                         </div>
-                        {entry.journal_lines?.map((line: any) => (
+                        {entry.journal_lines?.map((line: any) => {
+                           const debitAmount = toAmount(line.debit)
+                           const creditAmount = toAmount(line.credit)
+                           return (
                            <div key={line.id} className="grid grid-cols-12 gap-2 text-[10px] items-center border-b border-slate-50 pb-2 pt-0.5 last:border-0 last:pb-0">
                              <div className="col-span-6 font-bold text-slate-600 truncate" title={line.accounts?.name}>
                                {line.accounts?.code} - {line.accounts?.name}
                              </div>
-                             <div className={`col-span-3 text-right font-mono font-black tracking-tight ${line.debit > 0 ? 'text-emerald-600' : 'text-slate-200'}`}>
-                                {line.debit > 0 ? formatRupiah(line.debit) : '-'}
+                             <div className={`col-span-3 text-right font-mono font-black tracking-tight ${debitAmount > 0 ? 'text-emerald-600' : 'text-slate-200'}`}>
+                                {debitAmount > 0 ? formatRupiah(debitAmount) : '-'}
                              </div>
-                             <div className={`col-span-3 text-right font-mono font-black tracking-tight ${line.credit > 0 ? 'text-rose-600' : 'text-slate-200'}`}>
-                                {line.credit > 0 ? formatRupiah(line.credit) : '-'}
+                             <div className={`col-span-3 text-right font-mono font-black tracking-tight ${creditAmount > 0 ? 'text-rose-600' : 'text-slate-200'}`}>
+                                {creditAmount > 0 ? formatRupiah(creditAmount) : '-'}
                              </div>
                            </div>
-                        ))}
+                        )})}
                        </div>
                     </td>
 	                    <td className="px-6 py-6 align-top">
