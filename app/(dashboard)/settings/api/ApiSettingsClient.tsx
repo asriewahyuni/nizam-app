@@ -13,10 +13,9 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Key, Plus, Trash2, Copy, Check, X, Eye, EyeOff, Zap,
-  Settings, ChevronRight, Globe, Shield, Clock, Activity,
-  ArrowDownCircle, ArrowUpCircle, Webhook, RefreshCw, AlertCircle,
-  Code, Lock,
+  Key, Plus, Trash2, Copy, Check, X, Eye, EyeOff,
+  Clock, Activity, ArrowDownCircle, ArrowUpCircle,
+  Webhook, AlertCircle, Code,
 } from 'lucide-react'
 import {
   generateApiKey,
@@ -107,8 +106,20 @@ export function ApiSettingsClient({
   )
   const [showWebhookSecret, setShowWebhookSecret] = useState(false)
 
-  const isOwner = currentRole === 'owner'
   const isAdmin = currentRole === 'owner' || currentRole === 'admin'
+  const cashBankAccounts = initialAccounts.filter((account) =>
+    account.type === 'ASSET' &&
+    (
+      account.code.startsWith('11') ||
+      account.name.toLowerCase().includes('kas') ||
+      account.name.toLowerCase().includes('bank')
+    )
+  )
+  const selectableCashBankAccounts = cashBankAccounts.length > 0
+    ? cashBankAccounts
+    : initialAccounts.filter((account) => account.type === 'ASSET')
+  const revenueAccounts = initialAccounts.filter((account) => account.type === 'REVENUE')
+  const expenseAccounts = initialAccounts.filter((account) => account.type === 'EXPENSE')
 
   // ─────────────────────────────────────────────────────
   // Handlers
@@ -358,7 +369,7 @@ export function ApiSettingsClient({
                 className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 font-bold bg-white"
               >
                 <option value="">— Pilih Akun CoA —</option>
-                {initialAccounts.map(a => (
+                {selectableCashBankAccounts.map(a => (
                   <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
                 ))}
               </select>
@@ -382,7 +393,7 @@ export function ApiSettingsClient({
                   className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 font-bold bg-white"
                 >
                   <option value="">— Pilih Akun Pendapatan —</option>
-                  {initialAccounts.filter(a => a.type === 'REVENUE').map(a => (
+                  {revenueAccounts.map(a => (
                     <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
                   ))}
                 </select>
@@ -442,7 +453,7 @@ export function ApiSettingsClient({
                 className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-50 focus:border-rose-400 font-bold bg-white"
               >
                 <option value="">— Pilih Akun CoA —</option>
-                {initialAccounts.map(a => (
+                {selectableCashBankAccounts.map(a => (
                   <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
                 ))}
               </select>
@@ -466,7 +477,7 @@ export function ApiSettingsClient({
                   className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-rose-50 focus:border-rose-400 font-bold bg-white"
                 >
                   <option value="">— Pilih Akun Beban —</option>
-                  {initialAccounts.filter(a => a.type === 'EXPENSE').map(a => (
+                  {expenseAccounts.map(a => (
                     <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
                   ))}
                 </select>

@@ -19,6 +19,7 @@
  *   - RPC menjalankan SELECT fn(params) dan mengembalikan hasil pertama.
  */
 
+import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
 import { getPostgresPool, queryPostgres } from './postgres'
 
 // ─── FK constraint cache (fetched once from information_schema) ──────────────
@@ -814,6 +815,31 @@ async function callRpc(
   params?: Record<string, unknown>
 ): Promise<QueryResult> {
   try {
+    let authClaimValues: string[] = []
+
+    try {
+      const internalSession = await getInternalAuthSession()
+      const userId = String(internalSession?.user?.id || '').trim()
+      const email = String(internalSession?.user?.email || '').trim()
+
+      if (userId) {
+        const claimPayload = JSON.stringify({
+          sub: userId,
+          role: 'authenticated',
+          ...(email ? { email } : {}),
+        })
+
+        authClaimValues = [
+          userId,
+          'authenticated',
+          claimPayload,
+        ]
+      }
+    } catch {
+      // No request-scoped internal auth session is available (e.g. scripts/cron).
+      // In that case we call the RPC without auth claims injection.
+    }
+
     const args = params ? Object.entries(params) : []
     const paramValues = args.map(([, v]) => {
       if (v instanceof Date) {
@@ -830,10 +856,42 @@ async function callRpc(
 
       return v
     })
+
     // Build: SELECT * FROM fn(p1 => $1, p2 => $2)
     const argStr = args.map(([k], i) => `${k} => $${i + 1}`).join(', ')
     const sql = `SELECT * FROM public."${fnName.replace(/"/g, '""')}"(${argStr})`
-    const result = await queryPostgres<Record<string, unknown>>(sql, paramValues)
+    let result
+
+    if (authClaimValues.length > 0) {
+      const client = await getPostgresPool().connect()
+
+      try {
+        await client.query('BEGIN')
+        await client.query(
+          `
+            SELECT
+              set_config('request.jwt.claim.sub', $1::text, true),
+              set_config('request.jwt.claim.role', $2::text, true),
+              set_config('request.jwt.claims', $3::text, true)
+          `,
+          authClaimValues
+        )
+        result = await client.query<Record<string, unknown>>(sql, paramValues)
+        await client.query('COMMIT')
+      } catch (error) {
+        try {
+          await client.query('ROLLBACK')
+        } catch {
+          // Ignore rollback failures so the original RPC error is preserved.
+        }
+        throw error
+      } finally {
+        client.release()
+      }
+    } else {
+      result = await queryPostgres<Record<string, unknown>>(sql, paramValues)
+    }
+
     if (result.rows.length === 1) {
       const row = result.rows[0]
       const rowKeys = Object.keys(row)

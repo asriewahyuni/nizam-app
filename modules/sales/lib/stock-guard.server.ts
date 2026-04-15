@@ -3,6 +3,11 @@
  * Computes sellable quantity as on-hand branch stock minus other ORDERED SOs.
  */
 
+import {
+  getScopedSalesWarehouses,
+  isWarehousesBranchSchemaMissing,
+} from '@/modules/sales/lib/warehouse-branch-compat.server'
+
 const STOCK_EPSILON = 0.000001
 
 type GuardLineInput = {
@@ -95,23 +100,54 @@ export async function ensureSellableBranchStockAvailability(
 
   if (requirementByProduct.size === 0) return { success: true }
 
-  let stockQuery = (supabase as any)
+  const guardedProductIds = Array.from(requirementByProduct.keys())
+
+  const stockQuery = (supabase as any)
     .from('inventory_stocks')
     .select('product_id, quantity, warehouses!inner(branch_id)')
     .eq('org_id', params.orgId)
     .eq('warehouses.branch_id', params.branchId)
 
-  const { data: stockRows, error: stockError } = await stockQuery.in(
-    'product_id',
-    Array.from(requirementByProduct.keys())
-  )
+  const { data: stockRows, error: stockError } = await stockQuery.in('product_id', guardedProductIds)
 
-  if (stockError) {
-    return { error: 'Gagal membaca stok saat validasi penjualan: ' + stockError.message }
+  let currentStockRows = (stockRows as any[]) || []
+  let currentStockError = stockError
+
+  if (currentStockError && isWarehousesBranchSchemaMissing(currentStockError)) {
+    const { data: legacyStockRows, error: legacyStockError } = await (supabase as any)
+      .from('inventory_stocks')
+      .select('product_id, quantity, warehouse_id')
+      .eq('org_id', params.orgId)
+      .in('product_id', guardedProductIds)
+
+    if (legacyStockError) {
+      return { error: 'Gagal membaca stok saat validasi penjualan: ' + legacyStockError.message }
+    }
+
+    const scopedWarehouses = await getScopedSalesWarehouses(
+      supabase,
+      params.orgId,
+      ((legacyStockRows as any[]) || []).map((row) => String(row?.warehouse_id || '')).filter(Boolean),
+      params.branchId
+    )
+
+    if ('error' in scopedWarehouses) {
+      return { error: 'Gagal membaca gudang saat validasi penjualan: ' + scopedWarehouses.error }
+    }
+
+    const allowedWarehouseIds = new Set(scopedWarehouses.warehouses.map((warehouse) => warehouse.id))
+    currentStockRows = ((legacyStockRows as any[]) || []).filter((row) =>
+      allowedWarehouseIds.has(String(row?.warehouse_id || ''))
+    )
+    currentStockError = null
+  }
+
+  if (currentStockError) {
+    return { error: 'Gagal membaca stok saat validasi penjualan: ' + currentStockError.message }
   }
 
   const onHandByProduct: Record<string, number> = {}
-  for (const row of (stockRows as any[]) || []) {
+  for (const row of currentStockRows) {
     const productId = String((row as any).product_id || '')
     if (!productId) continue
     onHandByProduct[productId] = (onHandByProduct[productId] || 0) + Number((row as any).quantity || 0)
@@ -134,11 +170,11 @@ export async function ensureSellableBranchStockAvailability(
   }
 
   const reservedByProduct: Record<string, number> = {}
-  const guardedProductIds = new Set(requirementByProduct.keys())
+  const guardedProductIdSet = new Set(guardedProductIds)
   for (const sale of (orderedSales as any[]) || []) {
     for (const item of Array.isArray((sale as any)?.sales_items) ? (sale as any).sales_items : []) {
       const productId = String(item?.product_id || '')
-      if (!guardedProductIds.has(productId)) continue
+      if (!guardedProductIdSet.has(productId)) continue
 
       const qty = Number(item?.quantity || 0)
       if (!Number.isFinite(qty) || qty <= 0) continue

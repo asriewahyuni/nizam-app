@@ -76,6 +76,12 @@ function isMissingRpc(error: { code?: string | null; message?: string | null } |
   )
 }
 
+function isMissingColumnError(error: { message?: string | null } | null | undefined) {
+  if (!error) return false
+  const message = String(error.message || '').toLowerCase()
+  return message.includes('column') && message.includes('does not exist')
+}
+
 function mapAccountsWithBalance<T extends { account_id: string }>(
   accounts: T[],
   balancesByAccountId: Map<string, number>
@@ -391,31 +397,66 @@ async function getManagedRecentTransactionsForParent(
   const supabase = await createClient()
   const orgIds = await getConsolidatedOrgIds(parentOrgId)
 
-  const { data, error } = await supabase
-    .from('bank_transactions')
-    .select(`
-      id,
-      org_id,
-      branch_id,
-      bank_account_id,
-      transaction_date,
-      description,
-      amount,
-      type,
-      status,
-      bank_account:bank_accounts(bank_name, account_number),
-      category:accounts(name, code),
-      organization:organizations(name),
-      branch:branches(name)
-    `)
-    .in('org_id', orgIds)
-    .order('transaction_date', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(limit)
+  const detailedSelect = `
+    id,
+    org_id,
+    branch_id,
+    bank_account_id,
+    transaction_date,
+    created_at,
+    updated_at,
+    reference_number,
+    journal_entry_id,
+    description,
+    amount,
+    type,
+    status,
+    bank_account:bank_accounts(bank_name, account_number),
+    category:accounts(name, code),
+    organization:organizations(name),
+    branch:branches(name)
+  `
 
-  if (error || !Array.isArray(data)) return []
+  const legacySelect = `
+    id,
+    org_id,
+    branch_id,
+    bank_account_id,
+    transaction_date,
+    description,
+    amount,
+    type,
+    status,
+    bank_account:bank_accounts(bank_name, account_number),
+    category:accounts(name, code),
+    organization:organizations(name),
+    branch:branches(name)
+  `
 
-  return (data as RecentTransactionRecord[]).map((row) => ({
+  const runQuery = async (selectClause: string) => {
+    return supabase
+      .from('bank_transactions')
+      .select(selectClause)
+      .in('org_id', orgIds)
+      .order('transaction_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(limit)
+  }
+
+  const detailedResult = await runQuery(detailedSelect)
+  let rows: RecentTransactionRecord[] = []
+
+  if (!detailedResult.error && Array.isArray(detailedResult.data)) {
+    rows = detailedResult.data as RecentTransactionRecord[]
+  } else if (isMissingColumnError(detailedResult.error)) {
+    const fallbackResult = await runQuery(legacySelect)
+    if (fallbackResult.error || !Array.isArray(fallbackResult.data)) return []
+    rows = fallbackResult.data as RecentTransactionRecord[]
+  } else {
+    return []
+  }
+
+  return rows.map((row) => ({
     ...row,
     org_name: readRelationName(row.organization),
     branch_name: readRelationName(row.branch),

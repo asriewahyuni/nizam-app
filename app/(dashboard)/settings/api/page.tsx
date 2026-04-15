@@ -30,16 +30,17 @@ export default async function ApiSettingsPage() {
     listWebhookDeliveries(orgData.org.id, 10),
   ])
 
-  // Fetch CoA accounts for cash-in / cash-out mapping (kas & bank types)
+  // Fetch CoA accounts needed by cash-in / cash-out mapping:
+  // asset accounts for kas/bank, plus revenue/expense counter accounts.
   const { createAdminClient } = await import('@/lib/supabase/server')
   let accounts: Array<{ id: string; code: string; name: string; type: string }> = []
   try {
     const admin = await createAdminClient()
-    const { data } = await (admin as any)
+    const { data } = await admin
       .from('accounts')
       .select('id, code, name, type')
       .eq('org_id', orgData.org.id)
-      .in('type', ['ASSET'])
+      .in('type', ['ASSET', 'REVENUE', 'EXPENSE'])
       .eq('is_active', true)
       .order('code', { ascending: true })
     accounts = Array.isArray(data) ? data : []

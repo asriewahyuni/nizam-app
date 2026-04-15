@@ -12,9 +12,6 @@ import {
   Download,
   Filter,
   TrendingUp,
-  TrendingDown,
-  ArrowUpRight,
-  ArrowDownRight,
   Triangle,
   Layers
 } from 'lucide-react'
@@ -34,12 +31,29 @@ interface ReportsClientProps {
     icf: number
     fcf: number
     netChange: number
-    ocfItems?: any[]
-    icfItems?: any[]
-    fcfItems?: any[]
+    ocfItems?: CashFlowItem[]
+    icfItems?: CashFlowItem[]
+    fcfItems?: CashFlowItem[]
     netChangeTrend?: 'UP' | 'DOWN' | 'NEUTRAL'
     changePercent?: number
   }
+}
+
+type CashFlowItemDetail = {
+  entryId: string
+  entryDate: string | null
+  amount: number
+  description: string
+  notes: string | null
+  referenceType: string | null
+  referenceLabel: string | null
+}
+
+type CashFlowItem = {
+  code: string
+  name: string
+  amount: number
+  details?: CashFlowItemDetail[]
 }
 
 interface BalanceTreeRow {
@@ -147,7 +161,7 @@ export default function ReportsClient({
       setTimeout(() => setIsExporting(false), 1500)
     }
   }
-  const [detailModal, setDetailModal] = useState<{ show: boolean, title: string, items: any[] }>({
+  const [detailModal, setDetailModal] = useState<{ show: boolean, title: string, items: CashFlowItem[] }>({
     show: false,
     title: '',
     items: []
@@ -218,7 +232,7 @@ export default function ReportsClient({
     show: { opacity: 1, y: 0 }
   }
   
-  const openDetail = (title: string, items: any[]) => {
+  const openDetail = (title: string, items: CashFlowItem[]) => {
     setDetailModal({ show: true, title, items })
   }
 
@@ -266,7 +280,7 @@ export default function ReportsClient({
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Laporan Keuangan</h1>
-          <p className="text-sm text-slate-500 font-medium">Laporan real-time yang dihasilkan otomatis dari Buku Besar.</p>
+          <p className="text-sm text-slate-500 font-medium">Laporan real-time yang dihasilkan otomatis dari Buku Besar untuk {orgName}.</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
@@ -617,17 +631,58 @@ export default function ReportsClient({
                 {detailModal.items.length === 0 ? (
                   <div className="py-10 text-center text-slate-300 font-bold italic">Tidak ada data penyusun.</div>
                 ) : (
-                  detailModal.items.sort((a,b) => Math.abs(b.amount) - Math.abs(a.amount)).map((it: any) => (
-                    <div key={`${it.code}-${it.name}`} className="flex justify-between items-center p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                      <div className="space-y-0.5">
-                        <p className="text-[10px] font-black text-slate-400 font-mono tracking-tighter">{it.code}</p>
-                        <p className="text-xs font-bold text-slate-700">{it.name}</p>
+                  [...detailModal.items]
+                    .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
+                    .map((it) => (
+                      <div key={`${it.code}-${it.name}`} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-0.5">
+                            <p className="text-[10px] font-black text-slate-400 font-mono tracking-tighter">{it.code}</p>
+                            <p className="text-xs font-bold text-slate-700">{it.name}</p>
+                          </div>
+                          <div className={`shrink-0 text-sm font-black ${it.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {it.amount >= 0 ? '+' : ''}{formatRupiah(it.amount)}
+                          </div>
+                        </div>
+
+                        {Array.isArray(it.details) && it.details.length > 0 && (
+                          <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
+                            {it.details.map((detail) => (
+                              <div key={`${it.code}-${detail.entryId}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0 space-y-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      {detail.referenceLabel && (
+                                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-blue-700">
+                                          {detail.referenceLabel}
+                                        </span>
+                                      )}
+                                      {detail.entryDate && (
+                                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
+                                          {formatDate(detail.entryDate, 'short')}
+                                        </span>
+                                      )}
+                                      {!detail.referenceLabel && detail.referenceType && (
+                                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-amber-700">
+                                          {detail.referenceType.replaceAll('_', ' ')}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[11px] font-bold leading-relaxed text-slate-700">{detail.description}</p>
+                                    {detail.notes && (
+                                      <p className="text-[10px] font-medium leading-relaxed text-slate-500">{detail.notes}</p>
+                                    )}
+                                  </div>
+                                  <div className={`shrink-0 text-[11px] font-black ${detail.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    {detail.amount >= 0 ? '+' : ''}{formatRupiah(detail.amount)}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <div className={`text-sm font-black ${it.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {it.amount >= 0 ? '+' : ''}{formatRupiah(it.amount)}
-                      </div>
-                    </div>
-                  ))
+                    ))
                 )}
               </div>
 

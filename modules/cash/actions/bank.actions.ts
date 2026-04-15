@@ -76,6 +76,12 @@ function isMissingRpc(error: { code?: string | null; message?: string | null } |
   )
 }
 
+function isMissingColumnError(error: { message?: string | null } | null | undefined) {
+  if (!error) return false
+  const message = String(error.message || '').toLowerCase()
+  return message.includes('column') && message.includes('does not exist')
+}
+
 function decorateCashAccountsWithBalance<T extends CashBankAccountRecord & {
   branch?: NamedRelation
   organization?: NamedRelation
@@ -524,36 +530,69 @@ export async function getRecentBankTransactions(
 ): Promise<RecentTransactionOption[]> {
   const supabase = await createClient()
 
-  let query = (supabase as any)
-    .from('bank_transactions')
-    .select(`
-      id,
-      org_id,
-      branch_id,
-      bank_account_id,
-      transaction_date,
-      description,
-      amount,
-      type,
-      status,
-      bank_account:bank_accounts(bank_name, account_number),
-      category:accounts(name, code)
-    `)
-    .eq('org_id', orgId)
+  const detailedSelect = `
+    id,
+    org_id,
+    branch_id,
+    bank_account_id,
+    transaction_date,
+    created_at,
+    updated_at,
+    reference_number,
+    journal_entry_id,
+    description,
+    amount,
+    type,
+    status,
+    bank_account:bank_accounts(bank_name, account_number),
+    category:accounts(name, code)
+  `
 
+  const legacySelect = `
+    id,
+    org_id,
+    branch_id,
+    bank_account_id,
+    transaction_date,
+    description,
+    amount,
+    type,
+    status,
+    bank_account:bank_accounts(bank_name, account_number),
+    category:accounts(name, code)
+  `
+
+  let resolvedBranchId: string | null = null
   if (branchId) {
     const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
     if ('error' in branchSelection || !branchSelection.branchId) return []
-    query = query.eq('branch_id', branchSelection.branchId)
+    resolvedBranchId = branchSelection.branchId
   }
 
-  const { data, error } = await query
-    .order('transaction_date', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(limit)
+  const runQuery = async (selectClause: string) => {
+    let query = (supabase as any)
+      .from('bank_transactions')
+      .select(selectClause)
+      .eq('org_id', orgId)
 
-  if (error) return []
-  return data as RecentTransactionOption[]
+    if (resolvedBranchId) query = query.eq('branch_id', resolvedBranchId)
+
+    return query
+      .order('transaction_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(limit)
+  }
+
+  const detailedResult = await runQuery(detailedSelect)
+  if (!detailedResult.error && Array.isArray(detailedResult.data)) {
+    return detailedResult.data as RecentTransactionOption[]
+  }
+
+  if (!isMissingColumnError(detailedResult.error)) return []
+
+  const fallbackResult = await runQuery(legacySelect)
+  if (fallbackResult.error || !Array.isArray(fallbackResult.data)) return []
+  return fallbackResult.data as RecentTransactionOption[]
 }
 
 // ─────────────────────────────────────────────────────────────

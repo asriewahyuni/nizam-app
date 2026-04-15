@@ -39,6 +39,10 @@ export type RecentTransactionOption = {
   branch_id: string | null
   bank_account_id: string
   transaction_date: string
+  created_at?: string | null
+  updated_at?: string | null
+  reference_number?: string | null
+  journal_entry_id?: string | null
   description: string
   amount: number
   type: string

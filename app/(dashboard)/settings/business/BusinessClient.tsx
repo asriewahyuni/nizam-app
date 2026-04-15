@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { Settings, Save, Fingerprint, Building, Receipt, FileText, Upload, Check, AlertCircle, Plus, Trash2, Link as LinkIcon, Copy, X, Key, ShieldCheck, Clock, Zap, RotateCcw } from 'lucide-react'
+import { Settings, Save, Fingerprint, Building, Receipt, FileText, Upload, Check, AlertCircle, Plus, Trash2, Link as LinkIcon, Copy, X, Key, ShieldCheck, Clock, Zap, RotateCcw, MessageCircle } from 'lucide-react'
 import { updateOrgSettings, uploadLogo, checkSlugAvailability } from '@/modules/organization/actions/org.actions'
 import { resetOrganizationData, type ResetOrganizationMode } from '@/modules/settings/actions/audit.actions'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -53,6 +53,11 @@ export default function BusinessClient({
       po_format: (formData.get('po_format') as string) || 'PO-{YYYY}{MM}-{0000}',
       so_format: (formData.get('so_format') as string) || 'SO/{YY}/{MM}/{000}',
       inv_format: (formData.get('inv_format') as string) || 'INV/NIZ/{YYYY}/{0000}',
+      pos_wa_custom_message: (formData.get('pos_wa_custom_message') as string) || '',
+      pos_require_open_shift: formData.get('pos_require_open_shift') === 'on',
+      pos_enable_shift_settlement: formData.get('pos_enable_shift_settlement') === 'on',
+      pos_default_register_code: (formData.get('pos_default_register_code') as string) || 'REG-1',
+      pos_variance_approval_threshold: Number(formData.get('pos_variance_approval_threshold') || 0) || 0,
     }
     
     const logoUrl = formData.get('logo_url') as string
@@ -294,6 +299,99 @@ export default function BusinessClient({
               <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Alamat Headquarter</label>
               <textarea name="company_address" defaultValue={String(settings.company_address ?? '')} placeholder="Jl..." className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold min-h-[100px]" />
            </div>
+        </div>
+
+        <div className="space-y-8">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
+              <MessageCircle size={20} className="text-slate-400" /> Template WhatsApp POS
+            </h3>
+          </div>
+
+          <div className="rounded-[32px] border border-emerald-100 bg-emerald-50/40 p-8 shadow-inner space-y-4">
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Pesan Tambahan Default</label>
+              <textarea
+                name="pos_wa_custom_message"
+                defaultValue={String(settings.pos_wa_custom_message ?? '')}
+                placeholder="Contoh: Terima kasih Kak {customer_name}. Simpan nomor ini untuk info promo berikutnya."
+                className="w-full min-h-[140px] px-5 py-4 text-sm border border-slate-200 rounded-[28px] outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 font-medium bg-white"
+              />
+            </div>
+            <p className="text-[11px] font-medium text-slate-500 leading-6">
+              Template ini otomatis muncul di POS saat kasir mengirim struk WhatsApp. Placeholder yang didukung:
+              {' '}<code>{'{customer_name}'}</code>, <code>{'{sale_id}'}</code>, <code>{'{item_count}'}</code>, <code>{'{subtotal}'}</code>, <code>{'{discount}'}</code>, <code>{'{tax}'}</code>, dan <code>{'{total}'}</code>.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
+              <Clock size={20} className="text-slate-400" /> Operasional Shift POS
+            </h3>
+          </div>
+
+          <div className="rounded-[32px] border border-blue-100 bg-blue-50/40 p-8 shadow-inner space-y-6">
+            <label className="flex items-start gap-4 rounded-3xl border border-slate-200 bg-white px-5 py-4 cursor-pointer">
+              <input
+                type="checkbox"
+                name="pos_require_open_shift"
+                defaultChecked={Boolean(settings.pos_require_open_shift)}
+                className="mt-1 h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-black text-slate-900">Wajib Buka Shift Sebelum Checkout POS</span>
+                <span className="block text-[11px] font-medium text-slate-500 leading-6">
+                  Jika aktif, checkout POS akan terkunci sampai kasir membuka shift terlebih dahulu. Aman untuk rollout bertahap karena default-nya tetap nonaktif.
+                </span>
+              </span>
+            </label>
+
+            <label className="flex items-start gap-4 rounded-3xl border border-slate-200 bg-white px-5 py-4 cursor-pointer">
+              <input
+                type="checkbox"
+                name="pos_enable_shift_settlement"
+                defaultChecked={Boolean(settings.pos_enable_shift_settlement)}
+                className="mt-1 h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-black text-slate-900">Aktifkan Settlement Shift ke Jurnal</span>
+                <span className="block text-[11px] font-medium text-slate-500 leading-6">
+                  Menampilkan modal settlement di POS untuk memindahkan saldo kas/clearing shift ke akun tujuan secara terposting.
+                </span>
+              </span>
+            </label>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Kode Register Default</label>
+                <input
+                  name="pos_default_register_code"
+                  defaultValue={String(settings.pos_default_register_code ?? 'REG-1')}
+                  placeholder="REG-1"
+                  className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold bg-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Ambang Selisih Kas</label>
+                <input
+                  name="pos_variance_approval_threshold"
+                  type="number"
+                  min="0"
+                  defaultValue={String(settings.pos_variance_approval_threshold ?? 0)}
+                  placeholder="0"
+                  className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+              <p className="text-[11px] font-bold text-indigo-700 leading-relaxed">
+                Pola rollout aman: aktifkan dulu <code>Wajib Buka Shift</code> pada satu cabang pilot, lalu nyalakan <code>Settlement</code> setelah akun kas/clearing cabang tersebut sudah siap.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-8">

@@ -4,6 +4,8 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getActiveBranch } from '@/modules/organization/actions/org.actions'
 import { getDateInTimeZone } from '@/lib/utils'
+import { getPosShiftConfig, isPosShiftSchemaMissing } from '@/modules/sales/lib/pos-shift'
+import { listActiveSalesWarehouses } from '@/modules/sales/lib/warehouse-branch-compat.server'
 
 type PosStockRequirement = {
   productId: string
@@ -28,28 +30,25 @@ async function resolvePosWarehouseId(
   branchId: string,
   explicitWarehouseId?: string | null
 ) {
-  let query = (supabase as any)
-    .from('warehouses')
-    .select('id, name')
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .eq('branch_id', branchId)
+  const warehousesResult = await listActiveSalesWarehouses(supabase, orgId, branchId, {
+    warehouseId: explicitWarehouseId,
+    limit: explicitWarehouseId ? undefined : 2,
+  })
 
-  if (explicitWarehouseId) {
-    const { data, error } = await query.eq('id', explicitWarehouseId).maybeSingle()
-    if (error || !data) {
-      return { error: 'Gudang POS tidak tersedia pada unit aktif.' }
-    }
-
-    return { warehouseId: data.id }
-  }
-
-  const { data, error } = await query.order('name', { ascending: true }).limit(2)
-  if (error) {
+  if ('error' in warehousesResult) {
     return { error: 'Gagal memuat gudang POS.' }
   }
 
-  const warehouses = (data as Array<{ id: string }>) || []
+  const warehouses = warehousesResult.warehouses
+
+  if (explicitWarehouseId) {
+    if (!warehouses[0]?.id) {
+      return { error: 'Gudang POS tidak tersedia pada unit aktif.' }
+    }
+
+    return { warehouseId: warehouses[0].id }
+  }
+
   if (warehouses.length === 0) {
     return { error: 'Belum ada gudang aktif di unit ini. Tambahkan gudang terlebih dahulu sebelum memakai POS.' }
   }
@@ -181,6 +180,77 @@ async function trySyncMembershipRoleFromEmployee(
   }
 }
 
+async function validatePosShiftSession(
+  supabase: any,
+  orgId: string,
+  branchId: string,
+  userId: string,
+  payloadSessionId?: string | null
+) {
+  const normalizedSessionId = String(payloadSessionId || '').trim()
+
+  const { data: orgRow } = await (supabase as any)
+    .from('organizations')
+    .select('settings')
+    .eq('id', orgId)
+    .maybeSingle()
+
+  const config = getPosShiftConfig(orgRow?.settings)
+  const requiresOpenShift = config.requireOpenShift
+
+  if (!normalizedSessionId && !requiresOpenShift) {
+    return { sessionId: null as string | null }
+  }
+
+  if (!normalizedSessionId) {
+    const { error } = await (supabase as any)
+      .from('pos_shift_sessions')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('branch_id', branchId)
+      .eq('cashier_user_id', userId)
+      .eq('status', 'OPEN')
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (isPosShiftSchemaMissing(error)) {
+      return { sessionId: null as string | null }
+    }
+
+    return { error: 'Buka shift POS terlebih dahulu sebelum checkout.' }
+  }
+
+  const { data: sessionRow, error } = await (supabase as any)
+    .from('pos_shift_sessions')
+    .select('id, status, branch_id, cashier_user_id')
+    .eq('org_id', orgId)
+    .eq('id', normalizedSessionId)
+    .maybeSingle()
+
+  if (isPosShiftSchemaMissing(error)) {
+    return { sessionId: null as string | null }
+  }
+
+  if (error || !sessionRow?.id) {
+    return { error: 'Shift POS tidak ditemukan. Muat ulang halaman lalu buka shift baru.' }
+  }
+
+  if (String(sessionRow.status || '').toUpperCase() !== 'OPEN') {
+    return { error: 'Shift POS sudah ditutup. Buka shift baru sebelum melanjutkan transaksi.' }
+  }
+
+  if (String(sessionRow.branch_id || '') !== branchId) {
+    return { error: 'Shift POS tidak berada pada unit aktif.' }
+  }
+
+  if (String(sessionRow.cashier_user_id || '') !== userId) {
+    return { error: 'Shift POS aktif terdaftar untuk user lain.' }
+  }
+
+  return { sessionId: normalizedSessionId }
+}
+
 export async function processPosTransaction(orgId: string, payload: any) {
   const supabase = await createClient()
   const { data: { user } } = await (supabase as any).auth.getUser()
@@ -189,6 +259,18 @@ export async function processPosTransaction(orgId: string, payload: any) {
   if (!activeBranch) {
     return { error: 'Pilih unit aktif terlebih dahulu untuk memproses transaksi POS.' }
   }
+
+  const posShiftValidation = await validatePosShiftSession(
+    supabase as any,
+    orgId,
+    activeBranch.id,
+    user.id,
+    payload.pos_shift_session_id || null
+  )
+  if ('error' in posShiftValidation) {
+    return { error: posShiftValidation.error }
+  }
+  const posShiftSessionId = posShiftValidation.sessionId
 
   const productIds = [...new Set((payload.lines || []).map((line: any) => line.product_id).filter(Boolean))]
   let requiresWarehouse = false
@@ -301,31 +383,61 @@ export async function processPosTransaction(orgId: string, payload: any) {
   const taxAmount = payload.tax_amount || 0
   const discountAmount = payload.discount_amount || 0
   const grandTotal = totalAmount + taxAmount - discountAmount
-  
-  const { data: sale, error: saleErr } = await (supabase as any)
+
+  const normalizedPaymentMethod = String(payload.payment_method || '').trim().toUpperCase() || null
+  const posAmountTendered = Number(payload.amount_tendered)
+  const posChangeAmount = Number(payload.change_amount)
+  const baseSaleInsertPayload = {
+    org_id: orgId,
+    branch_id: activeBranch.id,
+    warehouse_id: resolvedWarehouseId,
+    customer_id: finalCustomerId,
+    sale_date: new Date().toISOString().split('T')[0],
+    due_date: new Date().toISOString().split('T')[0],
+    payment_term: 'CASH',
+    total_amount: totalAmount,
+    tax_amount: taxAmount,
+    discount_amount: discountAmount,
+    grand_total: grandTotal,
+    shariah_mode: 'CASH',
+    notes: payload.notes || 'POS Transaction',
+    created_by: user.id,
+    status: 'DRAFT',
+    payment_status: 'PAID',
+  }
+
+  let sale: { id: string } | null = null
+  let saleErr: { code?: string | null; message?: string | null } | null = null
+
+  const saleWithPosMetadata = {
+    ...baseSaleInsertPayload,
+    pos_session_id: posShiftSessionId,
+    pos_payment_method: normalizedPaymentMethod,
+    pos_amount_tendered: Number.isFinite(posAmountTendered) ? posAmountTendered : null,
+    pos_change_amount: Number.isFinite(posChangeAmount) ? posChangeAmount : 0,
+  }
+
+  const saleInsertWithMetadata = await (supabase as any)
     .from('sales' as any)
-    .insert({
-      org_id: orgId,
-      branch_id: activeBranch.id,
-      warehouse_id: resolvedWarehouseId,
-      customer_id: finalCustomerId,
-      sale_date: new Date().toISOString().split('T')[0],
-      due_date: new Date().toISOString().split('T')[0],
-      payment_term: 'CASH',
-      total_amount: totalAmount,
-      tax_amount: taxAmount,
-      discount_amount: discountAmount,
-      grand_total: grandTotal,
-      shariah_mode: 'CASH',
-      notes: payload.notes || 'POS Transaction',
-      created_by: user.id,
-      status: 'DRAFT',
-      payment_status: 'PAID'
-    })
+    .insert(saleWithPosMetadata)
     .select('id')
     .single()
 
-  if (saleErr) return { error: saleErr.message }
+  sale = saleInsertWithMetadata.data || null
+  saleErr = saleInsertWithMetadata.error || null
+
+  if (saleErr && isPosShiftSchemaMissing(saleErr)) {
+    const fallbackSaleInsert = await (supabase as any)
+      .from('sales' as any)
+      .insert(baseSaleInsertPayload)
+      .select('id')
+      .single()
+
+    sale = fallbackSaleInsert.data || null
+    saleErr = fallbackSaleInsert.error || null
+  }
+
+  if (saleErr || !sale?.id) return { error: saleErr?.message || 'Gagal membuat transaksi POS.' }
 
   const salesItemPayload = payload.lines.map((l: any) => ({
     org_id: orgId,

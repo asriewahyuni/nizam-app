@@ -13,12 +13,41 @@ import { QRCodeSVG } from 'qrcode.react'
 
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
-import { formatRupiah } from '@/lib/utils'
+import { formatDate, formatRupiah } from '@/lib/utils'
 import { getCommissionSchemeLabel, getResellerDisplayName, getResellerSubtitle } from '@/modules/sales/lib/commission'
 
 function pickRelation<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
+}
+
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+function normalizeDateInputValue(value: unknown): string {
+  if (!value) return ''
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return ''
+    if (DATE_ONLY_PATTERN.test(trimmed)) return trimmed
+
+    const parsed = new Date(trimmed)
+    if (Number.isNaN(parsed.getTime())) return ''
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return ''
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+  }
+
+  const normalized = String(value).trim()
+  if (!normalized) return ''
+  if (DATE_ONLY_PATTERN.test(normalized)) return normalized
+
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
 }
 
 export default function SalesClient({
@@ -214,8 +243,8 @@ export default function SalesClient({
     setEditingDraftSaleId(String(sale.id))
     setCustomerId(String(sale.customer_id || ''))
     setResellerId(String(sale.reseller_id || ''))
-    setSaleDate(String(sale.sale_date || new Date().toISOString().split('T')[0]))
-    setDueDate(sale?.due_date ? String(sale.due_date) : '')
+    setSaleDate(normalizeDateInputValue(sale.sale_date) || new Date().toISOString().split('T')[0])
+    setDueDate(normalizeDateInputValue(sale?.due_date))
     setNotes(String(sale?.notes || ''))
     setPaymentTerm(nextPaymentTerm)
     setPaymentAccountId(String(sale?.payment_account_id || ''))
@@ -593,7 +622,7 @@ export default function SalesClient({
   }
 
   const stats = {
-    omzetMonth: sales.filter((s: any) => s.status !== 'VOIDED' && s.sale_date.startsWith(new Date().toISOString().slice(0, 7))).reduce((sum: number, s: any) => sum + s.grand_total, 0),
+    omzetMonth: sales.filter((s: any) => s.status !== 'VOIDED' && normalizeDateInputValue(s.sale_date).startsWith(new Date().toISOString().slice(0, 7))).reduce((sum: number, s: any) => sum + s.grand_total, 0),
     receivables: sales.filter((s: any) => s.status === 'FINISHED' && s.payment_status !== 'PAID').reduce((sum: number, s: any) => {
       const activeReturns = s.sales_returns?.filter((r: any) => r.status !== 'VOIDED') || []
       const ret = activeReturns.reduce((acc: number, r: any) => acc + Number(r.grand_total), 0) || 0
@@ -700,7 +729,7 @@ export default function SalesClient({
                        <button onClick={() => setViewSale(s)} className="text-xs font-black text-blue-600 tracking-tighter hover:underline">
                          {s.sale_number}
                        </button>
-                       <div className="text-[10px] font-bold text-slate-400 mt-1">{s.sale_date}</div>
+                       <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(s.sale_date, 'short')}</div>
                     </td>
                     <td className="px-8 py-6">
                        <div className="text-sm font-bold text-slate-900">{s.contacts?.name || 'Unknown Client'}</div>
@@ -1415,7 +1444,7 @@ export default function SalesClient({
                       </div>
                       <div className="text-right">
                          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">Tanggal & Status</p>
-                         <p className="font-bold text-slate-900 mb-1">{viewSale.sale_date} {viewSale.due_date ? `| Tempo: ${viewSale.due_date}` : ''}</p>
+                         <p className="font-bold text-slate-900 mb-1">{formatDate(viewSale.sale_date, 'long')} {viewSale.due_date ? `| Tempo: ${formatDate(viewSale.due_date, 'long')}` : ''}</p>
                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border border-blue-200 bg-blue-50 text-blue-600`}>{viewSale.status === 'FINISHED' ? 'DELIVERED' : viewSale.status}</span>
                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border border-emerald-200 bg-emerald-50 text-emerald-600 ml-1 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>{viewSale.payment_status}</span>
                       </div>
@@ -1666,12 +1695,12 @@ export default function SalesClient({
       <div className="fixed bottom-8 right-8 z-[100] flex flex-col gap-2">
         <AnimatePresence>
           {error && (
-            <motion.div initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-red-50 border border-red-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-red-600 text-sm font-bold">
+            <motion.div key="sales-error-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-red-50 border border-red-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-red-600 text-sm font-bold">
               <AlertCircle size={18} /> {error}
             </motion.div>
           )}
           {success && (
-            <motion.div initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-emerald-50 border border-emerald-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
+            <motion.div key="sales-success-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-emerald-50 border border-emerald-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
               <CheckCircle2 size={18} /> {success}
             </motion.div>
           )}
