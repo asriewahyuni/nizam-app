@@ -34,6 +34,7 @@ const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 const DEFAULT_BRANCH_NAME = 'Unit Utama'
 const DEFAULT_BRANCH_CODE = 'MAIN'
 const DEMO_ACCOUNT_EMAIL = 'demo@nizam.app'
+const DEMO_SESSION_COOKIE_MAX_AGE = 60 * 60 * 12
 
 async function getAuthenticatedUserFromSupabaseOrInternal(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
@@ -842,8 +843,31 @@ async function createOrganizationRecord(
     }
 
     if (!preserveParentContext) {
+      if (isDemo) {
+        cookieStore.set('nizam_demo_org_id', orgId, {
+          maxAge: DEMO_SESSION_COOKIE_MAX_AGE,
+          path: '/',
+          httpOnly: true,
+          sameSite: 'lax',
+        })
+      } else {
+        cookieStore.delete('nizam_demo_org_id')
+      }
+
       cookieStore.set(ACTIVE_ORG_COOKIE, orgId, getActiveContextCookieOptions())
-      cookieStore.set(ACTIVE_BRANCH_COOKIE, defaultBranchId, getActiveContextCookieOptions())
+      cookieStore.set(
+        ACTIVE_BRANCH_COOKIE,
+        defaultBranchId,
+        isDemo
+          ? {
+              maxAge: DEMO_SESSION_COOKIE_MAX_AGE,
+              path: '/',
+              httpOnly: true,
+              sameSite: 'lax',
+              secure: process.env.NODE_ENV === 'production',
+            }
+          : getActiveContextCookieOptions()
+      )
     }
 
     return {
