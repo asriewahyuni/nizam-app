@@ -8,6 +8,7 @@ import {
   ArrowUpRight, 
   ArrowDownRight, 
   ArrowRightLeft,
+  ChevronDown,
   ChevronRight,
   MoreVertical,
   AlertCircle,
@@ -64,6 +65,21 @@ function isFinancingTransferAccount(account: Pick<TransferCategoryOption, 'code'
       code.startsWith('3')
     )
   )
+}
+
+function formatDateTime(date: string | null | undefined): string {
+  if (!date) return '-'
+  const parsedDate = new Date(date)
+  if (Number.isNaN(parsedDate.getTime())) return '-'
+
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(parsedDate)
 }
 
 interface CashClientProps {
@@ -170,6 +186,7 @@ export function CashClient({
   const [isCategoryLocked, setIsCategoryLocked] = useState(false)
   const [filterStatus, setFilterStatus] = useState<'POSTED' | 'VOIDED'>('POSTED')
   const [filterAccountId, setFilterAccountId] = useState<string | null>(null)
+  const [expandedTransactionId, setExpandedTransactionId] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const categoryNodeByOrg = new Map(transferCategoryNodes.map((node) => [node.orgId, node]))
@@ -221,6 +238,26 @@ export function CashClient({
     : activeBranchName
       ? `unit aktif ${activeBranchName}`
       : 'unit aktif parent yang sedang dipilih'
+  const filteredTransactions = recentTransactions.filter(
+    (transaction) => transaction.status === filterStatus && (!filterAccountId || transaction.bank_account_id === filterAccountId)
+  )
+  const transactionSummaryByAccountId = recentTransactions.reduce<Record<string, { total: number; posted: number; voided: number }>>((accumulator, transaction) => {
+    const currentSummary = accumulator[transaction.bank_account_id] || { total: 0, posted: 0, voided: 0 }
+    const postedCount = currentSummary.posted + (transaction.status === 'POSTED' ? 1 : 0)
+    const voidedCount = currentSummary.voided + (transaction.status === 'VOIDED' ? 1 : 0)
+    accumulator[transaction.bank_account_id] = {
+      total: currentSummary.total + 1,
+      posted: postedCount,
+      voided: voidedCount,
+    }
+    return accumulator
+  }, {})
+  const hasPostedTransactionsInScope = recentTransactions.some(
+    (transaction) => transaction.status === 'POSTED' && (!filterAccountId || transaction.bank_account_id === filterAccountId)
+  )
+  const hasVoidedTransactionsInScope = recentTransactions.some(
+    (transaction) => transaction.status === 'VOIDED' && (!filterAccountId || transaction.bank_account_id === filterAccountId)
+  )
 
   const handleCashViewChange = (nextMode: CashViewMode) => {
     if (!canUseHoldingView || nextMode === cashViewMode) return
@@ -563,6 +600,13 @@ export function CashClient({
                   const isCrossEntity = acc.org_id !== orgId
                   const showScopeBadge = isCrossEntity || (isAllBranchesView && Boolean(acc.branch_name))
                   const canOpenDetails = !isCrossEntity || isHoldingView
+                  const accountMutationSummary = transactionSummaryByAccountId[acc.id] || { total: 0, posted: 0, voided: 0 }
+                  const hasPostedMutations = accountMutationSummary.posted > 0
+                  const hasVoidedMutations = accountMutationSummary.voided > 0
+                  const accountMutationCount = accountMutationSummary.total
+                  const detailCountLabel = hasPostedMutations
+                    ? `${accountMutationSummary.posted} posted${hasVoidedMutations ? ` • ${accountMutationSummary.voided} voided` : ''}`
+                    : `${accountMutationSummary.voided} voided`
                   return (
                     <motion.div
                       key={acc.id}
@@ -607,15 +651,25 @@ export function CashClient({
                           <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-4 py-2 rounded-xl border border-blue-100">
                             Lintas Entitas
                           </span>
+                        ) : accountMutationCount === 0 ? (
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-100 px-4 py-2 rounded-xl border border-slate-200">
+                            Belum ada mutasi
+                          </span>
                         ) : (
                           <button
                             onClick={() => {
                               setFilterAccountId(acc.id)
+                              setExpandedTransactionId(null)
+                              if (!hasPostedMutations && hasVoidedMutations) {
+                                setFilterStatus('VOIDED')
+                              } else {
+                                setFilterStatus('POSTED')
+                              }
                               document.getElementById('recent-activities')?.scrollIntoView({ behavior: 'smooth' })
                             }}
                             className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-2 uppercase tracking-widest bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100"
                           >
-                            Mutasi Detail <ChevronRight size={14} strokeWidth={3} />
+                            Mutasi Detail ({detailCountLabel}) <ChevronRight size={14} strokeWidth={3} />
                           </button>
                         )}
                         <div className="relative group/menu">
@@ -655,7 +709,10 @@ export function CashClient({
                       <div className="flex items-center gap-2">
                         {filterAccountId && (
                           <button
-                            onClick={() => setFilterAccountId(null)}
+                            onClick={() => {
+                              setFilterAccountId(null)
+                              setExpandedTransactionId(null)
+                            }}
                             className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 rounded-lg shadow-sm border border-emerald-100 hover:bg-emerald-100 transition-colors"
                           >
                             Semua Rekening
@@ -663,12 +720,18 @@ export function CashClient({
                         )}
                         <div className="flex bg-white/50 p-1 rounded-xl border border-slate-100 shadow-sm">
                          <button
-                            onClick={() => setFilterStatus('POSTED')}
+                            onClick={() => {
+                              setFilterStatus('POSTED')
+                              setExpandedTransactionId(null)
+                            }}
                             className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${filterStatus === 'POSTED' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
                             POSTED
                          </button>
                          <button
-                            onClick={() => setFilterStatus('VOIDED')}
+                            onClick={() => {
+                              setFilterStatus('VOIDED')
+                              setExpandedTransactionId(null)
+                            }}
                             className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${filterStatus === 'VOIDED' ? 'bg-white text-rose-600 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
                             VOIDED
                          </button>
@@ -687,61 +750,158 @@ export function CashClient({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                          {recentTransactions.filter(t => t.status === filterStatus && (!filterAccountId || t.bank_account_id === filterAccountId)).length === 0 ? (
+                          {filteredTransactions.length === 0 ? (
                             <tr>
                               <td colSpan={4} className="py-40 text-center">
                                 <div className="flex flex-col items-center gap-3 opacity-40">
                                   <History size={40} className="text-slate-400" />
-                                  <span className="text-xs font-black uppercase tracking-widest">Tidak ada transaksi {filterStatus.toLowerCase()}</span>
+                                  <span className="text-xs font-black uppercase tracking-widest">
+                                    {filterStatus === 'POSTED' && !hasPostedTransactionsInScope && hasVoidedTransactionsInScope
+                                      ? (filterAccountId
+                                          ? 'Tidak ada mutasi posted untuk rekening ini. Ada mutasi voided, pindah ke tab VOIDED.'
+                                          : 'Tidak ada transaksi posted. Ada transaksi voided, pindah ke tab VOIDED.')
+                                      : (filterAccountId
+                                          ? `Belum ada mutasi ${filterStatus.toLowerCase()} untuk rekening ini`
+                                          : `Tidak ada transaksi ${filterStatus.toLowerCase()}`)}
+                                  </span>
                                 </div>
                               </td>
                             </tr>
                           ) : (
-                            recentTransactions.filter(t => t.status === filterStatus && (!filterAccountId || t.bank_account_id === filterAccountId)).map((tx) => (
-                             <tr key={tx.id} className="hover:bg-slate-50/80 transition-all group">
-                                <td className="px-8 py-6 align-top">
-                                  <div className="flex flex-col">
-                                    <span className="text-xs font-black text-slate-900 font-mono italic">#{tx.id.substring(0,6)}</span>
-                                    <span className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(tx.transaction_date, 'short')}</span>
-                                  </div>
-                                </td>
-                                <td className="px-8 py-6 align-top">
-                                   <div className="flex flex-col gap-1.5">
-                                      <span className="text-sm font-black text-slate-900 leading-tight">{tx.description}</span>
-                                      <div className="flex items-center gap-2">
-                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded text-[9px] font-black text-slate-500 uppercase">
-                                          <Building size={10} /> {tx.bank_account?.bank_name || 'Rekening'}
-                                        </div>
-                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 rounded text-[9px] font-black text-indigo-500 uppercase">
-                                          <Activity size={10} /> {tx.category?.name || 'Uncategorized'}
-                                        </div>
-                                        {isHoldingView && (tx.org_name || tx.org_id !== orgId) ? (
-                                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded text-[9px] font-black text-emerald-600 uppercase">
-                                            <Building2 size={10} /> {tx.org_name || 'Entitas'}{tx.branch_name ? ` / ${tx.branch_name}` : ''}
-                                          </div>
-                                        ) : null}
+                            filteredTransactions.map((tx) => {
+                              const isExpanded = expandedTransactionId === tx.id
+                              const transactionTypeLabel = tx.type === 'IN'
+                                ? 'Kas Masuk'
+                                : tx.type === 'OUT'
+                                  ? 'Kas Keluar'
+                                  : 'Transfer'
+                              const categoryDetail = tx.category?.code
+                                ? `${tx.category.code} • ${tx.category.name || 'Tanpa Nama Akun'}`
+                                : (tx.category?.name || '-')
+                              const accountLabel = tx.bank_account?.bank_name || 'Rekening'
+                              const accountNumber = tx.bank_account?.account_number
+                              const updatedAtLabel = tx.updated_at && tx.updated_at !== tx.created_at
+                                ? formatDateTime(tx.updated_at)
+                                : '-'
+
+                              return (
+                                <React.Fragment key={tx.id}>
+                                  <tr className={`${isExpanded ? 'bg-slate-50/80' : 'hover:bg-slate-50/80'} transition-all group`}>
+                                    <td className="px-8 py-6 align-top">
+                                      <div className="flex flex-col">
+                                        <span className="text-xs font-black text-slate-900 font-mono italic">#{tx.id.substring(0,6)}</span>
+                                        <span className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(tx.transaction_date, 'short')}</span>
                                       </div>
-                                   </div>
-                                </td>
-                                <td className={`px-8 py-6 align-top text-right font-black font-mono tracking-tighter text-sm ${tx.type === 'IN' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                  {tx.type === 'IN' ? '+' : '-'} {formatRupiah(tx.amount)}
-                                </td>
-                                <td className="px-8 py-6 align-top text-center">
-                                   {isOwner && tx.status === 'POSTED' && (
-                                     <button
-                                       onClick={() => handleDeleteTransaction(tx.id)}
-                                       className="p-2.5 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
-                                       title="Void Transaksi"
-                                     >
-                                       <Trash size={16} />
-                                     </button>
-                                   )}
-                                   {tx.status === 'VOIDED' && (
-                                     <StatusBadge label="Voided" variant="error" />
-                                   )}
-                                </td>
-                             </tr>
-                           ))
+                                    </td>
+                                    <td className="px-8 py-6 align-top">
+                                      <div className="flex flex-col gap-1.5">
+                                        <span className="text-sm font-black text-slate-900 leading-tight">{tx.description}</span>
+                                        <div className="flex items-center gap-2">
+                                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded text-[9px] font-black text-slate-500 uppercase">
+                                            <Building size={10} /> {accountLabel}
+                                          </div>
+                                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 rounded text-[9px] font-black text-indigo-500 uppercase">
+                                            <Activity size={10} /> {tx.category?.name || 'Uncategorized'}
+                                          </div>
+                                          {isHoldingView && (tx.org_name || tx.org_id !== orgId) ? (
+                                            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded text-[9px] font-black text-emerald-600 uppercase">
+                                              <Building2 size={10} /> {tx.org_name || 'Entitas'}{tx.branch_name ? ` / ${tx.branch_name}` : ''}
+                                            </div>
+                                          ) : null}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className={`px-8 py-6 align-top text-right font-black font-mono tracking-tighter text-sm ${tx.type === 'IN' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                      {tx.type === 'IN' ? '+' : '-'} {formatRupiah(tx.amount)}
+                                    </td>
+                                    <td className="px-8 py-6 align-top text-center">
+                                      <div className="flex items-center justify-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => setExpandedTransactionId((currentId) => currentId === tx.id ? null : tx.id)}
+                                          className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-600 transition-colors hover:bg-slate-100"
+                                        >
+                                          Detail
+                                          <ChevronDown size={12} className={isExpanded ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                                        </button>
+                                        {isOwner && tx.status === 'POSTED' && (
+                                          <button
+                                            onClick={() => handleDeleteTransaction(tx.id)}
+                                            className="p-2.5 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                                            title="Void Transaksi"
+                                          >
+                                            <Trash size={16} />
+                                          </button>
+                                        )}
+                                        {tx.status === 'VOIDED' && (
+                                          <StatusBadge label="Voided" variant="error" />
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  {isExpanded ? (
+                                    <tr className="bg-slate-50/50">
+                                      <td colSpan={4} className="px-8 pb-8">
+                                        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                                          <div className="mb-4 flex items-center justify-between gap-3">
+                                            <h4 className="text-xs font-black uppercase tracking-[0.16em] text-slate-700">Detail Riwayat Mutasi</h4>
+                                            <span className={`rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-widest ${tx.status === 'POSTED' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+                                              {tx.status}
+                                            </span>
+                                          </div>
+                                          <div className="grid grid-cols-1 gap-4 text-xs text-slate-600 md:grid-cols-2 lg:grid-cols-3">
+                                            <div>
+                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Jenis Mutasi</p>
+                                              <p className="mt-1 font-bold text-slate-900">{transactionTypeLabel}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tanggal Transaksi</p>
+                                              <p className="mt-1 font-bold text-slate-900">{formatDate(tx.transaction_date, 'long')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Dicatat Pada</p>
+                                              <p className="mt-1 font-bold text-slate-900">{formatDateTime(tx.created_at)}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rekening</p>
+                                              <p className="mt-1 font-bold text-slate-900">{accountLabel}{accountNumber ? ` • ${accountNumber}` : ''}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Akun Lawan</p>
+                                              <p className="mt-1 font-bold text-slate-900">{categoryDetail}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nomor Referensi</p>
+                                              <p className="mt-1 font-bold text-slate-900">{tx.reference_number || '-'}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Jurnal Terkait</p>
+                                              <p className="mt-1 font-bold text-slate-900">{tx.journal_entry_id || '-'}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Terakhir Diperbarui</p>
+                                              <p className="mt-1 font-bold text-slate-900">{updatedAtLabel}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">ID Mutasi Lengkap</p>
+                                              <p className="mt-1 break-all font-mono text-[11px] font-bold text-slate-900">{tx.id}</p>
+                                            </div>
+                                            {isHoldingView && (tx.org_name || tx.org_id !== orgId) ? (
+                                              <div className="md:col-span-2 lg:col-span-3">
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Entitas</p>
+                                                <p className="mt-1 font-bold text-slate-900">
+                                                  {tx.org_name || 'Entitas'}{tx.branch_name ? ` / ${tx.branch_name}` : ''}
+                                                </p>
+                                              </div>
+                                            ) : null}
+                                          </div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ) : null}
+                                </React.Fragment>
+                              )
+                            })
                          )}
                       </tbody>
                     </table>

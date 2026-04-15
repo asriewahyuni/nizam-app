@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { getResellerCommissionSnapshot } from '@/modules/sales/actions/commission.actions'
 import { ensureSellableBranchStockAvailability, shouldGuardOrderedSaleStock } from '@/modules/sales/lib/stock-guard.server'
+import { listActiveSalesWarehouses } from '@/modules/sales/lib/warehouse-branch-compat.server'
 
 type ActiveBranchResult =
   | { branchId: string }
@@ -21,6 +22,7 @@ type InventoryRequirement = {
 }
 
 const STOCK_EPSILON = 0.000001
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 function formatQuantity(value: number): string {
   if (!Number.isFinite(value)) return '0'
@@ -29,6 +31,37 @@ function formatQuantity(value: number): string {
   return Number.isInteger(rounded)
     ? String(rounded)
     : rounded.toFixed(6).replace(/\.?0+$/, '')
+}
+
+/**
+ * Convert DB date values into stable YYYY-MM-DD strings for client components.
+ * Raw postgres results may surface `date` columns as `Date` objects.
+ */
+function normalizeDateOnlyValue(value: unknown): string | null {
+  if (!value) return null
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    if (DATE_ONLY_PATTERN.test(trimmed)) return trimmed
+
+    const parsed = new Date(trimmed)
+    if (Number.isNaN(parsed.getTime())) return null
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+  }
+
+  const normalized = String(value).trim()
+  if (!normalized) return null
+  if (DATE_ONLY_PATTERN.test(normalized)) return normalized
+
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) return null
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
 }
 
 function normalizeShariahMode(value?: string | null): string {
@@ -147,28 +180,25 @@ async function resolveDeliveryWarehouseId(
   branchId: string,
   explicitWarehouseId?: string | null
 ): Promise<DeliveryWarehouseResult> {
-  const query = (supabase as any)
-    .from('warehouses')
-    .select('id, name, branch_id')
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .eq('branch_id', branchId)
+  const warehousesResult = await listActiveSalesWarehouses(supabase, orgId, branchId, {
+    warehouseId: explicitWarehouseId,
+    limit: explicitWarehouseId ? undefined : 2,
+  })
 
-  if (explicitWarehouseId) {
-    const { data, error } = await query.eq('id', explicitWarehouseId).maybeSingle()
-    if (error || !data) {
-      return { error: 'Gudang pengiriman tidak tersedia pada unit aktif.' }
-    }
-
-    return { warehouseId: data.id }
-  }
-
-  const { data, error } = await query.order('name', { ascending: true }).limit(2)
-  if (error) {
+  if ('error' in warehousesResult) {
     return { error: 'Gagal memuat gudang pengiriman.' }
   }
 
-  const warehouses = (data as Array<{ id: string }>) || []
+  const warehouses = warehousesResult.warehouses
+
+  if (explicitWarehouseId) {
+    if (!warehouses[0]?.id) {
+      return { error: 'Gudang pengiriman tidak tersedia pada unit aktif.' }
+    }
+
+    return { warehouseId: warehouses[0].id }
+  }
+
   if (warehouses.length === 0) {
     return { error: 'Belum ada gudang aktif di unit ini. Tambahkan gudang terlebih dahulu.' }
   }
@@ -503,6 +533,8 @@ export async function getSales(orgId: string, branchId?: string | null) {
     const sid = String(row.id ?? '')
     return {
       ...row,
+      sale_date: normalizeDateOnlyValue(row.sale_date),
+      due_date: normalizeDateOnlyValue(row.due_date),
       // UI expects sale.contacts?.name for the customer
       contacts: row.customer_name ? { name: row.customer_name } : null,
       branches: (row.branch_name || row.branch_code)

@@ -559,6 +559,14 @@ describe('Sales Branch Context', () => {
         error: null,
       }),
     }
+    const organizationsQuery = {
+      select: vi.fn(() => organizationsQuery),
+      eq: vi.fn(() => organizationsQuery),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { settings: {} },
+        error: null,
+      }),
+    }
     const saleSingle = vi.fn().mockResolvedValue({
       data: { id: 'sale-1' },
       error: null,
@@ -587,6 +595,7 @@ describe('Sales Branch Context', () => {
       },
       from: vi.fn((table: string) => {
         if (table === 'contacts') return walkInQuery
+        if (table === 'organizations') return organizationsQuery
         if (table === 'products') return productsQuery
         if (table === 'warehouses') return warehouseQuery
         if (table === 'inventory_stocks') return inventoryStocksQuery
@@ -601,6 +610,9 @@ describe('Sales Branch Context', () => {
       warehouse_id: 'wh-1',
       lines: [{ product_id: 'prod-1', product_name: 'Produk A', quantity: 1, unit_price: 1000 }],
       account_id: 'cash-1',
+      payment_method: 'CASH',
+      amount_tendered: 1000,
+      change_amount: 0,
       notes: 'POS',
     })
 
@@ -610,6 +622,9 @@ describe('Sales Branch Context', () => {
         org_id: 'org-1',
         branch_id: 'branch-1',
         warehouse_id: 'wh-1',
+        pos_payment_method: 'CASH',
+        pos_amount_tendered: 1000,
+        pos_change_amount: 0,
       })
     )
     expect(salesItemsInsert).toHaveBeenCalledWith([

@@ -211,6 +211,12 @@ function toFiniteNumber(value: unknown, fallback = 0) {
   return Number.isFinite(num) ? num : fallback
 }
 
+function normalizeJournalLineAccount(value: unknown): { type?: string | null; code?: string | null } | null {
+  const accountValue = Array.isArray(value) ? value.find((item) => item && typeof item === 'object') : value
+  if (!accountValue || typeof accountValue !== 'object') return null
+  return accountValue as { type?: string | null; code?: string | null }
+}
+
 function isPerspective(value: string): value is BSCPerspective {
   return PERSPECTIVES.includes(value as BSCPerspective)
 }
@@ -870,7 +876,8 @@ export async function getBSCMetrics(orgId: string, branchId?: string | null) {
       .in('entry_id', thisIds) as any
 
     for (const line of lines || []) {
-      const account = line.accounts
+      const account = normalizeJournalLineAccount(line.accounts)
+      if (!account) continue
       if (account.type === 'REVENUE' || account.code?.startsWith('4')) currentRevenue += Number(line.credit) - Number(line.debit)
       if (account.type === 'EXPENSE' || account.code?.startsWith('5') || account.code?.startsWith('6')) currentExpenses += Number(line.debit) - Number(line.credit)
     }
@@ -900,7 +907,8 @@ export async function getBSCMetrics(orgId: string, branchId?: string | null) {
       .in('entry_id', lastIds) as any
 
     for (const line of lastLines || []) {
-      const account = line.accounts
+      const account = normalizeJournalLineAccount(line.accounts)
+      if (!account) continue
       if (account.type === 'REVENUE' || account.code?.startsWith('4')) lastRevenue += Number(line.credit) - Number(line.debit)
     }
   }
