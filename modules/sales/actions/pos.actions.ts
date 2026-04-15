@@ -2,6 +2,7 @@
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { clampDiscountAmount } from '@/lib/commerce/discounts'
 import { getActiveBranch } from '@/modules/organization/actions/org.actions'
 import { getDateInTimeZone } from '@/lib/utils'
 import { getPosShiftConfig, isPosShiftSchemaMissing } from '@/modules/sales/lib/pos-shift'
@@ -377,8 +378,8 @@ export async function processPosTransaction(orgId: string, payload: any) {
 
   // Calculate totals
   const totalAmount = payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)
-  const taxAmount = payload.tax_amount || 0
-  const discountAmount = payload.discount_amount || 0
+  const taxAmount = Math.max(0, Number(payload.tax_amount || 0))
+  const discountAmount = clampDiscountAmount(payload.discount_amount || 0, totalAmount)
   const grandTotal = totalAmount + taxAmount - discountAmount
 
   const normalizedPaymentMethod = String(payload.payment_method || '').trim().toUpperCase() || null

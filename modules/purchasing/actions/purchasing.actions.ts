@@ -362,6 +362,8 @@ export async function getPurchases(orgId: string, branchId?: string | null) {
         pi.description,
         pi.quantity,
         pi.unit_price,
+        pi.discount_amount,
+        pi.tax_amount,
         pi.total_amount,
         pr.name  AS product_name,
         pr.sku   AS product_sku,
@@ -659,7 +661,8 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
   const headerDiscount = payload.discount_amount || processedLines.reduce((acc: any, l: any) => acc + l.discount_amount, 0)
   const headerTax = payload.tax_amount || processedLines.reduce((acc: any, l: any) => acc + l.tax_amount, 0)
   const headerShipping = payload.shipping_amount || 0
-  const headerGrand = headerSubtotal - headerDiscount + headerTax + headerShipping
+  const headerInsurance = payload.insurance_amount || 0
+  const headerGrand = headerSubtotal - headerDiscount + headerTax + headerShipping + headerInsurance
 
   // Simpan info termin di metadata/notes sementara atau via RPC (Saya asumsikan RPC sudah diupdate atau kita pakai p_notes)
   const notesWithTerm = `[TERMIN: ${resolvedPaymentTerm}] ${payload.payment_account_id ? `[ACC: ${payload.payment_account_id}] ` : ''}${payload.notes || ''}`

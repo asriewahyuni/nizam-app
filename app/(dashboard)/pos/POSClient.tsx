@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Plus, Minus, Trash2, ShoppingCart, User, CreditCard, Banknote, QrCode, MonitorSmartphone, Receipt, MapPin, CheckCircle2, MessageCircle, UserPlus, X, Tag, Clock3, ShieldAlert, ArrowRightLeft, Wallet, CalendarDays, ChevronDown, ChevronUp } from 'lucide-react'
+import { clampDiscountAmount } from '@/lib/commerce/discounts'
 import { formatRupiah } from '@/lib/utils'
 import { processPosTransaction } from '@/modules/sales/actions/pos.actions'
 import { closePosShift, getPosShiftHistory, openPosShift, settlePosShift, type PosShiftHistoryResponse, type PosShiftSnapshot } from '@/modules/sales/actions/pos-shift.actions'
@@ -496,10 +497,11 @@ export default function POSClient({
    const promoDiscount = appliedPromo 
       ? Math.round(appliedPromo.type === 'PERCENT' ? cartSubtotal * (appliedPromo.value / 100) : appliedPromo.value)
       : 0
-   const parsedDiscount = manualDiscount + promoDiscount
+   const parsedDiscount = clampDiscountAmount(manualDiscount + promoDiscount, cartSubtotal)
 
-   const taxNominal = Math.round((cartSubtotal - parsedDiscount) * (taxPercent / 100))
-   const grandTotal = Math.round(cartSubtotal - parsedDiscount + taxNominal)
+   const taxableSubtotal = Math.max(0, cartSubtotal - parsedDiscount)
+   const taxNominal = Math.round(taxableSubtotal * (taxPercent / 100))
+   const grandTotal = Math.round(taxableSubtotal + taxNominal)
    const changeDue = Math.round(Number(amountTendered.replace(/\D/g, ''))) - grandTotal
 
    const addToCart = (product: any) => {

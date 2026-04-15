@@ -334,6 +334,29 @@ function readDemoFlagFromSettings(settings: unknown): boolean {
   return Boolean(settings.is_demo) || isDemoPlanName(settings.plan)
 }
 
+function parseOptionalDate(value: unknown): Date | null {
+  if (!value) return null
+
+  const parsed = value instanceof Date ? value : new Date(String(value))
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function resolveOrganizationSubscriptionEnd(org: unknown): Date | null {
+  if (!isPlainObject(org)) return null
+
+  const settings = isPlainObject(org.settings) ? org.settings : null
+  const candidates = [
+    parseOptionalDate(org.subscription_end),
+    parseOptionalDate(settings?.expires_at),
+  ].filter((candidate): candidate is Date => candidate instanceof Date)
+
+  if (candidates.length === 0) return null
+
+  return candidates.reduce((latest, current) =>
+    current.getTime() > latest.getTime() ? current : latest
+  )
+}
+
 function isDemoAccountUser(user: { email?: string | null; user_metadata?: Record<string, unknown> | null } | null | undefined): boolean {
   if (!user) return false
   const normalizedEmail = String(user.email || '').trim().toLowerCase()
@@ -1358,13 +1381,13 @@ const getActiveOrgCached = cache(async () => {
     const isTimeLimited = typeof pkgData?.duration_days === 'number' && pkgData.duration_days > 0
     const isDemoPlan = planName === 'Demo'
     if (isTimeLimited && !isDemoPlan) {
-      // Prefer the explicit subscription_end stored on the org row.
-      const rawEnd = (org as any).subscription_end
-      if (rawEnd) {
-        subscriptionEnd = new Date(rawEnd)
+      // Keep supporting the legacy settings.expires_at field so old admin edits
+      // or manual extensions do not keep a tenant locked out after renewal.
+      subscriptionEnd = resolveOrganizationSubscriptionEnd(org)
+      if (subscriptionEnd) {
         isSubscriptionExpired = subscriptionEnd < new Date()
       }
-      // If subscription_end is null (legacy org), we do NOT force-expire.
+      // If both expiry fields are missing (legacy org), we do NOT force-expire.
     }
   }
 
@@ -1609,11 +1632,26 @@ export async function setActiveOrg(orgId: string) {
   return { success: true, orgId: trimmedOrgId, branchId: persistedBranchId }
 }
 
+function normalizeOrganizationLogoUrl(value: unknown): string | null {
+  const normalized = String(value || '').trim()
+  return normalized || null
+}
+
 export async function updateOrgSettings(orgId: string, updates: any) {
   const supabase = await createClient()
   const db = supabase as any
-  const { error } = await db.from('organizations').update(updates).eq('id', orgId)
+  const normalizedUpdates =
+    updates && typeof updates === 'object'
+      ? {
+          ...updates,
+          ...(Object.prototype.hasOwnProperty.call(updates, 'logo_url')
+            ? { logo_url: normalizeOrganizationLogoUrl(updates.logo_url) }
+            : {}),
+        }
+      : updates
+  const { error } = await db.from('organizations').update(normalizedUpdates).eq('id', orgId)
   if (error) return { error: 'Gagal menyimpan.' }
+  revalidatePath('/', 'layout')
   revalidatePath('/settings/business')
   return { success: true }
 }
@@ -1632,14 +1670,30 @@ export async function uploadLogo(orgId: string, formData: FormData) {
   if (!user) return { success: false, error: 'Auth failed' }
 
   const file = formData.get('file') as File
-  const filePath = `${orgId}/logo-${Date.now()}`
+  if (!file || typeof file.arrayBuffer !== 'function' || file.size === 0) {
+    return { success: false, error: 'File logo tidak valid.' }
+  }
+  if (!String(file.type || '').startsWith('image/')) {
+    return { success: false, error: 'Logo harus berupa file gambar PNG, JPG, WEBP, atau SVG.' }
+  }
+  if (file.size > 1024 * 1024) {
+    return { success: false, error: 'Ukuran logo maksimal 1 MB agar performa tetap ringan.' }
+  }
 
-  await supabase.storage.from('brand_assets').upload(filePath, file, { upsert: true })
-  const { data: { publicUrl } } = supabase.storage.from('brand_assets').getPublicUrl(filePath)
-  await db.from('organizations').update({ logo_url: publicUrl }).eq('id', orgId)
+  const base64Payload = Buffer.from(await file.arrayBuffer()).toString('base64')
+  const publicUrl = `data:${file.type};base64,${base64Payload}`
+  const normalizedLogoUrl = normalizeOrganizationLogoUrl(publicUrl)
+  const { error } = await db
+    .from('organizations')
+    .update({ logo_url: normalizedLogoUrl })
+    .eq('id', orgId)
+  if (error) {
+    return { success: false, error: 'Gagal menyimpan logo perusahaan.' }
+  }
 
+  revalidatePath('/', 'layout')
   revalidatePath('/settings/business')
-  return { success: true, url: publicUrl }
+  return { success: true, url: normalizedLogoUrl }
 }
 
 export async function getOrgMembers(orgId: string) {

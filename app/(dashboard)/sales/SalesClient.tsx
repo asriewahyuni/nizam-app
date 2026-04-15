@@ -13,6 +13,7 @@ import { QRCodeSVG } from 'qrcode.react'
 
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
+import { getEditableLineDiscountAmount, getStoredLineDiscountAmount, inferStoredLineDiscountMode } from '@/lib/commerce/discounts'
 import { formatDate, formatRupiah } from '@/lib/utils'
 import { getCommissionSchemeLabel, getResellerDisplayName, getResellerSubtitle } from '@/modules/sales/lib/commission'
 
@@ -181,11 +182,14 @@ export default function SalesClient({
   const paymentAccounts = coa?.filter((a: any) => a.type === 'ASSET' && (a.code.startsWith('11') || a.code.startsWith('12'))) || []
 
   const grossSubTotal = lines.reduce((sum: number, line: typeof lines[0]) => sum + (line.quantity * line.unit_price), 0)
-  const autoLineDiscounts = lines.reduce((sum: number, line: typeof lines[0]) => sum + ((line.discount_amount || 0) * line.quantity), 0)
+  const autoLineDiscounts = lines.reduce(
+    (sum: number, line: typeof lines[0]) => sum + getStoredLineDiscountAmount(line.discount_amount || 0, line.quantity),
+    0
+  )
   
   const appliedDiscount = customGlobalDiscount !== null ? customGlobalDiscount : autoLineDiscounts
   const taxableAmount = Math.max(0, grossSubTotal - appliedDiscount)
-  const calculatedTax = (grossSubTotal * headerTaxPercent) / 100
+  const calculatedTax = (taxableAmount * headerTaxPercent) / 100
   const grandTotal = taxableAmount + calculatedTax
   const STOCK_EPSILON = 0.000001
 
@@ -217,6 +221,11 @@ export default function SalesClient({
     const nextPaymentTerm: 'TEMPO' | 'LUNAS' =
       String(sale?.payment_term || 'TEMPO').toUpperCase() === 'LUNAS' ? 'LUNAS' : 'TEMPO'
 
+    const storedDiscountMode = inferStoredLineDiscountMode(
+      sale?.sales_items || [],
+      Number(sale?.discount_amount || 0)
+    )
+
     const mappedLines = (sale?.sales_items || []).map((item: any) => {
       const linkedProduct = products.find((p: ProductWithStock) => p.id === item?.product_id)
       const productType = (linkedProduct?.type || item?.products?.type || 'INVENTORY') as 'INVENTORY' | 'NON_INVENTORY' | 'SERVICE'
@@ -226,7 +235,11 @@ export default function SalesClient({
         product_id: String(item?.product_id || ''),
         quantity: Number(item?.quantity || 1),
         unit_price: Number(item?.unit_price || 0),
-        discount_amount: Number(item?.discount_amount || 0),
+        discount_amount: getEditableLineDiscountAmount(
+          Number(item?.discount_amount || 0),
+          Number(item?.quantity || 1),
+          storedDiscountMode
+        ),
         stock_available: Number(linkedProduct?.stock_available || 0),
         type: productType,
         unit: String(linkedProduct?.unit || item?.products?.unit || 'Pcs'),
@@ -396,7 +409,7 @@ export default function SalesClient({
         product_name: l.product_name,
         quantity: l.quantity,
         unit_price: l.unit_price,
-        discount_amount: l.discount_amount
+        discount_amount: getStoredLineDiscountAmount(l.discount_amount, l.quantity)
       }))
     }
 

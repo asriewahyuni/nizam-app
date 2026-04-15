@@ -64,6 +64,50 @@ function formatModuleLabel(moduleName: string) {
   return moduleName
 }
 
+type OrganizationExpirySource = {
+  subscription_end?: unknown
+  settings?: Record<string, unknown> | null
+}
+
+function parseOptionalDate(value: unknown): Date | null {
+  if (!value) return null
+
+  const parsed = value instanceof Date ? value : new Date(String(value))
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function resolveOrganizationExpiryDate(org: OrganizationExpirySource | null | undefined): Date | null {
+  const settings = org?.settings && typeof org.settings === 'object' ? org.settings : null
+  const candidates = [
+    parseOptionalDate(org?.subscription_end),
+    parseOptionalDate(settings?.expires_at),
+  ].filter((candidate): candidate is Date => candidate instanceof Date)
+
+  if (candidates.length === 0) return null
+
+  return candidates.reduce((latest, current) =>
+    current.getTime() > latest.getTime() ? current : latest
+  )
+}
+
+function formatDateInputValue(date: Date | null): string {
+  if (!date) return ''
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function buildPlanExpiryIso(durationDays: number | null | undefined): string | null {
+  if (typeof durationDays !== 'number' || durationDays <= 0) return null
+
+  const expiresAt = new Date()
+  expiresAt.setDate(expiresAt.getDate() + durationDays)
+  return expiresAt.toISOString()
+}
+
 type Tab = 'users' | 'packages' | 'invoices' | 'settings' | 'ai_tokens'
 
 export default function SaaSAdminPage() {
@@ -406,7 +450,13 @@ export default function SaaSAdminPage() {
 
     if (isAddon) {
       // HANDLE ADDON ACTIVATION
-      const { data: org } = await db.from('organizations').select('active_addons').eq('id', invoice.org_id).single()
+      const { data: org, error: orgLookupError } = await db
+        .from('organizations')
+        .select('active_addons, settings')
+        .eq('id', invoice.org_id)
+        .single()
+      if (orgLookupError) return alert('Gagal membaca data organisasi: ' + orgLookupError.message)
+
       const currentAddons = Array.isArray(org?.active_addons) ? org.active_addons : []
       const newAddon = {
         id: invoice.id, // linked to invoice
@@ -421,15 +471,27 @@ export default function SaaSAdminPage() {
       if (addonErr) return alert('Gagal aktivasi add-on: ' + addonErr.message)
     } else {
       // HANDLE PLAN UPGRADE
-      const expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + (pkg?.duration_days || 30))
+      const { data: org, error: orgLookupError } = await db
+        .from('organizations')
+        .select('settings')
+        .eq('id', invoice.org_id)
+        .single()
+      if (orgLookupError) return alert('Gagal membaca data organisasi: ' + orgLookupError.message)
+
+      const expiresAt = buildPlanExpiryIso(pkg?.duration_days)
+      const currentSettings =
+        org?.settings && typeof org.settings === 'object' && !Array.isArray(org.settings)
+          ? org.settings
+          : {}
 
       const { error: orgErr } = await db.from('organizations').update({
         settings: {
+          ...currentSettings,
           plan: pkg?.name || 'Pro',
-          expires_at: expiresAt.toISOString(),
+          expires_at: expiresAt,
           updated_at: new Date().toISOString()
         },
+        subscription_end: expiresAt,
         package_limit: {
           max_orgs: pkg?.max_orgs || 1,
           max_warehouses: pkg?.max_warehouses || 1
@@ -531,16 +593,27 @@ export default function SaaSAdminPage() {
     try {
       const fd = new FormData(e.currentTarget)
       const expiresVal = fd.get('expires_at') as string
+      const existingExpiry = resolveOrganizationExpiryDate(orgModal.editData as OrganizationExpirySource)
+      const expiresAt = expiresVal
+        ? new Date(expiresVal).toISOString()
+        : (existingExpiry?.toISOString() || null)
+      const currentSettings =
+        orgModal.editData?.settings &&
+        typeof orgModal.editData.settings === 'object' &&
+        !Array.isArray(orgModal.editData.settings)
+          ? orgModal.editData.settings
+          : {}
       
       const payload = {
          name: fd.get('name'),
          is_active: fd.get('is_active') === 'on',
          is_demo: fd.get('is_demo') === 'on',
          owner_email: fd.get('owner_email'),
+         subscription_end: expiresAt,
          settings: {
-            ...orgModal.editData?.settings,
+            ...currentSettings,
             plan: fd.get('plan'),
-            expires_at: expiresVal ? new Date(expiresVal).toISOString() : (orgModal.editData?.settings?.expires_at || null)
+            expires_at: expiresAt,
          }
       }
 
@@ -951,8 +1024,15 @@ export default function SaaSAdminPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {filteredOrgs.map((org) => (
-                        <tr key={org.id} className="hover:bg-slate-50/50 transition-colors">
+                      {filteredOrgs.map((org) => {
+                        const expiryDate = resolveOrganizationExpiryDate(org as OrganizationExpirySource)
+                        const expiryTime = expiryDate?.getTime() ?? null
+                        const daysRemaining = expiryTime
+                          ? Math.ceil((expiryTime - Date.now()) / (1000 * 60 * 60 * 24))
+                          : null
+
+                        return (
+                          <tr key={org.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="py-4 px-6">
                             <div>
                                <p className="font-bold text-slate-900">{org.name}</p>
@@ -971,17 +1051,17 @@ export default function SaaSAdminPage() {
                             <span className="text-sm font-bold text-slate-700">{(org.settings as any)?.plan || 'Basic'}</span>
                           </td>
                           <td className="py-4 px-6">
-                            {(org.settings as any)?.expires_at ? (
+                            {expiryDate && expiryTime !== null && daysRemaining !== null ? (
                               <div className="flex flex-col gap-0.5">
                                 <p className={`text-xs font-black tabular-nums ${
-                                  new Date((org.settings as any).expires_at).getTime() < new Date().getTime() 
+                                  expiryTime < Date.now()
                                     ? 'text-rose-600' 
-                                    : (new Date((org.settings as any).expires_at).getTime() - new Date().getTime() < 7 * 24 * 60 * 60 * 1000 ? 'text-orange-500' : 'text-slate-900')
+                                    : (expiryTime - Date.now() < 7 * 24 * 60 * 60 * 1000 ? 'text-orange-500' : 'text-slate-900')
                                 }`}>
-                                  {Math.ceil((new Date((org.settings as any).expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} Hari
+                                  {daysRemaining} Hari
                                 </p>
                                 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight italic">
-                                  s/d {new Date((org.settings as any).expires_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                  s/d {expiryDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
                                 </p>
                               </div>
                             ) : (
@@ -1021,8 +1101,9 @@ export default function SaaSAdminPage() {
                               )}
                             </div>
                           </td>
-                        </tr>
-                      ))}
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1214,7 +1295,7 @@ export default function SaaSAdminPage() {
                                        onClick={() => {
                                           const d = new Date()
                                           d.setDate(d.getDate() + days)
-                                          setModalExpireDate(d.toISOString().split('T')[0])
+                                          setModalExpireDate(formatDateInputValue(d))
                                        }}
                                        className="px-1.5 py-0.5 bg-slate-100 hover:bg-indigo-600 hover:text-white rounded text-[8px] font-black transition-colors"
                                     >
@@ -1226,7 +1307,7 @@ export default function SaaSAdminPage() {
                            <input 
                               name="expires_at" 
                               type="date" 
-                              value={modalExpireDate || (orgModal.editData?.settings?.expires_at ? new Date(orgModal.editData.settings.expires_at).toISOString().split('T')[0] : '')} 
+                              value={modalExpireDate || formatDateInputValue(resolveOrganizationExpiryDate(orgModal.editData as OrganizationExpirySource))} 
                               onChange={(e) => setModalExpireDate(e.target.value)}
                               className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" 
                            />

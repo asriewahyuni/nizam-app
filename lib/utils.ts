@@ -11,23 +11,30 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+function toFiniteNumber(value: unknown): number {
+  const parsed = Number(value ?? 0)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 /**
  * Format number as Indonesian Rupiah.
  * Usage: formatRupiah(1500000) → "Rp 1.500.000"
  */
 export function formatRupiah(amount: number, compact = false): string {
-  if (compact && Math.abs(amount) >= 1_000_000_000) {
-    return `Rp ${(amount / 1_000_000_000).toFixed(1)}M`
+  const safeAmount = toFiniteNumber(amount)
+
+  if (compact && Math.abs(safeAmount) >= 1_000_000_000) {
+    return `Rp ${(safeAmount / 1_000_000_000).toFixed(1)}M`
   }
-  if (compact && Math.abs(amount) >= 1_000_000) {
-    return `Rp ${(amount / 1_000_000).toFixed(1)}jt`
+  if (compact && Math.abs(safeAmount) >= 1_000_000) {
+    return `Rp ${(safeAmount / 1_000_000).toFixed(1)}jt`
   }
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount)
+  }).format(safeAmount)
 }
 
 /**

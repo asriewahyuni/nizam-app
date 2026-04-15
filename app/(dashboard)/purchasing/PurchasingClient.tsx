@@ -32,6 +32,7 @@ import type { Product } from '@/types/database.types'
 
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
+import { getEditableLineDiscountAmount, getStoredLineDiscountAmount, inferStoredLineDiscountMode } from '@/lib/commerce/discounts'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { QRCodeSVG } from 'qrcode.react'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
@@ -173,7 +174,10 @@ export default function PurchasingClient({
     })) || []
 
   const grossSubTotal = lines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0)
-  const autoLineDiscounts = lines.reduce((sum, line) => sum + ((line.discount_amount || 0) * line.quantity), 0)
+  const autoLineDiscounts = lines.reduce(
+    (sum, line) => sum + getStoredLineDiscountAmount(line.discount_amount || 0, line.quantity),
+    0
+  )
   
   const appliedDiscount = customGlobalDiscount !== null ? customGlobalDiscount : autoLineDiscounts
   const taxableAmount = Math.max(0, grossSubTotal - appliedDiscount)
@@ -221,6 +225,11 @@ export default function PurchasingClient({
     const nextShariahMode: 'CASH' | 'SALAM' | 'ISTISHNA' =
       parsedShariahMode === 'SALAM' || parsedShariahMode === 'ISTISHNA' ? parsedShariahMode : 'CASH'
 
+    const storedDiscountMode = inferStoredLineDiscountMode(
+      purchase?.purchase_items || [],
+      Number(purchase?.discount_amount || 0)
+    )
+
     const mappedLines = (purchase?.purchase_items || []).map((item: any) => {
       const unit = item?.products?.unit || 'Pcs'
       const sellingPrice = Number(item?.products?.selling_price || 0)
@@ -238,7 +247,11 @@ export default function PurchasingClient({
         custom_unit: UNIT_OPTIONS.includes(unit) ? '' : unit,
         unit_price: unitPrice,
         margin,
-        discount_amount: Number(item?.discount_amount || 0),
+        discount_amount: getEditableLineDiscountAmount(
+          Number(item?.discount_amount || 0),
+          Number(item?.quantity || 1),
+          storedDiscountMode
+        ),
         category: item?.products?.category || 'Bahan',
         selling_price: sellingPrice || 0,
         requestId: '',
@@ -370,7 +383,8 @@ export default function PurchasingClient({
       draft_id: editingDraftPurchaseId || undefined,
       lines: usableLines.map(line => {
         const totalOverhead = (parseFloat(shippingAmount) || 0) + (parseFloat(insuranceAmount) || 0)
-        const itemValue = (line.quantity * line.unit_price) - (line.discount_amount || 0)
+        const lineDiscountTotal = getStoredLineDiscountAmount(line.discount_amount || 0, line.quantity)
+        const itemValue = (line.quantity * line.unit_price) - lineDiscountTotal
         const allocatedOverheadPerUnit = grossSubTotal > 0 ? (itemValue / grossSubTotal * totalOverhead) / (line.quantity || 1) : 0
         const trueHpp = line.unit_price + allocatedOverheadPerUnit
         const effectiveUnit = line.unit === 'Lainnya' ? line.custom_unit : line.unit
@@ -382,6 +396,7 @@ export default function PurchasingClient({
           quantity: line.quantity,
           unit: effectiveUnit || 'Pcs',
           unit_price: line.unit_price,
+          discount_amount: lineDiscountTotal,
           selling_price: calculateSuggestedSellingPrice(trueHpp, line.margin)
         }
       })
@@ -1137,7 +1152,8 @@ export default function PurchasingClient({
 
                     {lines.map((line, idx) => {
                       const totalOverhead = (parseFloat(shippingAmount) || 0) + (parseFloat(insuranceAmount) || 0)
-                      const itemValue = (line.quantity * line.unit_price) - (line.discount_amount || 0)
+                      const lineDiscountTotal = getStoredLineDiscountAmount(line.discount_amount || 0, line.quantity)
+                      const itemValue = (line.quantity * line.unit_price) - lineDiscountTotal
                       const allocatedOverheadPerUnit = grossSubTotal > 0 ? (itemValue / grossSubTotal * totalOverhead) / (line.quantity || 1) : 0
                       const trueHpp = line.unit_price + allocatedOverheadPerUnit
                       const suggestedPrice = calculateSuggestedSellingPrice(trueHpp, line.margin)
@@ -1733,8 +1749,14 @@ export default function PurchasingClient({
                       <div className="w-80 space-y-3">
                          <div className="flex justify-between items-center text-slate-600">
                            <span>SubTotal</span>
-                           <span>{formatRupiah(selectedDetailPurchase.grand_total - selectedDetailPurchase.tax_amount - selectedDetailPurchase.shipping_amount - selectedDetailPurchase.insurance_amount)}</span>
+                           <span>{formatRupiah(selectedDetailPurchase.total_amount)}</span>
                          </div>
+                         {selectedDetailPurchase.discount_amount > 0 && (
+                           <div className="flex justify-between items-center text-rose-500">
+                             <span>Diskon</span>
+                             <span>-{formatRupiah(selectedDetailPurchase.discount_amount)}</span>
+                           </div>
+                         )}
                          {(selectedDetailPurchase.tax_amount > 0) && (
                            <div className="flex justify-between items-center text-slate-600">
                              <span>Pajak (Tax)</span>

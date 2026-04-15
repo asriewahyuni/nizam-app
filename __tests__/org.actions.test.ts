@@ -65,6 +65,8 @@ import {
   getActiveBranch,
   setActiveBranch,
   setActiveOrg,
+  updateOrgSettings,
+  uploadLogo,
 } from '@/modules/organization/actions/org.actions'
 import { getActiveBranchIdAction, getActiveOrgIdAction } from '@/modules/organization/actions/org-id.actions'
 
@@ -248,6 +250,194 @@ describe('Organization Branch Bootstrap', () => {
         permissions: ['coa:read', 'bank:read', 'journal:read'],
       })
     )
+  })
+
+  it('uses the latest valid expiry when legacy settings is newer than subscription_end', async () => {
+    const cookieStore = createCookieStore()
+    const staleExpiry = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+    const futureExpiry = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString()
+    mocks.cookies.mockResolvedValue(cookieStore)
+
+    const supabase = createSupabaseMock({
+      tables: {
+        saas_packages: [
+          {
+            maybeSingleResult: success({
+              modules: ['Accounting'],
+              duration_days: 14,
+            }),
+          },
+        ],
+        employees: [
+          {
+            maybeSingleResult: success({
+              job_title: 'Owner',
+              role_id: null,
+            }),
+          },
+        ],
+      },
+    })
+
+    mocks.getServerAuthContext.mockResolvedValue({
+      supabase: supabase.client,
+      user: {
+        id: 'user-1',
+        email: 'owner@example.com',
+        user_metadata: {},
+      },
+    })
+    mocks.resolveActiveMembership.mockResolvedValue({
+      org_id: 'org-1',
+      role: 'owner',
+      role_id: null,
+      organizations: {
+        id: 'org-1',
+        settings: { plan: 'Trial', expires_at: futureExpiry },
+        subscription_end: staleExpiry,
+        active_addons: [],
+      },
+      roles: {
+        permissions: ['dashboard:read'],
+      },
+    })
+
+    const result = await getActiveOrg()
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        isSubscriptionExpired: false,
+      })
+    )
+    expect(result?.subscriptionEnd?.toISOString()).toBe(futureExpiry)
+  })
+
+  it('still respects legacy settings expiry when subscription_end is missing', async () => {
+    const cookieStore = createCookieStore()
+    const pastExpiry = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    mocks.cookies.mockResolvedValue(cookieStore)
+
+    const supabase = createSupabaseMock({
+      tables: {
+        saas_packages: [
+          {
+            maybeSingleResult: success({
+              modules: ['Accounting'],
+              duration_days: 14,
+            }),
+          },
+        ],
+        employees: [
+          {
+            maybeSingleResult: success({
+              job_title: 'Owner',
+              role_id: null,
+            }),
+          },
+        ],
+      },
+    })
+
+    mocks.getServerAuthContext.mockResolvedValue({
+      supabase: supabase.client,
+      user: {
+        id: 'user-1',
+        email: 'owner@example.com',
+        user_metadata: {},
+      },
+    })
+    mocks.resolveActiveMembership.mockResolvedValue({
+      org_id: 'org-1',
+      role: 'owner',
+      role_id: null,
+      organizations: {
+        id: 'org-1',
+        settings: { plan: 'Trial', expires_at: pastExpiry },
+        active_addons: [],
+      },
+      roles: {
+        permissions: ['dashboard:read'],
+      },
+    })
+
+    const result = await getActiveOrg()
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        isSubscriptionExpired: true,
+      })
+    )
+    expect(result?.subscriptionEnd?.toISOString()).toBe(pastExpiry)
+  })
+
+  it('normalizes blank logo_url when updating organization settings', async () => {
+    const updateEq = vi.fn().mockResolvedValue({ error: null })
+    const update = vi.fn(() => ({ eq: updateEq }))
+
+    mocks.createClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'organizations') {
+          return { update }
+        }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const result = await updateOrgSettings('org-1', {
+      settings: { brand_name: 'PT Nizam' },
+      logo_url: '   ',
+      slug: 'pt-nizam',
+    })
+
+    expect(result).toEqual({ success: true })
+    expect(update).toHaveBeenCalledWith({
+      settings: { brand_name: 'PT Nizam' },
+      logo_url: null,
+      slug: 'pt-nizam',
+    })
+    expect(updateEq).toHaveBeenCalledWith('id', 'org-1')
+  })
+
+  it('stores uploaded logo as a usable data url in Railway mode', async () => {
+    const updateEq = vi.fn().mockResolvedValue({ error: null })
+    const update = vi.fn(() => ({ eq: updateEq }))
+
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: {
+            user: {
+              id: 'user-1',
+              email: 'owner@example.com',
+              user_metadata: {},
+            },
+          },
+          error: null,
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'organizations') {
+          return { update }
+        }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const formData = new FormData()
+    formData.set('file', new File(['logo-nizam'], 'logo.png', { type: 'image/png' }))
+
+    const result = await uploadLogo('org-1', formData)
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        url: expect.stringMatching(/^data:image\/png;base64,/),
+      })
+    )
+    expect(update).toHaveBeenCalledWith({
+      logo_url: expect.stringMatching(/^data:image\/png;base64,/),
+    })
+    expect(updateEq).toHaveBeenCalledWith('id', 'org-1')
   })
 
   it('returns the sole active branch id when no branch cookie is set', async () => {

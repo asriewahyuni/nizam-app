@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Settings, Save, Fingerprint, Building, Receipt, FileText, Upload, Check, AlertCircle, Plus, Trash2, Link as LinkIcon, Copy, X, Key, ShieldCheck, Clock, Zap, RotateCcw, MessageCircle } from 'lucide-react'
 import { updateOrgSettings, uploadLogo, checkSlugAvailability } from '@/modules/organization/actions/org.actions'
@@ -13,6 +13,10 @@ type BusinessProfile = {
   slug?: string
   logo_url?: string | null
   settings?: BusinessSettingsMap
+}
+
+function normalizeLogoUrl(value: unknown) {
+  return String(value || '').trim()
 }
 
 export default function BusinessClient({ 
@@ -28,11 +32,19 @@ export default function BusinessClient({
 }) {
   const [settings, setSettings] = useState<BusinessSettingsMap>(initialSettings?.settings || {})
   const [currentSlug, setCurrentSlug] = useState(initialSettings?.slug || '')
+  const [savedLogoUrl, setSavedLogoUrl] = useState(normalizeLogoUrl(initialSettings?.logo_url))
+  const [logoInputValue, setLogoInputValue] = useState(normalizeLogoUrl(initialSettings?.logo_url))
   const [loading, setLoading] = useState(false)
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [logoControlsReady, setLogoControlsReady] = useState(false)
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
   const [isResetModalOpen, setIsResetModalOpen] = useState(false)
   const [resetMode, setResetMode] = useState<ResetOrganizationMode>('transactions')
   const [resetConfirmation, setResetConfirmation] = useState('')
+
+  useEffect(() => {
+    setLogoControlsReady(true)
+  }, [])
 
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -60,7 +72,7 @@ export default function BusinessClient({
       pos_variance_approval_threshold: Number(formData.get('pos_variance_approval_threshold') || 0) || 0,
     }
     
-    const logoUrl = formData.get('logo_url') as string
+    const logoUrl = normalizeLogoUrl(formData.get('logo_url'))
 
     const res = await updateOrgSettings(orgId, { 
        settings: newSettings,
@@ -72,6 +84,8 @@ export default function BusinessClient({
     else {
       setSettings(newSettings)
       if (newSlug) setCurrentSlug(newSlug)
+      setSavedLogoUrl(logoUrl)
+      setLogoInputValue(logoUrl)
       setSlugStatus('idle')
       alert('Pengaturan Bisnis berhasil disimpan!')
     }
@@ -184,8 +198,8 @@ export default function BusinessClient({
            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 p-10 bg-slate-50/50 rounded-[32px] border border-slate-100/50 shadow-inner">
               <div className="md:col-span-3 bg-white p-8 rounded-3xl border border-slate-200 flex flex-col md:flex-row gap-8 items-center shadow-sm">
                  <div className="w-32 h-32 bg-slate-50 rounded-[28px] border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-inner group relative">
-                    {initialSettings.logo_url ? (
-                       <img src={initialSettings.logo_url} alt="Logo" className="w-full h-full object-contain" />
+                    {savedLogoUrl ? (
+                       <img src={savedLogoUrl} alt="Logo" className="w-full h-full object-contain" />
                     ) : (
                        <Building size={32} className="text-slate-300" />
                     )}
@@ -197,29 +211,60 @@ export default function BusinessClient({
                         <p className="text-[10px] text-slate-400 italic">Recommended format: Square (1:1) PNG or SVG with transparency.</p>
                      </div>
                      
-                     <div className="flex flex-col sm:flex-row gap-4 items-center">
-                        <input type="file" id="logo-upload" className="hidden" accept="image/*" onChange={(e) => {
-                           const file = e.target.files?.[0];
-                           if (file) {
-                              const fd = new FormData();
-                              fd.append('file', file);
-                              uploadLogo(orgId, fd).then(res => {
-                                 if (res.error) alert(res.error);
-                                 else window.location.reload();
-                              });
-                           }
-                        }} disabled={loading} />
-                        
-                        <div className="flex-1 w-full space-y-1 group">
-                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Logo URL Connection</label>
-                           <input 
-                              name="logo_url" 
-                              defaultValue={initialSettings.logo_url || ""}
-                              placeholder="https://cloud.com/brand/logo.png" 
-                              className="w-full px-5 py-3 text-[11px] border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold bg-slate-50 transition-all"
-                           />
-                        </div>
-                     </div>
+                     {logoControlsReady ? (
+                       <>
+                         <div className="flex flex-col sm:flex-row gap-4 items-center">
+                            <input type="file" id="logo-upload" className="hidden" accept="image/*" onChange={async (e) => {
+                               const input = e.currentTarget
+                               const file = input.files?.[0]
+                               if (!file) return
+
+                               setLogoUploading(true)
+
+                               try {
+                                  const fd = new FormData()
+                                  fd.append('file', file)
+                                  const res = await uploadLogo(orgId, fd)
+
+                                  if (res.error) {
+                                     alert(res.error)
+                                     return
+                                  }
+
+                                  const nextLogoUrl = normalizeLogoUrl(res.url)
+                                  setSavedLogoUrl(nextLogoUrl)
+                                  setLogoInputValue(nextLogoUrl)
+                                  alert('Logo perusahaan berhasil diperbarui!')
+                               } catch {
+                                  alert('Terjadi kesalahan saat mengunggah logo.')
+                               } finally {
+                                  setLogoUploading(false)
+                                  input.value = ''
+                               }
+                            }} disabled={loading || logoUploading} />
+                            
+                            <div className="flex-1 w-full space-y-1 group">
+                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Logo URL Connection</label>
+                               <input 
+                                  name="logo_url" 
+                                  value={logoInputValue}
+                                  onChange={(e) => setLogoInputValue(e.target.value)}
+                                  placeholder="https://cloud.com/brand/logo.png" 
+                                  className="w-full px-5 py-3 text-[11px] border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold bg-slate-50 transition-all"
+                                  disabled={loading || logoUploading}
+                               />
+                            </div>
+                         </div>
+                         <p className="text-[10px] text-slate-400">
+                            {logoUploading ? 'Sedang memproses logo...' : 'Anda bisa upload file langsung atau tempel URL gambar publik.'}
+                         </p>
+                       </>
+                     ) : (
+                       <div className="space-y-3">
+                          <div className="h-[58px] w-full rounded-2xl border border-slate-200 bg-slate-100/80" />
+                          <p className="text-[10px] text-slate-400">Menyiapkan kontrol logo...</p>
+                       </div>
+                     )}
                   </div>
               </div>
 

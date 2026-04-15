@@ -70,10 +70,13 @@ export default function JournalClient({
   const stats = {
     postedCount: entries.filter((e: any) => e.status === 'POSTED').length,
     draftCount: entries.filter((e: any) => e.status === 'DRAFT').length,
-    totalVolume: entries.filter((e: any) => e.status === 'POSTED').reduce((sum: number, e: any) => {
-        const debitSum = (e.journal_lines || []).reduce((acc: number, l: any) => acc + toAmount(l.debit), 0)
-        return sum + debitSum
-    }, 0),
+    totalVolume: entries
+      .filter((e: any) => e.status === 'POSTED')
+      .reduce((sum: number, e: any) => {
+        const journalLines = Array.isArray(e?.journal_lines) ? e.journal_lines : []
+        const debitSum = journalLines.reduce((acc: number, l: any) => acc + toAmount(l?.debit), 0)
+        return toAmount(sum) + toAmount(debitSum)
+      }, 0),
     voidedToday: entries.filter((e: any) => e.status === 'VOIDED' && e.entry_date === new Date().toISOString().split('T')[0]).length
   }
 
