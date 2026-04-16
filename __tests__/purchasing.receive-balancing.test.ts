@@ -122,7 +122,6 @@ describe('Purchasing Receipt Journal Balancing', () => {
     })
     const stockMovementsTable = createStockMovementsTable()
     const rpcMock = vi.fn(async (fn: string) => {
-      if (fn === 'update_product_average_cost') return { data: null, error: null }
       if (fn === 'adjust_inventory_stock') return { data: null, error: null }
       throw new Error(`Unexpected rpc ${fn}`)
     })
@@ -361,7 +360,6 @@ describe('Purchasing Receipt Journal Balancing', () => {
     })
     const stockMovementsTable = createStockMovementsTable()
     const rpcMock = vi.fn(async (fn: string) => {
-      if (fn === 'update_product_average_cost') return { data: null, error: null }
       if (fn === 'adjust_inventory_stock') return { data: null, error: null }
       throw new Error(`Unexpected rpc ${fn}`)
     })

@@ -20,7 +20,8 @@ import {
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatRupiah, formatDate } from '@/lib/utils'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip as ReTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts'
+import { SafeResponsiveContainer } from '@/components/ui/SafeResponsiveContainer'
 
 interface TaxClientProps {
   summary: any
@@ -186,7 +187,7 @@ export default function TaxClient({ summary, orgId }: TaxClientProps) {
                </div>
                
                <div className="h-64 relative">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <SafeResponsiveContainer>
                     <PieChart>
                       <Pie
                         data={vatData}
@@ -206,7 +207,7 @@ export default function TaxClient({ summary, orgId }: TaxClientProps) {
                         formatter={(value: any) => formatRupiah(Number(value || 0))}
                       />
                     </PieChart>
-                  </ResponsiveContainer>
+                  </SafeResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                      <span className="text-[10px] font-black text-slate-400 uppercase">Efek Kas</span>
                      <span className={`text-xs font-black ${summary.netVat >= 0 ? 'text-rose-500' : 'text-emerald-500'}`}>

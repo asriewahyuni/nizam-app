@@ -1299,15 +1299,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
       : Number(item.unit_price || 0)
 
     if (!hasExistingStockMovements) {
-      // A. Update Average Cost (HPP) in Master Data
-      await (supabase as any).rpc('update_product_average_cost', {
-        p_product_id: item.product_id,
-        p_new_cost: landedUnitPrice
-      }).then((r: any) => { if (r.error) (console as any).error("WAC error", r.error) })
-
-      // B. Replaced by direct update in PO Creation (createPurchaseEntry)
-      // No action needed here anymore since selling price is established upfront.
-
+      // Average cost is recalculated by the stock movement trigger after insert.
       stockMovements.push({
         org_id: orgId,
         branch_id: movementBranchId,

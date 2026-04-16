@@ -694,7 +694,6 @@ Core reusable components:
 | `ensure_salam_liability_account` | Ensure CoA syariah account `2602` (Hutang Salam) exists and return its account id |
 | `ensure_salam_vendor_receivable_account` | Ensure CoA syariah account `1404` (Piutang Salam Vendor) exists and return its account id |
 | `ensure_istishna_vendor_asset_account` | Ensure CoA account `1205` (Aset / Piutang Barang Istishna Pembelian) exists and return its account id |
-| `update_product_average_cost` | Average cost recalculation |
 | `resolve_inventory_asset_account` | Resolve inventory account per product / segment (`1301`–`1304`) |
 | `ensure_inventory_segment_accounts` | Ensure default segment accounts (WIP, raw material, finished goods) per org |
 | `generate_payslips_for_run` | Payslip generation |

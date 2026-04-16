@@ -20,8 +20,9 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area } from 'recharts'
 import { formatRupiah } from '@/lib/utils'
+import { SafeResponsiveContainer } from '@/components/ui/SafeResponsiveContainer'
 
 interface DashboardClientProps {
   data: {
@@ -211,7 +212,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
             </div>
           </div>
           <div className="bg-white rounded-[40px] p-10 border border-slate-100 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.04)] h-[380px] group transition-all">
-            <ResponsiveContainer width="100%" height="100%">
+            <SafeResponsiveContainer>
               <AreaChart data={data.analytics} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
@@ -242,7 +243,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
                 <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorRev)" />
                 <Area type="monotone" dataKey="profit" stroke="#3b82f6" strokeWidth={4} strokeDasharray="8 8" fill="url(#colorProfit)" />
               </AreaChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
           </div>
         </motion.div>
 
