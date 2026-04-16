@@ -121,9 +121,9 @@ export default function EduSimulationClient({
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                   <div className="max-w-2xl">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-600">EDU Mode Realtime</p>
-                    <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Pilot realtime 1-5 siap dipakai.</h3>
+                    <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">EDU realtime 15 soal siap dipakai.</h3>
                     <p className="mt-2 text-sm font-medium leading-relaxed text-slate-600">
-                      Mode ini menjalankan overlay di dashboard asli, timer global, dan validator otomatis untuk soal 1 sampai 5. Setelah klik mulai, user akan diarahkan ke dashboard dengan org training aktif.
+                      Mode ini menjalankan overlay di dashboard asli, timer global, dan validator otomatis untuk seluruh 15 soal. Setelah klik mulai, user akan diarahkan ke dashboard dengan org training aktif.
                     </p>
                   </div>
 
