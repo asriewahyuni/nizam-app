@@ -1,23 +1,23 @@
 # NIZAM ERP — Comprehensive Codebase Documentation
 
-> **Last updated:** 12 April 2026 — updated with Railway PostgreSQL full decoupling, native SQL JOIN resolution, and Internal Auth completion (`1176`).
+> **Last updated:** 17 April 2026 — refreshed to match current repository structure, PostgreSQL-native runtime, internal auth transition, new developer docs, and migrations through `1215`.
 
 ---
 
 ## 1. Executive Summary
 
-NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **Supabase (PostgreSQL)**. It consolidates accounting, cash & bank, inventory/WMS, purchasing, sales, POS, CRM, HRIS & payroll, fixed assets, budgeting, tax, zakat (Islamic finance), approval workflows, audit trails, manufacturing, fleet management, service orders, SaaS billing, AI token economy, and a sales page builder — all within a single monorepo.
+NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** with a **PostgreSQL-native runtime** and a compatibility layer that still preserves parts of the historical Supabase-oriented API surface. It consolidates accounting, cash & bank, inventory/WMS, purchasing, sales, POS, CRM, HRIS & payroll, fixed assets, budgeting, tax, zakat (Islamic finance), approval workflows, audit trails, manufacturing, fleet management, service orders, SaaS billing, AI token economy, education flows, and public sales pages — all within a single monorepo.
 
 ### Codebase Snapshot
 
 | Metric | Value |
 |---|---|
-| Page routes (`page.tsx`) | **65** |
-| Client components (`*Client.tsx`) | **46** |
-| Server action files | **47** |
-| Migration SQL files | **193** (latest: `1152`) |
-| Test files | **33** |
-| API route handlers | **2** (`/api/export`, `/api/sales-pages/lead`) |
+| Page routes (`page.tsx`) | **78** |
+| Client components (`*Client.tsx`) | **52** |
+| Server action files | **59** |
+| Migration SQL files | **235** (latest: `1215`) |
+| Test files | **49** |
+| API route handlers | **14** |
 | Proxy (middleware) | `proxy.ts` |
 
 ---
@@ -30,9 +30,9 @@ NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **
 | UI Runtime | React **19.2.4** |
 | Rendering | Server Components + Client Components + Server Actions |
 | Request Interception | `proxy.ts` (Next.js 16 Proxy convention) |
-| Database | Supabase / PostgreSQL with RLS |
-| Auth | Supabase Auth (email/password, NIK/password for staff) |
-| Security | RLS + org isolation + role/module gating + branch-level ACL |
+| Database | PostgreSQL native via `pg`, Railway-oriented runtime, legacy Supabase compatibility layer |
+| Auth | Internal auth runtime + compatibility handling for transitional flows |
+| Security | Org isolation, role/module gating, branch-level ACL, and a mix of DB/app-layer enforcement during transition |
 | Styling | Tailwind CSS **4.2.2** + custom design tokens + Framer Motion |
 | UI Components | Custom `NizamUI` component library + Radix UI primitives |
 | Charts | Recharts |
@@ -64,12 +64,16 @@ nizam-app/
 │   └── sp/              # Public sales pages
 ├── components/
 │   ├── shared/          # Layout components (sidebar, header, wizard, etc.)
+│   ├── edu/             # Education shell/components
 │   └── ui/              # Reusable UI primitives (NizamUI, CurrencyInput, etc.)
+├── docs/                # Developer-facing documentation hub
 ├── lib/
+│   ├── auth/            # Auth provider + internal auth helpers
+│   ├── db/              # PostgreSQL connection + native adapter layer
 │   ├── email/           # Email sender (Resend)
 │   ├── hooks/           # Client hooks (useActiveOrgId)
 │   ├── saas/            # SaaS module catalog, pricing, platform admin
-│   ├── supabase/        # Supabase clients (server, client, middleware, config)
+│   ├── supabase/        # Compatibility clients, middleware, config, legacy naming
 │   └── utils.ts         # cn(), formatRupiah(), formatDate(), generateSlug(), etc.
 ├── modules/             # Domain business logic (server actions + lib)
 │   ├── accounting/      # 17 action files
@@ -78,6 +82,7 @@ nizam-app/
 │   ├── cash/            # Bank + reconciliation
 │   ├── contacts/        # CRM contacts
 │   ├── demo/            # Demo seeding
+│   ├── edu/             # Training, competency, edu mode
 │   ├── factory/         # Manufacturing
 │   ├── fleet/           # Fleet management
 │   ├── hris/            # HR + payroll + attendance + leave + expense + self-service
@@ -90,9 +95,9 @@ nizam-app/
 │   └── settings/        # Settings audit
 ├── types/
 │   └── database.types.ts # Auto-generated Supabase types
-├── __tests__/           # Vitest test suites (33 files)
+├── __tests__/           # Vitest test suites (49 files)
 ├── supabase/
-│   └── migrations/      # 193 SQL migration files
+│   └── migrations/      # 235 SQL migration files
 ├── scripts/             # Data migration scripts
 └── public/              # PWA manifest, logo, static assets
 ```
@@ -106,9 +111,10 @@ nizam-app/
 | `app/(dashboard)/layout.tsx` | **Main app guard** — session, org, module, RBAC validation |
 | `proxy.ts` | Next.js 16 Proxy — session refresh, route protection |
 | `lib/supabase/middleware.ts` | Session update, auth/protected page redirect logic |
-| `lib/supabase/config.ts` | Centralized Supabase connection config (remote/local switch) |
-| `lib/supabase/server.ts` | Server-side Supabase client (`createClient`, `createAdminClient`) |
+| `lib/supabase/config.ts` | Compatibility config for remote/local Supabase-oriented flows |
+| `lib/supabase/server.ts` | Compatibility adapter exposing `createClient` / `createAdminClient` over PostgreSQL native runtime |
 | `lib/supabase/client.ts` | Browser-side Supabase client |
+| `lib/db/postgres.ts` | Native PostgreSQL pool and query entry point |
 | `next.config.mjs` | Build config: `standalone` output, TypeScript errors ignored |
 
 ---
@@ -122,7 +128,7 @@ NIZAM uses the **App Router** with route groups:
 - **`(auth)`** — login, register, join invitation, forgot/update password
 - **`(dashboard)`** — all authenticated business modules (20 subdirectories)
 - **Public routes** — `/`, `/demo`, `/abs`, `/onboarding`, `/sp/[orgSlug]/[pageSlug]`
-- **API routes** — `/api/export`, `/api/sales-pages/lead`
+- **API routes** — auth session/signout, edu session, export, DB/health endpoints, OpenAPI, public sales lead, and `/api/v1/*` module endpoints
 
 ### 4.2 Root Flow
 
@@ -199,16 +205,23 @@ app/(dashboard)/sales/SalesClient.tsx   ← Client Component ('use client', all 
 
 Client components import server actions and call them via `startTransition` or form actions.
 
-### 4.7 Supabase Client Usage
+### 4.7 Data Access & Compatibility Layer
 
 | Context | Import | Function |
 |---|---|---|
-| Server Components, Server Actions | `lib/supabase/server.ts` | `createClient()` |
-| Admin operations (password reset, etc.) | `lib/supabase/server.ts` | `createAdminClient()` |
+| Native PostgreSQL access | `lib/db/postgres.ts` | Pool + direct SQL queries |
+| Server Components, Server Actions | `lib/supabase/server.ts` | `createClient()` compatibility adapter |
+| Admin operations | `lib/supabase/server.ts` | `createAdminClient()` compatibility adapter |
 | Client Components | `lib/supabase/client.ts` | `createClient()` |
 | Middleware | `lib/supabase/middleware.ts` | `createServerClient()` inline |
 
-**Config switching:** `lib/supabase/config.ts` reads `NEXT_PUBLIC_SUPABASE_TARGET`:
+Important notes:
+
+- `lib/supabase/server.ts` no longer represents a purely Supabase-backed server client; it adapts many existing action files to PostgreSQL-native internals.
+- `lib/supabase/config.ts` remains for compatibility and environment switching where older flows still expect Supabase configuration.
+- File naming in this area is historical. Always inspect implementation, not just the filename.
+
+**Compatibility config switching:** `lib/supabase/config.ts` reads `NEXT_PUBLIC_SUPABASE_TARGET`:
 - `'local'` → use `NEXT_PUBLIC_SUPABASE_LOCAL_URL` + local keys
 - anything else → use `NEXT_PUBLIC_SUPABASE_URL` + remote keys
 
@@ -231,8 +244,14 @@ Client components import server actions and call them via `startTransition` or f
 | Staff login | `signInWithNik(formData)` | NIK/password |
 | Staff invitation | `verifyEmployeeNikByToken(token, nik)` | Join link → `/join/[token]` |
 | Staff registration | `registerEmployeeAccount(formData)` | After invitation verification |
-| Password reset (owner) | `sendPasswordResetEmail(formData)` | Via Supabase email |
+| Password reset (owner) | `sendPasswordResetEmail(formData)` | Transitional / provider-dependent |
 | Password reset (staff) | `requestPasswordReset(nik)` → `resetEmployeePassword(...)` | HR-initiated |
+
+Current runtime note:
+
+- Middleware still supports `AUTH_PROVIDER=supabase` and `AUTH_PROVIDER=internal`.
+- The server adapter in `lib/supabase/server.ts` is already wired around internal auth session semantics for the PostgreSQL-native runtime.
+- This means some auth flows are transitional and should be verified against the active environment before operational use.
 
 ### 5.3 Active Organization Resolution
 
@@ -799,19 +818,30 @@ Core reusable components:
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase anon key |
-| `NEXT_PUBLIC_SUPABASE_TARGET` | Optional | `local` = use local Supabase CLI |
-| `SUPABASE_SERVICE_ROLE_KEY` | For admin ops | Employee provisioning, reset password |
+| `DATABASE_URL` | Recommended | Primary PostgreSQL runtime connection |
+| `RAILWAY_DATABASE_URL` | Recommended fallback | Railway PostgreSQL connection |
+| `DATABASE_PUBLIC_URL` | Optional fallback | Alternate DB connection source |
+| `AUTH_PROVIDER` | Recommended | `internal` or `supabase` depending on environment |
+| `INTERNAL_AUTH_SESSION_SECRET` | Required when internal auth | Internal auth cookie/session signing |
+| `INTERNAL_AUTH_BOOTSTRAP_PASSWORD` | Optional | Bootstrap helper for internal auth scripts |
+| `NEXT_PUBLIC_SUPABASE_URL` | Compatibility / legacy | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Compatibility / legacy | Supabase anon key |
+| `NEXT_PUBLIC_SUPABASE_TARGET` | Optional | `local` = use local Supabase CLI compatibility mode |
+| `SUPABASE_SERVICE_ROLE_KEY` | Transitional admin ops | Employee provisioning, reset password, legacy scripts |
 | `NEXT_PUBLIC_SUPABASE_LOCAL_URL` | When local | Local Supabase URL |
 | `NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY` | When local | Local anon key |
 | `SUPABASE_LOCAL_SERVICE_ROLE_KEY` | When local | Local service role |
 | `GOOGLE_AI_STUDIO_KEY` | For AI features | OCR, AI content generation |
 | `RESEND_API_KEY` | For email | Invoice, promo email |
+| `NEXT_PUBLIC_APP_URL` | Optional | Public base URL fallback |
 | `NEXT_PUBLIC_SITE_URL` | Optional | Password reset redirect URL |
 | `VERCEL_URL` | Auto (Vercel) | Vercel deployment origin |
 
-Connection switching is handled by `lib/supabase/config.ts`. **Changing `NEXT_PUBLIC_SUPABASE_TARGET` requires a restart** — it doesn't hot-reload.
+Notes:
+
+- Runtime DB access now expects one of `DATABASE_URL`, `RAILWAY_DATABASE_URL`, or `DATABASE_PUBLIC_URL`.
+- [`.env.local.example`](/Users/manbook/nizam-app/.env.local.example:1) is still a useful baseline, but it does not fully explain every PostgreSQL-native runtime variable.
+- Compatibility switching for older Supabase-oriented flows is still handled by `lib/supabase/config.ts`. Changing `NEXT_PUBLIC_SUPABASE_TARGET` requires a restart.
 
 ---
 
@@ -820,7 +850,8 @@ Connection switching is handled by `lib/supabase/config.ts`. **Changing `NEXT_PU
 ### 11.1 Prerequisites
 
 - Node.js ≥ 20.0.0
-- Supabase project (or local Supabase CLI + Docker)
+- PostgreSQL database access for the active environment
+- Optional: Supabase project or local Supabase CLI + Docker for compatibility/testing flows
 - Environment variables configured
 
 ### 11.2 Available Scripts
@@ -845,14 +876,24 @@ npm run supabase:stop            # Stop local Supabase
 npm run supabase:status          # Show local Supabase status
 npm run supabase:db:reset        # Reset local database
 npm run supabase:migrate-local-data  # Clone online data to local
+
+# Railway / PostgreSQL cutover helpers
+npm run db:railway:sync          # Dry-run schema sync
+npm run db:railway:sync:apply    # Apply schema sync
+npm run db:railway:data:sync     # Dry-run data sync
+npm run db:railway:data:sync:apply # Apply data sync
+npm run db:railway:readiness     # Cutover readiness checks
+npm run db:railway:cutover       # Orchestrated dry-run cutover
+npm run db:railway:cutover:apply # Apply cutover flow
 ```
 
-### 11.3 Supabase Connection Modes
+### 11.3 Runtime and Compatibility Modes
 
 | Mode | Setup |
 |---|---|
-| **App → Remote Supabase** | Fill remote env vars, leave `NEXT_PUBLIC_SUPABASE_TARGET` empty |
-| **App → Local Supabase** | Run `supabase:start`, fill local env vars, set `TARGET=local` |
+| **App → PostgreSQL native runtime** | Fill `DATABASE_URL` or `RAILWAY_DATABASE_URL`, configure auth provider |
+| **App → Remote Supabase compatibility flow** | Fill remote Supabase env vars, leave `NEXT_PUBLIC_SUPABASE_TARGET` empty |
+| **App → Local Supabase compatibility flow** | Run `supabase:start`, fill local env vars, set `NEXT_PUBLIC_SUPABASE_TARGET=local` |
 | **Clone Remote → Local** | Keep both env sets, run `supabase:migrate-local-data` |
 
 > ⚠️ After cloning, user passwords are reset to `LocalTest123!`
@@ -877,7 +918,7 @@ This means production builds will succeed even with type errors. This flag exist
 - Coverage: `v8` provider, `text` + `html` reporters
 - Path alias: `@/` → project root
 
-### 12.2 Test Suites (33 files)
+### 12.2 Test Suites (49 files)
 
 | File | Coverage Area |
 |---|---|
@@ -973,10 +1014,12 @@ The project uses **Tailwind CSS 4.2.2** with `@tailwindcss/postcss`. Custom colo
 
 5. **Check branch access.** For branch-aware operations, use `modules/organization/lib/branch-access.server.ts` to filter by user's allowed branches.
 
-6. **Use the correct Supabase client:**
+6. **Use the correct data access layer:**
+   - Native SQL / infra debugging: inspect `lib/db/postgres.ts`
    - Server actions/components: `import { createClient } from '@/lib/supabase/server'`
    - Client components: `import { createClient } from '@/lib/supabase/client'`
    - Admin operations: `import { createAdminClient } from '@/lib/supabase/server'`
+   - Remember that `lib/supabase/server.ts` is now a compatibility adapter over PostgreSQL-native internals
 
 7. **Follow the thin page + fat client pattern.** Server `page.tsx` files should be minimal. Put interactive UI in `*Client.tsx` with `'use client'`.
 
@@ -1054,7 +1097,7 @@ When adding new modules to the SaaS system, update:
 ### 14.8 Known Technical Debt
 
 - `next.config.mjs` ignores TypeScript build errors
-- Some admin/settings areas use client-side Supabase writes instead of server actions
+- Some admin/settings areas still use client-side Supabase-oriented writes instead of server actions
 - ESLint has a backlog of warnings across modules
 - Some `<img>` tags should be `next/image`
 
