@@ -841,21 +841,7 @@ async function callRpc(
     }
 
     const args = params ? Object.entries(params) : []
-    const paramValues = args.map(([, v]) => {
-      if (v instanceof Date) {
-        return v.toISOString()
-      }
-
-      if (Array.isArray(v)) {
-        return JSON.stringify(v)
-      }
-
-      if (v && typeof v === 'object') {
-        return JSON.stringify(v)
-      }
-
-      return v
-    })
+    const paramValues = args.map(([, v]) => serializeRpcParam(v))
 
     // Build: SELECT * FROM fn(p1 => $1, p2 => $2)
     const argStr = args.map(([k], i) => `${k} => $${i + 1}`).join(', ')
@@ -912,6 +898,31 @@ async function callRpc(
     const code = (err as any)?.code
     return { data: null, error: { message, code } }
   }
+}
+
+function serializeRpcParam(value: unknown): unknown {
+  if (value instanceof Date) {
+    return value.toISOString()
+  }
+
+  if (Array.isArray(value)) {
+    const normalizedArray = value.map((item) => item instanceof Date ? item.toISOString() : item)
+
+    // Keep primitive arrays as native JS arrays so pg can bind them as
+    // PostgreSQL arrays (uuid[], text[], numeric[], etc.). Structured arrays
+    // still need JSON encoding for json/jsonb function parameters.
+    const hasStructuredItem = normalizedArray.some(
+      (item) => Array.isArray(item) || (item !== null && typeof item === 'object')
+    )
+
+    return hasStructuredItem ? JSON.stringify(normalizedArray) : normalizedArray
+  }
+
+  if (value && typeof value === 'object') {
+    return JSON.stringify(value)
+  }
+
+  return value
 }
 
 // ─── Main client factory ──────────────────────────────────────────────────────

@@ -101,4 +101,39 @@ describe('postgres native rpc auth claims', () => {
     expect(mocks.getPostgresPool).not.toHaveBeenCalled()
     expect(result).toEqual({ data: true, error: null })
   })
+
+  it('preserves primitive arrays for PostgreSQL array params and JSON-encodes structured arrays', async () => {
+    mocks.getInternalAuthSession.mockResolvedValue(null)
+    mocks.queryPostgres.mockResolvedValue({
+      rows: [],
+    })
+
+    const pItems = [
+      { product_id: 'prod-1', quantity: 2 },
+      { product_id: 'prod-2', quantity: 1 },
+    ]
+
+    const db = createPostgresNativeClient()
+    const result = await db.rpc('mixed_array_rpc', {
+      p_account_ids: [
+        '11111111-1111-4111-8111-111111111111',
+        '22222222-2222-4222-8222-222222222222',
+      ],
+      p_items: pItems,
+      p_effective_dates: ['2026-04-01', '2026-04-02'],
+    })
+
+    expect(mocks.queryPostgres).toHaveBeenCalledWith(
+      'SELECT * FROM public."mixed_array_rpc"(p_account_ids => $1, p_items => $2, p_effective_dates => $3)',
+      [
+        [
+          '11111111-1111-4111-8111-111111111111',
+          '22222222-2222-4222-8222-222222222222',
+        ],
+        JSON.stringify(pItems),
+        ['2026-04-01', '2026-04-02'],
+      ]
+    )
+    expect(result).toEqual({ data: [], error: null })
+  })
 })
