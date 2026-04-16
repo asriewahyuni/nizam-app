@@ -29,6 +29,7 @@ import {
 } from '@/modules/organization/lib/branch-access.server'
 import { applyVoucher } from './billing.actions'
 import { syncParentCoAToChildOrg } from '@/modules/accounting/actions/coa.actions'
+import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 
 const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 const DEFAULT_BRANCH_NAME = 'Unit Utama'
@@ -1337,6 +1338,7 @@ export async function createOrganizationQuick(formData: FormData) {
     revalidatePath('/', 'layout')
     revalidatePath('/dashboard')
   }
+  await nudgeEduModeValidation('organization.create.quick')
   return result
 }
 
@@ -2141,6 +2143,7 @@ export async function createBranch(orgId: string, formData: FormData) {
   revalidatePath('/', 'layout')
   revalidatePath('/settings/branches')
   revalidatePath('/settings/users')
+  await nudgeEduModeValidation('organization.create.branch')
   return {
     success: true,
     branch: insertedBranch,

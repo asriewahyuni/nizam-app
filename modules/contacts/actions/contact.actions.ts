@@ -3,6 +3,7 @@
 import { isInternalAuthProvider } from '@/lib/auth/provider'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 
 type ContactType = 'CUSTOMER' | 'SUPPLIER'
 type ContactMutationPayload = {
@@ -20,6 +21,9 @@ type ContactMutationResult =
 type DeleteContactResult =
   | { success: true; error?: undefined }
   | { success?: false; error: string }
+type ContactDbContext =
+  | { user: any; db: any; error?: undefined }
+  | { error: string; user?: undefined; db?: undefined }
 
 function normalizeOptionalField(value: FormDataEntryValue | null) {
   if (typeof value !== 'string') return null
@@ -54,14 +58,14 @@ function revalidateContactPages() {
   revalidatePath('/dashboard')
 }
 
-async function getContactDbContext(orgId: string) {
+async function getContactDbContext(orgId: string): Promise<ContactDbContext> {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return { error: 'Unauthorized' as const }
+    return { error: 'Unauthorized' }
   }
 
   if (!isInternalAuthProvider()) {
@@ -81,7 +85,7 @@ async function getContactDbContext(orgId: string) {
     .maybeSingle()
 
   if (!membership?.id) {
-    return { error: 'Unauthorized' as const }
+    return { error: 'Unauthorized' }
   }
 
   return {
@@ -104,7 +108,7 @@ export async function getContacts(orgId: string, type?: 'CUSTOMER' | 'SUPPLIER')
 
 export async function createContact(orgId: string, formData: FormData): Promise<ContactMutationResult> {
   const context = await getContactDbContext(orgId)
-  if ('error' in context) return { error: context.error }
+  if ('error' in context) return { error: context.error || 'Unauthorized' }
 
   const payload = parseContactFormData(formData)
   if ('error' in payload) return payload
@@ -118,12 +122,13 @@ export async function createContact(orgId: string, formData: FormData): Promise<
   if (error) return { error: 'Gagal membuat kontak: ' + error.message }
 
   revalidateContactPages()
+  await nudgeEduModeValidation('contacts.create.contact')
   return { success: true, data }
 }
 
 export async function updateContact(orgId: string, contactId: string, formData: FormData): Promise<ContactMutationResult> {
   const context = await getContactDbContext(orgId)
-  if ('error' in context) return { error: context.error }
+  if ('error' in context) return { error: context.error || 'Unauthorized' }
 
   const payload = parseContactFormData(formData)
   if ('error' in payload) return payload
@@ -148,7 +153,7 @@ export async function updateContact(orgId: string, contactId: string, formData: 
 
 export async function deleteContact(orgId: string, contactId: string): Promise<DeleteContactResult> {
   const context = await getContactDbContext(orgId)
-  if ('error' in context) return { error: context.error }
+  if ('error' in context) return { error: context.error || 'Unauthorized' }
 
   const { error } = await context.db
     .from('contacts')

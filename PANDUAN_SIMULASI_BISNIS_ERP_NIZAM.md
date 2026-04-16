@@ -9,6 +9,10 @@ Dokumen ini menjelaskan bagaimana codebase `nizam-app` saat ini dapat menjalanka
 - dasar penilaian berbasis leaderboard, dan
 - capability mapping untuk tim produk atau implementasi.
 
+Untuk status implementasi `EDU Mode` realtime dengan timer, validator otomatis, auto-advance soal, dan overlay di dashboard asli, lihat juga dokumen:
+
+- `DOKUMENTASI_EDU_MODE_REALTIME_NIZAM.md`
+
 ## Ringkasan Kesimpulan
 
 Skenario pada `uit.md` pada dasarnya sudah selaras dengan kemampuan inti NIZAM ERP. Sebagian besar alur yang diminta sudah tersedia melalui modul operasional yang aktif di dashboard, dan bahkan versi kurikulum 15 soal yang sangat mirip sudah ada di:
@@ -168,6 +172,8 @@ Ini poin penting untuk tim produk dan trainer:
 - `lib/edu/training-simulation.ts` sudah berisi 15 pertanyaan yang hampir identik dengan `uit.md`.
 - `/edu` sudah menampilkan kurikulum 15 soal dan leaderboard.
 - `training_events`, `training_teams`, dan `training_team_scores` sudah tersedia di schema.
+- pilot `EDU Mode` realtime sudah menambahkan `training_sessions`, `training_session_steps`, dan `training_progress_events`.
+- peserta sekarang bisa memulai session dari `/edu` lalu masuk ke dashboard asli dengan overlay realtime.
 - Trainer sudah bisa membuat tim dan memberi skor per soal melalui action:
   - `createTrainingTeam`
   - `updateTrainingQuestionScore`

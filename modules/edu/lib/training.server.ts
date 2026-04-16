@@ -15,6 +15,7 @@ type TrainingEventRow = {
   title: string
   description: string | null
   question_count: number | null
+  settings?: Record<string, unknown> | null
 }
 
 type TrainingTeamRow = {
@@ -118,7 +119,7 @@ export async function ensureTrainingEvent(eventSlug?: string | null): Promise<Tr
 
   const { data: existingEvent, error: existingError } = await db
     .from('training_events')
-    .select('id, slug, title, description, question_count')
+    .select('id, slug, title, description, question_count, settings')
     .eq('slug', slug)
     .maybeSingle()
 
@@ -146,7 +147,7 @@ export async function ensureTrainingEvent(eventSlug?: string | null): Promise<Tr
         source: 'edu-page',
       },
     })
-    .select('id, slug, title, description, question_count')
+    .select('id, slug, title, description, question_count, settings')
     .single()
 
   if (!insertError && insertedEvent?.id) {
@@ -155,7 +156,7 @@ export async function ensureTrainingEvent(eventSlug?: string | null): Promise<Tr
 
   const { data: fallbackEvent, error: fallbackError } = await db
     .from('training_events')
-    .select('id, slug, title, description, question_count')
+    .select('id, slug, title, description, question_count, settings')
     .eq('slug', slug)
     .maybeSingle()
 

@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   TRAINING_SCORING_CRITERIA,
   TRAINING_PHASE_LABELS,
@@ -8,6 +9,8 @@ import {
   TRAINING_MAX_SCORE,
   type TrainingBoardData,
 } from '@/lib/edu/training-simulation'
+import { createTrainingTeam } from '@/modules/edu/actions/training.actions'
+import { startTrainingSession } from '@/modules/edu/actions/session.actions'
 
 export default function EduSimulationClient({
   initialBoard,
@@ -18,7 +21,53 @@ export default function EduSimulationClient({
   canManage: boolean
   trainerLabel: string | null
 }) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<'board' | 'curriculum'>('board')
+  const [teamNameDraft, setTeamNameDraft] = useState('')
+  const [feedback, setFeedback] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  const handleCreateTeam = () => {
+    const normalizedName = teamNameDraft.trim()
+    if (!normalizedName) {
+      setFeedback('Nama tim belum diisi.')
+      return
+    }
+
+    startTransition(async () => {
+      const result = await createTrainingTeam({
+        teamName: normalizedName,
+        eventSlug: initialBoard.event.slug,
+      })
+
+      if (result.error) {
+        setFeedback(result.error)
+        return
+      }
+
+      setTeamNameDraft('')
+      setFeedback('Tim berhasil dibuat. Lanjut klik "Mulai EDU Mode" pada baris tim.')
+      router.refresh()
+    })
+  }
+
+  const handleStartSession = (teamId: string) => {
+    startTransition(async () => {
+      const result = await startTrainingSession({
+        teamId,
+        eventSlug: initialBoard.event.slug,
+      })
+
+      if (result.error) {
+        setFeedback(result.error)
+        return
+      }
+
+      setFeedback(null)
+      router.push(result.redirectTo || '/dashboard')
+      router.refresh()
+    })
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -67,6 +116,42 @@ export default function EduSimulationClient({
       <main className="max-w-6xl mx-auto px-4 py-8">
         {activeTab === 'board' && (
           <div className="space-y-6">
+            {canManage && (
+              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="max-w-2xl">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-600">EDU Mode Realtime</p>
+                    <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Pilot realtime 1-5 siap dipakai.</h3>
+                    <p className="mt-2 text-sm font-medium leading-relaxed text-slate-600">
+                      Mode ini menjalankan overlay di dashboard asli, timer global, dan validator otomatis untuk soal 1 sampai 5. Setelah klik mulai, user akan diarahkan ke dashboard dengan org training aktif.
+                    </p>
+                  </div>
+
+                  <div className="w-full max-w-xl rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                    <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Buat Tim Baru</label>
+                    <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+                      <input
+                        value={teamNameDraft}
+                        onChange={(event) => setTeamNameDraft(event.target.value)}
+                        placeholder="Misalnya Tim Alpha"
+                        className="h-12 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 outline-none transition-colors focus:border-blue-400"
+                      />
+                      <button
+                        onClick={handleCreateTeam}
+                        disabled={isPending}
+                        className="h-12 rounded-2xl bg-slate-900 px-5 text-sm font-black uppercase tracking-[0.14em] text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isPending ? 'Menyimpan...' : 'Tambah Tim'}
+                      </button>
+                    </div>
+                    {feedback && (
+                      <p className="mt-3 text-sm font-semibold text-slate-600">{feedback}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="p-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
                 <h3 className="font-bold text-slate-800">Skor Tim Saat Ini</h3>
@@ -88,6 +173,9 @@ export default function EduSimulationClient({
                           <th className="p-4 border-b border-slate-200">Total Skor</th>
                           <th className="p-4 border-b border-slate-200">Task Berhasil</th>
                           <th className="p-4 border-b border-slate-200">Waktu</th>
+                          {canManage && (
+                            <th className="p-4 border-b border-slate-200 text-right">EDU Mode</th>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
@@ -116,6 +204,17 @@ export default function EduSimulationClient({
                             <td className="p-4">
                               <span className="font-mono text-sm font-bold text-slate-600">{team.elapsedMinutes} mnt</span>
                             </td>
+                            {canManage && (
+                              <td className="p-4 text-right">
+                                <button
+                                  onClick={() => handleStartSession(team.id)}
+                                  disabled={isPending}
+                                  className="inline-flex items-center rounded-2xl border border-fuchsia-200 bg-fuchsia-50 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-fuchsia-700 transition-colors hover:border-fuchsia-300 hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {isPending ? 'Menyiapkan...' : 'Mulai EDU Mode'}
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>

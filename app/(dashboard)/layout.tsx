@@ -15,6 +15,7 @@ import { FloatingPlanBadge } from '@/components/shared/FloatingPlanBadge'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import { MobilePullToRefresh } from '@/components/shared/MobilePullToRefresh'
 import { RouteProgressBar } from '@/components/shared/RouteProgressBar'
+import { EduModeShell } from '@/components/edu/EduModeShell'
 
 type RouteModuleEntry = {
   path: string
@@ -136,6 +137,7 @@ export default async function DashboardLayout({
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 print:block print:h-auto print:overflow-visible print:bg-white">
       <RouteProgressBar />
+      <EduModeShell />
       {/* Sidebar */}
       <AppSidebar 
         key={`sidebar:${orgData.org.id}:${activeBranch?.id || 'all'}`}

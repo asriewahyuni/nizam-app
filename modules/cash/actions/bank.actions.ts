@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { checkCanManageCoA } from '@/modules/accounting/actions/coa.actions'
+import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 import type { Account, BankAccount } from '@/types/database.types'
 import type { CashBankAccount, RecentTransactionOption } from '@/modules/cash/types'
 
@@ -326,6 +327,7 @@ export async function createBankAccount(orgId: string, formData: FormData) {
   }
 
   revalidatePath('/cash')
+  await nudgeEduModeValidation('cash.create.bank-account')
   return { success: true }
 }
 
@@ -428,6 +430,7 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
   revalidatePath('/accounting/journal')
   revalidatePath('/reports')
   revalidatePath('/dashboard')
+  await nudgeEduModeValidation('cash.create.bank-transaction')
   return { success: true }
 }
 
@@ -517,6 +520,7 @@ export async function createInterOrgCapitalTransfer(orgId: string, formData: For
   revalidatePath('/accounting/journal')
   revalidatePath('/reports')
   revalidatePath('/dashboard')
+  await nudgeEduModeValidation('cash.create.interorg-capital-transfer')
   return { success: true, data }
 }
 

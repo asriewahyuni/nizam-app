@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 
 type WarehousePayload = {
   code: string
@@ -479,6 +480,7 @@ export async function createWarehouse(orgId: string, payload: WarehousePayload):
 
   if (error) return { error: error.message }
   revalidateWarehousePages(data?.id)
+  await nudgeEduModeValidation('inventory.create.warehouse')
   return { success: true, data }
 }
 

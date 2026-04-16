@@ -4,6 +4,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath, unstable_noStore as noStore } from 'next/cache'
 import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
 import { getBranchAccessScope, resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 
 type BranchSelectionResult =
   | { branchId: string | null; error?: undefined }
@@ -785,6 +786,9 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
     }
 
     revalidatePath('/purchasing')
+    if (createMode === 'PUBLISH') {
+      await nudgeEduModeValidation('purchasing.publish.purchase-from-draft')
+    }
     return { success: true, purchaseId: payload.draft_id }
   }
 
@@ -860,6 +864,7 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
   }
 
   revalidatePath('/purchasing')
+  await nudgeEduModeValidation('purchasing.create.purchase')
   return { success: true, purchaseId: rpcRes.purchase_id }
 }
 
@@ -991,6 +996,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 
       revalidatePath('/purchasing')
       revalidatePath('/inventory')
+      await nudgeEduModeValidation('purchasing.receive.purchase-idempotent')
       return { success: true }
     }
   }
@@ -1283,6 +1289,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 
   revalidatePath('/purchasing')
   revalidatePath('/inventory')
+  await nudgeEduModeValidation('purchasing.receive.purchase')
   return { success: true }
 }
 

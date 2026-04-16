@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { Product } from '@/types/database.types'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 
 type ProductInventoryFields = Pick<
   Product,
@@ -242,6 +243,7 @@ export async function createProduct(productData: Partial<Product>) {
   }
 
   revalidatePath('/inventory')
+  await nudgeEduModeValidation('inventory.create.product')
   return { data: data as Product }
 }
 
