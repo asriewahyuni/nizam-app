@@ -136,4 +136,58 @@ describe('Zakat Accounting Boundary', () => {
     expect(result.isZakatObligated).toBe(false)
     expect(result.zakatAmount).toBe(0)
   })
+
+  it('classifies SALAM and ISTISHNA receivables-liabilities into zakat assets correctly', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        zakat_haul: [
+          {
+            maybeSingleResult: success(null),
+          },
+          {
+            maybeSingleResult: success(null),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        zakat_asset_timeline: [
+          {
+            maybeSingleResult: success(null),
+          },
+          {
+            result: success([]),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        accounts: [
+          {
+            result: { data: null, error: null, count: 2 } as any,
+          },
+        ],
+      },
+    })
+
+    mocks.getAccountBalances.mockResolvedValue([
+      { code: '1101', name: 'Kas', balance: 100000000 },
+      { code: '1205', name: 'Piutang Barang Istishna', balance: 15000000 },
+      { code: '1404', name: 'Piutang Salam Vendor', balance: 5000000 },
+      { code: '1301', name: 'Persediaan', balance: 20000000 },
+      { code: '2101', name: 'Hutang Dagang', balance: -7000000 },
+      { code: '2602', name: 'Hutang Salam', balance: -3000000 },
+      { code: '2603', name: 'Hutang Istishna', balance: -4000000 },
+    ])
+    mocks.createClient.mockResolvedValue(supabase.client)
+
+    const result = await getZakatSummary('org-syariah', {
+      goldPerGram: 1500000,
+      silverPerGram: 15000,
+    })
+
+    expect(result.breakdown.totalAR).toBe(20000000)
+    expect(result.breakdown.totalAP).toBe(14000000)
+    expect(result.totalAssets).toBe(126000000)
+  })
 })

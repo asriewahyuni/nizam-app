@@ -226,6 +226,57 @@ describe('Sales Branch Context', () => {
     expect(fromMock).not.toHaveBeenCalled()
   })
 
+  it('keeps ISTISHNA sales on TEMPO so down payment can be recorded bertahap', async () => {
+    const saleSingle = vi.fn().mockResolvedValue({
+      data: { id: 'sale-istishna-1' },
+      error: null,
+    })
+    const saleInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: saleSingle,
+      })),
+    }))
+    const lineInsert = vi.fn().mockResolvedValue({ error: null })
+    const approvalInsert = vi.fn().mockResolvedValue({ error: null })
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'sales') return { insert: saleInsert }
+        if (table === 'sales_items') return { insert: lineInsert }
+        if (table === 'approval_requests') return { insert: approvalInsert }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const result = await createSaleEntry('org-1', {
+      customer_id: 'cust-1',
+      customer_name: 'PT Istishna Maju',
+      sale_date: '2026-04-05',
+      due_date: '2026-04-20',
+      payment_term: 'TEMPO',
+      shariah_mode: 'ISTISHNA',
+      lines: [{ product_name: 'Produk ISTISHNA', quantity: 1, unit_price: 5000 }],
+    })
+
+    expect(result).toEqual({ success: true, saleId: 'sale-istishna-1' })
+    expect(saleInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_term: 'TEMPO',
+        due_date: '2026-04-20',
+        shariah_mode: 'ISTISHNA',
+      })
+    )
+  })
+
   it('blocks non-SALAM invoice creation when stock is insufficient and suggests SALAM', async () => {
     const saleInsert = vi.fn()
     const lineInsert = vi.fn()

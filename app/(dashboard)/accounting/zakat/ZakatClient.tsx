@@ -606,9 +606,13 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
             <p className="text-[10px] font-black text-slate-900 uppercase italic tracking-widest">Syariah Add-on (CoAS)</p>
             <p className="text-[11px] font-medium text-slate-500 leading-relaxed italic">
               {summary.isShariahEnabled 
-                ? 'Struktur akun Syariah (Syirkah, Qard, Ijarah, Zakat) saat ini AKTIF di CoA Anda.'
-                : 'Suntikkan akun Syariah (Syirkah, Qard, Ijarah, Zakat) otomatis ke CoA Anda.'}
+                ? 'Struktur akun Syariah (Syirkah, Qard, SALAM, ISTISHNA, Ijarah, Zakat) saat ini AKTIF di CoA Anda.'
+                : 'Suntikkan akun Syariah (Syirkah, Qard, SALAM, ISTISHNA, Ijarah, Zakat) otomatis ke CoA Anda.'}
             </p>
+            <div className="rounded-3xl border border-slate-100 bg-slate-50 px-4 py-3 text-[10px] font-medium leading-relaxed text-slate-500">
+              <p><strong className="text-slate-700">SALAM:</strong> pembelian dan penjualan wajib tunai lunas di depan, barang menyusul.</p>
+              <p><strong className="text-slate-700">ISTISHNA:</strong> pembelian dan penjualan boleh memakai DP atau pembayaran bertahap.</p>
+            </div>
             
             {summary.isShariahEnabled ? (
               <button
@@ -635,7 +639,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                     setLoading(true)
                     const res = await injectShariahPack(orgId)
                     if (res.success) {
-                      alert('Struktur Akun Syariah Berhasil Disuntikkan!')
+                      alert('Struktur Akun Syariah berhasil diaktifkan ulang dan akun SALAM/ISTISHNA sudah disiapkan.')
                       router.refresh()
                     } else alert(res.error)
                     setLoading(false)

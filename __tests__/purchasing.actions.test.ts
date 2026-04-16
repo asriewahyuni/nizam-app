@@ -231,6 +231,58 @@ describe('Purchasing Branch Context', () => {
     expect(rpcMock).not.toHaveBeenCalled()
   })
 
+  it('keeps ISTISHNA purchase on chosen payment term so DP can be recorded bertahap', async () => {
+    const productsQuery = createNoopMutationBuilder()
+    const rpcMock = vi.fn().mockResolvedValue({
+      data: { success: true, purchase_id: 'po-istishna-1' },
+      error: null,
+    })
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'products') return productsQuery
+        throw new Error(`Unexpected table ${table}`)
+      }),
+      rpc: rpcMock,
+    })
+
+    const result = await createPurchaseEntry('org-1', {
+      vendor_id: 'vendor-1',
+      branch_id: 'branch-1',
+      purchase_date: '2026-04-06',
+      due_date: '2026-04-20',
+      payment_term: 'TEMPO',
+      shariah_mode: 'ISTISHNA',
+      lines: [
+        {
+          product_id: 'prod-1',
+          product_name: 'Barang ISTISHNA',
+          quantity: 2,
+          unit_price: 1000,
+        },
+      ],
+    })
+
+    expect(result).toEqual({ success: true, purchaseId: 'po-istishna-1' })
+    expect(rpcMock).toHaveBeenCalledWith(
+      'process_purchase_atomic',
+      expect.objectContaining({
+        p_shariah_mode: 'ISTISHNA',
+        p_due_date: '2026-04-20',
+        p_notes: expect.stringContaining('[TERMIN: TEMPO]'),
+      })
+    )
+  })
+
   it('filters purchase requests by branch when a unit is active', async () => {
     const orderMock = vi.fn().mockResolvedValue({
       data: [],

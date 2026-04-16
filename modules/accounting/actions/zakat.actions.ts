@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getAccountBalances } from './coa.actions'
 import { createJournalEntry } from './journal.actions'
+import { SHARIAH_COA_ENABLEMENT_CODES } from '@/modules/accounting/lib/shariah-coa'
 
 // Helper: Penentuan Hari Berdasarkan Fiqh (Pergantian hari di waktu Maghrib ~ 18:00 WIB)
 function getIslamicToday(timeZone: string = 'Asia/Jakarta'): string {
@@ -160,7 +161,7 @@ async function getTotalZakatAssets(orgId: string) {
 
   // 2. Piutang Dagang / AR (1201–1299) — yang diharapkan kembali
   const arAccounts = balances
-    .filter((b: any) => b.code >= '1201' && b.code <= '1299')
+    .filter((b: any) => (b.code >= '1201' && b.code <= '1299') || b.code === '1404')
     .map((b: any) => ({ name: b.name, code: b.code, balance: b.balance || 0, type: 'AR' as const }))
   const totalAR = arAccounts.reduce((s: any, a: any) => s + a.balance, 0)
 
@@ -180,9 +181,9 @@ async function getTotalZakatAssets(orgId: string) {
     .reduce((s: any, b: any) => s + (b.balance || 0), 0)
   const netProfit = Math.max(0, totalRevenue - totalExpenses)
 
-  // 5. Hutang Lancar / AP (2101-2199) - Mengurangi kewajiban zakat
+  // 5. Hutang Lancar / AP (2101-2199 + liabilitas SALAM/ISTISHNA) - Mengurangi kewajiban zakat
   const apAccounts = balances
-    .filter((b: any) => b.code >= '2101' && b.code <= '2199')
+    .filter((b: any) => (b.code >= '2101' && b.code <= '2199') || b.code === '2602' || b.code === '2603')
     .map((b: any) => ({ name: b.name, code: b.code, balance: Math.abs(b.balance || 0), type: 'AP' as const }))
   const totalAP = apAccounts.reduce((s: any, a: any) => s + a.balance, 0)
 
@@ -351,7 +352,7 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
     .from('accounts')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', orgId)
-    .in('code', ['2600', '6100', '6200'])
+    .in('code', SHARIAH_COA_ENABLEMENT_CODES)
     .eq('is_active', true)
 
   return {

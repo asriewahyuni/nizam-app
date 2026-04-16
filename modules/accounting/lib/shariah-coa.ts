@@ -1,0 +1,44 @@
+export type ShariahAccountSeed = {
+  code: string
+  name: string
+  type: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'EXPENSE'
+  normalBalance: 'DEBIT' | 'CREDIT'
+  parentCode: string
+  fallbackParentCodes?: string[]
+}
+
+export const LEGACY_SHARIAH_EQUITY_CODE = '3100'
+
+export const SHARIAH_COA_SEEDS: ShariahAccountSeed[] = [
+  { code: '3110', name: 'Modal Syirkah Mudharabah', type: 'EQUITY', normalBalance: 'CREDIT', parentCode: '3000' },
+  { code: '3120', name: 'Modal Syirkah Inan', type: 'EQUITY', normalBalance: 'CREDIT', parentCode: '3000' },
+  { code: '2600', name: 'Kewajiban Syariah', type: 'LIABILITY', normalBalance: 'CREDIT', parentCode: '2000' },
+  { code: '2601', name: 'Hutang Qard (Kebajikan)', type: 'LIABILITY', normalBalance: 'CREDIT', parentCode: '2600' },
+  { code: '2602', name: 'Hutang Salam', type: 'LIABILITY', normalBalance: 'CREDIT', parentCode: '2600' },
+  { code: '2603', name: 'Hutang Istishna', type: 'LIABILITY', normalBalance: 'CREDIT', parentCode: '2600' },
+  { code: '1404', name: 'Piutang Salam Vendor', type: 'ASSET', normalBalance: 'DEBIT', parentCode: '1000' },
+  {
+    code: '1205',
+    name: 'Aset / Piutang Barang Istishna (Pembelian)',
+    type: 'ASSET',
+    normalBalance: 'DEBIT',
+    parentCode: '1200',
+    fallbackParentCodes: ['1000'],
+  },
+  { code: '6100', name: 'Beban Ijarah & Ujrah', type: 'EXPENSE', normalBalance: 'DEBIT', parentCode: '6000' },
+  { code: '6110', name: 'Beban Ujrah Gaji', type: 'EXPENSE', normalBalance: 'DEBIT', parentCode: '6100' },
+  { code: '6120', name: 'Beban Ujrah Sewa & Lainnya', type: 'EXPENSE', normalBalance: 'DEBIT', parentCode: '6100' },
+  { code: '6200', name: 'Beban Zakat & Sosial', type: 'EXPENSE', normalBalance: 'DEBIT', parentCode: '6000' },
+  { code: '6210', name: 'Zakat Maal Pemilik', type: 'EXPENSE', normalBalance: 'DEBIT', parentCode: '6200' },
+  { code: '6220', name: 'Zakat Tijarah (Perdagangan)', type: 'EXPENSE', normalBalance: 'DEBIT', parentCode: '6200' },
+  { code: '6230', name: "Cukai Mu'ahidah", type: 'EXPENSE', normalBalance: 'DEBIT', parentCode: '6200' },
+]
+
+export const SHARIAH_COA_ACTIVATION_CODES = SHARIAH_COA_SEEDS.map((account) => account.code)
+
+export const SHARIAH_COA_DEACTIVATION_CODES = [
+  ...SHARIAH_COA_ACTIVATION_CODES,
+  LEGACY_SHARIAH_EQUITY_CODE,
+]
+
+export const SHARIAH_COA_ENABLEMENT_CODES = SHARIAH_COA_ACTIVATION_CODES

@@ -13,6 +13,10 @@ import { revalidatePath } from 'next/cache'
 import type { Account, AccountType, NormalBalance, AccountBalance } from '@/types/database.types'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { isInternalAuthProvider } from '@/lib/auth/provider'
+import {
+  SHARIAH_COA_ACTIVATION_CODES,
+  SHARIAH_COA_DEACTIVATION_CODES,
+} from '@/modules/accounting/lib/shariah-coa'
 
 type MirrorableAccount = Pick<
   Account,
@@ -878,17 +882,13 @@ export async function seedInitialCoA(orgId: string, options?: SeedInitialCoAOpti
 export async function setShariahAccountsActive(orgId: string, active: boolean) {
   const supabase = await createClient()
 
-  // Hanya 3100 yang tidak lagi dipakai pada CoAS.
-  // 3110 & 3120 tetap dipertahankan sebagai akun Syirkah.
-  const activationCodes = ['1404', '2600', '2601', '2602', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
-  const deactivationCodes = [...activationCodes, '3100']
-  const syariahCodes = active ? activationCodes : deactivationCodes
+  const syariahCodes = active ? SHARIAH_COA_ACTIVATION_CODES : SHARIAH_COA_DEACTIVATION_CODES
 
   const { error } = await (supabase as any)
     .from('accounts')
     .update({ is_active: active })
     .eq('org_id', orgId)
-    .filter('code', 'in', `(${syariahCodes.join(',')})`)
+    .in('code', syariahCodes)
 
   if (error) {
     (console as any).error('Toggle Syariah Error:', error)

@@ -1,17 +1,38 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import {
+  LEGACY_SHARIAH_EQUITY_CODE,
+  SHARIAH_COA_ACTIVATION_CODES,
+  SHARIAH_COA_DEACTIVATION_CODES,
+  SHARIAH_COA_SEEDS,
+} from '@/modules/accounting/lib/shariah-coa'
 import { revalidatePath } from 'next/cache'
 
 export async function injectShariahPack(orgId: string) {
   const supabase = await createClient()
 
   // --- Helper: upsert one account, return its ID ---
-  const upsert = async (code: string, name: string, type: string, normal_balance: string, parent_id: string | null) => {
+  const upsert = async (
+    code: string,
+    name: string,
+    type: string,
+    normal_balance: string,
+    parent_id: string | null
+  ) => {
     const { data, error } = await (supabase as any)
       .from('accounts')
       .upsert(
-        { org_id: orgId, code, name, type, normal_balance, parent_id: parent_id || null, is_system: false },
+        {
+          org_id: orgId,
+          code,
+          name,
+          type,
+          normal_balance,
+          parent_id: parent_id || null,
+          is_system: false,
+          is_active: true,
+        },
         { onConflict: 'org_id,code', ignoreDuplicates: false }
       )
       .select('id')
@@ -21,15 +42,26 @@ export async function injectShariahPack(orgId: string) {
   }
 
   try {
-    // Get root parent IDs
-    const { data: roots } = await (supabase as any)
+    const lookupCodes = Array.from(
+      new Set(
+        SHARIAH_COA_SEEDS.flatMap((account) => [
+          account.code,
+          account.parentCode,
+          ...(account.fallbackParentCodes || []),
+        ])
+      )
+    )
+
+    const { data: existingAccounts } = await (supabase as any)
       .from('accounts')
       .select('id, code')
       .eq('org_id', orgId)
-      .in('code', ['1000', '2000', '3000', '6000'])
+      .in('code', lookupCodes)
 
-    const rootMap: Record<string, string> = {}
-    for (const r of (roots || [])) rootMap[r.code] = r.id
+    const accountIdByCode: Record<string, string> = {}
+    for (const account of (existingAccounts || []) as Array<{ id: string; code: string }>) {
+      accountIdByCode[account.code] = account.id
+    }
 
     // Cleanup akun induk ekuitas syariah lama (3100) saja.
     // Coba hapus dulu, fallback ke nonaktif jika sudah terhubung transaksi/relasi.
@@ -37,7 +69,7 @@ export async function injectShariahPack(orgId: string) {
       .from('accounts')
       .select('id, code')
       .eq('org_id', orgId)
-      .eq('code', '3100')
+      .eq('code', LEGACY_SHARIAH_EQUITY_CODE)
 
     for (const acc of (legacyEquityParent || []) as Array<{ id: string; code: string }>) {
       const { error: deleteError } = await (supabase as any)
@@ -55,28 +87,20 @@ export async function injectShariahPack(orgId: string) {
       }
     }
 
-    // 0. EQUITY SYIRKAH (tanpa akun 3100)
-    await upsert('3110', 'Modal Syirkah Mudharabah', 'EQUITY', 'CREDIT', rootMap['3000'] ?? null)
-    await upsert('3120', 'Modal Syirkah Inan', 'EQUITY', 'CREDIT', rootMap['3000'] ?? null)
+    for (const account of SHARIAH_COA_SEEDS) {
+      const parentId = [account.parentCode, ...(account.fallbackParentCodes || [])]
+        .map((code) => accountIdByCode[code])
+        .find((value): value is string => Boolean(value)) || null
 
-    // 1. LIABILITIES (QARD)
-    const kewajSyariahId = await upsert('2600', 'Kewajiban Syariah', 'LIABILITY', 'CREDIT', rootMap['2000'] ?? null)
-    await upsert('2601', 'Hutang Qard (Kebajikan)', 'LIABILITY', 'CREDIT', kewajSyariahId)
-    await upsert('2602', 'Hutang Salam', 'LIABILITY', 'CREDIT', kewajSyariahId)
-
-    // 1b. SALAM RECEIVABLE (ASSET)
-    await upsert('1404', 'Piutang Salam Vendor', 'ASSET', 'DEBIT', rootMap['1000'] ?? null)
-
-    // 2. IJARAH (EXPENSES)
-    const ijarahId = await upsert('6100', 'Beban Ijarah & Ujrah', 'EXPENSE', 'DEBIT', rootMap['6000'] ?? null)
-    await upsert('6110', 'Beban Ujrah Gaji', 'EXPENSE', 'DEBIT', ijarahId)
-    await upsert('6120', 'Beban Ujrah Sewa & Lainnya', 'EXPENSE', 'DEBIT', ijarahId)
-
-    // 3. ZAKAT & CUKAI (EXPENSES)
-    const zakatId = await upsert('6200', 'Beban Zakat & Sosial', 'EXPENSE', 'DEBIT', rootMap['6000'] ?? null)
-    await upsert('6210', 'Zakat Maal Pemilik', 'EXPENSE', 'DEBIT', zakatId)
-    await upsert('6220', 'Zakat Tijarah (Perdagangan)', 'EXPENSE', 'DEBIT', zakatId)
-    await upsert('6230', "Cukai Mu'ahidah", 'EXPENSE', 'DEBIT', zakatId)
+      const upsertedId = await upsert(
+        account.code,
+        account.name,
+        account.type,
+        account.normalBalance,
+        parentId
+      )
+      accountIdByCode[account.code] = upsertedId
+    }
 
     revalidatePath('/settings/accounts')
     revalidatePath('/accounting/zakat')
@@ -89,17 +113,13 @@ export async function injectShariahPack(orgId: string) {
 export async function setShariahAccountsActive(orgId: string, active: boolean) {
   const supabase = await createClient()
 
-  // Hanya 3100 yang tidak lagi dipakai pada CoAS.
-  // 3110 & 3120 tetap dipertahankan sebagai akun Syirkah.
-  const activationCodes = ['1404', '2600', '2601', '2602', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
-  const deactivationCodes = [...activationCodes, '3100']
-  const syariahCodes = active ? activationCodes : deactivationCodes
+  const syariahCodes = active ? SHARIAH_COA_ACTIVATION_CODES : SHARIAH_COA_DEACTIVATION_CODES
 
   const { error } = await (supabase as any)
     .from('accounts')
     .update({ is_active: active })
     .eq('org_id', orgId)
-    .filter('code', 'in', `(${syariahCodes.join(',')})`)
+    .in('code', syariahCodes)
 
   if (error) {
     (console as any).error('Toggle Syariah Error:', error)
