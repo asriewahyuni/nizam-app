@@ -12,6 +12,7 @@ import {
   Printer,
 } from 'lucide-react'
 import type { OperatorDocumentSnapshot } from '@/modules/saas/actions/operator-sales.actions'
+import { MiniErpWordmark } from '@/components/shared/MiniErpWordmark'
 
 function formatIdr(value: number) {
   return new Intl.NumberFormat('id-ID', {
@@ -538,7 +539,7 @@ export default function SaasDocumentView({
                   </span>
                   <span className="flex flex-col leading-none">
                     <span className="text-lg font-black uppercase tracking-tight text-white">NIZAM</span>
-                    <span className="mt-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-300">Cloud ERP</span>
+                    <MiniErpWordmark className="mt-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-300" erpClassName="text-amber-300" />
                   </span>
                 </div>
                 <div>

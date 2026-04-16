@@ -50,6 +50,7 @@ import { signOut } from '@/modules/auth/actions/auth.actions'
 import { signOutDemo } from '@/modules/demo/actions/demo.actions'
 import { getSidebarChromeMetrics } from '@/modules/organization/actions/dashboard-shell.actions'
 import { getPendingApprovalsCount } from '@/modules/organization/actions/approval.actions'
+import { MiniErpWordmark } from '@/components/shared/MiniErpWordmark'
 
 interface NavGroup {
   group: string
@@ -566,7 +567,7 @@ export function AppSidebar({
           {!effectiveIsCollapsed && (
             <div className="flex flex-col justify-center overflow-hidden animate-in fade-in duration-500">
               <span className="font-black text-slate-900 text-lg tracking-tighter leading-tight uppercase">NIZAM</span>
-              <span className="text-[10px] text-slate-400 font-black tracking-[0.2em] uppercase opacity-80">Cloud ERP</span>
+              <MiniErpWordmark className="text-[10px] font-black tracking-[0.2em] uppercase text-slate-400 opacity-80" erpClassName="text-amber-500" />
             </div>
           )}
         </>
