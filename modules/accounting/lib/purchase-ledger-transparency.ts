@@ -66,6 +66,25 @@ function toReferenceId(value: unknown) {
   return trimmed.length > 0 ? trimmed : null
 }
 
+async function fetchPurchaseDocuments(
+  queryRunner: QueryRunner,
+  purchaseIds: string[]
+) {
+  return queryRunner<Record<string, unknown>>(`
+    SELECT
+      id,
+      purchase_number,
+      total_amount,
+      discount_amount,
+      tax_amount,
+      shipping_amount,
+      insurance_amount,
+      grand_total
+    FROM public.purchases
+    WHERE id = ANY($1::uuid[])
+  `, [purchaseIds])
+}
+
 export function buildPurchaseLedgerTransparency(
   purchase: PurchaseDocumentLike | null | undefined,
   items: PurchaseItemLike[] = []
@@ -160,19 +179,7 @@ export async function hydratePurchaseTransparencyForEntries<T extends JournalEnt
   }
 
   const [purchaseResult, purchaseItemsResult] = await Promise.all([
-    queryRunner<Record<string, unknown>>(`
-      SELECT
-        id,
-        purchase_number,
-        total_amount,
-        discount_amount,
-        tax_amount,
-        shipping_amount,
-        insurance_amount,
-        grand_total
-      FROM public.purchases
-      WHERE id = ANY($1::uuid[])
-    `, [purchaseIds]),
+    fetchPurchaseDocuments(queryRunner, purchaseIds),
     queryRunner<Record<string, unknown>>(`
       SELECT
         purchase_id,

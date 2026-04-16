@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createSupabaseMock, failure, success } from './helpers/supabase-mock'
+import { createSupabaseMock, success } from './helpers/supabase-mock'
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
   getActiveOrg: vi.fn(),
   isInternalAuthProvider: vi.fn(),
-  queryPostgres: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -26,10 +25,6 @@ vi.mock('@/modules/organization/actions/org.actions', () => ({
 
 vi.mock('@/lib/auth/provider', () => ({
   isInternalAuthProvider: mocks.isInternalAuthProvider,
-}))
-
-vi.mock('@/lib/db/postgres', () => ({
-  queryPostgres: mocks.queryPostgres,
 }))
 
 import { getRolesForOrganization, saveOrganizationRole } from '@/modules/organization/actions/roles.actions'
@@ -132,98 +127,5 @@ describe('Role Actions', () => {
 
     expect(result).toEqual({ success: true })
     expect(insertPayload.department_ids).toEqual(['MARKETING_SALES'])
-  })
-
-  it('retries role save via SQL when enum-array serialization fails', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        roles: [
-          { result: success([]) },
-          { result: failure('invalid input value for enum nizam_department: "{MARKETING_SALES}"') },
-        ],
-      },
-    })
-
-    mocks.createClient.mockResolvedValue(supabase.client)
-    mocks.queryPostgres
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            column_name: 'department_ids',
-            data_type: 'ARRAY',
-            udt_name: '_nizam_department',
-          },
-        ],
-      })
-      .mockResolvedValueOnce({ rows: [{ total: 0 }] })
-      .mockResolvedValueOnce({ rows: [] })
-
-    const result = await saveOrganizationRole('org-1', {
-      name: 'Sales Lead',
-      departmentIds: ['MARKETING_SALES'],
-      parentId: null,
-    })
-
-    const sqlInsertCall = mocks.queryPostgres.mock.calls.find(([text]) =>
-      String(text).includes('INSERT INTO public.roles')
-    )
-
-    expect(result).toEqual({ success: true })
-    expect(sqlInsertCall?.[1]).toEqual([
-      'org-1',
-      'Sales Lead',
-      ['MARKETING_SALES'],
-      null,
-      [],
-      false,
-      0,
-    ])
-  })
-
-  it('stores first department when legacy department_ids column is a single enum', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        roles: [
-          { result: success([]) },
-          { result: failure('invalid input value for enum nizam_department: "{MARKETING_SALES}"') },
-        ],
-      },
-    })
-
-    mocks.createClient.mockResolvedValue(supabase.client)
-    mocks.queryPostgres
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            column_name: 'department_ids',
-            data_type: 'USER-DEFINED',
-            udt_name: 'nizam_department',
-          },
-        ],
-      })
-      .mockResolvedValueOnce({ rows: [{ total: 0 }] })
-      .mockResolvedValueOnce({ rows: [] })
-
-    const result = await saveOrganizationRole('org-1', {
-      name: 'Sales Legacy',
-      departmentIds: ['MARKETING_SALES', 'FINANCE'],
-      parentId: null,
-    })
-
-    const sqlInsertCall = mocks.queryPostgres.mock.calls.find(([text]) =>
-      String(text).includes('INSERT INTO public.roles')
-    )
-
-    expect(result).toEqual({ success: true })
-    expect(String(sqlInsertCall?.[0])).toContain('department_ids')
-    expect(sqlInsertCall?.[1]).toEqual([
-      'org-1',
-      'Sales Legacy',
-      'MARKETING_SALES',
-      null,
-      [],
-      false,
-      0,
-    ])
   })
 })

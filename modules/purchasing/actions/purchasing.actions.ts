@@ -178,102 +178,36 @@ function isPurchaseWarehouseColumnSchemaCacheMiss(
   )
 }
 
-function isPurchaseInsuranceColumnMissing(
-  error: { code?: string | null; message?: string | null } | null | undefined
-) {
-  if (!error) return false
-
-  const message = String(error.message || '')
-  const normalized = message.toLowerCase()
-
-  return (
-    error.code === '42703' ||
-    error.code === 'PGRST204' ||
-    (
-      normalized.includes('purchases') &&
-      normalized.includes('insurance_amount') &&
-      (
-        normalized.includes('schema cache') ||
-        normalized.includes('could not find') ||
-        normalized.includes('does not exist')
-      )
-    )
-  )
-}
-
-function buildLegacyInsuranceCompatiblePurchasePayload(payload: Record<string, unknown>) {
-  const shippingAmount = roundMoney(payload.shipping_amount || 0)
-  const insuranceAmount = roundMoney(payload.insurance_amount || 0)
-
-  return {
-    ...payload,
-    shipping_amount: roundMoney(shippingAmount + insuranceAmount),
-  }
-}
-
-async function insertPurchaseCompat(
+async function insertPurchaseRecord(
   supabase: any,
   payload: Record<string, unknown>,
   selectColumns: string = 'id'
 ) {
-  const executeInsert = (insertPayload: Record<string, unknown>) =>
-    (supabase as any)
-      .from('purchases')
-      .insert(insertPayload)
-      .select(selectColumns)
-      .single()
-
-  const primaryPayload = {
-    ...payload,
-    insurance_amount: roundMoney(payload.insurance_amount || 0),
-  }
-  let result = await executeInsert(primaryPayload)
-  if (!result?.error) {
-    return { ...result, usedLegacyInsuranceFallback: false as const }
-  }
-
-  if (!isPurchaseInsuranceColumnMissing(result.error)) {
-    return { ...result, usedLegacyInsuranceFallback: false as const }
-  }
-
-  const legacyPayload = buildLegacyInsuranceCompatiblePurchasePayload(primaryPayload)
-  delete (legacyPayload as Record<string, unknown>).insurance_amount
-  result = await executeInsert(legacyPayload)
-
-  return { ...result, usedLegacyInsuranceFallback: true as const }
+  return (supabase as any)
+    .from('purchases')
+    .insert({
+      ...payload,
+      insurance_amount: roundMoney(payload.insurance_amount || 0),
+    })
+    .select(selectColumns)
+    .single()
 }
 
-async function updatePurchaseCompat(
+async function updatePurchaseRecord(
   supabase: any,
   payload: Record<string, unknown>,
   filters: Array<[string, unknown]>
 ) {
-  const executeUpdate = async (updatePayload: Record<string, unknown>) => {
-    let query = (supabase as any).from('purchases').update(updatePayload)
-    for (const [column, value] of filters) {
-      query = query.eq(column, value)
-    }
-    return query
-  }
-
-  const primaryPayload = {
+  let query = (supabase as any).from('purchases').update({
     ...payload,
     insurance_amount: roundMoney(payload.insurance_amount || 0),
-  }
-  let result = await executeUpdate(primaryPayload)
-  if (!result?.error) {
-    return { ...result, usedLegacyInsuranceFallback: false as const }
-  }
+  })
 
-  if (!isPurchaseInsuranceColumnMissing(result.error)) {
-    return { ...result, usedLegacyInsuranceFallback: false as const }
+  for (const [column, value] of filters) {
+    query = query.eq(column, value)
   }
 
-  const legacyPayload = buildLegacyInsuranceCompatiblePurchasePayload(primaryPayload)
-  delete (legacyPayload as Record<string, unknown>).insurance_amount
-  result = await executeUpdate(legacyPayload)
-
-  return { ...result, usedLegacyInsuranceFallback: true as const }
+  return query
 }
 
 function isStockMovementsWarehouseColumnMissing(
@@ -868,7 +802,7 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
       return { error: 'Hanya dokumen PO berstatus DRAFT yang bisa diedit atau diterbitkan ulang.' }
     }
 
-    const { error: updatePurchaseError } = await updatePurchaseCompat(
+    const { error: updatePurchaseError } = await updatePurchaseRecord(
       supabase,
       {
         vendor_id: payload.vendor_id,
@@ -975,7 +909,7 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
   }
 
   if (createMode === 'DRAFT') {
-    const { data: draftPurchase, error: draftInsertError } = await insertPurchaseCompat(
+    const { data: draftPurchase, error: draftInsertError } = await insertPurchaseRecord(
       supabase,
       {
         org_id: orgId,
@@ -1049,7 +983,7 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
   // discount_amount and insurance_amount. Sync them here so PO detail, AP, and
   // receipt landed-cost calculations stay consistent with the submitted form.
   if (Math.abs(headerDiscount) > 0.0001 || Math.abs(headerInsurance) > 0.0001) {
-    const { error: headerSyncError } = await updatePurchaseCompat(
+    const { error: headerSyncError } = await updatePurchaseRecord(
       supabase,
       {
         vendor_id: payload.vendor_id,
@@ -1810,7 +1744,7 @@ export async function repairReceivedPurchaseStock(orgId: string): Promise<{
   }
 
   // 2. Ambil PO yang sudah memiliki stock_movements agar tidak double-post
-  let poWithMovements = new Set<string>()
+  const poWithMovements = new Set<string>()
   try {
     const movResult = await queryPostgres<{ reference_id: string }>(`
       SELECT DISTINCT reference_id::text
