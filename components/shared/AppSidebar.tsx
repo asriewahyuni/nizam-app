@@ -118,6 +118,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Absensi & Cuti', href: '/hris?tab=attendance', icon: Clock, permission_key: 'attendance', module_key: 'Attendance' },
       { label: 'Payroll Components', href: '/hris?tab=payroll', icon: FileText, permission_key: 'payroll', module_key: 'Payroll' },
       { label: 'Proses Penggajian', href: '/hris?tab=runs', icon: Wallet, permission_key: 'payroll', module_key: 'Payroll' },
+      { label: 'Peningkatan Kompetensi', href: '/learning', icon: BookOpen, permission_key: 'learning', module_key: 'HRIS' },
       { label: 'Akses & Jabatan', href: '/settings/roles', icon: ShieldCheck, permission_key: 'business', module_key: 'HRIS' },
     ]
   },

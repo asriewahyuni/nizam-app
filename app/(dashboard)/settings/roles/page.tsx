@@ -89,6 +89,7 @@ const MODULE_CATEGORIES = [
       { id: 'employees', name: 'Karyawan Dasar', perms: ['employees:read', 'employees:write'] },
       { id: 'payroll', name: 'Payroll & Slip Gaji', perms: ['payroll:read', 'payroll:write'] },
       { id: 'attendance', name: 'Absensi & Cuti', perms: ['attendance:read', 'attendance:write'] },
+      { id: 'learning', name: 'Peningkatan Kompetensi', perms: ['learning:read', 'learning:write'] },
     ]
   }
 ]
