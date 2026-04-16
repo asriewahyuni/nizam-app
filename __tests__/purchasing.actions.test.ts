@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   getBranchAccessScope: vi.fn(),
   queryPostgres: vi.fn(),
   createJournalEntry: vi.fn(),
+  postJournalEntry: vi.fn(),
+  nudgeEduModeValidation: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -37,6 +39,11 @@ vi.mock('@/lib/db/postgres', () => ({
 
 vi.mock('@/modules/accounting/actions/journal.actions', () => ({
   createJournalEntry: mocks.createJournalEntry,
+  postJournalEntry: mocks.postJournalEntry,
+}))
+
+vi.mock('@/modules/edu/lib/progress-hooks.server', () => ({
+  nudgeEduModeValidation: mocks.nudgeEduModeValidation,
 }))
 
 import { createPurchaseRequests } from '@/modules/factory/actions/factory.actions'
@@ -76,6 +83,8 @@ describe('Purchasing Branch Context', () => {
     vi.clearAllMocks()
     mocks.noStore.mockImplementation(() => undefined)
     mocks.createJournalEntry.mockResolvedValue({ success: true })
+    mocks.postJournalEntry.mockResolvedValue({ success: true })
+    mocks.nudgeEduModeValidation.mockResolvedValue(undefined)
   })
 
   it('rejects purchase creation when branch does not belong to active org', async () => {

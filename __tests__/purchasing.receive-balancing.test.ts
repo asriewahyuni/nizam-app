@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   resolveAccessibleBranchSelection: vi.fn(),
   queryPostgres: vi.fn(),
   createJournalEntry: vi.fn(),
+  postJournalEntry: vi.fn(),
+  nudgeEduModeValidation: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -30,6 +32,11 @@ vi.mock('@/lib/db/postgres', () => ({
 
 vi.mock('@/modules/accounting/actions/journal.actions', () => ({
   createJournalEntry: mocks.createJournalEntry,
+  postJournalEntry: mocks.postJournalEntry,
+}))
+
+vi.mock('@/modules/edu/lib/progress-hooks.server', () => ({
+  nudgeEduModeValidation: mocks.nudgeEduModeValidation,
 }))
 
 import { receivePurchase } from '@/modules/purchasing/actions/purchasing.actions'
@@ -78,6 +85,8 @@ describe('Purchasing Receipt Journal Balancing', () => {
       role: 'staff',
     })
     mocks.createJournalEntry.mockResolvedValue({ success: true })
+    mocks.postJournalEntry.mockResolvedValue({ success: true })
+    mocks.nudgeEduModeValidation.mockResolvedValue(undefined)
   })
 
   it('keeps purchase journal balanced when landed cost allocation must offset line discounts', async () => {
