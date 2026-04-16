@@ -2,6 +2,7 @@
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getDocumentHeaderDiscountAmount, getDocumentLineDiscountTotal, roundMoney } from '@/lib/commerce/discounts'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { ensureSellableBranchStockAvailability, shouldGuardOrderedSaleStock } from '@/modules/sales/lib/stock-guard.server'
 
@@ -53,6 +54,20 @@ function deriveNameFromEmail(email: string | null): string | null {
   const withSpaces = localPart.replace(/[._-]+/g, ' ').trim()
   if (!withSpaces) return null
   return toTitleWords(withSpaces)
+}
+
+function hydratePurchaseApprovalDiscount<T extends Record<string, unknown>>(purchase: T, items: Array<Record<string, unknown>> = []) {
+  const storedDiscount = Math.max(0, roundMoney(purchase?.discount_amount))
+  const lineDiscountTotal = getDocumentLineDiscountTotal(items)
+  const headerDiscountAmount = getDocumentHeaderDiscountAmount({
+    ...purchase,
+    purchase_items: items,
+  }, lineDiscountTotal)
+
+  return {
+    ...purchase,
+    discount_amount: roundMoney(Math.max(storedDiscount, lineDiscountTotal + headerDiscountAmount)),
+  }
 }
 
 async function getOrgMemberIdentityByUserIds(supabase: any, orgId: string, userIds: string[]) {
@@ -421,13 +436,15 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
       if (poResult.rows.length === 0) { dataRes = { data: null, error: { message: 'Purchase order tidak ditemukan.' } } }
       else {
         const row = poResult.rows[0]
+        const purchaseItems = itemsResult.rows.map((item) => ({
+          ...item, products: item.product_name ? { name: item.product_name, unit: item.product_unit } : null,
+        }))
+        const hydratedRow = hydratePurchaseApprovalDiscount(row, purchaseItems)
         dataRes = { data: {
-          ...row,
-          contacts: row.vendor_name ? { name: row.vendor_name } : null,
-          branches: row.branch_name ? { name: row.branch_name, code: row.branch_code } : null,
-          purchase_items: itemsResult.rows.map((item) => ({
-            ...item, products: item.product_name ? { name: item.product_name, unit: item.product_unit } : null,
-          })),
+          ...hydratedRow,
+          contacts: hydratedRow.vendor_name ? { name: hydratedRow.vendor_name } : null,
+          branches: hydratedRow.branch_name ? { name: hydratedRow.branch_name, code: hydratedRow.branch_code } : null,
+          purchase_items: purchaseItems,
         }, error: null }
       }
     } catch (err: any) { dataRes = { data: null, error: { message: err?.message || 'Query error' } } }

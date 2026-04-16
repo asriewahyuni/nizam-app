@@ -32,7 +32,14 @@ import type { Product } from '@/types/database.types'
 
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
-import { getEditableLineDiscountAmount, getStoredLineDiscountAmount, inferStoredLineDiscountMode } from '@/lib/commerce/discounts'
+import {
+  getDocumentHeaderDiscountAmount,
+  getDocumentLineDiscountsForDisplay,
+  getDocumentLineDiscountTotal,
+  getEditableLineDiscountAmount,
+  getStoredLineDiscountAmount,
+  inferStoredLineDiscountMode,
+} from '@/lib/commerce/discounts'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { QRCodeSVG } from 'qrcode.react'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
@@ -630,6 +637,14 @@ export default function PurchasingClient({
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount)
   }
+
+  const getPurchaseLineGrossTotal = (item: any) => Number(item?.quantity || 0) * Number(item?.unit_price || 0)
+  const getPurchaseLineNetTotal = (item: any, displayDiscountAmount: number) =>
+    getPurchaseLineGrossTotal(item) - displayDiscountAmount + Number(item?.tax_amount || 0)
+  const getPurchaseLineDiscountTotal = (purchase: any) => getDocumentLineDiscountTotal(purchase?.purchase_items || [])
+  const getPurchaseHeaderDiscount = (purchase: any) =>
+    getDocumentHeaderDiscountAmount(purchase, getPurchaseLineDiscountTotal(purchase))
+  const selectedDetailPurchaseLineDiscounts = getDocumentLineDiscountsForDisplay(selectedDetailPurchase)
 
   const formatApprovalOfficer = (approval: any) => {
     if (!approval) return ''
@@ -1719,45 +1734,55 @@ export default function PurchasingClient({
                    </div>
 
                    {/* Details Table */}
-                   <div className="border border-slate-200 rounded-2xl overflow-hidden mb-8 relative z-10 font-mono text-sm">
-                      <table className="w-full text-left bg-white">
-                        <thead className="bg-slate-100">
-                           <tr>
-                             <th className="py-3 px-4 font-bold text-slate-700 w-12 text-center">NO</th>
-                             <th className="py-3 px-4 font-bold text-slate-700">DESKRIPSI BARANG</th>
-                             <th className="py-3 px-4 font-bold text-slate-700 text-center">QTY</th>
-                             <th className="py-3 px-4 font-bold text-slate-700 text-right">HARGA SATUAN</th>
-                             <th className="py-3 px-4 font-bold text-slate-700 text-right">TOTAL</th>
-                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                           {selectedDetailPurchase.purchase_items?.map((item: any, i: number) => (
-                             <tr key={item.id} className="hover:bg-slate-50/50">
-                               <td className="py-3 px-4 text-slate-500 text-center">{i + 1}</td>
-                               <td className="py-3 px-4 font-semibold text-slate-900">{item.description}</td>
-                               <td className="py-3 px-4 text-center text-slate-700">{item.quantity} {item.products?.unit || 'Pcs'}</td>
-                               <td className="py-3 px-4 text-right text-slate-700">{formatRupiah(item.unit_price)}</td>
-                               <td className="py-3 px-4 text-right font-semibold text-slate-900">{formatRupiah(item.total_amount)}</td>
-                             </tr>
-                           ))}
-                        </tbody>
-                      </table>
-                   </div>
+	                   <div className="border border-slate-200 rounded-2xl overflow-hidden mb-8 relative z-10 font-mono text-sm">
+	                      <table className="w-full text-left bg-white">
+	                        <thead className="bg-slate-100">
+	                           <tr>
+	                             <th className="py-3 px-4 font-bold text-slate-700 w-12 text-center">NO</th>
+	                             <th className="py-3 px-4 font-bold text-slate-700">DESKRIPSI BARANG</th>
+	                             <th className="py-3 px-4 font-bold text-slate-700 text-center">QTY</th>
+	                             <th className="py-3 px-4 font-bold text-slate-700 text-right">HARGA SATUAN</th>
+	                             <th className="py-3 px-4 font-bold text-slate-700 text-right">DISKON</th>
+	                             <th className="py-3 px-4 font-bold text-slate-700 text-right">TOTAL NETTO</th>
+	                           </tr>
+	                        </thead>
+	                        <tbody className="divide-y divide-slate-100">
+	                           {selectedDetailPurchase.purchase_items?.map((item: any, i: number) => {
+                               const displayDiscountAmount = Number(selectedDetailPurchaseLineDiscounts[i] || 0)
+                               return (
+	                             <tr key={item.id} className="hover:bg-slate-50/50">
+	                               <td className="py-3 px-4 text-slate-500 text-center">{i + 1}</td>
+	                               <td className="py-3 px-4 font-semibold text-slate-900">{item.description}</td>
+	                               <td className="py-3 px-4 text-center text-slate-700">{item.quantity} {item.products?.unit || 'Pcs'}</td>
+	                               <td className="py-3 px-4 text-right text-slate-700">{formatRupiah(item.unit_price)}</td>
+	                               <td className="py-3 px-4 text-right font-semibold text-rose-500">{displayDiscountAmount > 0 ? formatRupiah(displayDiscountAmount) : '-'}</td>
+	                               <td className="py-3 px-4 text-right font-semibold text-slate-900">{formatRupiah(getPurchaseLineNetTotal(item, displayDiscountAmount))}</td>
+	                             </tr>
+	                           )})}
+	                        </tbody>
+	                      </table>
+	                   </div>
 
                    {/* Calculations */}
                    <div className="flex justify-end relative z-10 font-mono text-sm mb-16">
-                      <div className="w-80 space-y-3">
-                         <div className="flex justify-between items-center text-slate-600">
-                           <span>SubTotal</span>
-                           <span>{formatRupiah(selectedDetailPurchase.total_amount)}</span>
-                         </div>
-                         {selectedDetailPurchase.discount_amount > 0 && (
-                           <div className="flex justify-between items-center text-rose-500">
-                             <span>Diskon</span>
-                             <span>-{formatRupiah(selectedDetailPurchase.discount_amount)}</span>
-                           </div>
-                         )}
-                         {(selectedDetailPurchase.tax_amount > 0) && (
+	                      <div className="w-80 space-y-3">
+	                         <div className="flex justify-between items-center text-slate-600">
+	                           <span>SubTotal</span>
+	                           <span>{formatRupiah(selectedDetailPurchase.total_amount)}</span>
+	                         </div>
+	                         {getPurchaseLineDiscountTotal(selectedDetailPurchase) > 0 && (
+	                           <div className="flex justify-between items-center text-rose-500">
+	                             <span>Diskon Item</span>
+	                             <span>-{formatRupiah(getPurchaseLineDiscountTotal(selectedDetailPurchase))}</span>
+	                           </div>
+	                         )}
+	                         {getPurchaseHeaderDiscount(selectedDetailPurchase) > 0 && (
+	                           <div className="flex justify-between items-center text-rose-500">
+	                             <span>Diskon Header / Faktur</span>
+	                             <span>-{formatRupiah(getPurchaseHeaderDiscount(selectedDetailPurchase))}</span>
+	                           </div>
+	                         )}
+	                         {(selectedDetailPurchase.tax_amount > 0) && (
                            <div className="flex justify-between items-center text-slate-600">
                              <span>Pajak (Tax)</span>
                              <span>{formatRupiah(selectedDetailPurchase.tax_amount)}</span>

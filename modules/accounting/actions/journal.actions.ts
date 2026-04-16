@@ -25,6 +25,110 @@ export interface CreateJournalEntryInput {
   allow_org_scope?: boolean
 }
 
+const JOURNAL_ENTRY_MAX_INSERT_RETRIES = 5
+
+function isJournalEntryNumberCollision(error: { message?: string; code?: string } | null | undefined) {
+  if (!error) return false
+
+  const message = String(error.message || '').toLowerCase()
+  const code = String(error.code || '')
+
+  return code === '23505' && (
+    message.includes('journal_entries_org_id_entry_number_key')
+    || (message.includes('duplicate key') && message.includes('entry_number'))
+  )
+}
+
+function getJournalInsertErrorMessage(error: { message?: string; code?: string } | null | undefined) {
+  const message = String(error?.message || '').trim()
+  if (!message) return 'Gagal membuat jurnal.'
+
+  if (isJournalEntryNumberCollision(error)) {
+    return 'Nomor jurnal bentrok saat disimpan. Sistem sudah mencoba ulang, silakan coba lagi beberapa saat lagi.'
+  }
+
+  return message
+}
+
+async function getNextJournalEntryNumber(supabase: any, orgId: string) {
+  const year = String(new Date().getFullYear())
+  const prefix = `JE-${year}-`
+
+  const { data, error } = await (supabase as any)
+    .from('journal_entries')
+    .select('entry_number')
+    .eq('org_id', orgId)
+    .like('entry_number', `${prefix}%`)
+    .order('entry_number', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    return { error: error.message || 'Gagal membaca nomor jurnal terakhir.' }
+  }
+
+  const lastEntryNumber = String(data?.entry_number || '')
+  const lastSequence = lastEntryNumber.startsWith(prefix)
+    ? Number.parseInt(lastEntryNumber.slice(prefix.length), 10)
+    : 0
+  const nextSequence = Number.isFinite(lastSequence) ? lastSequence + 1 : 1
+
+  return {
+    entryNumber: `${prefix}${String(nextSequence).padStart(6, '0')}`,
+  }
+}
+
+async function insertJournalEntryHeaderWithRetry(
+  supabase: any,
+  input: CreateJournalEntryInput,
+  branchId: string | null,
+  userId: string
+) {
+  let lastError: { message?: string; code?: string } | null = null
+
+  for (let attempt = 0; attempt < JOURNAL_ENTRY_MAX_INSERT_RETRIES; attempt += 1) {
+    const nextEntryNumberResult = await getNextJournalEntryNumber(supabase, input.org_id)
+    if ('error' in nextEntryNumberResult) {
+      return {
+        data: null,
+        error: { message: nextEntryNumberResult.error },
+      }
+    }
+
+    const { data, error } = await (supabase as any)
+      .from('journal_entries')
+      .insert({
+        org_id: input.org_id,
+        branch_id: branchId,
+        entry_number: nextEntryNumberResult.entryNumber,
+        entry_date: input.entry_date,
+        description: input.description,
+        reference_type: input.reference_type || 'MANUAL',
+        reference_id: input.reference_id || null,
+        notes: input.notes || null,
+        status: 'DRAFT',
+        created_by: userId,
+      })
+      .select()
+      .single()
+
+    if (!error && data) {
+      return { data, error: null }
+    }
+
+    if (!isJournalEntryNumberCollision(error)) {
+      return { data: null, error }
+    }
+
+    lastError = error
+  }
+
+  return {
+    data: null,
+    error: lastError || { message: 'Gagal membuat jurnal setelah beberapa percobaan.' },
+  }
+}
+
 async function resolveJournalBranchId(input: CreateJournalEntryInput) {
   if (input.branch_id) {
     const branchSelection = await resolveAccessibleBranchSelection(input.org_id, input.branch_id)
@@ -165,25 +269,17 @@ export async function createJournalEntry(input: CreateJournalEntryInput) {
     return { error: closedPeriodMessage }
   }
 
-  // Insert header
-  const { data: entry, error: entryError } = await (supabase as any)
-    .from('journal_entries')
-    .insert({
-      org_id: input.org_id,
-      branch_id: resolvedBranch.branchId, // Linked to branch
-      entry_date: input.entry_date,
-      description: input.description,
-      reference_type: input.reference_type || 'MANUAL',
-      reference_id: input.reference_id || null,
-      notes: input.notes || null,
-      status: 'DRAFT',
-      created_by: user.id,
-    })
-    .select()
-    .single()
+  // Insert header with explicit entry number so PO receipt is not blocked by
+  // trigger collisions from COUNT(*)-based numbering.
+  const { data: entry, error: entryError } = await insertJournalEntryHeaderWithRetry(
+    supabase,
+    input,
+    resolvedBranch.branchId,
+    user.id
+  )
 
   if (entryError || !entry) {
-    return { error: 'Gagal membuat jurnal.' }
+    return { error: getJournalInsertErrorMessage(entryError) }
   }
 
   // Insert lines

@@ -2,9 +2,13 @@
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath, unstable_noStore as noStore } from 'next/cache'
-import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
+import { createJournalEntry, postJournalEntry } from '@/modules/accounting/actions/journal.actions'
 import { getBranchAccessScope, resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
+import { getDocumentHeaderDiscountAmount, getDocumentLineDiscountTotal, roundMoney } from '@/lib/commerce/discounts'
+import { getDateInTimeZone } from '@/lib/utils'
+
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 type BranchSelectionResult =
   | { branchId: string | null; error?: undefined }
@@ -67,6 +71,74 @@ function normalizePurchaseShariahMode(value?: string | null): 'CASH' | 'SALAM' |
   }
 
   return 'CASH'
+}
+
+function normalizeJournalEntryDate(value: unknown): string {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (DATE_ONLY_PATTERN.test(trimmed)) return trimmed
+
+    const parsed = new Date(trimmed)
+    if (!Number.isNaN(parsed.getTime())) {
+      return getDateInTimeZone('Asia/Jakarta', parsed)
+    }
+  }
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return getDateInTimeZone('Asia/Jakarta', value)
+  }
+
+  return getDateInTimeZone('Asia/Jakarta')
+}
+
+function allocateRoundedAmounts(totalAmount: number, rawWeights: number[]): number[] {
+  const total = roundMoney(totalAmount)
+  const weights = rawWeights.map((weight) => Math.max(0, Number(weight || 0)))
+
+  if (weights.length === 0) return []
+  if (Math.abs(total) <= 0.0001) return weights.map(() => 0)
+
+  const weightTotal = weights.reduce((sum, weight) => sum + weight, 0)
+  const allocations = weights.map(() => 0)
+
+  if (weightTotal <= 0) {
+    allocations[allocations.length - 1] = total
+    return allocations
+  }
+
+  let remainderIndex = allocations.length - 1
+  for (let index = allocations.length - 1; index >= 0; index -= 1) {
+    if (weights[index] > 0) {
+      remainderIndex = index
+      break
+    }
+  }
+
+  let allocated = 0
+  for (let index = 0; index < weights.length; index += 1) {
+    if (index === remainderIndex) continue
+    const amount = roundMoney((weights[index] / weightTotal) * total)
+    allocations[index] = amount
+    allocated = roundMoney(allocated + amount)
+  }
+
+  allocations[remainderIndex] = roundMoney(total - allocated)
+  return allocations
+}
+
+function hydratePurchaseDiscountAmount<T extends Record<string, unknown>>(purchase: T, items: Array<Record<string, unknown>> = []) {
+  const storedDiscount = Math.max(0, roundMoney(purchase?.discount_amount))
+  const lineDiscountTotal = getDocumentLineDiscountTotal(items)
+  const headerDiscountAmount = getDocumentHeaderDiscountAmount({
+    ...purchase,
+    purchase_items: items,
+  }, lineDiscountTotal)
+  const effectiveDiscountAmount = roundMoney(Math.max(storedDiscount, lineDiscountTotal + headerDiscountAmount))
+
+  return {
+    ...purchase,
+    discount_amount: effectiveDiscountAmount,
+  }
 }
 
 function isAdjustInventoryStockUnavailable(error: { code?: string | null; message?: string | null } | null | undefined) {
@@ -424,14 +496,16 @@ export async function getPurchases(orgId: string, branchId?: string | null) {
   // Assemble final rows in the shape the UI expects
   return purchaseRows.map((row) => {
     const pid = String(row.id ?? '')
+    const purchaseItems = itemsByPurchaseId[pid] ?? []
+    const hydratedRow = hydratePurchaseDiscountAmount(row, purchaseItems)
     return {
-      ...row,
+      ...hydratedRow,
       // UI expects p.contacts?.name for the vendor
-      contacts: row.vendor_name ? { name: row.vendor_name } : null,
-      branches: (row.branch_name || row.branch_code)
-        ? { name: row.branch_name, code: row.branch_code }
+      contacts: hydratedRow.vendor_name ? { name: hydratedRow.vendor_name } : null,
+      branches: (hydratedRow.branch_name || hydratedRow.branch_code)
+        ? { name: hydratedRow.branch_name, code: hydratedRow.branch_code }
         : null,
-      purchase_items: itemsByPurchaseId[pid] ?? [],
+      purchase_items: purchaseItems,
       purchase_payments: paymentsByPurchaseId[pid] ?? [],
       purchase_returns: returnsByPurchaseId[pid] ?? [],
     }
@@ -492,7 +566,7 @@ export async function getPurchaseById(orgId: string, purchaseId: string) {
       queryPostgres<Record<string, unknown>>(`
         SELECT
           pi.id, pi.purchase_id, pi.product_id, pi.description,
-          pi.quantity, pi.unit_price, pi.total_amount,
+          pi.quantity, pi.unit_price, pi.discount_amount, pi.tax_amount, pi.total_amount,
           pr.name AS product_name, pr.sku AS product_sku,
           pr.unit AS product_unit, pr.category, pr.selling_price
         FROM   public.purchase_items pi
@@ -511,22 +585,25 @@ export async function getPurchaseById(orgId: string, purchaseId: string) {
       `, [purchaseId]),
     ])
 
+    const purchaseItems = itemsResult.rows.map((item) => ({
+      ...item,
+      products: item.product_name ? {
+        name: item.product_name,
+        sku: item.product_sku,
+        unit: item.product_unit,
+        category: item.category,
+        selling_price: item.selling_price,
+      } : null,
+    }))
+    const hydratedRow = hydratePurchaseDiscountAmount(row, purchaseItems)
+
     return {
-      ...row,
-      contacts: row.vendor_name ? { name: row.vendor_name } : null,
-      branches: (row.branch_name || row.branch_code)
-        ? { name: row.branch_name, code: row.branch_code }
+      ...hydratedRow,
+      contacts: hydratedRow.vendor_name ? { name: hydratedRow.vendor_name } : null,
+      branches: (hydratedRow.branch_name || hydratedRow.branch_code)
+        ? { name: hydratedRow.branch_name, code: hydratedRow.branch_code }
         : null,
-      purchase_items: itemsResult.rows.map((item) => ({
-        ...item,
-        products: item.product_name ? {
-          name: item.product_name,
-          sku: item.product_sku,
-          unit: item.product_unit,
-          category: item.category,
-          selling_price: item.selling_price,
-        } : null,
-      })),
+      purchase_items: purchaseItems,
       purchase_payments: paymentsResult.rows,
       purchase_returns: returnsResult.rows,
     }
@@ -863,6 +940,38 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
      return { error: 'Atomic Execution Failed: ' + String(rpcRes?.error || rpcError?.message || 'RPC returned no data') }
   }
 
+  // Legacy RPC header insert still omits some header pricing fields such as
+  // discount_amount and insurance_amount. Sync them here so PO detail, AP, and
+  // receipt landed-cost calculations stay consistent with the submitted form.
+  if (Math.abs(headerDiscount) > 0.0001 || Math.abs(headerInsurance) > 0.0001) {
+    const { error: headerSyncError } = await (supabase as any)
+      .from('purchases')
+      .update({
+        vendor_id: payload.vendor_id,
+        branch_id: purchaseBranchId,
+        purchase_date: payload.purchase_date,
+        due_date: resolvedDueDate,
+        total_amount: headerSubtotal,
+        tax_amount: headerTax,
+        discount_amount: headerDiscount,
+        shipping_amount: headerShipping,
+        insurance_amount: headerInsurance,
+        grand_total: headerGrand,
+        notes: notesWithTerm,
+        shariah_mode: shariahMode,
+      })
+      .eq('id', rpcRes.purchase_id)
+      .eq('org_id', orgId)
+
+    if (headerSyncError) {
+      return {
+        error:
+          'PO berhasil dibuat, tetapi sinkronisasi diskon/biaya header gagal: ' +
+          String(headerSyncError.message || 'unknown error'),
+      }
+    }
+  }
+
   revalidatePath('/purchasing')
   await nudgeEduModeValidation('purchasing.create.purchase')
   return { success: true, purchaseId: rpcRes.purchase_id }
@@ -902,23 +1011,23 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 
   const purchaseAccess = await ensurePurchaseDocumentAccess(orgId, purchase.branch_id)
   if ('error' in purchaseAccess) return { error: purchaseAccess.error }
-  if (purchase.status === 'RECEIVED') return { success: true }
+  const wasAlreadyReceived = purchase.status === 'RECEIVED'
   if (String(purchase.shariah_mode || '').toUpperCase() === 'SALAM' && purchase.payment_status !== 'PAID') {
     return { error: 'Akad SALAM pembelian wajib lunas terlebih dahulu sebelum penerimaan barang.' }
   }
 
-  const shipping = Number(purchase.shipping_amount || 0)
-  const insurance = Number(purchase.insurance_amount || 0)
-  const totalLandedOverhead = shipping + insurance
-  const totalLineDiscount = (purchase.purchase_items || []).reduce(
+  const shipping = roundMoney(purchase.shipping_amount || 0)
+  const insurance = roundMoney(purchase.insurance_amount || 0)
+  const totalLandedOverhead = roundMoney(shipping + insurance)
+  const totalLineDiscount = roundMoney((purchase.purchase_items || []).reduce(
     (sum: number, item: any) => sum + Number(item.discount_amount || 0),
     0
-  )
-  const globalDiscountRemainder = Math.max(Number(purchase.discount_amount || 0) - totalLineDiscount, 0)
+  ))
+  const headerDiscountAdjustment = roundMoney(Number(purchase.discount_amount || 0) - totalLineDiscount)
   const totalNetItemValue = Math.max(
     (purchase.purchase_items || []).reduce((sum: number, item: any) => {
       if (!item?.product_id) return sum
-      const grossValue = Number(item.quantity || 0) * Number(item.unit_price || 0)
+      const grossValue = roundMoney(Number(item.quantity || 0) * Number(item.unit_price || 0))
       return sum + Math.max(grossValue - Number(item.discount_amount || 0), 0)
     }, 0),
     1
@@ -971,38 +1080,51 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
   }
 
   const movementBranchId = purchase.branch_id || receiptWarehouse.branch_id || null
+  const expectedInventoryDebitTotal = roundMoney(Math.max(
+    Number(purchase.grand_total || 0) - Number(purchase.tax_amount || 0),
+    0
+  ))
+  let receiptJournal: { id: string; status: string } | null = null
+  const { data: existingReceiptJournal } = await (supabase as any)
+    .from('journal_entries')
+    .select('id, status')
+    .eq('org_id', orgId)
+    .eq('reference_type', 'PURCHASE')
+    .eq('reference_id', purchase.id)
+    .neq('status', 'VOIDED')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (existingReceiptJournal?.id) {
+    receiptJournal = {
+      id: String(existingReceiptJournal.id),
+      status: String(existingReceiptJournal.status || ''),
+    }
+  }
 
   // Idempotency guard:
   // If stock movement already exists for this PO but status is not yet RECEIVED
   // (e.g. previous run failed after stock posting), avoid double-posting.
   const stockMovementTable = (supabase as any).from('stock_movements')
+  let hasExistingStockMovements = false
   if (typeof stockMovementTable?.select === 'function') {
     const { count: existingMovementCount } = await stockMovementTable
       .select('id', { count: 'exact', head: true })
       .eq('org_id', orgId)
       .eq('reference_type', 'PURCHASE')
       .eq('reference_id', purchase.id)
-
-    if ((existingMovementCount || 0) > 0) {
-      const statusSyncResult = await markPurchaseAsReceived(supabase as any, {
-        orgId,
-        purchaseId,
-        warehouseId: purchase.warehouse_id || receiptWarehouse.id,
-      })
-
-      if ('error' in statusSyncResult) {
-        return { error: 'Gagal menyinkronkan status PO existing: ' + statusSyncResult.error }
-      }
-
-      revalidatePath('/purchasing')
-      revalidatePath('/inventory')
-      await nudgeEduModeValidation('purchasing.receive.purchase-idempotent')
-      return { success: true }
-    }
+    hasExistingStockMovements = (existingMovementCount || 0) > 0
   }
 
   const stockMovements: any[] = []
   const inventoryDebitAllocations: Array<{ assetAccountId: string | null; assetFallbackCode: string; amount: number }> = []
+  const inventoryReceiptItems: Array<{
+    item: any
+    assetAccountId: string | null
+    assetFallbackCode: string
+    rawLandedTotal: number
+  }> = []
 
   // 3. Process Items for WAC & Stock Card
   const totalPurchaseItems = (purchase.purchase_items || []).length
@@ -1020,60 +1142,82 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
     }
     
     // Landed Cost Calculation (Allocated based on Value)
-    const itemGrossValue = Number(item.quantity || 0) * Number(item.unit_price || 0)
-    const itemLineDiscount = Number(item.discount_amount || 0)
+    const itemGrossValue = roundMoney(Number(item.quantity || 0) * Number(item.unit_price || 0))
+    const itemLineDiscount = roundMoney(item.discount_amount || 0)
     const itemNetValue = Math.max(itemGrossValue - itemLineDiscount, 0)
-    const allocatedGlobalDiscount = totalNetItemValue > 0
-      ? (itemNetValue / totalNetItemValue) * globalDiscountRemainder
+    const allocatedDiscountAdjustment = totalNetItemValue > 0
+      ? (itemNetValue / totalNetItemValue) * headerDiscountAdjustment
       : 0
     const allocatedOverhead = totalNetItemValue > 0
       ? (itemNetValue / totalNetItemValue) * totalLandedOverhead
       : 0
-    const landedTotal = Math.max(itemNetValue - allocatedGlobalDiscount + allocatedOverhead, 0)
-    const landedUnitPrice = Number(item.quantity || 0) > 0
-      ? landedTotal / Number(item.quantity)
-      : Number(item.unit_price || 0)
-
-    // A. Update Average Cost (HPP) in Master Data
-    await (supabase as any).rpc('update_product_average_cost', {
-        p_product_id: item.product_id,
-        p_new_cost: landedUnitPrice
-    }).then((r: any) => { if (r.error) (console as any).error("WAC error", r.error) })
-
-    // B. Replaced by direct update in PO Creation (createPurchaseEntry)
-    // No action needed here anymore since selling price is established upfront.
-
-    stockMovements.push({
-      org_id: orgId,
-      branch_id: movementBranchId,
-      warehouse_id: receiptWarehouse.id,
-      product_id: item.product_id,
-      quantity: item.quantity,
-      unit_price: landedUnitPrice,
-      reference_type: 'PURCHASE',
-      reference_id: purchase.id,
-      notes: 'Penerimaan PO ' + (purchase.purchase_number || '')
-    })
+    const rawLandedTotal = Math.max(itemNetValue - allocatedDiscountAdjustment + allocatedOverhead, 0)
 
     const productRel = Array.isArray((item as any).products) ? (item as any).products[0] : (item as any).products
     const rawAssetAccountId = productRel?.asset_account_id
     const assetFallbackCode = getInventoryAssetFallbackCode(productRel?.category)
-    inventoryDebitAllocations.push({
+    inventoryReceiptItems.push({
+      item,
       assetAccountId: typeof rawAssetAccountId === 'string' ? rawAssetAccountId : null,
       assetFallbackCode,
-      amount: landedTotal,
+      rawLandedTotal,
     })
   }
 
-  // Guard: jika semua purchase_items tidak memiliki product_id, blokir penerimaan
-  // agar user tidak mengira berhasil padahal stok tidak bertambah sama sekali.
-  if (totalPurchaseItems > 0 && skippedItemCount === totalPurchaseItems) {
+  // Guard: item tanpa product_id tidak bisa diterima parsial, karena akan
+  // membuat stok dan jurnal berbeda dengan nilai PO.
+  if (skippedItemCount > 0) {
     return {
       error:
-        'Semua item pada PO ini tidak terhubung ke produk master. ' +
+        (skippedItemCount === totalPurchaseItems
+          ? 'Semua item pada PO ini tidak terhubung ke produk master. '
+          : `${skippedItemCount} item pada PO ini tidak terhubung ke produk master. `) +
         'Buka form edit PO dan pastikan setiap baris produk dipilih dari daftar (bukan diketik manual tanpa memilih). ' +
         'Atau buka Inventaris → Produk dan buat produk terlebih dahulu.'
     }
+  }
+
+  const landedTotals = allocateRoundedAmounts(
+    expectedInventoryDebitTotal,
+    inventoryReceiptItems.map((entry) => entry.rawLandedTotal)
+  )
+
+  for (let index = 0; index < inventoryReceiptItems.length; index += 1) {
+    const entry = inventoryReceiptItems[index]
+    const item = entry.item
+    const landedTotal = roundMoney(landedTotals[index] || 0)
+    const landedUnitPrice = Number(item.quantity || 0) > 0
+      ? landedTotal / Number(item.quantity)
+      : Number(item.unit_price || 0)
+
+    if (!hasExistingStockMovements) {
+      // A. Update Average Cost (HPP) in Master Data
+      await (supabase as any).rpc('update_product_average_cost', {
+        p_product_id: item.product_id,
+        p_new_cost: landedUnitPrice
+      }).then((r: any) => { if (r.error) (console as any).error("WAC error", r.error) })
+
+      // B. Replaced by direct update in PO Creation (createPurchaseEntry)
+      // No action needed here anymore since selling price is established upfront.
+
+      stockMovements.push({
+        org_id: orgId,
+        branch_id: movementBranchId,
+        warehouse_id: receiptWarehouse.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: landedUnitPrice,
+        reference_type: 'PURCHASE',
+        reference_id: purchase.id,
+        notes: 'Penerimaan PO ' + (purchase.purchase_number || '')
+      })
+    }
+
+    inventoryDebitAllocations.push({
+      assetAccountId: entry.assetAccountId,
+      assetFallbackCode: entry.assetFallbackCode,
+      amount: landedTotal,
+    })
   }
 
   // 4. Persistence: Stock Movements (Sub-Ledger) & WMS Sync (Physical Stock)
@@ -1100,177 +1244,187 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
      }
   }
 
-  // 5. GL Synchronization (Journal)
-  const { data: accounts } = await (supabase as any)
-    .from('accounts' as any)
-    .select('id, code, type')
-    .eq('org_id', orgId)
-    .in('code', ['1205', '1301', '1302', '1303', '1304', '1401', '1403', '1404', '2101'])
-
-  const inventoryAccountByCode = Object.fromEntries(
-    ((accounts || []) as any[]).map((account: any) => [account.code, account.id])
-  ) as Record<string, string | undefined>
-  const accPersediaan = inventoryAccountByCode['1301']
-  const accPpnMasukan = accounts?.find((a:any) => a.code === '1401')?.id
-  const accUangMuka = accounts?.find((a:any) => a.code === '1403')?.id
-  const accIstishnaAsset = accounts?.find((a:any) => a.code === '1205')?.id
-  const accPiutangSalamVendor = accounts?.find((a:any) => a.code === '1404')?.id
-  const defaultAccHutang = accounts?.find((a:any) => a.code === '2101')?.id
- 
-  let finalAccCredit = defaultAccHutang
   const isLunas = purchase.notes?.includes('[TERMIN: LUNAS]')
-  let LunasAccountId: string | null = null
-  if (isLunas) {
-     const match = purchase.notes.match(/\[ACC: ([a-f0-9-]+)\]/)
-     if (match && match[1]) LunasAccountId = match[1]
-  }
 
-  let validatedLunasAccountId: string | null = null
-  if (isLunas) {
-    if (!LunasAccountId) {
-      return { error: 'Pembelian LUNAS wajib memilih akun kas/bank pada form pembelian.' }
-    }
+  // 5. GL Synchronization (Journal)
+  if (!receiptJournal || receiptJournal.status !== 'POSTED') {
+    if (receiptJournal?.id && receiptJournal.status === 'DRAFT') {
+      const postResult = await postJournalEntry(receiptJournal.id, orgId)
+      if ((postResult as any).error) {
+        return { error: 'Gagal memposting jurnal penerimaan yang sudah ada: ' + String((postResult as any).error) }
+      }
+    } else {
+      const { data: accounts } = await (supabase as any)
+        .from('accounts' as any)
+        .select('id, code, type')
+        .eq('org_id', orgId)
+        .in('code', ['1205', '1301', '1302', '1303', '1304', '1401', '1403', '1404', '2101'])
 
-    const { data: lunasAccount, error: lunasAccountError } = await (supabase as any)
-      .from('accounts')
-      .select('id, code, type')
-      .eq('id', LunasAccountId)
-      .eq('org_id', orgId)
-      .maybeSingle()
-
-    if (lunasAccountError || !lunasAccount?.id) {
-      return { error: 'Akun kas/bank untuk pembayaran lunas tidak ditemukan.' }
-    }
-
-    if (lunasAccount.type !== 'ASSET' || !String(lunasAccount.code || '').startsWith('11')) {
-      return { error: 'Akun pembayaran lunas harus akun kas/bank (kelompok 11xx).' }
-    }
-
-    validatedLunasAccountId = lunasAccount.id
-  }
-
-  // Syariah Mod:
-  // - SALAM: clear Piutang Salam Vendor (1404) on goods receipt
-  // - ISTISHNA: clear Uang Muka Pembelian (1403)
-  if (String(purchase.shariah_mode || '').toUpperCase() === 'SALAM') {
-     if (!accPiutangSalamVendor) {
-       return { error: 'Akun Piutang Salam Vendor (1404) belum tersedia di CoA. Jalankan migrasi terbaru / aktifkan akun syariah.' }
-     }
-     finalAccCredit = accPiutangSalamVendor
-  } else if (String(purchase.shariah_mode || '').toUpperCase() === 'ISTISHNA') {
-     // Gunakan akun 1205 (Piutang Barang Istishna) jika ada, fallback ke 1403 (Uang Muka)
-     if (accIstishnaAsset) {
-        finalAccCredit = accIstishnaAsset
-     } else if (accUangMuka) {
-        finalAccCredit = accUangMuka
-     }
-  } else if (isLunas && validatedLunasAccountId) {
-     finalAccCredit = validatedLunasAccountId
-  }
-
-  if (!finalAccCredit) {
-    return {
-      error: isLunas
-        ? 'Akun kredit pembelian lunas tidak ditemukan. Pastikan akun kas/bank aktif.'
-        : 'Akun Hutang Usaha (2101) tidak ditemukan untuk mencatat penerimaan pembelian.',
-    }
-  }
-
-  if (finalAccCredit) {
-    const pajakVal = Number(purchase.tax_amount || 0)
-    const grandVal = Number(purchase.grand_total || 0)
-
-    // Check if overhead was paid separately in cash!
-    let vendorApAmount = grandVal
-    let overheadCashAmount = 0
-    let overheadAccId = null
-
-    const overheadMatch = purchase.notes?.match(/\[OVERHEAD_ACC: ([a-f0-9-]+)\]/)
-    if (overheadMatch && overheadMatch[1] && (shipping > 0 || insurance > 0)) {
-       overheadCashAmount = shipping + insurance
-       vendorApAmount = grandVal - overheadCashAmount
-       overheadAccId = overheadMatch[1]
-    }
-
-    const inventoryDebitByAccount: Record<string, number> = {}
-    for (const allocation of inventoryDebitAllocations) {
-      const accountId =
-        allocation.assetAccountId
-        || inventoryAccountByCode[allocation.assetFallbackCode]
-        || accPersediaan
-        || null
-      if (!accountId) continue
-      inventoryDebitByAccount[accountId] = (inventoryDebitByAccount[accountId] || 0) + Number(allocation.amount || 0)
-    }
-
-    if (Object.keys(inventoryDebitByAccount).length === 0 && inventoryDebitAllocations.length > 0) {
-      return { error: 'Akun persediaan produk belum lengkap. Set asset account produk atau siapkan akun 1301.' }
-    }
-
-    const journalLines: any[] = Object.entries(inventoryDebitByAccount).map(([accountId, amount]) => ({
-      account_id: accountId,
-      debit: amount,
-      credit: 0,
-      memo: 'Persediaan (Landed) ' + (purchase.purchase_number || '')
-    }))
-
-    // PPN
-    if (pajakVal > 0 && accPpnMasukan) {
-      journalLines.push({ account_id: accPpnMasukan, debit: pajakVal, credit: 0, memo: 'PPN Masukan PO' })
-    }
-
-    // Hutang Vendor / Lunas Pembayaran Barang Utama
-    if (vendorApAmount > 0) {
-      journalLines.push({ account_id: finalAccCredit, debit: 0, credit: vendorApAmount, memo: isLunas ? 'Pembayaran Lunas Barang PO' : 'Hutang Vendor PO' })
-    }
-
-    // Kas/Bank untuk Ongkir & Asuransi (Landed Cost Provider 3rd Party)
-    if (overheadCashAmount > 0 && overheadAccId) {
-      journalLines.push({ account_id: overheadAccId, debit: 0, credit: overheadCashAmount, memo: 'Pembayaran Tunai Freight/Logistics' })
-    }
-
-    // Balancer untuk Diskon Global dan Pembulatan (Round-off)
-    const totalDebit = journalLines.reduce((acc: any, l: any) => acc + l.debit, 0)
-    const totalCredit = journalLines.reduce((acc: any, l: any) => acc + l.credit, 0)
+      const inventoryAccountByCode = Object.fromEntries(
+        ((accounts || []) as any[]).map((account: any) => [account.code, account.id])
+      ) as Record<string, string | undefined>
+      const accPersediaan = inventoryAccountByCode['1301']
+      const accPpnMasukan = accounts?.find((a:any) => a.code === '1401')?.id
+      const accUangMuka = accounts?.find((a:any) => a.code === '1403')?.id
+      const accIstishnaAsset = accounts?.find((a:any) => a.code === '1205')?.id
+      const accPiutangSalamVendor = accounts?.find((a:any) => a.code === '1404')?.id
+      const defaultAccHutang = accounts?.find((a:any) => a.code === '2101')?.id
     
-    const diff = totalDebit - totalCredit
-    if (Math.abs(diff) > 0.05) {
-      return { error: `Jurnal pembelian tidak balance setelah alokasi diskon/biaya. Selisih ${diff.toFixed(2)}.` }
-    }
-    if (Math.abs(diff) > 0.001) {
-       journalLines.push({
-           account_id: finalAccCredit,
-           debit: diff < 0 ? Math.abs(diff) : 0,
-           credit: diff > 0 ? diff : 0,
-           memo: 'Penyesuaian Pembulatan PO'
-       })
-    }
+      let finalAccCredit = defaultAccHutang
+      let LunasAccountId: string | null = null
+      if (isLunas) {
+         const match = purchase.notes.match(/\[ACC: ([a-f0-9-]+)\]/)
+         if (match && match[1]) LunasAccountId = match[1]
+      }
 
-    const journalResult = await createJournalEntry({
-      org_id: orgId,
-      branch_id: purchase.branch_id || undefined,
-      entry_date: String(purchase.purchase_date || new Date().toISOString()).slice(0, 10),
-      description: 'Penerimaan Pembelian & Stok ' + (purchase.purchase_number || ''),
-      reference_type: 'PURCHASE',
-      reference_id: purchase.id,
-      lines: journalLines,
-      auto_post: true,
-      allow_org_scope: true
+      let validatedLunasAccountId: string | null = null
+      if (isLunas) {
+        if (!LunasAccountId) {
+          return { error: 'Pembelian LUNAS wajib memilih akun kas/bank pada form pembelian.' }
+        }
+
+        const { data: lunasAccount, error: lunasAccountError } = await (supabase as any)
+          .from('accounts')
+          .select('id, code, type')
+          .eq('id', LunasAccountId)
+          .eq('org_id', orgId)
+          .maybeSingle()
+
+        if (lunasAccountError || !lunasAccount?.id) {
+          return { error: 'Akun kas/bank untuk pembayaran lunas tidak ditemukan.' }
+        }
+
+        if (lunasAccount.type !== 'ASSET' || !String(lunasAccount.code || '').startsWith('11')) {
+          return { error: 'Akun pembayaran lunas harus akun kas/bank (kelompok 11xx).' }
+        }
+
+        validatedLunasAccountId = lunasAccount.id
+      }
+
+      // Syariah Mod:
+      // - SALAM: clear Piutang Salam Vendor (1404) on goods receipt
+      // - ISTISHNA: clear Uang Muka Pembelian (1403)
+      if (String(purchase.shariah_mode || '').toUpperCase() === 'SALAM') {
+         if (!accPiutangSalamVendor) {
+           return { error: 'Akun Piutang Salam Vendor (1404) belum tersedia di CoA. Jalankan migrasi terbaru / aktifkan akun syariah.' }
+         }
+         finalAccCredit = accPiutangSalamVendor
+      } else if (String(purchase.shariah_mode || '').toUpperCase() === 'ISTISHNA') {
+         // Gunakan akun 1205 (Piutang Barang Istishna) jika ada, fallback ke 1403 (Uang Muka)
+         if (accIstishnaAsset) {
+            finalAccCredit = accIstishnaAsset
+         } else if (accUangMuka) {
+            finalAccCredit = accUangMuka
+         }
+      } else if (isLunas && validatedLunasAccountId) {
+         finalAccCredit = validatedLunasAccountId
+      }
+
+      if (!finalAccCredit) {
+        return {
+          error: isLunas
+            ? 'Akun kredit pembelian lunas tidak ditemukan. Pastikan akun kas/bank aktif.'
+            : 'Akun Hutang Usaha (2101) tidak ditemukan untuk mencatat penerimaan pembelian.',
+        }
+      }
+
+      const pajakVal = roundMoney(purchase.tax_amount || 0)
+      const grandVal = roundMoney(purchase.grand_total || 0)
+
+      // Check if overhead was paid separately in cash!
+      let vendorApAmount = grandVal
+      let overheadCashAmount = 0
+      let overheadAccId = null
+
+      const overheadMatch = purchase.notes?.match(/\[OVERHEAD_ACC: ([a-f0-9-]+)\]/)
+      if (overheadMatch && overheadMatch[1] && (shipping > 0 || insurance > 0)) {
+         overheadCashAmount = roundMoney(shipping + insurance)
+         vendorApAmount = roundMoney(grandVal - overheadCashAmount)
+         overheadAccId = overheadMatch[1]
+      }
+
+      const inventoryDebitByAccount: Record<string, number> = {}
+      for (const allocation of inventoryDebitAllocations) {
+        const accountId =
+          allocation.assetAccountId
+          || inventoryAccountByCode[allocation.assetFallbackCode]
+          || accPersediaan
+          || null
+        if (!accountId) continue
+        inventoryDebitByAccount[accountId] = roundMoney((inventoryDebitByAccount[accountId] || 0) + Number(allocation.amount || 0))
+      }
+
+      if (Object.keys(inventoryDebitByAccount).length === 0 && inventoryDebitAllocations.length > 0) {
+        return { error: 'Akun persediaan produk belum lengkap. Set asset account produk atau siapkan akun 1301.' }
+      }
+
+      const journalLines: any[] = Object.entries(inventoryDebitByAccount).map(([accountId, amount]) => ({
+        account_id: accountId,
+        debit: amount,
+        credit: 0,
+        memo: 'Persediaan (Landed) ' + (purchase.purchase_number || '')
+      }))
+
+      // PPN
+      if (pajakVal > 0 && accPpnMasukan) {
+        journalLines.push({ account_id: accPpnMasukan, debit: pajakVal, credit: 0, memo: 'PPN Masukan PO' })
+      }
+
+      // Hutang Vendor / Lunas Pembayaran Barang Utama
+      if (vendorApAmount > 0) {
+        journalLines.push({ account_id: finalAccCredit, debit: 0, credit: vendorApAmount, memo: isLunas ? 'Pembayaran Lunas Barang PO' : 'Hutang Vendor PO' })
+      }
+
+      // Kas/Bank untuk Ongkir & Asuransi (Landed Cost Provider 3rd Party)
+      if (overheadCashAmount > 0 && overheadAccId) {
+        journalLines.push({ account_id: overheadAccId, debit: 0, credit: overheadCashAmount, memo: 'Pembayaran Tunai Freight/Logistics' })
+      }
+
+      // Balancer untuk Diskon Global dan Pembulatan (Round-off)
+      const totalDebit = roundMoney(journalLines.reduce((acc: any, l: any) => acc + l.debit, 0))
+      const totalCredit = roundMoney(journalLines.reduce((acc: any, l: any) => acc + l.credit, 0))
+      
+      const diff = roundMoney(totalDebit - totalCredit)
+      if (Math.abs(diff) > 0.05) {
+        return { error: `Jurnal pembelian tidak balance setelah alokasi diskon/biaya. Selisih ${diff.toFixed(2)}.` }
+      }
+      if (Math.abs(diff) > 0.001) {
+         journalLines.push({
+             account_id: finalAccCredit,
+             debit: diff < 0 ? Math.abs(diff) : 0,
+             credit: diff > 0 ? diff : 0,
+             memo: 'Penyesuaian Pembulatan PO'
+         })
+      }
+
+      const journalResult = await createJournalEntry({
+        org_id: orgId,
+        branch_id: purchase.branch_id || undefined,
+        entry_date: normalizeJournalEntryDate(purchase.purchase_date),
+        description: 'Penerimaan Pembelian & Stok ' + (purchase.purchase_number || ''),
+        reference_type: 'PURCHASE',
+        reference_id: purchase.id,
+        lines: journalLines,
+        auto_post: true,
+        allow_org_scope: true
+      })
+      
+      const jErr = (journalResult as any).error
+      if (jErr) {
+         return { error: 'Gagal menjurnal bukti penerimaan: ' + String(jErr) }
+      }
+    }
+  }
+
+  if (!wasAlreadyReceived) {
+    const statusResult = await markPurchaseAsReceived(supabase as any, {
+      orgId,
+      purchaseId,
+      warehouseId: purchase.warehouse_id || receiptWarehouse.id,
     })
-    
-    const jErr = (journalResult as any).error
-    if (jErr) {
-       return { error: 'Gagal menjurnal bukti penerimaan: ' + String(jErr) }
-    }
+
+    if ('error' in statusResult) return { error: 'Gagal memperbarui status PO: ' + statusResult.error }
   }
-
-  const statusResult = await markPurchaseAsReceived(supabase as any, {
-    orgId,
-    purchaseId,
-    warehouseId: purchase.warehouse_id || receiptWarehouse.id,
-  })
-
-  if ('error' in statusResult) return { error: 'Gagal memperbarui status PO: ' + statusResult.error }
 
   if (isLunas) {
     const { error: paymentStatusError } = await (supabase as any)
@@ -1289,7 +1443,11 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 
   revalidatePath('/purchasing')
   revalidatePath('/inventory')
-  await nudgeEduModeValidation('purchasing.receive.purchase')
+  await nudgeEduModeValidation(
+    hasExistingStockMovements
+      ? 'purchasing.receive.purchase-idempotent'
+      : 'purchasing.receive.purchase'
+  )
   return { success: true }
 }
 
