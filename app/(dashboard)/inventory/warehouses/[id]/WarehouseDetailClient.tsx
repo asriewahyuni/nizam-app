@@ -26,6 +26,13 @@ type WarehouseBinSummary = {
   total_asset_value: number
 }
 
+type WarehouseUnassignedStockSummary = {
+  sku_count: number
+  batch_count: number
+  total_quantity: number
+  total_asset_value: number
+}
+
 type WarehouseBin = {
   id: string
   code: string
@@ -55,6 +62,7 @@ interface WarehouseDetailClientProps {
   activeBranchName?: string | null
   warehouse: WarehouseRecord
   initialBins: WarehouseBin[]
+  unassignedStockSummary: WarehouseUnassignedStockSummary
   userRole: string
 }
 
@@ -130,6 +138,7 @@ export function WarehouseDetailClient({
   activeBranchName,
   warehouse,
   initialBins,
+  unassignedStockSummary,
   userRole,
 }: WarehouseDetailClientProps) {
   const router = useRouter()
@@ -223,6 +232,7 @@ export function WarehouseDetailClient({
     bin.stock_items.length > 0 || Math.abs(bin.stock_summary.total_quantity) > 0.0001
   ).length
 
+  const hasUnassignedStock = Math.abs(unassignedStockSummary.total_quantity) > 0.0001
   const totalAssetValue = bins.reduce((sum, bin) => sum + bin.stock_summary.total_asset_value, 0)
   const totalQuantity = bins.reduce((sum, bin) => sum + bin.stock_summary.total_quantity, 0)
   const uniqueSkuCount = new Set(
@@ -276,6 +286,26 @@ export function WarehouseDetailClient({
             Kode rak, barcode, dan deskripsi tetap jadi master layout. SKU, qty, batch, expiry, dan nilai aset di bawah ini dihitung otomatis dari stok aktif pada bin.
           </p>
         </div>
+
+        {hasUnassignedStock && (
+          <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-5 py-5 shadow-sm">
+            <p className="text-sm font-black text-amber-950">Ada stok gudang yang belum ditempatkan ke bin.</p>
+            <p className="mt-1 text-sm font-medium text-amber-900">
+              Inventory umum tetap menampilkan stok ini, tetapi kartu bin di halaman ini hanya menghitung stok yang sudah punya lokasi bin.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-bold">
+              <span className="inline-flex items-center rounded-full border border-amber-200 bg-white px-3 py-1.5 text-amber-800">
+                {unassignedStockSummary.sku_count.toLocaleString('id-ID')} SKU belum ditempatkan
+              </span>
+              <span className="inline-flex items-center rounded-full border border-amber-200 bg-white px-3 py-1.5 text-amber-800">
+                {formatQuantity(unassignedStockSummary.total_quantity)} Qty belum punya bin
+              </span>
+              <span className="inline-flex items-center rounded-full border border-amber-200 bg-white px-3 py-1.5 text-amber-800">
+                Nilai {formatRupiah(unassignedStockSummary.total_asset_value)}
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           <KpiCard
@@ -427,7 +457,9 @@ export function WarehouseDetailClient({
                         <p className="text-xs font-medium text-slate-500">
                           {hasStock
                             ? 'Klik untuk melihat detail SKU, qty, batch, expiry, dan nilai stok.'
-                            : 'Bin ini masih kosong dan siap dipakai untuk putaway baru.'}
+                            : hasUnassignedStock
+                              ? 'Bin ini belum berisi stok. Gudang masih punya stok yang belum ditempatkan ke bin.'
+                              : 'Bin ini masih kosong dan siap dipakai untuk putaway baru.'}
                         </p>
                       </div>
                     </div>
@@ -439,7 +471,7 @@ export function WarehouseDetailClient({
                         <div>
                           <p className="text-[11px] font-black text-emerald-700 uppercase tracking-[0.22em]">Isi Bin Saat Ini</p>
                           <p className="mt-1 text-sm font-medium text-emerald-900">
-                            Data ini otomatis mengikuti stok yang benar-benar tersimpan di bin.
+                            Data ini otomatis mengikuti stok yang benar-benar tersimpan di bin. Stok gudang yang belum punya bin belum dihitung di kartu ini.
                           </p>
                         </div>
                         <div className="text-left sm:text-right">
@@ -468,9 +500,15 @@ export function WarehouseDetailClient({
                       </div>
 
                       {!hasStock ? (
-                        <div className="mt-4 rounded-2xl border border-dashed border-emerald-200 bg-white/70 px-4 py-5 text-sm font-medium text-emerald-900">
-                          Bin ini masih kosong. Cocok untuk slot putaway baru karena belum ada SKU yang aktif menempati lokasi ini.
-                        </div>
+                        hasUnassignedStock ? (
+                          <div className="mt-4 rounded-2xl border border-dashed border-amber-200 bg-amber-50/80 px-4 py-5 text-sm font-medium text-amber-900">
+                            Bin ini belum ditempati stok. Namun gudang ini masih memiliki {formatQuantity(unassignedStockSummary.total_quantity)} qty dari {unassignedStockSummary.sku_count.toLocaleString('id-ID')} SKU yang belum dialokasikan ke bin, jadi stoknya tetap terlihat di Inventory umum.
+                          </div>
+                        ) : (
+                          <div className="mt-4 rounded-2xl border border-dashed border-emerald-200 bg-white/70 px-4 py-5 text-sm font-medium text-emerald-900">
+                            Bin ini masih kosong. Cocok untuk slot putaway baru karena belum ada SKU yang aktif menempati lokasi ini.
+                          </div>
+                        )
                       ) : (
                         <div className={`mt-4 space-y-3 ${bin.stock_items.length > 3 ? 'max-h-72 overflow-y-auto pr-1' : ''}`}>
                           {bin.stock_items.map((item) => (

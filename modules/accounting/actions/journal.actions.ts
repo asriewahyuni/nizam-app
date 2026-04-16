@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { hydratePurchaseTransparencyForEntries } from '@/modules/accounting/lib/purchase-ledger-transparency'
 import type { JournalReferenceType } from '@/types/database.types'
 
 export interface JournalLineInput {
@@ -609,10 +610,17 @@ export async function getJournalEntries(
     ;(console as any).error('[getJournalEntries] lines SQL error:', err)
   }
 
-  return entryRows.map((row) => {
+  const entries = entryRows.map((row) => {
     const eid = String(row.id ?? '')
     const lines = (linesByEntryId[eid] ?? [])
       .sort((a: any, b: any) => (Number(b.debit) || 0) - (Number(a.debit) || 0))
     return { ...row, journal_lines: lines }
   })
+
+  try {
+    return await hydratePurchaseTransparencyForEntries(entries, queryPostgres)
+  } catch (err) {
+    ;(console as any).error('[getJournalEntries] purchase transparency hydrate error:', err)
+    return entries.map((entry) => ({ ...entry, purchase_transparency: null }))
+  }
 }

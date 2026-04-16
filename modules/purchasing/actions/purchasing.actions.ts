@@ -3,6 +3,10 @@
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath, unstable_noStore as noStore } from 'next/cache'
 import { createJournalEntry, postJournalEntry } from '@/modules/accounting/actions/journal.actions'
+import {
+  buildPurchaseLedgerTransparency,
+  formatPurchaseLedgerTransparencyNote,
+} from '@/modules/accounting/lib/purchase-ledger-transparency'
 import { getBranchAccessScope, resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 import { getDocumentHeaderDiscountAmount, getDocumentLineDiscountTotal, roundMoney } from '@/lib/commerce/discounts'
@@ -1397,11 +1401,17 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
          })
       }
 
+      const purchaseTransparency = buildPurchaseLedgerTransparency(
+        purchase,
+        Array.isArray(purchase.purchase_items) ? purchase.purchase_items : []
+      )
+
       const journalResult = await createJournalEntry({
         org_id: orgId,
         branch_id: purchase.branch_id || undefined,
         entry_date: normalizeJournalEntryDate(purchase.purchase_date),
         description: 'Penerimaan Pembelian & Stok ' + (purchase.purchase_number || ''),
+        notes: formatPurchaseLedgerTransparencyNote(purchaseTransparency),
         reference_type: 'PURCHASE',
         reference_id: purchase.id,
         lines: journalLines,

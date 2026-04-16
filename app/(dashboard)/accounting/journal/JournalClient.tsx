@@ -19,6 +19,18 @@ interface JournalClientProps {
   activeBranchName: string | null
 }
 
+type PurchaseTransparencySummary = {
+  subtotal?: number
+  lineDiscount?: number
+  headerDiscount?: number
+  subtotalAfterDiscount?: number
+  landedCost?: number
+  inventoryValue?: number
+  tax?: number
+  grandTotal?: number
+  note?: string | null
+}
+
 export default function JournalClient({
   orgId,
   initialEntries,
@@ -39,6 +51,18 @@ export default function JournalClient({
   const [filterStatus, setFilterStatus] = useState<'POSTED' | 'VOIDED' | 'DRAFT'>('POSTED')
   
   const isOwner = userRole === 'owner'
+
+  const getPurchaseTransparency = (entry: any): PurchaseTransparencySummary | null => {
+    if (!entry || typeof entry !== 'object') return null
+    const summary = entry.purchase_transparency
+    return summary && typeof summary === 'object' ? (summary as PurchaseTransparencySummary) : null
+  }
+
+  const getLedgerDisclosureNote = (entry: any) => {
+    const notes = typeof entry?.notes === 'string' ? entry.notes.trim() : ''
+    if (notes) return notes
+    return String(getPurchaseTransparency(entry)?.note || '').trim()
+  }
   
   // Form State
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0])
@@ -185,13 +209,14 @@ export default function JournalClient({
     const activeEntries = entries.filter((e: any) => e.status === filterStatus)
     if (activeEntries.length === 0) return alert("Tidak ada data untuk diunduh.")
 
-    const headers = ["Tanggal", "No. Jurnal", "Deskripsi", "Tipe Ref", "Akun", "Debit", "Kredit", "Memo"]
+    const headers = ["Tanggal", "No. Jurnal", "Deskripsi", "Tipe Ref", "Breakdown", "Akun", "Debit", "Kredit", "Memo"]
     const rows = activeEntries.flatMap(entry => 
       (entry.journal_lines || []).map((line: any) => [
         entry.entry_date,
         `"${entry.entry_number}"`,
         `"${(entry.description || '').replace(/"/g, '""')}"`,
         entry.reference_type,
+        `"${getLedgerDisclosureNote(entry).replace(/"/g, '""')}"`,
         `"${line.accounts?.code} - ${(line.accounts?.name || '').replace(/"/g, '""')}"`,
         line.debit,
         line.credit,
@@ -332,6 +357,8 @@ export default function JournalClient({
                       const lockMessage = lockedPeriod
                         ? `Periode fiskal ${lockedPeriod.name} sudah ditutup.`
                         : null
+                      const purchaseTransparency = getPurchaseTransparency(entry)
+                      const disclosureNote = getLedgerDisclosureNote(entry)
 
                       return (
 	                  <tr key={entry.id} className="group hover:bg-slate-50 transition-colors">
@@ -343,11 +370,52 @@ export default function JournalClient({
                        <div className="text-sm font-black text-slate-800 leading-tight">{entry.description}</div>
                        <div className="flex items-center gap-2 mt-2">
                          <span className="text-[9px] font-black text-slate-400 border border-slate-200 bg-white px-2 py-0.5 rounded uppercase tracking-widest">{entry.reference_type}</span>
-                         {entry.notes && <span className="text-[10px] font-medium text-slate-400 italic truncate max-w-[150px]">{entry.notes}</span>}
+                         {disclosureNote && <span className="text-[10px] font-medium text-slate-400 italic truncate max-w-[220px]">{disclosureNote}</span>}
                        </div>
                     </td>
                     <td className="px-6 py-6 align-top">
                        <div className="flex flex-col gap-1.5 w-full min-w-[340px] max-w-lg">
+                        {purchaseTransparency && (
+                          <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 mb-2">
+                            <div className="text-[8px] font-black text-amber-700 uppercase tracking-[0.22em] mb-2">
+                              Transparansi Diskon Pembelian
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">Bruto Barang</span>
+                                <span className="font-mono font-black text-slate-800">{formatRupiah(Number(purchaseTransparency.subtotal || 0))}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">Diskon Item</span>
+                                <span className="font-mono font-black text-rose-600">{formatRupiah(Number(purchaseTransparency.lineDiscount || 0))}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">Diskon Header</span>
+                                <span className="font-mono font-black text-rose-600">{formatRupiah(Number(purchaseTransparency.headerDiscount || 0))}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">Neto Barang</span>
+                                <span className="font-mono font-black text-slate-800">{formatRupiah(Number(purchaseTransparency.subtotalAfterDiscount || 0))}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">Landed Cost</span>
+                                <span className="font-mono font-black text-slate-800">{formatRupiah(Number(purchaseTransparency.landedCost || 0))}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">Persediaan Tercatat</span>
+                                <span className="font-mono font-black text-emerald-700">{formatRupiah(Number(purchaseTransparency.inventoryValue || 0))}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">PPN Masukan</span>
+                                <span className="font-mono font-black text-slate-800">{formatRupiah(Number(purchaseTransparency.tax || 0))}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">Total Tagihan</span>
+                                <span className="font-mono font-black text-blue-700">{formatRupiah(Number(purchaseTransparency.grandTotal || 0))}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         <div className="grid grid-cols-12 gap-2 text-[8px] font-black text-slate-300 uppercase tracking-widest mb-1 pb-2 border-b border-slate-100">
                           <div className="col-span-6">Akun (CoA)</div>
                           <div className="col-span-3 text-right text-emerald-600/50">Debit</div>
