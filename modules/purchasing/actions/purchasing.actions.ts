@@ -178,6 +178,104 @@ function isPurchaseWarehouseColumnSchemaCacheMiss(
   )
 }
 
+function isPurchaseInsuranceColumnMissing(
+  error: { code?: string | null; message?: string | null } | null | undefined
+) {
+  if (!error) return false
+
+  const message = String(error.message || '')
+  const normalized = message.toLowerCase()
+
+  return (
+    error.code === '42703' ||
+    error.code === 'PGRST204' ||
+    (
+      normalized.includes('purchases') &&
+      normalized.includes('insurance_amount') &&
+      (
+        normalized.includes('schema cache') ||
+        normalized.includes('could not find') ||
+        normalized.includes('does not exist')
+      )
+    )
+  )
+}
+
+function buildLegacyInsuranceCompatiblePurchasePayload(payload: Record<string, unknown>) {
+  const shippingAmount = roundMoney(payload.shipping_amount || 0)
+  const insuranceAmount = roundMoney(payload.insurance_amount || 0)
+
+  return {
+    ...payload,
+    shipping_amount: roundMoney(shippingAmount + insuranceAmount),
+  }
+}
+
+async function insertPurchaseCompat(
+  supabase: any,
+  payload: Record<string, unknown>,
+  selectColumns: string = 'id'
+) {
+  const executeInsert = (insertPayload: Record<string, unknown>) =>
+    (supabase as any)
+      .from('purchases')
+      .insert(insertPayload)
+      .select(selectColumns)
+      .single()
+
+  const primaryPayload = {
+    ...payload,
+    insurance_amount: roundMoney(payload.insurance_amount || 0),
+  }
+  let result = await executeInsert(primaryPayload)
+  if (!result?.error) {
+    return { ...result, usedLegacyInsuranceFallback: false as const }
+  }
+
+  if (!isPurchaseInsuranceColumnMissing(result.error)) {
+    return { ...result, usedLegacyInsuranceFallback: false as const }
+  }
+
+  const legacyPayload = buildLegacyInsuranceCompatiblePurchasePayload(primaryPayload)
+  delete (legacyPayload as Record<string, unknown>).insurance_amount
+  result = await executeInsert(legacyPayload)
+
+  return { ...result, usedLegacyInsuranceFallback: true as const }
+}
+
+async function updatePurchaseCompat(
+  supabase: any,
+  payload: Record<string, unknown>,
+  filters: Array<[string, unknown]>
+) {
+  const executeUpdate = async (updatePayload: Record<string, unknown>) => {
+    let query = (supabase as any).from('purchases').update(updatePayload)
+    for (const [column, value] of filters) {
+      query = query.eq(column, value)
+    }
+    return query
+  }
+
+  const primaryPayload = {
+    ...payload,
+    insurance_amount: roundMoney(payload.insurance_amount || 0),
+  }
+  let result = await executeUpdate(primaryPayload)
+  if (!result?.error) {
+    return { ...result, usedLegacyInsuranceFallback: false as const }
+  }
+
+  if (!isPurchaseInsuranceColumnMissing(result.error)) {
+    return { ...result, usedLegacyInsuranceFallback: false as const }
+  }
+
+  const legacyPayload = buildLegacyInsuranceCompatiblePurchasePayload(primaryPayload)
+  delete (legacyPayload as Record<string, unknown>).insurance_amount
+  result = await executeUpdate(legacyPayload)
+
+  return { ...result, usedLegacyInsuranceFallback: true as const }
+}
+
 function isStockMovementsWarehouseColumnMissing(
   error: { code?: string | null; message?: string | null } | null | undefined
 ) {
@@ -770,9 +868,9 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
       return { error: 'Hanya dokumen PO berstatus DRAFT yang bisa diedit atau diterbitkan ulang.' }
     }
 
-    const { error: updatePurchaseError } = await (supabase as any)
-      .from('purchases')
-      .update({
+    const { error: updatePurchaseError } = await updatePurchaseCompat(
+      supabase,
+      {
         vendor_id: payload.vendor_id,
         branch_id: purchaseBranchId,
         purchase_date: payload.purchase_date,
@@ -787,9 +885,12 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
         shariah_mode: shariahMode,
         status: createMode === 'DRAFT' ? 'DRAFT' : 'ORDERED',
         updated_at: new Date().toISOString(),
-      })
-      .eq('id', payload.draft_id)
-      .eq('org_id', orgId)
+      },
+      [
+        ['id', payload.draft_id],
+        ['org_id', orgId],
+      ]
+    )
 
     if (updatePurchaseError) {
       return { error: 'Gagal memperbarui draft PO: ' + updatePurchaseError.message }
@@ -874,9 +975,9 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
   }
 
   if (createMode === 'DRAFT') {
-    const { data: draftPurchase, error: draftInsertError } = await (supabase as any)
-      .from('purchases')
-      .insert({
+    const { data: draftPurchase, error: draftInsertError } = await insertPurchaseCompat(
+      supabase,
+      {
         org_id: orgId,
         branch_id: purchaseBranchId,
         vendor_id: payload.vendor_id,
@@ -892,9 +993,9 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
         shariah_mode: shariahMode,
         status: 'DRAFT',
         created_by: user.id,
-      })
-      .select('id')
-      .single()
+      },
+      'id'
+    )
 
     if (draftInsertError || !draftPurchase?.id) {
       return { error: 'Gagal menyimpan draft PO: ' + (draftInsertError?.message || 'Unknown error') }
@@ -948,9 +1049,9 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
   // discount_amount and insurance_amount. Sync them here so PO detail, AP, and
   // receipt landed-cost calculations stay consistent with the submitted form.
   if (Math.abs(headerDiscount) > 0.0001 || Math.abs(headerInsurance) > 0.0001) {
-    const { error: headerSyncError } = await (supabase as any)
-      .from('purchases')
-      .update({
+    const { error: headerSyncError } = await updatePurchaseCompat(
+      supabase,
+      {
         vendor_id: payload.vendor_id,
         branch_id: purchaseBranchId,
         purchase_date: payload.purchase_date,
@@ -963,9 +1064,12 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
         grand_total: headerGrand,
         notes: notesWithTerm,
         shariah_mode: shariahMode,
-      })
-      .eq('id', rpcRes.purchase_id)
-      .eq('org_id', orgId)
+      },
+      [
+        ['id', rpcRes.purchase_id],
+        ['org_id', orgId],
+      ]
+    )
 
     if (headerSyncError) {
       return {
