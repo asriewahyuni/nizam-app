@@ -3,10 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   createAdminClient: vi.fn(),
+  createJournalEntry: vi.fn(),
   revalidatePath: vi.fn(),
+  noStore: vi.fn(),
   getActiveBranch: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
   getBranchAccessScope: vi.fn(),
+  queryPostgres: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -16,6 +19,7 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('next/cache', () => ({
   revalidatePath: mocks.revalidatePath,
+  unstable_noStore: mocks.noStore,
 }))
 
 vi.mock('@/modules/organization/actions/org.actions', () => ({
@@ -25,6 +29,14 @@ vi.mock('@/modules/organization/actions/org.actions', () => ({
 vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
   getBranchAccessScope: mocks.getBranchAccessScope,
+}))
+
+vi.mock('@/lib/db/postgres', () => ({
+  queryPostgres: mocks.queryPostgres,
+}))
+
+vi.mock('@/modules/accounting/actions/journal.actions', () => ({
+  createJournalEntry: mocks.createJournalEntry,
 }))
 
 import { createPurchaseRequests } from '@/modules/factory/actions/factory.actions'
@@ -40,9 +52,21 @@ function createNoopMutationBuilder() {
   return builder
 }
 
+function queueReceivePurchaseRows(purchaseRow: Record<string, unknown>, itemRows: Array<Record<string, unknown>> = []) {
+  mocks.queryPostgres
+    .mockResolvedValueOnce({ rows: [purchaseRow] })
+    .mockResolvedValueOnce({ rows: itemRows })
+}
+
 describe('Purchasing Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.createClient.mockReset()
+    mocks.createAdminClient.mockReset()
+    mocks.createJournalEntry.mockReset()
+    mocks.queryPostgres.mockReset()
+    mocks.noStore.mockReset()
+    mocks.createJournalEntry.mockResolvedValue({ success: true, id: 'journal-1' })
   })
 
   it('rejects purchase creation when branch does not belong to active org', async () => {
@@ -396,6 +420,17 @@ describe('Purchasing Branch Context', () => {
       }),
     }
 
+    queueReceivePurchaseRows({
+      id: 'po-1',
+      org_id: 'org-1',
+      status: 'DRAFT',
+      branch_id: 'branch-1',
+      warehouse_id: null,
+      total_amount: 1000,
+      shipping_amount: 0,
+      insurance_amount: 0,
+    })
+
     mocks.createClient.mockResolvedValue({
       from: vi.fn((table: string) => {
         if (table === 'purchases') return purchasesTable
@@ -409,6 +444,10 @@ describe('Purchasing Branch Context', () => {
       canAccessAllBranches: false,
       membershipId: 'member-1',
       role: 'staff',
+    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
     })
 
     const result = await receivePurchase('org-1', 'po-1')
@@ -449,6 +488,19 @@ describe('Purchasing Branch Context', () => {
       })),
     }
 
+    queueReceivePurchaseRows({
+      id: 'po-salam-1',
+      org_id: 'org-1',
+      status: 'ORDERED',
+      branch_id: 'branch-1',
+      shariah_mode: 'SALAM',
+      payment_status: 'UNPAID',
+      warehouse_id: null,
+      total_amount: 1000,
+      shipping_amount: 0,
+      insurance_amount: 0,
+    })
+
     mocks.createClient.mockResolvedValue({
       from: vi.fn((table: string) => {
         if (table === 'purchases') return purchasesTable
@@ -461,6 +513,10 @@ describe('Purchasing Branch Context', () => {
       canAccessAllBranches: false,
       membershipId: 'member-1',
       role: 'staff',
+    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
     })
 
     const result = await receivePurchase('org-1', 'po-salam-1')
@@ -530,7 +586,10 @@ describe('Purchasing Branch Context', () => {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       in: vi.fn().mockResolvedValue({
-        data: [],
+        data: [
+          { id: 'acc-inventory', code: '1301', type: 'ASSET' },
+          { id: 'acc-ap', code: '2101', type: 'LIABILITY' },
+        ],
         error: null,
       }),
     }
@@ -569,7 +628,43 @@ describe('Purchasing Branch Context', () => {
       })),
     }
 
+    queueReceivePurchaseRows(
+      {
+        id: 'po-1',
+        org_id: 'org-1',
+        status: 'APPROVED',
+        branch_id: 'branch-1',
+        warehouse_id: 'wh-1',
+        purchase_number: 'PO-001',
+        total_amount: 2000,
+        shipping_amount: 0,
+        insurance_amount: 0,
+        tax_amount: 0,
+        discount_amount: 0,
+        grand_total: 2000,
+        notes: '',
+        shariah_mode: 'CASH',
+      },
+      [
+        {
+          id: 'pi-1',
+          purchase_id: 'po-1',
+          product_id: 'prod-1',
+          quantity: 2,
+          unit_price: 1000,
+          discount_amount: 0,
+          product_asset_account_id: null,
+          product_category: null,
+        },
+      ]
+    )
+
     mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
       from: vi.fn((table: string) => {
         if (table === 'purchases') return purchasesTable
         if (table === 'warehouses') return explicitWarehouseQuery
@@ -591,6 +686,10 @@ describe('Purchasing Branch Context', () => {
       canAccessAllBranches: false,
       membershipId: 'member-1',
       role: 'staff',
+    })
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
     })
 
     const result = await receivePurchase('org-1', 'po-1')
@@ -676,7 +775,10 @@ describe('Purchasing Branch Context', () => {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       in: vi.fn().mockResolvedValue({
-        data: [],
+        data: [
+          { id: 'acc-inventory', code: '1301', type: 'ASSET' },
+          { id: 'acc-ap', code: '2101', type: 'LIABILITY' },
+        ],
         error: null,
       }),
     }
@@ -715,7 +817,43 @@ describe('Purchasing Branch Context', () => {
       })),
     }
 
+    queueReceivePurchaseRows(
+      {
+        id: 'po-1',
+        org_id: 'org-1',
+        status: 'APPROVED',
+        branch_id: 'branch-1',
+        warehouse_id: 'wh-1',
+        purchase_number: 'PO-001',
+        total_amount: 2000,
+        shipping_amount: 0,
+        insurance_amount: 0,
+        tax_amount: 0,
+        discount_amount: 0,
+        grand_total: 2000,
+        notes: '',
+        shariah_mode: 'CASH',
+      },
+      [
+        {
+          id: 'pi-1',
+          purchase_id: 'po-1',
+          product_id: 'prod-1',
+          quantity: 2,
+          unit_price: 1000,
+          discount_amount: 0,
+          product_asset_account_id: null,
+          product_category: null,
+        },
+      ]
+    )
+
     mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
       from: vi.fn((table: string) => {
         if (table === 'purchases') return purchasesTable
         if (table === 'warehouses') return explicitWarehouseQuery
@@ -822,7 +960,10 @@ describe('Purchasing Branch Context', () => {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       in: vi.fn().mockResolvedValue({
-        data: [],
+        data: [
+          { id: 'acc-inventory', code: '1301', type: 'ASSET' },
+          { id: 'acc-ap', code: '2101', type: 'LIABILITY' },
+        ],
         error: null,
       }),
     }
@@ -861,7 +1002,43 @@ describe('Purchasing Branch Context', () => {
       })),
     }
 
+    queueReceivePurchaseRows(
+      {
+        id: 'po-1',
+        org_id: 'org-1',
+        status: 'APPROVED',
+        branch_id: 'branch-1',
+        warehouse_id: 'wh-1',
+        purchase_number: 'PO-001',
+        total_amount: 2000,
+        shipping_amount: 0,
+        insurance_amount: 0,
+        tax_amount: 0,
+        discount_amount: 0,
+        grand_total: 2000,
+        notes: '',
+        shariah_mode: 'CASH',
+      },
+      [
+        {
+          id: 'pi-1',
+          purchase_id: 'po-1',
+          product_id: 'prod-1',
+          quantity: 2,
+          unit_price: 1000,
+          discount_amount: 0,
+          product_asset_account_id: null,
+          product_category: null,
+        },
+      ]
+    )
+
     mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
       from: vi.fn((table: string) => {
         if (table === 'purchases') return purchasesTable
         if (table === 'warehouses') return explicitWarehouseQuery
@@ -965,6 +1142,17 @@ describe('Purchasing Branch Context', () => {
       }),
     }
 
+    queueReceivePurchaseRows({
+      id: 'po-2',
+      org_id: 'org-1',
+      status: 'APPROVED',
+      branch_id: 'branch-1',
+      warehouse_id: 'wh-1',
+      total_amount: 1000,
+      shipping_amount: 0,
+      insurance_amount: 0,
+    })
+
     mocks.createClient.mockResolvedValue({
       from: vi.fn((table: string) => {
         if (table === 'purchases') return purchasesTable
@@ -1054,6 +1242,17 @@ describe('Purchasing Branch Context', () => {
       })),
       insert: vi.fn().mockResolvedValue({ error: null }),
     }
+
+    queueReceivePurchaseRows({
+      id: 'po-3',
+      org_id: 'org-1',
+      status: 'APPROVED',
+      branch_id: 'branch-1',
+      warehouse_id: 'wh-1',
+      total_amount: 1000,
+      shipping_amount: 0,
+      insurance_amount: 0,
+    })
 
     mocks.createClient.mockResolvedValue({
       from: vi.fn((table: string) => {

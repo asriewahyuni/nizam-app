@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
   getActiveBranch: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
+  queryPostgres: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -21,6 +22,10 @@ vi.mock('@/modules/organization/actions/org.actions', () => ({
 
 vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
+}))
+
+vi.mock('@/lib/db/postgres', () => ({
+  queryPostgres: mocks.queryPostgres,
 }))
 
 import { processPosTransaction } from '@/modules/sales/actions/pos.actions'
@@ -40,6 +45,8 @@ function createOrderedSalesLookup(rows: any[] = []) {
 describe('Sales Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.createClient.mockReset()
+    mocks.queryPostgres.mockReset()
   })
 
   it('rejects creating sales order when no active branch is selected', async () => {
@@ -522,31 +529,18 @@ describe('Sales Branch Context', () => {
   })
 
   it('filters sales list by branch when a unit is active', async () => {
-    const orderMock = vi.fn().mockResolvedValue({
-      data: [],
-      error: null,
-    })
-    const salesQuery = {
-      select: vi.fn(() => salesQuery),
-      eq: vi.fn(() => salesQuery),
-      order: orderMock,
-    }
-
-    mocks.createClient.mockResolvedValue({
-      from: vi.fn((table: string) => {
-        if (table !== 'sales') throw new Error(`Unexpected table ${table}`)
-        return salesQuery
-      }),
-    })
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
       branchId: 'branch-1',
     })
+    mocks.queryPostgres.mockResolvedValueOnce({ rows: [] })
 
     await getSales('org-1', 'branch-1')
 
-    expect(salesQuery.eq).toHaveBeenCalledWith('org_id', 'org-1')
-    expect(salesQuery.eq).toHaveBeenCalledWith('branch_id', 'branch-1')
+    expect(mocks.queryPostgres).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE  s.org_id = $1 AND s.branch_id = $2'),
+      ['org-1', 'branch-1']
+    )
   })
 
   it('rejects POS transaction when no active branch is selected', async () => {

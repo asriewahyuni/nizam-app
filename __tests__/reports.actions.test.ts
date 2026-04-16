@@ -4,10 +4,15 @@ import { createSupabaseMock, success } from './helpers/supabase-mock'
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
+  queryPostgres: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: mocks.createClient,
+}))
+
+vi.mock('@/lib/db/postgres', () => ({
+  queryPostgres: mocks.queryPostgres,
 }))
 
 import { getBalanceSheet, getCashFlow, getGeneralLedger, getProfitLoss } from '@/modules/accounting/actions/reports.actions'
@@ -15,6 +20,8 @@ import { getBalanceSheet, getCashFlow, getGeneralLedger, getProfitLoss } from '@
 describe('Reports Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.createClient.mockReset()
+    mocks.queryPostgres.mockReset()
   })
 
   it('filters general ledger by active branch', async () => {
@@ -32,6 +39,9 @@ describe('Reports Branch Context', () => {
     })
 
     mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.queryPostgres
+      .mockResolvedValueOnce({ rows: [{ id: 'je-1' }] })
+      .mockResolvedValueOnce({ rows: [] })
 
     const result = await getGeneralLedger('org-1', 'branch-1')
 
@@ -88,6 +98,32 @@ describe('Reports Branch Context', () => {
     })
 
     mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.queryPostgres.mockResolvedValueOnce({
+      rows: [
+        {
+          debit: 0,
+          credit: 125000,
+          account_id: 'acc-rev',
+          account_code: '4001',
+          account_name: 'Penjualan',
+          account_type: 'REVENUE',
+          account_normal_balance: 'CREDIT',
+          account_parent_id: null,
+          account_cash_flow_category: 'OPERATING',
+        },
+        {
+          debit: 25000,
+          credit: 0,
+          account_id: 'acc-exp',
+          account_code: '5001',
+          account_name: 'Beban Operasional',
+          account_type: 'EXPENSE',
+          account_normal_balance: 'DEBIT',
+          account_parent_id: null,
+          account_cash_flow_category: 'OPERATING',
+        },
+      ],
+    })
 
     const result = await getProfitLoss('org-1', '2026-04-01', '2026-04-30', 'branch-1')
 
@@ -103,13 +139,86 @@ describe('Reports Branch Context', () => {
         expect.objectContaining({ method: 'lte', args: ['entry_date', '2026-04-30'] }),
       ])
     )
+    expect(mocks.queryPostgres).toHaveBeenCalledTimes(1)
+  })
 
-    const lineCall = supabase.calls.find((call) => call.table === 'journal_lines')
-    expect(lineCall?.operations).toEqual(
+  it('expands report scope through consolidation RPC when consolidated mode is enabled', async () => {
+    const supabase = createSupabaseMock({
+      rpc: {
+        get_consolidated_org_ids: [
+          success([
+            { org_id: 'org-child-1' },
+            { org_id: 'org-child-2' },
+          ]),
+        ],
+      },
+      tables: {
+        journal_entries: [
+          {
+            result: success([{ id: 'je-1' }]),
+          },
+        ],
+        journal_lines: [
+          {
+            result: success([
+              {
+                debit: 0,
+                credit: 150000,
+                accounts: {
+                  id: 'acc-rev',
+                  code: '4001',
+                  name: 'Penjualan Konsolidasi',
+                  type: 'REVENUE',
+                  normal_balance: 'CREDIT',
+                  cash_flow_category: 'OPERATING',
+                },
+              },
+            ]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.queryPostgres.mockResolvedValueOnce({
+      rows: [
+        {
+          debit: 0,
+          credit: 150000,
+          account_id: 'acc-rev',
+          account_code: '4001',
+          account_name: 'Penjualan Konsolidasi',
+          account_type: 'REVENUE',
+          account_normal_balance: 'CREDIT',
+          account_parent_id: null,
+          account_cash_flow_category: 'OPERATING',
+        },
+      ],
+    })
+
+    const result = await getProfitLoss('org-parent', '2026-04-01', '2026-04-30', 'branch-parent', true)
+
+    expect(result.totalRevenue).toBe(150000)
+    expect(supabase.rpcCalls).toEqual([
+      {
+        fn: 'get_consolidated_org_ids',
+        args: { p_parent_org_id: 'org-parent' },
+      },
+    ])
+
+    const entryCall = supabase.calls.find((call) => call.table === 'journal_entries')
+    const branchFilter = entryCall?.operations.find(
+      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
+    )
+
+    expect(entryCall?.operations).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ method: 'in', args: ['entry_id', ['je-1']] }),
+        expect.objectContaining({ method: 'in', args: ['org_id', ['org-parent', 'org-child-1', 'org-child-2']] }),
+        expect.objectContaining({ method: 'gte', args: ['entry_date', '2026-04-01'] }),
+        expect.objectContaining({ method: 'lte', args: ['entry_date', '2026-04-30'] }),
       ])
     )
+    expect(branchFilter).toBeUndefined()
   })
 
   it('uses cash-touching journal lines for branch-scoped cash flow', async () => {
@@ -252,6 +361,168 @@ describe('Reports Branch Context', () => {
     })
 
     mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.queryPostgres
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            entry_id: 'je-sale',
+            debit: 200000,
+            credit: 0,
+            account_id: 'acc-cash',
+            account_code: '1101',
+            account_name: 'Kas Besar',
+            account_type: 'ASSET',
+            account_normal_balance: 'DEBIT',
+            account_parent_id: null,
+            account_cash_flow_category: null,
+            je_entry_date: '2026-04-15',
+            je_description: 'Sale paid',
+            je_notes: null,
+            je_reference_type: null,
+            je_reference_id: null,
+          },
+          {
+            entry_id: 'je-sale',
+            debit: 0,
+            credit: 200000,
+            account_id: 'acc-rev',
+            account_code: '4001',
+            account_name: 'Penjualan',
+            account_type: 'REVENUE',
+            account_normal_balance: 'CREDIT',
+            account_parent_id: null,
+            account_cash_flow_category: 'OPERATING',
+            je_entry_date: '2026-04-15',
+            je_description: 'Sale paid',
+            je_notes: null,
+            je_reference_type: null,
+            je_reference_id: null,
+          },
+          {
+            entry_id: 'je-utility',
+            debit: 50000,
+            credit: 0,
+            account_id: 'acc-util',
+            account_code: '6003',
+            account_name: 'Utilitas',
+            account_type: 'EXPENSE',
+            account_normal_balance: 'DEBIT',
+            account_parent_id: null,
+            account_cash_flow_category: 'OPERATING',
+            je_entry_date: '2026-04-16',
+            je_description: 'Utility payment',
+            je_notes: null,
+            je_reference_type: null,
+            je_reference_id: null,
+          },
+          {
+            entry_id: 'je-utility',
+            debit: 0,
+            credit: 50000,
+            account_id: 'acc-cash',
+            account_code: '1101',
+            account_name: 'Kas Besar',
+            account_type: 'ASSET',
+            account_normal_balance: 'DEBIT',
+            account_parent_id: null,
+            account_cash_flow_category: null,
+            je_entry_date: '2026-04-16',
+            je_description: 'Utility payment',
+            je_notes: null,
+            je_reference_type: null,
+            je_reference_id: null,
+          },
+          {
+            entry_id: 'je-accrual',
+            debit: 80000,
+            credit: 0,
+            account_id: 'acc-ar',
+            account_code: '1201',
+            account_name: 'Piutang Usaha',
+            account_type: 'ASSET',
+            account_normal_balance: 'DEBIT',
+            account_parent_id: null,
+            account_cash_flow_category: 'OPERATING',
+            je_entry_date: '2026-04-17',
+            je_description: 'Accrual sale',
+            je_notes: null,
+            je_reference_type: null,
+            je_reference_id: null,
+          },
+          {
+            entry_id: 'je-accrual',
+            debit: 0,
+            credit: 80000,
+            account_id: 'acc-rev',
+            account_code: '4001',
+            account_name: 'Penjualan',
+            account_type: 'REVENUE',
+            account_normal_balance: 'CREDIT',
+            account_parent_id: null,
+            account_cash_flow_category: 'OPERATING',
+            je_entry_date: '2026-04-17',
+            je_description: 'Accrual sale',
+            je_notes: null,
+            je_reference_type: null,
+            je_reference_id: null,
+          },
+          {
+            entry_id: 'je-loan',
+            debit: 300000,
+            credit: 0,
+            account_id: 'acc-cash',
+            account_code: '1101',
+            account_name: 'Kas Besar',
+            account_type: 'ASSET',
+            account_normal_balance: 'DEBIT',
+            account_parent_id: null,
+            account_cash_flow_category: null,
+            je_entry_date: '2026-04-18',
+            je_description: 'Loan proceeds',
+            je_notes: null,
+            je_reference_type: null,
+            je_reference_id: null,
+          },
+          {
+            entry_id: 'je-loan',
+            debit: 0,
+            credit: 300000,
+            account_id: 'acc-loan',
+            account_code: '2501',
+            account_name: 'Hutang Bank Jangka Panjang',
+            account_type: 'LIABILITY',
+            account_normal_balance: 'CREDIT',
+            account_parent_id: null,
+            account_cash_flow_category: 'FINANCING',
+            je_entry_date: '2026-04-18',
+            je_description: 'Loan proceeds',
+            je_notes: null,
+            je_reference_type: null,
+            je_reference_id: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            entry_id: 'je-prev',
+            debit: 150000,
+            credit: 0,
+            account_id: 'acc-cash',
+            account_code: '1101',
+            account_name: 'Kas Besar',
+            account_type: 'ASSET',
+            account_normal_balance: 'DEBIT',
+            account_parent_id: null,
+            account_cash_flow_category: null,
+            je_entry_date: '2026-03-31',
+            je_description: 'Previous cash',
+            je_notes: null,
+            je_reference_type: null,
+            je_reference_id: null,
+          },
+        ],
+      })
 
     const result = await getCashFlow('org-1', 'branch-1', false, {
       startDate: '2026-04-01',
@@ -263,11 +534,11 @@ describe('Reports Branch Context', () => {
     expect(result.fcf).toBe(300000)
     expect(result.netChange).toBe(450000)
     expect(result.ocfItems).toEqual([
-      { code: '4001', name: 'Penerimaan dari Pelanggan / Penjualan', amount: 200000 },
-      { code: '6003', name: 'Pembayaran Utilitas', amount: -50000 },
+      expect.objectContaining({ code: '4001', name: 'Penerimaan dari Pelanggan / Penjualan', amount: 200000 }),
+      expect.objectContaining({ code: '6003', name: 'Pembayaran Utilitas', amount: -50000 }),
     ])
     expect(result.fcfItems).toEqual([
-      { code: '2501', name: 'Penerimaan Hutang Bank Jangka Panjang', amount: 300000 },
+      expect.objectContaining({ code: '2501', name: 'Penerimaan Hutang Bank Jangka Panjang', amount: 300000 }),
     ])
 
     const journalEntryCalls = supabase.calls.filter((call) => call.table === 'journal_entries')
@@ -344,6 +615,46 @@ describe('Reports Branch Context', () => {
     })
 
     mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.queryPostgres
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            entry_id: 'je-pos',
+            debit: 175000,
+            credit: 0,
+            account_id: 'acc-cash-custom',
+            account_code: '1109',
+            account_name: 'Kas Outlet',
+            account_type: 'ASSET',
+            account_normal_balance: 'DEBIT',
+            account_parent_id: null,
+            account_cash_flow_category: null,
+            je_entry_date: '2026-04-10',
+            je_description: 'POS payment',
+            je_notes: null,
+            je_reference_type: null,
+            je_reference_id: null,
+          },
+          {
+            entry_id: 'je-pos',
+            debit: 0,
+            credit: 175000,
+            account_id: 'acc-rev',
+            account_code: '4001',
+            account_name: 'Penjualan',
+            account_type: 'REVENUE',
+            account_normal_balance: 'CREDIT',
+            account_parent_id: null,
+            account_cash_flow_category: 'OPERATING',
+            je_entry_date: '2026-04-10',
+            je_description: 'POS payment',
+            je_notes: null,
+            je_reference_type: null,
+            je_reference_id: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
 
     const result = await getCashFlow('org-1', 'branch-1', false, {
       startDate: '2026-04-01',
@@ -353,7 +664,7 @@ describe('Reports Branch Context', () => {
     expect(result.ocf).toBe(175000)
     expect(result.netChange).toBe(175000)
     expect(result.ocfItems).toEqual([
-      { code: '4001', name: 'Penerimaan dari Pelanggan / Penjualan', amount: 175000 },
+      expect.objectContaining({ code: '4001', name: 'Penerimaan dari Pelanggan / Penjualan', amount: 175000 }),
     ])
   })
 
@@ -489,6 +800,59 @@ describe('Reports Branch Context', () => {
     })
 
     mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.queryPostgres
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            debit: 0,
+            credit: 1000000,
+            account_id: 'acc-rev',
+            account_code: '4001',
+            account_name: 'Pendapatan Usaha',
+            account_type: 'REVENUE',
+            account_normal_balance: 'CREDIT',
+            account_parent_id: null,
+            account_cash_flow_category: 'OPERATING',
+          },
+          {
+            debit: 400000,
+            credit: 0,
+            account_id: 'acc-exp',
+            account_code: '6003',
+            account_name: 'Utilitas',
+            account_type: 'EXPENSE',
+            account_normal_balance: 'DEBIT',
+            account_parent_id: null,
+            account_cash_flow_category: 'OPERATING',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            debit: 0,
+            credit: 500000,
+            account_id: 'acc-rev',
+            account_code: '4001',
+            account_name: 'Pendapatan Usaha',
+            account_type: 'REVENUE',
+            account_normal_balance: 'CREDIT',
+            account_parent_id: null,
+            account_cash_flow_category: 'OPERATING',
+          },
+          {
+            debit: 200000,
+            credit: 0,
+            account_id: 'acc-exp',
+            account_code: '6003',
+            account_name: 'Utilitas',
+            account_type: 'EXPENSE',
+            account_normal_balance: 'DEBIT',
+            account_parent_id: null,
+            account_cash_flow_category: 'OPERATING',
+          },
+        ],
+      })
 
     const result = await getBalanceSheet('org-1', '2026-04-30', 'branch-1')
 

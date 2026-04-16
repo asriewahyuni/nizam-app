@@ -95,6 +95,10 @@ export function createSupabaseMock(config: MockConfig = {}) {
         operations.push({ method: 'eq', args: [column, value] })
         return builder
       },
+      ilike(column: string, value: unknown) {
+        operations.push({ method: 'ilike', args: [column, value] })
+        return builder
+      },
       in(column: string, values: unknown[]) {
         operations.push({ method: 'in', args: [column, values] })
         return builder
