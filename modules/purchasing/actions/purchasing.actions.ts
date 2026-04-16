@@ -519,7 +519,7 @@ export async function getPurchases(orgId: string, branchId?: string | null) {
     const purchaseResult = await queryPostgres<Record<string, unknown>>(purchaseSql, baseParams)
     purchaseRows = purchaseResult.rows
   } catch (err) {
-    ;(console as any).error('[getPurchases] raw SQL error:', err)
+    ; (console as any).error('[getPurchases] raw SQL error:', err)
     return []
   }
 
@@ -561,7 +561,7 @@ export async function getPurchases(orgId: string, branchId?: string | null) {
       })
     }
   } catch (err) {
-    ;(console as any).warn('[getPurchases] purchase_items fetch failed:', err)
+    ; (console as any).warn('[getPurchases] purchase_items fetch failed:', err)
     // Continue without items rather than failing entirely
   }
 
@@ -710,7 +710,7 @@ export async function getPurchaseById(orgId: string, purchaseId: string) {
       purchase_returns: returnsResult.rows,
     }
   } catch (err) {
-    ;(console as any).error('[getPurchaseById] raw SQL error:', err)
+    ; (console as any).error('[getPurchaseById] raw SQL error:', err)
     return null
   }
 }
@@ -724,7 +724,7 @@ export interface PurchaseLineData {
   unit_price: number
   discount_amount?: number
   tax_amount?: number
-  selling_price?: number 
+  selling_price?: number
   category?: string
 }
 
@@ -811,19 +811,19 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
         })
         .select('id')
         .single()
-      
+
       if (!prodErr && newProd) finalProductId = newProd.id
     } else if (finalProductId) {
-       // Update EXISTING products master data directly using Landed Cost HPP!
-       await (supabase as any).from('products' as any)
-         .update({
-            purchase_price: trueHpp,
-            selling_price: line.selling_price || trueHpp * 1.25,
-            category: line.category,
-            unit: line.unit // Sync unit from PO to master product
-         })
-         .eq('id', finalProductId)
-         .eq('org_id', orgId)
+      // Update EXISTING products master data directly using Landed Cost HPP!
+      await (supabase as any).from('products' as any)
+        .update({
+          purchase_price: trueHpp,
+          selling_price: line.selling_price || trueHpp * 1.25,
+          category: line.category,
+          unit: line.unit // Sync unit from PO to master product
+        })
+        .eq('id', finalProductId)
+        .eq('org_id', orgId)
     }
 
     processedLines.push({
@@ -1026,23 +1026,23 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
   }
 
   const { data: rpcRes, error: rpcError } = await (supabase as any).rpc('process_purchase_atomic', {
-      p_org_id: orgId,
-      p_vendor_id: payload.vendor_id,
-      p_date: payload.purchase_date || new Date().toISOString(),
-      p_due_date: resolvedDueDate,
-      p_total: headerSubtotal,
-      p_tax: headerTax,
-      p_shipping: headerShipping,
-      p_grand_total: headerGrand,
-      p_notes: notesWithTerm,
-      p_shariah_mode: shariahMode,
-      p_lines: JSON.stringify(processedLines),
-      p_user_id: user.id,
-      p_branch_id: purchaseBranchId,
+    p_org_id: orgId,
+    p_vendor_id: payload.vendor_id,
+    p_date: payload.purchase_date || new Date().toISOString(),
+    p_due_date: resolvedDueDate,
+    p_total: headerSubtotal,
+    p_tax: headerTax,
+    p_shipping: headerShipping,
+    p_grand_total: headerGrand,
+    p_notes: notesWithTerm,
+    p_shariah_mode: shariahMode,
+    p_lines: JSON.stringify(processedLines),
+    p_user_id: user.id,
+    p_branch_id: purchaseBranchId,
   })
 
   if (rpcError || !rpcRes?.success) {
-     return { error: 'Atomic Execution Failed: ' + String(rpcRes?.error || rpcError?.message || 'RPC returned no data') }
+    return { error: 'Atomic Execution Failed: ' + String(rpcRes?.error || rpcError?.message || 'RPC returned no data') }
   }
 
   // Legacy RPC header insert still omits some header pricing fields such as
@@ -1243,12 +1243,12 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
       // Item tanpa product_id tidak bisa disinkronkan ke inventaris.
       // Ini terjadi jika produk baru gagal dibuat saat PO atau item diisi tanpa memilih produk dari master.
       skippedItemCount++
-      ;(console as any).warn(
-        `[receivePurchase] purchase_item ${item.id} pada PO ${purchaseId} tidak memiliki product_id — dilewati dari sinkronisasi stok.`
-      )
+        ; (console as any).warn(
+          `[receivePurchase] purchase_item ${item.id} pada PO ${purchaseId} tidak memiliki product_id — dilewati dari sinkronisasi stok.`
+        )
       continue
     }
-    
+
     // Landed Cost Calculation (Allocated based on Value)
     const itemGrossValue = roundMoney(Number(item.quantity || 0) * Number(item.unit_price || 0))
     const itemLineDiscount = roundMoney(item.discount_amount || 0)
@@ -1330,26 +1330,26 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 
   // 4. Persistence: Stock Movements (Sub-Ledger) & WMS Sync (Physical Stock)
   if (stockMovements.length > 0) {
-     const stockMovementInsert = await insertStockMovementsCompat(supabase, stockMovements)
-     if ('error' in stockMovementInsert) {
-       return { error: 'Gagal mencatat kartu stok pembelian: ' + stockMovementInsert.error }
-     }
-     
-     // CRITICAL: Sync with physical inventory (inventory_stocks)
-     const whId = receiptWarehouse.id
+    const stockMovementInsert = await insertStockMovementsCompat(supabase, stockMovements)
+    if ('error' in stockMovementInsert) {
+      return { error: 'Gagal mencatat kartu stok pembelian: ' + stockMovementInsert.error }
+    }
 
-     for (const m of stockMovements) {
-       const inventorySyncResult = await syncInventoryStock(supabase, {
-         orgId,
-         productId: m.product_id,
-         warehouseId: whId,
-         diff: m.quantity,
-       })
+    // CRITICAL: Sync with physical inventory (inventory_stocks)
+    const whId = receiptWarehouse.id
 
-       if ('error' in inventorySyncResult) {
-         return inventorySyncResult
-       }
-     }
+    for (const m of stockMovements) {
+      const inventorySyncResult = await syncInventoryStock(supabase, {
+        orgId,
+        productId: m.product_id,
+        warehouseId: whId,
+        diff: m.quantity,
+      })
+
+      if ('error' in inventorySyncResult) {
+        return inventorySyncResult
+      }
+    }
   }
 
   const isLunas = purchase.notes?.includes('[TERMIN: LUNAS]')
@@ -1372,17 +1372,17 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
         ((accounts || []) as any[]).map((account: any) => [account.code, account.id])
       ) as Record<string, string | undefined>
       const accPersediaan = inventoryAccountByCode['1301']
-      const accPpnMasukan = accounts?.find((a:any) => a.code === '1401')?.id
-      const accUangMuka = accounts?.find((a:any) => a.code === '1403')?.id
-      const accIstishnaAsset = accounts?.find((a:any) => a.code === '1205')?.id
-      const accPiutangSalamVendor = accounts?.find((a:any) => a.code === '1404')?.id
-      const defaultAccHutang = accounts?.find((a:any) => a.code === '2101')?.id
-    
+      const accPpnMasukan = accounts?.find((a: any) => a.code === '1401')?.id
+      const accUangMuka = accounts?.find((a: any) => a.code === '1403')?.id
+      const accIstishnaAsset = accounts?.find((a: any) => a.code === '1205')?.id
+      const accPiutangSalamVendor = accounts?.find((a: any) => a.code === '1404')?.id
+      const defaultAccHutang = accounts?.find((a: any) => a.code === '2101')?.id
+
       let finalAccCredit = defaultAccHutang
       let LunasAccountId: string | null = null
       if (isLunas) {
-         const match = purchase.notes.match(/\[ACC: ([a-f0-9-]+)\]/)
-         if (match && match[1]) LunasAccountId = match[1]
+        const match = purchase.notes.match(/\[ACC: ([a-f0-9-]+)\]/)
+        if (match && match[1]) LunasAccountId = match[1]
       }
 
       let validatedLunasAccountId: string | null = null
@@ -1413,19 +1413,19 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
       // - SALAM: clear Piutang Salam Vendor (1404) on goods receipt
       // - ISTISHNA: clear Uang Muka Pembelian (1403)
       if (String(purchase.shariah_mode || '').toUpperCase() === 'SALAM') {
-         if (!accPiutangSalamVendor) {
-           return { error: 'Akun Piutang Salam Vendor (1404) belum tersedia di CoA. Jalankan migrasi terbaru / aktifkan akun syariah.' }
-         }
-         finalAccCredit = accPiutangSalamVendor
+        if (!accPiutangSalamVendor) {
+          return { error: 'Akun Piutang Salam Vendor (1404) belum tersedia di CoA. Jalankan migrasi terbaru / aktifkan akun syariah.' }
+        }
+        finalAccCredit = accPiutangSalamVendor
       } else if (String(purchase.shariah_mode || '').toUpperCase() === 'ISTISHNA') {
-         // Gunakan akun 1205 (Piutang Barang Istishna) jika ada, fallback ke 1403 (Uang Muka)
-         if (accIstishnaAsset) {
-            finalAccCredit = accIstishnaAsset
-         } else if (accUangMuka) {
-            finalAccCredit = accUangMuka
-         }
+        // Gunakan akun 1205 (Piutang Barang Istishna) jika ada, fallback ke 1403 (Uang Muka)
+        if (accIstishnaAsset) {
+          finalAccCredit = accIstishnaAsset
+        } else if (accUangMuka) {
+          finalAccCredit = accUangMuka
+        }
       } else if (isLunas && validatedLunasAccountId) {
-         finalAccCredit = validatedLunasAccountId
+        finalAccCredit = validatedLunasAccountId
       }
 
       if (!finalAccCredit) {
@@ -1446,9 +1446,9 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
 
       const overheadMatch = purchase.notes?.match(/\[OVERHEAD_ACC: ([a-f0-9-]+)\]/)
       if (overheadMatch && overheadMatch[1] && (shipping > 0 || insurance > 0)) {
-         overheadCashAmount = roundMoney(shipping + insurance)
-         vendorApAmount = roundMoney(grandVal - overheadCashAmount)
-         overheadAccId = overheadMatch[1]
+        overheadCashAmount = roundMoney(shipping + insurance)
+        vendorApAmount = roundMoney(grandVal - overheadCashAmount)
+        overheadAccId = overheadMatch[1]
       }
 
       const inventoryDebitByAccount: Record<string, number> = {}
@@ -1491,18 +1491,18 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
       // Balancer untuk Diskon Global dan Pembulatan (Round-off)
       const totalDebit = roundMoney(journalLines.reduce((acc: any, l: any) => acc + l.debit, 0))
       const totalCredit = roundMoney(journalLines.reduce((acc: any, l: any) => acc + l.credit, 0))
-      
+
       const diff = roundMoney(totalDebit - totalCredit)
       if (Math.abs(diff) > 0.05) {
         return { error: `Jurnal pembelian tidak balance setelah alokasi diskon/biaya. Selisih ${diff.toFixed(2)}.` }
       }
       if (Math.abs(diff) > 0.001) {
-         journalLines.push({
-             account_id: finalAccCredit,
-             debit: diff < 0 ? Math.abs(diff) : 0,
-             credit: diff > 0 ? diff : 0,
-             memo: 'Penyesuaian Pembulatan PO'
-         })
+        journalLines.push({
+          account_id: finalAccCredit,
+          debit: diff < 0 ? Math.abs(diff) : 0,
+          credit: diff > 0 ? diff : 0,
+          memo: 'Penyesuaian Pembulatan PO'
+        })
       }
 
       const purchaseTransparency = buildPurchaseLedgerTransparency(
@@ -1522,10 +1522,10 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
         auto_post: true,
         allow_org_scope: true
       })
-      
+
       const jErr = (journalResult as any).error
       if (jErr) {
-         return { error: 'Gagal menjurnal bukti penerimaan: ' + String(jErr) }
+        return { error: 'Gagal menjurnal bukti penerimaan: ' + String(jErr) }
       }
     }
   }
@@ -1584,20 +1584,20 @@ export async function voidPurchase(orgId: string, purchaseId: string) {
   // Gunakan RPC agar berjalan di level DB dengan security definer (admin) 
   // Melewati pembatasan RLS agar Ledger & Sub-Ledger sinkron
   const { data: rpcRes, error: rpcError } = await (supabase as any).rpc('void_purchase_atomic', {
-      p_org_id: orgId,
-      p_purchase_id: purchaseId,
-      p_user_id: user.id,
-      p_reason: 'Pembatalan Manual via Dashboard'
+    p_org_id: orgId,
+    p_purchase_id: purchaseId,
+    p_user_id: user.id,
+    p_reason: 'Pembatalan Manual via Dashboard'
   })
 
   if (rpcError || !rpcRes?.success) {
-      return { error: 'Gagal membatalkan PO secara atomik: ' + (rpcRes?.error || rpcError?.message) }
+    return { error: 'Gagal membatalkan PO secara atomik: ' + (rpcRes?.error || rpcError?.message) }
   }
 
   revalidatePath('/purchasing')
   revalidatePath('/inventory')
   revalidatePath('/accounting/ledgers')
-  
+
   return { success: true }
 }
 
@@ -1687,7 +1687,7 @@ export async function getPurchaseRequests(orgId: string, branchId?: string | nul
   const supabase = await createClient()
   const branchSelection = await resolvePurchasingBranchId(orgId, branchId)
   if ('error' in branchSelection) return []
-  
+
   let query = (supabase as any)
     .from('purchase_requests')
     .select(`
@@ -1932,7 +1932,7 @@ export async function repairReceivedPurchaseStock(orgId: string): Promise<{
       const stockMovementInsert = await insertStockMovementsCompat(supabase, movementsToInsert)
       if ('error' in stockMovementInsert) {
         // Jika gagal insert movement (misalnya sudah ada), tetap anggap sukses karena inventory_stocks sudah diupdate
-        ;(console as any).warn(
+        ; (console as any).warn(
           `[repairReceivedPurchaseStock] Gagal insert stock_movements untuk ${poNum}:`,
           stockMovementInsert.error
         )
