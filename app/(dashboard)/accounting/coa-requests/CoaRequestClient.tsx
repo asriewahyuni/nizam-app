@@ -465,6 +465,36 @@ function SubmitRequestForm({
         </div>
       </div>
 
+      {parentAccountOptions.length > 0 && (
+        <div className="space-y-2">
+          <label className={labelCls}>Akun Induk (Parent Account)</label>
+          <select
+            value={form.parentId}
+            onChange={(e) => {
+              const nextParentId = e.target.value
+              const selectedParent = parentAccountOptions.find((option) => option.account.id === nextParentId)?.account
+              setForm((prev) => ({
+                ...prev,
+                parentId: nextParentId,
+                type: selectedParent?.type || prev.type,
+                normalBalance: selectedParent?.normal_balance || prev.normalBalance,
+              }))
+            }}
+            className={inputCls}
+          >
+            <option value="">-- Tidak Ada (Header Utama) --</option>
+            {parentAccountOptions.map(({ account, depth }) => (
+              <option key={account.id} value={account.id}>
+                [{account.code}] {`${depth > 0 ? `${'— '.repeat(Math.min(depth, 4))}` : ''}${account.name}`} {depth === 0 ? '• Root' : ''}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500">
+            Struktur root & turunan dirapikan seperti daftar CoA agar mudah memilih parent yang tepat.
+          </p>
+        </div>
+      )}
+
       {/* Form */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
@@ -503,36 +533,6 @@ function SubmitRequestForm({
           </select>
         </div>
       </div>
-
-      {parentAccountOptions.length > 0 && (
-        <div className="space-y-2">
-          <label className={labelCls}>Akun Induk (Parent Account)</label>
-          <select
-            value={form.parentId}
-            onChange={(e) => {
-              const nextParentId = e.target.value
-              const selectedParent = parentAccountOptions.find((option) => option.account.id === nextParentId)?.account
-              setForm((prev) => ({
-                ...prev,
-                parentId: nextParentId,
-                type: selectedParent?.type || prev.type,
-                normalBalance: selectedParent?.normal_balance || prev.normalBalance,
-              }))
-            }}
-            className={inputCls}
-          >
-            <option value="">-- Tidak Ada (Header Utama) --</option>
-            {parentAccountOptions.map(({ account, depth }) => (
-              <option key={account.id} value={account.id}>
-                [{account.code}] {`${depth > 0 ? `${'— '.repeat(Math.min(depth, 4))}` : ''}${account.name}`} {depth === 0 ? '• Root' : ''}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-500">
-            Struktur root & turunan dirapikan seperti daftar CoA agar mudah memilih parent yang tepat.
-          </p>
-        </div>
-      )}
 
       <div>
         <label className={labelCls}>Deskripsi Akun (opsional)</label>
