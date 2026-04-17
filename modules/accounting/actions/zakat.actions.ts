@@ -72,6 +72,42 @@ function isServiceBusinessHint(value: unknown): boolean {
   return SERVICE_BUSINESS_KEYWORDS.some((keyword) => normalized.includes(keyword))
 }
 
+function getAccountCodeStem(value: unknown): string {
+  const normalized = String(value || '').trim().toUpperCase()
+  const match = normalized.match(/^(\d{4})/)
+  return match?.[1] || normalized
+}
+
+function isCashAccountForZakat(code: unknown): boolean {
+  const stem = getAccountCodeStem(code)
+  if (!stem) return false
+  const numericStem = Number(stem)
+  return Number.isFinite(numericStem) && numericStem >= 1100 && numericStem < 1200
+}
+
+function isReceivableAccountForZakat(code: unknown): boolean {
+  const stem = getAccountCodeStem(code)
+  if (!stem || stem === '1203') return false
+  if (stem === '1404') return true
+  const numericStem = Number(stem)
+  return Number.isFinite(numericStem) && numericStem >= 1200 && numericStem < 1300
+}
+
+function isInventoryAccountForZakat(code: unknown): boolean {
+  const stem = getAccountCodeStem(code)
+  if (!stem) return false
+  const numericStem = Number(stem)
+  return Number.isFinite(numericStem) && numericStem >= 1300 && numericStem < 1400
+}
+
+function isCurrentLiabilityForZakat(code: unknown): boolean {
+  const stem = getAccountCodeStem(code)
+  if (!stem) return false
+  if (stem === '2602' || stem === '2603') return true
+  const numericStem = Number(stem)
+  return Number.isFinite(numericStem) && numericStem >= 2100 && numericStem < 2200
+}
+
 async function resolveTradeZakatApplicability(supabase: any, orgId: string): Promise<TradeZakatApplicability> {
   const { data: orgData } = await (supabase as any)
     .from('organizations')
@@ -153,22 +189,22 @@ async function resolveTradeZakatApplicability(supabase: any, orgId: string): Pro
 async function getTotalZakatAssets(orgId: string) {
   const balances = await getAccountBalances(orgId)
 
-  // 1. Kas & Bank (1101–1199)
+  // 1. Kas & Bank
   const cashAccounts = balances
-    .filter((b: any) => b.code >= '1101' && b.code <= '1199')
-    .map((b: any) => ({ name: b.name, code: b.code, balance: b.balance || 0, type: 'CASH' as const }))
+    .filter((b: any) => isCashAccountForZakat(b.code))
+    .map((b: any) => ({ id: b.account_id, name: b.name, code: b.code, balance: Number(b.balance || 0), type: 'CASH' as const }))
   const totalCash = cashAccounts.reduce((s: any, a: any) => s + a.balance, 0)
 
-  // 2. Piutang Dagang / AR (1201–1299) — yang diharapkan kembali
+  // 2. Piutang Dagang / AR — yang diharapkan kembali
   const arAccounts = balances
-    .filter((b: any) => (b.code >= '1201' && b.code <= '1299') || b.code === '1404')
-    .map((b: any) => ({ name: b.name, code: b.code, balance: b.balance || 0, type: 'AR' as const }))
+    .filter((b: any) => isReceivableAccountForZakat(b.code))
+    .map((b: any) => ({ id: b.account_id, name: b.name, code: b.code, balance: Number(b.balance || 0), type: 'AR' as const }))
   const totalAR = arAccounts.reduce((s: any, a: any) => s + a.balance, 0)
 
-  // 3. Persediaan / Inventory (1301–1399)
+  // 3. Persediaan / Inventory
   const inventoryAccounts = balances
-    .filter((b: any) => b.code >= '1301' && b.code <= '1399')
-    .map((b: any) => ({ name: b.name, code: b.code, balance: b.balance || 0, type: 'INVENTORY' as const }))
+    .filter((b: any) => isInventoryAccountForZakat(b.code))
+    .map((b: any) => ({ id: b.account_id, name: b.name, code: b.code, balance: Number(b.balance || 0), type: 'INVENTORY' as const }))
   const totalInventory = inventoryAccounts.reduce((s: any, a: any) => s + a.balance, 0)
 
   // 4. Laba Bersih (Hanya sebagai info, JANGAN DITAMBAH ke Harta Zakat!)
@@ -181,10 +217,10 @@ async function getTotalZakatAssets(orgId: string) {
     .reduce((s: any, b: any) => s + (b.balance || 0), 0)
   const netProfit = Math.max(0, totalRevenue - totalExpenses)
 
-  // 5. Hutang Lancar / AP (2101-2199 + liabilitas SALAM/ISTISHNA) - Mengurangi kewajiban zakat
+  // 5. Hutang Lancar / AP (+ liabilitas SALAM/ISTISHNA) - Mengurangi kewajiban zakat
   const apAccounts = balances
-    .filter((b: any) => (b.code >= '2101' && b.code <= '2199') || b.code === '2602' || b.code === '2603')
-    .map((b: any) => ({ name: b.name, code: b.code, balance: Math.abs(b.balance || 0), type: 'AP' as const }))
+    .filter((b: any) => isCurrentLiabilityForZakat(b.code))
+    .map((b: any) => ({ id: b.account_id, name: b.name, code: b.code, balance: Math.abs(Number(b.balance || 0)), type: 'AP' as const }))
   const totalAP = apAccounts.reduce((s: any, a: any) => s + a.balance, 0)
 
   // 6. Total Harta Zakat = (Kas + Piutang + Persediaan) - Hutang Lancar
@@ -562,9 +598,36 @@ export async function payZakat(orgId: string, accountId: string, amount: number)
     return { error: tradeZakatApplicability.reason || 'Zakat tijarah tidak berlaku untuk tipe usaha ini.' }
   }
 
-  let { data: zakatAcc } = await (supabase as any).from('accounts').select('id').eq('org_id', orgId).ilike('name', '%Zakat Tijarah%').single()
+  if (!String(accountId || '').trim()) {
+    return { error: 'Pilih rekening Kas & Bank terlebih dahulu.' }
+  }
+
+  let { data: zakatAcc } = await (supabase as any)
+    .from('accounts')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('code', '6220')
+    .maybeSingle()
+
   if (!zakatAcc) {
-     const { data: alt } = await (supabase as any).from('accounts').select('id').eq('org_id', orgId).ilike('name', '%Zakat%').limit(1).single()
+     const { data: alt } = await (supabase as any)
+       .from('accounts')
+       .select('id')
+       .eq('org_id', orgId)
+       .ilike('name', '%Zakat Tijarah%')
+       .limit(1)
+       .maybeSingle()
+     zakatAcc = alt
+  }
+
+  if (!zakatAcc) {
+     const { data: alt } = await (supabase as any)
+       .from('accounts')
+       .select('id')
+       .eq('org_id', orgId)
+       .ilike('name', '%Zakat%')
+       .limit(1)
+       .maybeSingle()
      zakatAcc = alt
   }
   

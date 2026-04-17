@@ -382,11 +382,11 @@ export async function getEmployeeTransferHistory(orgId: string) {
 }
 
 /**
- * Mutasi karyawan antar entitas (parent/child) dalam satu holding:
+ * Mutasi karyawan antar entitas dalam satu holding:
  * - buat data karyawan baru di entitas tujuan
  * - pindahkan profil asal (hapus jika memungkinkan, fallback RESIGNED jika terikat histori transaksi)
- * - lepas assignment PIC cabang lama
- * - opsional assign sebagai PIC di cabang tujuan
+ * - lepas assignment PIC unit lama
+ * - opsional assign sebagai PIC di unit tujuan
  * - simpan audit trail mutasi
  */
 export async function transferEmployeeToChildOrg(orgId: string, payload: EmployeeChildTransferPayload) {
@@ -400,7 +400,7 @@ export async function transferEmployeeToChildOrg(orgId: string, payload: Employe
   if (!sourceOrgId) return { error: 'Organisasi asal tidak valid.' }
   if (!employeeId) return { error: 'Karyawan yang akan dimutasi tidak valid.' }
   if (!targetOrgId) return { error: 'Entitas tujuan belum dipilih.' }
-  if (!targetBranchId) return { error: 'Cabang tujuan belum dipilih.' }
+  if (!targetBranchId) return { error: 'Unit tujuan belum dipilih.' }
   if (targetOrgId === sourceOrgId) return { error: 'Mutasi harus menuju entitas yang berbeda.' }
 
   const supabase = await createClient()
@@ -464,7 +464,7 @@ export async function transferEmployeeToChildOrg(orgId: string, payload: Employe
 
   const holdingRole = String(holdingMembershipResult?.data?.role || '')
   if (!['owner', 'admin'].includes(holdingRole)) {
-    return { error: 'Mutasi parent/child memerlukan akses owner/admin pada organisasi holding.' }
+    return { error: 'Mutasi antar entitas memerlukan akses owner/admin pada organisasi holding.' }
   }
 
   const sourceEmployee = sourceEmployeeResult?.data
@@ -490,7 +490,7 @@ export async function transferEmployeeToChildOrg(orgId: string, payload: Employe
 
   const targetBranch = targetBranchResult?.data
   if (!targetBranch?.id || !targetBranch?.is_active) {
-    return { error: 'Cabang tujuan tidak valid atau tidak aktif.' }
+    return { error: 'Unit tujuan tidak valid atau tidak aktif.' }
   }
 
   const baseEmployeeData = sanitizeEmployeeDateOnlyFields({ ...sourceEmployee })
@@ -675,7 +675,7 @@ export async function transferEmployeeToChildOrg(orgId: string, payload: Employe
     .eq('pic_employee_id', employeeId)
 
   if (clearSourcePicError) {
-    warnings.push('PIC cabang lama belum sepenuhnya terlepas otomatis. Mohon cek menu Cabang.')
+    warnings.push('PIC unit lama belum sepenuhnya terlepas otomatis. Mohon cek menu Unit Operasional.')
   }
 
   const clearSourceManagerAssignmentResult = await clearManagedChildOrgAssignmentsForEmployee(db, employeeId)
@@ -737,7 +737,7 @@ export async function transferEmployeeToChildOrg(orgId: string, payload: Employe
       .eq('org_id', targetOrgId)
 
     if (setTargetPicError) {
-      warnings.push('Gagal menetapkan karyawan sebagai PIC di cabang tujuan.')
+      warnings.push('Gagal menetapkan karyawan sebagai PIC di unit tujuan.')
     }
   }
 
@@ -864,7 +864,7 @@ export async function transferEmployeeToChildOrg(orgId: string, payload: Employe
 
 /**
  * Tandai karyawan sebagai RESIGNED dan tulis rekam jejak ke audit log.
- * Jika memungkinkan, PIC cabang yang menunjuk karyawan ini juga dilepas otomatis.
+ * Jika memungkinkan, PIC unit yang menunjuk karyawan ini juga dilepas otomatis.
  */
 export async function resignEmployee(id: string, orgId: string, payload?: EmployeeResignPayload) {
   const supabase = await createClient()
@@ -927,7 +927,7 @@ export async function resignEmployee(id: string, orgId: string, payload?: Employ
     .eq('pic_employee_id', trimmedEmpId)
 
   if (clearSourcePicError) {
-    warnings.push('Penugasan PIC cabang belum sepenuhnya terlepas otomatis.')
+    warnings.push('Penugasan PIC unit belum sepenuhnya terlepas otomatis.')
   }
 
   const clearManagedChildOrgResult = await clearManagedChildOrgAssignmentsForEmployee(db, trimmedEmpId)

@@ -70,6 +70,7 @@ const MODULE_CATEGORIES = [
       { id: 'inventory', name: 'Gudang & Stok', perms: ['inventory:read', 'inventory:write'] },
       { id: 'factory', name: 'Manufaktur & BoM', perms: ['factory:read', 'factory:write'] },
       { id: 'fleet', name: 'Fleet & Rental', perms: ['fleet:read', 'fleet:write'] },
+      { id: 'syirkah', name: 'Akad Syirkah', perms: ['syirkah:read', 'syirkah:write'] },
     ]
   },
   {
@@ -172,7 +173,7 @@ export default function RolesManagementPage() {
   }, [activeRole, activeRoleDepartmentIds])
 
   const togglePermission = async (perm: string) => {
-    if (!activeRole) return
+    if (!activeRole || !activeRoleId || !org?.org_id) return
     const pSet = new Set(activeRolePermissions)
     if (pSet.has(perm)) pSet.delete(perm)
     else pSet.add(perm)

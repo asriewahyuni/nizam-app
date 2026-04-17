@@ -5,8 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, FileText, Send, AlertCircle, Trash2, Printer, ArrowRight, XCircle } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createQuotation, convertQuotationToOrder } from '@/modules/sales/actions/sales.actions'
+import { getUsableSalesPromoByCode } from '@/modules/sales/actions/promo.actions'
 import { formatRupiah } from '@/lib/utils'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
+import type { SalesPromoRecord } from '@/modules/sales/lib/sales-promos'
 
 type MaybeRelation<T> = T | T[] | null | undefined
 
@@ -66,6 +68,15 @@ type DraftLine = {
   discount_amount: number
 }
 
+function sanitizeDraftNumber(value: string | number, fallback = 0): number {
+  const parsed = typeof value === 'number' ? value : Number.parseFloat(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function getSafeLineNumber(value: number | null | undefined): number {
+  return Number.isFinite(value) ? Number(value) : 0
+}
+
 function pickRelation<T>(value: MaybeRelation<T>): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
@@ -108,12 +119,6 @@ function createDraftLine(): DraftLine {
   }
 }
 
-const PROMOS = [
-  { code: 'RAMADHAN24', type: 'PERCENT', value: 10, status: 'ACTIVE' },
-  { code: 'NEWCUSTOMER', type: 'FIXED', value: 50000, status: 'ACTIVE' },
-  { code: 'HARBOLSALE', type: 'PERCENT', value: 15, status: 'EXPIRED' },
-] as const
-
 export default function QuotationClient({
   orgId,
   orgName,
@@ -133,7 +138,7 @@ export default function QuotationClient({
   const [quoteDate, setQuoteDate] = useState(new Date().toISOString().split('T')[0])
   const [notes, setNotes] = useState('')
   const [promoCode, setPromoCode] = useState('')
-  const [appliedPromo, setAppliedPromo] = useState<(typeof PROMOS)[number] | null>(null)
+  const [appliedPromo, setAppliedPromo] = useState<SalesPromoRecord | null>(null)
   const [lines, setLines] = useState<DraftLine[]>(() => [createDraftLine()])
 
   const companyProfile = {
@@ -145,20 +150,30 @@ export default function QuotationClient({
     website: orgSettings.website || '',
   }
 
-  const subtotal = lines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0)
-  const totalLineDiscount = lines.reduce((sum, line) => sum + (line.quantity * (line.discount_amount || 0)), 0)
+  const subtotal = lines.reduce(
+    (sum, line) => sum + (getSafeLineNumber(line.quantity) * getSafeLineNumber(line.unit_price)),
+    0
+  )
+  const totalLineDiscount = lines.reduce(
+    (sum, line) => sum + (getSafeLineNumber(line.quantity) * getSafeLineNumber(line.discount_amount)),
+    0
+  )
   const promoDiscount = appliedPromo
     ? Math.round(appliedPromo.type === 'PERCENT' ? subtotal * (appliedPromo.value / 100) : appliedPromo.value)
     : 0
   const grandTotal = subtotal - totalLineDiscount - promoDiscount
 
-  const handleApplyPromo = () => {
+  const handleApplyPromo = async () => {
     const code = promoCode.toUpperCase().trim()
     if (!code) return
-    const promo = PROMOS.find((item) => item.code === code)
-    if (!promo) return alert('Kode kupon tidak ditemukan!')
-    if (promo.status !== 'ACTIVE') return alert('Maaf, kode kupon sudah kadaluarsa/tidak aktif!')
-    setAppliedPromo(promo)
+
+    const promoResult = await getUsableSalesPromoByCode(orgId, code)
+    if ('error' in promoResult) {
+      alert(promoResult.error)
+      return
+    }
+
+    setAppliedPromo(promoResult.promo)
     setPromoCode('')
   }
 
@@ -169,7 +184,10 @@ export default function QuotationClient({
   const handleLineChange = (id: number, field: keyof DraftLine, value: string | number) => {
     setLines((current) => current.map((line) => {
       if (line.id !== id) return line
-      const updatedLine = { ...line, [field]: value } as DraftLine
+      const nextValue = field === 'product_name' || field === 'product_id'
+        ? String(value)
+        : sanitizeDraftNumber(value)
+      const updatedLine = { ...line, [field]: nextValue } as DraftLine
       if (field === 'product_name') {
         const product = products.find((item) => item.name === value)
         if (product) {
@@ -213,6 +231,7 @@ export default function QuotationClient({
       sale_date: quoteDate,
       notes: finalNotes,
       discount_amount: promoDiscount,
+      promo_code: appliedPromo?.code || null,
       lines: usableLines.map((line) => ({
         product_id: line.product_id || undefined,
         product_name: line.product_name,
@@ -434,15 +453,15 @@ export default function QuotationClient({
                       <div className="col-span-2">
                         <input
                           type="number"
-                          value={line.quantity}
-                          onChange={(e) => handleLineChange(line.id, 'quantity', parseFloat(e.target.value))}
+                          value={getSafeLineNumber(line.quantity)}
+                          onChange={(e) => handleLineChange(line.id, 'quantity', e.target.value)}
                           className="w-full h-12 px-4 border rounded-xl text-xs outline-none focus:border-blue-600"
                         />
                       </div>
                       <div className="col-span-3">
                         <CurrencyInput
                           label=""
-                          value={line.unit_price}
+                          value={getSafeLineNumber(line.unit_price)}
                           onChange={(value) => handleLineChange(line.id, 'unit_price', value)}
                           className="!h-12"
                         />
@@ -450,7 +469,7 @@ export default function QuotationClient({
                       <div className="col-span-2">
                         <CurrencyInput
                           label=""
-                          value={line.discount_amount}
+                          value={getSafeLineNumber(line.discount_amount)}
                           onChange={(value) => handleLineChange(line.id, 'discount_amount', value)}
                           className="!h-12 !text-rose-500"
                         />

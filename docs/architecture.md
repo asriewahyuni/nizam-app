@@ -76,6 +76,16 @@ NIZAM adalah aplikasi multi-tenant. Praktik akses utamanya:
 - Dashboard guard memaksa keberadaan active org.
 - Hak akses dipengaruhi oleh role, permission, enabled modules, dan dalam beberapa flow juga branch access.
 
+### Model organisasi vs unit operasional
+
+Ada dua konsep tenancy yang perlu dibedakan dengan tegas:
+
+- `organizations.parent_org_id` mewakili hierarki entitas, misalnya holding ke anak perusahaan.
+- `branches` mewakili unit operasional di dalam satu entitas, bukan otomatis anak perusahaan.
+- Setiap organisasi saat ini tetap memiliki satu unit default `Unit Utama` dengan kode `MAIN`.
+- `Unit Utama` dipakai sebagai anchor teknis untuk context access, RLS, dan beberapa governance finance master.
+- Dalam UX, `Unit Utama` sebaiknya dipahami sebagai konteks operasional default internal organisasi. Jika sebuah entitas hanya punya satu unit, UI tidak perlu menampilkannya seolah-olah bisnis tersebut sudah multi-unit.
+
 Komponen guard paling penting ada di [`app/(dashboard)/layout.tsx`](/Users/manbook/nizam-app/app/(dashboard)/layout.tsx:1).
 
 Yang dilakukan layout ini antara lain:

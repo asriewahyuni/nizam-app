@@ -341,13 +341,13 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                     <label className="text-[10px] font-black text-white/70 uppercase tracking-widest">Sumber Dana (Kas & Bank)</label>
                     <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
                       {summary.zakatAssets.filter((a: any) => a.type === 'CASH').map((acc: any) => (
-                        <button key={acc.code} onClick={() => setSelectedBank(acc.code)} 
-                          className={`text-left p-3 rounded-xl border-2 transition-all flex justify-between items-center ${selectedBank === acc.code ? 'border-white bg-white/20' : 'border-white/10 bg-white/5 hover:border-white/20'}`}>
+                        <button key={acc.id || acc.code} onClick={() => setSelectedBank(acc.id)} 
+                          className={`text-left p-3 rounded-xl border-2 transition-all flex justify-between items-center ${selectedBank === acc.id ? 'border-white bg-white/20' : 'border-white/10 bg-white/5 hover:border-white/20'}`}>
                           <div>
                             <p className="text-xs font-black">{acc.name}</p>
                             <p className="text-[10px] font-bold text-white/70">Saldo: {formatRupiah(acc.balance)}</p>
                           </div>
-                          {selectedBank === acc.code && <CheckCircle2 size={16} className="text-white"/>}
+                          {selectedBank === acc.id && <CheckCircle2 size={16} className="text-white"/>}
                         </button>
                       ))}
                     </div>

@@ -190,4 +190,59 @@ describe('Zakat Accounting Boundary', () => {
     expect(result.breakdown.totalAP).toBe(14000000)
     expect(result.totalAssets).toBe(126000000)
   })
+
+  it('counts derived account codes for cash, receivables, and inventory while excluding contra receivable 1203', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        zakat_haul: [
+          {
+            maybeSingleResult: success(null),
+          },
+          {
+            maybeSingleResult: success(null),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        zakat_asset_timeline: [
+          {
+            maybeSingleResult: success(null),
+          },
+          {
+            result: success([]),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        accounts: [
+          {
+            result: { data: null, error: null, count: 4 } as any,
+          },
+        ],
+      },
+    })
+
+    mocks.getAccountBalances.mockResolvedValue([
+      { code: '1101-01', name: 'Kas POS Depan', balance: '12000000' },
+      { code: '1103-02', name: 'Bank Operasional Cabang', balance: '8000000' },
+      { code: '1201-AR', name: 'Piutang Usaha Cabang', balance: '9000000' },
+      { code: '1203', name: 'Cadangan Kerugian Piutang', balance: '7000000' },
+      { code: '1304-FG', name: 'Persediaan Barang Jadi', balance: '15000000' },
+      { code: '2101-AP', name: 'Hutang Usaha Cabang', balance: '-4000000' },
+    ])
+    mocks.createClient.mockResolvedValue(supabase.client)
+
+    const result = await getZakatSummary('org-derived', {
+      goldPerGram: 1500000,
+      silverPerGram: 15000,
+    })
+
+    expect(result.breakdown.totalCash).toBe(20000000)
+    expect(result.breakdown.totalAR).toBe(9000000)
+    expect(result.breakdown.totalInventory).toBe(15000000)
+    expect(result.breakdown.totalAP).toBe(4000000)
+    expect(result.totalAssets).toBe(40000000)
+  })
 })

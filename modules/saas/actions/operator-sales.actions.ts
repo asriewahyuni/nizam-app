@@ -3,11 +3,17 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
-import { normalizeSaasEntitlementList } from '@/lib/saas/module-catalog'
+import {
+  getSaasCapabilityDisplayLabel,
+  getSaasPackageArchitecture,
+  normalizeSaasEntitlementList,
+} from '@/lib/saas/module-catalog'
 import {
   EXTRA_BRANCH_UNIT_PRICE,
   EXTRA_ENTITY_UNIT_PRICE,
   getOperatorAddonById,
+  getOperatorMarketplaceCompatibility,
+  getOperatorMarketplaceLabel,
 } from '@/lib/saas/operator-pricing'
 
 type OperatorSnapshot = {
@@ -54,6 +60,7 @@ type QuotationDraft = {
   orgId: string
   packageId: string
   packageName: string
+  bundleLabel: string
   finalAmount: number
   discountPercent: number
   discountAmount: number
@@ -174,7 +181,7 @@ function extractAddonNamesFromDescription(rawDescription: string | null | undefi
     .filter(Boolean)
 
   const addonNames = lines.flatMap((line) => {
-    const match = line.match(/^Add-on(?:\s+Single\s+Bill)?\s+(.+?):\s+/i)
+    const match = line.match(/^(?:Module|Add-on|Capacity Add-on)(?:\s+Single\s+Bill)?\s+(.+?):\s+/i)
     return match?.[1] ? [match[1].trim()] : []
   })
 
@@ -794,10 +801,12 @@ async function buildQuotationDraftFromFormData(admin: any, formData: FormData): 
     const anchorPrice = Math.max(promoPrice, parseNumber(String(addonAnchorOverrides[addonId] ?? addon?.anchorPrice ?? promoPrice), promoPrice))
     const billing = String(addon?.billing || 'Bulan').trim()
     const isSingleBill = billing.toLowerCase().includes('single')
+    const marketplaceLabel = getOperatorMarketplaceLabel({ name: addon?.name || addonId })
 
     return {
       id: addonId,
       name: addon?.name || addonId,
+      marketplaceLabel,
       promoPrice,
       anchorPrice,
       billing,
@@ -845,19 +854,49 @@ async function buildQuotationDraftFromFormData(admin: any, formData: FormData): 
   }
 
   const packageModules = normalizeSaasEntitlementList(toStringArray(pkg.modules))
-  const modulesForQuote = selectedModules.length > 0 ? selectedModules : packageModules
+  const modulesForQuote = normalizeSaasEntitlementList(selectedModules.length > 0 ? selectedModules : packageModules)
+  const packageArchitecture = getSaasPackageArchitecture(modulesForQuote)
+  const quoteCapabilities = normalizeSaasEntitlementList([
+    ...modulesForQuote,
+    ...selectedAddonBreakdown.map((addon) => addon.name),
+  ])
+  const incompatibleAddons = selectedAddonBreakdown
+    .map((addon) => {
+      const addonOption = getOperatorAddonById(addon.id)
+      const compatibility = getOperatorMarketplaceCompatibility(addonOption || addon, {
+        coreFamilyLevel: packageArchitecture.coreFamilyLevel,
+        enabledCapabilities: quoteCapabilities,
+      })
+
+      return compatibility.isCompatible
+        ? null
+        : `${addon.name}: ${compatibility.reason || 'belum kompatibel dengan Core Family yang dipilih.'}`
+    })
+    .filter(Boolean)
+
+  if (incompatibleAddons.length > 0) {
+    return { error: `Module/Add-on belum kompatibel. ${incompatibleAddons.join(' ')}` }
+  }
+
+  const coreScopeLabels = Array.from(new Set(
+    modulesForQuote
+      .map((moduleName) => getSaasCapabilityDisplayLabel(moduleName))
+      .filter(Boolean)
+  ))
 
   const detailLines = [
-    `Paket dasar: ${formatCurrencyId(baseAmount)}`,
+    `Core Family: ${pkg.name}`,
+    `Core Family Layer: ${packageArchitecture.bundleLabel}`,
+    `Harga Core Family: ${formatCurrencyId(baseAmount)}`,
     `Durasi: ${durationMonths} bulan`,
     ...selectedAddonBreakdown.map((addon) => (
       addon.anchorPrice > addon.promoPrice
-        ? `${addon.isSingleBill ? 'Add-on Single Bill' : 'Add-on'} ${addon.name}: ${formatCurrencyId(addon.anchorPrice)} -> ${formatCurrencyId(addon.promoPrice)}`
-        : `${addon.isSingleBill ? 'Add-on Single Bill' : 'Add-on'} ${addon.name}: ${formatCurrencyId(addon.promoPrice)}`
+        ? `${addon.marketplaceLabel}${addon.isSingleBill ? ' Single Bill' : ''} ${addon.name}: ${formatCurrencyId(addon.anchorPrice)} -> ${formatCurrencyId(addon.promoPrice)}`
+        : `${addon.marketplaceLabel}${addon.isSingleBill ? ' Single Bill' : ''} ${addon.name}: ${formatCurrencyId(addon.promoPrice)}`
     )),
     ...(aiTokenPackageId && aiTokenLabel ? [`Token AI: ${aiTokenLabel} (${formatCurrencyId(aiTokenTotal)})`] : []),
     ...(extraEntityQty > 0 ? [`Entitas tambahan: ${extraEntityQty} x ${formatCurrencyId(extraEntityUnitPrice)} = ${formatCurrencyId(extraEntityTotal)}`] : []),
-    ...(extraBranchQty > 0 ? [`Cabang tambahan: ${extraBranchQty} x ${formatCurrencyId(extraBranchUnitPrice)} = ${formatCurrencyId(extraBranchTotal)}`] : []),
+    ...(extraBranchQty > 0 ? [`Unit tambahan: ${extraBranchQty} x ${formatCurrencyId(extraBranchUnitPrice)} = ${formatCurrencyId(extraBranchTotal)}`] : []),
     `Subtotal / bulan: ${formatCurrencyId(monthlySubtotalAmount)}`,
     `Subtotal durasi (${durationMonths} bulan): ${formatCurrencyId(durationSubtotalAmount)}`,
     ...(oneTimeSubtotalAmount > 0 ? [`Subtotal one-time: ${formatCurrencyId(oneTimeSubtotalAmount)}`] : []),
@@ -865,7 +904,7 @@ async function buildQuotationDraftFromFormData(admin: any, formData: FormData): 
     ...(discountAmount > 0 || discountPercent > 0 ? [`Diskon setelah durasi: ${discountPercent}% (${formatCurrencyId(discountAmount)})`] : []),
     ...(taxAmount > 0 || taxPercent > 0 ? [`Pajak: ${taxPercent}% (${formatCurrencyId(taxAmount)})`] : []),
     `Grand total: ${formatCurrencyId(finalAmount)}`,
-    ...(modulesForQuote.length > 0 ? [`Modul dipilih: ${modulesForQuote.join(', ')}`] : []),
+    ...(coreScopeLabels.length > 0 ? [`Core Family Scope: ${coreScopeLabels.join(', ')}`] : []),
     ...(note ? [`Catatan: ${note}`] : []),
   ]
 
@@ -874,6 +913,7 @@ async function buildQuotationDraftFromFormData(admin: any, formData: FormData): 
       orgId,
       packageId,
       packageName: pkg.name,
+      bundleLabel: packageArchitecture.bundleLabel,
       finalAmount,
       discountPercent,
       discountAmount,
@@ -905,7 +945,7 @@ export async function createOperatorQuotation(formData: FormData) {
 
   const payloadWithItemsAndPricing = {
     ...baseInvoicePayload,
-    item_name: `Penawaran SaaS: ${draft.packageName}`,
+    item_name: `Penawaran SaaS: ${draft.bundleLabel} - ${draft.packageName}`,
     item_description: draft.itemDescription,
     discount_percent: draft.discountPercent,
     discount_amount: draft.discountAmount,
@@ -914,7 +954,7 @@ export async function createOperatorQuotation(formData: FormData) {
   }
   const payloadWithItemsOnly = {
     ...baseInvoicePayload,
-    item_name: `Penawaran SaaS: ${draft.packageName}`,
+    item_name: `Penawaran SaaS: ${draft.bundleLabel} - ${draft.packageName}`,
     item_description: draft.itemDescription,
   }
 
@@ -980,7 +1020,7 @@ export async function updateOperatorQuotation(formData: FormData) {
   }
   const payloadWithItemsAndPricing = {
     ...baseUpdatePayload,
-    item_name: `Penawaran SaaS: ${draft.packageName}`,
+    item_name: `Penawaran SaaS: ${draft.bundleLabel} - ${draft.packageName}`,
     item_description: draft.itemDescription,
     discount_percent: draft.discountPercent,
     discount_amount: draft.discountAmount,
@@ -989,7 +1029,7 @@ export async function updateOperatorQuotation(formData: FormData) {
   }
   const payloadWithItemsOnly = {
     ...baseUpdatePayload,
-    item_name: `Penawaran SaaS: ${draft.packageName}`,
+    item_name: `Penawaran SaaS: ${draft.bundleLabel} - ${draft.packageName}`,
     item_description: draft.itemDescription,
   }
 
@@ -1070,7 +1110,7 @@ export async function updateOperatorSaleInvoice(formData: FormData) {
   }
   const payloadWithItemsAndPricing = {
     ...baseUpdatePayload,
-    item_name: `Invoice SaaS: ${draft.packageName}`,
+    item_name: `Invoice SaaS: ${draft.bundleLabel} - ${draft.packageName}`,
     item_description: draft.itemDescription,
     discount_percent: draft.discountPercent,
     discount_amount: draft.discountAmount,
@@ -1079,7 +1119,7 @@ export async function updateOperatorSaleInvoice(formData: FormData) {
   }
   const payloadWithItemsOnly = {
     ...baseUpdatePayload,
-    item_name: `Invoice SaaS: ${draft.packageName}`,
+    item_name: `Invoice SaaS: ${draft.bundleLabel} - ${draft.packageName}`,
     item_description: draft.itemDescription,
   }
 
@@ -1178,12 +1218,23 @@ export async function convertQuotationToSale(invoiceId: string) {
 
   if (!invoiceId) return { error: 'Invoice penawaran tidak valid.' }
 
-  const { data: invoiceData } = await admin
+  let invoiceRes = await admin
     .from('saas_invoices')
-    .select('id, org_id, invoice_number, amount, tax_amount, created_at')
+    .select('id, org_id, invoice_number, item_name, amount, tax_amount, created_at')
     .eq('id', invoiceId)
     .maybeSingle()
-  const invoice = invoiceData as Pick<InvoiceRecord, 'id' | 'org_id' | 'invoice_number' | 'amount' | 'tax_amount' | 'created_at'> | null
+
+  if (invoiceRes.error && hasMissingInvoiceItemColumn(invoiceRes.error.message)) {
+    invoiceRes = await admin
+      .from('saas_invoices')
+      .select('id, org_id, invoice_number, amount, tax_amount, created_at')
+      .eq('id', invoiceId)
+      .maybeSingle()
+  }
+
+  const invoice = invoiceRes.data as (Pick<InvoiceRecord, 'id' | 'org_id' | 'invoice_number' | 'amount' | 'tax_amount' | 'created_at'> & {
+    item_name?: string | null
+  }) | null
 
   if (!invoice) return { error: 'Data penawaran tidak ditemukan.' }
   if (!isQuotationNumber(invoice.invoice_number)) {
@@ -1204,12 +1255,32 @@ export async function convertQuotationToSale(invoiceId: string) {
     return { error: `Gagal membuat jurnal penjualan: ${journalResult.error}` }
   }
 
-  const { error } = await (admin.from('saas_invoices') as any)
-    .update({
-      invoice_number: nextInvoiceNumber,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', invoiceId)
+  const baseUpdatePayload = {
+    invoice_number: nextInvoiceNumber,
+    updated_at: new Date().toISOString(),
+  }
+  const payloadWithItemName = {
+    ...baseUpdatePayload,
+    item_name: String(invoice.item_name || '').replace(/^Penawaran SaaS:/i, 'Invoice SaaS:') || invoice.item_name || null,
+  }
+
+  let error: { message: string } | null = null
+  const updateAttempts = [payloadWithItemName, baseUpdatePayload]
+
+  for (const payload of updateAttempts) {
+    const updateRes = await (admin.from('saas_invoices') as any)
+      .update(payload)
+      .eq('id', invoiceId)
+    if (!updateRes.error) {
+      error = null
+      break
+    }
+
+    error = { message: updateRes.error.message }
+    if (!updateRes.error.message.includes('Could not find the')) {
+      break
+    }
+  }
 
   if (error) {
     if (journalResult.entryId && !journalResult.existed) {

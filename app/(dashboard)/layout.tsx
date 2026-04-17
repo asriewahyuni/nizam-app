@@ -98,7 +98,7 @@ export default async function DashboardLayout({
     { path: '/learning', requiredModule: 'HRIS', aliases: ['HRIS', 'Learning', 'Peningkatan Kompetensi'], permissionKeys: ['learning', 'hris', 'employee', 'employees'] },
     { path: '/reports', requiredModule: 'Reports', aliases: ['Reports', 'Laporan', 'Insight'], permissionKeys: ['reports', 'strategy', 'forecast'] },
     { path: '/services', requiredModule: 'Job Order (Jasa)', aliases: ['Job Order (Jasa)', 'Industrial Job Order', 'Services'], permissionKeys: ['services', 'service', 'job_order'] },
-    { path: '/syirkah', requiredModule: 'Syirkah', aliases: ['Syirkah', 'Partnership'] },
+    { path: '/syirkah', requiredModule: 'Syirkah', aliases: ['Syirkah', 'Partnership'], permissionKeys: ['syirkah'] },
   ]
 
   // Identify which module is being accessed
@@ -204,7 +204,11 @@ export default async function DashboardLayout({
             {children}
           </div>
         </main>
-        <MobileBottomNav />
+        <MobileBottomNav
+          userRole={orgData.role}
+          permissions={orgData.permissions}
+          enabledModules={orgData.enabledModules}
+        />
         <FloatingPlanBadge planName={effectivePlanName} />
       </div>
     </div>

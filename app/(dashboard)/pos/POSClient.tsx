@@ -6,15 +6,11 @@ import { Search, Plus, Minus, Trash2, ShoppingCart, User, CreditCard, Banknote, 
 import { clampDiscountAmount } from '@/lib/commerce/discounts'
 import { formatRupiah } from '@/lib/utils'
 import { processPosTransaction } from '@/modules/sales/actions/pos.actions'
+import { getUsableSalesPromoByCode } from '@/modules/sales/actions/promo.actions'
 import { closePosShift, getPosShiftHistory, openPosShift, settlePosShift, type PosShiftHistoryResponse, type PosShiftSnapshot } from '@/modules/sales/actions/pos-shift.actions'
 import { buildPosWhatsappReceiptMessage, normalizeWhatsappPhone } from '@/modules/sales/lib/pos-whatsapp'
 import { resolveDefaultPosAccountId, type PosShiftConfig, type PosShiftMethod } from '@/modules/sales/lib/pos-shift'
-
-const PROMOS = [
-   { code: 'RAMADHAN24', type: 'PERCENT', value: 10, status: 'ACTIVE' },
-   { code: 'NEWCUSTOMER', type: 'FIXED', value: 50000, status: 'ACTIVE' },
-   { code: 'HARBOLSALE', type: 'PERCENT', value: 15, status: 'EXPIRED' }
-]
+import type { SalesPromoRecord } from '@/modules/sales/lib/sales-promos'
 
 type PosSuccessData = {
    total: number
@@ -212,9 +208,9 @@ export default function POSClient({
    
    // Promo States
    const [promoCode, setPromoCode] = useState('')
-   const [appliedPromo, setAppliedPromo] = useState<any>(null)
+   const [appliedPromo, setAppliedPromo] = useState<SalesPromoRecord | null>(null)
 
-   const handleApplyPromo = (scannedCode?: string) => {
+   const handleApplyPromo = async (scannedCode?: string) => {
       const code = (typeof scannedCode === 'string' ? scannedCode : promoCode).toUpperCase().trim()
       if (!code) return
       
@@ -223,11 +219,10 @@ export default function POSClient({
          return alert("Peringatan: Kupon Gagal Ditebus! Anda wajib mendaftarkan identitas Pelanggan (serta Nomor WA) yang valid terlebih dahulu.")
       }
 
-      const promo = PROMOS.find(p => p.code === code)
-      if (!promo) return alert(`Kode kupon '${code}' tidak ditemukan!`)
-      if (promo.status !== 'ACTIVE') return alert(`Maaf, kode kupon '${code}' sudah kadaluarsa/tidak aktif!`)
+      const promoResult = await getUsableSalesPromoByCode(orgId, code)
+      if ('error' in promoResult) return alert(promoResult.error)
       
-      setAppliedPromo(promo)
+      setAppliedPromo(promoResult.promo)
       if (typeof scannedCode !== 'string') setPromoCode('')
    }
    const [cart, setCart] = useState<any[]>([])
@@ -423,7 +418,7 @@ export default function POSClient({
                
                if (showPayment) {
                   // Mode Pembayaran -> Tangkap tembakan Barcode Scanner sebagai Kupon/Voucher Diskon
-                  handleApplyPromo(scannedCode)
+                  void handleApplyPromo(scannedCode)
                } else {
                   // Mode Katalog -> Tangkap tembakan Scanner sebagai SKU Produk (Tambah ke keranjang)
                   const product = products.find((p: any) =>
@@ -781,6 +776,7 @@ export default function POSClient({
          lines: cart.map((c: any) => ({ product_id: c.id, product_name: c.name, quantity: c.qty, unit_price: c.price })),
          discount_amount: parsedDiscount,
          tax_amount: taxNominal,
+         promo_code: appliedPromo?.code || null,
          notes: `POS - ${paymentMethod}${showAddCustomer ? ` | Pelanggan Baru: ${newCustomerName} (${newCustomerPhone})` : ''}${appliedPromo ? ` | [VOUCHER REDEEMED: ${appliedPromo.code}]` : ''}`
       }
 
@@ -1479,11 +1475,16 @@ export default function POSClient({
                                     value={promoCode}
                                     onChange={e => setPromoCode(e.target.value)}
                                     style={{ textTransform: 'uppercase' }}
-                                    onKeyDown={e => e.key === 'Enter' && handleApplyPromo()}
+                                    onKeyDown={e => {
+                                       if (e.key === 'Enter') {
+                                          e.preventDefault()
+                                          void handleApplyPromo()
+                                       }
+                                    }}
                                     className="w-full h-8 pl-7 pr-3 bg-black/20 border border-white/10 rounded-lg text-[10px] font-bold text-white placeholder-slate-500 outline-none focus:border-blue-500 shadow-inner" 
                                  />
                               </div>
-                              <button onClick={() => handleApplyPromo()} className="h-8 px-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-black text-[10px] tracking-widest uppercase transition-colors">CEK</button>
+                              <button onClick={() => void handleApplyPromo()} className="h-8 px-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-black text-[10px] tracking-widest uppercase transition-colors">CEK</button>
                            </div>
                         )}
                      </div>

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createSupabaseMock, failure, success } from './helpers/supabase-mock'
+
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   revalidatePath: vi.fn(),
@@ -18,7 +20,18 @@ vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
 }))
 
-import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
+import { createJournalEntry, voidJournalEntry } from '@/modules/accounting/actions/journal.actions'
+
+function mockAuthedClient(supabaseClient: ReturnType<typeof createSupabaseMock>['client']) {
+  return {
+    ...supabaseClient,
+    auth: {
+      getUser: vi.fn().mockResolvedValue({
+        data: { user: { id: 'user-1' } },
+      }),
+    },
+  }
+}
 
 function createFiscalPeriodsQuery() {
   return {
@@ -335,5 +348,257 @@ describe('Journal Branch Guardrails', () => {
     expect(result).toEqual({
       error: 'insert or update on table "journal_entries" violates foreign key constraint',
     })
+  })
+})
+
+describe('Journal Void Synchronization', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('delegates sale journal voids to the atomic sale RPC', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        journal_entries: [
+          {
+            maybeSingleResult: success({
+              entry_date: '2026-04-17',
+              status: 'POSTED',
+              reference_type: 'SALE',
+              reference_id: 'sale-1',
+            }),
+          },
+        ],
+        fiscal_periods: [
+          {
+            maybeSingleResult: success(null),
+          },
+        ],
+      },
+      rpc: {
+        void_sale_atomic: [
+          success({ success: true }),
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+
+    const result = await voidJournalEntry('je-sale-1', 'org-1', 'Void dari jurnal')
+
+    expect(result).toEqual({ success: true })
+    expect(supabase.rpcCalls).toEqual([
+      {
+        fn: 'void_sale_atomic',
+        args: {
+          p_org_id: 'org-1',
+          p_sale_id: 'sale-1',
+          p_user_id: 'user-1',
+          p_reason: 'Void dari jurnal',
+        },
+      },
+    ])
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sales')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/accounting/journal')
+  })
+
+  it('removes sales payment rows and recalculates payment status when PAYMENT_IN is voided', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        journal_entries: [
+          {
+            maybeSingleResult: success({
+              entry_date: '2026-04-17',
+              status: 'POSTED',
+              reference_type: 'PAYMENT_IN',
+              reference_id: 'pay-1',
+            }),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        fiscal_periods: [
+          {
+            maybeSingleResult: success(null),
+          },
+        ],
+        sales_payments: [
+          {
+            maybeSingleResult: success({
+              id: 'pay-1',
+              sale_id: 'sale-1',
+            }),
+          },
+          {
+            result: success([]),
+          },
+          {
+            result: success([
+              { amount: 200, discount_amount: 0 },
+            ]),
+          },
+        ],
+        sales: [
+          {
+            maybeSingleResult: success({
+              grand_total: 1000,
+            }),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        sales_returns: [
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+
+    const result = await voidJournalEntry('je-pay-1', 'org-1', 'Void pembayaran masuk')
+
+    expect(result).toEqual({ success: true })
+
+    const paymentDeleteCall = supabase.calls.find(
+      (call) => call.table === 'sales_payments' && call.operations.some((operation) => operation.method === 'delete')
+    )
+    expect(paymentDeleteCall).toBeTruthy()
+
+    const salesUpdateCall = supabase.calls.find(
+      (call) => call.table === 'sales' && call.operations.some((operation) => operation.method === 'update')
+    )
+    expect(salesUpdateCall?.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: 'update',
+          args: [{ payment_status: 'PARTIAL' }],
+        }),
+      ])
+    )
+  })
+
+  it('falls back to zeroing purchase returns when legacy schema lacks purchase_returns.status', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        journal_entries: [
+          {
+            maybeSingleResult: success({
+              entry_date: '2026-04-17',
+              status: 'POSTED',
+              reference_type: 'PURCHASE_RETURN',
+              reference_id: 'pret-1',
+            }),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        fiscal_periods: [
+          {
+            maybeSingleResult: success(null),
+          },
+        ],
+        purchase_returns: [
+          {
+            maybeSingleResult: success({
+              id: 'pret-1',
+              purchase_id: 'po-1',
+              notes: 'Retur vendor',
+            }),
+          },
+          {
+            result: failure("Could not find the 'status' column of 'purchase_returns' in the schema cache", 'PGRST204'),
+          },
+          {
+            result: success([]),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        purchases: [
+          {
+            maybeSingleResult: success({
+              warehouse_id: 'wh-1',
+            }),
+          },
+          {
+            maybeSingleResult: success({
+              grand_total: 500000,
+            }),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        stock_movements: [
+          {
+            result: success([
+              { product_id: 'prod-1', quantity: -2 },
+            ]),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        purchase_return_items: [
+          {
+            result: success([]),
+          },
+        ],
+        purchase_payments: [
+          {
+            result: success([]),
+          },
+        ],
+      },
+      rpc: {
+        adjust_inventory_stock: [
+          success(null),
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(mockAuthedClient(supabase.client))
+
+    const result = await voidJournalEntry('je-pret-1', 'org-1', 'Void retur pembelian')
+
+    expect(result).toEqual({ success: true })
+
+    const purchaseReturnUpdateCalls = supabase.calls.filter(
+      (call) => call.table === 'purchase_returns' && call.operations.some((operation) => operation.method === 'update')
+    )
+
+    expect(purchaseReturnUpdateCalls).toHaveLength(2)
+    expect(purchaseReturnUpdateCalls[0]?.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: 'update',
+          args: [
+            expect.objectContaining({
+              status: 'VOIDED',
+              total_amount: 0,
+              tax_amount: 0,
+            }),
+          ],
+        }),
+      ])
+    )
+    expect(purchaseReturnUpdateCalls[1]?.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: 'update',
+          args: [
+            expect.not.objectContaining({
+              status: expect.anything(),
+            }),
+          ],
+        }),
+      ])
+    )
   })
 })

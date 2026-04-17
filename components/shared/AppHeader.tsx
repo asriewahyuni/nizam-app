@@ -4,9 +4,9 @@ import { formatRupiah, getInitials } from '@/lib/utils'
 import { scheduleIdleTask } from '@/lib/browser/idle'
 import { approvalRequestTouchesActiveBranch } from '@/lib/browser/approval-realtime'
 import { createOptionalClient as createOptionalBrowserSupabaseClient } from '@/lib/supabase/client'
-import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X } from 'lucide-react'
+import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import Link from 'next/link'
 import type { Organization } from '@/types/database.types'
 import type { AiTokenHeaderSummary } from '@/modules/ai/lib/ai-token'
@@ -76,6 +76,9 @@ const ORG_DECK_CARD_EXPANDED_HEIGHT = 430
 const ORG_DECK_BRANCH_CARD_WIDTH = 186
 const ORG_DECK_BRANCH_CARD_HEIGHT = 160
 const ORG_DECK_COLUMN_SPACING = 560
+const ORG_DECK_MIN_ZOOM = 0.5
+const ORG_DECK_MAX_ZOOM = 1.8
+const ORG_DECK_ZOOM_STEP = 0.1
 const EMPTY_BSC_SUMMARIES: Record<string, BSCDeckSummary> = {}
 const EMPTY_BRANCH_MAP: Record<string, BranchSummary[]> = {}
 const EMPTY_CASH_SUMMARIES: Record<string, DeckCashSummary> = {}
@@ -98,6 +101,13 @@ type OrgDeckBranchOffset = {
 type OrgDeckPosition = {
   x: number
   y: number
+}
+
+type OrgDeckPanState = {
+  startClientX: number
+  startClientY: number
+  startScrollLeft: number
+  startScrollTop: number
 }
 
 type OrgDeckLink = {
@@ -195,6 +205,47 @@ function getOrgDeckCardHeight(isPerspectiveExpanded: boolean, bscIsReady: boolea
   return isPerspectiveExpanded && bscIsReady ? ORG_DECK_CARD_EXPANDED_HEIGHT : ORG_DECK_CARD_HEIGHT
 }
 
+function formatDeckMetricValue(value: number | null | undefined): string {
+  const numericValue = Number(value ?? 0)
+  if (!Number.isFinite(numericValue)) return 'Rp 0'
+
+  const absoluteValue = Math.abs(numericValue)
+  const sign = numericValue < 0 ? '-' : ''
+  const shortFormatter = new Intl.NumberFormat('id-ID', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  })
+
+  if (absoluteValue >= 1_000_000_000_000) {
+    return `${sign}Rp ${shortFormatter.format(absoluteValue / 1_000_000_000_000)}T`
+  }
+  if (absoluteValue >= 1_000_000_000) {
+    return `${sign}Rp ${shortFormatter.format(absoluteValue / 1_000_000_000)}M`
+  }
+  if (absoluteValue >= 1_000_000) {
+    return `${sign}Rp ${shortFormatter.format(absoluteValue / 1_000_000)}jt`
+  }
+  if (absoluteValue >= 1_000) {
+    return `${sign}Rp ${shortFormatter.format(absoluteValue / 1_000)}rb`
+  }
+
+  return `${sign}Rp ${Math.round(absoluteValue).toLocaleString('id-ID')}`
+}
+
+function getDeckMetricValueClass(valueLabel: string, compact: boolean): string {
+  const length = valueLabel.length
+
+  if (compact) {
+    if (length >= 12) return 'text-[8px]'
+    if (length >= 10) return 'text-[9px]'
+    return 'text-[10px]'
+  }
+
+  if (length >= 14) return 'text-[9px]'
+  if (length >= 11) return 'text-[10px]'
+  return 'text-[11px]'
+}
+
 export function AppHeader({
   user,
   jobTitle,
@@ -233,6 +284,8 @@ export function AppHeader({
   const [isLoadingTokenSummary, setIsLoadingTokenSummary] = useState(false)
   const [expandedDeckOrgIds, setExpandedDeckOrgIds] = useState<Record<string, boolean>>({})
   const [orgDeckBranchOffsets, setOrgDeckBranchOffsets] = useState<Record<string, OrgDeckBranchOffset>>({})
+  const [orgDeckZoom, setOrgDeckZoom] = useState(1)
+  const [isOrgDeckFullscreen, setIsOrgDeckFullscreen] = useState(false)
   const [organizations, setOrganizations] = useState<AccessibleOrganization[]>(initialOrganizations)
   const [branches, setBranches] = useState<BranchSummary[]>(initialBranches)
   const [headerPendingApprovals, setHeaderPendingApprovals] = useState(initialPendingApprovals)
@@ -262,6 +315,8 @@ export function AppHeader({
   const tokenPopupRef = useRef<HTMLDivElement | null>(null)
   const orgMenuRef = useRef<HTMLDivElement | null>(null)
   const branchMenuRef = useRef<HTMLDivElement | null>(null)
+  const orgDeckPanelRef = useRef<HTMLDivElement | null>(null)
+  const orgDeckViewportRef = useRef<HTMLDivElement | null>(null)
   const orgDeckDragRef = useRef<{
     orgId: string
     startClientX: number
@@ -269,6 +324,7 @@ export function AppHeader({
     originX: number
     originY: number
   } | null>(null)
+  const orgDeckPanRef = useRef<OrgDeckPanState | null>(null)
   const orgDeckBranchDragRef = useRef<{
     key: string
     startClientX: number
@@ -806,11 +862,107 @@ export function AppHeader({
     })()
   }, [activeOrgId, branches, hasLoadedNavigationContext, hasLoadedOrgDeckData, organizations])
 
+  const clampOrgDeckZoom = useCallback((nextZoom: number) => {
+    if (!Number.isFinite(nextZoom)) return 1
+    return Math.min(ORG_DECK_MAX_ZOOM, Math.max(ORG_DECK_MIN_ZOOM, Math.round(nextZoom * 100) / 100))
+  }, [])
+
+  const updateOrgDeckZoom = useCallback((nextZoom: number, focusPoint?: { clientX: number; clientY: number }) => {
+    const clampedZoom = clampOrgDeckZoom(nextZoom)
+    const viewport = orgDeckViewportRef.current
+
+    if (!viewport) {
+      setOrgDeckZoom(clampedZoom)
+      return
+    }
+
+    const previousZoom = orgDeckZoom
+    if (Math.abs(previousZoom - clampedZoom) < 0.001) return
+
+    const rect = viewport.getBoundingClientRect()
+    const offsetX = focusPoint ? focusPoint.clientX - rect.left : viewport.clientWidth / 2
+    const offsetY = focusPoint ? focusPoint.clientY - rect.top : viewport.clientHeight / 2
+    const contentX = (viewport.scrollLeft + offsetX) / previousZoom
+    const contentY = (viewport.scrollTop + offsetY) / previousZoom
+
+    setOrgDeckZoom(clampedZoom)
+
+    window.requestAnimationFrame(() => {
+      viewport.scrollLeft = Math.max(0, contentX * clampedZoom - offsetX)
+      viewport.scrollTop = Math.max(0, contentY * clampedZoom - offsetY)
+    })
+  }, [clampOrgDeckZoom, orgDeckZoom])
+
+  const resetOrgDeckView = useCallback(() => {
+    setOrgDeckZoom(1)
+    setOrgDeckPositions(initialOrgDeckPositions)
+    setOrgDeckBranchOffsets({})
+    window.requestAnimationFrame(() => {
+      orgDeckViewportRef.current?.scrollTo({ left: 0, top: 0, behavior: 'smooth' })
+    })
+  }, [initialOrgDeckPositions])
+
+  const toggleOrgDeckFullscreen = useCallback(async () => {
+    const panel = orgDeckPanelRef.current
+    if (!panel) return
+
+    try {
+      if (document.fullscreenElement === panel) {
+        await document.exitFullscreen()
+        return
+      }
+
+      await panel.requestFullscreen()
+    } catch (error) {
+      console.error('[AppHeader] Failed to toggle deck fullscreen:', error)
+    }
+  }, [])
+
   const closeOrgDeck = useCallback(() => {
     setIsOrgDeckOpen(false)
     orgDeckDragRef.current = null
     orgDeckBranchDragRef.current = null
+    orgDeckPanRef.current = null
+
+    const panel = orgDeckPanelRef.current
+    if (document.fullscreenElement === panel) {
+      void document.exitFullscreen().catch(() => {})
+    }
   }, [])
+
+  const handleOrgDeckViewportPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return
+
+    const target = event.target as HTMLElement | null
+    if (
+      target?.closest('[data-deck-card]')
+      || target?.closest('[data-deck-control]')
+      || target?.closest('button, a, input, textarea, select, label')
+    ) {
+      return
+    }
+
+    const viewport = orgDeckViewportRef.current
+    if (!viewport) return
+
+    orgDeckPanRef.current = {
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startScrollLeft: viewport.scrollLeft,
+      startScrollTop: viewport.scrollTop,
+    }
+  }, [])
+
+  const handleOrgDeckViewportWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
+    if (!event.ctrlKey && !event.metaKey) return
+
+    event.preventDefault()
+    const direction = event.deltaY > 0 ? -1 : 1
+    updateOrgDeckZoom(orgDeckZoom + direction * ORG_DECK_ZOOM_STEP, {
+      clientX: event.clientX,
+      clientY: event.clientY,
+    })
+  }, [orgDeckZoom, updateOrgDeckZoom])
 
   const handleOrgDeckPointerDown = (orgId: string, clientX: number, clientY: number) => {
     const origin = orgDeckPositions[orgId] || initialOrgDeckPositions[orgId]
@@ -869,6 +1021,15 @@ export function AppHeader({
   }, [isOrgDeckOpen])
 
   useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsOrgDeckFullscreen(document.fullscreenElement === orgDeckPanelRef.current)
+    }
+
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }, [])
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
       const isTypingTarget = Boolean(
@@ -881,8 +1042,8 @@ export function AppHeader({
       if (isTypingTarget) return
 
       if (event.key === 'Escape') {
-        setIsOrgDeckOpen(false)
-        orgDeckDragRef.current = null
+        if (document.fullscreenElement === orgDeckPanelRef.current) return
+        closeOrgDeck()
         return
       }
 
@@ -917,20 +1078,29 @@ export function AppHeader({
       }
 
       const branchDragState = orgDeckBranchDragRef.current
-      if (!branchDragState) return
+      if (branchDragState) {
+        const nextOffsetX = branchDragState.originX + (event.clientX - branchDragState.startClientX)
+        const nextOffsetY = branchDragState.originY + (event.clientY - branchDragState.startClientY)
 
-      const nextOffsetX = branchDragState.originX + (event.clientX - branchDragState.startClientX)
-      const nextOffsetY = branchDragState.originY + (event.clientY - branchDragState.startClientY)
+        setOrgDeckBranchOffsets((current) => ({
+          ...current,
+          [branchDragState.key]: { x: nextOffsetX, y: nextOffsetY },
+        }))
+        return
+      }
 
-      setOrgDeckBranchOffsets((current) => ({
-        ...current,
-        [branchDragState.key]: { x: nextOffsetX, y: nextOffsetY },
-      }))
+      const panState = orgDeckPanRef.current
+      const viewport = orgDeckViewportRef.current
+      if (!panState || !viewport) return
+
+      viewport.scrollLeft = Math.max(0, panState.startScrollLeft - (event.clientX - panState.startClientX))
+      viewport.scrollTop = Math.max(0, panState.startScrollTop - (event.clientY - panState.startClientY))
     }
 
     const stopDragging = () => {
       orgDeckDragRef.current = null
       orgDeckBranchDragRef.current = null
+      orgDeckPanRef.current = null
     }
 
     window.addEventListener('pointermove', onPointerMove)
@@ -951,28 +1121,38 @@ export function AppHeader({
     const { active, compact = false } = options
 
     return (
-      <div className={`grid grid-cols-2 gap-2 ${compact ? '' : 'mt-1'}`}>
-        {cashMetricMeta.map((metric) => (
-          <div
-            key={metric.key}
-            className={`rounded-2xl border px-2.5 py-2 ${
-              active
-                ? 'border-white/10 bg-white/5 text-white'
-                : 'border-slate-200 bg-white text-slate-900'
-            }`}
-          >
-            <div className={`text-[9px] font-black uppercase tracking-[0.14em] ${
-              active ? 'text-slate-300' : 'text-slate-400'
-            }`}>
-              {metric.label}
+      <div className={`grid grid-cols-2 ${compact ? 'gap-1.5' : 'gap-2 mt-1'}`}>
+        {cashMetricMeta.map((metric) => {
+          const rawValue = summary?.[metric.key] ?? 0
+          const compactValueLabel = formatDeckMetricValue(rawValue)
+          const fullValueLabel = formatRupiah(rawValue)
+          const valueClassName = getDeckMetricValueClass(compactValueLabel, compact)
+
+          return (
+            <div
+              key={metric.key}
+              className={`min-w-0 rounded-2xl border ${compact ? 'px-2 py-1.5' : 'px-2.5 py-2'} ${
+                active
+                  ? 'border-white/10 bg-white/5 text-white'
+                  : 'border-slate-200 bg-white text-slate-900'
+              }`}
+            >
+              <div className={`truncate text-[9px] font-black uppercase tracking-[0.14em] ${
+                active ? 'text-slate-300' : 'text-slate-400'
+              }`}>
+                {metric.label}
+              </div>
+              <div
+                title={fullValueLabel}
+                className={`mt-1 font-black leading-[1.1] tracking-tight tabular-nums ${valueClassName} ${
+                  active ? 'text-white' : 'text-slate-900'
+                }`}
+              >
+                {compactValueLabel}
+              </div>
             </div>
-            <div className={`mt-1 text-[11px] font-black leading-tight ${
-              active ? 'text-white' : 'text-slate-900'
-            }`}>
-              {formatRupiah(summary?.[metric.key] ?? 0, true)}
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     )
   }
@@ -1110,9 +1290,6 @@ export function AppHeader({
                           Shift + D
                         </div>
                       </div>
-                      <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-blue-600">
-                        Drag handle ≡ untuk pindah hierarki cepat, atau buka deck untuk lihat mindmap grup.
-                      </p>
                     </>
                   )}
                 </div>
@@ -1614,34 +1791,70 @@ export function AppHeader({
           />
 
           <div className="relative flex h-full items-center justify-center p-3 md:p-6">
-            <div className="relative flex h-[min(90vh,860px)] w-full max-w-[min(96vw,1600px)] flex-col overflow-hidden rounded-[36px] border border-white/70 bg-white shadow-2xl">
+            <div
+              ref={orgDeckPanelRef}
+              className="relative flex h-[calc(100vh-24px)] w-[calc(100vw-24px)] max-w-none flex-col overflow-hidden rounded-[30px] border border-white/70 bg-white shadow-2xl md:h-[calc(100vh-48px)] md:w-[calc(100vw-48px)] md:rounded-[36px]"
+            >
               <div className="border-b border-slate-100 bg-[radial-gradient(circle_at_top_left,_rgba(191,219,254,0.32),_transparent_48%),linear-gradient(135deg,_rgba(248,250,252,0.98),_rgba(255,255,255,0.98))] px-5 py-4 md:px-7">
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div className="max-w-3xl">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">
-                        <Workflow size={12} />
-                        Open Deck
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500">
-                        <Command size={10} />
-                        Shift + D
-                      </span>
-                    </div>
-                    <h2 className="mt-3 text-xl font-black tracking-tight text-slate-950 md:text-2xl">
-                      Struktur grup yang bisa dijelajahi tanpa banyak klik
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">
+                      <Workflow size={12} />
+                      Open Deck
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500">
+                      <Command size={10} />
+                      Shift + D
+                    </span>
+                    <h2 className="text-lg font-black tracking-tight text-slate-950 md:text-xl">
+                      Struktur Grup
                     </h2>
-                    <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-slate-500">
-                      Geser kartu seperti mindmap untuk memahami hubungan parent-child, aktifkan konteks kerja dari sini,
-                      lalu lanjutkan ke pengaturan jika ingin ubah struktur lebih detail.
-                    </p>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-600">
-                      <Move size={12} />
-                      Geser Kartu
+                  <div data-deck-control className="flex flex-wrap items-center gap-2">
+                    <div className="inline-flex items-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => updateOrgDeckZoom(orgDeckZoom - ORG_DECK_ZOOM_STEP)}
+                        disabled={orgDeckZoom <= ORG_DECK_MIN_ZOOM}
+                        className="inline-flex h-10 w-10 items-center justify-center text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Zoom out"
+                        title="Zoom out"
+                      >
+                        <ZoomOut size={14} />
+                      </button>
+                      <div className="min-w-[64px] border-x border-slate-200 px-3 text-center text-[11px] font-black text-slate-700">
+                        {Math.round(orgDeckZoom * 100)}%
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => updateOrgDeckZoom(orgDeckZoom + ORG_DECK_ZOOM_STEP)}
+                        disabled={orgDeckZoom >= ORG_DECK_MAX_ZOOM}
+                        className="inline-flex h-10 w-10 items-center justify-center text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Zoom in"
+                        title="Zoom in"
+                      >
+                        <ZoomIn size={14} />
+                      </button>
                     </div>
+                    <button
+                      type="button"
+                      onClick={resetOrgDeckView}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
+                      aria-label="Reset view"
+                      title="Reset view"
+                    >
+                      <RotateCcw size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void toggleOrgDeckFullscreen()}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
+                      aria-label={isOrgDeckFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                      title={isOrgDeckFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                    >
+                      {isOrgDeckFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                    </button>
                     {canManageAffiliates && (
                       <Link
                         href="/settings/sub-orgs"
@@ -1649,7 +1862,7 @@ export function AppHeader({
                         className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700 transition hover:bg-blue-100"
                       >
                         <Plus size={12} />
-                        Tambah Anak Perusahaan
+                        Tambah
                       </Link>
                     )}
                     {canManageAffiliates && (
@@ -1658,7 +1871,7 @@ export function AppHeader({
                         onClick={closeOrgDeck}
                         className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-700 transition hover:bg-slate-50"
                       >
-                        Kelola Struktur
+                        Kelola
                         <ArrowUpRight size={12} />
                       </Link>
                     )}
@@ -1674,14 +1887,27 @@ export function AppHeader({
                 </div>
               </div>
 
-              <div className="flex-1 overflow-auto bg-[linear-gradient(rgba(226,232,240,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(226,232,240,0.55)_1px,transparent_1px)] bg-[size:28px_28px]">
+              <div
+                ref={orgDeckViewportRef}
+                onPointerDown={handleOrgDeckViewportPointerDown}
+                onWheel={handleOrgDeckViewportWheel}
+                className={`flex-1 overflow-auto bg-[linear-gradient(rgba(226,232,240,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(226,232,240,0.55)_1px,transparent_1px)] bg-[size:28px_28px] ${orgDeckPanRef.current ? 'cursor-grabbing' : 'cursor-grab'}`}
+              >
                 <div
                   className="relative"
                   style={{
-                    width: `${deckCanvasSize.width}px`,
-                    height: `${deckCanvasSize.height}px`,
+                    width: `${deckCanvasSize.width * orgDeckZoom}px`,
+                    height: `${deckCanvasSize.height * orgDeckZoom}px`,
                   }}
                 >
+                  <div
+                    style={{
+                      width: `${deckCanvasSize.width}px`,
+                      height: `${deckCanvasSize.height}px`,
+                      transform: `scale(${orgDeckZoom})`,
+                      transformOrigin: 'top left',
+                    }}
+                  >
                   {isLoadingOrgDeckData && !hasLoadedOrgDeckData && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/78 backdrop-blur-sm">
                       <div className="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 shadow-lg">
@@ -1762,6 +1988,7 @@ export function AppHeader({
                     return (
                       <div
                         key={`deck-${membership.orgId}`}
+                        data-deck-card="org"
                         className={`absolute w-[272px] rounded-[28px] border shadow-xl transition ${
                           isActiveCard
                             ? 'border-slate-900 bg-slate-950 text-white shadow-slate-900/20'
@@ -2007,6 +2234,7 @@ export function AppHeader({
                     return (
                       <div
                         key={`branch-card-${node.key}`}
+                        data-deck-card="branch"
                         role="button"
                         tabIndex={isActiveBranchCard || isSwitchingContext ? -1 : 0}
                         aria-disabled={isActiveBranchCard || isSwitchingContext}
@@ -2094,6 +2322,7 @@ export function AppHeader({
                       </div>
                     )
                   })}
+                  </div>
                 </div>
               </div>
             </div>

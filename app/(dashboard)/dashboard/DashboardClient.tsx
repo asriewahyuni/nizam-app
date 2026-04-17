@@ -4,24 +4,22 @@ import { motion } from 'framer-motion'
 import {
    Search,
    ChevronRight,
-   Clock,
-   CheckCircle2,
    Wallet,
    ArrowUpRight,
    ArrowDownRight,
    TrendingUp,
    TrendingDown,
    BarChart3,
-   PieChart,
    Package,
    Star,
    Target,
    Trophy,
-   GraduationCap
+   GraduationCap,
+   type LucideIcon,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area } from 'recharts'
+import { XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area } from 'recharts'
 import { formatRupiah } from '@/lib/utils'
 import { SafeResponsiveContainer } from '@/components/ui/SafeResponsiveContainer'
 
@@ -82,7 +80,7 @@ interface DashboardClientProps {
    }
 }
 
-const ICON_MAP: Record<string, any> = {
+const ICON_MAP: Record<string, LucideIcon> = {
    wallet: Wallet,
    receivables: ArrowDownRight,
    payables: ArrowUpRight,
@@ -239,7 +237,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
                            contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', padding: '20px' }}
                            itemStyle={{ fontWeight: 800, fontSize: '12px' }}
                            labelStyle={{ fontWeight: 900, fontSize: '10px', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '8px' }}
-                           formatter={(value: any) => [formatRupiah(Number(value || 0)), '']}
+                           formatter={(value: number | string) => [formatRupiah(Number(value || 0)), '']}
                         />
                         <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorRev)" />
                         <Area type="monotone" dataKey="profit" stroke="#3b82f6" strokeWidth={4} strokeDasharray="8 8" fill="url(#colorProfit)" />

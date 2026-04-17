@@ -93,6 +93,15 @@ export function BranchManagementClient({
     })
     return map
   })
+  const activeUnitCount = branches.filter((branch) => branch.is_active).length
+  const hasMultipleUnits = activeUnitCount > 1
+  const hasSingleUnit = activeUnitCount <= 1
+
+  const isDefaultUnit = (branch: Branch) => {
+    const normalizedName = String(branch.name || '').trim().toLowerCase()
+    const normalizedCode = String(branch.code || '').trim().toUpperCase()
+    return normalizedCode === 'MAIN' || normalizedName === 'unit utama'
+  }
 
   const getEmpName = (id: string) => {
     if (!id) return null
@@ -170,7 +179,7 @@ export function BranchManagementClient({
   /* ─── DELETE (optimistic) ─── */
   const handleDelete = async (branch: Branch) => {
     const agreed = window.confirm(
-      `Hapus cabang "${branch.name}"?\nTindakan ini permanen.`
+      `Hapus unit "${branch.name}"?\nTindakan ini permanen.`
     )
     if (!agreed) return
 
@@ -209,10 +218,12 @@ export function BranchManagementClient({
         <div className="space-y-2">
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
             <MapPin size={32} className="text-emerald-500" />
-            Cabang
+            Unit Operasional
           </h1>
           <p className="text-sm text-slate-500 font-medium max-w-xl">
-            Kelola struktur multi-cabang untuk bisnis retail, armada bus, atau pabrik manufaktur Anda dalam satu ekosistem terpadu.
+            {hasMultipleUnits
+              ? 'Kelola beberapa unit operasional dalam satu entitas. Unit Utama tetap menjadi konteks default internal, sedangkan unit lain dipakai saat bisnis memang multi-lokasi atau multi-divisi.'
+              : 'Organisasi ini saat ini berjalan dengan satu Unit Utama. Unit tersebut adalah konteks operasional default internal, jadi tidak perlu dibaca sebagai struktur operasional terpisah.'}
           </p>
         </div>
 
@@ -220,20 +231,34 @@ export function BranchManagementClient({
           <div className="flex flex-col md:items-end gap-2 shrink-0">
             {limits && (
               <div className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-                Pemakaian Kuota: <span className="text-slate-800">{limits.currentBranches}</span> / {limits.maxBranches === null ? '∞' : limits.maxBranches} Cabang
+                Pemakaian Kuota: <span className="text-slate-800">{limits.currentBranches}</span> / {limits.maxBranches === null ? '∞' : limits.maxBranches} Unit
               </div>
             )}
             <button
               onClick={() => setShowModal(true)}
               disabled={limits?.maxBranches !== null && limits!.currentBranches >= limits!.maxBranches}
-              title={limits?.maxBranches !== null && limits!.currentBranches >= limits!.maxBranches ? 'Batas cabang tercapai. Upgrade paket SaaS Anda.' : ''}
+              title={limits?.maxBranches !== null && limits!.currentBranches >= limits!.maxBranches ? 'Batas unit tercapai. Upgrade paket SaaS Anda.' : ''}
               className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white text-sm font-bold rounded-2xl hover:bg-slate-800 shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto"
             >
-              <Plus size={18} /> Tambah Cabang
+              <Plus size={18} /> Tambah Unit
             </button>
           </div>
         )}
       </motion.div>
+
+      {hasSingleUnit && branches[0] && (
+        <motion.div
+          variants={cardAnim}
+          className="rounded-[28px] border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-6 text-sm text-slate-600 shadow-sm"
+        >
+          <p className="font-semibold text-slate-800">
+            <span className="font-mono">Unit Utama</span> adalah konteks default internal organisasi.
+          </p>
+          <p className="mt-2">
+            Selama entitas ini hanya memiliki satu unit aktif, sistem tidak perlu dipahami sebagai struktur multi-unit. Tambahkan unit baru hanya jika bisnis memang memiliki lokasi atau unit operasional terpisah.
+          </p>
+        </motion.div>
+      )}
 
       {/* ── Branch Cards ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -241,6 +266,8 @@ export function BranchManagementClient({
           const isAssigning = assigningPICId === branch.id
           const currentPIC = localPICMap[branch.id] || ''
           const picName = getEmpName(currentPIC)
+          const isMainUnit = isDefaultUnit(branch)
+          const canDeleteUnit = canMutate && activeUnitCount > 1
 
           return (
             <motion.div
@@ -261,15 +288,15 @@ export function BranchManagementClient({
                     <>
                       <button
                         onClick={() => setEditingBranch(branch)}
-                        title="Edit Cabang"
+                        title="Edit Unit"
                         className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-blue-600 transition"
                       >
                         <Pencil size={14} />
                       </button>
-                      {canMutate && (
+                      {canDeleteUnit && (
                         <button
                           onClick={() => handleDelete(branch)}
-                          title="Hapus Cabang"
+                          title="Hapus Unit"
                           className="p-2 rounded-xl border border-rose-100 text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition"
                         >
                           <Trash2 size={14} />
@@ -284,7 +311,14 @@ export function BranchManagementClient({
               <div className="space-y-4 flex-1">
                 <div>
                   <h3 className="text-xl font-black text-slate-900 group-hover:text-emerald-600 transition-colors">{branch.name}</h3>
-                  <p className="text-xs font-bold text-slate-400 tracking-[0.2em] mt-1 uppercase">{branch.code}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-bold text-slate-400 tracking-[0.2em] uppercase">{branch.code}</p>
+                    {isMainUnit && (
+                      <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                        Unit Default
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-2 pt-2">
@@ -292,6 +326,11 @@ export function BranchManagementClient({
                     <MapPin size={12} className="text-slate-300 shrink-0" />
                     <span className="line-clamp-1">{branch.address || 'Alamat belum diset'}</span>
                   </div>
+                  {isMainUnit && (
+                    <p className="text-xs font-medium text-slate-500">
+                      Unit ini menjadi konteks operasional default untuk organisasi.
+                    </p>
+                  )}
                   {branch.phone && (
                     <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
                       <Phone size={12} className="text-slate-300 shrink-0" />
@@ -304,7 +343,7 @@ export function BranchManagementClient({
               {/* ── PIC Section ── */}
               <div className="mt-6 pt-6 border-t border-slate-50">
                 <label className="text-[10px] uppercase font-black text-slate-400 tracking-[0.15em] flex items-center gap-2 mb-2">
-                  <UserCircle size={14} /> PIC Cabang
+                  <UserCircle size={14} /> PIC Unit
                 </label>
 
                 {picName && (
@@ -349,8 +388,8 @@ export function BranchManagementClient({
         {branches.length === 0 && (
           <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-200 rounded-[32px] bg-slate-50 flex flex-col items-center justify-center space-y-4">
             <MapPin size={48} className="text-slate-300" />
-            <h3 className="text-lg font-black text-slate-700">Belum Ada Cabang</h3>
-            <p className="text-sm text-slate-500">Klik tombol di atas untuk menambahkan cabang pertama.</p>
+            <h3 className="text-lg font-black text-slate-700">Belum Ada Unit</h3>
+            <p className="text-sm text-slate-500">Klik tombol di atas untuk menambahkan unit operasional pertama.</p>
           </div>
         )}
       </div>
@@ -373,7 +412,7 @@ export function BranchManagementClient({
                   <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
                     <Plus size={24} />
                   </div>
-                  Tambah Cabang
+                  Tambah Unit
                 </h3>
                 <button onClick={() => setShowModal(false)} className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-rose-50 hover:text-rose-500 transition-colors">
                   <X size={20} />
@@ -381,20 +420,20 @@ export function BranchManagementClient({
               </div>
               <form onSubmit={handleAddBranch} className="space-y-5">
                 <div className="space-y-1.5 text-left">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Cabang</label>
-                  <input name="name" required placeholder="Cth: Cabang Jakarta - Slipi" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-emerald-500 font-bold transition-all shadow-inner" />
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Unit</label>
+                  <input name="name" required placeholder="Cth: Unit Distribusi Jakarta" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-emerald-500 font-bold transition-all shadow-inner" />
                 </div>
                 <div className="space-y-1.5 text-left">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Kode Cabang</label>
-                  <input name="code" required placeholder="Cth: BR-JKT-01" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-emerald-500 font-bold uppercase transition-all shadow-inner" />
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Kode Unit</label>
+                  <input name="code" required placeholder="Cth: JKT-DIST" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-emerald-500 font-bold uppercase transition-all shadow-inner" />
                 </div>
                 <div className="space-y-1.5 text-left">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Alamat Lengkap</label>
-                  <textarea name="address" placeholder="Tulis alamat operasional cabang ini..." className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-emerald-500 text-sm h-24 transition-all shadow-inner resize-none" />
+                  <textarea name="address" placeholder="Tulis alamat operasional unit ini..." className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-emerald-500 text-sm h-24 transition-all shadow-inner resize-none" />
                 </div>
                 <div className="pt-4">
                   <button type="submit" disabled={loading} className="w-full py-5 bg-slate-900 text-white font-black rounded-[20px] shadow-xl hover:shadow-2xl transition-all relative overflow-hidden group disabled:opacity-60">
-                    <span className="relative z-10">{loading ? 'Memproses...' : 'Daftarkan Cabang Sekarang'}</span>
+                    <span className="relative z-10">{loading ? 'Memproses...' : 'Daftarkan Unit Sekarang'}</span>
                     <div className="absolute inset-0 bg-emerald-500 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300" />
                   </button>
                 </div>
@@ -422,7 +461,7 @@ export function BranchManagementClient({
                   <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center">
                     <Pencil size={22} />
                   </div>
-                  Edit Cabang
+                  Edit Unit
                 </h3>
                 <button onClick={() => setEditingBranch(null)} className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-rose-50 hover:text-rose-500 transition-colors">
                   <X size={20} />
@@ -430,12 +469,12 @@ export function BranchManagementClient({
               </div>
               <form onSubmit={handleEditBranch} className="space-y-5">
                 <div className="space-y-1.5 text-left">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Cabang</label>
-                  <input name="name" required defaultValue={editingBranch.name} placeholder="Nama cabang" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold transition-all shadow-inner" />
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Unit</label>
+                  <input name="name" required defaultValue={editingBranch.name} placeholder="Nama unit" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold transition-all shadow-inner" />
                 </div>
                 <div className="space-y-1.5 text-left">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Kode Cabang</label>
-                  <input name="code" required defaultValue={editingBranch.code} placeholder="Kode cabang" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold uppercase transition-all shadow-inner" />
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Kode Unit</label>
+                  <input name="code" required defaultValue={editingBranch.code} placeholder="Kode unit" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold uppercase transition-all shadow-inner" />
                 </div>
                 <div className="space-y-1.5 text-left">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Alamat Lengkap</label>
@@ -468,15 +507,15 @@ export function BranchManagementClient({
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
               className="relative w-full max-w-md bg-white rounded-[32px] shadow-2xl p-8"
             >
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
-                  <AlertTriangle size={24} />
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
+                    <AlertTriangle size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900 mb-1">Tidak Dapat Menghapus Unit</h3>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Terdapat data yang masih terhubung</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-black text-slate-900 mb-1">Tidak Dapat Menghapus Cabang</h3>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Terdapat data yang masih terhubung</p>
-                </div>
-              </div>
               <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 mb-6">
                 <p className="text-sm text-rose-800 font-medium whitespace-pre-line leading-relaxed">{errorModal}</p>
               </div>

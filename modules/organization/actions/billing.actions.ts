@@ -1,6 +1,15 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import {
+  getSaasPackageArchitecture,
+  normalizeSaasEntitlementList,
+  normalizeSaasEntitlementName,
+} from '@/lib/saas/module-catalog'
+import {
+  getOperatorAddonById,
+  getOperatorMarketplaceCompatibility,
+} from '@/lib/saas/operator-pricing'
 import { revalidatePath } from 'next/cache'
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -15,6 +24,28 @@ function mergeOrganizationSettings(
     ...(isPlainObject(currentSettings) ? currentSettings : {}),
     ...patch,
   }
+}
+
+function toStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean)
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return []
+
+    try {
+      const parsed = JSON.parse(trimmed) as unknown
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item || '').trim()).filter(Boolean)
+      }
+    } catch {
+      return trimmed.split(',').map((item) => item.trim()).filter(Boolean)
+    }
+  }
+
+  return []
 }
 
 async function ensurePackageManagedFromRoot(db: any, orgId: string) {
@@ -43,6 +74,72 @@ async function ensurePackageManagedFromRoot(db: any, orgId: string) {
   return { success: true as const }
 }
 
+function getActiveAddonName(entry: unknown) {
+  if (typeof entry === 'string') return entry.trim()
+  if (entry && typeof entry === 'object' && typeof (entry as { name?: unknown }).name === 'string') {
+    return String((entry as { name?: string }).name || '').trim()
+  }
+  return ''
+}
+
+async function getOrganizationMarketplaceContext(db: any, orgId: string) {
+  const { data: org, error: orgError } = await db
+    .from('organizations')
+    .select('settings, active_addons')
+    .eq('id', orgId)
+    .maybeSingle()
+
+  if (orgError || !org) {
+    return { error: orgError?.message || 'Organisasi tidak ditemukan.' }
+  }
+
+  const planName = String((org as any)?.settings?.plan || '').trim()
+  const activeAddonNames = normalizeSaasEntitlementList(
+    (Array.isArray((org as any)?.active_addons) ? (org as any).active_addons : [])
+      .map((entry: unknown) => getActiveAddonName(entry))
+      .filter(Boolean)
+  )
+
+  if (!planName) {
+    return {
+      planName: '',
+      coreFamilyLevel: 'none' as const,
+      enabledCapabilities: activeAddonNames,
+      activeAddonNames,
+    }
+  }
+
+  const { data: pkg, error: pkgError } = await db
+    .from('saas_packages')
+    .select('name, modules, addons')
+    .eq('name', planName)
+    .maybeSingle()
+
+  if (pkgError || !pkg) {
+    return {
+      planName,
+      coreFamilyLevel: 'none' as const,
+      enabledCapabilities: activeAddonNames,
+      activeAddonNames,
+    }
+  }
+
+  const packageModules = normalizeSaasEntitlementList(toStringArray((pkg as any).modules))
+  const packageAddons = normalizeSaasEntitlementList(toStringArray((pkg as any).addons))
+  const architecture = getSaasPackageArchitecture(packageModules, packageAddons)
+
+  return {
+    planName,
+    coreFamilyLevel: architecture.coreFamilyLevel,
+    enabledCapabilities: normalizeSaasEntitlementList([
+      ...packageModules,
+      ...packageAddons,
+      ...activeAddonNames,
+    ]),
+    activeAddonNames,
+  }
+}
+
 export async function createBillingInvoice(
   orgId: string,
   item: {
@@ -58,11 +155,33 @@ export async function createBillingInvoice(
   const invoiceKey = `${item.type}-${item.id}`
   const isPackage = item.type === 'PACKAGE'
   const isTopup = item.type === 'AI_TOKEN_TOPUP'
+  const isAddon = item.type === 'ADDON'
 
   if (isPackage) {
     const packageScope = await ensurePackageManagedFromRoot(supabase as any, orgId)
     if (!packageScope.success) {
       return { error: packageScope.error }
+    }
+  }
+
+  if (isAddon) {
+    const addon = getOperatorAddonById(item.id)
+    if (!addon) {
+      return { error: 'Module/Add-on yang dipilih tidak ditemukan.' }
+    }
+
+    const context = await getOrganizationMarketplaceContext(supabase as any, orgId)
+    if ('error' in context) {
+      return { error: context.error }
+    }
+
+    const compatibility = getOperatorMarketplaceCompatibility(addon, {
+      coreFamilyLevel: context.coreFamilyLevel,
+      enabledCapabilities: context.enabledCapabilities,
+    })
+
+    if (!compatibility.isCompatible) {
+      return { error: compatibility.reason || 'Module/Add-on belum kompatibel dengan Core Family aktif.' }
     }
   }
 
@@ -252,6 +371,40 @@ export async function submitPaymentProof(orgId: string, invoiceId: string, proof
         updated_at: new Date().toISOString(),
       } as any)
       .eq('id', orgId)
+  }
+
+  if (!isPackageInvoice && (inv as any)?.item_name) {
+    const addonName = normalizeSaasEntitlementName(String((inv as any).item_name || ''))
+    if (addonName) {
+      const { data: orgRow } = await db
+        .from('organizations')
+        .select('active_addons')
+        .eq('id', orgId)
+        .maybeSingle()
+
+      const currentAddons = Array.isArray((orgRow as any)?.active_addons) ? (orgRow as any).active_addons : []
+      const existingAddonNames = new Set(
+        normalizeSaasEntitlementList(currentAddons.map((entry: unknown) => getActiveAddonName(entry)).filter(Boolean))
+      )
+
+      if (!existingAddonNames.has(addonName)) {
+        await db
+          .from('organizations')
+          .update({
+            active_addons: [
+              ...currentAddons,
+              {
+                id: `${invoiceId}:addon`,
+                name: addonName,
+                activated_at: new Date().toISOString(),
+                source: 'billing_self_service',
+              },
+            ],
+            updated_at: new Date().toISOString(),
+          } as any)
+          .eq('id', orgId)
+      }
+    }
   }
 
   revalidatePath('/billing')

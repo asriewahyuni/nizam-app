@@ -34,6 +34,52 @@ type ChildOrgPicOption = {
   manager_employee_id?: string | null
 }
 
+const HRIS_DATE_ONLY_KEYS = new Set([
+  'date_of_birth',
+  'join_date',
+  'end_date',
+  'license_expiry',
+  'record_date',
+  'start_date',
+  'period_start',
+  'period_end',
+  'payment_date',
+  'effective_date',
+])
+
+/**
+ * Convert Date instances from server queries into client-safe strings.
+ * Some HRIS data comes from raw Postgres helpers that may hydrate DATE columns as JS Date objects.
+ */
+function serializeHrisClientValue(value: unknown, key?: string): unknown {
+  if (value instanceof Date) {
+    if (key && HRIS_DATE_ONLY_KEYS.has(key)) {
+      return [
+        value.getUTCFullYear(),
+        String(value.getUTCMonth() + 1).padStart(2, '0'),
+        String(value.getUTCDate()).padStart(2, '0'),
+      ].join('-')
+    }
+
+    return value.toISOString()
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => serializeHrisClientValue(item))
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([entryKey, entryValue]) => [
+        entryKey,
+        serializeHrisClientValue(entryValue, entryKey),
+      ])
+    )
+  }
+
+  return value
+}
+
 export default async function HrisPage(props: { searchParams: Promise<{ tab?: string }> }) {
   const searchParams = await props.searchParams
   const defaultTab = (searchParams.tab || 'EMPLOYEES').toUpperCase()
@@ -196,25 +242,39 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
     getEmployeeTransferHistory(orgData.org.id),
   ])
 
+  const clientSafeEmployees = serializeHrisClientValue(employees) as typeof employees
+  const clientSafePayrollComponents = serializeHrisClientValue(payrollComponents) as typeof payrollComponents
+  const clientSafeAccounts = serializeHrisClientValue(accounts) as typeof accounts
+  const clientSafePayrollRuns = serializeHrisClientValue(payrollRuns) as typeof payrollRuns
+  const clientSafeAttendanceRecords = serializeHrisClientValue(attendanceRecords) as typeof attendanceRecords
+  const clientSafeLeaveRequests = serializeHrisClientValue(leaveRequests) as typeof leaveRequests
+  const clientSafeInvitations = serializeHrisClientValue(invitations) as typeof invitations
+  const clientSafeRoles = serializeHrisClientValue(roles || []) as typeof roles
+  const clientSafeBranches = serializeHrisClientValue(branches || []) as typeof branches
+  const clientSafeChildOrgOptions = serializeHrisClientValue(childOrgOptions || []) as typeof childOrgOptions
+  const clientSafeTransferTargets = serializeHrisClientValue(transferTargets || []) as typeof transferTargets
+  const clientSafeTransferHistory = serializeHrisClientValue(initialTransferHistory || []) as typeof initialTransferHistory
+  const clientSafeSettings = serializeHrisClientValue(orgData.org.settings)
+
   return <HrisClient 
     orgId={orgData.org.id} 
     activeBranchId={activeBranch?.id ?? null}
     activeBranchName={activeBranch?.name ?? null}
     allowAllBranchSelection={allowAllBranchSelection}
-    initialEmployees={employees} 
-    initialPayrollComponents={payrollComponents}
-    initialPayrollRuns={payrollRuns}
-    initialAttendanceRecords={attendanceRecords}
-    initialLeaveRequests={leaveRequests}
-    accounts={accounts}
-    settings={orgData.org.settings}
-    roles={roles || []}
-    branches={branches || []}
-    childOrgOptions={childOrgOptions || []}
-    transferTargets={transferTargets || []}
+    initialEmployees={clientSafeEmployees} 
+    initialPayrollComponents={clientSafePayrollComponents}
+    initialPayrollRuns={clientSafePayrollRuns}
+    initialAttendanceRecords={clientSafeAttendanceRecords}
+    initialLeaveRequests={clientSafeLeaveRequests}
+    accounts={clientSafeAccounts}
+    settings={clientSafeSettings}
+    roles={clientSafeRoles}
+    branches={clientSafeBranches}
+    childOrgOptions={clientSafeChildOrgOptions}
+    transferTargets={clientSafeTransferTargets}
     transferDisabledReason={transferDisabledReason}
-    initialTransferHistory={initialTransferHistory || []}
-    initialInvitations={invitations || []}
+    initialTransferHistory={clientSafeTransferHistory}
+    initialInvitations={clientSafeInvitations}
     defaultTab={defaultTab}
   />
 }

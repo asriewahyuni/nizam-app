@@ -21,6 +21,7 @@ export default async function PipelinePage() {
   }
 
   const { data: sales } = await query.order('created_at', { ascending: false })
-  
-  return <PipelineClient orgId={orgId} sales={sales || []} />
+  const serializableSales = JSON.parse(JSON.stringify(sales || []))
+
+  return <PipelineClient orgId={orgId} sales={serializableSales} />
 }

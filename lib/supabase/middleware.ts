@@ -37,6 +37,7 @@ const BYPASS_EXACT_PATHS = new Set([
   '/robots.txt',
   '/sitemap.xml',
 ])
+const NEXT_ACTION_HEADER = 'next-action'
 
 function isAuthPage(pathname: string) {
   return AUTH_PAGE_PREFIXES.some((prefix) => pathname.startsWith(prefix))
@@ -48,6 +49,23 @@ function isProtectedPage(pathname: string) {
 
 function isBypassedPath(pathname: string) {
   return BYPASS_PREFIXES.some((prefix) => pathname.startsWith(prefix)) || BYPASS_EXACT_PATHS.has(pathname)
+}
+
+function isServerActionRequest(request: NextRequest) {
+  return request.headers.has(NEXT_ACTION_HEADER)
+}
+
+function createServerActionRedirectResponse(target: string | URL) {
+  const location = typeof target === 'string' ? target : target.toString()
+
+  return new NextResponse(null, {
+    status: 303,
+    headers: {
+      'content-type': 'text/plain; charset=utf-8',
+      'x-action-redirect': `${location};replace`,
+      location,
+    },
+  })
 }
 
 function normalizeRedirectTarget(rawPath: string | null) {
@@ -67,6 +85,7 @@ function normalizeRedirectTarget(rawPath: string | null) {
  */
 export async function updateSession(request: NextRequest) {
   const { pathname, search } = request.nextUrl
+  const serverActionRequest = isServerActionRequest(request)
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-pathname', pathname)
 
@@ -117,12 +136,19 @@ export async function updateSession(request: NextRequest) {
         }
       }
 
-      return NextResponse.redirect(new URL(redirectFromQuery || redirectFromReferer || '/dashboard', request.url))
+      const redirectTarget = new URL(redirectFromQuery || redirectFromReferer || '/dashboard', request.url)
+      if (serverActionRequest) {
+        return createServerActionRedirectResponse(redirectTarget)
+      }
+      return NextResponse.redirect(redirectTarget)
     }
 
     if (protectedPage && !hasInternalSession) {
       const redirectUrl = new URL('/login', request.url)
       redirectUrl.searchParams.set('redirectTo', `${pathname}${search}`)
+      if (serverActionRequest) {
+        return createServerActionRedirectResponse(redirectUrl)
+      }
       return NextResponse.redirect(redirectUrl)
     }
 
@@ -173,13 +199,20 @@ export async function updateSession(request: NextRequest) {
       }
     }
 
-    return NextResponse.redirect(new URL(redirectFromQuery || redirectFromReferer || '/dashboard', request.url))
+    const redirectTarget = new URL(redirectFromQuery || redirectFromReferer || '/dashboard', request.url)
+    if (serverActionRequest) {
+      return createServerActionRedirectResponse(redirectTarget)
+    }
+    return NextResponse.redirect(redirectTarget)
   }
 
   // Protected pages: redirect to login if not authenticated
   if (protectedPage && !user) {
     const redirectUrl = new URL('/login', request.url)
     redirectUrl.searchParams.set('redirectTo', `${pathname}${search}`)
+    if (serverActionRequest) {
+      return createServerActionRedirectResponse(redirectUrl)
+    }
     return NextResponse.redirect(redirectUrl)
   }
 

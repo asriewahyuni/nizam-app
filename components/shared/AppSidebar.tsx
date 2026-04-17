@@ -7,7 +7,8 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { approvalRequestTouchesActiveBranch } from '@/lib/browser/approval-realtime'
 import { scheduleIdleTask } from '@/lib/browser/idle'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
-import { saasModuleMatches, normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
+import { saasModuleMatches, saasModuleCoversCapability, normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
+import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { createOptionalClient as createOptionalBrowserSupabaseClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard,
@@ -68,7 +69,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Utama',
     items: [
-      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission_key: 'dashboard' },
       { label: 'Audit Integritas', href: '/accounting/audit', icon: ShieldCheck, permission_key: 'audit', module_key: 'Audit' },
     ]
   },
@@ -133,7 +134,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Syirkah',
     items: [
-      { label: 'Akad Syirkah', href: '/syirkah', icon: Briefcase, module_key: 'Syirkah' },
+      { label: 'Akad Syirkah', href: '/syirkah', icon: Briefcase, permission_key: 'syirkah', module_key: 'Syirkah' },
     ]
   },
   {
@@ -436,9 +437,10 @@ export function AppSidebar({
         // b. Canonical module match — backward compat with packages storing canonical names
         //    Only applies when the enabledModule IS already a canonical name (normalizes to itself)
         //    e.g. enabledModules has 'Purchasing' → matches item.module_key 'Purchasing'
+        //    Also supports family coverage, e.g. 'HRIS' should reveal Payroll/Attendance menus.
         const normalizedEnabled = normalizeSaasEntitlementName(moduleName)
         if (normalizedEnabled.trim().toLowerCase() === enabledLower) {
-          if (saasModuleMatches(moduleName, item.module_key!)) return true
+          if (saasModuleCoversCapability(moduleName, item.module_key!)) return true
         }
 
         return false
@@ -447,14 +449,7 @@ export function AppSidebar({
     }
 
     // 2. RBAC Permission Check
-    if (isOwnerOrAdmin) return true
-    if (!item.permission_key) return true
-
-    const reqPerms = item.permission_key.split(',').map((key) => key.trim().toLowerCase())
-    return permissions.some((permission) => {
-      const normalizedPermission = permission.toLowerCase()
-      return reqPerms.some((requiredPermission) => normalizedPermission.includes(requiredPermission))
-    })
+    return hasRolePermission(userRole, permissions, item.permission_key)
   }, [
     canManageSubOrganizations,
     enabledModules,
@@ -462,6 +457,7 @@ export function AppSidebar({
     isOwnerOrAdmin,
     permissions,
     showSaasOperatorGroup,
+    userRole,
   ])
 
   const visibleNavGroups = useMemo(() => {

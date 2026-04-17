@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { 
   LayoutDashboard, 
@@ -10,11 +10,22 @@ import {
   History, 
   User 
 } from 'lucide-react'
+import { hasEnabledModuleAccess, hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { cn } from '@/lib/utils'
 
 const ROUTE_LOADING_START_EVENT = 'nizam_route_loading_start'
 
-export function MobileBottomNav() {
+type MobileBottomNavProps = {
+  userRole: string
+  permissions?: string[]
+  enabledModules?: string[]
+}
+
+export function MobileBottomNav({
+  userRole,
+  permissions = [],
+  enabledModules = [],
+}: MobileBottomNavProps) {
   const router = useRouter()
   const pathname = usePathname()
   const prefetchedRoutesRef = useRef<Set<string>>(new Set())
@@ -33,17 +44,26 @@ export function MobileBottomNav() {
     window.dispatchEvent(new Event(ROUTE_LOADING_START_EVENT))
   }
 
-  const items = [
-    { label: 'Dash', href: '/dashboard', icon: LayoutDashboard },
-    { label: 'POS', href: '/pos', icon: Store },
-    { label: 'Laporan', href: '/reports', icon: FileText },
-    { label: 'Audit', href: '/accounting/audit', icon: History },
+  const items = useMemo(() => ([
+    { label: 'Dash', href: '/dashboard', icon: LayoutDashboard, permission_key: 'dashboard' },
+    { label: 'POS', href: '/pos', icon: Store, permission_key: 'pos', module_key: 'POS' },
+    { label: 'Laporan', href: '/reports', icon: FileText, permission_key: 'reports', module_key: 'Reports' },
+    { label: 'Audit', href: '/accounting/audit', icon: History, permission_key: 'audit', module_key: 'Audit' },
     { label: 'Akun', href: '/profil-saya', icon: User },
-  ]
+  ]), [])
+
+  const visibleItems = useMemo(() => {
+    return items.filter((item) => {
+      if (item.href === '/profil-saya') return true
+      if (!hasRolePermission(userRole, permissions, item.permission_key)) return false
+      if (!hasEnabledModuleAccess(enabledModules, item.module_key)) return false
+      return true
+    })
+  }, [enabledModules, items, permissions, userRole])
 
   return (
     <nav className="print:hidden md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 flex items-center justify-around pb-safe pt-2 px-2">
-      {items.map((item) => {
+      {visibleItems.map((item) => {
         const isActive = pathname === item.href
         const Icon = item.icon
         return (

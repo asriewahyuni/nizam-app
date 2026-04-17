@@ -245,55 +245,12 @@ describe('Sales Branch Context', () => {
     }))
     const lineInsert = vi.fn().mockResolvedValue({ error: null })
     const approvalInsert = vi.fn().mockResolvedValue({ error: null })
-
-    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
-      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
-      branchId: 'branch-1',
-    })
-    mocks.createClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1' } },
-        }),
-      },
-      from: vi.fn((table: string) => {
-        if (table === 'sales') return { insert: saleInsert }
-        if (table === 'sales_items') return { insert: lineInsert }
-        if (table === 'approval_requests') return { insert: approvalInsert }
-        throw new Error(`Unexpected table ${table}`)
-      }),
-    })
-
-    const result = await createSaleEntry('org-1', {
-      customer_id: 'cust-1',
-      customer_name: 'PT Istishna Maju',
-      sale_date: '2026-04-05',
-      due_date: '2026-04-20',
-      payment_term: 'TEMPO',
-      shariah_mode: 'ISTISHNA',
-      lines: [{ product_name: 'Produk ISTISHNA', quantity: 1, unit_price: 5000 }],
-    })
-
-    expect(result).toEqual({ success: true, saleId: 'sale-istishna-1' })
-    expect(saleInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        payment_term: 'TEMPO',
-        due_date: '2026-04-20',
-        shariah_mode: 'ISTISHNA',
-      })
-    )
-  })
-
-  it('blocks non-SALAM invoice creation when stock is insufficient and suggests SALAM', async () => {
-    const saleInsert = vi.fn()
-    const lineInsert = vi.fn()
-    const approvalInsert = vi.fn()
     const orderedSalesLookup = createOrderedSalesLookup([])
     const productsQuery = {
       select: vi.fn(() => productsQuery),
       eq: vi.fn(() => productsQuery),
       in: vi.fn().mockResolvedValue({
-        data: [{ id: 'prod-1', name: 'Produk A', type: 'INVENTORY' }],
+        data: [{ id: 'prod-1', name: 'Produk ISTISHNA', type: 'INVENTORY' }],
         error: null,
       }),
     }
@@ -301,7 +258,16 @@ describe('Sales Branch Context', () => {
       select: vi.fn(() => inventoryStocksQuery),
       eq: vi.fn(() => inventoryStocksQuery),
       in: vi.fn().mockResolvedValue({
-        data: [{ product_id: 'prod-1', quantity: 2, warehouses: { branch_id: 'branch-1' } }],
+        data: [{ product_id: 'prod-1', quantity: 10, warehouses: { branch_id: 'branch-1' } }],
+        error: null,
+      }),
+    }
+    const productionBomsQuery = {
+      select: vi.fn(() => productionBomsQuery),
+      eq: vi.fn(() => productionBomsQuery),
+      in: vi.fn(() => productionBomsQuery),
+      or: vi.fn().mockResolvedValue({
+        data: [{ id: 'bom-1', product_id: 'prod-1', branch_id: 'branch-1' }],
         error: null,
       }),
     }
@@ -319,6 +285,87 @@ describe('Sales Branch Context', () => {
       from: vi.fn((table: string) => {
         if (table === 'products') return productsQuery
         if (table === 'inventory_stocks') return inventoryStocksQuery
+        if (table === 'production_boms') return productionBomsQuery
+        if (table === 'sales') return { ...orderedSalesLookup, insert: saleInsert }
+        if (table === 'sales_items') return { insert: lineInsert }
+        if (table === 'approval_requests') return { insert: approvalInsert }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const result = await createSaleEntry('org-1', {
+      customer_id: 'cust-1',
+      customer_name: 'PT Istishna Maju',
+      sale_date: '2026-04-05',
+      due_date: '2026-04-20',
+      payment_term: 'TEMPO',
+      shariah_mode: 'ISTISHNA',
+      lines: [{ product_id: 'prod-1', product_name: 'Produk ISTISHNA', quantity: 1, unit_price: 5000 }],
+    })
+
+    expect(result).toEqual({ success: true, saleId: 'sale-istishna-1' })
+    expect(saleInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_term: 'TEMPO',
+        due_date: '2026-04-20',
+        shariah_mode: 'ISTISHNA',
+      })
+    )
+  })
+
+  it('auto-converts shortage without BoM into SALAM sales order', async () => {
+    const saleSingle = vi.fn().mockResolvedValue({
+      data: { id: 'sale-auto-salam-1' },
+      error: null,
+    })
+    const saleInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: saleSingle,
+      })),
+    }))
+    const lineInsert = vi.fn().mockResolvedValue({ error: null })
+    const approvalInsert = vi.fn().mockResolvedValue({ error: null })
+    const orderedSalesLookup = createOrderedSalesLookup([])
+    const productsQuery = {
+      select: vi.fn(() => productsQuery),
+      eq: vi.fn(() => productsQuery),
+      in: vi.fn().mockResolvedValue({
+        data: [{ id: 'prod-1', name: 'Produk A', type: 'INVENTORY' }],
+        error: null,
+      }),
+    }
+    const inventoryStocksQuery = {
+      select: vi.fn(() => inventoryStocksQuery),
+      eq: vi.fn(() => inventoryStocksQuery),
+      in: vi.fn().mockResolvedValue({
+        data: [{ product_id: 'prod-1', quantity: 2, warehouses: { branch_id: 'branch-1' } }],
+        error: null,
+      }),
+    }
+    const productionBomsQuery = {
+      select: vi.fn(() => productionBomsQuery),
+      eq: vi.fn(() => productionBomsQuery),
+      in: vi.fn(() => productionBomsQuery),
+      or: vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      }),
+    }
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'products') return productsQuery
+        if (table === 'inventory_stocks') return inventoryStocksQuery
+        if (table === 'production_boms') return productionBomsQuery
         if (table === 'sales') return { ...orderedSalesLookup, insert: saleInsert }
         if (table === 'sales_items') return { insert: lineInsert }
         if (table === 'approval_requests') return { insert: approvalInsert }
@@ -335,9 +382,166 @@ describe('Sales Branch Context', () => {
       lines: [{ product_id: 'prod-1', product_name: 'Produk A', quantity: 5, unit_price: 1000 }],
     })
 
+    expect(result).toEqual({ success: true, saleId: 'sale-auto-salam-1' })
+    expect(saleInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        shariah_mode: 'SALAM',
+        payment_term: 'LUNAS',
+        due_date: '2026-04-16',
+      })
+    )
+    expect(lineInsert).toHaveBeenCalled()
+    expect(approvalInsert).toHaveBeenCalled()
+  })
+
+  it('auto-converts shortage with active BoM into ISTISHNA sales order', async () => {
+    const saleSingle = vi.fn().mockResolvedValue({
+      data: { id: 'sale-auto-istishna-1' },
+      error: null,
+    })
+    const saleInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: saleSingle,
+      })),
+    }))
+    const lineInsert = vi.fn().mockResolvedValue({ error: null })
+    const approvalInsert = vi.fn().mockResolvedValue({ error: null })
+    const orderedSalesLookup = createOrderedSalesLookup([])
+    const productsQuery = {
+      select: vi.fn(() => productsQuery),
+      eq: vi.fn(() => productsQuery),
+      in: vi.fn().mockResolvedValue({
+        data: [{ id: 'prod-1', name: 'Produk BoM', type: 'INVENTORY' }],
+        error: null,
+      }),
+    }
+    const inventoryStocksQuery = {
+      select: vi.fn(() => inventoryStocksQuery),
+      eq: vi.fn(() => inventoryStocksQuery),
+      in: vi.fn().mockResolvedValue({
+        data: [{ product_id: 'prod-1', quantity: 1, warehouses: { branch_id: 'branch-1' } }],
+        error: null,
+      }),
+    }
+    const productionBomsQuery = {
+      select: vi.fn(() => productionBomsQuery),
+      eq: vi.fn(() => productionBomsQuery),
+      in: vi.fn(() => productionBomsQuery),
+      or: vi.fn().mockResolvedValue({
+        data: [{ id: 'bom-1', product_id: 'prod-1', branch_id: 'branch-1' }],
+        error: null,
+      }),
+    }
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'products') return productsQuery
+        if (table === 'inventory_stocks') return inventoryStocksQuery
+        if (table === 'production_boms') return productionBomsQuery
+        if (table === 'sales') return { ...orderedSalesLookup, insert: saleInsert }
+        if (table === 'sales_items') return { insert: lineInsert }
+        if (table === 'approval_requests') return { insert: approvalInsert }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const result = await createSaleEntry('org-1', {
+      customer_id: 'cust-1',
+      sale_date: '2026-04-06',
+      due_date: '2026-04-18',
+      payment_term: 'TEMPO',
+      shariah_mode: 'CASH',
+      lines: [{ product_id: 'prod-1', product_name: 'Produk BoM', quantity: 5, unit_price: 1000 }],
+    })
+
+    expect(result).toEqual({ success: true, saleId: 'sale-auto-istishna-1' })
+    expect(saleInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        shariah_mode: 'ISTISHNA',
+        payment_term: 'TEMPO',
+        due_date: '2026-04-18',
+      })
+    )
+  })
+
+  it('rejects mixed shortage that would require both ISTISHNA and SALAM in one SO', async () => {
+    const saleInsert = vi.fn()
+    const lineInsert = vi.fn()
+    const approvalInsert = vi.fn()
+    const orderedSalesLookup = createOrderedSalesLookup([])
+    const productsQuery = {
+      select: vi.fn(() => productsQuery),
+      eq: vi.fn(() => productsQuery),
+      in: vi.fn().mockResolvedValue({
+        data: [
+          { id: 'prod-bom', name: 'Produk Produksi', type: 'INVENTORY' },
+          { id: 'prod-salam', name: 'Produk Salam', type: 'INVENTORY' },
+        ],
+        error: null,
+      }),
+    }
+    const inventoryStocksQuery = {
+      select: vi.fn(() => inventoryStocksQuery),
+      eq: vi.fn(() => inventoryStocksQuery),
+      in: vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      }),
+    }
+    const productionBomsQuery = {
+      select: vi.fn(() => productionBomsQuery),
+      eq: vi.fn(() => productionBomsQuery),
+      in: vi.fn(() => productionBomsQuery),
+      or: vi.fn().mockResolvedValue({
+        data: [{ id: 'bom-1', product_id: 'prod-bom', branch_id: 'branch-1' }],
+        error: null,
+      }),
+    }
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'products') return productsQuery
+        if (table === 'inventory_stocks') return inventoryStocksQuery
+        if (table === 'production_boms') return productionBomsQuery
+        if (table === 'sales') return { ...orderedSalesLookup, insert: saleInsert }
+        if (table === 'sales_items') return { insert: lineInsert }
+        if (table === 'approval_requests') return { insert: approvalInsert }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const result = await createSaleEntry('org-1', {
+      customer_id: 'cust-1',
+      sale_date: '2026-04-06',
+      due_date: '2026-04-20',
+      payment_term: 'TEMPO',
+      shariah_mode: 'CASH',
+      lines: [
+        { product_id: 'prod-bom', product_name: 'Produk Produksi', quantity: 5, unit_price: 1000 },
+        { product_id: 'prod-salam', product_name: 'Produk Salam', quantity: 2, unit_price: 2000 },
+      ],
+    })
+
     expect(result).toEqual({
-      error:
-        'Stok produk "Produk A" tidak mencukupi untuk invoice biasa. Dibutuhkan 5, tersedia 2. Ubah transaksi ke akad SALAM agar pesanan tetap bisa dicatat tanpa mengurangi stok saat ini.',
+      error: 'SO ini mencampur produk yang harus diproduksi dan yang harus dipesan tanpa produksi. Produk "Produk Produksi" harus memakai akad ISTISHNA karena punya BoM aktif, sedangkan "Produk Salam" harus memakai akad SALAM karena tidak punya BoM. Pisahkan ke SO terpisah.',
     })
     expect(saleInsert).not.toHaveBeenCalled()
     expect(lineInsert).not.toHaveBeenCalled()
@@ -749,6 +953,72 @@ describe('Sales Branch Context', () => {
     })
   })
 
+  it('maps duplicate sales delivery journal collisions into a friendly message', async () => {
+    const saleQuery = {
+      select: vi.fn(() => saleQuery),
+      eq: vi.fn(() => saleQuery),
+      single: vi.fn().mockResolvedValue({
+        data: { status: 'ORDERED', warehouse_id: null, shariah_mode: 'CASH' },
+      }),
+    }
+    const saleItemsQuery: any = {
+      select: vi.fn(() => saleItemsQuery),
+      eq: vi.fn((..._args: any[]) => saleItemsQuery),
+    }
+    saleItemsQuery.eq = vi.fn((column: string, value: string) => {
+      if (column === 'sale_id' && value === 'sale-1') {
+        return Promise.resolve({
+          data: [{ product_id: 'prod-1', quantity: 1, products: { name: 'Produk A', type: 'INVENTORY' } }],
+          error: null,
+        })
+      }
+      return saleItemsQuery
+    })
+    const inventoryStocksQuery = {
+      select: vi.fn(() => inventoryStocksQuery),
+      eq: vi.fn(() => inventoryStocksQuery),
+      in: vi.fn().mockResolvedValue({
+        data: [{ product_id: 'prod-1', quantity: 5 }],
+        error: null,
+      }),
+    }
+    const warehouseQuery = {
+      select: vi.fn(() => warehouseQuery),
+      eq: vi.fn(() => warehouseQuery),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { id: 'wh-1', name: 'Gudang Utama', branch_id: 'branch-1' },
+        error: null,
+      }),
+    }
+    const rpcMock = vi.fn().mockResolvedValue({
+      error: {
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "uq_journal_ref_per_org"',
+      },
+    })
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'sales') return saleQuery
+        if (table === 'sales_items') return saleItemsQuery
+        if (table === 'inventory_stocks') return inventoryStocksQuery
+        if (table === 'warehouses') return warehouseQuery
+        throw new Error(`Unexpected table ${table}`)
+      }),
+      rpc: rpcMock,
+    })
+
+    const result = await deliverSale('org-1', 'sale-1', 'wh-1')
+
+    expect(result).toEqual({
+      error: 'Sales ini sudah memiliki jurnal delivery. Sistem menolak membuat jurnal SALE ganda. Muat ulang data; jika status sales masih belum selesai, rekonsiliasi jurnal delivery lama terlebih dahulu.',
+    })
+  })
+
   it('blocks delivery when stock is insufficient for non-SALAM sales', async () => {
     const saleQuery = {
       select: vi.fn(() => saleQuery),
@@ -778,6 +1048,15 @@ describe('Sales Branch Context', () => {
         error: null,
       }),
     }
+    const productionBomsQuery = {
+      select: vi.fn(() => productionBomsQuery),
+      eq: vi.fn(() => productionBomsQuery),
+      in: vi.fn(() => productionBomsQuery),
+      or: vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      }),
+    }
     const warehouseQuery = {
       select: vi.fn(() => warehouseQuery),
       eq: vi.fn(() => warehouseQuery),
@@ -797,6 +1076,7 @@ describe('Sales Branch Context', () => {
         if (table === 'sales') return saleQuery
         if (table === 'sales_items') return saleItemsQuery
         if (table === 'inventory_stocks') return inventoryStocksQuery
+        if (table === 'production_boms') return productionBomsQuery
         if (table === 'warehouses') return warehouseQuery
         throw new Error(`Unexpected table ${table}`)
       }),
@@ -805,9 +1085,102 @@ describe('Sales Branch Context', () => {
 
     const result = await deliverSale('org-1', 'sale-1', 'wh-1')
 
-    expect(result).toEqual({
-      error: 'Stok tidak cukup untuk produk "Produk A". Dibutuhkan 5, tersedia 2. Penjualan tidak boleh melebihi stok (kecuali akad SALAM).',
+    expect(result).toMatchObject({
+      error: expect.stringContaining('Stok tidak cukup untuk produk "Produk A"'),
+      code: 'DELIVERY_STOCK_SHORTAGE',
     })
+    expect((result as any).shortages).toEqual([
+      expect.objectContaining({
+        productId: 'prod-1',
+        resolution: 'PURCHASING',
+        requiredQty: 5,
+        availableQty: 2,
+        shortageQty: 3,
+      }),
+    ])
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('blocks paid SALAM delivery when stock is insufficient and suggests production from BoM', async () => {
+    const saleQuery = {
+      select: vi.fn(() => saleQuery),
+      eq: vi.fn(() => saleQuery),
+      single: vi.fn().mockResolvedValue({
+        data: { status: 'ORDERED', warehouse_id: 'wh-1', shariah_mode: 'SALAM', payment_status: 'PAID' },
+      }),
+    }
+    const saleItemsQuery: any = {
+      select: vi.fn(() => saleItemsQuery),
+      eq: vi.fn((..._args: any[]) => saleItemsQuery),
+    }
+    saleItemsQuery.eq = vi.fn((column: string, value: string) => {
+      if (column === 'sale_id' && value === 'sale-1') {
+        return Promise.resolve({
+          data: [{ product_id: 'prod-1', quantity: 4, products: { name: 'Produk A', type: 'INVENTORY', unit: 'Pcs' } }],
+          error: null,
+        })
+      }
+      return saleItemsQuery
+    })
+    const inventoryStocksQuery = {
+      select: vi.fn(() => inventoryStocksQuery),
+      eq: vi.fn(() => inventoryStocksQuery),
+      in: vi.fn().mockResolvedValue({
+        data: [{ product_id: 'prod-1', quantity: 0 }],
+        error: null,
+      }),
+    }
+    const productionBomsQuery = {
+      select: vi.fn(() => productionBomsQuery),
+      eq: vi.fn(() => productionBomsQuery),
+      in: vi.fn(() => productionBomsQuery),
+      or: vi.fn().mockResolvedValue({
+        data: [{ id: 'bom-1', product_id: 'prod-1', branch_id: 'branch-1' }],
+        error: null,
+      }),
+    }
+    const warehouseQuery = {
+      select: vi.fn(() => warehouseQuery),
+      eq: vi.fn(() => warehouseQuery),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { id: 'wh-1', name: 'Gudang Utama', branch_id: 'branch-1' },
+        error: null,
+      }),
+    }
+    const rpcMock = vi.fn()
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table === 'sales') return saleQuery
+        if (table === 'sales_items') return saleItemsQuery
+        if (table === 'inventory_stocks') return inventoryStocksQuery
+        if (table === 'production_boms') return productionBomsQuery
+        if (table === 'warehouses') return warehouseQuery
+        throw new Error(`Unexpected table ${table}`)
+      }),
+      rpc: rpcMock,
+    })
+
+    const result = await deliverSale('org-1', 'sale-1', 'wh-1')
+
+    expect(result).toMatchObject({
+      error: expect.stringContaining('Stok tidak cukup untuk produk "Produk A"'),
+      code: 'DELIVERY_STOCK_SHORTAGE',
+    })
+    expect((result as any).shortages).toEqual([
+      expect.objectContaining({
+        productId: 'prod-1',
+        resolution: 'PRODUCTION',
+        bomId: 'bom-1',
+        requiredQty: 4,
+        availableQty: 0,
+        shortageQty: 4,
+      }),
+    ])
     expect(rpcMock).not.toHaveBeenCalled()
   })
 
