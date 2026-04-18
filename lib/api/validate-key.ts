@@ -18,7 +18,11 @@ export const VALID_SCOPES = [
   'cash:write',
   'sales:read',
   'inventory:read',
+  'ledger:read',
   'contacts:read',
+  'contacts:write',
+  'purchases:read',
+  'bank_transactions:read',
 ] as const
 
 export type ApiScope = (typeof VALID_SCOPES)[number]
@@ -89,6 +93,9 @@ function inferApiErrorCode(message: string, statusCode: number, fallback?: strin
   if (normalized.includes('request body harus berformat json valid')) return 'request_body_invalid'
   if (normalized.includes('branch_id diperlukan')) return 'branch_id_required'
   if (normalized.includes('branch_id pada body tidak boleh berbeda')) return 'branch_scope_mismatch'
+  if (normalized.includes('field "name" wajib')) return 'contact_name_required'
+  if (normalized.includes('field "type" harus berisi customer atau supplier')) return 'contact_type_invalid'
+  if (normalized.includes('request body harus object json')) return 'request_body_invalid'
   if (normalized.includes('field "type" harus')) return 'cash_type_invalid'
   if (normalized.includes('field "amount" harus')) return 'amount_invalid'
   if (normalized.includes('field "description" wajib')) return 'description_required'
@@ -107,8 +114,21 @@ function inferApiErrorCode(message: string, statusCode: number, fallback?: strin
   if (normalized.includes('akun diskon')) return 'discount_account_missing'
   if (normalized.includes('akun biaya lain-lain')) return 'other_charge_account_missing'
   if (normalized.includes('gagal mengambil data inventori')) return 'inventory_fetch_failed'
+  if (normalized.includes('gagal mengambil data mutasi inventori')) return 'inventory_movements_fetch_failed'
+  if (normalized.includes('gagal mengambil data buku besar')) return 'general_ledger_fetch_failed'
+  if (normalized.includes('gagal mengambil data rekonsiliasi inventory')) return 'inventory_reconciliation_fetch_failed'
+  if (normalized.includes('parameter "product_id" harus berupa uuid valid')) return 'product_id_invalid'
+  if (normalized.includes('parameter "account_id" harus berupa uuid valid')) return 'account_id_invalid'
+  if (normalized.includes('parameter "date_from" harus berformat yyyy-mm-dd')) return 'date_from_invalid'
+  if (normalized.includes('parameter "date_to" harus berformat yyyy-mm-dd')) return 'date_to_invalid'
+  if (normalized.includes('parameter "as_of_date" harus berformat yyyy-mm-dd')) return 'as_of_date_invalid'
+  if (normalized.includes('parameter "direction" harus berisi in atau out')) return 'inventory_direction_invalid'
   if (normalized.includes('gagal mengambil data kontak')) return 'contacts_fetch_failed'
+  if (normalized.includes('gagal membuat atau memperbarui kontak')) return 'contacts_upsert_failed'
   if (normalized.includes('gagal mengambil data penjualan')) return 'sales_fetch_failed'
+  if (normalized.includes('data penjualan tidak ditemukan')) return 'sales_not_found'
+  if (normalized.includes('gagal mengambil data pembelian')) return 'purchases_fetch_failed'
+  if (normalized.includes('gagal mengambil data transaksi bank')) return 'bank_transactions_fetch_failed'
   if (normalized.includes('gagal mengambil data rekening')) return 'cash_accounts_fetch_failed'
   if (normalized.includes('gagal mencatat transaksi kas masuk')) return 'cash_in_create_failed'
   if (normalized.includes('gagal mencatat transaksi kas keluar')) return 'cash_out_create_failed'

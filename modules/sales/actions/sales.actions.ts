@@ -631,6 +631,52 @@ async function adjustInventoryStockCompat(
   return { success: true as const }
 }
 
+function isStockMovementsWarehouseColumnMissing(
+  error: { code?: string | null; message?: string | null } | null | undefined
+) {
+  if (!error) return false
+
+  const message = String(error.message || '')
+  const normalized = message.toLowerCase()
+
+  return (
+    error.code === '42703' ||
+    error.code === 'PGRST204' ||
+    (
+      normalized.includes('stock_movements') &&
+      normalized.includes('warehouse_id') &&
+      (
+        normalized.includes('does not exist') ||
+        normalized.includes('could not find')
+      )
+    )
+  )
+}
+
+async function insertStockMovementsCompat(supabase: any, movements: any[]) {
+  if (!Array.isArray(movements) || movements.length === 0) {
+    return { success: true as const }
+  }
+
+  const { error: insertError } = await (supabase as any).from('stock_movements').insert(movements)
+  if (!insertError) {
+    return { success: true as const }
+  }
+
+  if (!isStockMovementsWarehouseColumnMissing(insertError)) {
+    return { error: insertError.message }
+  }
+
+  const legacyCompatibleMovements = movements.map(({ warehouse_id: _warehouseId, ...movement }) => movement)
+  const { error: fallbackError } = await (supabase as any).from('stock_movements').insert(legacyCompatibleMovements)
+
+  if (fallbackError) {
+    return { error: fallbackError.message }
+  }
+
+  return { success: true as const }
+}
+
 async function fallbackVoidSaleWithoutRpc(
   supabase: any,
   args: {
@@ -643,7 +689,7 @@ async function fallbackVoidSaleWithoutRpc(
 ) {
   const { data: stockMovements, error: movementError } = await (supabase as any)
     .from('stock_movements')
-    .select('product_id, quantity')
+    .select('branch_id, warehouse_id, product_id, quantity, unit_price, notes')
     .eq('org_id', args.orgId)
     .eq('reference_type', 'SALE')
     .eq('reference_id', args.saleId)
@@ -685,6 +731,25 @@ async function fallbackVoidSaleWithoutRpc(
       if ('error' in reverseResult) {
         return { error: 'Gagal sinkronisasi stok saat membatalkan sales order: ' + reverseResult.error }
       }
+    }
+
+    const reversalMovements = ((stockMovements as any[]) || []).map((row) => ({
+      org_id: args.orgId,
+      branch_id: String((row as any).branch_id || '').trim() || args.branchId,
+      warehouse_id: String((row as any).warehouse_id || '').trim() || resolvedWarehouseId,
+      product_id: String((row as any).product_id || ''),
+      quantity: -Number((row as any).quantity || 0),
+      unit_price: Number((row as any).unit_price || 0),
+      reference_type: 'SALE_VOID',
+      reference_id: args.saleId,
+      notes: String((row as any).notes || '').trim()
+        ? `Reversal SALE ${args.saleId} | ${String((row as any).notes).trim()}`
+        : `Reversal SALE ${args.saleId}`,
+    })).filter((row) => row.product_id && Number.isFinite(row.quantity) && row.quantity !== 0)
+
+    const reversalInsert = await insertStockMovementsCompat(supabase as any, reversalMovements)
+    if ('error' in reversalInsert) {
+      return { error: 'Gagal mencatat kartu stok reversal sales: ' + reversalInsert.error }
     }
   }
 

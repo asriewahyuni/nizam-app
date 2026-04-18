@@ -9,6 +9,7 @@
  */
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { INVENTORY_WEBHOOK_DIRECTIONS, VALID_WEBHOOK_EVENTS } from '@/lib/api/webhook-events'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { generateRawApiKey, hashApiKeySecret, VALID_SCOPES, type ApiScope } from '@/lib/api/validate-key'
 import { revalidatePath } from 'next/cache'
@@ -43,6 +44,8 @@ export type ApiConfigurationRecord = {
   webhook_secret: string | null
   webhook_events: string[]
   webhook_is_active: boolean
+  webhook_inventory_directions: string[]
+  webhook_inventory_reference_types: string[]
 }
 
 export type GenerateApiKeyInput = {
@@ -63,6 +66,69 @@ export type SaveApiConfigurationInput = {
   webhookSecret?: string | null
   webhookEvents?: string[]
   webhookIsActive?: boolean
+  webhookInventoryDirections?: string[]
+  webhookInventoryReferenceTypes?: string[]
+}
+
+type QueryError = { message?: string | null } | null
+type MaybeSingleResult<T> = Promise<{ data: T | null; error: QueryError }>
+type MutationResult = Promise<{ error: QueryError }>
+
+type SupabaseQueryBuilder<T> = PromiseLike<{ data: T[] | null; error: QueryError }> & {
+  eq(column: string, value: unknown): SupabaseQueryBuilder<T>
+  is(column: string, value: null): SupabaseQueryBuilder<T>
+  order(column: string, options: { ascending: boolean }): SupabaseQueryBuilder<T>
+  limit(value: number): SupabaseQueryBuilder<T>
+  maybeSingle<S = T>(): MaybeSingleResult<S>
+}
+
+type SupabaseInsertBuilder<T> = {
+  select(columns: string): {
+    maybeSingle<S = T>(): MaybeSingleResult<S>
+  }
+}
+
+type SupabaseTableBuilder<T> = {
+  select(columns: string): SupabaseQueryBuilder<T>
+  insert(values: Record<string, unknown>): SupabaseInsertBuilder<T>
+  update(values: Record<string, unknown>): SupabaseQueryBuilder<T>
+  upsert(values: Record<string, unknown>, options?: { onConflict: string }): MutationResult
+}
+
+type SupabaseActionClient = {
+  from(table: 'api_keys'): SupabaseTableBuilder<ApiKeyRecord>
+  from(table: 'api_configurations'): SupabaseTableBuilder<ApiConfigurationRecord>
+  from(table: 'api_call_logs'): SupabaseTableBuilder<ApiCallLogRecord>
+  from(table: 'api_webhook_deliveries'): SupabaseTableBuilder<{
+    id: string
+    event_type: string
+    status: string
+    http_status: number | null
+    target_url: string
+    attempt_count: number
+    delivered_at: string | null
+    created_at: string
+  }>
+}
+
+function normalizeWebhookArray(values: string[] | undefined) {
+  return Array.from(
+    new Set(
+      (values ?? [])
+        .map((value) => String(value ?? '').trim())
+        .filter(Boolean)
+    )
+  )
+}
+
+function normalizeWebhookReferenceTypes(values: string[] | undefined) {
+  return Array.from(
+    new Set(
+      (values ?? [])
+        .map((value) => String(value ?? '').trim().toUpperCase())
+        .filter(Boolean)
+    )
+  )
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -82,12 +148,12 @@ async function getAdminOrgContext(orgId: string, requireOwner = false) {
     return { error: 'Hanya owner/admin yang dapat mengelola API key.' }
   }
 
-  let admin: Awaited<ReturnType<typeof createAdminClient>>
+  let admin: SupabaseActionClient
   try {
-    admin = await createAdminClient()
+    admin = await createAdminClient() as unknown as SupabaseActionClient
   } catch {
     const db = await createClient()
-    admin = db as any
+    admin = db as unknown as SupabaseActionClient
   }
 
   return { admin, orgData }
@@ -101,7 +167,7 @@ export async function listApiKeys(orgId: string): Promise<ApiKeyRecord[]> {
   const ctx = await getAdminOrgContext(orgId)
   if ('error' in ctx) return []
 
-  const { data, error } = await (ctx.admin as any)
+  const { data, error } = await ctx.admin
     .from('api_keys')
     .select('id, name, key_prefix, scopes, branch_id, is_active, rate_limit_rpm, request_count, last_used_at, expires_at, created_at')
     .eq('org_id', orgId)
@@ -150,7 +216,7 @@ export async function generateApiKey(
   if (input.branchId) insertPayload.branch_id = input.branchId
   if (input.expiresAt) insertPayload.expires_at = input.expiresAt
 
-  const { data, error } = await (ctx.admin as any)
+  const { data, error } = await ctx.admin
     .from('api_keys')
     .insert(insertPayload)
     .select('id')
@@ -176,7 +242,7 @@ export async function revokeApiKey(
   const ctx = await getAdminOrgContext(orgId)
   if ('error' in ctx) return { error: String(ctx.error ?? 'Tidak terautentikasi.') }
 
-  const { error } = await (ctx.admin as any)
+  const { error } = await ctx.admin
     .from('api_keys')
     .update({ is_active: false, updated_at: new Date().toISOString() })
     .eq('id', keyId)
@@ -200,7 +266,7 @@ export async function getApiConfiguration(
   const ctx = await getAdminOrgContext(orgId)
   if ('error' in ctx) return null
 
-  let query = (ctx.admin as any)
+  let query = ctx.admin
     .from('api_configurations')
     .select('*')
     .eq('org_id', orgId)
@@ -226,6 +292,8 @@ export async function getApiConfiguration(
       webhook_secret: null,
       webhook_events: [],
       webhook_is_active: false,
+      webhook_inventory_directions: [],
+      webhook_inventory_reference_types: [],
     }
   }
 
@@ -243,6 +311,24 @@ export async function saveApiConfiguration(
   const ctx = await getAdminOrgContext(orgId)
   if ('error' in ctx) return { error: String(ctx.error ?? 'Tidak terautentikasi.') }
 
+  const normalizedWebhookEvents = normalizeWebhookArray(input.webhookEvents)
+  const invalidWebhookEvents = normalizedWebhookEvents.filter(
+    (event) => !(VALID_WEBHOOK_EVENTS as readonly string[]).includes(event)
+  )
+  if (invalidWebhookEvents.length > 0) {
+    return { error: `Webhook event tidak valid: ${invalidWebhookEvents.join(', ')}` }
+  }
+
+  const normalizedWebhookInventoryDirections = Array.from(
+    new Set(normalizeWebhookArray(input.webhookInventoryDirections).map((direction) => direction.toLowerCase()))
+  )
+  const invalidInventoryDirections = normalizedWebhookInventoryDirections.filter(
+    (direction) => !(INVENTORY_WEBHOOK_DIRECTIONS as readonly string[]).includes(direction)
+  )
+  if (invalidInventoryDirections.length > 0) {
+    return { error: `Arah inventory webhook tidak valid: ${invalidInventoryDirections.join(', ')}` }
+  }
+
   const upsertPayload: Record<string, unknown> = {
     org_id: orgId,
     branch_id: input.branchId ?? null,
@@ -251,8 +337,10 @@ export async function saveApiConfiguration(
     cash_in_params: input.cashInParams ?? {},
     cash_out_params: input.cashOutParams ?? {},
     webhook_url: input.webhookUrl ?? null,
-    webhook_events: input.webhookEvents ?? [],
+    webhook_events: normalizedWebhookEvents,
     webhook_is_active: input.webhookIsActive ?? false,
+    webhook_inventory_directions: normalizedWebhookInventoryDirections,
+    webhook_inventory_reference_types: normalizeWebhookReferenceTypes(input.webhookInventoryReferenceTypes),
     updated_at: new Date().toISOString(),
   }
 
@@ -261,7 +349,7 @@ export async function saveApiConfiguration(
     upsertPayload.webhook_secret = input.webhookSecret || null
   }
 
-  const { error } = await (ctx.admin as any)
+  const { error } = await ctx.admin
     .from('api_configurations')
     .upsert(upsertPayload, { onConflict: 'org_id,branch_id' })
 
@@ -293,7 +381,7 @@ export async function listApiCallLogs(orgId: string, limit = 50): Promise<ApiCal
   const ctx = await getAdminOrgContext(orgId)
   if ('error' in ctx) return []
 
-  const { data } = await (ctx.admin as any)
+  const { data } = await ctx.admin
     .from('api_call_logs')
     .select('id, api_key_id, method, endpoint, status_code, duration_ms, ip_address, user_agent, error_message, created_at')
     .eq('org_id', orgId)
@@ -311,7 +399,7 @@ export async function listWebhookDeliveries(orgId: string, limit = 20) {
   const ctx = await getAdminOrgContext(orgId)
   if ('error' in ctx) return []
 
-  const { data } = await (ctx.admin as any)
+  const { data } = await ctx.admin
     .from('api_webhook_deliveries')
     .select('id, event_type, status, http_status, target_url, attempt_count, delivered_at, created_at')
     .eq('org_id', orgId)

@@ -3,7 +3,7 @@
  *
  * Utilitas pengiriman webhook dari Nizam ke URL eksternal.
  *
- * Setiap event (cash_in, cash_out, sale, purchase) akan memicu
+ * Setiap event (cash_in, cash_out, sale, purchase, inventory_movement) akan memicu
  * HTTP POST ke webhook_url yang dikonfigurasi di api_configurations.
  *
  * Payload disertai HMAC-SHA256 signature menggunakan webhook_secret
@@ -17,8 +17,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/server'
-
-export type WebhookEventType = 'cash_in' | 'cash_out' | 'sale' | 'purchase'
+import { INVENTORY_WEBHOOK_DIRECTIONS, type InventoryWebhookDirection, type WebhookEventType } from '@/lib/api/webhook-events'
 
 export type WebhookPayload = {
   event: WebhookEventType
@@ -26,6 +25,110 @@ export type WebhookPayload = {
   branch_id?: string | null
   timestamp: string
   data: Record<string, unknown>
+}
+
+type QueryError = { message?: string | null } | null
+
+type MaybeSingleResult<T> = Promise<{ data: T | null; error: QueryError }>
+type MutationResult = PromiseLike<{ error: QueryError }>
+
+type ApiWebhookConfigurationRecord = {
+  id: string
+  webhook_url: string | null
+  webhook_secret: string | null
+  webhook_events: unknown
+  webhook_is_active: boolean
+  webhook_inventory_directions: unknown
+  webhook_inventory_reference_types: unknown
+}
+
+type WebhookDeliveryRecord = {
+  id: string
+}
+
+type WebhookConfigQueryBuilder = {
+  eq(column: string, value: unknown): WebhookConfigQueryBuilder
+  or(filter: string): WebhookConfigQueryBuilder
+  order(column: string, options: { ascending: boolean }): WebhookConfigQueryBuilder
+  limit(value: number): WebhookConfigQueryBuilder
+  maybeSingle(): MaybeSingleResult<ApiWebhookConfigurationRecord>
+}
+
+type WebhookDeliveryInsertBuilder = {
+  select(columns: string): {
+    maybeSingle(): MaybeSingleResult<WebhookDeliveryRecord>
+  }
+}
+
+type WebhookDeliveryUpdateBuilder = MutationResult & {
+  eq(column: string, value: unknown): WebhookDeliveryUpdateBuilder
+}
+
+type WebhookAdminClient = {
+  from(table: 'api_configurations'): {
+    select(columns: string): WebhookConfigQueryBuilder
+  }
+  from(table: 'api_webhook_deliveries'): {
+    insert(values: Record<string, unknown>): WebhookDeliveryInsertBuilder
+    update(values: Record<string, unknown>): WebhookDeliveryUpdateBuilder
+  }
+}
+
+export type DeliverWebhookResult =
+  | { status: 'delivered'; deliveryId?: string }
+  | { status: 'skipped'; reason: string }
+  | { status: 'failed'; error: string; deliveryId?: string }
+
+function normalizeStringArray(values: unknown) {
+  if (!Array.isArray(values)) return []
+
+  return Array.from(
+    new Set(
+      values
+        .map((value) => String(value ?? '').trim())
+        .filter(Boolean)
+    )
+  )
+}
+
+function normalizeReferenceTypes(values: unknown) {
+  return normalizeStringArray(values).map((value) => value.toUpperCase())
+}
+
+function resolveInventoryDirection(data: Record<string, unknown>): InventoryWebhookDirection | null {
+  const rawDirection = String(data.direction ?? '').trim().toLowerCase()
+  if ((INVENTORY_WEBHOOK_DIRECTIONS as readonly string[]).includes(rawDirection)) {
+    return rawDirection as InventoryWebhookDirection
+  }
+
+  const quantity = Number(data.quantity ?? NaN)
+  if (!Number.isFinite(quantity) || quantity === 0) return null
+  return quantity > 0 ? 'in' : 'out'
+}
+
+function resolveInventoryReferenceType(data: Record<string, unknown>) {
+  const referenceType = String(data.reference_type ?? '').trim().toUpperCase()
+  return referenceType || null
+}
+
+function shouldDeliverInventoryWebhook(
+  config: ApiWebhookConfigurationRecord,
+  data: Record<string, unknown>
+): DeliverWebhookResult | null {
+  const allowedDirections = normalizeStringArray(config.webhook_inventory_directions)
+  const allowedReferenceTypes = normalizeReferenceTypes(config.webhook_inventory_reference_types)
+  const direction = resolveInventoryDirection(data)
+  const referenceType = resolveInventoryReferenceType(data)
+
+  if (allowedDirections.length > 0 && (!direction || !allowedDirections.includes(direction))) {
+    return { status: 'skipped', reason: 'inventory_direction_filtered' }
+  }
+
+  if (allowedReferenceTypes.length > 0 && (!referenceType || !allowedReferenceTypes.includes(referenceType))) {
+    return { status: 'skipped', reason: 'inventory_reference_type_filtered' }
+  }
+
+  return null
 }
 
 /**
@@ -65,18 +168,18 @@ export async function deliverWebhook(
   branchId: string | null,
   event: WebhookEventType,
   data: Record<string, unknown>
-): Promise<void> {
-  let admin: Awaited<ReturnType<typeof createAdminClient>>
+): Promise<DeliverWebhookResult> {
+  let admin: WebhookAdminClient
   try {
-    admin = await createAdminClient()
+    admin = await createAdminClient() as unknown as WebhookAdminClient
   } catch {
-    return
+    return { status: 'failed', error: 'admin_client_unavailable' }
   }
 
   // Fetch api_configuration for this org/branch
-  const { data: config } = await (admin as any)
+  const { data: config } = await admin
     .from('api_configurations')
-    .select('id, webhook_url, webhook_secret, webhook_events, webhook_is_active')
+    .select('id, webhook_url, webhook_secret, webhook_events, webhook_is_active, webhook_inventory_directions, webhook_inventory_reference_types')
     .eq('org_id', orgId)
     .eq('webhook_is_active', true)
     .or(`branch_id.eq.${branchId ?? 'null'},branch_id.is.null`)
@@ -84,10 +187,19 @@ export async function deliverWebhook(
     .limit(1)
     .maybeSingle()
 
-  if (!config?.webhook_url || !config?.webhook_is_active) return
+  if (!config?.webhook_url || !config?.webhook_is_active) {
+    return { status: 'skipped', reason: 'webhook_config_inactive' }
+  }
 
-  const webhookEvents: string[] = Array.isArray(config.webhook_events) ? config.webhook_events : []
-  if (webhookEvents.length > 0 && !webhookEvents.includes(event)) return
+  const webhookEvents = normalizeStringArray(config.webhook_events)
+  if (webhookEvents.length > 0 && !webhookEvents.includes(event)) {
+    return { status: 'skipped', reason: 'webhook_event_not_subscribed' }
+  }
+
+  if (event === 'inventory_movement') {
+    const filterResult = shouldDeliverInventoryWebhook(config, data)
+    if (filterResult) return filterResult
+  }
 
   const timestamp = Date.now().toString()
   const payload: WebhookPayload = {
@@ -105,7 +217,7 @@ export async function deliverWebhook(
   }
 
   // Create delivery log record first
-  const { data: deliveryLog } = await (admin as any)
+  const { data: deliveryLog } = await admin
     .from('api_webhook_deliveries')
     .insert({
       org_id: orgId,
@@ -139,7 +251,7 @@ export async function deliverWebhook(
     const responseBody = await response.text().catch(() => '')
 
     if (deliveryId) {
-      await (admin as any)
+      await admin
         .from('api_webhook_deliveries')
         .update({
           status: response.ok ? 'delivered' : 'failed',
@@ -150,10 +262,20 @@ export async function deliverWebhook(
         })
         .eq('id', deliveryId)
     }
+
+    if (!response.ok) {
+      return {
+        status: 'failed',
+        error: `webhook_http_${response.status}`,
+        deliveryId,
+      }
+    }
+
+    return { status: 'delivered', deliveryId }
   } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : 'Network error'
     if (deliveryId) {
-      const errMsg = err instanceof Error ? err.message : 'Network error'
-      await (admin as any)
+      await admin
         .from('api_webhook_deliveries')
         .update({
           status: 'failed',
@@ -161,6 +283,12 @@ export async function deliverWebhook(
           attempt_count: 1,
         })
         .eq('id', deliveryId)
+    }
+
+    return {
+      status: 'failed',
+      error: errMsg,
+      deliveryId,
     }
   }
 }

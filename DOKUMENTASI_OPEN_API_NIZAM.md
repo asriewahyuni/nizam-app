@@ -1,123 +1,172 @@
 # DOKUMENTASI OPEN API NIZAM
 
-Dokumen ini diaudit berdasarkan implementasi aktual pada 16 April 2026.
+Dokumen ini disinkronkan dengan implementasi runtime dan smoke test terakhir pada 18 April 2026.
 
-Sumber utama audit:
+Sumber utama:
 - `lib/api/openapi.ts`
 - `app/api/openapi/route.ts`
 - `lib/api/validate-key.ts`
 - `lib/api/webhook.ts`
+- `lib/api/inventory-webhook-outbox.ts`
 - `app/api/v1/cash/route.ts`
 - `app/api/v1/inventory/route.ts`
+- `app/api/v1/inventory/movements/route.ts`
+- `app/api/v1/inventory/reconciliation/route.ts`
+- `app/api/v1/general-ledger/route.ts`
 - `app/api/v1/sales/route.ts`
+- `app/api/v1/sales/[saleId]/route.ts`
+- `app/api/v1/purchases/route.ts`
+- `app/api/v1/bank-transactions/route.ts`
+- `app/api/v1/contacts/upsert/route.ts`
 - `app/api/v1/contacts/route.ts`
+- `app/api/internal/open-api/process-webhook-outbox/route.ts`
 - `app/(dashboard)/developers/api/page.tsx`
 - `app/(dashboard)/settings/api/ApiSettingsClient.tsx`
 - `modules/organization/actions/api-key.actions.ts`
 - `supabase/migrations/1200_open_api.sql`
 - `supabase/migrations/1201_api_call_logs.sql`
+- `supabase/migrations/1222_open_api_idempotency.sql`
+- `supabase/migrations/1223_open_api_inventory_webhook_outbox.sql`
 
 ## 1. Ringkasan
 
-Open API Nizam adalah lapisan integrasi REST publik untuk sistem eksternal yang perlu membaca data ERP atau mendorong transaksi ke Nizam. Fitur ini terdiri dari:
+Open API Nizam adalah lapisan integrasi REST publik untuk sistem eksternal yang perlu:
+
+- membaca data ERP
+- membuat transaksi kas masuk atau kas keluar
+- memakai API key ber-scope
+- memonitor request dan delivery webhook
+
+Fitur yang aktif di implementasi saat ini:
 
 - endpoint publik di `/api/v1/*`
 - spesifikasi OpenAPI 3.1 mesin-baca di `/api/openapi`
-- portal admin internal di `/developers/api`
-- API key ber-scope dan bisa dibatasi per cabang
-- rate limit, call logging, dan webhook delivery log
+- portal internal owner/admin di `/developers/api`
+- API key per organisasi, opsional dibatasi satu cabang
+- rate limit per menit
+- audit trail request
+- subscription webhook untuk event kas, sales, purchase, dan inventory movement
+- filter webhook inventory berdasarkan arah mutasi dan `reference_type`
+- outbox internal untuk webhook inventory dari tabel `stock_movements`
+- idempotency untuk `POST /api/v1/cash`
 
-Use case utama yang sudah berjalan di kode saat ini:
+Endpoint bisnis yang sudah tersedia:
 
-- membaca daftar rekening kas dan bank
-- membuat transaksi kas masuk atau kas keluar
-- membaca stok inventori
-- membaca data penjualan
-- membaca data kontak
+- `GET /api/v1/cash`
+- `POST /api/v1/cash`
+- `GET /api/v1/inventory`
+- `GET /api/v1/inventory/movements`
+- `GET /api/v1/inventory/reconciliation`
+- `GET /api/v1/general-ledger`
+- `GET /api/v1/sales`
+- `GET /api/v1/sales/{saleId}`
+- `GET /api/v1/purchases`
+- `GET /api/v1/bank-transactions`
+- `GET /api/v1/contacts`
+- `POST /api/v1/contacts/upsert`
 
-Catatan penting:
-- spesifikasi OpenAPI mesin-baca saat ini baru mendokumentasikan `/cash` dan `/inventory`
-- route `/sales` dan `/contacts` sudah ada, tetapi belum dimasukkan ke `lib/api/openapi.ts`
+## 2. Arsitektur Singkat
 
-## 2. Komponen Utama
+Komponen utama:
 
 - `lib/api/openapi.ts`
-  Builder spesifikasi OpenAPI 3.1. Mendefinisikan `info`, `servers`, `security`, `paths`, `components.securitySchemes`, dan `components.schemas`.
+  Builder spesifikasi OpenAPI 3.1.
 
 - `app/api/openapi/route.ts`
-  Endpoint GET yang mengembalikan spesifikasi mesin-baca. Base URL diambil dari `NEXT_PUBLIC_APP_URL`, atau fallback ke `origin` request.
+  Route GET yang menyajikan spec mesin-baca.
 
 - `lib/api/validate-key.ts`
-  Utilitas inti untuk:
-  - ekstraksi API key dari header
-  - validasi format, status aktif, expiry, dan scope
-  - rate limiting per menit
-  - standardisasi response JSON
-  - pencatatan call history
+  Helper untuk validasi API key, scope, rate limit, error envelope, dan call log.
 
 - `app/api/v1/cash/route.ts`
-  Endpoint publik untuk baca rekening kas/bank dan membuat transaksi kas.
+  Route publik untuk baca rekening kas/bank dan membuat transaksi kas.
 
 - `app/api/v1/inventory/route.ts`
-  Endpoint publik untuk membaca daftar produk aktif dan stok.
+  Route publik untuk baca produk inventory dan stok.
+
+- `app/api/v1/inventory/movements/route.ts`
+  Route publik untuk baca kartu stok / riwayat pergerakan inventory dari tabel `public.stock_movements`.
+
+- `app/api/v1/inventory/reconciliation/route.ts`
+  Route publik untuk baca rekonsiliasi nilai persediaan antara sub-ledger inventory dan buku besar akun persediaan.
+
+- `app/api/v1/general-ledger/route.ts`
+  Route publik untuk baca jurnal posted buku besar beserta line account per entry.
 
 - `app/api/v1/sales/route.ts`
-  Endpoint publik untuk membaca data penjualan.
+  Route publik untuk baca data penjualan dari tabel `public.sales`.
+
+- `app/api/v1/sales/[saleId]/route.ts`
+  Route publik untuk baca detail penjualan berikut line item, pembayaran, dan retur.
+
+- `app/api/v1/purchases/route.ts`
+  Route publik untuk baca data pembelian dari tabel `public.purchases`.
+
+- `app/api/v1/bank-transactions/route.ts`
+  Route publik untuk baca mutasi kas/bank dari tabel `public.bank_transactions`.
 
 - `app/api/v1/contacts/route.ts`
-  Endpoint publik untuk membaca data kontak customer/supplier.
+  Route publik untuk baca kontak aktif dari tabel `public.contacts`.
+
+- `app/api/v1/contacts/upsert/route.ts`
+  Route publik untuk membuat atau memperbarui kontak customer/supplier dengan perilaku upsert.
 
 - `lib/api/webhook.ts`
-  Pengirim webhook HMAC-SHA256 untuk event integrasi.
+  Pengirim webhook HMAC-SHA256.
 
-- `app/(dashboard)/developers/api/page.tsx` dan `app/(dashboard)/settings/api/ApiSettingsClient.tsx`
-  Portal internal owner/admin untuk generate key, konfigurasi cash mapping, dokumentasi visual, tryout request, webhook, dan call history.
+- `app/(dashboard)/developers/api/page.tsx`
+- `app/(dashboard)/settings/api/ApiSettingsClient.tsx`
+  Portal admin internal untuk key management, mapping kas, webhook, referensi API, tryout, history, dan onboarding checklist.
 
-## 3. Cara Akses
+## 3. Base URL dan Header
 
-### Base URL
-
-Base URL publik untuk endpoint bisnis:
+Base URL endpoint bisnis:
 
 ```text
 https://your-domain.com/api/v1
 ```
 
-Spesifikasi mesin-baca tersedia di:
+Spec mesin-baca:
 
 ```text
 https://your-domain.com/api/openapi
 ```
 
-Portal manajemen internal tersedia di:
+Portal internal:
 
 ```text
 /developers/api
 ```
 
-### Header Response
-
-Endpoint helper `apiSuccess()` dan `apiError()` menambahkan:
+Header response JSON sukses:
 
 ```text
 Content-Type: application/json
 X-Nizam-API: 1.0
 ```
 
-Endpoint `/api/openapi` mengembalikan:
+Header response error:
+
+```text
+Content-Type: application/json
+X-Nizam-API: 1.0
+X-Nizam-Request-Id: <uuid>
+```
+
+Header response `/api/openapi`:
 
 ```text
 Content-Type: application/vnd.oai.openapi+json; charset=utf-8
 Cache-Control: public, max-age=300
 ```
 
-Endpoint v1 publik juga dipaksa `no-store` agar hasil tidak di-cache.
+Semua endpoint `/api/v1/*` memakai `Cache-Control: no-store, no-cache, must-revalidate`.
 
-## 4. Autentikasi dan Scope
+## 4. Autentikasi, Scope, dan Rate Limit
 
-### Mekanisme Autentikasi
+### Autentikasi
 
-API key bisa dikirim dengan dua cara:
+API key dapat dikirim melalui:
 
 ```http
 x-api-key: nzm_live_xxxxxxxxxxxxxxxxxxxxxxxx
@@ -135,68 +184,80 @@ Format key:
 nzm_live_<24 karakter random>
 ```
 
-Implementasi penyimpanan key:
+Penyimpanan key:
 
 - prefix `nzm_live_` disimpan terpisah
-- secret di-hash SHA-256
+- secret disimpan dalam bentuk hash SHA-256
 - full key hanya ditampilkan satu kali saat generate
 
 ### Scope yang Didukung
 
-Scope valid yang didefinisikan saat ini:
-
 - `cash:read`
 - `cash:write`
 - `sales:read`
+- `purchases:read`
+- `bank_transactions:read`
 - `inventory:read`
+- `ledger:read`
 - `contacts:read`
+- `contacts:write`
 
-### Pembatasan Cabang
+### Branch Scope
 
 API key bisa:
 
 - berlaku untuk semua cabang jika `branch_id` kosong
-- dibatasi ke satu cabang jika `branch_id` diisi
+- dibatasi ke satu cabang jika `branch_id` terisi
 
 Khusus `POST /api/v1/cash`:
 
-- jika key tidak branch-scoped, request wajib mengirim `branch_id`
-- jika key sudah branch-scoped, `branch_id` pada body tidak boleh berbeda
+- jika key tidak branch-scoped, body harus mengirim `branch_id`
+- jika key branch-scoped, `branch_id` pada body tidak boleh berbeda
 
 ### Rate Limit
 
-Rate limit disimpan per API key per menit di tabel `api_rate_limit_log`.
+Rate limit dicatat di `api_rate_limit_log`.
 
 Perilaku saat ini:
 
 - default `60 req/menit`
-- counter direset per window menit
-- saat limit tercapai response menjadi `429`
+- counter dihitung per key per window menit
+- saat limit tercapai response adalah `429`
 
-## 5. Alur Request
+## 5. Error Contract
 
-Untuk setiap request publik, flow utamanya adalah:
+Response error sudah distandarkan menjadi:
 
-1. ekstrak API key dari header
-2. validasi format key
-3. cek apakah key aktif
-4. cek expiry
-5. cek rate limit
-6. cek scope
-7. eksekusi query sesuai `org_id` dan `branch_id`
-8. tulis log ke `api_call_logs`
+```json
+{
+  "success": false,
+  "error": "Pesan error",
+  "message": "Pesan error",
+  "error_code": "machine_readable_code",
+  "request_id": "uuid"
+}
+```
 
-Metadata yang dicatat ke log:
+Contoh `error_code` yang sekarang dipakai:
 
-- `org_id`
-- `api_key_id`
-- HTTP method
-- endpoint path
-- status code
-- durasi request
-- IP address
-- user agent
-- pesan error singkat bila ada
+- `api_key_missing`
+- `api_key_invalid`
+- `api_key_not_found`
+- `api_key_revoked`
+- `api_key_expired`
+- `scope_missing`
+- `rate_limit_exceeded`
+- `branch_scope_mismatch`
+- `request_body_invalid`
+- `cash_in_counter_account_missing`
+- `cash_out_counter_account_missing`
+- `idempotency_key_conflict`
+- `idempotency_key_in_progress`
+
+Catatan:
+
+- response sukses tidak membawa `request_id`
+- response error membawa `X-Nizam-Request-Id` yang sama dengan `request_id` di body
 
 ## 6. Endpoint Matrix
 
@@ -205,21 +266,36 @@ Metadata yang dicatat ke log:
 | `/api/v1/cash` | `GET` | `cash:read` | Ya | Daftar rekening kas/bank aktif + saldo posted |
 | `/api/v1/cash` | `POST` | `cash:write` | Ya | Buat transaksi kas masuk/keluar |
 | `/api/v1/inventory` | `GET` | `inventory:read` | Ya | Daftar produk aktif + stok |
-| `/api/v1/sales` | `GET` | `sales:read` | Tidak | Daftar sales order / invoice |
-| `/api/v1/contacts` | `GET` | `contacts:read` | Tidak | Daftar kontak aktif |
+| `/api/v1/inventory/movements` | `GET` | `inventory:read` | Ya | Kartu stok / riwayat mutasi inventory |
+| `/api/v1/inventory/reconciliation` | `GET` | `ledger:read` | Ya | Rekonsiliasi nilai inventory vs GL inventory |
+| `/api/v1/general-ledger` | `GET` | `ledger:read` | Ya | Daftar jurnal posted beserta line account |
+| `/api/v1/sales` | `GET` | `sales:read` | Ya | Daftar penjualan |
+| `/api/v1/sales/{saleId}` | `GET` | `sales:read` | Ya | Detail penjualan + item + payment + retur |
+| `/api/v1/purchases` | `GET` | `purchases:read` | Ya | Daftar pembelian |
+| `/api/v1/bank-transactions` | `GET` | `bank_transactions:read` | Ya | Daftar mutasi kas/bank |
+| `/api/v1/contacts` | `GET` | `contacts:read` | Ya | Daftar kontak aktif |
+| `/api/v1/contacts/upsert` | `POST` | `contacts:write` | Ya | Buat atau update kontak |
 
 ## 7. Spesifikasi OpenAPI 3.1
 
-`lib/api/openapi.ts` membangun spesifikasi dengan properti utama berikut:
+Builder spec saat ini:
 
 - `openapi: 3.1.0`
 - `info.title: Nizam Open API`
-- `info.version: 1.0.0`
+- `info.version: 1.5.0`
 - `servers[0].url: <base-url>/api/v1`
 - `security: ApiKeyAuth` dan `BearerAuth`
-- tag utama: `Cash` dan `Inventory`
 
-### Security Schemes
+Tag yang saat ini sudah didokumentasikan:
+
+- `Cash`
+- `Inventory`
+- `Sales`
+- `Purchases`
+- `Bank Transactions`
+- `Contacts`
+
+Security schemes:
 
 - `ApiKeyAuth`
   - type: `apiKey`
@@ -231,32 +307,42 @@ Metadata yang dicatat ke log:
   - scheme: `bearer`
   - bearerFormat: `API Key`
 
-### Schema yang Sudah Didefinisikan
-
-Schema penting yang sudah tersedia di `components.schemas`:
+Schema penting yang sekarang tersedia:
 
 - `CashAccount`
 - `CashJournalLineInput`
 - `InventoryItem`
+- `InventoryMovementItem`
+- `InventoryReconciliationItem`
+- `GeneralLedgerLineItem`
+- `GeneralLedgerEntry`
+- `SalesItem`
+- `SalesDetail`
+- `ContactItem`
+- `ContactUpsertRequest`
+- `PurchaseListItem`
+- `BankTransactionItem`
 - `CashTransactionResult`
 - `ResponseMeta`
 - `CashListResponse`
 - `InventoryListResponse`
+- `InventoryMovementListResponse`
+- `InventoryReconciliationListResponse`
+- `GeneralLedgerListResponse`
+- `SalesListResponse`
+- `SalesDetailResponse`
+- `PurchaseListResponse`
+- `BankTransactionListResponse`
+- `ContactsListResponse`
+- `ContactUpsertResponse`
 - `CreateCashRequest`
 - `CreateCashResponse`
 
-### Contoh Ambil Spec
+Contoh ambil spec:
 
 ```bash
 curl https://your-domain.com/api/openapi
 ```
-
-Spec ini bisa dipakai untuk:
-
-- Swagger UI
-- Postman import
-- SDK generator
-- validasi kontrak API
 
 ## 8. Detail Endpoint
 
@@ -264,40 +350,31 @@ Spec ini bisa dipakai untuk:
 
 Fungsi:
 
-- mengembalikan rekening bank aktif dari tabel `bank_accounts`
-- menggabungkan akun kas/bank CoA `11xx` yang aktif meskipun belum punya bridge `bank_accounts`
-- menghitung saldo dari jurnal berstatus `POSTED`
+- membaca rekening aktif dari `bank_accounts`
+- menggabungkan akun kas/bank CoA `11xx` yang belum punya bridge `bank_accounts`
+- menghitung saldo dari jurnal `POSTED`
 
-Karakteristik penting:
+Karakteristik:
 
-- response memuat `source`
 - `source = bank_account` berarti row berasal dari `bank_accounts`
-- `source = gl_account` berarti akun berasal langsung dari CoA `11xx`
-- `bank_account_id` bisa `null` untuk `gl_account`
-- `branch_scope` di meta mengikuti pembatasan API key
+- `source = gl_account` berarti row berasal langsung dari CoA `11xx`
+- `bank_account_id` dapat `null` untuk `gl_account`
+- meta `branch_scope` mengikuti scope API key
 
-Contoh:
+Status umum:
 
-```bash
-curl "https://your-domain.com/api/v1/cash" \
-  -H "x-api-key: nzm_live_<your-key>" \
-  -H "Accept: application/json"
-```
-
-Status yang umum:
-
-- `200` berhasil
-- `401` key hilang, tidak valid, nonaktif, atau expired
-- `403` scope `cash:read` tidak ada
-- `429` rate limit tercapai
+- `200`
+- `401`
+- `403`
+- `429`
 
 ### POST `/api/v1/cash`
 
 Fungsi:
 
-- mencatat kas masuk atau kas keluar ke `bank_transactions`
-- dapat memakai mode sederhana dengan satu akun lawan
-- dapat memakai mode split jurnal dengan `journal_lines`
+- membuat transaksi kas masuk atau kas keluar ke `bank_transactions`
+- mendukung mode sederhana satu akun lawan
+- mendukung split jurnal melalui `journal_lines`
 
 Field inti:
 
@@ -306,55 +383,64 @@ Field inti:
 - `description`: wajib
 - `reference`: opsional
 - `transaction_date`: opsional, default hari ini
-- `branch_id`: wajib jika key tidak dibatasi ke cabang tertentu
+- `branch_id`: wajib bila key tidak branch-scoped
 - `bank_account_id`: opsional
-- `account_id`: opsional, bisa menunjuk akun CoA kas/bank `11xx`
-- `category_id` atau `counter_account_id`: akun lawan untuk mode sederhana
+- `account_id`: opsional, dapat menunjuk akun CoA `11xx`
+- `category_id` atau `counter_account_id`: akun lawan sederhana
 - `settlement_type`: `general`, `revenue`, `expense`, `receivable`, `payable`, `tax`, `discount`, `other_charge`
 - `journal_lines[]`: split jurnal tanpa baris kas/bank
 
 Aturan penting:
 
-- `auto_post` default bernilai `true` bila tidak diisi di konfigurasi
-- jika `account_id` menunjuk akun CoA `11xx` dan bridge `bank_accounts` belum ada, sistem akan membuat bridge otomatis
-- urutan pencarian rekening untuk write adalah:
-  1. `bank_account_id`
-  2. `account_id`
-  3. default account dari `api_configurations`
-  4. satu-satunya `bank_account` aktif pada cabang tersebut
-- `journal_lines` hanya boleh dipakai saat `auto_post = true`
-- setiap line harus punya tepat satu sisi: `debit` atau `credit`
+- `auto_post` default `true` bila tidak diisi pada konfigurasi
+- bila `account_id` menunjuk akun `11xx` dan bridge belum ada, sistem membuat `bank_accounts` otomatis
+- `journal_lines` hanya boleh dipakai ketika `auto_post = true`
+- setiap line harus punya tepat satu sisi `debit` atau `credit`
 - total `journal_lines` plus baris kas/bank harus balance
-- untuk `type = out`, sistem menolak transaksi jika saldo posted tidak cukup
+- untuk `type = out`, transaksi ditolak bila saldo posted tidak cukup
 - akun lawan tidak boleh sama dengan akun kas/bank
 
-Mapping akun lawan dapat berasal dari:
+### Idempotency
 
-- body request
-- `cash_in_params`
-- `cash_out_params`
+`POST /api/v1/cash` sekarang mendukung idempotency dengan dua cara:
 
-Key konfigurasi JSON yang dikenali:
+- header `Idempotency-Key`
+- field body `idempotency_key`
 
-- `default_description`
-- `auto_post`
-- `counter_account_id`
-- `revenue_account_id`
-- `expense_account_id`
-- `receivable_account_id`
-- `payable_account_id`
-- `tax_account_id`
-- `discount_account_id`
-- `other_charge_account_id`
-- `other_fee_account_id`
+Aturan:
 
-Contoh kas masuk sederhana:
+- jika header dan body sama-sama dikirim, nilainya harus sama
+- payload yang sama + key yang sama akan replay response sukses sebelumnya
+- payload berbeda + key yang sama akan `409`
+- key yang masih diproses akan `409`
+
+Header tambahan:
+
+```text
+Idempotency-Key: <same-key>
+X-Idempotent-Replay: true
+```
+
+`X-Idempotent-Replay` hanya muncul saat response berasal dari replay.
+
+Status umum:
+
+- `200`
+- `400`
+- `401`
+- `403`
+- `409`
+- `422`
+- `429`
+
+Contoh sederhana:
 
 ```bash
 curl https://your-domain.com/api/v1/cash \
   -X POST \
   -H "x-api-key: nzm_live_<your-key>" \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: cash-inv-2026-001" \
   -d '{
     "type": "in",
     "amount": 250000,
@@ -367,47 +453,12 @@ curl https://your-domain.com/api/v1/cash \
   }'
 ```
 
-Contoh kas keluar split jurnal:
-
-```bash
-curl https://your-domain.com/api/v1/cash \
-  -X POST \
-  -H "x-api-key: nzm_live_<your-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "out",
-    "amount": 15000,
-    "description": "Push marketplace pembelian buku",
-    "reference": "PO-MP-BOOK-2026-0001",
-    "branch_id": "branch-uuid",
-    "transaction_date": "2026-04-15",
-    "account_id": "cash-account-uuid",
-    "journal_lines": [
-      { "account_id": "inventory-account-uuid", "debit": 19200, "memo": "Persediaan" },
-      { "account_id": "tax-account-uuid", "debit": 1920, "memo": "PPN masukan" },
-      { "account_id": "other-charge-account-uuid", "debit": 2000, "memo": "Ongkir" },
-      { "account_id": "discount-account-uuid", "credit": 1000, "memo": "Diskon" },
-      { "account_id": "payable-account-uuid", "credit": 7120, "memo": "Sisa hutang" }
-    ]
-  }'
-```
-
-Status yang umum:
-
-- `200` berhasil
-- `400` JSON/body tidak valid
-- `401` autentikasi gagal
-- `403` scope `cash:write` tidak ada
-- `422` konfigurasi rekening, akun lawan, saldo, atau jurnal tidak valid
-- `429` rate limit tercapai
-
 ### GET `/api/v1/inventory`
 
 Fungsi:
 
 - membaca produk aktif
-- mengagregasi stok dari `inventory_stocks`
-- memfilter warehouse aktif
+- mengagregasi stok inventory
 - mendukung filter nama produk
 
 Query parameter:
@@ -415,81 +466,380 @@ Query parameter:
 - `limit`: default `100`, maksimum `500`
 - `search`: filter nama produk, case-insensitive
 
-Contoh:
+Status umum:
 
-```bash
-curl "https://your-domain.com/api/v1/inventory?limit=20&search=buku" \
-  -H "x-api-key: nzm_live_<your-key>" \
-  -H "Accept: application/json"
-```
+- `200`
+- `401`
+- `403`
+- `429`
 
-Status yang umum:
+### GET `/api/v1/inventory/movements`
 
-- `200` berhasil
-- `401` autentikasi gagal
-- `403` scope `inventory:read` tidak ada
-- `429` rate limit tercapai
+Fitur saat ini:
+
+- scope `inventory:read`
+- filter `limit`, `product_id`, `reference_type`, `direction`, `date_from`, `date_to`, `search`
+- membaca kartu stok dari tabel `public.stock_movements`
+
+Field utama response:
+
+- `id`
+- `product_id`
+- `product_code`
+- `product_name`
+- `product_unit`
+- `product_category`
+- `movement_date`
+- `quantity`
+- `direction`
+- `unit_price`
+- `reference_type`
+- `reference_id`
+- `notes`
+- `branch_id`
+- `created_at`
+
+Catatan:
+
+- `quantity` tetap signed agar integrator bisa menghitung saldo berjalan
+- `direction` disediakan sebagai helper `in` / `out` / `neutral`
+- `reference_type` saat ini bisa berisi nilai seperti `SALE`, `PURCHASE`, `ADJUSTMENT`, `PRODUCTION_OUTPUT`, `PRODUCTION_CONSUMPTION`
+
+Status umum:
+
+- `200`
+- `400`
+- `401`
+- `403`
+- `429`
+
+### GET `/api/v1/inventory/reconciliation`
+
+Fitur saat ini:
+
+- scope `ledger:read`
+- filter `limit`, `product_id`, `as_of_date`, `variance_only`, `search`
+- membandingkan nilai inventory sub-ledger dari `stock_movements` dengan saldo buku besar akun `1301-1399`
+
+Field utama response:
+
+- `product_id`
+- `product_code`
+- `product_name`
+- `product_unit`
+- `product_category`
+- `stock_qty`
+- `avg_cost`
+- `on_hand_value`
+- `ledger_value`
+- `variance`
+
+Catatan:
+
+- `on_hand_value` dihitung dari `stock_qty * average_cost`
+- `ledger_value` di level produk adalah alokasi proporsional dari total saldo GL inventory, bukan posting GL per item secara langsung
+- metadata juga membawa `on_hand_value`, `gl_inventory_balance`, `inventory_variance`, `valuation_method`, dan `gl_account_range`
+
+Status umum:
+
+- `200`
+- `400`
+- `401`
+- `403`
+- `429`
+
+### GET `/api/v1/general-ledger`
+
+Fitur saat ini:
+
+- scope `ledger:read`
+- filter `limit`, `date_from`, `date_to`, `account_id`, `account_code`, `reference_type`, `search`
+- hanya mengembalikan jurnal `POSTED`
+
+Field utama response:
+
+- `id`
+- `entry_number`
+- `entry_date`
+- `description`
+- `reference_type`
+- `reference_id`
+- `status`
+- `notes`
+- `posted_at`
+- `created_at`
+- `branch_id`
+- `total_debit`
+- `total_credit`
+- `journal_lines`
+
+Catatan:
+
+- filter `account_id` / `account_code` bekerja berdasarkan keberadaan line akun di suatu entry
+- tetapi response tetap mengembalikan seluruh `journal_lines` dari entry yang match
+
+Status umum:
+
+- `200`
+- `400`
+- `401`
+- `403`
+- `429`
 
 ### GET `/api/v1/sales`
-
-Endpoint ini sudah diimplementasikan tetapi belum masuk spesifikasi OpenAPI mesin-baca.
 
 Fitur saat ini:
 
 - scope `sales:read`
 - filter `limit`, `status`, `date_from`, `date_to`
-- membaca `sales_orders`
-- otomatis menghormati pembatasan cabang dari API key
+- membaca data dari tabel `public.sales`
+- menghormati pembatasan cabang dari API key
+
+Response item:
+
+- `id`
+- `so_number`
+- `customer_name`
+- `total_amount`
+- `status`
+- `branch_id`
+- `order_date`
+- `created_at`
+
+Status umum:
+
+- `200`
+- `401`
+- `403`
+- `429`
+
+### GET `/api/v1/sales/{saleId}`
+
+Fitur saat ini:
+
+- scope `sales:read`
+- membaca satu dokumen penjualan berdasarkan `saleId`
+- mengembalikan header dokumen, `items`, `payments`, dan `returns`
+- menghormati pembatasan cabang dari API key
+
+Field utama response:
+
+- `id`
+- `so_number`
+- `customer_id`
+- `customer_name`
+- `total_amount`
+- `tax_amount`
+- `discount_amount`
+- `grand_total`
+- `status`
+- `payment_status`
+- `branch_id`
+- `branch_name`
+- `warehouse_id`
+- `warehouse_name`
+- `order_date`
+- `due_date`
+- `items[]`
+- `payments[]`
+- `returns[]`
+
+Status umum:
+
+- `200`
+- `401`
+- `403`
+- `404`
+- `429`
+
+### GET `/api/v1/purchases`
+
+Fitur saat ini:
+
+- scope `purchases:read`
+- filter `limit`, `status`, `payment_status`, `date_from`, `date_to`
+- membaca data dari tabel `public.purchases`
+- menghormati pembatasan cabang dari API key
+
+Response item:
+
+- `id`
+- `po_number`
+- `vendor_name`
+- `total_amount`
+- `status`
+- `payment_status`
+- `branch_id`
+- `purchase_date`
+- `due_date`
+- `item_count`
+- `created_at`
+
+Status umum:
+
+- `200`
+- `401`
+- `403`
+- `429`
+
+### GET `/api/v1/bank-transactions`
+
+Fitur saat ini:
+
+- scope `bank_transactions:read`
+- filter `limit`, `type`, `status`, `date_from`, `date_to`, `search`
+- membaca data dari tabel `public.bank_transactions`
+- menghormati pembatasan cabang dari API key
+
+Field utama response:
+
+- `id`
+- `bank_account_id`
+- `cash_account_id`
+- `cash_account_code`
+- `cash_account_name`
+- `bank_name`
+- `account_number`
+- `description`
+- `amount`
+- `type`
+- `reference_number`
+- `status`
+- `category_id`
+- `category_code`
+- `category_name`
+- `journal_entry_id`
+- `branch_id`
+- `transaction_date`
+- `created_at`
+
+Catatan:
+
+- `type` dinormalisasi menjadi `in` / `out`
+- `search` melakukan pencarian pada `description` dan `reference_number`
+
+Status umum:
+
+- `200`
+- `401`
+- `403`
+- `429`
 
 ### GET `/api/v1/contacts`
-
-Endpoint ini sudah diimplementasikan tetapi belum masuk spesifikasi OpenAPI mesin-baca.
 
 Fitur saat ini:
 
 - scope `contacts:read`
 - filter `limit`, `type`, `search`
-- membaca kontak aktif dari tabel `contacts`
+- membaca kontak aktif dari tabel `public.contacts`
 
-## 9. Konfigurasi Open API di Portal Admin
+Field yang sekarang benar-benar ada di response:
 
-Portal `/developers/api` hanya bisa diakses oleh role:
+- `id`
+- `name`
+- `email`
+- `phone`
+- `phone_wa`
+- `instagram`
+- `address`
+- `type`
+- `is_active`
+- `created_at`
+
+Status umum:
+
+- `200`
+- `401`
+- `403`
+- `429`
+
+### POST `/api/v1/contacts/upsert`
+
+Fitur saat ini:
+
+- scope `contacts:write`
+- membuat kontak baru atau memperbarui kontak lama dengan satu endpoint
+- urutan pencocokan: `id`, `email`, `phone_wa`, `phone`, lalu `name` pada tipe kontak yang sama
+- bila kontak lama ditemukan, response tetap `200` dengan metadata `action = updated`
+
+Field request:
+
+- `id`
+- `name`
+- `type`
+- `email`
+- `phone`
+- `phone_wa`
+- `instagram`
+- `address`
+- `is_active`
+
+Metadata response:
+
+- `meta.action`: `created` atau `updated`
+- `meta.matched_by`: `id`, `email`, `phone_wa`, `phone`, `name`, atau `insert`
+
+Status umum:
+
+- `200`
+- `400`
+- `401`
+- `403`
+- `429`
+
+## 9. Portal Admin `/developers/api`
+
+Portal hanya bisa diakses oleh:
 
 - `owner`
 - `admin`
 
-Fitur portal yang tersedia:
+Fitur portal:
 
-- generate API key baru
-- menampilkan full key sekali setelah generate
+- generate API key
+- tampilkan full key sekali setelah generate
 - revoke key
-- mengatur scope
-- mengatur pembatasan `branch_id`
-- mengatur `rate_limit_rpm`
-- mengatur `expires_at`
-- menyimpan konfigurasi cash-in dan cash-out
-- menyimpan konfigurasi webhook
-- melihat dokumentasi visual endpoint
-- mencoba request langsung dari browser pada tab "Try API"
-- melihat riwayat panggilan API
-- melihat riwayat delivery webhook
+- atur scope
+- atur `branch_id`
+- atur `rate_limit_rpm`
+- atur `expires_at`
+- simpan konfigurasi cash-in dan cash-out
+- simpan konfigurasi webhook
+- dokumentasi visual endpoint
+- tab tryout request dari browser
+- history request API
+- history delivery webhook
+- onboarding checklist kesiapan integrasi
 
-Perilaku konfigurasi:
+Checklist onboarding saat ini memeriksa:
 
-- konfigurasi cash dan webhook disimpan di `api_configurations`
-- saat route kas membaca konfigurasi, sistem lebih dulu mencari konfigurasi cabang spesifik
-- jika tidak ada, sistem fallback ke konfigurasi default organisasi dengan `branch_id = null`
+- API key aktif
+- akun kas/bank `11xx`
+- bridge `bank_accounts`
+- default cash-in mapping
+- default cash-out mapping
+- webhook aktif
 
 ## 10. Webhook
 
 Konfigurasi webhook disimpan di `api_configurations`.
 
-Field penting:
+Field utama:
 
 - `webhook_url`
 - `webhook_secret`
 - `webhook_events`
 - `webhook_is_active`
+- `webhook_inventory_directions`
+- `webhook_inventory_reference_types`
+
+Event yang sekarang bisa dipilih di pengaturan:
+
+- `cash_in`
+- `cash_out`
+- `sale`
+- `purchase`
+- `inventory_movement`
 
 Header yang dikirim:
 
@@ -501,85 +851,227 @@ X-Nizam-Webhook-Timestamp: <unix-ms>
 User-Agent: Nizam-Webhook/1.0
 ```
 
-Payload dasar:
-
-```json
-{
-  "event": "cash_in",
-  "org_id": "org-uuid",
-  "branch_id": "branch-uuid",
-  "timestamp": "2026-04-16T10:00:00.000Z",
-  "data": {}
-}
-```
-
 Event type yang didefinisikan:
 
 - `cash_in`
 - `cash_out`
 - `sale`
 - `purchase`
+- `inventory_movement`
+
+Khusus `inventory_movement`:
+
+- deteksi stok masuk/keluar didasarkan pada tanda `quantity` di `stock_movements`, bukan pada pemilihan akun buku besar
+- `quantity > 0` dianggap `direction = in`
+- `quantity < 0` dianggap `direction = out`
+- void sale akan menghasilkan movement kompensasi dengan `reference_type = SALE_VOID`
+- void purchase akan menghasilkan movement kompensasi dengan `reference_type = PURCHASE_VOID`
+- jika `webhook_inventory_directions` kosong, semua arah dikirim
+- jika `webhook_inventory_reference_types` kosong, semua `reference_type` dikirim
+
+Payload inventory movement yang dikirim saat ini memuat snapshot utama:
+
+- `movement_id`
+- `product_id`
+- `product_code`
+- `product_name`
+- `movement_date`
+- `quantity`
+- `direction`
+- `unit_price`
+- `reference_type`
+- `reference_id`
+- `notes`
+- `branch_id`
+
+Contoh header yang diterima implementor:
+
+```text
+Content-Type: application/json
+X-Nizam-Webhook-Event: inventory_movement
+X-Nizam-Webhook-Signature: sha256=<hex>
+X-Nizam-Webhook-Timestamp: <unix-ms>
+User-Agent: Nizam-Webhook/1.0
+```
+
+Contoh verifikasi signature di server implementor:
+
+```ts
+import crypto from 'node:crypto'
+
+const signature = req.headers['x-nizam-webhook-signature']
+const rawBody = Buffer.isBuffer(req.rawBody)
+  ? req.rawBody
+  : Buffer.from(String(req.rawBody || ''), 'utf8')
+
+const expected = 'sha256=' + crypto
+  .createHmac('sha256', WEBHOOK_SECRET)
+  .update(rawBody)
+  .digest('hex')
+
+if (signature !== expected) {
+  throw new Error('Invalid signature')
+}
+```
+
+Catatan:
+
+- gunakan body mentah sebelum `JSON.parse`
+- jangan gunakan `JSON.stringify(req.body)` untuk verifikasi HMAC
+- di Next.js route handler Anda bisa memakai `await request.text()`, sedangkan di Express gunakan middleware yang menyimpan raw body
+
+Contoh payload `inventory_movement` stok masuk hasil smoke test:
+
+```json
+{
+  "event": "inventory_movement",
+  "org_id": "4d253fb0-9dd2-42e2-86b4-2706ff7a701c",
+  "branch_id": "67d61da3-0c58-412e-abcd-d0cd1a0a3550",
+  "timestamp": "2026-04-18T13:21:29.248Z",
+  "data": {
+    "notes": "SMOKE WEBHOOK IN",
+    "quantity": 5,
+    "branch_id": "67d61da3-0c58-412e-abcd-d0cd1a0a3550",
+    "direction": "in",
+    "created_at": "2026-04-18T13:21:29.049297+00:00",
+    "product_id": "f2a248c1-f0d1-46dd-8771-7c6e6f2fae30",
+    "unit_price": 12500,
+    "movement_id": "2eb6dab4-9208-45e7-b946-d14371f13ca3",
+    "product_code": "SMOKE-WH-1776518488399",
+    "product_name": "Produk Smoke Webhook",
+    "product_unit": "Pcs",
+    "reference_id": "411f110b-d1c1-4129-8c0d-3e59751f4f73",
+    "movement_date": "2026-04-18T13:21:29.049297+00:00",
+    "reference_type": "PURCHASE",
+    "product_category": "Smoke Test"
+  }
+}
+```
+
+Contoh payload `inventory_movement` stok keluar hasil smoke test:
+
+```json
+{
+  "event": "inventory_movement",
+  "org_id": "4d253fb0-9dd2-42e2-86b4-2706ff7a701c",
+  "branch_id": "67d61da3-0c58-412e-abcd-d0cd1a0a3550",
+  "timestamp": "2026-04-18T13:21:29.472Z",
+  "data": {
+    "notes": "SMOKE WEBHOOK OUT",
+    "quantity": -2,
+    "branch_id": "67d61da3-0c58-412e-abcd-d0cd1a0a3550",
+    "direction": "out",
+    "created_at": "2026-04-18T13:21:29.049297+00:00",
+    "product_id": "f2a248c1-f0d1-46dd-8771-7c6e6f2fae30",
+    "unit_price": 12500,
+    "movement_id": "bc164441-29b4-4e96-b053-c0c59e124f67",
+    "product_code": "SMOKE-WH-1776518488399",
+    "product_name": "Produk Smoke Webhook",
+    "product_unit": "Pcs",
+    "reference_id": "5e70e892-6531-456b-8330-d8ba48dda2f7",
+    "movement_date": "2026-04-18T13:21:29.049297+00:00",
+    "reference_type": "SALE",
+    "product_category": "Smoke Test"
+  }
+}
+```
 
 Catatan implementasi saat ini:
 
-- `deliverWebhook()` mendukung keempat event di atas
-- trigger nyata yang terlihat di kode saat ini baru berasal dari `POST /api/v1/cash`, yaitu `cash_in` dan `cash_out`
-- delivery dicatat ke tabel `api_webhook_deliveries`
+- `cash_in` dan `cash_out` tetap dikirim langsung dari route publik
+- `inventory_movement` dikumpulkan via outbox `api_webhook_outbox` dari trigger `AFTER INSERT` pada `stock_movements`, termasuk movement kompensasi saat void sale/purchase
+- worker internal Next standalone memanggil route privat `/api/internal/open-api/process-webhook-outbox` setiap beberapa detik untuk mengosongkan outbox
+- delivery dicatat ke `api_webhook_deliveries`
 - timeout outbound request adalah `10 detik`
 
 ## 11. Tabel dan Migrasi Pendukung
 
-Tabel utama yang dibentuk oleh migrasi Open API:
+Tabel utama Open API:
 
 - `api_keys`
-  Menyimpan metadata API key, scope, branch scope, expiry, rate limit, request counter, dan status aktif.
+  Metadata API key, scope, branch scope, expiry, rate limit, dan status aktif.
 
 - `api_rate_limit_log`
-  Menyimpan counter request per key per menit.
+  Counter request per key per menit.
 
 - `api_configurations`
-  Menyimpan default account mapping cash-in/cash-out dan konfigurasi webhook.
+  Mapping default cash-in/cash-out dan konfigurasi webhook.
 
 - `api_webhook_deliveries`
-  Menyimpan status pengiriman webhook.
+  Log delivery webhook.
 
 - `api_call_logs`
-  Menyimpan audit trail setiap request ke Open API.
+  Audit trail request ke Open API.
+
+- `api_idempotency_keys`
+  Penyimpanan idempotency write request untuk `POST /api/v1/cash`.
+
+- `api_webhook_outbox`
+  Queue internal untuk event webhook inventory yang berasal dari `stock_movements`.
 
 RLS saat ini:
 
-- `api_keys` hanya bisa dikelola owner/admin organisasi
-- `api_configurations` hanya bisa dikelola owner/admin organisasi
-- `api_webhook_deliveries` hanya bisa dilihat owner/admin organisasi
-- `api_call_logs` hanya bisa dilihat owner/admin organisasi
-- `api_rate_limit_log` dipakai service role, tidak memerlukan RLS untuk user biasa
+- `api_keys` hanya dikelola owner/admin
+- `api_configurations` hanya dikelola owner/admin
+- `api_webhook_deliveries` hanya dilihat owner/admin
+- `api_call_logs` hanya dilihat owner/admin
+- `api_rate_limit_log` dan `api_idempotency_keys` dipakai server-side
 
-## 12. Environment Variable Terkait
+Migrasi Open API yang relevan:
 
-Open API tidak memiliki env var khusus tersendiri, tetapi bergantung pada:
+- `1200_open_api.sql`
+- `1201_api_call_logs.sql`
+- `1222_open_api_idempotency.sql`
+- `1223_open_api_inventory_webhook_outbox.sql`
 
+## 12. Environment
+
+Open API saat ini berjalan di atas PostgreSQL native, bukan bergantung pada Supabase Cloud runtime.
+
+Environment penting:
+
+- `DATABASE_URL`
+- `RAILWAY_DATABASE_URL`
+- `DATABASE_PUBLIC_URL`
 - `NEXT_PUBLIC_APP_URL`
-  Dipakai sebagai fallback base URL untuk `/api/openapi`.
-
 - `NEXT_PUBLIC_SITE_URL`
-  Legacy alias yang masih dipakai di beberapa flow lama.
+- `INTERNAL_WEBHOOK_WORKER_TOKEN` untuk route privat worker inventory. Saat `npm start`, token ini akan dibuat otomatis bila tidak diset.
 
-- `SUPABASE_SERVICE_ROLE_KEY` atau `SUPABASE_LOCAL_SERVICE_ROLE_KEY`
-  Diperlukan oleh `createAdminClient()` untuk validasi key, rate limit log, webhook log, dan call log.
+Catatan:
 
-## 13. Known Gaps dan Catatan Implementasi
+- folder `supabase/migrations/` masih dipakai sebagai lokasi file SQL migration
+- `createAdminClient()` di layer kompatibilitas saat ini diarahkan ke PostgreSQL native
 
-- Badge endpoint di portal internal menampilkan `/cash`, `/sales`, `/inventory`, dan `/contacts`, tetapi spesifikasi OpenAPI mesin-baca baru mencakup `/cash` dan `/inventory`.
-- Dokumentasi visual di portal internal juga saat ini hanya fokus pada tiga operasi: read cash, read inventory, dan create cash.
-- Event webhook `sale` dan `purchase` sudah disiapkan di tipe dan konfigurasi, tetapi trigger konkretnya belum terlihat pada route publik yang diaudit.
-- Versi spesifikasi masih `1.0.0`, jadi setiap penambahan endpoint ke `lib/api/openapi.ts` sebaiknya diikuti update versioning dan contoh payload.
+## 13. Hasil Verifikasi Terakhir
+
+Smoke test terbaru pada tenant uji `coba@xales.id` memverifikasi:
+
+- `/api/openapi` `200` dan versi `1.5.0`
+- `/api/v1/sales` `200`
+- `/api/v1/contacts` `200`
+- `POST /api/v1/cash` `200`
+- replay idempotency `POST /api/v1/cash` `200` dengan `X-Idempotent-Replay: true`
+- payload berbeda dengan key yang sama menghasilkan `409 idempotency_key_conflict`
+
+Verifikasi test untuk paket `v1.2`:
+
+- route baru `/api/v1/purchases` lulus unit test
+- route baru `/api/v1/bank-transactions` lulus unit test
+- route baru `/api/v1/sales/{saleId}` lulus unit test
+- route baru `/api/v1/contacts/upsert` lulus unit test
+- route baru `/api/v1/inventory/movements` lulus unit test
+- route baru `/api/v1/inventory/reconciliation` lulus unit test
+- route baru `/api/v1/general-ledger` lulus unit test
+- spec `/api/openapi` sinkron dengan endpoint dan schema baru
 
 ## 14. Rekomendasi Penggunaan
 
-Untuk integrasi eksternal yang stabil, urutan penggunaan yang direkomendasikan adalah:
+Urutan penggunaan yang direkomendasikan:
 
 1. owner/admin membuat API key dari `/developers/api`
-2. pilih scope minimal sesuai kebutuhan integrasi
-3. bila integrasi kas dipakai, set `api_configurations` untuk cash-in/cash-out dan webhook
-4. gunakan `/api/openapi` untuk import ke tool integrasi
-5. monitor penggunaan lewat tab history dan webhook delivery di portal admin
+2. pilih scope minimum sesuai kebutuhan
+3. siapkan akun kas/bank `11xx` dan bridge `bank_accounts` bila integrasi write kas akan dipakai
+4. isi `api_configurations` untuk default cash-in/cash-out
+5. gunakan `/api/openapi` untuk import kontrak ke tool integrasi
+6. untuk semua write request, kirim `Idempotency-Key`
+7. monitor history request dan delivery webhook di portal admin

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { cpSync, existsSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 
@@ -27,15 +28,54 @@ const syncStandaloneAssets = () => {
 
 syncStandaloneAssets()
 
+const internalWebhookWorkerToken =
+  process.env.INTERNAL_WEBHOOK_WORKER_TOKEN || randomUUID()
+const runtimePort = process.env.PORT || '3000'
+const workerBaseUrl = `http://127.0.0.1:${runtimePort}`
+
 const child = spawn(process.execPath, ['.next/standalone/server.js'], {
   stdio: 'inherit',
   env: {
     ...process.env,
     HOSTNAME: '0.0.0.0',
+    INTERNAL_WEBHOOK_WORKER_TOKEN: internalWebhookWorkerToken,
   },
 })
 
+let workerRunning = false
+let workerTimer = null
+
+const runInternalWebhookWorker = async () => {
+  if (workerRunning || child.killed || process.env.DISABLE_INTERNAL_WEBHOOK_WORKER === 'true') return
+  workerRunning = true
+
+  try {
+    await fetch(`${workerBaseUrl}/api/internal/open-api/process-webhook-outbox?limit=25`, {
+      method: 'POST',
+      headers: {
+        'x-internal-worker-token': internalWebhookWorkerToken,
+      },
+      signal: AbortSignal.timeout(10_000),
+    }).catch(() => undefined)
+  } finally {
+    workerRunning = false
+  }
+}
+
+if (process.env.DISABLE_INTERNAL_WEBHOOK_WORKER !== 'true') {
+  const initialKick = setTimeout(() => {
+    void runInternalWebhookWorker()
+  }, 4_000)
+  initialKick.unref?.()
+
+  workerTimer = setInterval(() => {
+    void runInternalWebhookWorker()
+  }, 5_000)
+  workerTimer.unref?.()
+}
+
 const forwardSignal = (signal) => {
+  if (workerTimer) clearInterval(workerTimer)
   if (child.killed) return
   child.kill(signal)
 }
@@ -44,6 +84,7 @@ process.on('SIGINT', forwardSignal)
 process.on('SIGTERM', forwardSignal)
 
 child.on('exit', (code, signal) => {
+  if (workerTimer) clearInterval(workerTimer)
   if (signal) {
     process.kill(process.pid, signal)
     return

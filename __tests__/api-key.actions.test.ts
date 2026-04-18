@@ -25,7 +25,7 @@ vi.mock('next/cache', () => ({
 }))
 
 vi.mock('@/lib/api/validate-key', () => ({
-  VALID_SCOPES: ['cash:read', 'cash:write', 'sales:read', 'inventory:read', 'contacts:read'],
+  VALID_SCOPES: ['cash:read', 'cash:write', 'sales:read', 'inventory:read', 'ledger:read', 'contacts:read', 'contacts:write', 'purchases:read', 'bank_transactions:read'],
   generateRawApiKey: mocks.generateRawApiKey,
   hashApiKeySecret: mocks.hashApiKeySecret,
 }))
@@ -139,7 +139,7 @@ describe('Open API settings server actions', () => {
 
     const result = await generateApiKey('org-1', {
       name: 'Invalid',
-      scopes: ['unsupported:scope' as any],
+      scopes: ['unsupported:scope'] as unknown as Parameters<typeof generateApiKey>[1]['scopes'],
     })
 
     expect(result).toEqual({
@@ -193,6 +193,8 @@ describe('Open API settings server actions', () => {
       webhook_secret: null,
       webhook_events: [],
       webhook_is_active: false,
+      webhook_inventory_directions: [],
+      webhook_inventory_reference_types: [],
     })
   })
 
@@ -213,6 +215,8 @@ describe('Open API settings server actions', () => {
       webhookUrl: 'https://example.com/webhook',
       webhookEvents: ['cash_in'],
       webhookIsActive: true,
+      webhookInventoryDirections: ['in'],
+      webhookInventoryReferenceTypes: ['purchase', 'sale_void'],
     })
 
     expect(result).toEqual({ success: true })
@@ -227,9 +231,40 @@ describe('Open API settings server actions', () => {
         webhook_url: 'https://example.com/webhook',
         webhook_events: ['cash_in'],
         webhook_is_active: true,
+        webhook_inventory_directions: ['in'],
+        webhook_inventory_reference_types: ['PURCHASE', 'SALE_VOID'],
       })
     )
     expect(payload).not.toHaveProperty('webhook_secret')
+  })
+
+  it('rejects invalid webhook events before saving configuration', async () => {
+    mocks.createAdminClient.mockResolvedValue(createSupabaseMock().client)
+
+    const result = await saveApiConfiguration('org-1', {
+      branchId: 'branch-1',
+      webhookEvents: ['unsupported_event'],
+      webhookIsActive: true,
+    })
+
+    expect(result).toEqual({
+      error: 'Webhook event tidak valid: unsupported_event',
+    })
+  })
+
+  it('rejects invalid inventory webhook directions before saving configuration', async () => {
+    mocks.createAdminClient.mockResolvedValue(createSupabaseMock().client)
+
+    const result = await saveApiConfiguration('org-1', {
+      branchId: 'branch-1',
+      webhookEvents: ['inventory_movement'],
+      webhookInventoryDirections: ['sideways'],
+      webhookIsActive: true,
+    })
+
+    expect(result).toEqual({
+      error: 'Arah inventory webhook tidak valid: sideways',
+    })
   })
 
   it('lists call logs and webhook deliveries for the organization', async () => {

@@ -48,6 +48,14 @@ function withNoStore(response: Response) {
   return response
 }
 
+function normalizeContactType(rawType: string | null) {
+  if (!rawType) return null
+
+  const normalized = rawType.trim().toUpperCase()
+  if (normalized === 'CUSTOMER' || normalized === 'SUPPLIER') return normalized
+  return rawType
+}
+
 export async function GET(request: NextRequest) {
   const startTime = Date.now()
   const rawKey = extractApiKeyFromRequest(request)
@@ -67,7 +75,7 @@ export async function GET(request: NextRequest) {
   const response = await (async () => {
   const { searchParams } = new URL(request.url)
   const limitParam = Math.min(Number(searchParams.get('limit') ?? '100'), 500)
-  const type = searchParams.get('type') // 'customer' | 'supplier' | null
+  const type = normalizeContactType(searchParams.get('type'))
   const search = searchParams.get('search') ?? ''
 
   let admin: Awaited<ReturnType<typeof createAdminClient>>

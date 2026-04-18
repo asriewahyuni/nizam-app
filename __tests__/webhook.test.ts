@@ -177,4 +177,122 @@ describe('Open API webhook delivery', () => {
       ])
     )
   })
+
+  it('skips inventory movement deliveries when the direction filter does not match', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        api_configurations: [{
+          maybeSingleResult: success({
+            id: 'cfg-1',
+            webhook_url: 'https://example.com/webhook',
+            webhook_secret: null,
+            webhook_events: ['inventory_movement'],
+            webhook_is_active: true,
+            webhook_inventory_directions: ['in'],
+            webhook_inventory_reference_types: [],
+          }),
+        }],
+      },
+    })
+    mocks.createAdminClient.mockResolvedValue(supabase.client)
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await deliverWebhook('org-1', 'branch-1', 'inventory_movement', {
+      movement_id: 'move-1',
+      quantity: -2,
+      direction: 'out',
+      reference_type: 'SALE',
+    })
+
+    expect(result).toEqual({
+      status: 'skipped',
+      reason: 'inventory_direction_filtered',
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('delivers inventory movement when direction and reference_type filters match', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        api_configurations: [{
+          maybeSingleResult: success({
+            id: 'cfg-1',
+            webhook_url: 'https://example.com/webhook',
+            webhook_secret: null,
+            webhook_events: ['inventory_movement'],
+            webhook_is_active: true,
+            webhook_inventory_directions: ['in'],
+            webhook_inventory_reference_types: ['PURCHASE'],
+          }),
+        }],
+        api_webhook_deliveries: [
+          { maybeSingleResult: success({ id: 'delivery-3' }) },
+          { result: success([]) },
+        ],
+      },
+    })
+    mocks.createAdminClient.mockResolvedValue(supabase.client)
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: vi.fn().mockResolvedValue('ok'),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await deliverWebhook('org-1', 'branch-1', 'inventory_movement', {
+      movement_id: 'move-1',
+      quantity: 5,
+      direction: 'in',
+      reference_type: 'PURCHASE',
+    })
+
+    expect(result).toEqual({
+      status: 'delivered',
+      deliveryId: 'delivery-3',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('delivers inventory reversal movement when SALE_VOID filter matches', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        api_configurations: [{
+          maybeSingleResult: success({
+            id: 'cfg-void',
+            webhook_url: 'https://example.com/webhook',
+            webhook_secret: null,
+            webhook_events: ['inventory_movement'],
+            webhook_is_active: true,
+            webhook_inventory_directions: ['in'],
+            webhook_inventory_reference_types: ['SALE_VOID'],
+          }),
+        }],
+        api_webhook_deliveries: [
+          { maybeSingleResult: success({ id: 'delivery-void' }) },
+          { result: success([]) },
+        ],
+      },
+    })
+    mocks.createAdminClient.mockResolvedValue(supabase.client)
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: vi.fn().mockResolvedValue('ok'),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await deliverWebhook('org-1', 'branch-1', 'inventory_movement', {
+      movement_id: 'move-void',
+      quantity: 5,
+      direction: 'in',
+      reference_type: 'SALE_VOID',
+    })
+
+    expect(result).toEqual({
+      status: 'delivered',
+      deliveryId: 'delivery-void',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })

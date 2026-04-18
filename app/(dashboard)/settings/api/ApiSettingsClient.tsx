@@ -25,6 +25,11 @@ import {
   type GenerateApiKeyInput,
   type ApiCallLogRecord,
 } from '@/modules/organization/actions/api-key.actions'
+import {
+  INVENTORY_WEBHOOK_DIRECTION_OPTIONS,
+  INVENTORY_WEBHOOK_REFERENCE_TYPE_OPTIONS,
+  WEBHOOK_EVENT_OPTIONS,
+} from '@/lib/api/webhook-events'
 import type { ApiScope } from '@/lib/api/validate-key'
 
 // ─────────────────────────────────────────────────────
@@ -67,7 +72,7 @@ type WebhookDelivery = {
 }
 type EndpointParameter = {
   name: string
-  in: 'header' | 'query' | 'body'
+  in: 'header' | 'query' | 'body' | 'path'
   required: boolean
   schema: string
   description: string
@@ -91,10 +96,10 @@ type EndpointExample = {
   response: string
 }
 type EndpointDoc = {
-  id: 'cash-read' | 'inventory-read' | 'sales-read' | 'contacts-read' | 'cash-create'
+  id: 'cash-read' | 'inventory-read' | 'inventory-movements-read' | 'inventory-reconciliation-read' | 'general-ledger-read' | 'sales-read' | 'sales-detail-read' | 'purchases-read' | 'bank-transactions-read' | 'contacts-read' | 'contacts-upsert' | 'cash-create'
   label: string
   method: 'GET' | 'POST'
-  path: '/cash' | '/inventory' | '/sales' | '/contacts'
+  path: '/cash' | '/inventory' | '/inventory/movements' | '/inventory/reconciliation' | '/general-ledger' | '/sales' | '/sales/{saleId}' | '/purchases' | '/bank-transactions' | '/contacts' | '/contacts/upsert'
   summary: string
   operationId: string
   scope: ApiScope
@@ -107,6 +112,21 @@ type EndpointDoc = {
   examples: EndpointExample[]
 }
 type TryAuthMode = 'x-api-key' | 'bearer'
+type WebhookReferencePayload = {
+  id: string
+  label: string
+  description: string
+  payload: Record<string, unknown>
+}
+type WebhookReferenceCard = {
+  event: string
+  label: string
+  description: string
+  runtimeStatus: 'active' | 'reserved'
+  when: string[]
+  notes: string[]
+  payloads: WebhookReferencePayload[]
+}
 
 interface Props {
   orgId: string
@@ -127,11 +147,14 @@ const SCOPES: { value: ApiScope; label: string; desc: string; color: string }[] 
   { value: 'cash:read',      label: 'Cash Read',      desc: 'Baca saldo & rekening',        color: 'blue' },
   { value: 'cash:write',     label: 'Cash Write',     desc: 'Catat kas masuk & keluar',     color: 'emerald' },
   { value: 'sales:read',     label: 'Sales Read',     desc: 'Baca data penjualan',           color: 'violet' },
+  { value: 'purchases:read', label: 'Purchases Read', desc: 'Baca data pembelian',           color: 'amber' },
+  { value: 'bank_transactions:read', label: 'Bank Tx Read', desc: 'Baca mutasi kas & bank', color: 'cyan' },
   { value: 'inventory:read', label: 'Inventory Read', desc: 'Baca stok inventori',           color: 'orange' },
+  { value: 'ledger:read',    label: 'Ledger Read',    desc: 'Baca buku besar & rekonsiliasi', color: 'slate' },
   { value: 'contacts:read',  label: 'Contacts Read',  desc: 'Baca data kontak/customer',    color: 'pink' },
+  { value: 'contacts:write', label: 'Contacts Write', desc: 'Buat atau update kontak',       color: 'rose' },
 ]
 
-const WEBHOOK_EVENTS = ['cash_in', 'cash_out', 'sale', 'purchase']
 const TRYOUT_INVISIBLE_CHARACTERS = /[\u200B-\u200D\u2060\uFEFF]/g
 
 function ScopeBadge({ scope }: { scope: string }) {
@@ -140,8 +163,12 @@ function ScopeBadge({ scope }: { scope: string }) {
     blue: 'bg-blue-100 text-blue-700',
     emerald: 'bg-emerald-100 text-emerald-700',
     violet: 'bg-violet-100 text-violet-700',
+    amber: 'bg-amber-100 text-amber-700',
+    cyan: 'bg-cyan-100 text-cyan-700',
     orange: 'bg-orange-100 text-orange-700',
+    slate: 'bg-slate-100 text-slate-700',
     pink: 'bg-pink-100 text-pink-700',
+    rose: 'bg-rose-100 text-rose-700',
   }
   const color = colorMap[def?.color ?? 'blue'] ?? 'bg-slate-100 text-slate-600'
   return (
@@ -225,6 +252,264 @@ function buildCurlExample(args: {
   -d '${formatJson(args.body ?? {})}'`
 }
 
+function buildWebhookHeadersExample(event: string) {
+  return [
+    'Content-Type: application/json',
+    `X-Nizam-Webhook-Event: ${event}`,
+    'X-Nizam-Webhook-Signature: sha256=<hex>',
+    'X-Nizam-Webhook-Timestamp: <unix-ms>',
+    'User-Agent: Nizam-Webhook/1.0',
+  ].join('\n')
+}
+
+function buildInventoryExampleNote(referenceType: string, direction: 'in' | 'out') {
+  switch (referenceType) {
+    case 'PURCHASE':
+      return 'Penerimaan pembelian PO-2026-0007'
+    case 'SALE_VOID':
+      return 'Pembatalan sales order SO-2026-0012'
+    case 'SALES_RETURN':
+      return 'Retur customer SR-2026-0003'
+    case 'PURCHASE_RETURN':
+      return 'Retur pembelian PR-2026-0004'
+    case 'PURCHASE_VOID':
+      return 'Pembatalan penerimaan pembelian PO-2026-0007'
+    case 'SALE':
+      return 'Pengiriman sales order SO-2026-0012'
+    case 'ADJUSTMENT':
+      return direction === 'in'
+        ? 'Penyesuaian stok opname ADJ-2026-0005'
+        : 'Write-off stok ADJ-2026-0005'
+    case 'TRANSFER':
+      return direction === 'in'
+        ? 'Transfer masuk antar gudang TRF-2026-0006'
+        : 'Transfer keluar antar gudang TRF-2026-0006'
+    case 'PRODUCTION_OUTPUT':
+      return 'Hasil produksi WO-2026-0008'
+    case 'PRODUCTION_CONSUMPTION':
+      return 'Pemakaian bahan baku WO-2026-0008'
+    default:
+      return direction === 'in' ? 'Mutasi inventory masuk' : 'Mutasi inventory keluar'
+  }
+}
+
+function buildWebhookReferenceCards(config: ApiConfigurationRecord) {
+  const activeEvents = (config.webhook_events.length > 0
+    ? WEBHOOK_EVENT_OPTIONS.filter((option) => config.webhook_events.includes(option.value))
+    : WEBHOOK_EVENT_OPTIONS
+  )
+
+  const inventoryDirections = Array.from(
+    new Set((config.webhook_inventory_directions ?? []).map((value) => String(value).trim().toLowerCase()).filter(Boolean))
+  )
+  const inventoryReferenceTypes = Array.from(
+    new Set((config.webhook_inventory_reference_types ?? []).map((value) => String(value).trim().toUpperCase()).filter(Boolean))
+  )
+
+  const preferredInboundReferenceType =
+    inventoryReferenceTypes.find((value) => ['PURCHASE', 'SALE_VOID', 'SALES_RETURN', 'ADJUSTMENT', 'PRODUCTION_OUTPUT', 'TRANSFER'].includes(value))
+    ?? inventoryReferenceTypes[0]
+    ?? 'PURCHASE'
+  const preferredOutboundReferenceType =
+    inventoryReferenceTypes.find((value) => ['SALE', 'PURCHASE_VOID', 'PURCHASE_RETURN', 'ADJUSTMENT', 'PRODUCTION_CONSUMPTION', 'TRANSFER'].includes(value))
+    ?? inventoryReferenceTypes[0]
+    ?? 'SALE'
+
+  const showInboundInventoryExample = inventoryDirections.length === 0 || inventoryDirections.includes('in')
+  const showOutboundInventoryExample = inventoryDirections.length === 0 || inventoryDirections.includes('out')
+
+  return activeEvents.map<WebhookReferenceCard>((option) => {
+    if (option.value === 'cash_in') {
+      return {
+        event: option.value,
+        label: option.label,
+        description: option.description,
+        runtimeStatus: 'active',
+        when: [
+          'Dikirim setelah `POST /api/v1/cash` tipe `in` berhasil membuat transaksi kas.',
+          'Webhook hanya terkirim jika request lolos validasi, branch scope, dan penyimpanan transaksi sukses.',
+        ],
+        notes: [
+          'Field `status` mengikuti status transaksi kas yang tersimpan, misalnya `POSTED` atau `DRAFT`.',
+          'Gunakan `counter_account_id` dan `settlement_type` untuk mapping ke akun penerimaan di sistem Anda.',
+        ],
+        payloads: [
+          {
+            id: 'cash-in',
+            label: 'Contoh Payload',
+            description: 'Contoh notifikasi kas masuk untuk pembayaran invoice.',
+            payload: {
+              event: 'cash_in',
+              org_id: 'org_uuid',
+              branch_id: 'branch_uuid',
+              timestamp: '2026-04-18T13:30:00.000Z',
+              data: {
+                transaction_id: 'cash_transaction_uuid',
+                bank_account_id: 'bank_account_uuid',
+                bank_gl_account_id: 'cash_gl_account_uuid',
+                counter_account_id: 'revenue_account_uuid',
+                settlement_type: 'revenue',
+                amount: 250000,
+                description: 'Pembayaran invoice INV-2026-0001',
+                reference: 'INV-2026-0001',
+                status: 'POSTED',
+                transaction_date: '2026-04-18',
+              },
+            },
+          },
+        ],
+      }
+    }
+
+    if (option.value === 'cash_out') {
+      return {
+        event: option.value,
+        label: option.label,
+        description: option.description,
+        runtimeStatus: 'active',
+        when: [
+          'Dikirim setelah `POST /api/v1/cash` tipe `out` berhasil membuat transaksi kas keluar.',
+          'Webhook baru terkirim setelah pengecekan saldo dan jurnal berhasil lolos.',
+        ],
+        notes: [
+          'Field `amount` selalu positif. Arah transaksi dibedakan oleh event `cash_out` itu sendiri.',
+          'Jika Anda membutuhkan referensi dokumen sumber, baca field `reference` dan `description` bersamaan.',
+        ],
+        payloads: [
+          {
+            id: 'cash-out',
+            label: 'Contoh Payload',
+            description: 'Contoh notifikasi kas keluar untuk pembayaran vendor.',
+            payload: {
+              event: 'cash_out',
+              org_id: 'org_uuid',
+              branch_id: 'branch_uuid',
+              timestamp: '2026-04-18T13:35:00.000Z',
+              data: {
+                transaction_id: 'cash_transaction_uuid',
+                bank_account_id: 'bank_account_uuid',
+                bank_gl_account_id: 'cash_gl_account_uuid',
+                counter_account_id: 'expense_account_uuid',
+                settlement_type: 'expense',
+                amount: 185000,
+                description: 'Pembayaran ongkir vendor',
+                reference: 'BILL-2026-0042',
+                status: 'POSTED',
+                transaction_date: '2026-04-18',
+              },
+            },
+          },
+        ],
+      }
+    }
+
+    if (option.value === 'inventory_movement') {
+      const payloads: WebhookReferencePayload[] = []
+
+      if (showInboundInventoryExample) {
+        payloads.push({
+          id: 'inventory-in',
+          label: 'Contoh Payload Stock In',
+          description: 'Contoh notifikasi ketika stok bertambah dari mutasi inventory.',
+          payload: {
+            event: 'inventory_movement',
+            org_id: 'org_uuid',
+            branch_id: 'branch_uuid',
+            timestamp: '2026-04-18T13:40:00.000Z',
+            data: {
+              notes: buildInventoryExampleNote(preferredInboundReferenceType, 'in'),
+              quantity: 5,
+              branch_id: 'branch_uuid',
+              direction: 'in',
+              created_at: '2026-04-18T13:39:58.412Z',
+              product_id: 'product_uuid',
+              unit_price: 12500,
+              movement_id: 'stock_movement_uuid',
+              product_code: 'SKU-001',
+              product_name: 'Produk Inventory',
+              product_unit: 'Pcs',
+              reference_id: 'reference_uuid',
+              movement_date: '2026-04-18T13:39:58.412Z',
+              reference_type: preferredInboundReferenceType,
+              product_category: 'General',
+            },
+          },
+        })
+      }
+
+      if (showOutboundInventoryExample) {
+        payloads.push({
+          id: 'inventory-out',
+          label: 'Contoh Payload Stock Out',
+          description: 'Contoh notifikasi ketika stok berkurang dari mutasi inventory.',
+          payload: {
+            event: 'inventory_movement',
+            org_id: 'org_uuid',
+            branch_id: 'branch_uuid',
+            timestamp: '2026-04-18T13:41:00.000Z',
+            data: {
+              notes: buildInventoryExampleNote(preferredOutboundReferenceType, 'out'),
+              quantity: -2,
+              branch_id: 'branch_uuid',
+              direction: 'out',
+              created_at: '2026-04-18T13:40:54.115Z',
+              product_id: 'product_uuid',
+              unit_price: 12500,
+              movement_id: 'stock_movement_uuid',
+              product_code: 'SKU-001',
+              product_name: 'Produk Inventory',
+              product_unit: 'Pcs',
+              reference_id: 'reference_uuid',
+              movement_date: '2026-04-18T13:40:54.115Z',
+              reference_type: preferredOutboundReferenceType,
+              product_category: 'General',
+            },
+          },
+        })
+      }
+
+      return {
+        event: option.value,
+        label: option.label,
+        description: option.description,
+        runtimeStatus: 'active',
+        when: [
+          'Dikirim setiap ada insert baru ke tabel `stock_movements` yang menghasilkan quantity non-zero, termasuk movement kompensasi saat sale atau purchase yang sudah memengaruhi stok dibatalkan.',
+          '`quantity > 0` dianggap `direction = in`, sedangkan `quantity < 0` dianggap `direction = out`.',
+          inventoryDirections.length > 0
+            ? `Filter arah aktif: ${inventoryDirections.join(', ')}. Hanya mutasi yang lolos filter ini yang akan dikirim.`
+            : 'Tidak ada filter arah. Semua mutasi stok masuk dan keluar akan dikirim.',
+        ],
+        notes: [
+          'Deteksi stok masuk/keluar berasal dari tanda `quantity`, bukan dari akun buku besar.',
+          inventoryReferenceTypes.length > 0
+            ? `Filter reference type aktif: ${inventoryReferenceTypes.join(', ')}.`
+            : 'Tidak ada filter reference type. Semua sumber mutasi inventory akan dikirim.',
+          'Void sale menghasilkan `reference_type = SALE_VOID`, sedangkan void purchase menghasilkan `reference_type = PURCHASE_VOID`.',
+          'Field `quantity` tetap signed agar integrator bisa membedakan perubahan stok tanpa menghitung ulang.',
+        ],
+        payloads,
+      }
+    }
+
+    return {
+      event: option.value,
+      label: option.label,
+      description: option.description,
+      runtimeStatus: 'reserved',
+      when: [
+        'Event ini sudah tersedia di pengaturan webhook.',
+        'Emitter otomatis untuk event ini belum dipasang di runtime saat ini, jadi belum ada delivery webhook yang benar-benar dikirim.',
+      ],
+      notes: [
+        'Jangan anggap event ini live sebelum emitter-nya diaktifkan di backend.',
+        'Gunakan event `cash_in`, `cash_out`, atau `inventory_movement` jika Anda perlu webhook yang sudah aktif sekarang.',
+      ],
+      payloads: [],
+    }
+  })
+}
+
 // ─────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────
@@ -243,7 +528,7 @@ export function ApiSettingsClient({
   baseUrl,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'keys' | 'cashin' | 'cashout' | 'webhook' | 'tryout' | 'history'>('keys')
-  const [activeDoc, setActiveDoc] = useState<'cash-read' | 'inventory-read' | 'sales-read' | 'contacts-read' | 'cash-create'>('cash-read')
+  const [activeDoc, setActiveDoc] = useState<'cash-read' | 'inventory-read' | 'inventory-movements-read' | 'inventory-reconciliation-read' | 'general-ledger-read' | 'sales-read' | 'sales-detail-read' | 'purchases-read' | 'bank-transactions-read' | 'contacts-read' | 'contacts-upsert' | 'cash-create'>('cash-read')
   const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>(initialApiKeys)
   const [loading, setLoading] = useState(false)
   const [resolvedBaseUrl, setResolvedBaseUrl] = useState(baseUrl)
@@ -260,14 +545,26 @@ export function ApiSettingsClient({
 
   // ── Config state ──
   const [config, setConfig] = useState<ApiConfigurationRecord>(
-    initialConfig ?? {
-      id: null, org_id: orgId, branch_id: null,
-      cash_in_account_id: null, cash_out_account_id: null,
-      cash_in_params: {}, cash_out_params: {},
-      webhook_url: null, webhook_secret: null, webhook_events: [], webhook_is_active: false,
-    }
+    initialConfig
+      ? {
+          ...initialConfig,
+          webhook_inventory_directions: Array.isArray(initialConfig.webhook_inventory_directions)
+            ? initialConfig.webhook_inventory_directions
+            : [],
+          webhook_inventory_reference_types: Array.isArray(initialConfig.webhook_inventory_reference_types)
+            ? initialConfig.webhook_inventory_reference_types
+            : [],
+        }
+      : {
+          id: null, org_id: orgId, branch_id: null,
+          cash_in_account_id: null, cash_out_account_id: null,
+          cash_in_params: {}, cash_out_params: {},
+          webhook_url: null, webhook_secret: null, webhook_events: [], webhook_is_active: false,
+          webhook_inventory_directions: [], webhook_inventory_reference_types: [],
+        }
   )
   const [showWebhookSecret, setShowWebhookSecret] = useState(false)
+  const [copiedSnippetId, setCopiedSnippetId] = useState<string | null>(null)
   const [tryApiKey, setTryApiKey] = useState('')
   const [tryAuthMode, setTryAuthMode] = useState<TryAuthMode>('x-api-key')
   const [tryPath, setTryPath] = useState('/api/v1/cash')
@@ -664,6 +961,358 @@ export function ApiSettingsClient({
       ],
     },
     {
+      id: 'inventory-movements-read',
+      label: 'Inventory Movements',
+      method: 'GET',
+      path: '/inventory/movements',
+      summary: 'List inventory movements',
+      operationId: 'listInventoryMovements',
+      scope: 'inventory:read',
+      description: 'Ambil kartu stok atau riwayat mutasi inventory dari tabel `stock_movements`, lengkap dengan arah pergerakan, referensi sumber, dan timestamp pencatatan.',
+      auth: ['ApiKeyAuth', 'BearerAuth'],
+      parameters: [
+        {
+          name: 'limit',
+          in: 'query',
+          required: false,
+          schema: 'integer (1..500)',
+          description: 'Maximum records returned. Default 100, maximum 500.',
+        },
+        {
+          name: 'product_id',
+          in: 'query',
+          required: false,
+          schema: 'uuid',
+          description: 'Exact filter untuk satu produk.',
+        },
+        {
+          name: 'reference_type',
+          in: 'query',
+          required: false,
+          schema: 'string',
+          description: 'Exact filter tipe sumber mutasi seperti `SALE`, `PURCHASE`, `ADJUSTMENT`, `PRODUCTION_OUTPUT`.',
+        },
+        {
+          name: 'direction',
+          in: 'query',
+          required: false,
+          schema: '`in` | `out`',
+          description: 'Filter arah mutasi stok.',
+        },
+        {
+          name: 'date_from',
+          in: 'query',
+          required: false,
+          schema: 'YYYY-MM-DD',
+          description: 'Batas bawah tanggal movement.',
+        },
+        {
+          name: 'date_to',
+          in: 'query',
+          required: false,
+          schema: 'YYYY-MM-DD',
+          description: 'Batas atas tanggal movement.',
+        },
+        {
+          name: 'search',
+          in: 'query',
+          required: false,
+          schema: 'string',
+          description: 'Cari berdasarkan nama produk, SKU, atau notes.',
+        },
+      ],
+      requestBody: null,
+      responses: [
+        { status: '200', description: 'Inventory movements returned successfully.' },
+        { status: '400', description: 'Invalid filters such as malformed UUID, date, or direction.' },
+        { status: '401', description: 'API key missing, invalid, expired, or revoked.' },
+        { status: '403', description: 'API key does not include `inventory:read` scope.' },
+        { status: '429', description: 'Per-key rate limit exceeded.' },
+      ],
+      notes: [
+        'Gunakan endpoint ini untuk audit stok atau sinkronisasi kartu stok ke sistem eksternal.',
+        'Field `quantity` tetap signed, sedangkan `direction` disediakan sebagai helper agar integrator tidak perlu menghitung sendiri.',
+      ],
+      examples: [
+        {
+          id: 'inventory-movements-default',
+          label: 'Stock Ledger',
+          description: 'Contoh mutasi stok keluar untuk produk inventory utama pada unit aktif.',
+          query: `limit=20&product_id=${preferredInventoryProduct?.id ?? 'product-id'}&reference_type=SALE&direction=out`,
+          curl: buildCurlExample({
+            baseUrl,
+            method: 'GET',
+            path: '/api/v1/inventory/movements',
+            query: `limit=20&product_id=${preferredInventoryProduct?.id ?? 'product-id'}&reference_type=SALE&direction=out`,
+          }),
+          response: formatJson({
+            success: true,
+            data: [
+              {
+                id: 'movement-id',
+                product_id: preferredInventoryProduct?.id ?? 'product-id',
+                product_code: preferredInventoryProduct?.sku ?? 'BMS3',
+                product_name: preferredInventoryProduct?.name ?? 'BUKU MATEMATIKA SERIES 3',
+                product_unit: preferredInventoryProduct?.unit ?? 'Pcs',
+                product_category: preferredInventoryProduct?.category ?? 'Siap Jual',
+                movement_date: '2026-04-18T08:00:00.000Z',
+                quantity: -2,
+                direction: 'out',
+                unit_price: toSafeAmount(preferredInventoryProduct?.purchase_price ?? preferredInventoryProduct?.average_cost, 9600),
+                reference_type: 'SALE',
+                reference_id: 'sale-id',
+                notes: 'Pengiriman SO-2026-000001',
+                branch_id: exampleBranchId,
+                created_at: '2026-04-18T08:00:00.000Z',
+              },
+            ],
+            meta: {
+              org_id: orgId,
+              branch_scope: exampleBranchId,
+              count: 1,
+            },
+          }),
+        },
+      ],
+    },
+    {
+      id: 'inventory-reconciliation-read',
+      label: 'Inventory Reconciliation',
+      method: 'GET',
+      path: '/inventory/reconciliation',
+      summary: 'List inventory reconciliation rows',
+      operationId: 'listInventoryLedgerReconciliation',
+      scope: 'ledger:read',
+      description: 'Bandingkan nilai inventory on-hand dari sub-ledger `stock_movements` dengan saldo buku besar akun persediaan `1301-1399` memakai average cost produk aktif.',
+      auth: ['ApiKeyAuth', 'BearerAuth'],
+      parameters: [
+        {
+          name: 'limit',
+          in: 'query',
+          required: false,
+          schema: 'integer (1..500)',
+          description: 'Maximum products returned. Default 100, maximum 500.',
+        },
+        {
+          name: 'product_id',
+          in: 'query',
+          required: false,
+          schema: 'uuid',
+          description: 'Exact filter untuk satu produk.',
+        },
+        {
+          name: 'as_of_date',
+          in: 'query',
+          required: false,
+          schema: 'YYYY-MM-DD',
+          description: 'Cut-off date untuk stock movements dan jurnal posted.',
+        },
+        {
+          name: 'variance_only',
+          in: 'query',
+          required: false,
+          schema: 'boolean',
+          description: 'Hanya tampilkan row dengan variance non-zero.',
+        },
+        {
+          name: 'search',
+          in: 'query',
+          required: false,
+          schema: 'string',
+          description: 'Cari berdasarkan nama produk atau SKU.',
+        },
+      ],
+      requestBody: null,
+      responses: [
+        { status: '200', description: 'Inventory reconciliation returned successfully.' },
+        { status: '400', description: 'Invalid UUID or cut-off date filter.' },
+        { status: '401', description: 'API key missing, invalid, expired, or revoked.' },
+        { status: '403', description: 'API key does not include `ledger:read` scope.' },
+        { status: '429', description: 'Per-key rate limit exceeded.' },
+      ],
+      notes: [
+        'Nilai `ledger_value` di level produk adalah alokasi proporsional dari total saldo GL inventory, bukan hasil posting GL yang benar-benar dipisah per item.',
+        'Gunakan endpoint ini untuk audit variance antara kartu stok dan saldo buku besar inventory.',
+      ],
+      examples: [
+        {
+          id: 'inventory-reconciliation-default',
+          label: 'Inventory vs GL',
+          description: 'Contoh audit variance persediaan per produk hingga tanggal cut-off tertentu.',
+          query: `limit=20&as_of_date=2026-04-18&variance_only=true`,
+          curl: buildCurlExample({
+            baseUrl,
+            method: 'GET',
+            path: '/api/v1/inventory/reconciliation',
+            query: 'limit=20&as_of_date=2026-04-18&variance_only=true',
+          }),
+          response: formatJson({
+            success: true,
+            data: [
+              {
+                product_id: preferredInventoryProduct?.id ?? 'product-id',
+                product_code: preferredInventoryProduct?.sku ?? 'BMS3',
+                product_name: preferredInventoryProduct?.name ?? 'BUKU MATEMATIKA SERIES 3',
+                product_unit: preferredInventoryProduct?.unit ?? 'Pcs',
+                product_category: preferredInventoryProduct?.category ?? 'Siap Jual',
+                stock_qty: 7,
+                avg_cost: toSafeAmount(preferredInventoryProduct?.average_cost ?? preferredInventoryProduct?.purchase_price, 9600),
+                on_hand_value: 67200,
+                ledger_value: 65000,
+                variance: 2200,
+              },
+            ],
+            meta: {
+              org_id: orgId,
+              branch_scope: exampleBranchId,
+              count: 1,
+              as_of_date: '2026-04-18',
+              on_hand_value: 67200,
+              gl_inventory_balance: 65000,
+              inventory_variance: 2200,
+              valuation_method: 'average_cost',
+              gl_account_range: '1301-1399',
+            },
+          }),
+        },
+      ],
+    },
+    {
+      id: 'general-ledger-read',
+      label: 'General Ledger',
+      method: 'GET',
+      path: '/general-ledger',
+      summary: 'List general ledger entries',
+      operationId: 'listGeneralLedgerEntries',
+      scope: 'ledger:read',
+      description: 'Ambil jurnal posted lengkap dengan total debit/kredit dan seluruh line account per entry, dapat difilter per akun, reference type, dan tanggal.',
+      auth: ['ApiKeyAuth', 'BearerAuth'],
+      parameters: [
+        {
+          name: 'limit',
+          in: 'query',
+          required: false,
+          schema: 'integer (1..200)',
+          description: 'Maximum entries returned. Default 50, maximum 200.',
+        },
+        {
+          name: 'date_from',
+          in: 'query',
+          required: false,
+          schema: 'YYYY-MM-DD',
+          description: 'Batas bawah tanggal jurnal.',
+        },
+        {
+          name: 'date_to',
+          in: 'query',
+          required: false,
+          schema: 'YYYY-MM-DD',
+          description: 'Batas atas tanggal jurnal.',
+        },
+        {
+          name: 'account_id',
+          in: 'query',
+          required: false,
+          schema: 'uuid',
+          description: 'Filter entry berdasarkan keberadaan line account tertentu.',
+        },
+        {
+          name: 'account_code',
+          in: 'query',
+          required: false,
+          schema: 'string',
+          description: 'Filter entry berdasarkan code akun tertentu.',
+        },
+        {
+          name: 'reference_type',
+          in: 'query',
+          required: false,
+          schema: 'string',
+          description: 'Filter tipe referensi jurnal seperti `SALE` atau `PURCHASE`.',
+        },
+        {
+          name: 'search',
+          in: 'query',
+          required: false,
+          schema: 'string',
+          description: 'Cari entry number, description, atau notes.',
+        },
+      ],
+      requestBody: null,
+      responses: [
+        { status: '200', description: 'General ledger entries returned successfully.' },
+        { status: '400', description: 'Invalid UUID or date filter.' },
+        { status: '401', description: 'API key missing, invalid, expired, or revoked.' },
+        { status: '403', description: 'API key does not include `ledger:read` scope.' },
+        { status: '429', description: 'Per-key rate limit exceeded.' },
+      ],
+      notes: [
+        'Filter `account_id` atau `account_code` bekerja dengan mencari entry yang memiliki line akun tersebut, tetapi response tetap mengembalikan seluruh line dalam entry.',
+        'Endpoint ini cocok untuk audit jurnal source system, bukan untuk saldo neraca percobaan per akun.',
+      ],
+      examples: [
+        {
+          id: 'general-ledger-default',
+          label: 'Posted Journal',
+          description: 'Contoh satu entry buku besar yang berasal dari pengiriman penjualan.',
+          query: 'limit=10&reference_type=SALE',
+          curl: buildCurlExample({
+            baseUrl,
+            method: 'GET',
+            path: '/api/v1/general-ledger',
+            query: 'limit=10&reference_type=SALE',
+          }),
+          response: formatJson({
+            success: true,
+            data: [
+              {
+                id: 'je-id',
+                entry_number: 'JE-2026-000101',
+                entry_date: '2026-04-18',
+                description: 'Pengiriman penjualan SO-2026-000001',
+                reference_type: 'SALE',
+                reference_id: 'sale-id',
+                status: 'POSTED',
+                notes: null,
+                posted_at: '2026-04-18T08:10:00.000Z',
+                created_at: '2026-04-18T08:09:00.000Z',
+                branch_id: exampleBranchId,
+                total_debit: 19200,
+                total_credit: 19200,
+                journal_lines: [
+                  {
+                    id: 'jl-1',
+                    account_id: 'account-hpp-id',
+                    account_code: '5101',
+                    account_name: 'Harga Pokok Penjualan',
+                    account_type: 'EXPENSE',
+                    debit: 19200,
+                    credit: 0,
+                    memo: 'HPP keluar',
+                  },
+                  {
+                    id: 'jl-2',
+                    account_id: 'account-inventory-id',
+                    account_code: '1301',
+                    account_name: 'Persediaan Barang Dagang',
+                    account_type: 'ASSET',
+                    debit: 0,
+                    credit: 19200,
+                    memo: 'Pengurangan stok',
+                  },
+                ],
+              },
+            ],
+            meta: {
+              org_id: orgId,
+              branch_scope: exampleBranchId,
+              count: 1,
+            },
+          }),
+        },
+      ],
+    },
+    {
       id: 'cash-create',
       label: 'Create Cash',
       method: 'POST',
@@ -884,6 +1533,317 @@ export function ApiSettingsClient({
       ],
     },
     {
+      id: 'sales-detail-read',
+      label: 'Sales Detail',
+      method: 'GET',
+      path: '/sales/{saleId}',
+      summary: 'Get a sales document by ID',
+      operationId: 'getSalesDocumentById',
+      scope: 'sales:read',
+      description: 'Ambil detail satu dokumen penjualan lengkap dengan item, pembayaran, dan retur. Cocok untuk sinkronisasi detail invoice atau debugging mismatch di middleware.',
+      auth: ['ApiKeyAuth', 'BearerAuth'],
+      parameters: [
+        {
+          name: 'saleId',
+          in: 'path',
+          required: true,
+          schema: 'uuid',
+          description: 'ID dokumen penjualan yang ingin dibaca.',
+        },
+      ],
+      requestBody: null,
+      responses: [
+        { status: '200', description: 'Sales detail returned successfully.' },
+        { status: '401', description: 'API key missing, invalid, expired, or revoked.' },
+        { status: '403', description: 'API key does not include `sales:read` scope.' },
+        { status: '404', description: 'Sales document not found for this organization / branch scope.' },
+        { status: '429', description: 'Per-key rate limit exceeded.' },
+      ],
+      notes: [
+        'Gunakan endpoint ini ketika Anda butuh line item, payment summary, atau data retur yang tidak tersedia di endpoint list.',
+        'Jika API key dibatasi ke satu cabang, penjualan di cabang lain akan terlihat sebagai `404`.',
+      ],
+      examples: [
+        {
+          id: 'sales-detail-default',
+          label: 'Sales Detail',
+          description: 'Contoh pengambilan detail satu dokumen penjualan beserta item dan pembayaran yang sudah tercatat.',
+          curl: buildCurlExample({
+            baseUrl,
+            method: 'GET',
+            path: '/api/v1/sales/sale-id',
+          }),
+          response: formatJson({
+            success: true,
+            data: {
+              id: 'sale-id',
+              so_number: 'SO-2026-000001',
+              customer_id: 'customer-id',
+              customer_name: 'CV Maju',
+              total_amount: 225000,
+              tax_amount: 22500,
+              discount_amount: 5000,
+              grand_total: 242500,
+              status: 'ORDERED',
+              payment_status: 'PARTIAL',
+              branch_id: exampleBranchId,
+              branch_name: exampleBranchLabel,
+              warehouse_id: 'warehouse-id',
+              warehouse_name: 'Gudang Utama',
+              order_date: '2026-04-18',
+              due_date: '2026-04-25',
+              notes: 'Follow up pengiriman H+1',
+              created_at: '2026-04-18T00:00:00.000Z',
+              updated_at: '2026-04-18T01:00:00.000Z',
+              items: [
+                {
+                  id: 'sale-item-id',
+                  product_id: preferredInventoryProduct?.id ?? 'product-id',
+                  description: preferredInventoryProduct?.name ?? 'BUKU MATEMATIKA SERIES 3',
+                  quantity: 3,
+                  unit_price: 75000,
+                  discount_amount: 5000,
+                  tax_amount: 22500,
+                  total_amount: 242500,
+                  branch_id: exampleBranchId,
+                  product_name: preferredInventoryProduct?.name ?? 'BUKU MATEMATIKA SERIES 3',
+                  sku: preferredInventoryProduct?.sku ?? 'BMS3',
+                  unit: preferredInventoryProduct?.unit ?? 'Pcs',
+                  product_type: preferredInventoryProduct?.type ?? 'INVENTORY',
+                },
+              ],
+              payments: [
+                {
+                  id: 'payment-id',
+                  account_id: exampleCashAccountId,
+                  account_code: defaultCashAccount?.code ?? '1101',
+                  account_name: defaultCashAccount?.name ?? 'Kas',
+                  payment_date: '2026-04-18',
+                  amount: 100000,
+                  discount_amount: 0,
+                  payment_number: 'PAY-2026-000001',
+                  notes: 'DP customer',
+                  created_at: '2026-04-18T02:00:00.000Z',
+                },
+              ],
+              returns: [],
+            },
+            meta: {
+              org_id: orgId,
+              branch_scope: exampleBranchId,
+            },
+          }),
+        },
+      ],
+    },
+    {
+      id: 'purchases-read',
+      label: 'Read Purchases',
+      method: 'GET',
+      path: '/purchases',
+      summary: 'List purchase documents',
+      operationId: 'listPurchaseDocuments',
+      scope: 'purchases:read',
+      description: 'Ambil daftar pembelian untuk sinkronisasi AP, hutang dagang, atau monitoring PO dari sistem eksternal.',
+      auth: ['ApiKeyAuth', 'BearerAuth'],
+      parameters: [
+        {
+          name: 'limit',
+          in: 'query',
+          required: false,
+          schema: 'integer (1..200)',
+          description: 'Maximum records returned. Default 50, maximum 200.',
+        },
+        {
+          name: 'status',
+          in: 'query',
+          required: false,
+          schema: 'string',
+          description: 'Filter exact status pembelian.',
+        },
+        {
+          name: 'payment_status',
+          in: 'query',
+          required: false,
+          schema: 'string',
+          description: 'Filter exact payment status pembelian.',
+        },
+        {
+          name: 'date_from',
+          in: 'query',
+          required: false,
+          schema: 'date (YYYY-MM-DD)',
+          description: 'Batas bawah tanggal pembelian (inklusif).',
+        },
+        {
+          name: 'date_to',
+          in: 'query',
+          required: false,
+          schema: 'date (YYYY-MM-DD)',
+          description: 'Batas atas tanggal pembelian (inklusif).',
+        },
+      ],
+      requestBody: null,
+      responses: [
+        { status: '200', description: 'Purchase list returned successfully.' },
+        { status: '401', description: 'API key missing, invalid, expired, or revoked.' },
+        { status: '403', description: 'API key does not include `purchases:read` scope.' },
+        { status: '429', description: 'Per-key rate limit exceeded.' },
+      ],
+      notes: [
+        'Gunakan kombinasi `status`, `payment_status`, dan rentang tanggal untuk sinkronisasi incremental hutang/pembelian.',
+        'Jumlah item per dokumen diringkas di field `item_count` agar list tetap ringan.',
+      ],
+      examples: [
+        {
+          id: 'purchases-read-default',
+          label: 'Purchases List',
+          description: 'Contoh sinkronisasi pembelian terbaru untuk vendor payable dan matching dokumen eksternal.',
+          query: 'limit=10&status=RECEIVED&payment_status=PARTIAL&date_from=2026-04-01&date_to=2026-04-30',
+          curl: buildCurlExample({
+            baseUrl,
+            method: 'GET',
+            path: '/api/v1/purchases',
+            query: 'limit=10&status=RECEIVED&payment_status=PARTIAL&date_from=2026-04-01&date_to=2026-04-30',
+          }),
+          response: formatJson({
+            success: true,
+            data: [
+              {
+                id: 'purchase-id',
+                po_number: 'PO-2026-000001',
+                vendor_name: 'PT Supplier Buku',
+                total_amount: 512000,
+                status: 'RECEIVED',
+                payment_status: 'PARTIAL',
+                branch_id: exampleBranchId,
+                purchase_date: '2026-04-18',
+                due_date: '2026-04-25',
+                item_count: 2,
+                created_at: '2026-04-18T00:00:00.000Z',
+              },
+            ],
+            meta: {
+              org_id: orgId,
+              branch_scope: exampleBranchId,
+              count: 1,
+            },
+          }),
+        },
+      ],
+    },
+    {
+      id: 'bank-transactions-read',
+      label: 'Read Bank Tx',
+      method: 'GET',
+      path: '/bank-transactions',
+      summary: 'List bank and cash transactions',
+      operationId: 'listBankTransactions',
+      scope: 'bank_transactions:read',
+      description: 'Ambil daftar mutasi kas/bank dengan informasi rekening kas, akun lawan, referensi, dan arah arus kas.',
+      auth: ['ApiKeyAuth', 'BearerAuth'],
+      parameters: [
+        {
+          name: 'limit',
+          in: 'query',
+          required: false,
+          schema: 'integer (1..200)',
+          description: 'Maximum records returned. Default 50, maximum 200.',
+        },
+        {
+          name: 'type',
+          in: 'query',
+          required: false,
+          schema: '`in` | `out`',
+          description: 'Filter arah arus kas.',
+        },
+        {
+          name: 'status',
+          in: 'query',
+          required: false,
+          schema: 'string',
+          description: 'Filter exact status transaksi kas/bank.',
+        },
+        {
+          name: 'date_from',
+          in: 'query',
+          required: false,
+          schema: 'date (YYYY-MM-DD)',
+          description: 'Batas bawah tanggal transaksi (inklusif).',
+        },
+        {
+          name: 'date_to',
+          in: 'query',
+          required: false,
+          schema: 'date (YYYY-MM-DD)',
+          description: 'Batas atas tanggal transaksi (inklusif).',
+        },
+        {
+          name: 'search',
+          in: 'query',
+          required: false,
+          schema: 'string',
+          description: 'Cari di deskripsi atau nomor referensi.',
+        },
+      ],
+      requestBody: null,
+      responses: [
+        { status: '200', description: 'Bank transactions returned successfully.' },
+        { status: '401', description: 'API key missing, invalid, expired, or revoked.' },
+        { status: '403', description: 'API key does not include `bank_transactions:read` scope.' },
+        { status: '429', description: 'Per-key rate limit exceeded.' },
+      ],
+      notes: [
+        'Field `type` dinormalisasi menjadi `in` atau `out` walaupun database menyimpan nilai uppercase.',
+        'Endpoint ini cocok untuk rekonsiliasi kas, matching payout, dan audit jejak transaksi integrasi.',
+      ],
+      examples: [
+        {
+          id: 'bank-transactions-read-default',
+          label: 'Bank Transactions',
+          description: 'Contoh pengambilan mutasi kas/bank masuk untuk rekonsiliasi pelunasan invoice.',
+          query: 'limit=20&type=in&status=POSTED&date_from=2026-04-01&date_to=2026-04-30&search=INV-2026',
+          curl: buildCurlExample({
+            baseUrl,
+            method: 'GET',
+            path: '/api/v1/bank-transactions',
+            query: 'limit=20&type=in&status=POSTED&date_from=2026-04-01&date_to=2026-04-30&search=INV-2026',
+          }),
+          response: formatJson({
+            success: true,
+            data: [
+              {
+                id: 'bank-tx-id',
+                bank_account_id: exampleBankAccountId,
+                cash_account_id: exampleCashAccountId,
+                cash_account_code: defaultCashAccount?.code ?? '1101',
+                cash_account_name: defaultCashAccount?.name ?? 'Kas',
+                bank_name: tryoutBankAccount?.bank_name ?? exampleCashAccountLabel,
+                account_number: tryoutBankAccount?.account_number ?? '1234567890',
+                description: 'Pelunasan invoice INV-2026-001',
+                amount: 250000,
+                type: 'in',
+                reference_number: 'INV-2026-001',
+                status: 'POSTED',
+                category_id: initialAccounts.find((account) => account.code === '1201')?.id ?? 'receivable-account-id',
+                category_code: initialAccounts.find((account) => account.code === '1201')?.code ?? '1201',
+                category_name: initialAccounts.find((account) => account.code === '1201')?.name ?? 'Piutang Dagang',
+                journal_entry_id: 'journal-entry-id',
+                branch_id: exampleBranchId,
+                transaction_date: '2026-04-18',
+                created_at: '2026-04-18T00:00:00.000Z',
+              },
+            ],
+            meta: {
+              org_id: orgId,
+              branch_scope: exampleBranchId,
+              count: 1,
+            },
+          }),
+        },
+      ],
+    },
+    {
       id: 'contacts-read',
       label: 'Read Contacts',
       method: 'GET',
@@ -963,9 +1923,116 @@ export function ApiSettingsClient({
         },
       ],
     },
+    {
+      id: 'contacts-upsert',
+      label: 'Upsert Contact',
+      method: 'POST',
+      path: '/contacts/upsert',
+      summary: 'Create or update a contact',
+      operationId: 'upsertContact',
+      scope: 'contacts:write',
+      description: 'Buat kontak baru atau update kontak yang sudah ada dengan urutan pencocokan: `id`, `email`, `phone_wa`, `phone`, lalu `name` pada tipe kontak yang sama.',
+      auth: ['ApiKeyAuth', 'BearerAuth'],
+      parameters: [
+        {
+          name: 'x-api-key',
+          in: 'header',
+          required: false,
+          schema: 'string',
+          description: 'Primary authentication header.',
+        },
+        {
+          name: 'Authorization',
+          in: 'header',
+          required: false,
+          schema: 'Bearer <api-key>',
+          description: 'Alternative bearer authentication using the same API key.',
+        },
+      ],
+      requestBody: {
+        required: true,
+        contentType: 'application/json',
+        fields: [
+          '`id` UUID, optional untuk memprioritaskan match ke kontak tertentu',
+          '`name` string, required',
+          '`type` enum: `CUSTOMER` | `SUPPLIER`, required',
+          '`email` string, optional',
+          '`phone` string, optional',
+          '`phone_wa` string, optional',
+          '`instagram` string, optional',
+          '`address` string, optional',
+          '`is_active` boolean, optional default `true`',
+        ],
+      },
+      responses: [
+        { status: '200', description: 'Contact created or updated successfully.' },
+        { status: '400', description: 'Invalid JSON body or invalid contact fields.' },
+        { status: '401', description: 'API key missing, invalid, expired, or revoked.' },
+        { status: '403', description: 'API key does not include `contacts:write` scope.' },
+        { status: '429', description: 'Per-key rate limit exceeded.' },
+      ],
+      notes: [
+        'Cocok untuk sinkronisasi master customer/supplier dari middleware atau marketplace connector.',
+        'Jika kontak sudah ada, response tetap `200` dengan `meta.action = updated` dan `meta.matched_by` menunjukkan field yang dipakai untuk menemukan row lama.',
+      ],
+      examples: [
+        {
+          id: 'contacts-upsert-default',
+          label: 'Upsert Supplier',
+          description: 'Contoh membuat supplier baru atau memperbarui supplier yang sudah ada berdasarkan email/WA/nama.',
+          body: formatJson({
+            name: 'Andi Supplier',
+            type: 'SUPPLIER',
+            email: 'andi@example.com',
+            phone: '08123',
+            phone_wa: '628123',
+            instagram: '@andisupplier',
+            address: 'Jl. Supplier No. 1',
+            is_active: true,
+          }),
+          curl: buildCurlExample({
+            baseUrl,
+            method: 'POST',
+            path: '/api/v1/contacts/upsert',
+            body: {
+              name: 'Andi Supplier',
+              type: 'SUPPLIER',
+              email: 'andi@example.com',
+              phone: '08123',
+              phone_wa: '628123',
+              instagram: '@andisupplier',
+              address: 'Jl. Supplier No. 1',
+              is_active: true,
+            },
+          }),
+          response: formatJson({
+            success: true,
+            data: {
+              id: 'contact-id',
+              name: 'Andi Supplier',
+              email: 'andi@example.com',
+              phone: '08123',
+              phone_wa: '628123',
+              instagram: '@andisupplier',
+              address: 'Jl. Supplier No. 1',
+              type: 'SUPPLIER',
+              is_active: true,
+              created_at: '2026-04-18T00:00:00.000Z',
+              updated_at: '2026-04-18T00:00:00.000Z',
+            },
+            meta: {
+              org_id: orgId,
+              action: 'created',
+              matched_by: 'insert',
+            },
+          }),
+        },
+      ],
+    },
   ]
 
   const activeEndpointDoc = endpointDocs.find((doc) => doc.id === activeDoc) ?? endpointDocs[0]
+  const webhookReferenceCards = buildWebhookReferenceCards(config)
   const defaultEndpointExampleId =
     (activeEndpointDoc.id === 'cash-create'
       ? activeEndpointDoc.examples.find((example) => example.id === 'cash-create-online-book-purchase')?.id
@@ -1039,6 +2106,12 @@ export function ApiSettingsClient({
     setTimeout(() => setKeyCopied(false), 2000)
   }
 
+  const handleCopySnippet = async (snippetId: string, text: string) => {
+    await navigator.clipboard.writeText(text)
+    setCopiedSnippetId(snippetId)
+    setTimeout(() => setCopiedSnippetId((current) => (current === snippetId ? null : current)), 2000)
+  }
+
   const handleSaveConfig = async () => {
     setLoading(true)
     const res = await saveApiConfiguration(orgId, {
@@ -1051,6 +2124,8 @@ export function ApiSettingsClient({
       webhookSecret: config.webhook_secret,
       webhookEvents: config.webhook_events,
       webhookIsActive: config.webhook_is_active,
+      webhookInventoryDirections: config.webhook_inventory_directions,
+      webhookInventoryReferenceTypes: config.webhook_inventory_reference_types,
     })
     setLoading(false)
     if ('error' in res) return alert(res.error)
@@ -1179,7 +2254,7 @@ export function ApiSettingsClient({
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            {['/cash', '/sales', '/inventory', '/contacts'].map(ep => (
+            {['/cash', '/sales', '/inventory', '/inventory/movements', '/inventory/reconciliation', '/general-ledger', '/contacts'].map(ep => (
               <span key={ep} className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-[11px] font-black text-slate-600 shadow-sm">
                 {ep}
               </span>
@@ -2118,17 +3193,18 @@ export function ApiSettingsClient({
               <div className="space-y-3">
                 <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Events yang Di-trigger</label>
                 <div className="flex flex-wrap gap-2">
-                  {WEBHOOK_EVENTS.map(ev => {
-                    const active = config.webhook_events.includes(ev)
+                  {WEBHOOK_EVENT_OPTIONS.map((option) => {
+                    const active = config.webhook_events.includes(option.value)
                     return (
                       <button
-                        key={ev}
+                        key={option.value}
                         type="button"
+                        title={option.description}
                         onClick={() => setConfig(c => ({
                           ...c,
                           webhook_events: active
-                            ? c.webhook_events.filter(e => e !== ev)
-                            : [...c.webhook_events, ev],
+                            ? c.webhook_events.filter(e => e !== option.value)
+                            : [...c.webhook_events, option.value],
                         }))}
                         className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border ${
                           active
@@ -2136,12 +3212,85 @@ export function ApiSettingsClient({
                             : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300'
                         }`}
                       >
-                        {ev.replace('_', ' ')}
+                        {option.label}
                       </button>
                     )
                   })}
                 </div>
               </div>
+
+              {config.webhook_events.includes('inventory_movement') && (
+                <div className="rounded-[28px] border border-violet-100 bg-violet-50/50 p-5 space-y-5">
+                  <div>
+                    <p className="text-[10px] font-black text-violet-700 uppercase tracking-widest">Filter Inventory Movement</p>
+                    <p className="text-xs text-violet-700/80 mt-1">
+                      Deteksi stok masuk atau keluar dihitung dari tanda `quantity` pada `stock_movements`, bukan dari akun buku besar.
+                      Kosongkan filter jika webhook harus dikirim untuk semua mutasi inventory.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[9px] uppercase font-black text-violet-700 tracking-[0.2em] ml-1">Arah Mutasi</label>
+                    <div className="flex flex-wrap gap-2">
+                      {INVENTORY_WEBHOOK_DIRECTION_OPTIONS.map((option) => {
+                        const active = config.webhook_inventory_directions.includes(option.value)
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            title={option.description}
+                            onClick={() => setConfig((current) => ({
+                              ...current,
+                              webhook_inventory_directions: active
+                                ? current.webhook_inventory_directions.filter((value) => value !== option.value)
+                                : [...current.webhook_inventory_directions, option.value],
+                            }))}
+                            className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border ${
+                              active
+                                ? 'bg-violet-600 text-white border-violet-600 shadow-md'
+                                : 'bg-white text-slate-500 border-violet-200 hover:border-violet-400'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[9px] uppercase font-black text-violet-700 tracking-[0.2em] ml-1">Reference Type</label>
+                    <div className="flex flex-wrap gap-2">
+                      {INVENTORY_WEBHOOK_REFERENCE_TYPE_OPTIONS.map((option) => {
+                        const active = config.webhook_inventory_reference_types.includes(option.value)
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            title={option.description}
+                            onClick={() => setConfig((current) => ({
+                              ...current,
+                              webhook_inventory_reference_types: active
+                                ? current.webhook_inventory_reference_types.filter((value) => value !== option.value)
+                                : [...current.webhook_inventory_reference_types, option.value],
+                            }))}
+                            className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border ${
+                              active
+                                ? 'bg-white text-violet-700 border-violet-400 shadow-sm'
+                                : 'bg-white/80 text-slate-500 border-violet-100 hover:border-violet-300'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <p className="text-[11px] text-violet-700/80">
+                      Contoh: pilih `Stock In` + `Purchase` jika client hanya ingin webhook saat penerimaan pembelian menambah stok.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Signature hint */}
               <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
@@ -2151,15 +3300,132 @@ export function ApiSettingsClient({
 const crypto = require('crypto')
 
 const signature = req.headers['x-nizam-webhook-signature']
-const body = JSON.stringify(req.body)
+// rawBody harus berupa body mentah sebelum JSON.parse
+const rawBody = Buffer.isBuffer(req.rawBody)
+  ? req.rawBody
+  : Buffer.from(String(req.rawBody || ''), 'utf8')
 const expected = 'sha256=' + 
   crypto.createHmac('sha256', WEBHOOK_SECRET)
-    .update(body).digest('hex')
+    .update(rawBody).digest('hex')
 
 if (signature !== expected) {
   return res.status(401).json({ error: 'Invalid signature' })
 }`}
                 </pre>
+              </div>
+
+              <div className="rounded-[30px] border border-slate-100 bg-slate-50/80 p-6 space-y-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Payload Reference</p>
+                    <h4 className="mt-2 text-base font-black text-slate-900 uppercase tracking-tight">Dokumentasi Webhook untuk Implementor</h4>
+                    <p className="mt-1 text-sm text-slate-500 leading-relaxed">
+                      Bagian ini menampilkan contoh header dan payload yang bisa langsung dipakai integrator untuk membangun endpoint penerima webhook.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-[11px] text-violet-800 leading-relaxed lg:max-w-sm">
+                    Gunakan raw request body saat memverifikasi `X-Nizam-Webhook-Signature`.
+                    Nilai UUID, timestamp, nominal, dan reference pada payload runtime akan berubah mengikuti transaksi nyata.
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {webhookReferenceCards.map((card) => {
+                    const headerSnippet = buildWebhookHeadersExample(card.event)
+                    const runtimeStatusClass =
+                      card.runtimeStatus === 'active'
+                        ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-100 text-amber-700 border-amber-200'
+
+                    return (
+                      <div key={card.event} className="rounded-[26px] border border-slate-200 bg-white p-5 space-y-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h5 className="text-sm font-black text-slate-900 uppercase tracking-wide">{card.label}</h5>
+                              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${runtimeStatusClass}`}>
+                                {card.runtimeStatus === 'active' ? 'Live Runtime' : 'Reserved'}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-sm text-slate-500 leading-relaxed">{card.description}</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.18em]">Kapan Event Dikirim</p>
+                            <div className="space-y-2">
+                              {card.when.map((line) => (
+                                <p key={line} className="text-sm text-slate-600 leading-relaxed">
+                                  • {line}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl border border-slate-100 bg-slate-950 p-4 space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.18em]">Header</p>
+                              <button
+                                type="button"
+                                onClick={() => handleCopySnippet(`headers-${card.event}`, headerSnippet)}
+                                className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-white transition-all hover:bg-slate-700"
+                              >
+                                {copiedSnippetId === `headers-${card.event}` ? <Check size={12} /> : <Copy size={12} />}
+                                {copiedSnippetId === `headers-${card.event}` ? 'Copied' : 'Copy'}
+                              </button>
+                            </div>
+                            <pre className="overflow-x-auto text-[11px] leading-relaxed text-emerald-300 font-mono whitespace-pre-wrap">
+                              <code>{headerSnippet}</code>
+                            </pre>
+                          </div>
+                        </div>
+
+                        {card.payloads.length > 0 ? (
+                          <div className="space-y-4">
+                            {card.payloads.map((payload) => {
+                              const payloadSnippet = formatJson(payload.payload)
+                              return (
+                                <div key={payload.id} className="rounded-2xl border border-slate-100 bg-slate-950 p-4 space-y-3">
+                                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                    <div>
+                                      <p className="text-sm font-black text-white">{payload.label}</p>
+                                      <p className="mt-1 text-xs text-slate-300 leading-relaxed">{payload.description}</p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopySnippet(`payload-${payload.id}`, payloadSnippet)}
+                                      className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-white transition-all hover:bg-slate-700"
+                                    >
+                                      {copiedSnippetId === `payload-${payload.id}` ? <Check size={12} /> : <Copy size={12} />}
+                                      {copiedSnippetId === `payload-${payload.id}` ? 'Copied' : 'Copy JSON'}
+                                    </button>
+                                  </div>
+                                  <pre className="overflow-x-auto text-[11px] leading-relaxed text-emerald-300 font-mono whitespace-pre-wrap">
+                                    <code>{payloadSnippet}</code>
+                                  </pre>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 leading-relaxed">
+                            Event ini belum memiliki emitter otomatis di runtime aktif. Dokumentasi payload final baru aman dibagikan setelah event tersebut benar-benar dipancarkan oleh backend.
+                          </div>
+                        )}
+
+                        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-2">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.18em]">Catatan Integrasi</p>
+                          {card.notes.map((note) => (
+                            <p key={note} className="text-sm text-slate-600 leading-relaxed">
+                              • {note}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             </div>
 
