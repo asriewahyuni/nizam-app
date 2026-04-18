@@ -17,8 +17,10 @@ type ContactApiRow = {
   name: string
   email: string | null
   phone: string | null
+  phone_wa: string | null
+  instagram: string | null
+  address: string | null
   type: string | null
-  company: string | null
   is_active: boolean
   created_at: string
 }
@@ -74,7 +76,7 @@ export async function GET(request: NextRequest) {
 
   let query = adminClient
     .from('contacts')
-    .select('id, name, email, phone, type, company, is_active, created_at')
+    .select('id, name, email, phone, phone_wa, instagram, address, type, is_active, created_at')
     .eq('org_id', orgId)
     .eq('is_active', true)
     .order('name', { ascending: true })
