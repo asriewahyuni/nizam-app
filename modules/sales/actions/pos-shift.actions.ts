@@ -50,6 +50,14 @@ type PosShiftSessionRow = {
   closed_at?: string | null
 }
 
+type PosShiftFundingAccountRow = {
+  id?: string | null
+  code?: string | null
+  name?: string | null
+  type?: string | null
+  is_active?: boolean | null
+}
+
 type PosShiftSaleRow = {
   pos_session_id?: string | null
   grand_total?: number | string | null
@@ -78,6 +86,26 @@ type PosShiftUserIdentity = {
   displayName: string | null
   nik: string | null
 }
+
+const POS_SHIFT_SESSION_SELECT = `
+  id,
+  org_id,
+  branch_id,
+  cashier_user_id,
+  register_code,
+  opening_cash,
+  expected_cash,
+  closing_cash,
+  variance_amount,
+  cash_account_id,
+  transfer_account_id,
+  qris_account_id,
+  opening_notes,
+  closing_notes,
+  status,
+  opened_at,
+  closed_at
+`
 
 export type PosShiftSettlementSummary = {
   method: PosShiftMethod
@@ -161,6 +189,115 @@ export type PosShiftHistoryResponse = {
 function parseNumber(value: unknown): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+function isPosShiftOpeningFundingColumnMissing(
+  error: { code?: string | null; message?: string | null } | null | undefined
+) {
+  if (!error) return false
+
+  const code = String(error.code || '')
+  const message = String(error.message || '').toLowerCase()
+
+  if (code === '42703' || code === 'PGRST204') {
+    return (
+      message.includes('opening_source_account_id')
+      || message.includes('opening_journal_entry_id')
+    )
+  }
+
+  return (
+    (
+      message.includes('opening_source_account_id')
+      || message.includes('opening_journal_entry_id')
+    ) &&
+    (
+      message.includes('does not exist')
+      || message.includes('could not find')
+      || message.includes('schema cache')
+      || message.includes('undefined column')
+    )
+  )
+}
+
+function isPosShiftLiquidAccount(account: PosShiftFundingAccountRow | null | undefined) {
+  if (!account?.id) return false
+
+  const type = String(account.type || '').trim().toUpperCase()
+  const code = String(account.code || '').trim().toUpperCase()
+
+  return type === 'ASSET' && (code.startsWith('11') || code.startsWith('12'))
+}
+
+function formatPosShiftAccountLabel(account: PosShiftFundingAccountRow | null | undefined) {
+  const code = String(account?.code || '').trim()
+  const name = String(account?.name || '').trim()
+  return [code, name].filter(Boolean).join(' - ') || 'akun terpilih'
+}
+
+async function getPosShiftFundingAccounts(
+  db: any,
+  orgId: string,
+  accountIds: Array<string | null | undefined>
+) {
+  const normalizedAccountIds = Array.from(new Set(
+    accountIds
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+  ))
+
+  if (normalizedAccountIds.length === 0) {
+    return { accountsById: new Map<string, PosShiftFundingAccountRow>() }
+  }
+
+  const { data, error } = await db
+    .from('accounts')
+    .select('id, code, name, type, is_active')
+    .eq('org_id', orgId)
+    .in('id', normalizedAccountIds)
+
+  if (error) {
+    return { error: 'Gagal membaca akun POS shift: ' + String(error.message || 'unknown error') }
+  }
+
+  const accountsById = new Map<string, PosShiftFundingAccountRow>()
+  for (const account of ((data as PosShiftFundingAccountRow[]) || [])) {
+    const accountId = String(account?.id || '').trim()
+    if (!accountId) continue
+    accountsById.set(accountId, account)
+  }
+
+  return { accountsById }
+}
+
+function validatePosShiftFundingAccount(
+  accountsById: Map<string, PosShiftFundingAccountRow>,
+  accountId: string | null | undefined,
+  label: string,
+  options?: { required?: boolean }
+) {
+  const normalizedAccountId = String(accountId || '').trim()
+  if (!normalizedAccountId) {
+    if (options?.required) {
+      return { error: `${label} wajib dipilih.` as const }
+    }
+    return { account: null }
+  }
+
+  const account = accountsById.get(normalizedAccountId)
+  if (!account?.id) {
+    return { error: `${label} tidak ditemukan.` as const }
+  }
+
+  if (account.is_active === false) {
+    return { error: `${label} tidak aktif.` as const }
+  }
+
+  if (!isPosShiftLiquidAccount(account)) {
+    return { error: `${label} harus memakai akun ASSET kelompok 11xx/12xx.` as const }
+  }
+
+  return { account }
 }
 
 function normalizeMethod(value: unknown): PosShiftMethod {
@@ -511,25 +648,7 @@ async function getSingleSession(
 ): Promise<{ session: PosShiftSessionRow | null; error: { code?: string | null; message?: string | null } | null }> {
   const { data, error } = await db
     .from('pos_shift_sessions')
-    .select(`
-      id,
-      org_id,
-      branch_id,
-      cashier_user_id,
-      register_code,
-      opening_cash,
-      expected_cash,
-      closing_cash,
-      variance_amount,
-      cash_account_id,
-      transfer_account_id,
-      qris_account_id,
-      opening_notes,
-      closing_notes,
-      status,
-      opened_at,
-      closed_at
-    `)
+    .select(POS_SHIFT_SESSION_SELECT)
     .eq('org_id', orgId)
     .eq('id', sessionId)
     .maybeSingle()
@@ -825,25 +944,7 @@ export async function getPosShiftSnapshot(orgId: string): Promise<PosShiftSnapsh
 
   const { data: openRow, error: openError } = await db
     .from('pos_shift_sessions')
-    .select(`
-      id,
-      org_id,
-      branch_id,
-      cashier_user_id,
-      register_code,
-      opening_cash,
-      expected_cash,
-      closing_cash,
-      variance_amount,
-      cash_account_id,
-      transfer_account_id,
-      qris_account_id,
-      opening_notes,
-      closing_notes,
-      status,
-      opened_at,
-      closed_at
-    `)
+    .select(POS_SHIFT_SESSION_SELECT)
     .eq('org_id', orgId)
     .eq('branch_id', context.branchId)
     .eq('status', 'OPEN')
@@ -866,25 +967,7 @@ export async function getPosShiftSnapshot(orgId: string): Promise<PosShiftSnapsh
 
   const { data: latestClosedRow } = await db
     .from('pos_shift_sessions')
-    .select(`
-      id,
-      org_id,
-      branch_id,
-      cashier_user_id,
-      register_code,
-      opening_cash,
-      expected_cash,
-      closing_cash,
-      variance_amount,
-      cash_account_id,
-      transfer_account_id,
-      qris_account_id,
-      opening_notes,
-      closing_notes,
-      status,
-      opened_at,
-      closed_at
-    `)
+    .select(POS_SHIFT_SESSION_SELECT)
     .eq('org_id', orgId)
     .eq('branch_id', context.branchId)
     .eq('status', 'CLOSED')
@@ -939,25 +1022,7 @@ export async function getPosShiftHistory(
   const db = await getPosShiftDbClient()
   let query = db
     .from('pos_shift_sessions')
-    .select(`
-      id,
-      org_id,
-      branch_id,
-      cashier_user_id,
-      register_code,
-      opening_cash,
-      expected_cash,
-      closing_cash,
-      variance_amount,
-      cash_account_id,
-      transfer_account_id,
-      qris_account_id,
-      opening_notes,
-      closing_notes,
-      status,
-      opened_at,
-      closed_at
-    `)
+    .select(POS_SHIFT_SESSION_SELECT)
     .eq('org_id', orgId)
     .eq('branch_id', context.branchId)
     .eq('status', 'CLOSED')
@@ -1030,6 +1095,7 @@ export async function openPosShift(
     cashAccountId?: string | null
     transferAccountId?: string | null
     qrisAccountId?: string | null
+    openingSourceAccountId?: string | null
     cashierNik: string
     cashierPassword: string
   }
@@ -1087,52 +1153,174 @@ export async function openPosShift(
 
   const openingCash = Math.max(0, parseNumber(payload.openingCash))
   const registerCode = String(payload.registerCode || context.config.defaultRegisterCode || 'REG-1').trim() || 'REG-1'
+  const fundingAccountsResult = await getPosShiftFundingAccounts(db, orgId, [
+    payload.cashAccountId,
+    payload.transferAccountId,
+    payload.qrisAccountId,
+    payload.openingSourceAccountId,
+  ])
+  if ('error' in fundingAccountsResult) {
+    return { error: fundingAccountsResult.error }
+  }
+
+  const cashAccountResult = validatePosShiftFundingAccount(
+    fundingAccountsResult.accountsById,
+    payload.cashAccountId,
+    'Akun kas laci',
+    { required: openingCash > 0 }
+  )
+  if ('error' in cashAccountResult) return cashAccountResult
+
+  const transferAccountResult = validatePosShiftFundingAccount(
+    fundingAccountsResult.accountsById,
+    payload.transferAccountId,
+    'Akun transfer shift'
+  )
+  if ('error' in transferAccountResult) return transferAccountResult
+
+  const qrisAccountResult = validatePosShiftFundingAccount(
+    fundingAccountsResult.accountsById,
+    payload.qrisAccountId,
+    'Akun QRIS / EDC shift'
+  )
+  if ('error' in qrisAccountResult) return qrisAccountResult
+
+  const openingSourceAccountResult = validatePosShiftFundingAccount(
+    fundingAccountsResult.accountsById,
+    payload.openingSourceAccountId,
+    'Akun sumber modal awal',
+    { required: openingCash > 0 }
+  )
+  if ('error' in openingSourceAccountResult) return openingSourceAccountResult
+
+  if (
+    openingCash > 0 &&
+    cashAccountResult.account?.id &&
+    openingSourceAccountResult.account?.id &&
+    String(cashAccountResult.account.id) === String(openingSourceAccountResult.account.id)
+  ) {
+    return { error: 'Akun sumber modal awal tidak boleh sama dengan akun kas laci karena jurnal akan bernilai nol.' }
+  }
+
+  const sessionInsertPayload = {
+    org_id: orgId,
+    branch_id: context.branchId,
+    cashier_user_id: cashierLogin.sessionUserId,
+    opened_by: cashierLogin.sessionUserId,
+    register_code: registerCode,
+    opening_cash: openingCash,
+    expected_cash: openingCash,
+    opening_notes: payload.openingNotes ? String(payload.openingNotes).trim() : null,
+    cash_account_id: cashAccountResult.account?.id ? String(cashAccountResult.account.id).trim() : null,
+    transfer_account_id: transferAccountResult.account?.id ? String(transferAccountResult.account.id).trim() : null,
+    qris_account_id: qrisAccountResult.account?.id ? String(qrisAccountResult.account.id).trim() : null,
+    status: 'OPEN',
+    ...(openingSourceAccountResult.account?.id
+      ? { opening_source_account_id: String(openingSourceAccountResult.account.id).trim() }
+      : {}),
+  }
 
   const { data: insertedRow, error: insertError } = await db
     .from('pos_shift_sessions')
-    .insert({
-      org_id: orgId,
-      branch_id: context.branchId,
-      cashier_user_id: cashierLogin.sessionUserId,
-      opened_by: cashierLogin.sessionUserId,
-      register_code: registerCode,
-      opening_cash: openingCash,
-      expected_cash: openingCash,
-      opening_notes: payload.openingNotes ? String(payload.openingNotes).trim() : null,
-      cash_account_id: payload.cashAccountId ? String(payload.cashAccountId).trim() : null,
-      transfer_account_id: payload.transferAccountId ? String(payload.transferAccountId).trim() : null,
-      qris_account_id: payload.qrisAccountId ? String(payload.qrisAccountId).trim() : null,
-      status: 'OPEN',
-    })
-    .select(`
-      id,
-      org_id,
-      branch_id,
-      cashier_user_id,
-      register_code,
-      opening_cash,
-      expected_cash,
-      closing_cash,
-      variance_amount,
-      cash_account_id,
-      transfer_account_id,
-      qris_account_id,
-      opening_notes,
-      closing_notes,
-      status,
-      opened_at,
-      closed_at
-    `)
+    .insert(sessionInsertPayload)
+    .select(POS_SHIFT_SESSION_SELECT)
     .maybeSingle()
 
-  if (insertError) {
-    return { error: `Gagal membuka shift POS: ${String(insertError.message || 'unknown error')}` }
+  let finalInsertedRow = insertedRow as PosShiftSessionRow | null
+  let finalInsertError = insertError
+
+  if (finalInsertError && isPosShiftOpeningFundingColumnMissing(finalInsertError)) {
+    const { opening_source_account_id: _openingSourceAccountId, ...legacyInsertPayload } = sessionInsertPayload
+    void _openingSourceAccountId
+    const legacyInsertResult = await db
+      .from('pos_shift_sessions')
+      .insert(legacyInsertPayload)
+      .select(POS_SHIFT_SESSION_SELECT)
+      .maybeSingle()
+
+    finalInsertedRow = legacyInsertResult.data as PosShiftSessionRow | null
+    finalInsertError = legacyInsertResult.error
+  }
+
+  if (finalInsertError || !finalInsertedRow?.id) {
+    return { error: `Gagal membuka shift POS: ${String(finalInsertError?.message || 'unknown error')}` }
+  }
+
+  let warning: string | null = null
+  if (openingCash > 0 && cashAccountResult.account?.id && openingSourceAccountResult.account?.id) {
+    const sourceAccountLabel = formatPosShiftAccountLabel(openingSourceAccountResult.account)
+    const cashAccountLabel = formatPosShiftAccountLabel(cashAccountResult.account)
+    const journalResult = await createJournalEntry({
+      org_id: orgId,
+      branch_id: context.branchId,
+      entry_date: getDateInTimeZone('Asia/Jakarta'),
+      description: `Modal Awal POS ${registerCode}`,
+      reference_type: 'POS_SHIFT_OPENING',
+      reference_id: String(finalInsertedRow.id),
+      notes: payload.openingNotes
+        ? `Modal awal shift ${registerCode}. ${String(payload.openingNotes).trim()}`
+        : `Modal awal shift POS ${registerCode}.`,
+      lines: [
+        {
+          account_id: String(cashAccountResult.account.id),
+          debit: openingCash,
+          credit: 0,
+          memo: `Kas laci shift ${registerCode} (${cashAccountLabel})`,
+        },
+        {
+          account_id: String(openingSourceAccountResult.account.id),
+          debit: 0,
+          credit: openingCash,
+          memo: `Sumber modal awal shift ${registerCode} (${sourceAccountLabel})`,
+        },
+      ],
+      auto_post: true,
+    })
+
+    if ((journalResult as { error?: string }).error) {
+      const cleanupResult = await db
+        .from('pos_shift_sessions')
+        .delete()
+        .eq('id', String(finalInsertedRow.id))
+        .eq('org_id', orgId)
+
+      const cleanupFailed = Boolean((cleanupResult as { error?: { message?: string | null } | null })?.error)
+      const cleanupHint = cleanupFailed
+        ? ' Shift sempat dibuat, tetapi rollback sesi gagal sehingga perlu dicek manual.'
+        : ''
+
+      return {
+        error: `Gagal membuat jurnal modal awal shift: ${String((journalResult as { error?: string }).error || 'unknown error')}.${cleanupHint}`,
+      }
+    }
+
+    const openingJournalEntryId = String((journalResult as { entryId?: string }).entryId || '').trim()
+    if (openingJournalEntryId) {
+      const { error: metadataError } = await db
+        .from('pos_shift_sessions')
+        .update({
+          opening_source_account_id: String(openingSourceAccountResult.account.id),
+          opening_journal_entry_id: openingJournalEntryId,
+        })
+        .eq('id', String(finalInsertedRow.id))
+        .eq('org_id', orgId)
+
+      if (metadataError && !isPosShiftOpeningFundingColumnMissing(metadataError)) {
+        warning = 'Jurnal modal awal shift berhasil dibuat, tetapi metadata akun sumber belum tersimpan penuh.'
+      }
+    }
   }
 
   revalidatePath('/pos')
+  if (openingCash > 0) {
+    revalidatePath('/accounting/journal')
+    revalidatePath('/reports')
+    revalidatePath('/cash')
+  }
   return {
     success: true,
-    session: await buildPosShiftSummary(db, orgId, (insertedRow as PosShiftSessionRow) || {}, context.branchName),
+    session: await buildPosShiftSummary(db, orgId, finalInsertedRow, context.branchName),
+    warning,
   }
 }
 
@@ -1159,25 +1347,7 @@ export async function closePosShift(
     ? await getSingleSession(db, orgId, String(payload.sessionId))
     : await db
         .from('pos_shift_sessions')
-        .select(`
-          id,
-          org_id,
-          branch_id,
-          cashier_user_id,
-          register_code,
-          opening_cash,
-          expected_cash,
-          closing_cash,
-          variance_amount,
-          cash_account_id,
-          transfer_account_id,
-          qris_account_id,
-          opening_notes,
-          closing_notes,
-          status,
-          opened_at,
-          closed_at
-        `)
+        .select(POS_SHIFT_SESSION_SELECT)
         .eq('org_id', orgId)
         .eq('branch_id', context.branchId)
         .eq('status', 'OPEN')
@@ -1228,25 +1398,7 @@ export async function closePosShift(
     })
     .eq('id', currentSession.id)
     .eq('org_id', orgId)
-    .select(`
-      id,
-      org_id,
-      branch_id,
-      cashier_user_id,
-      register_code,
-      opening_cash,
-      expected_cash,
-      closing_cash,
-      variance_amount,
-      cash_account_id,
-      transfer_account_id,
-      qris_account_id,
-      opening_notes,
-      closing_notes,
-      status,
-      opened_at,
-      closed_at
-    `)
+    .select(POS_SHIFT_SESSION_SELECT)
     .maybeSingle()
 
   if (updateError) {

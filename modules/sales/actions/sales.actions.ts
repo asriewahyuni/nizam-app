@@ -4,7 +4,14 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { getResellerCommissionSnapshot } from '@/modules/sales/actions/commission.actions'
-import { ensureSellableBranchStockAvailability, shouldGuardOrderedSaleStock } from '@/modules/sales/lib/stock-guard.server'
+import {
+  calculateSalesPromoDiscount,
+  getUsableSalesPromoByCodeWithDb,
+  incrementSalesPromoUsage,
+} from '@/modules/sales/actions/promo.actions'
+import {
+  getSellableBranchStockShortages,
+} from '@/modules/sales/lib/stock-guard.server'
 import { listActiveSalesWarehouses } from '@/modules/sales/lib/warehouse-branch-compat.server'
 
 type ActiveBranchResult =
@@ -19,10 +26,58 @@ type InventoryRequirement = {
   productId: string
   productName: string
   requiredQty: number
+  unit: string | null
 }
+
+type DeliveryShortageResolution = 'PRODUCTION' | 'PURCHASING'
+
+type DeliveryShortage = {
+  productId: string
+  productName: string
+  requiredQty: number
+  availableQty: number
+  shortageQty: number
+  unit: string | null
+  bomId: string | null
+  resolution: DeliveryShortageResolution
+}
+
+type DeliveryStockCheckResult =
+  | { success: true }
+  | { error: string; shortages: DeliveryShortage[] }
+
+type AutoSaleShariahResolutionResult =
+  | { mode: 'SALAM' | 'ISTISHNA' | null }
+  | { error: string }
 
 const STOCK_EPSILON = 0.000001
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Normalize low-level delivery RPC failures into user-facing sales messages.
+ * This prevents duplicate delivery journals from surfacing as raw SQL errors.
+ */
+function getSalesDeliveryRpcErrorMessage(error: { message?: string | null; code?: string | null } | null | undefined) {
+  const code = String(error?.code || '').trim()
+  const rawMessage = String(error?.message || '').trim()
+  const normalizedMessage = rawMessage.toLowerCase()
+
+  if (
+    code === '23505'
+    && (
+      normalizedMessage.includes('uq_journal_ref_per_org')
+      || (normalizedMessage.includes('duplicate key') && normalizedMessage.includes('journal'))
+    )
+  ) {
+    return 'Sales ini sudah memiliki jurnal delivery. Sistem menolak membuat jurnal SALE ganda. Muat ulang data; jika status sales masih belum selesai, rekonsiliasi jurnal delivery lama terlebih dahulu.'
+  }
+
+  if (!rawMessage) {
+    return 'Gagal memproses delivery sales.'
+  }
+
+  return `Gagal memproses delivery sales: ${rawMessage}`
+}
 
 function formatQuantity(value: number): string {
   if (!Number.isFinite(value)) return '0'
@@ -31,6 +86,37 @@ function formatQuantity(value: number): string {
   return Number.isInteger(rounded)
     ? String(rounded)
     : rounded.toFixed(6).replace(/\.?0+$/, '')
+}
+
+function buildSaleShortageMarker(saleId: string, productId: string) {
+  return `[AUTO_SO_SHORTAGE:${saleId}:${productId}]`
+}
+
+async function reserveUniqueWorkOrderNumber(
+  supabase: any,
+  orgId: string,
+  baseNumber: string
+) {
+  for (let attempt = 0; attempt < 25; attempt += 1) {
+    const candidate = attempt === 0 ? baseNumber : `${baseNumber}-${attempt + 1}`
+    const { data, error } = await (supabase as any)
+      .from('production_work_orders')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('wo_number', candidate)
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      return { error: 'Gagal menyiapkan nomor SPK otomatis: ' + error.message }
+    }
+
+    if (!data?.id) {
+      return { woNumber: candidate }
+    }
+  }
+
+  return { woNumber: `${baseNumber}-${Date.now().toString().slice(-4)}` }
 }
 
 /**
@@ -81,8 +167,16 @@ async function ensureCreateSaleStockAvailability(
   orgId: string,
   branchId: string,
   lines: Array<{ product_id?: string | null; product_name?: string | null; quantity?: number }>
-): Promise<{ success: true } | { error: string }> {
-  return ensureSellableBranchStockAvailability(supabase, {
+): Promise<{ shortages: Array<{
+  productId: string
+  productName: string
+  requiredQty: number
+  onHandQty: number
+  reservedQty: number
+  sellableQty: number
+  shortageQty: number
+}> } | { error: string }> {
+  return getSellableBranchStockShortages(supabase, {
     orgId,
     branchId,
     lines,
@@ -92,6 +186,157 @@ async function ensureCreateSaleStockAvailability(
 function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return (value[0] as T | undefined) ?? null
   return (value as T | null) ?? null
+}
+
+async function getPreferredProductionBomByProduct(
+  supabase: any,
+  orgId: string,
+  branchId: string,
+  productIds: string[]
+): Promise<{ bomByProduct: Map<string, { id: string; branchId: string | null }> } | { error: string }> {
+  const normalizedProductIds = [...new Set(productIds.map((productId) => String(productId || '').trim()).filter(Boolean))]
+  if (!normalizedProductIds.length) {
+    return { bomByProduct: new Map() }
+  }
+
+  const { data: bomRows, error: bomError } = await (supabase as any)
+    .from('production_boms')
+    .select('id, product_id, branch_id')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .in('product_id', normalizedProductIds)
+    .or(`branch_id.is.null,branch_id.eq.${branchId}`)
+
+  if (bomError) {
+    return { error: 'Gagal membaca BoM aktif: ' + bomError.message }
+  }
+
+  const preferredBomByProduct = new Map<string, { id: string; branchId: string | null }>()
+  for (const row of (bomRows as any[]) || []) {
+    const productId = String((row as any).product_id || '').trim()
+    if (!productId) continue
+
+    const branchSpecificBom = String((row as any).branch_id || '').trim() || null
+    const existing = preferredBomByProduct.get(productId)
+    if (!existing || (!existing.branchId && branchSpecificBom === branchId)) {
+      preferredBomByProduct.set(productId, {
+        id: String((row as any).id || ''),
+        branchId: branchSpecificBom,
+      })
+    }
+  }
+
+  return { bomByProduct: preferredBomByProduct }
+}
+
+async function ensureIstishnaLinesHaveActiveBom(
+  supabase: any,
+  orgId: string,
+  branchId: string,
+  lines: Array<{ product_id?: string | null; product_name?: string | null; quantity?: number }>
+): Promise<{ success: true } | { error: string }> {
+  const normalizedProductIds = [...new Set(
+    (lines || [])
+      .map((line) => String(line?.product_id || '').trim())
+      .filter(Boolean)
+  )]
+
+  if (!normalizedProductIds.length) {
+    return { error: 'Akad ISTISHNA hanya bisa dipakai untuk produk master yang punya BoM aktif.' }
+  }
+
+  const { data: productRows, error: productError } = await (supabase as any)
+    .from('products')
+    .select('id, name, type')
+    .eq('org_id', orgId)
+    .in('id', normalizedProductIds)
+
+  if (productError) {
+    return { error: 'Gagal memvalidasi produk ISTISHNA: ' + productError.message }
+  }
+
+  const inventoryProducts = ((productRows as any[]) || []).filter(
+    (product) => String((product as any).type || 'INVENTORY').toUpperCase() === 'INVENTORY'
+  )
+
+  if (!inventoryProducts.length) {
+    return { error: 'Akad ISTISHNA hanya berlaku untuk produk inventori yang diproduksi melalui BoM.' }
+  }
+
+  const bomLookup = await getPreferredProductionBomByProduct(
+    supabase,
+    orgId,
+    branchId,
+    inventoryProducts.map((product) => String((product as any).id || ''))
+  )
+  if ('error' in bomLookup) return bomLookup
+
+  const missingBomProducts = inventoryProducts.filter(
+    (product) => !bomLookup.bomByProduct.has(String((product as any).id || ''))
+  )
+
+  if (!missingBomProducts.length) {
+    return { success: true }
+  }
+
+  const firstMissing = String((missingBomProducts[0] as any).name || 'produk').trim() || 'produk'
+  const extraCount = missingBomProducts.length - 1
+  const extraInfo = extraCount > 0 ? ` Ada ${extraCount} produk lain yang juga belum punya BoM aktif.` : ''
+
+  return {
+    error: `Akad ISTISHNA hanya bisa dipakai untuk produk dengan BoM aktif. Lengkapi BoM untuk "${firstMissing}" terlebih dahulu.${extraInfo}`,
+  }
+}
+
+async function resolveAutomaticSaleShariahModeForShortage(
+  supabase: any,
+  orgId: string,
+  branchId: string,
+  lines: Array<{ product_id?: string | null; product_name?: string | null; quantity?: number }>
+): Promise<AutoSaleShariahResolutionResult> {
+  const stockCheck = await ensureCreateSaleStockAvailability(supabase, orgId, branchId, lines)
+  if ('error' in stockCheck) return stockCheck
+
+  if (!stockCheck.shortages.length) {
+    return { mode: null }
+  }
+
+  const reservedShortage = stockCheck.shortages.find((shortage) => shortage.reservedQty > STOCK_EPSILON)
+  if (reservedShortage) {
+    return {
+      error: `Stok produk "${reservedShortage.productName}" tidak cukup. Stok fisik ${formatQuantity(
+        reservedShortage.onHandQty
+      )}, sudah dialokasikan ke SO lain ${formatQuantity(
+        reservedShortage.reservedQty
+      )}, tersedia dijual ${formatQuantity(Math.max(
+        0,
+        reservedShortage.sellableQty
+      ))}, permintaan ${formatQuantity(reservedShortage.requiredQty)}.`,
+    }
+  }
+
+  const bomLookup = await getPreferredProductionBomByProduct(
+    supabase,
+    orgId,
+    branchId,
+    stockCheck.shortages.map((shortage) => shortage.productId)
+  )
+  if ('error' in bomLookup) return bomLookup
+
+  const shortagesWithBom = stockCheck.shortages.filter((shortage) => bomLookup.bomByProduct.has(shortage.productId))
+  const shortagesWithoutBom = stockCheck.shortages.filter((shortage) => !bomLookup.bomByProduct.has(shortage.productId))
+
+  if (shortagesWithBom.length && shortagesWithoutBom.length) {
+    const productionProduct = shortagesWithBom[0]
+    const salamProduct = shortagesWithoutBom[0]
+    return {
+      error: `SO ini mencampur produk yang harus diproduksi dan yang harus dipesan tanpa produksi. Produk "${productionProduct.productName}" harus memakai akad ISTISHNA karena punya BoM aktif, sedangkan "${salamProduct.productName}" harus memakai akad SALAM karena tidak punya BoM. Pisahkan ke SO terpisah.`,
+    }
+  }
+
+  return {
+    mode: shortagesWithBom.length ? 'ISTISHNA' : 'SALAM',
+  }
 }
 
 function isRpcFunctionNotFound(
@@ -217,7 +462,7 @@ async function getSaleInventoryRequirements(
 ): Promise<{ requirements: InventoryRequirement[] } | { error: string }> {
   const { data: rows, error } = await (supabase as any)
     .from('sales_items')
-    .select('product_id, quantity, products(name, type)')
+    .select('product_id, quantity, products(name, type, unit)')
     .eq('org_id', orgId)
     .eq('sale_id', saleId)
 
@@ -227,7 +472,7 @@ async function getSaleInventoryRequirements(
 
   const requirementMap = new Map<string, InventoryRequirement>()
   for (const row of (rows as any[]) || []) {
-    const product = normalizeRelation<{ name?: string | null; type?: string | null }>((row as any).products)
+    const product = normalizeRelation<{ name?: string | null; type?: string | null; unit?: string | null }>((row as any).products)
     const productType = String(product?.type || 'INVENTORY').toUpperCase()
     if (productType !== 'INVENTORY') continue
 
@@ -247,6 +492,7 @@ async function getSaleInventoryRequirements(
       productId,
       productName: String(product?.name || productId),
       requiredQty: qty,
+      unit: String(product?.unit || '').trim() || null,
     })
   }
 
@@ -256,9 +502,10 @@ async function getSaleInventoryRequirements(
 async function ensureDeliveryStockAvailability(
   supabase: any,
   orgId: string,
+  branchId: string,
   warehouseId: string,
   requirements: InventoryRequirement[]
-): Promise<{ success: true } | { error: string }> {
+): Promise<DeliveryStockCheckResult> {
   if (!requirements.length) return { success: true }
 
   const productIds = requirements.map((item) => item.productId)
@@ -270,7 +517,7 @@ async function ensureDeliveryStockAvailability(
     .in('product_id', productIds)
 
   if (error) {
-    return { error: 'Gagal memvalidasi stok gudang: ' + error.message }
+    return { error: 'Gagal memvalidasi stok gudang: ' + error.message, shortages: [] }
   }
 
   const availableByProduct: Record<string, number> = {}
@@ -280,27 +527,77 @@ async function ensureDeliveryStockAvailability(
     availableByProduct[productId] = (availableByProduct[productId] || 0) + Number((row as any).quantity || 0)
   }
 
-  const shortages = requirements
+  const shortageCandidates = requirements
     .map((item) => {
       const availableQty = Number(availableByProduct[item.productId] || 0)
       return {
         ...item,
         availableQty,
-        shortage: item.requiredQty - availableQty,
+        shortageQty: item.requiredQty - availableQty,
       }
     })
-    .filter((item) => item.shortage > STOCK_EPSILON)
+    .filter((item) => item.shortageQty > STOCK_EPSILON)
 
-  if (!shortages.length) return { success: true }
+  if (!shortageCandidates.length) return { success: true }
+
+  const { data: bomRows, error: bomError } = await (supabase as any)
+    .from('production_boms')
+    .select('id, product_id, branch_id')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .in('product_id', shortageCandidates.map((item) => item.productId))
+    .or(`branch_id.is.null,branch_id.eq.${branchId}`)
+
+  if (bomError) {
+    return { error: 'Gagal menentukan tindak lanjut stok kurang: ' + bomError.message, shortages: [] }
+  }
+
+  const preferredBomByProduct = new Map<string, { id: string; branchId: string | null }>()
+  for (const row of (bomRows as any[]) || []) {
+    const productId = String((row as any).product_id || '')
+    if (!productId) continue
+
+    const branchSpecificBom = String((row as any).branch_id || '') || null
+    const existing = preferredBomByProduct.get(productId)
+    if (!existing || (!existing.branchId && branchSpecificBom === branchId)) {
+      preferredBomByProduct.set(productId, {
+        id: String((row as any).id || ''),
+        branchId: branchSpecificBom,
+      })
+    }
+  }
+
+  const shortages: DeliveryShortage[] = shortageCandidates.map((item) => {
+    const preferredBom = preferredBomByProduct.get(item.productId)
+    return {
+      productId: item.productId,
+      productName: item.productName,
+      requiredQty: item.requiredQty,
+      availableQty: item.availableQty,
+      shortageQty: item.shortageQty,
+      unit: item.unit,
+      bomId: preferredBom?.id || null,
+      resolution: preferredBom?.id ? 'PRODUCTION' : 'PURCHASING',
+    }
+  })
 
   const first = shortages[0]
+  const quantitySuffix = first.unit ? ` ${first.unit}` : ''
+  const guidance =
+    first.resolution === 'PRODUCTION'
+      ? ' Produk ini punya BoM aktif. Buat SPK produksi terlebih dahulu sebelum pengiriman.'
+      : ' Produk ini tidak punya BoM aktif. Ajukan purchase request terlebih dahulu sebelum pengiriman.'
+  const additionalShortageInfo =
+    shortages.length > 1 ? ` Ada ${shortages.length - 1} produk lain yang juga kurang stok.` : ''
+
   return {
     error: `Stok tidak cukup untuk produk "${first.productName}". Dibutuhkan ${formatQuantity(
       first.requiredQty
     )}, tersedia ${formatQuantity(Math.max(
       0,
       first.availableQty
-    ))}. Penjualan tidak boleh melebihi stok (kecuali akad SALAM).`,
+    ))}, kurang ${formatQuantity(first.shortageQty)}${quantitySuffix}.${guidance}${additionalShortageInfo}`,
+    shortages,
   }
 }
 
@@ -576,27 +873,43 @@ export async function createSaleEntry(orgId: string, payload: any) {
     return { error: 'Customer dan minimal satu baris item wajib diisi.' }
   }
 
-  const shariahMode = normalizeShariahMode(payload.shariah_mode)
-  const salamMode = isSalamMode(shariahMode)
-  const paymentTerm = salamMode ? 'LUNAS' : (String(payload.payment_term || 'TEMPO').toUpperCase() === 'LUNAS' ? 'LUNAS' : 'TEMPO')
-  const dueDate = (paymentTerm === 'TEMPO' || salamMode) ? (payload.due_date || null) : null
+  let shariahMode = normalizeShariahMode(payload.shariah_mode)
 
-  if (createMode === 'PUBLISH' && (paymentTerm === 'TEMPO' || salamMode) && !dueDate) {
-    return { error: 'Tanggal jatuh tempo pengiriman wajib diisi.' }
-  }
-
-  if (createMode === 'PUBLISH' && salamMode && paymentTerm !== 'LUNAS') {
-    return { error: 'Akad SALAM wajib dibayar lunas (tunai) di awal.' }
-  }
-
-  if (createMode === 'PUBLISH' && shouldGuardOrderedSaleStock(shariahMode)) {
-    const createStockCheck = await ensureCreateSaleStockAvailability(
+  if (createMode === 'PUBLISH' && shariahMode === 'CASH') {
+    const autoShariahMode = await resolveAutomaticSaleShariahModeForShortage(
       supabase as any,
       orgId,
       activeBranchId,
       normalizedLines
     )
-    if ('error' in createStockCheck) return { error: createStockCheck.error }
+    if ('error' in autoShariahMode) return autoShariahMode
+
+    if (autoShariahMode.mode) {
+      shariahMode = autoShariahMode.mode
+    }
+  }
+
+  if (createMode === 'PUBLISH' && shariahMode === 'ISTISHNA') {
+    const istishnaValidation = await ensureIstishnaLinesHaveActiveBom(
+      supabase as any,
+      orgId,
+      activeBranchId,
+      normalizedLines
+    )
+    if ('error' in istishnaValidation) return istishnaValidation
+  }
+
+  const salamMode = isSalamMode(shariahMode)
+  const istishnaMode = normalizeShariahMode(shariahMode) === 'ISTISHNA'
+  const paymentTerm = salamMode ? 'LUNAS' : (String(payload.payment_term || 'TEMPO').toUpperCase() === 'LUNAS' ? 'LUNAS' : 'TEMPO')
+  const dueDate = (paymentTerm === 'TEMPO' || salamMode || istishnaMode) ? (payload.due_date || null) : null
+
+  if (createMode === 'PUBLISH' && (paymentTerm === 'TEMPO' || salamMode || istishnaMode) && !dueDate) {
+    return { error: 'Tanggal jatuh tempo pengiriman wajib diisi.' }
+  }
+
+  if (createMode === 'PUBLISH' && salamMode && paymentTerm !== 'LUNAS') {
+    return { error: 'Akad SALAM wajib dibayar lunas (tunai) di awal.' }
   }
 
   const totalAmount = normalizedLines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)
@@ -780,6 +1093,215 @@ export async function createSaleEntry(orgId: string, payload: any) {
   return { success: true, saleId }
 }
 
+export async function createSaleFulfillmentDrafts(
+  orgId: string,
+  saleId: string,
+  warehouseId?: string | null
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Tidak terautentikasi.' }
+
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk menyiapkan tindak lanjut kekurangan stok.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+
+  const { data: sale, error: saleError } = await (supabase as any)
+    .from('sales')
+    .select('id, sale_number, due_date, warehouse_id, status')
+    .eq('id', saleId)
+    .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
+    .single()
+
+  if (saleError || !sale) {
+    return { error: 'Sales order tidak ditemukan pada unit aktif.' }
+  }
+
+  if ((sale as any).status === 'FINISHED') {
+    return { error: 'Sales order ini sudah selesai dikirim.' }
+  }
+
+  if ((sale as any).status === 'VOIDED') {
+    return { error: 'Sales order yang sudah dibatalkan tidak bisa dibuatkan tindak lanjut stok.' }
+  }
+
+  const inventoryRequirementResult = await getSaleInventoryRequirements(supabase as any, orgId, saleId)
+  if ('error' in inventoryRequirementResult) return { error: inventoryRequirementResult.error }
+  if (!inventoryRequirementResult.requirements.length) {
+    return { error: 'SO ini tidak memiliki item persediaan yang perlu ditindaklanjuti.' }
+  }
+
+  let resolvedWarehouseId: string | null = warehouseId || (sale as any).warehouse_id || null
+  const resolvedWarehouse = await resolveDeliveryWarehouseId(
+    supabase as any,
+    orgId,
+    activeBranchResult.branchId,
+    resolvedWarehouseId
+  )
+
+  if ('error' in resolvedWarehouse) {
+    return { error: resolvedWarehouse.error }
+  }
+
+  resolvedWarehouseId = resolvedWarehouse.warehouseId
+
+  const stockCheck = await ensureDeliveryStockAvailability(
+    supabase as any,
+    orgId,
+    activeBranchResult.branchId,
+    resolvedWarehouseId,
+    inventoryRequirementResult.requirements
+  )
+
+  if (!('error' in stockCheck)) {
+    return { error: 'Stok saat ini sudah cukup. Coba kirim ulang barang.' }
+  }
+
+  if (!stockCheck.shortages.length) {
+    return { error: stockCheck.error }
+  }
+
+  const saleNumber = String((sale as any).sale_number || saleId)
+  const dueDate = normalizeDateOnlyValue((sale as any).due_date)
+  let workOrdersCreated = 0
+  let workOrdersSkipped = 0
+  let purchaseRequestsCreated = 0
+  let purchaseRequestsSkipped = 0
+
+  for (const shortage of stockCheck.shortages) {
+    const marker = buildSaleShortageMarker(saleId, shortage.productId)
+    const baseNote = `${marker} Otomatis dari kekurangan stok SO ${saleNumber} untuk produk ${shortage.productName}.`
+
+    if (shortage.resolution === 'PRODUCTION' && shortage.bomId) {
+      const { data: existingWorkOrder, error: existingWorkOrderError } = await (supabase as any)
+        .from('production_work_orders')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('branch_id', activeBranchResult.branchId)
+        .eq('bom_id', shortage.bomId)
+        .in('status', ['DRAFT', 'RELEASED'])
+        .ilike('notes', `%${marker}%`)
+        .limit(1)
+        .maybeSingle()
+
+      if (existingWorkOrderError) {
+        return { error: 'Gagal memeriksa draft SPK otomatis: ' + existingWorkOrderError.message }
+      }
+
+      if (existingWorkOrder?.id) {
+        workOrdersSkipped += 1
+        continue
+      }
+
+      const workOrderBaseNumber = [
+        'SPK',
+        saleNumber.replace(/[^A-Za-z0-9-]/g, '').slice(0, 30) || 'SO',
+        shortage.productId.replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase() || 'AUTO',
+      ].join('-')
+      const reservedNumber = await reserveUniqueWorkOrderNumber(
+        supabase as any,
+        orgId,
+        workOrderBaseNumber
+      )
+      if ('error' in reservedNumber) {
+        return { error: reservedNumber.error }
+      }
+
+      const { error: workOrderInsertError } = await (supabase as any)
+        .from('production_work_orders')
+        .insert({
+          org_id: orgId,
+          branch_id: activeBranchResult.branchId,
+          bom_id: shortage.bomId,
+          wo_number: reservedNumber.woNumber,
+          quantity_planned: shortage.shortageQty,
+          status: 'DRAFT',
+          notes: baseNote,
+          deadline_date: dueDate,
+        })
+
+      if (workOrderInsertError) {
+        return { error: 'Gagal membuat draft SPK otomatis: ' + workOrderInsertError.message }
+      }
+
+      workOrdersCreated += 1
+      continue
+    }
+
+    const { data: existingPurchaseRequest, error: existingPurchaseRequestError } = await (supabase as any)
+      .from('purchase_requests')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('branch_id', activeBranchResult.branchId)
+      .eq('source_type', 'SALES_DELIVERY_SHORTAGE')
+      .eq('source_id', saleId)
+      .eq('product_id', shortage.productId)
+      .in('status', ['PENDING', 'ORDERED', 'RECEIVED'])
+      .limit(1)
+      .maybeSingle()
+
+    if (existingPurchaseRequestError) {
+      return { error: 'Gagal memeriksa purchase request otomatis: ' + existingPurchaseRequestError.message }
+    }
+
+    if (existingPurchaseRequest?.id) {
+      purchaseRequestsSkipped += 1
+      continue
+    }
+
+    const { error: purchaseRequestInsertError } = await (supabase as any)
+      .from('purchase_requests')
+      .insert({
+        org_id: orgId,
+        branch_id: activeBranchResult.branchId,
+        requester_id: user.id,
+        product_id: shortage.productId,
+        product_name: shortage.productName,
+        quantity: shortage.shortageQty,
+        unit: shortage.unit,
+        status: 'PENDING',
+        priority: 'URGENT',
+        notes: baseNote,
+        source_type: 'SALES_DELIVERY_SHORTAGE',
+        source_id: saleId,
+      })
+
+    if (purchaseRequestInsertError) {
+      return { error: 'Gagal membuat purchase request otomatis: ' + purchaseRequestInsertError.message }
+    }
+
+    purchaseRequestsCreated += 1
+  }
+
+  revalidatePath('/sales')
+  revalidatePath('/factory')
+  revalidatePath('/purchasing')
+
+  const messageParts: string[] = []
+  if (workOrdersCreated > 0) messageParts.push(`${workOrdersCreated} draft SPK dibuat`)
+  if (workOrdersSkipped > 0) messageParts.push(`${workOrdersSkipped} draft SPK sudah ada`)
+  if (purchaseRequestsCreated > 0) messageParts.push(`${purchaseRequestsCreated} purchase request dibuat`)
+  if (purchaseRequestsSkipped > 0) messageParts.push(`${purchaseRequestsSkipped} purchase request sudah ada`)
+
+  return {
+    success: true,
+    message:
+      messageParts.join('. ') ||
+      'Tindak lanjut kekurangan stok sudah tersedia. Cek modul Factory atau Purchasing.',
+    workOrdersCreated,
+    workOrdersSkipped,
+    purchaseRequestsCreated,
+    purchaseRequestsSkipped,
+    routes: [
+      ...(workOrdersCreated + workOrdersSkipped > 0 ? ['/factory'] : []),
+      ...(purchaseRequestsCreated + purchaseRequestsSkipped > 0 ? ['/purchasing'] : []),
+    ],
+  }
+}
+
 export async function deliverSale(orgId: string, saleId: string, warehouseId?: string | null) {
   const supabase = await createClient()
   const activeBranchResult = await requireActiveBranchId(
@@ -822,7 +1344,7 @@ export async function deliverSale(orgId: string, saleId: string, warehouseId?: s
   if ('error' in inventoryRequirementResult) return { error: inventoryRequirementResult.error }
 
   const hasInventoryItems = inventoryRequirementResult.requirements.length > 0
-  if (hasInventoryItems && !isSalam && !resolvedWarehouseId) {
+  if (hasInventoryItems && !resolvedWarehouseId) {
     const resolvedWarehouse = await resolveDeliveryWarehouseId(
       supabase as any,
       orgId,
@@ -837,17 +1359,28 @@ export async function deliverSale(orgId: string, saleId: string, warehouseId?: s
     resolvedWarehouseId = resolvedWarehouse.warehouseId
   }
 
-  if (hasInventoryItems && !isSalam) {
+  if (hasInventoryItems) {
     if (!resolvedWarehouseId) {
       return { error: 'Gudang pengiriman wajib dipilih untuk memvalidasi stok.' }
     }
     const stockCheck = await ensureDeliveryStockAvailability(
       supabase as any,
       orgId,
+      activeBranchResult.branchId,
       resolvedWarehouseId,
       inventoryRequirementResult.requirements
     )
-    if ('error' in stockCheck) return { error: stockCheck.error }
+    if ('error' in stockCheck) {
+      if (!stockCheck.shortages.length) {
+        return { error: stockCheck.error }
+      }
+
+      return {
+        error: stockCheck.error,
+        code: 'DELIVERY_STOCK_SHORTAGE',
+        shortages: stockCheck.shortages,
+      }
+    }
   }
 
   const { error } = await (supabase as any).rpc('process_sales_delivery_atomic', {
@@ -858,7 +1391,7 @@ export async function deliverSale(orgId: string, saleId: string, warehouseId?: s
 
   if (error) {
     (console as any).error('Failed to deliver sale via atomic engine:', error)
-    return { error: `[RPC ERROR]: ${error.message} (Code: ${error.code})` }
+    return { error: getSalesDeliveryRpcErrorMessage(error) }
   }
 
   revalidatePath('/sales')
@@ -1072,7 +1605,7 @@ export async function getQuotations(orgId: string, branchId?: string | null) {
   if (quoteRows.length === 0) return []
   const saleIds = quoteRows.map((r) => r.id)
 
-  let itemsBySaleId: Record<string, any[]> = {}
+  const itemsBySaleId: Record<string, any[]> = {}
   try {
     const itemsResult = await queryPostgres<Record<string, unknown>>(`
       SELECT si.*, p.name AS product_name, p.sku, p.unit, p.type AS product_type
@@ -1128,8 +1661,21 @@ export async function createQuotation(orgId: string, payload: any) {
     (acc: number, l: any) => acc + (Number(l.quantity || 0) * Number(l.discount_amount || 0)),
     0
   )
-  const headerDiscount = Number(payload.discount_amount || 0)
+  let headerDiscount = Number(payload.discount_amount || 0)
   const taxAmount = Number(payload.tax_amount || 0)
+  let appliedPromoId: string | null = null
+
+  const promoCode = String(payload.promo_code || '').trim()
+  if (promoCode) {
+    const promoResult = await getUsableSalesPromoByCodeWithDb(supabase as any, orgId, promoCode)
+    if ('error' in promoResult) {
+      return { error: promoResult.error }
+    }
+
+    appliedPromoId = promoResult.promo.id
+    headerDiscount = calculateSalesPromoDiscount(promoResult.promo, total)
+  }
+
   const grandTotal = total - lineDiscountTotal - headerDiscount + taxAmount
   const resellerSnapshot = await getResellerCommissionSnapshot(orgId, payload.reseller_id)
 
@@ -1193,6 +1739,13 @@ export async function createQuotation(orgId: string, payload: any) {
     })))
 
   if (linesErr) return { error: linesErr.message }
+
+  if (appliedPromoId) {
+    const usageResult = await incrementSalesPromoUsage(supabase as any, orgId, appliedPromoId)
+    if ('error' in usageResult) {
+      ;(console as any).warn('[createQuotation] failed to increment promo usage:', usageResult.error)
+    }
+  }
 
   revalidatePath('/sales/quotations')
   return { success: true, quotationId: quote.id }

@@ -130,38 +130,43 @@ export default function SubOrgClient({
     setCreateLoading(true)
     setCreateError(null)
 
-    const fd = new FormData(e.currentTarget)
+    const form = e.currentTarget
+    const fd = new FormData(form)
     const childName = String(fd.get('name') || '').trim()
     fd.set('parent_org_id', orgId)
     fd.set('preserve_parent_context', 'true')
 
-    const res: Awaited<ReturnType<typeof createOrganizationQuick>> = await createOrganizationQuick(fd)
-    if ('error' in res) {
-      setCreateError(res.error)
+    try {
+      const res: Awaited<ReturnType<typeof createOrganizationQuick>> = await createOrganizationQuick(fd)
+      if ('error' in res) {
+        setCreateError(res.error)
+        return
+      }
+
+      const createdChild: ChildOrgRecord = res.organization ?? {
+        id: String(res.orgId || crypto.randomUUID()),
+        name: childName,
+        slug: makeClientSlug(childName),
+        logo_url: null,
+        created_at: new Date().toISOString(),
+        is_active: true,
+        manager_employee_id: null,
+      }
+
+      setChildOrgList((current) => [createdChild, ...current])
+      setLocalManagerMap((current) => ({ ...current, [createdChild.id]: createdChild.manager_employee_id || '' }))
+      setLocalLimits((current) => current ? ({
+        ...current,
+        currentChildOrgs: current.currentChildOrgs + 1,
+      }) : current)
+
+      form.reset()
+      setIsCreateModalOpen(false)
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Gagal membuat entitas baru.')
+    } finally {
       setCreateLoading(false)
-      return
     }
-
-    const createdChild: ChildOrgRecord = res.organization ?? {
-      id: String(res.orgId || crypto.randomUUID()),
-      name: childName,
-      slug: makeClientSlug(childName),
-      logo_url: null,
-      created_at: new Date().toISOString(),
-      is_active: true,
-      manager_employee_id: null,
-    }
-
-    setChildOrgList((current) => [createdChild, ...current])
-    setLocalManagerMap((current) => ({ ...current, [createdChild.id]: createdChild.manager_employee_id || '' }))
-    setLocalLimits((current) => current ? ({
-      ...current,
-      currentChildOrgs: current.currentChildOrgs + 1,
-    }) : current)
-
-    setIsCreateModalOpen(false)
-    e.currentTarget.reset()
-    setCreateLoading(false)
   }
 
   const handleAssignPIC = async (childId: string, empId: string) => {

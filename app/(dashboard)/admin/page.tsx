@@ -35,7 +35,16 @@ import { createClient } from '@/lib/supabase/client'
 import { deleteInactiveTenantByPlatformAdmin, signInAsTenantOwner } from '@/modules/auth/actions/auth.actions'
 import { Organization } from '@/types/database.types'
 import Link from 'next/link'
-import { SAAS_SPECIALIZED_MODULES } from '@/lib/saas/module-catalog'
+import {
+  SAAS_ADDON_ITEMS,
+  SAAS_FULL_CORE_EXTENSION_ITEMS,
+  SAAS_PACKAGE_EDITOR_SECTIONS,
+  SAAS_STARTER_CORE_ITEMS,
+  SAAS_VERTICAL_MODULE_ITEMS,
+  getSaasCapabilityDisplayLabel,
+  getSaasPackageArchitecture,
+  saasModuleMatches,
+} from '@/lib/saas/module-catalog'
 import {
   calculateAiHppPerGeneration,
   calculateAiRecommendedSellPer1kTokens,
@@ -45,24 +54,14 @@ import {
 
 const supabase = createClient()
 
-const CORE_MODULES = [
-  'Dashboard', 'Audit Integritas',
-  'Akun (CoA)', 'Kas & Bank', 'Buku Besar', 'Aging (AR/AP)', 'Manajemen Zakat', 'Manajemen Pajak', 'Reimbursement', 'Penutupan Buku', 'Aset Tetap', 'Anggaran',
-  'Pembelian', 'Inventori', 'Gudang (WMS)', 'Manufaktur (BoM)', 
-  'Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward', 'Sales Page',
-  'Karyawan (HRIS)', 'Absensi & Cuti', 'Payroll Components', 'Proses Penggajian', 'Akses & Jabatan',
-  'Laporan', 'Strategi (BSC)', 'Proyeksi Kas',
-  'Audit Trail', 'Cabang & Divisi', 'Anak Perusahaan', 'Pengaturan Bisnis', 'Ticketing', 'Doc Update Ticketing'
-]
+function isCapabilitySelected(values: readonly string[] | undefined, value: string) {
+  if (!Array.isArray(values) || values.length === 0) return false
 
-const ADDON_MODULES = [
-  'Fleet & Rental', 'Job Order (Jasa)'
-]
+  if (value === 'Dashboard') {
+    return values.some((moduleName) => String(moduleName || '').trim().toLowerCase() === 'dashboard')
+  }
 
-function formatModuleLabel(moduleName: string) {
-  if (moduleName === 'Ticketing') return 'Support Ticket'
-  if (moduleName === 'Doc Update Ticketing') return 'Dokumen Update Support Ticket'
-  return moduleName
+  return values.some((moduleName) => saasModuleMatches(String(moduleName || ''), value))
 }
 
 type OrganizationExpirySource = {
@@ -561,13 +560,27 @@ export default function SaaSAdminPage() {
     e.preventDefault()
     try {
       const fd = new FormData(e.currentTarget)
-      const modules = fd.getAll('modules') as string[]
+      const modules = Array.from(
+        new Set(
+          fd.getAll('modules')
+            .map((value) => String(value || '').trim())
+            .filter(Boolean)
+        )
+      )
+      const addons = Array.from(
+        new Set(
+          fd.getAll('addons')
+            .map((value) => String(value || '').trim())
+            .filter(Boolean)
+        )
+      )
       const payload = {
         name: fd.get('name') as string,
         price: Number(fd.get('price')),
         billing: fd.get('billing') as string,
         is_active: true,
         modules: JSON.stringify(modules), // PostgREST requires stringified array for jsonb column
+        addons: JSON.stringify(addons),
         duration_days: Number(fd.get('duration_days') || 30),
         max_orgs: Number(fd.get('max_orgs') || 1),
         max_warehouses: Number(fd.get('max_warehouses') || 1),
@@ -1119,7 +1132,10 @@ export default function SaaSAdminPage() {
                  <SafeButton variant="primary" onClick={() => setPkgModal({ open: true, editData: null })} icon={<Plus size={16} />}>Tambah Paket Baru</SafeButton>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                 {packages.map((pkg) => (
+                 {packages.map((pkg) => {
+                    const architecture = getSaasPackageArchitecture(pkg.modules || [], pkg.addons || [])
+                    const totalCoreItems = architecture.liteCore.length + architecture.starterCore.length
+                    return (
                     <div key={pkg.id || pkg.name} className={`
                       relative p-6 rounded-[32px] border transition-all duration-300 shadow-sm flex flex-col justify-between
                       ${pkg.active ? 'bg-white border-slate-200 hover:shadow-xl hover:-translate-y-1' : 'bg-slate-50/50 border-slate-200 opacity-75 grayscale-[30%]'}
@@ -1146,6 +1162,9 @@ export default function SaaSAdminPage() {
                             </span>
                             {pkg.price > 0 && <span className="text-xs text-slate-400 font-bold">/{pkg.billing}</span>}
                           </div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-600">
+                            {architecture.bundleLabel}
+                          </p>
                           <p className={`text-[10px] font-black uppercase tracking-wider ${pkg.price === 0 ? 'text-orange-500' : 'text-emerald-600'}`}>
                             Batas: {pkg.duration_days ?? '?'} Hari
                           </p>
@@ -1155,11 +1174,16 @@ export default function SaaSAdminPage() {
                            <div className="flex flex-wrap gap-1.5">
                               {pkg.modules?.slice(0, 4).map((mod: string) => (
                                  <span key={mod} className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
-                                   {formatModuleLabel(mod)}
+                                   {getSaasCapabilityDisplayLabel(mod)}
                                  </span>
                               ))}
                               {pkg.modules?.length > 4 && <span className="text-[9px] font-bold text-slate-400">+{pkg.modules.length - 4} more</span>}
                            </div>
+                           <p className="text-[10px] font-semibold text-slate-400">
+                             Platform Core + {totalCoreItems} core item
+                             {architecture.fullCoreExtensions.length > 0 ? ` + ${architecture.fullCoreExtensions.length} full core` : ''}
+                             {architecture.verticalModules.length > 0 ? ` + ${architecture.verticalModules.length} vertical module` : ''}
+                           </p>
                         </div>
                       </div>
                       <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
@@ -1172,7 +1196,8 @@ export default function SaaSAdminPage() {
                          </button>
                       </div>
                     </div>
-                 ))}
+                    )
+                 })}
               </div>
             </div>
           )}
@@ -1397,32 +1422,23 @@ export default function SaaSAdminPage() {
                     </div>
 
                     <div className="space-y-6">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Konfigurasi Fitur & Modul</label>
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Bundle Core, Module, dan Add-on</label>
                        
                        <div className="space-y-6 p-6 bg-slate-50 border border-slate-100 rounded-[32px]">
-                          {[
-                             { group: 'Utama', items: ['Dashboard', 'Audit Integritas'] },
-                             { group: 'Finance', items: ['Akun (CoA)', 'Kas & Bank', 'Buku Besar', 'Aging (AR/AP)', 'Manajemen Zakat', 'Manajemen Pajak', 'Reimbursement', 'Penutupan Buku', 'Aset Tetap', 'Anggaran'] },
-                             { group: 'Operasional', items: ['Pembelian', 'Inventori', 'Gudang (WMS)', 'Manufaktur (BoM)'] },
-                             { group: 'Tambahan (Premium)', items: ['Fleet & Rental', 'Job Order (Jasa)'] },
-                             { group: 'Marketing & Sales', items: ['Pelanggan (CRM)', 'POS (Kasir)', 'Penawaran (Quotation)', 'Penjualan', 'Sales Pipeline', 'Target & Komisi', 'Promo & Reward', 'Sales Page'] },
-                             { group: 'HRIS', items: ['Karyawan (HRIS)', 'Absensi & Cuti', 'Payroll Components', 'Proses Penggajian', 'Akses & Jabatan'] },
-                             { group: 'Insight', items: ['Laporan', 'Strategi (BSC)', 'Proyeksi Kas'] },
-                             { group: 'Ekstensi Khusus', items: [...SAAS_SPECIALIZED_MODULES] },
-                             { group: 'Config', items: ['Audit Trail', 'Cabang & Divisi', 'Anak Perusahaan', 'Pengaturan Bisnis', 'Ticketing', 'Doc Update Ticketing'] }
-                          ].map(cat => (
-                             <div key={cat.group} className="space-y-2" data-module-group={cat.group}>
+                          {SAAS_PACKAGE_EDITOR_SECTIONS.map((cat) => (
+                             <div key={cat.key} className="space-y-2" data-module-group={cat.key}>
                                 <div className="flex items-center gap-2 px-2">
                                    <div className="h-[1px] flex-1 bg-slate-200" />
-                                   <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{cat.group}</span>
+                                   <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{cat.title}</span>
                                    <div className="h-[1px] flex-1 bg-slate-200" />
                                 </div>
+                                <p className="px-2 text-[11px] font-semibold text-slate-500">{cat.description}</p>
                                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
                                    {/* Opsi untuk centang "SATU GRUP" sekaligus — hanya toggle UI, tidak submit value sendiri */}
                                    <label className="flex items-center gap-2 p-2.5 bg-indigo-50/50 rounded-xl border border-indigo-100/50 cursor-pointer hover:bg-indigo-100/50 transition-colors group">
                                       <input 
                                          type="checkbox" 
-                                         defaultChecked={cat.items.every(item => pkgModal.editData?.modules?.includes(item))}
+                                         defaultChecked={cat.items.every((item) => isCapabilitySelected(pkgModal.editData?.modules, item.value))}
                                          onChange={(e) => {
                                            const container = e.target.closest('[data-module-group]')
                                            if (!container) return
@@ -1431,19 +1447,90 @@ export default function SaaSAdminPage() {
                                          }}
                                          className="w-4 h-4 rounded text-indigo-600" 
                                       />
-                                      <span className="text-[9px] font-black uppercase text-indigo-600 group-hover:underline italic">Pilih Semua {cat.group}</span>
+                                      <span className="text-[9px] font-black uppercase text-indigo-600 group-hover:underline italic">Pilih Semua {cat.title}</span>
                                    </label>
 
-                                   {cat.items.map(item => (
-                                      <label key={item} className="flex items-center gap-2 p-2.5 bg-white rounded-xl border border-slate-100 hover:border-blue-200 cursor-pointer transition-all group">
+                                   {cat.items.map((item) => (
+                                      <label key={item.value} className="flex items-center gap-2 p-2.5 bg-white rounded-xl border border-slate-100 hover:border-blue-200 cursor-pointer transition-all group">
                                          <input 
                                             type="checkbox" 
                                             name="modules" 
-                                            value={item} 
-                                            defaultChecked={pkgModal.editData?.modules?.includes(item)}
+                                            value={item.value} 
+                                            defaultChecked={isCapabilitySelected(pkgModal.editData?.modules, item.value)}
                                             className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
                                          />
-                                         <span className="text-[9px] font-black text-slate-500 group-hover:text-blue-600 truncate">{formatModuleLabel(item)}</span>
+                                         <span className="text-[9px] font-black text-slate-500 group-hover:text-blue-600 truncate">{item.label}</span>
+                                      </label>
+                                   ))}
+                                </div>
+                             </div>
+                          ))}
+                       </div>
+                    </div>
+
+                    <div className="space-y-6">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Growth Layer Opsional</label>
+
+                       <div className="space-y-6 p-6 bg-slate-50 border border-slate-100 rounded-[32px]">
+                          {[
+                            {
+                              key: 'starter_core_upsell',
+                              title: 'Upsell Starter Core',
+                              description: 'Ekstensi operasional dari Lite menuju Starter Core Family.',
+                              items: SAAS_STARTER_CORE_ITEMS,
+                            },
+                            {
+                              key: 'full_core_upsell',
+                              title: 'Upsell Full Core',
+                              description: 'Capability tambahan yang bisa ditawarkan di atas Starter Core.',
+                              items: SAAS_FULL_CORE_EXTENSION_ITEMS,
+                            },
+                            {
+                              key: 'vertical_modules',
+                              title: 'Vertical Modules',
+                              description: 'Modul industri yang bisa diaktifkan terpisah dari core.',
+                              items: SAAS_VERTICAL_MODULE_ITEMS,
+                            },
+                            {
+                              key: 'addons',
+                              title: 'Add-ons',
+                              description: 'Ekspansi tambahan seperti WMS, sales page, API, dan capacity pack.',
+                              items: SAAS_ADDON_ITEMS,
+                            },
+                          ].map((cat) => (
+                             <div key={cat.key} className="space-y-2" data-addon-group={cat.key}>
+                                <div className="flex items-center gap-2 px-2">
+                                   <div className="h-[1px] flex-1 bg-slate-200" />
+                                   <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{cat.title}</span>
+                                   <div className="h-[1px] flex-1 bg-slate-200" />
+                                </div>
+                                <p className="px-2 text-[11px] font-semibold text-slate-500">{cat.description}</p>
+                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                                   <label className="flex items-center gap-2 p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100/50 cursor-pointer hover:bg-emerald-100/50 transition-colors group">
+                                      <input
+                                         type="checkbox"
+                                         defaultChecked={cat.items.every((item) => isCapabilitySelected(pkgModal.editData?.addons, item.value))}
+                                         onChange={(e) => {
+                                           const container = e.target.closest('[data-addon-group]')
+                                           if (!container) return
+                                           const checkboxes = container.querySelectorAll<HTMLInputElement>('input[name="addons"]')
+                                           checkboxes.forEach((cb) => { cb.checked = e.target.checked })
+                                         }}
+                                         className="w-4 h-4 rounded text-emerald-600"
+                                      />
+                                      <span className="text-[9px] font-black uppercase text-emerald-700 group-hover:underline italic">Pilih Semua {cat.title}</span>
+                                   </label>
+
+                                   {cat.items.map((item) => (
+                                      <label key={`addon-${item.value}`} className="flex items-center gap-2 p-2.5 bg-white rounded-xl border border-slate-100 hover:border-emerald-200 cursor-pointer transition-all group">
+                                         <input
+                                            type="checkbox"
+                                            name="addons"
+                                            value={item.value}
+                                            defaultChecked={isCapabilitySelected(pkgModal.editData?.addons, item.value)}
+                                            className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                         />
+                                         <span className="text-[9px] font-black text-slate-500 group-hover:text-emerald-600 truncate">{item.label}</span>
                                       </label>
                                    ))}
                                 </div>

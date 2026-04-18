@@ -20,7 +20,7 @@ export default async function POSPage() {
     activeBranch ? getProducts(orgId, activeBranch.id) : Promise.resolve([]),
     activeBranch ? getWarehouses(orgId, activeBranch.id) : Promise.resolve([]),
     supabase.from('contacts').select('id, name, phone').eq('org_id', orgId).eq('type', 'CUSTOMER'),
-    supabase.from('accounts').select('id, name, code').eq('org_id', orgId).eq('is_active', true),
+    supabase.from('accounts').select('id, name, code, type').eq('org_id', orgId).eq('is_active', true),
     supabase
       .from('employees')
       .select('first_name, last_name')

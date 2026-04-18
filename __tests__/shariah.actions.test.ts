@@ -90,6 +90,50 @@ describe('Shariah CoA Activation', () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/accounting/zakat')
   })
 
+  it('deactivates legacy 3100 instead of deleting referenced account rows', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        accounts: [
+          {
+            result: success([
+              { id: 'asset-root', code: '1000' },
+              { id: 'liability-root', code: '2000' },
+              { id: 'equity-root', code: '3000' },
+              { id: 'expense-root', code: '6000' },
+            ]),
+          },
+          {
+            result: success([{ id: 'legacy-3100', code: '3100' }]),
+          },
+          {},
+          ...SHARIAH_COA_ACTIVATION_CODES.map((code) => ({
+            singleResult: success({ id: `acc-${code}` }),
+          })),
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+
+    const result = await injectShariahPack('org-1')
+
+    expect(result).toEqual({ success: true })
+
+    const legacyCleanupCall = supabase.calls.find((call) =>
+      call.operations.some(
+        (operation) =>
+          operation.method === 'eq' &&
+          operation.args[0] === 'id' &&
+          operation.args[1] === 'legacy-3100'
+      )
+    )
+
+    expect(legacyCleanupCall?.operations.some((operation) => operation.method === 'delete')).toBe(false)
+    expect(legacyCleanupCall?.operations.find((operation) => operation.method === 'update')?.args[0]).toEqual({
+      is_active: false,
+    })
+  })
+
   it('toggles SALAM/ISTISHNA accounts together with the rest of CoAS codes', async () => {
     const supabase = createSupabaseMock({
       tables: {

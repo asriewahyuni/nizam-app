@@ -5,8 +5,9 @@ import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { createAdminClient } from '@/lib/supabase/server'
 import { ensureTrainingEvent } from '@/modules/edu/lib/training.server'
 import {
-  EDU_REALTIME_PILOT_QUESTION_LIMIT,
+  EDU_REALTIME_QUESTION_LIMIT,
   DEFAULT_EDU_TIME_LIMIT_MINUTES,
+  EDU_VALIDATOR_VERSION,
   primeEduOrgContext,
   setEduSessionCookie,
 } from '@/modules/edu/lib/session.server'
@@ -109,8 +110,8 @@ export async function startTrainingSession(input: {
       deadline_at: deadlineAt,
       metadata: {
         realtime_enabled: true,
-        pilot_mode: true,
-        question_limit: EDU_REALTIME_PILOT_QUESTION_LIMIT,
+        pilot_mode: false,
+        question_limit: EDU_REALTIME_QUESTION_LIMIT,
         source: 'edu-page',
         root_org_name: orgRow?.name || null,
       },
@@ -122,12 +123,12 @@ export async function startTrainingSession(input: {
     return { error: sessionError?.message || 'Gagal membuat session EDU Mode.' }
   }
 
-  const stepRows = Array.from({ length: EDU_REALTIME_PILOT_QUESTION_LIMIT }, (_, index) => ({
+  const stepRows = Array.from({ length: EDU_REALTIME_QUESTION_LIMIT }, (_, index) => ({
     session_id: createdSession.id,
     question_id: index + 1,
     status: index === 0 ? 'ACTIVE' : 'LOCKED',
     started_at: index === 0 ? now.toISOString() : null,
-    validator_version: 'v1-pilot-1-5',
+    validator_version: EDU_VALIDATOR_VERSION,
   }))
 
   const [{ error: stepError }, { error: eventLogError }, { error: teamUpdateError }, { error: scoreSeedError }] = await Promise.all([
@@ -141,10 +142,10 @@ export async function startTrainingSession(input: {
         question_id: 1,
         event_type: 'session_started',
         severity: 'success',
-        message: 'Session EDU Mode dimulai. Sistem realtime pilot aktif untuk soal 1-5.',
+        message: 'Session EDU Mode dimulai. Validator realtime aktif untuk seluruh 15 soal.',
         source_module: 'edu',
         payload: {
-          questionLimit: EDU_REALTIME_PILOT_QUESTION_LIMIT,
+          questionLimit: EDU_REALTIME_QUESTION_LIMIT,
           timeLimitMinutes: normalizedTimeLimitMinutes,
         },
         created_by: user.id,

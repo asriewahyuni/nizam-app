@@ -81,6 +81,18 @@ type WarehouseBinRow = {
   stock_items: WarehouseBinStockItem[]
 }
 
+type WarehouseUnassignedStockSummary = {
+  sku_count: number
+  batch_count: number
+  total_quantity: number
+  total_asset_value: number
+}
+
+type WarehouseBinsResult = {
+  bins: WarehouseBinRow[]
+  unassignedStockSummary: WarehouseUnassignedStockSummary
+}
+
 type WarehouseBinPayload = {
   warehouse_id: string
   code: string
@@ -144,6 +156,24 @@ function normalizeWarehouseBinRow(row: any): WarehouseBinRow {
       total_asset_value: toFiniteNumber(row?.total_asset_value),
     },
     stock_items: stockItems,
+  }
+}
+
+function createEmptyWarehouseUnassignedStockSummary(): WarehouseUnassignedStockSummary {
+  return {
+    sku_count: 0,
+    batch_count: 0,
+    total_quantity: 0,
+    total_asset_value: 0,
+  }
+}
+
+function normalizeWarehouseUnassignedStockSummary(row: any): WarehouseUnassignedStockSummary {
+  return {
+    sku_count: Math.max(0, Math.round(toFiniteNumber(row?.sku_count))),
+    batch_count: Math.max(0, Math.round(toFiniteNumber(row?.batch_count))),
+    total_quantity: toFiniteNumber(row?.total_quantity),
+    total_asset_value: toFiniteNumber(row?.total_asset_value),
   }
 }
 
@@ -278,9 +308,14 @@ export async function getWarehouseBins(
   orgId: string,
   warehouseId?: string,
   branchId?: string | null
-): Promise<WarehouseBinRow[]> {
+): Promise<WarehouseBinsResult> {
   const branchSelection = await resolveActiveBranchId(orgId, branchId)
-  if ('error' in branchSelection) return []
+  if ('error' in branchSelection) {
+    return {
+      bins: [],
+      unassignedStockSummary: createEmptyWarehouseUnassignedStockSummary(),
+    }
+  }
   const effectiveBranchId = branchSelection.branchId
 
   const { queryPostgres } = await import('@/lib/db/postgres')
@@ -407,10 +442,48 @@ export async function getWarehouseBins(
 
   try {
     const { rows } = await queryPostgres<Record<string, unknown>>(sql, params)
-    return rows.map((row) => normalizeWarehouseBinRow(row))
+    let unassignedStockSummary = createEmptyWarehouseUnassignedStockSummary()
+
+    if (warehouseId) {
+      const summaryParams: unknown[] = [orgId, warehouseId]
+      let summarySql = `
+        SELECT
+          COUNT(DISTINCT s.product_id) FILTER (WHERE ABS(COALESCE(s.quantity, 0)) > 0.0001)::int AS sku_count,
+          COUNT(*) FILTER (WHERE ABS(COALESCE(s.quantity, 0)) > 0.0001)::int AS batch_count,
+          COALESCE(SUM(COALESCE(s.quantity, 0)) FILTER (WHERE ABS(COALESCE(s.quantity, 0)) > 0.0001), 0)::numeric AS total_quantity,
+          COALESCE(
+            SUM(COALESCE(s.quantity, 0) * COALESCE(p.average_cost, p.purchase_price, 0))
+            FILTER (WHERE ABS(COALESCE(s.quantity, 0)) > 0.0001),
+            0
+          )::numeric AS total_asset_value
+        FROM public.inventory_stocks s
+        JOIN public.warehouses w ON w.id = s.warehouse_id
+        LEFT JOIN public.products p ON p.id = s.product_id
+        WHERE s.org_id = $1
+          AND s.warehouse_id = $2
+          AND s.bin_id IS NULL
+          AND w.is_active = TRUE
+      `
+
+      if (effectiveBranchId) {
+        summaryParams.push(effectiveBranchId)
+        summarySql += ` AND (w.branch_id = $${summaryParams.length} OR w.branch_id IS NULL)`
+      }
+
+      const summaryResult = await queryPostgres<Record<string, unknown>>(summarySql, summaryParams)
+      unassignedStockSummary = normalizeWarehouseUnassignedStockSummary(summaryResult.rows[0])
+    }
+
+    return {
+      bins: rows.map((row) => normalizeWarehouseBinRow(row)),
+      unassignedStockSummary,
+    }
   } catch(err) {
     console.error(err)
-    return []
+    return {
+      bins: [],
+      unassignedStockSummary: createEmptyWarehouseUnassignedStockSummary(),
+    }
   }
 }
 

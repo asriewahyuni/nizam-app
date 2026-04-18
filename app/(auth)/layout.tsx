@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { MiniErpWordmark } from '@/components/shared/MiniErpWordmark'
 
 export const metadata: Metadata = {
   title: 'Masuk Ke Sistem NIZAM',
@@ -23,7 +24,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             </div>
             <div className="flex flex-col justify-center">
               <span className="text-4xl font-black tracking-tight text-white leading-none">NIZAM</span>
-              <span className="text-blue-400 text-[10px] font-black tracking-[0.4em] uppercase mt-1">Cloud ERP</span>
+              <MiniErpWordmark className="mt-1 text-[10px] font-black tracking-[0.4em] uppercase text-blue-400" />
             </div>
           </div>
           

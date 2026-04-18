@@ -1,5 +1,21 @@
 export type StoredLineDiscountMode = 'per_unit' | 'line_total'
 
+export interface DiscountDocumentLine {
+  quantity?: unknown
+  unit_price?: unknown
+  discount_amount?: unknown
+}
+
+export interface DiscountDocument {
+  discount_amount?: unknown
+  total_amount?: unknown
+  tax_amount?: unknown
+  shipping_amount?: unknown
+  insurance_amount?: unknown
+  grand_total?: unknown
+  purchase_items?: DiscountDocumentLine[]
+}
+
 const MONEY_EPSILON = 0.01
 
 function toMoney(value: unknown): number {
@@ -69,4 +85,85 @@ export function getEditableLineDiscountAmount(
   }
 
   return storedDiscount
+}
+
+export function getDocumentLineDiscountTotal(lines: DiscountDocumentLine[] = []): number {
+  return roundMoney(lines.reduce((sum, line) => sum + roundMoney(line?.discount_amount), 0))
+}
+
+export function getDocumentHeaderDiscountAmount(
+  document: DiscountDocument | null | undefined,
+  lineDiscountTotal = getDocumentLineDiscountTotal(document?.purchase_items || [])
+): number {
+  const storedDocumentDiscount = Math.max(0, roundMoney(document?.discount_amount))
+  const storedHeaderDiscount = Math.max(0, roundMoney(storedDocumentDiscount - lineDiscountTotal))
+  const inferredHeaderDiscount = Math.max(
+    0,
+    roundMoney(
+      roundMoney(document?.total_amount) +
+      roundMoney(document?.tax_amount) +
+      roundMoney(document?.shipping_amount) +
+      roundMoney(document?.insurance_amount) -
+      roundMoney(document?.grand_total)
+    )
+  )
+
+  return Math.max(storedHeaderDiscount, inferredHeaderDiscount)
+}
+
+function allocateRoundedAmounts(totalAmount: number, rawWeights: number[]): number[] {
+  const total = roundMoney(totalAmount)
+  const weights = rawWeights.map((weight) => Math.max(0, Number(weight || 0)))
+
+  if (weights.length === 0) return []
+  if (Math.abs(total) <= MONEY_EPSILON) return weights.map(() => 0)
+
+  const weightTotal = weights.reduce((sum, weight) => sum + weight, 0)
+  const allocations = weights.map(() => 0)
+
+  if (weightTotal <= 0) {
+    allocations[allocations.length - 1] = total
+    return allocations
+  }
+
+  let remainderIndex = allocations.length - 1
+  for (let index = allocations.length - 1; index >= 0; index -= 1) {
+    if (weights[index] > 0) {
+      remainderIndex = index
+      break
+    }
+  }
+
+  let allocated = 0
+  for (let index = 0; index < weights.length; index += 1) {
+    if (index === remainderIndex) continue
+    const amount = roundMoney((weights[index] / weightTotal) * total)
+    allocations[index] = amount
+    allocated = roundMoney(allocated + amount)
+  }
+
+  allocations[remainderIndex] = roundMoney(total - allocated)
+  return allocations
+}
+
+export function getDocumentLineDiscountsForDisplay(
+  document: DiscountDocument | null | undefined
+): number[] {
+  const lines = Array.isArray(document?.purchase_items) ? document.purchase_items : []
+  const lineDiscountTotal = getDocumentLineDiscountTotal(lines)
+  const headerDiscountAmount = getDocumentHeaderDiscountAmount(document, lineDiscountTotal)
+  const weights = lines.map((line) =>
+    Math.max(
+      0,
+      roundMoney(
+        (Number(line?.quantity || 0) * Number(line?.unit_price || 0)) -
+        Number(line?.discount_amount || 0)
+      )
+    )
+  )
+  const headerAllocations = allocateRoundedAmounts(headerDiscountAmount, weights)
+
+  return lines.map((line, index) =>
+    roundMoney(Number(line?.discount_amount || 0) + Number(headerAllocations[index] || 0))
+  )
 }

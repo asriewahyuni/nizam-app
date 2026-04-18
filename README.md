@@ -1,264 +1,142 @@
 # NIZAM ERP
 
-Dokumentasi ini telah diaudit ulang berdasarkan kode aktual pada **29 Maret 2026**.
+NIZAM adalah aplikasi ERP multi-tenant untuk operasional bisnis Indonesia yang dibangun dengan Next.js, React, dan PostgreSQL. Repository ini mencakup modul akuntansi, kas/bank, purchasing, sales, inventory, HRIS/payroll, manufaktur, fleet, services, SaaS billing, edukasi, dan beberapa flow onboarding publik.
 
-NIZAM adalah ERP multi-tenant berbasis Next.js + Supabase untuk operasi bisnis Indonesia: akuntansi, kas/bank, purchasing, sales, inventory, HRIS/payroll, manufaktur, fleet, service order, billing SaaS, dan modul pelengkap seperti zakat, audit, BSC, serta demo onboarding.
+Dokumentasi ini ditujukan sebagai pintu masuk utama untuk programmer dan developer internal. Fokusnya adalah membantu tim baru cepat memahami arsitektur, alur kerja, dan cara menjalankan project tanpa harus membaca seluruh codebase dari nol.
 
-## Snapshot Repo Saat Ini
+## Ringkasan Cepat
 
-- `55` halaman App Router (`app/**/page.tsx`)
-- `40` client page/component utama (`*Client.tsx`)
-- `41` server action files (`modules/**/actions/*.ts`)
-- `127` file migrasi SQL di `supabase/migrations/`
-- `7` file test Vitest
-
-## Stack Aktual
-
-| Area | Teknologi |
+| Area | Stack |
 |---|---|
-| Frontend | Next.js `16.2.1`, React `19.2.4`, App Router |
-| Styling | Tailwind CSS `4.2.2`, Framer Motion |
-| Backend | Supabase SSR + PostgreSQL |
-| Auth | Supabase Auth + RBAC custom + RLS |
-| Reporting | ExcelJS, Recharts |
-| AI | Google Gemini / AI Studio (`GOOGLE_AI_STUDIO_KEY`) |
-| Email | Resend |
-| Testing | Vitest 4 |
+| Frontend | Next.js 16, React 19, App Router |
+| Styling | Tailwind CSS 4, Framer Motion |
+| Backend | Server Actions, Route Handlers |
+| Database | PostgreSQL native (`pg`) dengan lapisan kompatibilitas Supabase |
+| Auth | Internal auth dan compatibility flow untuk mode legacy |
+| Testing | Vitest |
+| Runtime | Node.js 20.19.x |
 
-## Baca Dokumentasi Lengkap
+## Status Arsitektur Saat Ini
 
-Dokumentasi lengkap proyek ada di [DOCUMENTATION.md](./DOCUMENTATION.md).
+Codebase sedang berada dalam fase transisi dokumentasi dan infrastruktur:
 
-Dokumen operasional tambahan:
+- Jalur database utama saat ini sudah mengarah ke PostgreSQL native melalui [`lib/db/postgres.ts`](/Users/manbook/nizam-app/lib/db/postgres.ts:1) dan [`lib/supabase/server.ts`](/Users/manbook/nizam-app/lib/supabase/server.ts:1).
+- Beberapa nama file, helper, dan flow masih menggunakan istilah `supabase` karena layer kompatibilitas lama masih dipertahankan agar migrasi kode tidak mematahkan modul yang ada.
+- Middleware masih mendukung dua mode auth lewat [`lib/supabase/middleware.ts`](/Users/manbook/nizam-app/lib/supabase/middleware.ts:1): `supabase` dan `internal`.
 
-- [DOKUMENTASI_OPEN_API_NIZAM.md](./DOKUMENTASI_OPEN_API_NIZAM.md) untuk panduan fitur Open API, API key, endpoint publik, webhook, dan spesifikasi `/api/openapi`.
-- [PLAYBOOK_MIGRASI_KE_NIZAM.md](./PLAYBOOK_MIGRASI_KE_NIZAM.md) untuk panduan onboarding user pindahan dari Excel atau aplikasi lain.
-- [CHECKLIST_ONBOARDING_MIGRASI_NIZAM.md](./CHECKLIST_ONBOARDING_MIGRASI_NIZAM.md) untuk checklist internal tim onboarding saat menangani migrasi client.
-- [RAILWAY_DECOUPLING_PLAN.md](./RAILWAY_DECOUPLING_PLAN.md) untuk roadmap migrasi ke Railway dan pelepasan dependency runtime Supabase.
-- [templates/migrasi/README.md](./templates/migrasi/README.md) untuk paket template CSV migrasi yang bisa dibagikan ke client.
-- [templates/migrasi/NIZAM_Migration_Template.xlsx](./templates/migrasi/NIZAM_Migration_Template.xlsx) untuk workbook Excel multi-sheet yang siap diberikan ke client.
+Karena itu, developer baru disarankan membaca dokumentasi di `docs/` sebagai referensi utama, bukan hanya mengandalkan nama file.
 
-Isi utamanya mencakup:
+## Quick Start
 
-- arsitektur aplikasi dan struktur folder
-- auth, organisasi, RLS, RBAC, dan module gating
-- peta route yang aktif saat ini
-- ringkasan lengkap modul bisnis dan server actions
-- peta migrasi database dan storage bucket
-- daftar environment variable aktual
-- temuan audit dokumentasi dan update dibanding README lama
+### 1. Prasyarat
 
-## Setup Singkat
+- Node.js `20.19.x`
+- npm
+- Akses ke database project
+- File environment lokal
 
-1. Gunakan Node.js `>=20`.
-2. Salin `.env.local.example` menjadi `.env.local`.
-3. Isi kredensial Supabase dan variabel opsional yang diperlukan.
-4. Jalankan migrasi Supabase sesuai urutan file di `supabase/migrations/`, atau gunakan Supabase CLI.
-5. Jalankan:
+### 2. Setup
 
 ```bash
 npm install
+cp .env.local.example .env.local
+```
+
+Isi `.env.local` sesuai mode yang ingin dipakai:
+
+- Mode yang direkomendasikan untuk runtime saat ini: `DATABASE_URL` atau `RAILWAY_DATABASE_URL`
+- Jika memakai internal auth: `AUTH_PROVIDER=internal` dan `INTERNAL_AUTH_SESSION_SECRET`
+- Jika masih membutuhkan flow kompatibilitas lama: isi variabel Supabase yang relevan
+- File [`.env.local.example`](/Users/manbook/nizam-app/.env.local.example:1) bisa dipakai sebagai baseline, tetapi untuk mode PostgreSQL native Anda mungkin tetap perlu menambahkan env database yang belum tercantum penuh di sana.
+
+### 3. Menjalankan aplikasi
+
+```bash
 npm run dev
 ```
 
-Perintah lain:
+### 4. Menjalankan test
 
 ```bash
 npm run test
-npm run build
-npm run supabase:start
-npm run supabase:stop
-npm run supabase:status
-npm run supabase:db:reset
-npm run supabase:migrate-local-data
-npm run db:railway:sync
-npm run db:railway:sync:apply
-npm run db:railway:data:sync
-npm run db:railway:data:sync:apply
-npm run db:railway:parity
-npm run db:railway:readiness
-npm run db:railway:cutover
-npm run db:railway:cutover:apply
 ```
 
-### Sinkronisasi Supabase -> Railway (Staging/Prod)
+## Peta Dokumentasi
 
-Gunakan flow ini supaya schema Railway tetap mutakhir mengikuti migration di `supabase/migrations`.
+Dokumentasi utama untuk developer ada di folder [`docs/`](./docs/README.md):
 
-1. Cek parity dulu:
-   ```bash
-   npm run db:railway:parity
-   ```
-2. Simulasikan migration (aman, tidak apply):
-   ```bash
-   npm run db:railway:sync
-   ```
-3. Jika hasil dry-run sesuai, apply ke Railway:
-   ```bash
-   npm run db:railway:sync:apply
-   ```
+- [`docs/README.md`](./docs/README.md): indeks dokumentasi developer
+- [`docs/developer-guide.md`](./docs/developer-guide.md): panduan setup, workflow, dan kebiasaan kerja tim
+- [`docs/architecture.md`](./docs/architecture.md): arsitektur aplikasi, auth, data access, dan request flow
+- [`docs/modules.md`](./docs/modules.md): peta modul bisnis, route, dan lokasi kode
 
-Catatan:
-- `db:railway:sync` default **dry-run** agar tidak ada perubahan tidak sengaja.
-- Script otomatis mencoba ambil DB URL dari Railway CLI (`Postgres` service).
-- Untuk source Supabase via linked project, pastikan `supabase login`/`SUPABASE_ACCESS_TOKEN` tersedia.
+Dokumen besar yang sudah ada tetap dipertahankan sebagai referensi tambahan:
 
-### Sinkronisasi Data Supabase -> Railway
+- [`DOCUMENTATION.md`](./DOCUMENTATION.md): dokumentasi audit codebase versi panjang
+- [`PLAYBOOK_MIGRASI_KE_NIZAM.md`](./PLAYBOOK_MIGRASI_KE_NIZAM.md): playbook onboarding dan migrasi client
+- [`CHECKLIST_ONBOARDING_MIGRASI_NIZAM.md`](./CHECKLIST_ONBOARDING_MIGRASI_NIZAM.md): checklist tim onboarding
+- [`PANDUAN_ADMIN_SAAS_NIZAM.md`](./PANDUAN_ADMIN_SAAS_NIZAM.md): panduan operasional admin SaaS
+- [`templates/migrasi/README.md`](./templates/migrasi/README.md): template migrasi data
 
-Gunakan flow ini untuk meng-copy isi tabel SQL setelah schema Railway siap.
+## Struktur Repository
 
-1. Simulasikan dump (aman, tidak apply):
-   ```bash
-   npm run db:railway:data:sync
-   ```
-2. Jika dry-run sesuai, apply ke Railway:
-   ```bash
-   npm run db:railway:data:sync:apply
-   ```
-
-Catatan:
-- Script ini fokus migrasi **data tabel SQL** (default schema `public`).
-- Script ini **tidak** memindahkan Supabase Auth users dan Supabase Storage objects.
-- Untuk source linked Supabase, pastikan `supabase login`/`SUPABASE_ACCESS_TOKEN` tersedia.
-- Untuk override source DB URL, gunakan `SUPABASE_SOURCE_DB_URL` atau `--source-db-url`.
-
-### Backfill `auth.users` di Railway
-
-Jika hasil sinkronisasi data membuat relasi `user_id` ke `auth.users` kosong/orphan, jalankan:
-
-```bash
-npm run db:railway:auth:backfill
-npm run db:railway:auth:backfill:apply
+```text
+nizam-app/
+├── app/                # Route Next.js App Router
+├── components/         # Shared UI dan reusable components
+├── docs/               # Dokumentasi developer yang dirapikan
+├── lib/                # Infra, helper, auth, db, email, hooks
+├── modules/            # Business logic per domain
+├── scripts/            # Script utilitas, migrasi, sinkronisasi
+├── supabase/           # Migration SQL dan artefak legacy/compatibility
+├── __tests__/          # Vitest test suites
+└── public/             # Asset statis
 ```
 
-Command ini membuat/menyelaraskan baris `auth.users` dari data `public.org_members` dan `public.employees` agar FK tetap valid di Railway.
+## Script Yang Sering Dipakai
 
-### Bootstrap `internal_auth_users` di Railway
+| Command | Fungsi |
+|---|---|
+| `npm run dev` | Menjalankan aplikasi dalam mode development |
+| `npm run build` | Build production |
+| `npm run start` | Menjalankan standalone server |
+| `npm run test` | Menjalankan seluruh test Vitest |
+| `npm run test:watch` | Menjalankan test dalam mode watch |
+| `npm run test:coverage` | Menjalankan test dengan coverage |
+| `npm run lint` | Menjalankan ESLint |
+| `npm run supabase:start` | Menyalakan Supabase local |
+| `npm run supabase:stop` | Mematikan Supabase local |
+| `npm run supabase:status` | Melihat status Supabase local |
+| `npm run supabase:db:reset` | Reset database Supabase local |
+| `npm run supabase:migrate-local-data` | Clone data dari project lama ke local |
+| `npm run db:railway:sync` | Dry-run sinkronisasi schema ke Railway |
+| `npm run db:railway:sync:apply` | Apply sinkronisasi schema ke Railway |
+| `npm run db:railway:data:sync` | Dry-run sinkronisasi data ke Railway |
+| `npm run db:railway:data:sync:apply` | Apply sinkronisasi data ke Railway |
+| `npm run db:railway:readiness` | Verifikasi kesiapan cutover |
 
-Untuk menyiapkan akun login mode `AUTH_PROVIDER=internal` dari data user existing:
+## Area Modul Utama
 
-```bash
-npm run db:railway:internal-auth:bootstrap
-INTERNAL_AUTH_BOOTSTRAP_PASSWORD='temporary-password' npm run db:railway:internal-auth:bootstrap:apply
-```
+- `accounting`: jurnal, buku besar, audit, zakat, reimburse, analytics
+- `cash`: kas, bank, rekonsiliasi
+- `contacts`: CRM dan master kontak
+- `factory`: manufaktur dan BOM
+- `fleet`: armada dan rental
+- `hris`: karyawan, attendance, payroll, leave, expense, self-service
+- `inventory`: produk, gudang, stok
+- `purchasing`: PR, PO, penerimaan, vendor flow
+- `sales`: quotation, order, POS, komisi, sales page
+- `services`: job order dan layanan
+- `organization`, `settings`, `saas`, `edu`, `syirkah`: modul platform dan fitur pendukung
 
-Catatan:
-- `legacy_user_id` akan dipetakan ke `auth.users.id` agar kompatibel dengan data lama.
-- `--apply` butuh password sementara (`INTERNAL_AUTH_BOOTSTRAP_PASSWORD` atau `--password`).
+Detail lengkap tiap modul ada di [`docs/modules.md`](./docs/modules.md).
 
-### Cutover SQL/Auth Supabase -> Railway
+## Catatan Untuk Developer
 
-Jika ingin menjalankan jalur cutover database dan auth dalam satu command, gunakan:
+- Jangan berasumsi semua referensi `supabase` berarti project masih fully Supabase-native.
+- Cek lebih dulu apakah sebuah modul membaca PostgreSQL native, compatibility layer, atau flow transisional.
+- Perubahan pada auth, organization context, dan route protection sebaiknya selalu ditinjau bersama [`app/(dashboard)/layout.tsx`](/Users/manbook/nizam-app/app/(dashboard)/layout.tsx:1), [`proxy.ts`](/Users/manbook/nizam-app/proxy.ts:1), dan [`lib/supabase/middleware.ts`](/Users/manbook/nizam-app/lib/supabase/middleware.ts:1).
 
-```bash
-npm run db:railway:cutover
-INTERNAL_AUTH_BOOTSTRAP_PASSWORD='temporary-password' npm run db:railway:cutover:apply
-```
+## Lisensi dan Kepemilikan
 
-Command ini mengorkestrasi:
-- schema sync ke Railway
-- public SQL data sync dari Supabase ke Railway
-- backfill `auth.users` di Railway
-- bootstrap `public.internal_auth_users`
-- readiness check SQL/auth antara Supabase dan Railway
-
-Untuk verifikasi tanpa write, gunakan:
-
-```bash
-npm run db:railway:readiness
-```
-
-Catatan:
-- flow ini fokus ke SQL data + auth di Railway
-- Supabase Storage objects masih perlu dipindah terpisah sebelum runtime benar-benar lepas dari Supabase
-
-### Health Check Railway DB (Direct)
-
-Untuk verifikasi koneksi Postgres direct dari runtime app (tanpa Supabase client), gunakan endpoint:
-
-```bash
-GET /api/healthz-db
-```
-
-Endpoint ini membaca `DATABASE_URL`/`RAILWAY_DATABASE_URL`/`DATABASE_PUBLIC_URL`.
-
-## Mode Auth Runtime
-
-- `AUTH_PROVIDER=supabase` (default): login tetap memakai Supabase Auth.
-- `AUTH_PROVIDER=internal`: login membaca tabel `public.internal_auth_users` + `public.internal_auth_sessions`.
-- Saat mode `internal`, isi `INTERNAL_AUTH_SESSION_SECRET`.
-
-Catatan: mode `internal` saat ini baru fondasi untuk cutover bertahap dan belum menutup semua flow lanjutan (misalnya login-as tenant owner dan reset password email).
-
-## Mode Supabase Saat Development
-
-Seleksi target Supabase dipusatkan di `lib/supabase/config.ts`.
-
-- Jika `NEXT_PUBLIC_SUPABASE_TARGET=local`, app memakai `NEXT_PUBLIC_SUPABASE_LOCAL_URL`, `NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY`, dan `SUPABASE_LOCAL_SERVICE_ROLE_KEY`.
-- Jika `NEXT_PUBLIC_SUPABASE_TARGET` kosong atau bernilai selain `local`, app memakai `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, dan `SUPABASE_SERVICE_ROLE_KEY`.
-
-Artinya Anda bisa menyimpan kredensial remote dan local sekaligus di `.env.local`, lalu cukup switch lewat satu flag dan restart dev server.
-
-### Jalankan App Lokal Dengan Supabase Online
-
-Gunakan mode ini jika ingin develop di mesin lokal tetapi database/auth/storage tetap memakai project Supabase online.
-
-1. Isi `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, dan `SUPABASE_SERVICE_ROLE_KEY` di `.env.local`.
-2. Pastikan `NEXT_PUBLIC_SUPABASE_TARGET` kosong, dihapus, atau bukan `local`.
-3. Jalankan `npm run dev`.
-
-### Jalankan App Lokal Dengan Supabase Local
-
-Gunakan mode ini jika ingin test penuh tanpa menyentuh project online.
-
-1. Jalankan `npm run supabase:start`.
-2. Ambil `API URL`, `anon key`, dan `service_role key` dari `npm run supabase:status`.
-3. Isi `NEXT_PUBLIC_SUPABASE_LOCAL_URL`, `NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY`, dan `SUPABASE_LOCAL_SERVICE_ROLE_KEY` di `.env.local`.
-4. Set `NEXT_PUBLIC_SUPABASE_TARGET=local`.
-5. Jalankan `npm run dev`.
-
-Jika butuh database lokal yang bersih, jalankan `npm run supabase:db:reset`. Skema lokal akan dibangun dari SQL di `supabase/migrations/`.
-
-### Clone Data Online Ke Supabase Local
-
-Gunakan ini jika Anda ingin app lokal tetap memakai Supabase local, tetapi isi data awalnya berasal dari project online.
-
-1. Pastikan kredensial remote tetap terisi: `NEXT_PUBLIC_SUPABASE_URL` dan `SUPABASE_SERVICE_ROLE_KEY`.
-2. Pastikan Supabase local sudah running dan blok `NEXT_PUBLIC_SUPABASE_LOCAL_URL`, `NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY`, `SUPABASE_LOCAL_SERVICE_ROLE_KEY` sudah benar.
-3. Jalankan `npm run supabase:migrate-local-data`.
-4. Jalankan app dengan `NEXT_PUBLIC_SUPABASE_TARGET=local`.
-
-Catatan penting:
-
-- Script migrasi meng-copy auth users, public tables, dan storage objects ke stack local.
-- Password user lokal hasil clone di-set ulang menjadi `LocalTest123!`.
-- Jika Anda mengubah target Supabase, restart `npm run dev` agar process Next.js membaca env terbaru.
-
-### Cara Switch Cepat
-
-#### Dari Supabase Local ke Supabase Online
-
-1. Ubah `NEXT_PUBLIC_SUPABASE_TARGET` menjadi kosong, hapus, atau isi nilai selain `local`.
-2. Pastikan variabel remote (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) tetap valid.
-3. Restart `npm run dev`.
-
-Stack Supabase local boleh tetap hidup; app tidak akan memakainya selama target bukan `local`.
-
-#### Dari Supabase Online ke Supabase Local
-
-1. Pastikan `npm run supabase:start` sudah berjalan.
-2. Pastikan variabel local (`NEXT_PUBLIC_SUPABASE_LOCAL_URL`, `NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY`, `SUPABASE_LOCAL_SERVICE_ROLE_KEY`) valid.
-3. Set `NEXT_PUBLIC_SUPABASE_TARGET=local`.
-4. Restart `npm run dev`.
-
-## Update Penting Dibanding Dokumentasi Sebelumnya
-
-- Stack frontend sudah naik ke **Next.js 16** dan **React 19**, bukan Next.js 15.
-- Runtime minimum sekarang **Node.js 20+**, bukan 18+.
-- Proteksi request memakai **`proxy.ts`** (terminologi Next.js 16), bukan penyebutan middleware lama.
-- Migrasi aktif sudah jauh lebih panjang: **127 file SQL** dengan titik terbaru sampai `1085_sync_official_saas_module_catalog.sql`.
-- Fitur yang kini jelas hadir di kode: billing SaaS, voucher ABS, demo session, invitation token organisasi, avatar karyawan, service orders, fleet hardening, barcode foundation, warehouse bins, dan module activation SaaS.
-
-## Catatan
-
-README ini sengaja dibuat ringkas sebagai pintu masuk. Untuk audit teknis lengkap, daftar route, modul, action, migrasi, dan temuan implementasi, lihat [DOCUMENTATION.md](./DOCUMENTATION.md).
+Repository ini bersifat private dan ditujukan untuk pengembangan internal NIZAM.

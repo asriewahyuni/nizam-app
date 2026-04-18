@@ -275,7 +275,8 @@ export async function exportGeneralLedgerXLSX(
     { key: 'no', width: 8 },
     { key: 'date', width: 14 },
     { key: 'entry_number', width: 14 },
-    { key: 'description', width: 40 },
+    { key: 'description', width: 34 },
+    { key: 'breakdown', width: 52 },
     { key: 'account_code', width: 10 },
     { key: 'account_name', width: 30 },
     { key: 'ref_type', width: 16 },
@@ -285,19 +286,21 @@ export async function exportGeneralLedgerXLSX(
 
   addNizamHeader(sheet, 'BUKU BESAR UMUM (GENERAL LEDGER)', `Semua transaksi POSTED per ${new Date().toLocaleDateString('id-ID')}`, orgName)
 
-  const headerRow = sheet.addRow(['No', 'Tanggal', 'No. Jurnal', 'Keterangan', 'Kode Akun', 'Nama Akun', 'Tipe Referensi', 'DEBIT (Rp)', 'KREDIT (Rp)'])
+  const headerRow = sheet.addRow(['No', 'Tanggal', 'No. Jurnal', 'Keterangan', 'Breakdown / Catatan', 'Kode Akun', 'Nama Akun', 'Tipe Referensi', 'DEBIT (Rp)', 'KREDIT (Rp)'])
   styleHeaderRow(headerRow)
 
   let lineNo = 1
   entries.forEach((entry: any, idx: number) => {
     if (entry.journal_lines && entry.journal_lines.length > 0) {
       let isFirstLine = true
+      const breakdownNote = String(entry?.purchase_transparency?.note || entry?.notes || '').trim()
       entry.journal_lines.forEach((line: any) => {
         const row = sheet.addRow([
           isFirstLine ? lineNo : '',
           isFirstLine ? entry.entry_date : '',
           isFirstLine ? (entry.entry_number || '') : '',
           isFirstLine ? entry.description : '',
+          isFirstLine ? breakdownNote : '',
           line.accounts?.code || '',
           line.accounts?.name || '',
           isFirstLine ? (entry.reference_type || 'MANUAL') : '',
@@ -305,8 +308,8 @@ export async function exportGeneralLedgerXLSX(
           line.credit > 0 ? formatRupiahExcel(line.credit) : '',
         ])
         styleDataRow(row, idx % 2 === 0)
-        row.getCell(8).alignment = { horizontal: 'right' }
         row.getCell(9).alignment = { horizontal: 'right' }
+        row.getCell(10).alignment = { horizontal: 'right' }
         isFirstLine = false
       })
       lineNo++
@@ -322,14 +325,14 @@ export async function exportGeneralLedgerXLSX(
     return s + (e.journal_lines || []).reduce((ls: number, l: any) => ls + Number(l.credit || 0), 0)
   }, 0)
 
-  const totalRow = sheet.addRow(['', '', '', '', '', '', 'TOTAL', formatRupiahExcel(totalDebit), formatRupiahExcel(totalCredit)])
+  const totalRow = sheet.addRow(['', '', '', '', '', '', '', 'TOTAL', formatRupiahExcel(totalDebit), formatRupiahExcel(totalCredit)])
   styleTotalRow(totalRow)
-  totalRow.getCell(8).alignment = { horizontal: 'right' }
   totalRow.getCell(9).alignment = { horizontal: 'right' }
+  totalRow.getCell(10).alignment = { horizontal: 'right' }
 
   // Balance check
-  const balRow = sheet.addRow(['', '', '', '', '', '', 'SELISIH (harus 0)', formatRupiahExcel(Math.abs(totalDebit - totalCredit)), ''])
-  balRow.getCell(7).font = { italic: true, size: 8, color: { argb: Math.abs(totalDebit - totalCredit) < 0.01 ? 'FF16A34A' : 'FFDC2626' } }
+  const balRow = sheet.addRow(['', '', '', '', '', '', '', 'SELISIH (harus 0)', formatRupiahExcel(Math.abs(totalDebit - totalCredit)), ''])
+  balRow.getCell(8).font = { italic: true, size: 8, color: { argb: Math.abs(totalDebit - totalCredit) < 0.01 ? 'FF16A34A' : 'FFDC2626' } }
 
   return Buffer.from(await wb.xlsx.writeBuffer())
 }

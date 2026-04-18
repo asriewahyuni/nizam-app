@@ -32,7 +32,14 @@ import type { Product } from '@/types/database.types'
 
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
-import { getEditableLineDiscountAmount, getStoredLineDiscountAmount, inferStoredLineDiscountMode } from '@/lib/commerce/discounts'
+import {
+  getDocumentHeaderDiscountAmount,
+  getDocumentLineDiscountsForDisplay,
+  getDocumentLineDiscountTotal,
+  getEditableLineDiscountAmount,
+  getStoredLineDiscountAmount,
+  inferStoredLineDiscountMode,
+} from '@/lib/commerce/discounts'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { QRCodeSVG } from 'qrcode.react'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
@@ -71,7 +78,7 @@ export default function PurchasingClient({
    useEffect(() => {
      if (payId && purchaseRows.length > 0) {
        const purchase = purchaseRows.find((p: any) => p.id === payId)
-       if (purchase) {
+       if (purchase && purchase.payment_status !== 'PAID') {
          handleOpenPayment(purchase)
        }
      }
@@ -465,6 +472,9 @@ export default function PurchasingClient({
 
   const isPurchaseSalam = (purchase: any) => String(purchase?.shariah_mode || '').trim().toUpperCase() === 'SALAM'
 
+  const isReceiveBlockedByPayment = (purchase: any) =>
+    isPurchaseSalam(purchase) && String(purchase?.payment_status || '').trim().toUpperCase() !== 'PAID'
+
   const getOutstandingAmount = (purchase: any) => {
     const paid = (purchase?.purchase_payments || []).reduce((sum: number, pay: any) => sum + (Number(pay.amount) + Number(pay.discount_amount)), 0)
     const returned = (purchase?.purchase_returns || []).reduce((sum: number, ret: any) => sum + Number(ret.total_amount), 0)
@@ -486,10 +496,14 @@ export default function PurchasingClient({
     setLoading(false)
   }
 
-  const handleReceivePO = async (id: string) => {
+  const handleReceivePO = async (purchase: any) => {
+    if (isReceiveBlockedByPayment(purchase)) {
+      setError('Akad SALAM pembelian wajib lunas terlebih dahulu sebelum penerimaan barang.')
+      return
+    }
     if (!confirm('Tandai bahwa barang sudah diterima (Status -> RECEIVED)?')) return
     setLoading(true)
-    const res = await receivePurchase(orgId, id)
+    const res = await receivePurchase(orgId, purchase.id)
     if (res?.error) {
       setError(res.error)
     } else {
@@ -560,6 +574,7 @@ export default function PurchasingClient({
     else {
       setSuccess('Pembayaran berhasil dicatat!')
       setShowPaymentModal(false)
+      router.refresh()
       setTimeout(() => setSuccess(null), 3000)
     }
     setLoading(false)
@@ -630,6 +645,14 @@ export default function PurchasingClient({
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount)
   }
+
+  const getPurchaseLineGrossTotal = (item: any) => Number(item?.quantity || 0) * Number(item?.unit_price || 0)
+  const getPurchaseLineNetTotal = (item: any, displayDiscountAmount: number) =>
+    getPurchaseLineGrossTotal(item) - displayDiscountAmount + Number(item?.tax_amount || 0)
+  const getPurchaseLineDiscountTotal = (purchase: any) => getDocumentLineDiscountTotal(purchase?.purchase_items || [])
+  const getPurchaseHeaderDiscount = (purchase: any) =>
+    getDocumentHeaderDiscountAmount(purchase, getPurchaseLineDiscountTotal(purchase))
+  const selectedDetailPurchaseLineDiscounts = getDocumentLineDiscountsForDisplay(selectedDetailPurchase)
 
   const formatApprovalOfficer = (approval: any) => {
     if (!approval) return ''
@@ -800,24 +823,30 @@ export default function PurchasingClient({
               {purchaseRows.length === 0 ? (
                 <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Belum ada data pembelian.</td></tr>
               ) : (
-                purchaseRows.map((p: any) => (
-                  <tr key={p.id} className="group hover:bg-slate-50 transition-colors">
-                    <td className="px-8 py-6">
-                       <div className="text-xs font-black text-rose-600 tracking-tighter">{p.purchase_number}</div>
-                       <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(p.purchase_date)}</div>
-                    </td>
-                    <td className="px-8 py-6">
-                       <div className="text-sm font-bold text-slate-900">{p.contacts?.name || 'Unknown Vendor'}</div>
-                       <div className="flex gap-2 mt-1.5 overflow-hidden max-w-[300px]">
-                          <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-md border border-slate-200 uppercase tracking-tighter">
-                            {p.purchase_items?.length || 0} SKU
-                          </span>
-                          <span className="text-[10px] text-slate-400 truncate font-medium">
-                            {p.purchase_items?.[0]?.description}{p.purchase_items?.length > 1 ? ` & ${p.purchase_items.length - 1} lainnya` : ''}
-                          </span>
-                       </div>
-                    </td>
-                    <td className="px-8 py-6 text-right">
+                purchaseRows.map((p: any) => {
+                  const receiveBlockedByPayment = p.status === 'ORDERED' && isReceiveBlockedByPayment(p)
+                  const receiveButtonTitle = receiveBlockedByPayment
+                    ? 'Akad SALAM: lakukan pembayaran lunas terlebih dahulu sebelum penerimaan barang'
+                    : 'Terima Barang'
+
+                  return (
+                    <tr key={p.id} className="group hover:bg-slate-50 transition-colors">
+                      <td className="px-8 py-6">
+                         <div className="text-xs font-black text-rose-600 tracking-tighter">{p.purchase_number}</div>
+                         <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(p.purchase_date)}</div>
+                      </td>
+                      <td className="px-8 py-6">
+                         <div className="text-sm font-bold text-slate-900">{p.contacts?.name || 'Unknown Vendor'}</div>
+                         <div className="flex gap-2 mt-1.5 overflow-hidden max-w-[300px]">
+                            <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-md border border-slate-200 uppercase tracking-tighter">
+                              {p.purchase_items?.length || 0} SKU
+                            </span>
+                            <span className="text-[10px] text-slate-400 truncate font-medium">
+                              {p.purchase_items?.[0]?.description}{p.purchase_items?.length > 1 ? ` & ${p.purchase_items.length - 1} lainnya` : ''}
+                            </span>
+                         </div>
+                      </td>
+                      <td className="px-8 py-6 text-right">
                        {(() => {
                          const paid = (p.purchase_payments || []).reduce((sum: number, pay: any) => sum + (Number(pay.amount) + Number(pay.discount_amount)), 0)
                          const returned = (p.purchase_returns || []).reduce((sum: number, ret: any) => sum + Number(ret.total_amount), 0)
@@ -839,14 +868,14 @@ export default function PurchasingClient({
                            </div>
                          )
                        })()}
-                    </td>
-                    <td className="px-8 py-6 text-center">
+                      </td>
+                      <td className="px-8 py-6 text-center">
                        <StatusBadge 
                          label={p.status} 
                          variant={p.status === 'RECEIVED' ? 'success' : p.status === 'VOIDED' ? 'error' : 'warning'} 
                        />
-                    </td>
-                     <td className="px-8 py-6">
+                      </td>
+                       <td className="px-8 py-6">
                        <div className="flex flex-wrap items-center justify-end gap-2">
                          <button onClick={() => handleOpenDetail(p)} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-500 hover:text-white transition-all border border-blue-100" title="Detail Dokumen PO">
                            <FileText size={16}/>
@@ -859,9 +888,20 @@ export default function PurchasingClient({
                          )}
                          
                          {p.status === 'ORDERED' && (
-                           <button onClick={() => handleReceivePO(p.id)} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm border border-emerald-100 group/btn" title="Terima Barang">
-                             <CheckSquare size={16}/>
-                           </button>
+                           <span className="inline-flex" title={receiveButtonTitle}>
+                             <button
+                               onClick={() => handleReceivePO(p)}
+                               disabled={receiveBlockedByPayment}
+                               aria-disabled={receiveBlockedByPayment}
+                               className={`p-2.5 rounded-xl transition-all shadow-sm border group/btn ${
+                                 receiveBlockedByPayment
+                                   ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed shadow-none'
+                                   : 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-500 hover:text-white'
+                               }`}
+                             >
+                               <CheckSquare size={16}/>
+                             </button>
+                           </span>
                          )}
                          
                          {(p.status === 'DRAFT' || p.status === 'ORDERED' || (p.status === 'RECEIVED' && p.payment_status === 'UNPAID')) && (
@@ -882,9 +922,10 @@ export default function PurchasingClient({
                            </button>
                          )}
                        </div>
-                     </td>
-                  </tr>
-                ))
+                       </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -1719,45 +1760,55 @@ export default function PurchasingClient({
                    </div>
 
                    {/* Details Table */}
-                   <div className="border border-slate-200 rounded-2xl overflow-hidden mb-8 relative z-10 font-mono text-sm">
-                      <table className="w-full text-left bg-white">
-                        <thead className="bg-slate-100">
-                           <tr>
-                             <th className="py-3 px-4 font-bold text-slate-700 w-12 text-center">NO</th>
-                             <th className="py-3 px-4 font-bold text-slate-700">DESKRIPSI BARANG</th>
-                             <th className="py-3 px-4 font-bold text-slate-700 text-center">QTY</th>
-                             <th className="py-3 px-4 font-bold text-slate-700 text-right">HARGA SATUAN</th>
-                             <th className="py-3 px-4 font-bold text-slate-700 text-right">TOTAL</th>
-                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                           {selectedDetailPurchase.purchase_items?.map((item: any, i: number) => (
-                             <tr key={item.id} className="hover:bg-slate-50/50">
-                               <td className="py-3 px-4 text-slate-500 text-center">{i + 1}</td>
-                               <td className="py-3 px-4 font-semibold text-slate-900">{item.description}</td>
-                               <td className="py-3 px-4 text-center text-slate-700">{item.quantity} {item.products?.unit || 'Pcs'}</td>
-                               <td className="py-3 px-4 text-right text-slate-700">{formatRupiah(item.unit_price)}</td>
-                               <td className="py-3 px-4 text-right font-semibold text-slate-900">{formatRupiah(item.total_amount)}</td>
-                             </tr>
-                           ))}
-                        </tbody>
-                      </table>
-                   </div>
+	                   <div className="border border-slate-200 rounded-2xl overflow-hidden mb-8 relative z-10 font-mono text-sm">
+	                      <table className="w-full text-left bg-white">
+	                        <thead className="bg-slate-100">
+	                           <tr>
+	                             <th className="py-3 px-4 font-bold text-slate-700 w-12 text-center">NO</th>
+	                             <th className="py-3 px-4 font-bold text-slate-700">DESKRIPSI BARANG</th>
+	                             <th className="py-3 px-4 font-bold text-slate-700 text-center">QTY</th>
+	                             <th className="py-3 px-4 font-bold text-slate-700 text-right">HARGA SATUAN</th>
+	                             <th className="py-3 px-4 font-bold text-slate-700 text-right">DISKON</th>
+	                             <th className="py-3 px-4 font-bold text-slate-700 text-right">TOTAL NETTO</th>
+	                           </tr>
+	                        </thead>
+	                        <tbody className="divide-y divide-slate-100">
+	                           {selectedDetailPurchase.purchase_items?.map((item: any, i: number) => {
+                               const displayDiscountAmount = Number(selectedDetailPurchaseLineDiscounts[i] || 0)
+                               return (
+	                             <tr key={item.id} className="hover:bg-slate-50/50">
+	                               <td className="py-3 px-4 text-slate-500 text-center">{i + 1}</td>
+	                               <td className="py-3 px-4 font-semibold text-slate-900">{item.description}</td>
+	                               <td className="py-3 px-4 text-center text-slate-700">{item.quantity} {item.products?.unit || 'Pcs'}</td>
+	                               <td className="py-3 px-4 text-right text-slate-700">{formatRupiah(item.unit_price)}</td>
+	                               <td className="py-3 px-4 text-right font-semibold text-rose-500">{displayDiscountAmount > 0 ? formatRupiah(displayDiscountAmount) : '-'}</td>
+	                               <td className="py-3 px-4 text-right font-semibold text-slate-900">{formatRupiah(getPurchaseLineNetTotal(item, displayDiscountAmount))}</td>
+	                             </tr>
+	                           )})}
+	                        </tbody>
+	                      </table>
+	                   </div>
 
                    {/* Calculations */}
                    <div className="flex justify-end relative z-10 font-mono text-sm mb-16">
-                      <div className="w-80 space-y-3">
-                         <div className="flex justify-between items-center text-slate-600">
-                           <span>SubTotal</span>
-                           <span>{formatRupiah(selectedDetailPurchase.total_amount)}</span>
-                         </div>
-                         {selectedDetailPurchase.discount_amount > 0 && (
-                           <div className="flex justify-between items-center text-rose-500">
-                             <span>Diskon</span>
-                             <span>-{formatRupiah(selectedDetailPurchase.discount_amount)}</span>
-                           </div>
-                         )}
-                         {(selectedDetailPurchase.tax_amount > 0) && (
+	                      <div className="w-80 space-y-3">
+	                         <div className="flex justify-between items-center text-slate-600">
+	                           <span>SubTotal</span>
+	                           <span>{formatRupiah(selectedDetailPurchase.total_amount)}</span>
+	                         </div>
+	                         {getPurchaseLineDiscountTotal(selectedDetailPurchase) > 0 && (
+	                           <div className="flex justify-between items-center text-rose-500">
+	                             <span>Diskon Item</span>
+	                             <span>-{formatRupiah(getPurchaseLineDiscountTotal(selectedDetailPurchase))}</span>
+	                           </div>
+	                         )}
+	                         {getPurchaseHeaderDiscount(selectedDetailPurchase) > 0 && (
+	                           <div className="flex justify-between items-center text-rose-500">
+	                             <span>Diskon Header / Faktur</span>
+	                             <span>-{formatRupiah(getPurchaseHeaderDiscount(selectedDetailPurchase))}</span>
+	                           </div>
+	                         )}
+	                         {(selectedDetailPurchase.tax_amount > 0) && (
                            <div className="flex justify-between items-center text-slate-600">
                              <span>Pajak (Tax)</span>
                              <span>{formatRupiah(selectedDetailPurchase.tax_amount)}</span>

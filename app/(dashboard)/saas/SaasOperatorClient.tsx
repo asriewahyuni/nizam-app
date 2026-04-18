@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useMemo, useState, useSyncExternalStore, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { BadgeDollarSign, CheckCircle2, ClipboardList, Download, Receipt, RefreshCcw } from 'lucide-react'
+import { AlertCircle, BadgeDollarSign, CheckCircle2, ClipboardList, Download, Receipt, RefreshCcw } from 'lucide-react'
 import {
   convertQuotationToSale,
   createOperatorQuotation,
@@ -16,7 +16,17 @@ import {
   EXTRA_BRANCH_UNIT_PRICE,
   EXTRA_ENTITY_UNIT_PRICE,
   OPERATOR_ADDON_OPTIONS,
+  getOperatorAddonById,
+  getOperatorMarketplaceCompatibility,
+  getOperatorMarketplaceKind,
+  getOperatorMarketplaceLabel,
+  getOperatorMarketplaceMinCoreFamily,
 } from '@/lib/saas/operator-pricing'
+import {
+  getSaasCoreFamilyLabel,
+  getSaasPackageArchitecture,
+  normalizeSaasEntitlementList,
+} from '@/lib/saas/module-catalog'
 
 type Snapshot = {
   orgs: Array<{ id: string; name: string }>
@@ -133,6 +143,11 @@ function parseQuoteDraft(rawDescription: string | null | undefined): ParsedQuote
     .filter(Boolean)
 
   lines.forEach((line) => {
+    if (line.startsWith('Harga Core Family:')) {
+      parsed.baseAmount = parseCurrencyValue(line.slice('Harga Core Family:'.length))
+      return
+    }
+
     if (line.startsWith('Paket dasar:')) {
       parsed.baseAmount = parseCurrencyValue(line.slice('Paket dasar:'.length))
       return
@@ -144,7 +159,7 @@ function parseQuoteDraft(rawDescription: string | null | undefined): ParsedQuote
       return
     }
 
-    const addonWithAnchor = line.match(/^Add-on(?:\s+Single\s+Bill)?\s+(.+):\s+(.+)\s+->\s+(.+)$/i)
+    const addonWithAnchor = line.match(/^(?:Module|Add-on|Capacity Add-on)(?:\s+Single\s+Bill)?\s+(.+):\s+(.+)\s+->\s+(.+)$/i)
     if (addonWithAnchor) {
       parsed.addons.push({
         name: addonWithAnchor[1].trim(),
@@ -154,7 +169,7 @@ function parseQuoteDraft(rawDescription: string | null | undefined): ParsedQuote
       return
     }
 
-    const addonSimple = line.match(/^Add-on(?:\s+Single\s+Bill)?\s+(.+):\s+(.+)$/i)
+    const addonSimple = line.match(/^(?:Module|Add-on|Capacity Add-on)(?:\s+Single\s+Bill)?\s+(.+):\s+(.+)$/i)
     if (addonSimple) {
       parsed.addons.push({
         name: addonSimple[1].trim(),
@@ -177,7 +192,7 @@ function parseQuoteDraft(rawDescription: string | null | undefined): ParsedQuote
       return
     }
 
-    const extraBranchMatch = line.match(/^Cabang tambahan:\s+(\d+)\s+x\s+(.+?)\s+=\s+(.+)$/i)
+    const extraBranchMatch = line.match(/^(?:Cabang|Unit) tambahan:\s+(\d+)\s+x\s+(.+?)\s+=\s+(.+)$/i)
     if (extraBranchMatch) {
       parsed.extraBranchQty = Number(extraBranchMatch[1] || 0)
       parsed.extraBranchUnitPrice = parseCurrencyValue(extraBranchMatch[2]) || EXTRA_BRANCH_UNIT_PRICE
@@ -193,6 +208,15 @@ function parseQuoteDraft(rawDescription: string | null | undefined): ParsedQuote
     const taxMatch = line.match(/^Pajak:\s+([\d.,]+)%/i)
     if (taxMatch) {
       parsed.taxPercent = parsePercentValue(taxMatch[1])
+      return
+    }
+
+    if (line.startsWith('Core Family Scope:')) {
+      parsed.modules = line
+        .slice('Core Family Scope:'.length)
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
       return
     }
 
@@ -275,6 +299,55 @@ export default function SaasOperatorClient({
     () => snapshot.aiTokenPackages.find((pkg) => pkg.id === selectedAiTokenPackageId) || null,
     [snapshot.aiTokenPackages, selectedAiTokenPackageId]
   )
+  const selectedPackageArchitecture = useMemo(
+    () => selectedPackage ? getSaasPackageArchitecture(selectedPackage.modules || [], selectedPackage.addons || []) : null,
+    [selectedPackage]
+  )
+  const quoteCoreCapabilities = useMemo(
+    () => normalizeSaasEntitlementList(selectedModules.length > 0 ? selectedModules : (selectedPackage?.modules || [])),
+    [selectedModules, selectedPackage?.modules]
+  )
+  const quoteArchitecture = useMemo(
+    () => getSaasPackageArchitecture(quoteCoreCapabilities),
+    [quoteCoreCapabilities]
+  )
+  const selectedAddonCapabilities = useMemo(
+    () => normalizeSaasEntitlementList(
+      selectedAddonIds
+        .map((addonId) => getOperatorAddonById(addonId)?.name || '')
+        .filter(Boolean)
+    ),
+    [selectedAddonIds]
+  )
+  const quoteEnabledCapabilities = useMemo(
+    () => normalizeSaasEntitlementList([...quoteCoreCapabilities, ...selectedAddonCapabilities]),
+    [quoteCoreCapabilities, selectedAddonCapabilities]
+  )
+  const addonCompatibilityById = useMemo(() => (
+    Object.fromEntries(
+      OPERATOR_ADDON_OPTIONS.map((addon) => [
+        addon.id,
+        getOperatorMarketplaceCompatibility(addon, {
+          coreFamilyLevel: quoteArchitecture.coreFamilyLevel,
+          enabledCapabilities: quoteEnabledCapabilities,
+        }),
+      ])
+    ) as Record<string, ReturnType<typeof getOperatorMarketplaceCompatibility>>
+  ), [quoteArchitecture.coreFamilyLevel, quoteEnabledCapabilities])
+  const marketplaceSections = useMemo(() => ([
+    {
+      title: 'Module Marketplace',
+      items: OPERATOR_ADDON_OPTIONS
+        .filter((addon) => getOperatorMarketplaceKind(addon) === 'module')
+        .map((addon) => ({ ...addon, compatibility: addonCompatibilityById[addon.id] })),
+    },
+    {
+      title: 'Add-on Marketplace',
+      items: OPERATOR_ADDON_OPTIONS
+        .filter((addon) => getOperatorMarketplaceKind(addon) !== 'module')
+        .map((addon) => ({ ...addon, compatibility: addonCompatibilityById[addon.id] })),
+    },
+  ]), [addonCompatibilityById])
   const addonOptionByName = useMemo(() => (
     new Map(OPERATOR_ADDON_OPTIONS.map((addon) => [addon.name.trim().toLowerCase(), addon]))
   ), [])
@@ -298,19 +371,62 @@ export default function SaasOperatorClient({
   }
 
   const toggleAddon = (addonId: string) => {
-    setSelectedAddonIds((prev) => (
-      prev.includes(addonId)
-        ? prev.filter((id) => id !== addonId)
-        : [...prev, addonId]
-    ))
+    const compatibility = addonCompatibilityById[addonId]
+    if (!selectedAddonIds.includes(addonId) && compatibility && !compatibility.isCompatible) {
+      setMsg({ type: 'err', text: compatibility.reason || 'Module/Add-on belum kompatibel dengan Core Family yang dipilih.' })
+      return
+    }
+
+    const nextSelectedAddonIds = selectedAddonIds.includes(addonId)
+      ? selectedAddonIds.filter((id) => id !== addonId)
+      : [...selectedAddonIds, addonId]
+
+    const nextAddonCapabilities = normalizeSaasEntitlementList(
+      nextSelectedAddonIds
+        .map((id) => getOperatorAddonById(id)?.name || '')
+        .filter(Boolean)
+    )
+    const nextEnabledCapabilities = normalizeSaasEntitlementList([...quoteCoreCapabilities, ...nextAddonCapabilities])
+    const filteredAddonIds = nextSelectedAddonIds.filter((id) => {
+      const addon = getOperatorAddonById(id)
+      if (!addon) return false
+      return getOperatorMarketplaceCompatibility(addon, {
+        coreFamilyLevel: quoteArchitecture.coreFamilyLevel,
+        enabledCapabilities: nextEnabledCapabilities,
+      }).isCompatible
+    })
+
+    setSelectedAddonIds(filteredAddonIds)
   }
 
   const toggleModule = (moduleName: string) => {
-    setSelectedModules((prev) => (
-      prev.includes(moduleName)
-        ? prev.filter((name) => name !== moduleName)
-        : [...prev, moduleName]
-    ))
+    const nextModules = selectedModules.includes(moduleName)
+      ? selectedModules.filter((name) => name !== moduleName)
+      : [...selectedModules, moduleName]
+
+    setSelectedModules(nextModules)
+
+    if (selectedAddonIds.length === 0) return
+
+    const nextArchitecture = getSaasPackageArchitecture(nextModules)
+    const nextAddonCapabilities = normalizeSaasEntitlementList(
+      selectedAddonIds
+        .map((addonId) => getOperatorAddonById(addonId)?.name || '')
+        .filter(Boolean)
+    )
+    const nextEnabledCapabilities = normalizeSaasEntitlementList([...nextModules, ...nextAddonCapabilities])
+    const filteredAddonIds = selectedAddonIds.filter((addonId) => {
+      const addon = getOperatorAddonById(addonId)
+      if (!addon) return false
+      return getOperatorMarketplaceCompatibility(addon, {
+        coreFamilyLevel: nextArchitecture.coreFamilyLevel,
+        enabledCapabilities: nextEnabledCapabilities,
+      }).isCompatible
+    })
+
+    if (filteredAddonIds.length !== selectedAddonIds.length) {
+      setSelectedAddonIds(filteredAddonIds)
+    }
   }
 
   const selectedAddonMonthlyTotal = useMemo(
@@ -642,6 +758,9 @@ export default function SaasOperatorClient({
 
                       const pkg = snapshot.packages.find((item) => item.id === nextPackageId)
                       setSelectedModules(pkg?.modules || [])
+                      setSelectedAddonIds([])
+                      setAddonPromoPrices(createDefaultAddonPromoMap())
+                      setAddonAnchorPrices(createDefaultAddonAnchorMap())
                     }}
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold"
                   >
@@ -795,11 +914,24 @@ export default function SaasOperatorClient({
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="mb-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">4. Aktivasi Fitur</p>
-                <p className="mt-1 text-sm font-semibold text-slate-600">Review modul paket, add-on premium, dan topup token AI dalam satu area.</p>
+                <p className="mt-1 text-sm font-semibold text-slate-600">Review bundle core, vertical module, add-on, dan topup token AI dalam satu area.</p>
               </div>
               <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Modul Paket</p>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Core Family</p>
+                  {selectedPackageArchitecture && (
+                    <div className="mt-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600">{quoteArchitecture.bundleLabel}</p>
+                      <p className="mt-1 text-[11px] font-semibold text-slate-600">
+                        Platform Core + {quoteArchitecture.liteCore.length + quoteArchitecture.starterCore.length} core item
+                        {quoteArchitecture.fullCoreExtensions.length > 0 ? ` + ${quoteArchitecture.fullCoreExtensions.length} full core extension` : ''}
+                        {selectedPackageArchitecture.verticalModules.length > 0 ? ` + ${selectedPackageArchitecture.verticalModules.length} vertical module` : ''}
+                      </p>
+                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                        Minimum capability: {getSaasCoreFamilyLabel(quoteArchitecture.coreFamilyLevel)}
+                      </p>
+                    </div>
+                  )}
                   <div className="mt-2 flex flex-wrap gap-2">
                     {visiblePackageModules.length > 0 ? (
                       visiblePackageModules.map((moduleName) => (
@@ -820,55 +952,84 @@ export default function SaasOperatorClient({
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Add-on Premium</p>
-                  <div className="mt-2 space-y-1.5">
-                    {OPERATOR_ADDON_OPTIONS.map((addon) => (
-                      <div key={addon.id} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-[11px]">
-                        <label className="flex items-center justify-between gap-2">
-                          <span className="inline-flex items-center gap-2 font-bold text-slate-700">
-                            <input
-                              type="checkbox"
-                              checked={selectedAddonIds.includes(addon.id)}
-                              onChange={() => toggleAddon(addon.id)}
-                              className="h-3.5 w-3.5 rounded border-slate-300 text-[#003366]"
-                            />
-                            {addon.name}
-                            <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-500">
-                              {addon.billing}
-                            </span>
-                          </span>
-                          <span className="font-black text-indigo-700">{formatIdr(parseSafeNumber(addonPromoPrices[addon.id], addon.price))}</span>
-                        </label>
-                        {(addon.capacityNote || addon.description) && (
-                          <div className="mt-2 space-y-1">
-                            {addon.capacityNote && (
-                              <div className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-blue-700">
-                                {addon.capacityNote}
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Marketplace Layers</p>
+                  <div className="mt-2 space-y-3">
+                    {marketplaceSections.map((section) => (
+                      <div key={section.title} className="space-y-1.5">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{section.title}</p>
+                        {section.items.map((addon) => {
+                          const isLocked = !addon.compatibility?.isCompatible
+                          return (
+                          <div
+                            key={addon.id}
+                            className={`rounded-lg border px-2 py-2 text-[11px] ${
+                              isLocked ? 'border-amber-200 bg-amber-50/60' : 'border-slate-200 bg-white'
+                            }`}
+                          >
+                            <label className="flex items-center justify-between gap-2">
+                              <span className="inline-flex items-center gap-2 font-bold text-slate-700">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedAddonIds.includes(addon.id)}
+                                  disabled={isLocked && !selectedAddonIds.includes(addon.id)}
+                                  onChange={() => toggleAddon(addon.id)}
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-[#003366]"
+                                />
+                                {addon.name}
+                                <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-500">
+                                  {addon.billing}
+                                </span>
+                                <span className="rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-blue-700">
+                                  {getOperatorMarketplaceLabel(addon)}
+                                </span>
+                                <span className="rounded-full border border-indigo-100 bg-indigo-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-indigo-700">
+                                  Min. {getSaasCoreFamilyLabel(getOperatorMarketplaceMinCoreFamily(addon))}
+                                </span>
+                              </span>
+                              <span className="font-black text-indigo-700">{formatIdr(parseSafeNumber(addonPromoPrices[addon.id], addon.price))}</span>
+                            </label>
+                            {isLocked && addon.compatibility?.reason && (
+                              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[10px] font-bold text-amber-800">
+                                <div className="flex items-start gap-1.5">
+                                  <AlertCircle size={12} className="mt-0.5 shrink-0" />
+                                  <span>{addon.compatibility.reason}</span>
+                                </div>
                               </div>
                             )}
-                            <p className="text-[10px] font-semibold leading-relaxed text-slate-500">
-                              {addon.description}
-                            </p>
+                            {(addon.capacityNote || addon.description) && (
+                              <div className="mt-2 space-y-1">
+                                {addon.capacityNote && (
+                                  <div className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-blue-700">
+                                    {addon.capacityNote}
+                                  </div>
+                                )}
+                                <p className="text-[10px] font-semibold leading-relaxed text-slate-500">
+                                  {addon.description}
+                                </p>
+                              </div>
+                            )}
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={addonAnchorPrices[addon.id] || ''}
+                                onChange={(event) => setAddonAnchorPrices((prev) => ({ ...prev, [addon.id]: event.target.value }))}
+                                placeholder="Harga coret"
+                                disabled={isLocked && !selectedAddonIds.includes(addon.id)}
+                                className="h-8 rounded-md border border-slate-200 px-2 text-[10px] font-bold disabled:bg-slate-100"
+                              />
+                              <input
+                                type="number"
+                                min="0"
+                                value={addonPromoPrices[addon.id] || ''}
+                                onChange={(event) => setAddonPromoPrices((prev) => ({ ...prev, [addon.id]: event.target.value }))}
+                                placeholder="Harga jual"
+                                disabled={isLocked && !selectedAddonIds.includes(addon.id)}
+                                className="h-8 rounded-md border border-slate-200 px-2 text-[10px] font-bold disabled:bg-slate-100"
+                              />
+                            </div>
                           </div>
-                        )}
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                          <input
-                            type="number"
-                            min="0"
-                            value={addonAnchorPrices[addon.id] || ''}
-                            onChange={(event) => setAddonAnchorPrices((prev) => ({ ...prev, [addon.id]: event.target.value }))}
-                            placeholder="Harga coret"
-                            className="h-8 rounded-md border border-slate-200 px-2 text-[10px] font-bold"
-                          />
-                          <input
-                            type="number"
-                            min="0"
-                            value={addonPromoPrices[addon.id] || ''}
-                            onChange={(event) => setAddonPromoPrices((prev) => ({ ...prev, [addon.id]: event.target.value }))}
-                            placeholder="Harga jual"
-                            className="h-8 rounded-md border border-slate-200 px-2 text-[10px] font-bold"
-                          />
-                        </div>
+                        )})}
                       </div>
                     ))}
                   </div>

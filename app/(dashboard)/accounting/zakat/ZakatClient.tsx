@@ -9,10 +9,11 @@ import {
 } from 'lucide-react'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis, AreaChart, Area, ReferenceLine } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Cell, Tooltip, XAxis, YAxis, AreaChart, Area, ReferenceLine } from 'recharts'
 import { injectShariahPack, setShariahAccountsActive } from '@/modules/accounting/actions/shariah.actions'
 import { getLivePreciousMetalsPrices } from '@/modules/accounting/actions/price.actions'
 import { startZakatHaul, checkAndCancelHaul, payZakat, syncActiveHaulPrices } from '@/modules/accounting/actions/zakat.actions'
+import { SafeResponsiveContainer } from '@/components/ui/SafeResponsiveContainer'
 
 interface ZakatClientProps {
   summary: any
@@ -340,13 +341,13 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                     <label className="text-[10px] font-black text-white/70 uppercase tracking-widest">Sumber Dana (Kas & Bank)</label>
                     <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
                       {summary.zakatAssets.filter((a: any) => a.type === 'CASH').map((acc: any) => (
-                        <button key={acc.code} onClick={() => setSelectedBank(acc.code)} 
-                          className={`text-left p-3 rounded-xl border-2 transition-all flex justify-between items-center ${selectedBank === acc.code ? 'border-white bg-white/20' : 'border-white/10 bg-white/5 hover:border-white/20'}`}>
+                        <button key={acc.id || acc.code} onClick={() => setSelectedBank(acc.id)} 
+                          className={`text-left p-3 rounded-xl border-2 transition-all flex justify-between items-center ${selectedBank === acc.id ? 'border-white bg-white/20' : 'border-white/10 bg-white/5 hover:border-white/20'}`}>
                           <div>
                             <p className="text-xs font-black">{acc.name}</p>
                             <p className="text-[10px] font-bold text-white/70">Saldo: {formatRupiah(acc.balance)}</p>
                           </div>
-                          {selectedBank === acc.code && <CheckCircle2 size={16} className="text-white"/>}
+                          {selectedBank === acc.id && <CheckCircle2 size={16} className="text-white"/>}
                         </button>
                       ))}
                     </div>
@@ -376,7 +377,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
 
                     return (
                       <div className="h-[130px] w-full pt-4 border-t border-white/10 mt-auto">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <SafeResponsiveContainer>
                           <AreaChart data={chartData} margin={{ top: 10, right: 4, left: 4, bottom: 0 }}>
                             <defs>
                               <linearGradient id="colorAbove" x1="0" y1="0" x2="0" y2="1">
@@ -421,7 +422,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                               activeDot={{ r: 7, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }}
                             />
                           </AreaChart>
-                        </ResponsiveContainer>
+                        </SafeResponsiveContainer>
                       </div>
                     )
                   })()}
@@ -539,7 +540,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
             <Scale size={20} className="text-slate-300" />
           </div>
           <div className="h-[220px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <SafeResponsiveContainer>
               <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 40 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                 <XAxis type="number" hide />
@@ -554,7 +555,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
                   ))}
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
           </div>
 
           {/* Fiqh Notes */}

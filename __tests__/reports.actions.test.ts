@@ -45,7 +45,7 @@ describe('Reports Branch Context', () => {
 
     const result = await getGeneralLedger('org-1', 'branch-1')
 
-    expect(result).toEqual([{ id: 'je-1', journal_lines: [] }])
+    expect(result).toEqual([expect.objectContaining({ id: 'je-1', journal_lines: [] })])
     expect(supabase.calls[0]?.table).toBe('journal_entries')
     expect(supabase.calls[0]?.operations).toEqual(
       expect.arrayContaining([
@@ -54,6 +54,87 @@ describe('Reports Branch Context', () => {
         expect.objectContaining({ method: 'eq', args: ['branch_id', 'branch-1'] }),
       ])
     )
+  })
+
+  it('hydrates purchase discount transparency on general ledger entries', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        journal_entries: [
+          {
+            result: success([{ id: 'je-purchase' }]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.queryPostgres
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'je-purchase',
+            entry_number: 'JE-2026-000101',
+            entry_date: '2026-04-16',
+            description: 'Penerimaan Pembelian & Stok PO-001',
+            reference_type: 'PURCHASE',
+            reference_id: '11111111-1111-1111-1111-111111111111',
+            notes: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'jl-1',
+            entry_id: 'je-purchase',
+            debit: 335000,
+            credit: 0,
+            account_code: '1301',
+            account_name: 'Persediaan Barang Dagang',
+            account_type: 'ASSET',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '11111111-1111-1111-1111-111111111111',
+            purchase_number: 'PO-001',
+            total_amount: 350000,
+            discount_amount: 35000,
+            tax_amount: 34650,
+            shipping_amount: 20000,
+            insurance_amount: 0,
+            grand_total: 369650,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            purchase_id: '11111111-1111-1111-1111-111111111111',
+            quantity: 10,
+            unit_price: 35000,
+            discount_amount: 35000,
+          },
+        ],
+      })
+
+    const result = await getGeneralLedger('org-1', 'branch-1')
+
+    expect(result).toHaveLength(1)
+    expect(result[0]?.purchase_transparency).toEqual(
+      expect.objectContaining({
+        subtotal: 350000,
+        lineDiscount: 35000,
+        headerDiscount: 0,
+        inventoryValue: 335000,
+        tax: 34650,
+        grandTotal: 369650,
+      })
+    )
+    expect(String(result[0]?.purchase_transparency?.note || '')).toContain('Diskon item')
+    expect(mocks.queryPostgres).toHaveBeenCalledTimes(4)
   })
 
   it('scopes profit and loss calculations to the active branch', async () => {

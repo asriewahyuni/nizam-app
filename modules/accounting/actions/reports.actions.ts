@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { unstable_noStore as noStore } from 'next/cache'
 import { cache } from 'react'
 import { addDaysToDateString, diffDateOnlyStrings, getDateInTimeZone } from '@/lib/utils'
+import { hydratePurchaseTransparencyForEntries } from '@/modules/accounting/lib/purchase-ledger-transparency'
 import type { BranchSummary } from '@/modules/organization/lib/org-context'
 
 type BranchFilter = string | null | undefined
@@ -992,10 +993,17 @@ export async function getGeneralLedger(orgId: string, branchId?: BranchFilter, c
     }
   }
 
-  return entryRows.map((row) => ({
+  const entries = entryRows.map((row) => ({
     ...row,
     journal_lines: linesByEntryId[String(row.id ?? '')] ?? []
   }))
+
+  try {
+    return await hydratePurchaseTransparencyForEntries(entries, queryPostgres)
+  } catch (err) {
+    ;(console as any).error('[getGeneralLedger] purchase transparency hydrate error:', err)
+    return entries.map((entry) => ({ ...entry, purchase_transparency: null }))
+  }
 }
 
 

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { MiniErpWordmark } from '@/components/shared/MiniErpWordmark'
 
 export const metadata: Metadata = {
   title: 'Masa Trial Berakhir — Nizam MiniERP',
@@ -45,7 +46,13 @@ export default function ExpiredPage() {
           </h1>
           <p className="text-slate-400 text-sm leading-relaxed mb-8">
             Periode percobaan gratis organisasi Anda sudah habis. Upgrade ke paket berbayar untuk
-            melanjutkan akses penuh ke seluruh fitur <span className="text-white font-medium">Nizam MiniERP</span>.
+            melanjutkan akses penuh ke seluruh fitur{' '}
+            <MiniErpWordmark
+              prefix="Nizam Mini"
+              className="font-medium text-white"
+              erpClassName="text-amber-400"
+            />
+            .
           </p>
 
           {/* Actions */}

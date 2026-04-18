@@ -96,7 +96,7 @@ interface CashClientProps {
   recentTransactions: RecentTransactionOption[]
   cashViewMode: CashViewMode
   userRole: string
-  /** TRUE jika org adalah Parent/Holding dan user bisa kelola rekening langsung */
+  /** TRUE jika org adalah organisasi induk/holding dan user bisa kelola rekening langsung */
   canManageDirect: boolean
   /** TRUE jika org adalah induk (parent_org_id IS NULL) */
   isParentOrg: boolean
@@ -232,12 +232,12 @@ export function CashClient({
   const isAmountExceedingAvailable = shouldCheckAvailableCash && Boolean(txBankAccountId) && txAmount > availableCashBalance
   const reconcileScopeLabel = activeBranchName
     ? `unit aktif ${activeBranchName}`
-    : 'unit aktif parent yang sedang dipilih'
+    : 'unit aktif organisasi induk yang sedang dipilih'
   const visibleScopeLabel = isAllBranchesView
     ? 'semua unit'
     : activeBranchName
       ? `unit aktif ${activeBranchName}`
-      : 'unit aktif parent yang sedang dipilih'
+      : 'unit aktif organisasi induk yang sedang dipilih'
   const filteredTransactions = recentTransactions.filter(
     (transaction) => transaction.status === filterStatus && (!filterAccountId || transaction.bank_account_id === filterAccountId)
   )
@@ -268,7 +268,7 @@ export function CashClient({
   }
 
   const pageSubtitle = isHoldingView
-    ? 'Mode holding aktif. Pantau saldo dan mutasi parent + seluruh entitas dari satu halaman.'
+    ? 'Mode holding aktif. Pantau saldo dan mutasi organisasi induk + seluruh entitas dari satu halaman.'
     : isAllBranchesView
       ? (activeBranchName
           ? `Menampilkan saldo dan mutasi semua unit. Transaksi baru tetap diproses dari unit aktif ${activeBranchName}.`
@@ -434,7 +434,7 @@ export function CashClient({
                   onClick={() => handleCashViewChange('parent')}
                   className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${!isHoldingView ? 'bg-white text-blue-700 shadow-md' : 'text-blue-400 hover:text-blue-600'}`}
                 >
-                  Kas Parent
+                  Kas Induk
                 </button>
                 <button
                   onClick={() => handleCashViewChange('holding')}
@@ -459,7 +459,7 @@ export function CashClient({
                </button>
             </div>
             {isParentOrg ? (
-              /* Parent/Holding: bisa tambah rekening langsung */
+              /* Organisasi induk/holding: bisa tambah rekening langsung */
               <div className="flex items-center gap-2">
                 <a
                   href="/accounting/coa-requests"
@@ -477,8 +477,8 @@ export function CashClient({
                   disabled={!canOpenParentAccountModal}
                   title={
                     !canManageDirect
-                      ? 'Pindah ke konteks Unit Utama parent untuk membuat rekening.'
-                      : (!canWriteCash ? 'Pilih unit aktif parent terlebih dahulu.' : undefined)
+                      ? 'Pindah ke konteks Unit Utama organisasi induk untuk membuat rekening.'
+                      : (!canWriteCash ? 'Pilih unit aktif organisasi induk terlebih dahulu.' : undefined)
                   }
                   onClick={() => setShowAccountModal(true)}
                 >
@@ -486,11 +486,11 @@ export function CashClient({
                 </SafeButton>
               </div>
             ) : (
-              /* Child/Branch: diarahkan ke halaman pengajuan */
+              /* Entitas anak: diarahkan ke halaman pengajuan */
               <a
                 href="/accounting/coa-requests"
                 className="flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition-all shadow-sm"
-                title="Ajukan rekening baru melalui Parent/Holding"
+                title="Ajukan rekening baru melalui organisasi induk/holding"
               >
                 <Building2 size={14} />
                 Ajukan Rekening
@@ -527,19 +527,19 @@ export function CashClient({
       ) : null}
       {isHoldingView && hasCrossEntityAccounts ? (
         <div className="rounded-3xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-900 shadow-sm">
-          Mode holding aktif: kartu rekening dan aktivitas terbaru menampilkan parent + child. Pencatatan transaksi baru dan rekonsiliasi tetap diproses dari unit aktif parent.
+          Mode holding aktif: kartu rekening dan aktivitas terbaru menampilkan organisasi induk + seluruh entitas anak. Pencatatan transaksi baru dan rekonsiliasi tetap diproses dari unit aktif organisasi induk.
         </div>
       ) : isParentButRestricted ? (
         <div className="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-4 text-sm font-semibold text-amber-900 shadow-sm">
-          Anda berada di Parent, tetapi pembuatan rekening hanya bisa dari konteks Unit Utama. Pindah unit aktif ke Unit Utama parent lalu coba lagi.
+          Anda berada di organisasi induk, tetapi pembuatan rekening hanya bisa dari konteks Unit Utama. Pindah unit aktif ke Unit Utama organisasi induk lalu coba lagi.
         </div>
       ) : canUseHoldingView && hasCrossEntityAccounts ? (
         <div className="rounded-3xl border border-slate-200 bg-slate-50 px-6 py-4 text-sm font-semibold text-slate-700 shadow-sm">
-          Mode parent aktif: yang tampil hanya rekening dan mutasi parent. Pindah ke `Kas Holding` untuk melihat seluruh entitas.
+          Mode induk aktif: yang tampil hanya rekening dan mutasi organisasi induk. Pindah ke `Kas Holding` untuk melihat seluruh entitas.
         </div>
       ) : isAllBranchesView ? (
         <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-semibold text-emerald-900 shadow-sm">
-          Mode semua unit aktif: total likuiditas dan daftar rekening di bawah ini mencakup seluruh branch dalam entitas ini. Pencatatan transaksi baru tetap memakai unit aktif {activeBranchName || 'yang sedang dipilih'}.
+          Mode semua unit aktif: total likuiditas dan daftar rekening di bawah ini mencakup seluruh unit dalam entitas ini. Pencatatan transaksi baru tetap memakai unit aktif {activeBranchName || 'yang sedang dipilih'}.
         </div>
       ) : null}
 
@@ -549,7 +549,7 @@ export function CashClient({
           value={formatRupiah(visibleBankAccounts.reduce((sum, acc) => sum + (acc.balances?.balance || 0), 0))} 
           icon={Wallet}
           color="emerald"
-          sub={isHoldingView ? 'Total saldo parent + seluruh entitas' : `Total saldo rekening pada ${visibleScopeLabel}`}
+          sub={isHoldingView ? 'Total saldo organisasi induk + seluruh entitas' : `Total saldo rekening pada ${visibleScopeLabel}`}
         />
         <StatCard 
           label="Transaksi Bulan Ini" 
@@ -702,7 +702,7 @@ export function CashClient({
                   <SectionHeader 
                     title={isHoldingView ? 'Aktivitas Holding Terkini' : 'Aktivitas Keuangan Terkini'} 
                     subtitle={isHoldingView
-                      ? 'Mutasi kas/bank terbaru dari parent dan seluruh entitas dalam holding.'
+                      ? 'Mutasi kas/bank terbaru dari organisasi induk dan seluruh entitas dalam holding.'
                       : 'Daftar mutasi kas dan bank yang sudah terposting.'}
                     icon={History}
                     actions={
@@ -953,7 +953,7 @@ export function CashClient({
             <div className="space-y-8">
               {isHoldingView ? (
                 <div className="rounded-3xl border border-blue-200 bg-blue-50 px-6 py-4 text-sm font-semibold text-blue-900 shadow-sm">
-                  Mode holding tetap mengizinkan rekonsiliasi, tetapi proses impor CSV hanya berjalan untuk {reconcileScopeLabel}. Gunakan toggle `Kas Parent` jika Anda ingin fokus penuh pada rekening parent saja.
+                  Mode holding tetap mengizinkan rekonsiliasi, tetapi proses impor CSV hanya berjalan untuk {reconcileScopeLabel}. Gunakan toggle `Kas Induk` jika Anda ingin fokus penuh pada rekening organisasi induk saja.
                 </div>
               ) : null}
               <SectionCard className="p-10 space-y-10">
@@ -1072,7 +1072,7 @@ export function CashClient({
 
                  {placementNodes.length > 0 ? (
                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penempatan Rekening (Organisasi & Cabang)</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penempatan Rekening (Organisasi & Unit)</label>
                       <div className="relative">
                         <select 
                           name="target_org_branch" 
@@ -1100,7 +1100,7 @@ export function CashClient({
                  ) : (
                    branches.length > 0 && (
                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penempatan Rekening (Cabang)</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penempatan Rekening (Unit)</label>
                         <div className="relative">
                           <select name="target_branch_id" defaultValue={activeBranchId || undefined} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-bold appearance-none focus:bg-white focus:border-emerald-500 transition-all shadow-inner">
                              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -1248,7 +1248,7 @@ export function CashClient({
                             </select>
                             <p className="text-[10px] font-bold text-blue-500 ml-1">
                               {isInterOrgTransfer
-                                ? 'Transfer lintas entitas: pilih rekening child/unit yang sudah diajukan dan aktif. Sistem akan posting OUT investasi di parent dan IN pendanaan di entitas tujuan.'
+                                ? 'Transfer lintas entitas: pilih rekening entitas tujuan yang sudah diajukan dan aktif. Sistem akan posting OUT investasi di organisasi induk dan IN pendanaan di entitas tujuan.'
                                 : 'Target harus rekening kas/bank lain dalam unit aktif yang sama.'}
                             </p>
                           </>
@@ -1279,7 +1279,7 @@ export function CashClient({
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div className="space-y-1">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] ml-1">
-                         Akun Investasi Parent (OUT)
+                         Akun Investasi Induk (OUT)
                        </label>
                        <select
                          name="source_counter_account_id"
@@ -1288,7 +1288,7 @@ export function CashClient({
                          onChange={(e) => setTxSourceCounterAccountId(e.target.value)}
                          className="w-full px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none shadow-xl border border-slate-800 transition-all"
                        >
-                         <option value="">Select Parent Investment Account...</option>
+                         <option value="">Select Source Investment Account...</option>
                          {sourceInterOrgCounterAccounts.map((account) => (
                            <option key={account.id} value={account.id} className="text-white">
                              {account.code} - {account.name}
@@ -1297,11 +1297,11 @@ export function CashClient({
                        </select>
                        {sourceInterOrgCounterAccounts.length > 0 ? (
                          <p className="text-[10px] font-bold text-blue-500 ml-1">
-                           Gunakan akun investasi parent, idealnya 1601 Investasi pada Entitas Anak / Unit.
+                           Gunakan akun investasi organisasi induk, idealnya 1601 Investasi pada Entitas Anak / Unit.
                          </p>
                        ) : (
                          <p className="text-[10px] font-bold text-amber-600 ml-1">
-                           Akun investasi parent belum tersedia. Jalankan migrasi terbaru atau sinkronkan CoA terlebih dahulu.
+                           Akun investasi organisasi induk belum tersedia. Jalankan migrasi terbaru atau sinkronkan CoA terlebih dahulu.
                          </p>
                        )}
                      </div>
@@ -1341,7 +1341,7 @@ export function CashClient({
                       : txType === 'IN'
                         ? 'Choosing REVENUE will increase equity. Choosing an ASSET account like Accounts Receivable will settle a customer debt.'
                         : isInterOrgTransfer
-                          ? 'Transfer modal antar entitas membuat dua jurnal otomatis: parent mencatat arus kas investasi, sedangkan child/unit penerima mencatat arus kas pendanaan pada rekening target yang dipilih.'
+                          ? 'Transfer modal antar entitas membuat dua jurnal otomatis: organisasi induk mencatat arus kas investasi, sedangkan entitas penerima mencatat arus kas pendanaan pada rekening target yang dipilih.'
                           : 'A transfer credits the source bank account and debits the target bank account in the same unit.'}
                  </div>
 

@@ -64,7 +64,8 @@ export async function injectShariahPack(orgId: string) {
     }
 
     // Cleanup akun induk ekuitas syariah lama (3100) saja.
-    // Coba hapus dulu, fallback ke nonaktif jika sudah terhubung transaksi/relasi.
+    // Jangan hapus fisik karena akun bisa sudah direferensikan payroll/modul lain.
+    // CoAS baru cukup menonaktifkan legacy 3100 dan mempertahankan 3110/3120.
     const { data: legacyEquityParent } = await (supabase as any)
       .from('accounts')
       .select('id, code')
@@ -72,19 +73,11 @@ export async function injectShariahPack(orgId: string) {
       .eq('code', LEGACY_SHARIAH_EQUITY_CODE)
 
     for (const acc of (legacyEquityParent || []) as Array<{ id: string; code: string }>) {
-      const { error: deleteError } = await (supabase as any)
+      await (supabase as any)
         .from('accounts')
-        .delete()
+        .update({ is_active: false })
         .eq('org_id', orgId)
         .eq('id', acc.id)
-
-      if (deleteError) {
-        await (supabase as any)
-          .from('accounts')
-          .update({ is_active: false })
-          .eq('org_id', orgId)
-          .eq('id', acc.id)
-      }
     }
 
     for (const account of SHARIAH_COA_SEEDS) {

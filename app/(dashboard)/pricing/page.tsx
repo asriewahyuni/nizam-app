@@ -2,16 +2,19 @@
 
 import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle2, Zap, Crown, Shield, Package, ArrowRight, Loader2, Building2, Store, Users, Warehouse } from 'lucide-react'
+import { CheckCircle2, Zap, Crown, Shield, Package, Loader2, Building2, Warehouse, Truck, Edit3, Megaphone } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
+import { getSaasCoreFamilyLabel, getSaasPackageArchitecture } from '@/lib/saas/module-catalog'
+import { OPERATOR_GROWTH_ADDON_OPTIONS, OPERATOR_MODULE_OPTIONS, getOperatorMarketplaceLabel, getOperatorMarketplaceMinCoreFamily } from '@/lib/saas/operator-pricing'
 
 const db = createClient() as any
 
 const PLAN_ICON: Record<string, any> = {
   Trial: Shield,
   Demo: Zap,
+  Lite: Package,
   Basic: Package,
   Pro: Crown,
   Enterprise: Crown,
@@ -20,9 +23,18 @@ const PLAN_ICON: Record<string, any> = {
 const PLAN_GRADIENT: Record<string, string> = {
   Trial: 'from-slate-500 to-slate-700',
   Demo: 'from-orange-500 to-amber-600',
+  Lite: 'from-emerald-500 to-teal-700',
   Basic: 'from-blue-500 to-blue-700',
   Pro: 'from-indigo-500 to-purple-700',
   Enterprise: 'from-[#003366] to-indigo-800',
+}
+
+const GROWTH_LAYER_META: Record<string, { icon: typeof Building2; detail: string }> = {
+  addon_fleet: { icon: Truck, detail: 'vertical module / bulan' },
+  addon_job_order: { icon: Edit3, detail: 'vertical module / bulan' },
+  addon_warehouse: { icon: Warehouse, detail: 'add-on / bulan' },
+  addon_org: { icon: Building2, detail: 'capacity add-on / bulan' },
+  addon_sales_page: { icon: Megaphone, detail: 'add-on / bulan' },
 }
 
 export default function PricingPage() {
@@ -41,7 +53,8 @@ export default function PricingPage() {
       if (pkgs) {
         setPackages(pkgs.map((p: any) => ({
           ...p,
-          modules: Array.isArray(p.modules) ? p.modules : JSON.parse(p.modules || '[]')
+          modules: Array.isArray(p.modules) ? p.modules : JSON.parse(p.modules || '[]'),
+          addons: Array.isArray(p.addons) ? p.addons : JSON.parse(p.addons || '[]'),
         })))
       }
 
@@ -87,6 +100,15 @@ export default function PricingPage() {
           const isCurrentPlan = currentPlan === pkg.name
           const Icon = PLAN_ICON[pkg.name] || Package
           const gradient = PLAN_GRADIENT[pkg.name] || 'from-slate-600 to-slate-800'
+          const architecture = getSaasPackageArchitecture(pkg.modules || [], pkg.addons || [])
+          const totalCoreItems = architecture.liteCore.length + architecture.starterCore.length
+          const architectureSections = [
+            { title: 'Platform Core', items: architecture.platformCore },
+            { title: 'Lite Core Family', items: architecture.liteCore },
+            { title: 'Starter Core Family', items: architecture.starterCore },
+            { title: 'Full Core Family', items: architecture.fullCoreExtensions },
+            { title: 'Vertical Modules', items: architecture.verticalModules },
+          ].filter((section) => section.items.length > 0)
 
           return (
             <motion.div
@@ -147,21 +169,39 @@ export default function PricingPage() {
                   </div>
                 </div>
 
-                {/* Section: FULL Modules Grid */}
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 px-1">Paket Fitur Lengkap:</p>
-                  <div className="grid grid-cols-2 gap-y-3 gap-x-2">
-                    {pkg.modules?.map((mod: string) => (
-                      <div key={mod} className="flex items-center gap-2 group">
-                        <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 rotate-12 transition-transform group-hover:rotate-0">
-                          <CheckCircle2 size={10} className="text-white" />
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-600">Arsitektur Paket</p>
+                    <p className="mt-1 text-sm font-black text-slate-900">{architecture.bundleLabel}</p>
+                    <p className="mt-1 text-[11px] font-semibold text-slate-600">
+                      Platform Core selalu ikut. Paket ini membawa {totalCoreItems} core item
+                      {architecture.fullCoreExtensions.length > 0 ? ` + ${architecture.fullCoreExtensions.length} full core extension` : ''}
+                      {architecture.verticalModules.length > 0 ? ` + ${architecture.verticalModules.length} vertical module` : ''}.
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 px-1">Paket Fitur Lengkap:</p>
+                    <div className="space-y-4">
+                      {architectureSections.map((section) => (
+                        <div key={`${pkg.id}-${section.title}`}>
+                          <p className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{section.title}</p>
+                          <div className="grid grid-cols-2 gap-y-3 gap-x-2">
+                            {section.items.map((item) => (
+                              <div key={`${pkg.id}-${section.title}-${item}`} className="flex items-center gap-2 group">
+                                <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 rotate-12 transition-transform group-hover:rotate-0">
+                                  <CheckCircle2 size={10} className="text-white" />
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-600 group-hover:text-slate-900 transition-colors uppercase tracking-tight leading-tight">{item}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <span className="text-[10px] font-bold text-slate-600 group-hover:text-slate-900 transition-colors uppercase tracking-tight leading-tight">{mod}</span>
-                      </div>
-                    ))}
-                    {(!pkg.modules || pkg.modules.length === 0) && (
-                      <div className="col-span-2 text-xs text-slate-400 italic">Fitur Standar Terintegrasi</div>
-                    )}
+                      ))}
+                      {architectureSections.length === 0 && (
+                        <div className="col-span-2 text-xs text-slate-400 italic">Fitur Standar Terintegrasi</div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -189,6 +229,7 @@ export default function PricingPage() {
                   >
                     <span className="text-xs font-black leading-tight tracking-tight">
                       {pkg.name === 'Trial' ? 'Mulai Langkah Berkah Sekarang →' : 
+                       pkg.name === 'Lite' ? 'Mulai Transaksi Paling Sederhana →' :
                        pkg.name === 'Basic' ? 'Dapatkan Akses Operasional →' :
                        isEnterprise ? 'Dapatkan Full Power Expansion →' :
                        'Pilih Paket Ini →'}
@@ -201,7 +242,7 @@ export default function PricingPage() {
         })}
       </div>
 
-      {/* Add-ons Section ala Hormozi */}
+      {/* Growth Layers Section */}
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
@@ -213,35 +254,52 @@ export default function PricingPage() {
         <div className="relative z-10 flex flex-col md:flex-row items-center gap-12">
           <div className="flex-1 space-y-6 text-center md:text-left">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/20 text-blue-300 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-500/30">
-              Power-ups & Add-ons
+              Module Marketplace & Add-on Marketplace
             </div>
-            <h2 className="text-4xl font-black tracking-tighter">Butuh Kekuatan Lebih? <br />Tambah Sesuai Kebutuhan.</h2>
+            <h2 className="text-4xl font-black tracking-tighter">Butuh Lapisan Tambahan? <br />Aktifkan Sesuai Kebutuhan.</h2>
             <p className="text-slate-400 font-bold max-w-lg">
-              Bayar hanya yang Anda gunakan. Bebas tambah cabang atau perangkat POS kapan saja tanpa harus upgrade paket utama.
+              Core Family tetap stabil. Tinggal tambahkan Module atau Add-on saat bisnis butuh perluasan proses, channel, atau kapasitas.
             </p>
           </div>
 
-          <div className="w-full md:w-auto grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[
-              { icon: Building2, label: 'Tambah Bisnis Baru', price: 'Rp 249rb', detail: 'per entitas baru / bulan' },
-              { icon: Warehouse, label: 'Tambah Lokasi (WMS)', price: 'Rp 149rb', detail: 'per gudang / cabang / bulan' },
-              { icon: Store, label: 'Mesin POS Tambahan', price: 'Rp 99rb', detail: 'per perangkat / bulan' },
-              { icon: Users, label: 'Staff Unlimited', price: 'GRATIS', detail: 'di semua paket' },
-            ].map((addon, i) => {
-              const Icon = addon.icon
-              return (
-                <div key={i} className="bg-white/5 border border-white/10 p-5 rounded-3xl space-y-3 hover:bg-white/10 transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-                    <Icon size={20} className="text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{addon.label}</p>
-                    <p className="text-xl font-black text-white">{addon.price}</p>
-                    <p className="text-[10px] text-slate-500 font-bold">{addon.detail}</p>
-                  </div>
+        <div className="w-full md:w-auto space-y-6">
+          {[
+              { title: 'Module Marketplace', items: OPERATOR_MODULE_OPTIONS },
+              { title: 'Add-on Marketplace', items: OPERATOR_GROWTH_ADDON_OPTIONS },
+            ].map((section) => (
+              <div key={section.title} className="space-y-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-300">{section.title}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {section.items.map((addon) => {
+                    const meta = GROWTH_LAYER_META[addon.id] || { icon: Building2, detail: addon.billing.toLowerCase() }
+                    const Icon = meta.icon
+                    return (
+                      <div key={addon.id} className="bg-white/5 border border-white/10 p-5 rounded-3xl space-y-3 hover:bg-white/10 transition-colors">
+                        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                          <Icon size={20} className="text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{addon.name}</p>
+                          {addon.anchorPrice && addon.anchorPrice > addon.price && (
+                            <p className="text-[10px] font-bold text-slate-500 line-through">
+                              {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(addon.anchorPrice)}
+                            </p>
+                          )}
+                          <p className="text-xl font-black text-white">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(addon.price)}</p>
+                          <p className="text-[10px] text-slate-500 font-bold">{getOperatorMarketplaceLabel(addon)} • {meta.detail}</p>
+                          <p className="text-[10px] text-blue-200 font-black uppercase tracking-[0.16em]">
+                            Min. {getSaasCoreFamilyLabel(getOperatorMarketplaceMinCoreFamily(addon))}
+                          </p>
+                          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-300">
+                            {addon.selfServiceEnabled === false ? 'Via konsultasi / sales' : 'Aktif mandiri via billing'}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              )
-            })}
+              </div>
+            ))}
           </div>
         </div>
       </motion.div>

@@ -2,6 +2,7 @@ import { getSyirkahContractByToken } from '@/modules/syirkah/actions/syirkah.act
 import { CheckCircle, AlertOctagon, Briefcase, Handshake, Users, ShieldCheck } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
 import PrintButton from './PrintButton'
+import { MiniErpWordmark } from '@/components/shared/MiniErpWordmark'
 
 export const metadata = {
   title: 'Validasi Akad Syirkah | Nizam ERP',
@@ -87,7 +88,15 @@ export default async function SyirkahDocumentValidationPage({ params }: { params
             </div>
 
             <div className="mt-12 text-center text-sm font-medium text-slate-400 pt-6 border-t border-slate-100 print:border-black">
-              <p>Mencetak dokumen ini sama dengan menerima secara sah bahwa data telah direkam pada sistem Cloud ERP NIZAM.</p>
+              <p>
+                Mencetak dokumen ini sama dengan menerima secara sah bahwa data telah direkam pada sistem{' '}
+                <MiniErpWordmark
+                  prefix="NIZAM Mini"
+                  className="font-semibold text-slate-500 print:text-black"
+                  erpClassName="text-amber-500 print:text-black"
+                />
+                .
+              </p>
               <PrintButton />
             </div>
           </div>

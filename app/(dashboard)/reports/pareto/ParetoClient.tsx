@@ -8,7 +8,6 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer, 
   Line, 
   ComposedChart,
   Cell
@@ -27,6 +26,7 @@ import {
 import { formatRupiah } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { SafeResponsiveContainer } from '@/components/ui/SafeResponsiveContainer'
 
 interface ParetoClientProps {
   orgId: string
@@ -124,7 +124,7 @@ export function ParetoClient({ orgId, data }: ParetoClientProps) {
          </div>
 
          <div className="h-[400px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <SafeResponsiveContainer>
                <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis 
@@ -157,7 +157,7 @@ export function ParetoClient({ orgId, data }: ParetoClientProps) {
                     dot={{fill: '#f59e0b', r: 4}} 
                   />
                </ComposedChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
          </div>
       </div>
 

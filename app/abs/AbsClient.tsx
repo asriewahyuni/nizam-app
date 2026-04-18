@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import type { VoucherStatus } from './page'
+import { MiniErpWordmark } from '@/components/shared/MiniErpWordmark'
 
 export default function AbsClient({ status }: { status: VoucherStatus }) {
   const [timeLeft, setTimeLeft] = useState<string | null>(null)
@@ -85,7 +86,13 @@ export default function AbsClient({ status }: { status: VoucherStatus }) {
                  </h1>
                  
                  <p className="text-slate-400 text-sm font-medium leading-relaxed max-w-md mx-auto">
-                    Transformasi Digital Bisnis Anda dimulai hari ini bersama Nizam Cloud ERP x Akademi Bisnis Syariah.
+                    Transformasi Digital Bisnis Anda dimulai hari ini bersama{' '}
+                    <MiniErpWordmark
+                      prefix="Nizam Mini"
+                      className="font-semibold text-slate-600"
+                      erpClassName="text-amber-500"
+                    />{' '}
+                    x Akademi Bisnis Syariah.
                  </p>
               </div>
 

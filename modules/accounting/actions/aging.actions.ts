@@ -226,19 +226,6 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
   const db = supabase as any
   const today = getBusinessToday()
 
-  // === DEBUG: trace raw query results ===
-  if (type === 'AP') {
-    const { data: rawPO, error: rawErr } = await db
-      .from('purchases')
-      .select('id, purchase_number, status, payment_status, grand_total')
-      .eq('org_id', orgId)
-      .limit(10)
-    console.log('[AGING-DEBUG] orgId:', orgId, 'branchId:', branchId)
-    console.log('[AGING-DEBUG] raw purchases (no filter):', rawPO?.length, rawErr?.message)
-    console.log('[AGING-DEBUG] sample:', JSON.stringify(rawPO?.slice(0, 3)))
-  }
-  // === END DEBUG ===
-
   const settlementAccounts = await getSettlementAccounts(db, orgId, ['1201', '1205', '1404', '2101', '2201', '2301', '2401', '2602', '2603'])
 
   const enrichWithContactNames = async (items: any[], idField: string) => {
@@ -766,8 +753,10 @@ export async function getAgingReport(orgId: string, type: 'AR' | 'AP', branchId?
 
 
 export async function getAgingSummary(orgId: string, branchId?: BranchFilter) {
-  const ar = await getAgingReport(orgId, 'AR', branchId)
-  const ap = await getAgingReport(orgId, 'AP', branchId)
+  const [ar, ap] = await Promise.all([
+    getAgingReport(orgId, 'AR', branchId),
+    getAgingReport(orgId, 'AP', branchId),
+  ])
 
   const arSummary = AGING_BUCKETS.map((b) => ({
     bucket: b,

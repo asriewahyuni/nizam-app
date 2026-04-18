@@ -1,6 +1,23 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
+const NEXT_ACTION_HEADER = 'next-action'
+
+function isServerActionRequest(request: NextRequest) {
+  return request.headers.has(NEXT_ACTION_HEADER)
+}
+
+function createServerActionRedirectResponse(target: string) {
+  return new NextResponse(null, {
+    status: 303,
+    headers: {
+      'content-type': 'text/plain; charset=utf-8',
+      'x-action-redirect': `${target};replace`,
+      location: target,
+    },
+  })
+}
+
 /**
  * Next.js Proxy — Runs on every request.
  * Replaces the deprecated middleware.ts convention (Next.js 16+).
@@ -10,9 +27,13 @@ import { updateSession } from '@/lib/supabase/middleware'
  */
 export async function proxy(request: NextRequest) {
   const host = request.headers.get('host')
+  const serverActionRequest = isServerActionRequest(request)
 
   // Legacy domain redirect: nizam.xales.id ke kliknizam.app
   if (host === 'nizam.xales.id') {
+    if (serverActionRequest) {
+      return createServerActionRedirectResponse('https://kliknizam.app')
+    }
     return NextResponse.redirect('https://kliknizam.app', 301)
   }
 
@@ -39,4 +60,3 @@ export const config = {
     },
   ],
 }
-

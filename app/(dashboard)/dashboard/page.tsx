@@ -1,71 +1,72 @@
-import { canSelectAllBranches, getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import {
   getBalanceSheet,
   getCashFlow,
   getProfitLoss,
 } from '@/modules/accounting/actions/reports.actions'
+import { getAgingSummary } from '@/modules/accounting/actions/aging.actions'
 import { getBankLiquidityTotal } from '@/modules/cash/actions/bank.actions'
 import { unstable_noStore as noStore } from 'next/cache'
 import { formatRupiah } from '@/lib/utils'
+import { hasRolePermission, resolveDefaultAuthorizedRoute } from '@/modules/organization/lib/navigation-access'
 import { redirect } from 'next/navigation'
 import { DashboardClient } from './DashboardClient'
 import { getDashboardAnalytics } from '@/modules/accounting/actions/analytics.actions'
+
+type DashboardBalanceRow = {
+  code?: string | null
+  balance?: number | null
+}
 
 export default async function DashboardPage() {
   noStore()
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
-  const [activeBranch, canAccessAllBranches] = await Promise.all([
-    getActiveBranch(orgData.org.id),
-    canSelectAllBranches(orgData.org.id),
-  ])
+  if (!hasRolePermission(orgData.role, orgData.permissions, 'dashboard')) {
+    return redirect(resolveDefaultAuthorizedRoute({
+      userRole: orgData.role,
+      permissions: orgData.permissions,
+      enabledModules: orgData.enabledModules,
+    }))
+  }
+  const activeBranch = await getActiveBranch(orgData.org.id)
   // Allow admins to filter dashboard by their selected branch
   const reportBranchId = activeBranch?.id ?? null
 
-  const [cashBalance, balanceSheet, profitLoss, cashFlow, analytics] = await Promise.all([
+  const [cashBalance, balanceSheet, profitLoss, cashFlow, analytics, agingSummary] = await Promise.all([
     getBankLiquidityTotal(orgData.org.id, reportBranchId),
     getBalanceSheet(orgData.org.id, undefined, reportBranchId, false),
     getProfitLoss(orgData.org.id, undefined, undefined, reportBranchId, false),
     getCashFlow(orgData.org.id, reportBranchId, false),
     getDashboardAnalytics(orgData.org.id, reportBranchId ?? undefined),
+    getAgingSummary(orgData.org.id, reportBranchId),
   ])
 
-  const assetRows = Array.isArray(balanceSheet?.assets) ? balanceSheet.assets : []
-  const liabilityRows = Array.isArray(balanceSheet?.liabilities) ? balanceSheet.liabilities : []
+  const assetRows: DashboardBalanceRow[] = Array.isArray(balanceSheet?.assets) ? balanceSheet.assets : []
+  const liabilityRows: DashboardBalanceRow[] = Array.isArray(balanceSheet?.liabilities) ? balanceSheet.liabilities : []
 
   const totalCash = Number(cashBalance || 0)
 
-  const totalReceivables = assetRows
-    .filter((account: any) => String(account?.code || '').startsWith('12') && String(account?.code || '') !== '1203')
-    .reduce((sum: number, account: any) => sum + Number(account?.balance || 0), 0)
-
-  const totalPayables = liabilityRows
-    .filter((account: any) => {
-      const code = String(account?.code || '').trim()
-      return code === '2101' || code.startsWith('22') || code.startsWith('23') || code.startsWith('24')
-    })
-    .reduce((sum: number, account: any) => sum + Number(account?.balance || 0), 0)
+  const totalReceivables = Number(agingSummary?.totalAR || 0)
+  const totalPayables = Number(agingSummary?.totalAP || 0)
 
   const totalNonCurrentLiabilities = liabilityRows
-    .filter((account: any) => {
+    .filter((account) => {
       const code = String(account?.code || '').trim()
       return code.startsWith('25') || code.startsWith('26')
     })
-    .reduce((sum: number, account: any) => sum + Number(account?.balance || 0), 0)
+    .reduce((sum, account) => sum + Number(account?.balance || 0), 0)
 
   const totalInventory = assetRows
-    .filter((account: any) => String(account?.code || '').startsWith('13'))
-    .reduce((sum: number, account: any) => sum + Number(account?.balance || 0), 0)
+    .filter((account) => String(account?.code || '').startsWith('13'))
+    .reduce((sum, account) => sum + Number(account?.balance || 0), 0)
 
   const totalOtherCurrentAssets = assetRows
-    .filter((account: any) => String(account?.code || '').startsWith('14'))
-    .reduce((sum: number, account: any) => sum + Number(account?.balance || 0), 0)
+    .filter((account) => String(account?.code || '').startsWith('14'))
+    .reduce((sum, account) => sum + Number(account?.balance || 0), 0)
 
   const netProfit = Number(profitLoss?.netProfit || 0)
   const operatingCashFlow = Number(cashFlow?.ocf || 0)
-
-  const runwayMonths = operatingCashFlow < 0 && totalCash > 0 ? Math.abs(totalCash / operatingCashFlow) : 999
-  const runwayText = operatingCashFlow >= 0 ? 'Aman (OCF Positif)' : `${runwayMonths.toFixed(1)} Bulan tewas`
 
   const workingCapitalSummary = `${formatRupiah(totalPayables)} / ${formatRupiah(totalReceivables)}`
   const currentAssetPressureSummary = `${formatRupiah(totalInventory + totalOtherCurrentAssets)} / ${formatRupiah(totalNonCurrentLiabilities)}`
@@ -89,18 +90,10 @@ export default async function DashboardPage() {
         href: '/reports'
       },
       {
-        label: 'Runway / Burn Rate',
-        value: runwayText,
-        icon: 'wallet',
-        hint: operatingCashFlow < 0 ? 'Waktu tersisa sebelum bangkrut' : 'Perusahaan mencetak Net Cash.',
-        danger: operatingCashFlow < 0 && runwayMonths < 6,
-        href: '/accounting/budgets'
-      },
-      {
         label: 'Hutang & Piutang',
         value: workingCapitalSummary,
         icon: 'receivables',
-        hint: 'Utang operasional vs piutang usaha',
+        hint: 'Outstanding aging AP / AR dari modul operasional',
         href: '/accounting/aging?view=AP'
       },
       {

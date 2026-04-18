@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
-import { createSaleEntry, deliverSale, voidSale, processSalesReturn, processSalesPayment } from '@/modules/sales/actions/sales.actions'
+import { createSaleEntry, createSaleFulfillmentDrafts, deliverSale, voidSale, processSalesReturn, processSalesPayment } from '@/modules/sales/actions/sales.actions'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
 import { createContact } from '@/modules/contacts/actions/contact.actions'
 import type { ProductWithStock } from '@/modules/inventory/actions/inventory.actions'
@@ -191,7 +191,6 @@ export default function SalesClient({
   const taxableAmount = Math.max(0, grossSubTotal - appliedDiscount)
   const calculatedTax = (taxableAmount * headerTaxPercent) / 100
   const grandTotal = taxableAmount + calculatedTax
-  const STOCK_EPSILON = 0.000001
 
   const resetSaleForm = () => {
     setEditingDraftSaleId(null)
@@ -308,37 +307,6 @@ export default function SalesClient({
     }))
   }
 
-  const getFirstNonSalamStockShortage = () => {
-    const requirementByProduct = new Map<string, { productName: string; requiredQty: number; availableQty: number; unit: string }>()
-
-    for (const line of lines) {
-      if (line.type !== 'INVENTORY' || !line.product_id) continue
-      const qty = Number(line.quantity || 0)
-      if (!Number.isFinite(qty) || qty <= 0) continue
-
-      const current = requirementByProduct.get(line.product_id)
-      if (current) {
-        current.requiredQty += qty
-        continue
-      }
-
-      requirementByProduct.set(line.product_id, {
-        productName: line.product_name || line.product_id,
-        requiredQty: qty,
-        availableQty: Number(line.stock_available || 0),
-        unit: line.unit || 'Pcs',
-      })
-    }
-
-    for (const requirement of requirementByProduct.values()) {
-      if ((requirement.requiredQty - requirement.availableQty) > STOCK_EPSILON) {
-        return requirement
-      }
-    }
-
-    return null
-  }
-
   const handleCreateSale = async (e: React.FormEvent) => {
     e.preventDefault()
     const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
@@ -351,7 +319,9 @@ export default function SalesClient({
     if (usableLines.length === 0) return setError('Tambahkan minimal 1 item sebelum menyimpan dokumen.')
     if (!isDraftSave && paymentTerm === 'LUNAS' && !paymentAccountId) return setError('Pilih akun penerimaan untuk transaksi Lunas!')
     if (!isDraftSave && shariahMode === 'SALAM' && paymentTerm !== 'LUNAS') return setError('Akad SALAM wajib dibayar lunas (tunai) di awal.')
-    if (!isDraftSave && (paymentTerm === 'TEMPO' || shariahMode === 'SALAM') && !dueDate) return setError('Tanggal jatuh tempo pengiriman wajib diisi.')
+    if (!isDraftSave && (paymentTerm === 'TEMPO' || shariahMode === 'SALAM' || shariahMode === 'ISTISHNA') && !dueDate) {
+      return setError('Tanggal jatuh tempo pengiriman wajib diisi.')
+    }
 
     if (!isDraftSave && usableLines.some(l => !l.product_name || l.quantity <= 0 || l.unit_price < 0)) {
       return setError('Lengkapi detail barang, kuantitas, dan Harga Jual pada setiap baris.')
@@ -359,34 +329,11 @@ export default function SalesClient({
 
     const dpFinalAmount = dpMode === 'PERCENT' ? ((parseFloat(dpPercent) || 0) / 100) * grandTotal : (parseFloat(dpAmount) || 0)
 
-    let resolvedShariahMode: 'CASH' | 'SALAM' | 'ISTISHNA' = shariahMode
-    let resolvedPaymentTerm: 'TEMPO' | 'LUNAS' = shariahMode === 'SALAM' ? 'LUNAS' : paymentTerm
+    const resolvedShariahMode: 'CASH' | 'SALAM' | 'ISTISHNA' = shariahMode
+    const resolvedPaymentTerm: 'TEMPO' | 'LUNAS' = shariahMode === 'SALAM' ? 'LUNAS' : paymentTerm
 
     if (!isDraftSave && resolvedPaymentTerm === 'TEMPO' && hasDp && dpFinalAmount > grandTotal) {
       return setError('Nilai Uang Muka (DP) tidak boleh melebihi Total Penjualan.')
-    }
-
-    if (!isDraftSave && resolvedShariahMode !== 'SALAM' && resolvedShariahMode !== 'ISTISHNA') {
-      const stockShortage = getFirstNonSalamStockShortage()
-      if (stockShortage) {
-        const stockMessage = `Stok produk "${stockShortage.productName}" tidak mencukupi. Dibutuhkan ${formatStockQuantity(
-          stockShortage.requiredQty
-        )}, tersedia ${formatStockQuantity(Math.max(0, stockShortage.availableQty))} ${stockShortage.unit}.`
-
-        const wantsSalam = confirm(
-          `${stockMessage}\n\nOtomatis ubah ke akad SALAM agar bisa diproses tanpa stok?\n\n(Pilih Cancel jika Anda ingin membatalkan dan mengubah manual menjadi akad ISTISHNA untuk dimanufaktur)`
-        )
-        if (wantsSalam) {
-          resolvedShariahMode = 'SALAM'
-          resolvedPaymentTerm = 'LUNAS'
-          setShariahMode('SALAM')
-          setPaymentTerm('LUNAS')
-          setHasDp(false)
-          setError(null)
-        } else {
-          return setError(`${stockMessage} Invoice biasa dibatalkan. Silakan ubah Dropdown mode akad ke ISTISHNA (jika diproduksi) atau SALAM.`)
-        }
-      }
     }
 
     setLoading(true)
@@ -395,7 +342,7 @@ export default function SalesClient({
       customer_id: customerId,
       reseller_id: resellerId || null,
       sale_date: saleDate,
-      due_date: (resolvedPaymentTerm === 'TEMPO' || resolvedShariahMode === 'SALAM') ? dueDate : null,
+      due_date: (resolvedPaymentTerm === 'TEMPO' || resolvedShariahMode === 'SALAM' || resolvedShariahMode === 'ISTISHNA') ? dueDate : null,
       notes,
       payment_term: resolvedShariahMode === 'SALAM' ? 'LUNAS' : resolvedPaymentTerm,
       payment_account_id: paymentAccountId,
@@ -473,12 +420,47 @@ export default function SalesClient({
   const executeDelivery = async (saleId: string, warehouseId?: string | null) => {
     setLoading(true)
     const res = await deliverSale(orgId, saleId, warehouseId || null)
-    if (res?.error) setError(res.error)
-    else {
+    if (res?.code === 'DELIVERY_STOCK_SHORTAGE') {
+      setError(res.error)
+
+      const wantsDrafts = confirm(`${res.error}\n\n${buildDeliveryShortagePrompt(res.shortages || [])}`)
+      if (!wantsDrafts) {
+        setLoading(false)
+        return
+      }
+
+      const followUpRes = await createSaleFulfillmentDrafts(orgId, saleId, warehouseId || null)
+      if (followUpRes?.error) {
+        setError(followUpRes.error)
+      } else {
+        const cleanMessage = String(followUpRes.message || 'Tindak lanjut stok berhasil dibuat').replace(/\.+$/, '')
+        const routeHint =
+          Array.isArray(followUpRes?.routes) && followUpRes.routes.length > 0
+            ? ` Cek menu ${followUpRes.routes.includes('/factory') && followUpRes.routes.includes('/purchasing')
+              ? 'Factory dan Purchasing'
+              : followUpRes.routes.includes('/factory')
+                ? 'Factory'
+                : 'Purchasing'
+            }.`
+            : ''
+
+        setError(null)
+        setSuccess(`${cleanMessage}.${routeHint}`.trim())
+        setShowDeliveryModal(false)
+        setSelectedSaleForDelivery(null)
+        setDeliveryWarehouseId('')
+        router.refresh()
+        setTimeout(() => setSuccess(null), 4500)
+      }
+    } else if (res?.error) {
+      setError(res.error)
+    } else {
+      setError(null)
       setSuccess('Penjualan berhasil diselesaikan (FINISHED)! Jurnal COGS telah dibukukan otomatis.')
       setShowDeliveryModal(false)
       setSelectedSaleForDelivery(null)
       setDeliveryWarehouseId('')
+      router.refresh()
       setTimeout(() => setSuccess(null), 4000)
     }
     setLoading(false)
@@ -544,6 +526,23 @@ export default function SalesClient({
     return Number.isInteger(rounded)
       ? String(rounded)
       : rounded.toFixed(6).replace(/\.?0+$/, '')
+  }
+
+  const buildDeliveryShortagePrompt = (shortages: any[] = []) => {
+    const productionCount = shortages.filter((item) => item?.resolution === 'PRODUCTION').length
+    const purchasingCount = shortages.filter((item) => item?.resolution === 'PURCHASING').length
+    const actionParts: string[] = []
+
+    if (productionCount > 0) actionParts.push(`${productionCount} draft SPK`)
+    if (purchasingCount > 0) actionParts.push(`${purchasingCount} purchase request`)
+
+    const shortageLines = shortages.slice(0, 3).map((item) => {
+      const unitSuffix = item?.unit ? ` ${item.unit}` : ''
+      const actionLabel = item?.resolution === 'PRODUCTION' ? 'Buat SPK' : 'Ajukan purchasing'
+      return `- ${item?.productName || 'Produk'}: kurang ${formatStockQuantity(Number(item?.shortageQty || 0))}${unitSuffix} -> ${actionLabel}`
+    })
+
+    return `${shortageLines.length > 0 ? `${shortageLines.join('\n')}\n\n` : ''}Buat ${actionParts.join(' dan ') || 'tindak lanjut stok'} otomatis sekarang?`
   }
 
   const handleOpenPayment = (sale: any) => {
@@ -888,10 +887,11 @@ export default function SalesClient({
                     <div className="flex-1 space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Mode Transaksi</label>
                       <select value={shariahMode} onChange={(e) => setShariahMode(e.target.value as any)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-black text-blue-600 shadow-sm focus:border-blue-500 transition-all">
-                         <option value="CASH">PENJUALAN LANGSUNG (CASH)</option>
-                         <option value="SALAM">PENJUALAN SALAM (BAYAR DEPAN)</option>
-                         <option value="ISTISHNA">PENJUALAN ISTISHNA (PESANAN/DP)</option>
+                         <option value="CASH">PENJUALAN LANGSUNG / STOK SIAP</option>
+                         {shariahMode === 'SALAM' && <option value="SALAM">PENJUALAN SALAM (OTOMATIS)</option>}
+                         <option value="ISTISHNA">PENJUALAN ISTISHNA (PESANAN PRODUKSI)</option>
                       </select>
+                      {shariahMode === 'CASH' && <p className="text-[9px] font-bold text-slate-500 italic mt-1 leading-tight px-1">* Jika stok kurang, sistem akan otomatis menetapkan SALAM atau ISTISHNA berdasarkan ada/tidaknya BoM aktif.</p>}
                       {shariahMode === 'SALAM' && <p className="text-[9px] font-bold text-indigo-500 italic mt-1 leading-tight px-1">* Uang diterima lunas di awal, barang baru dikirim pada waktu yang ditentukan.</p>}
                       {shariahMode === 'ISTISHNA' && <p className="text-[9px] font-bold text-indigo-500 italic mt-1 leading-tight px-1">* Pesanan manufaktur/konstruksi, pembayaran boleh dicicil di awal.</p>}
                     </div>
@@ -936,9 +936,9 @@ export default function SalesClient({
                       <input type="date" required value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-blue-500 transition-all" />
                     </div>
 
-                    {(paymentTerm === 'TEMPO' || shariahMode === 'SALAM') && (
+                    {(paymentTerm === 'TEMPO' || shariahMode === 'SALAM' || shariahMode === 'ISTISHNA') && (
                        <div className="w-full md:w-40 space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                         <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block px-1">{shariahMode === 'SALAM' ? 'Jatuh Tempo Kirim' : 'Jatuh Tempo'}</label>
+                         <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block px-1">{shariahMode === 'SALAM' || shariahMode === 'ISTISHNA' ? 'Target Kirim' : 'Jatuh Tempo'}</label>
                          <input type="date" required value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-amber-50/50 font-bold text-slate-900 shadow-sm focus:border-amber-500 transition-all" />
                        </div>
                     )}
@@ -1077,7 +1077,7 @@ export default function SalesClient({
 
                     {lines.map((line) => {
                       const isStockShortage = line.type === 'INVENTORY' && line.quantity > line.stock_available
-                      const isValidStock = !isStockShortage || shariahMode === 'SALAM'
+                      const isValidStock = !isStockShortage || shariahMode === 'SALAM' || shariahMode === 'ISTISHNA'
                       
                       return (
                       <div key={line.id} className={`grid grid-cols-1 sm:grid-cols-12 gap-2 items-start bg-white p-3 sm:p-0 border sm:border-0 ${isStockShortage ? 'border-amber-400 bg-amber-50 rounded-xl' : 'border-slate-100 rounded-xl sm:rounded-none'}`}>
@@ -1097,11 +1097,14 @@ export default function SalesClient({
                           ) : line.product_name ? (
                             <span className="text-[9px] font-bold text-purple-600 block mt-1">+ Jasa Kustom Non-Inventori</span>
                           ) : null}
-                          {isStockShortage && shariahMode !== 'SALAM' && (
-                            <span className="text-[10px] font-bold text-amber-600 block mt-1 flex items-center gap-1"><AlertCircle size={10}/> Peringatan: Melebihi Stok. Ubah ke akad SALAM untuk lanjut.</span>
+                          {isStockShortage && shariahMode !== 'SALAM' && shariahMode !== 'ISTISHNA' && (
+                            <span className="text-[10px] font-bold text-amber-600 block mt-1 flex items-center gap-1"><AlertCircle size={10}/> Stok kurang. Saat disimpan, sistem akan otomatis menetapkan ISTISHNA bila ada BoM aktif, atau SALAM bila tidak ada BoM.</span>
                           )}
                           {isStockShortage && shariahMode === 'SALAM' && (
-                            <span className="text-[10px] font-bold text-emerald-700 block mt-1 flex items-center gap-1"><CheckCircle2 size={10}/> Akad SALAM aktif: pesanan boleh dicatat, stok fisik dikurangi saat pengiriman.</span>
+                            <span className="text-[10px] font-bold text-emerald-700 block mt-1 flex items-center gap-1"><CheckCircle2 size={10}/> Akad SALAM aktif: pesanan boleh dicatat untuk barang tanpa BoM, stok fisik dikurangi saat pengiriman.</span>
+                          )}
+                          {isStockShortage && shariahMode === 'ISTISHNA' && (
+                            <span className="text-[10px] font-bold text-blue-700 block mt-1 flex items-center gap-1"><CheckCircle2 size={10}/> Akad ISTISHNA aktif: pesanan produksi boleh dicatat walau stok barang jadi belum cukup.</span>
                           )}
                         </div>
 

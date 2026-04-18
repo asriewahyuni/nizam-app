@@ -17,7 +17,7 @@ export default async function WarehouseDetailPage({ params }: { params: Promise<
     redirect('/inventory/warehouses')
   }
 
-  const bins = await getWarehouseBins(orgData.org.id, id, activeBranch?.id)
+  const warehouseBinsResult = await getWarehouseBins(orgData.org.id, id, activeBranch?.id)
 
   return (
     <WarehouseDetailClient 
@@ -25,7 +25,8 @@ export default async function WarehouseDetailPage({ params }: { params: Promise<
       activeBranchId={activeBranch?.id ?? null}
       activeBranchName={activeBranch?.name ?? null}
       warehouse={warehouse} 
-      initialBins={bins || []} 
+      initialBins={warehouseBinsResult.bins || []}
+      unassignedStockSummary={warehouseBinsResult.unassignedStockSummary}
       userRole={orgData.role}
     />
   )

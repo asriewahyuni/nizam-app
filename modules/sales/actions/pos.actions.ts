@@ -5,6 +5,10 @@ import { revalidatePath } from 'next/cache'
 import { clampDiscountAmount } from '@/lib/commerce/discounts'
 import { getActiveBranch } from '@/modules/organization/actions/org.actions'
 import { getDateInTimeZone } from '@/lib/utils'
+import {
+  getUsableSalesPromoByCodeWithDb,
+  incrementSalesPromoUsage,
+} from '@/modules/sales/actions/promo.actions'
 import { getPosShiftConfig, isPosShiftSchemaMissing } from '@/modules/sales/lib/pos-shift'
 import { listActiveSalesWarehouses } from '@/modules/sales/lib/warehouse-branch-compat.server'
 
@@ -376,6 +380,17 @@ export async function processPosTransaction(orgId: string, payload: any) {
     }
   }
 
+  let appliedPromoId: string | null = null
+  const promoCode = String(payload.promo_code || '').trim()
+  if (promoCode) {
+    const promoResult = await getUsableSalesPromoByCodeWithDb(supabase as any, orgId, promoCode)
+    if ('error' in promoResult) {
+      return { error: promoResult.error }
+    }
+
+    appliedPromoId = promoResult.promo.id
+  }
+
   // Calculate totals
   const totalAmount = payload.lines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)
   const taxAmount = Math.max(0, Number(payload.tax_amount || 0))
@@ -544,6 +559,13 @@ export async function processPosTransaction(orgId: string, payload: any) {
       }
     }
     return { error: `Gagal memproses delivery POS: ${rawMessage || 'Unknown delivery error.'}` }
+  }
+
+  if (appliedPromoId) {
+    const usageResult = await incrementSalesPromoUsage(supabase as any, orgId, appliedPromoId)
+    if ('error' in usageResult) {
+      console.warn('Failed to increment sales promo usage for POS transaction:', usageResult.error)
+    }
   }
 
   // Auto-pay (create journal entry)

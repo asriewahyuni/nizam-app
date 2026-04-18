@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { useFormStatus } from 'react-dom'
 import { Play, Sparkles, Building2, ArrowRight, Zap, Shield, BarChart3, Package, Factory, Users, Utensils, Store, Truck, Laptop, type LucideIcon } from 'lucide-react'
 import { startDemoSessionFromForm, type DemoBusinessType } from '@/modules/demo/actions/demo.actions'
+import { MiniErpWordmark } from '@/components/shared/MiniErpWordmark'
 
 const BUSINESS_TYPES: { id: DemoBusinessType; label: string; icon: LucideIcon; description: string; color: string }[] = [
   { 
@@ -84,7 +85,7 @@ export default function DemoClient() {
               </div>
               <div className="text-left">
                 <h1 className="text-3xl font-black text-white tracking-tighter">NIZAM</h1>
-                <p className="text-[10px] font-bold text-blue-400 tracking-[0.3em] uppercase">Cloud ERP Demo</p>
+                <MiniErpWordmark className="text-[10px] font-bold tracking-[0.3em] uppercase text-blue-400" suffix=" Demo" />
               </div>
             </motion.div>
 

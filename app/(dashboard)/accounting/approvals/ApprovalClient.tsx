@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { Check, X, Bell, FileText, View, QrCode, ShieldCheck, AlertTriangle, Clock, Shield } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { decideApproval, getApprovalDetail, getApprovalHistory } from '@/modules/organization/actions/approval.actions'
+import { getDocumentHeaderDiscountAmount, getDocumentLineDiscountsForDisplay, getDocumentLineDiscountTotal } from '@/lib/commerce/discounts'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { QRCodeSVG } from 'qrcode.react'
 
@@ -74,6 +75,14 @@ function getLogActorDisplayText(log: any) {
   return getApproverDisplayText(log)
 }
 
+function getPurchaseLineGrossTotal(item: any) {
+  return Number(item?.quantity || 0) * Number(item?.unit_price || 0)
+}
+
+function getPurchaseLineNetTotal(item: any, displayDiscountAmount: number) {
+  return getPurchaseLineGrossTotal(item) - displayDiscountAmount + Number(item?.tax_amount || 0)
+}
+
 export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps) {
   const [approvals, setApprovals] = useState(initialApprovals)
   const [history, setHistory] = useState<any[]>([])
@@ -86,6 +95,9 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
   const [detailData, setDetailData] = useState<any>(null)
   const [detailLogs, setDetailLogs] = useState<any[]>([])
   const [loadingDetail, setLoadingDetail] = useState(false)
+  const purchaseLineDiscountTotal = getDocumentLineDiscountTotal(detailData?.purchase_items || [])
+  const purchaseHeaderDiscountAmount = getDocumentHeaderDiscountAmount(detailData, purchaseLineDiscountTotal)
+  const purchaseLineDisplayDiscounts = getDocumentLineDiscountsForDisplay(detailData)
 
   // Confirmation + Notes Modal State
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -300,7 +312,9 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                         <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-tighter">Verified Items</span>
                       </h3>
                       <div className="space-y-3">
-                        {detailData.purchase_items?.map((item: any) => (
+                        {detailData.purchase_items?.map((item: any, index: number) => {
+                          const displayDiscountAmount = Number(purchaseLineDisplayDiscounts[index] || 0)
+                          return (
                           <div key={item.id} className="flex justify-between items-center p-4 border border-slate-100 rounded-xl">
                             <div>
                                <p className="font-bold text-slate-900">{item.products?.name || item.description}</p>
@@ -309,11 +323,21 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                                    {item.quantity} {item.unit || item.products?.unit || 'Unit/Pcs'}
                                  </span>
                                  <span className="text-xs text-slate-400 font-bold">@ {formatRupiah(item.unit_price)}</span>
+                                 {displayDiscountAmount > 0 && (
+                                   <span className="inline-flex h-6 px-3 items-center justify-center bg-rose-50 text-rose-600 text-[10px] font-black rounded-lg border border-rose-100 uppercase tracking-tighter">
+                                     Diskon {formatRupiah(displayDiscountAmount)}
+                                   </span>
+                                 )}
                                </div>
                             </div>
-                            <div className="font-bold text-[#003366]">{formatRupiah(item.quantity * item.unit_price)}</div>
+                            <div className="text-right">
+                              {displayDiscountAmount > 0 && (
+                                <p className="text-[11px] font-bold text-slate-400 line-through">{formatRupiah(getPurchaseLineGrossTotal(item))}</p>
+                              )}
+                              <p className="font-bold text-[#003366]">{formatRupiah(getPurchaseLineNetTotal(item, displayDiscountAmount))}</p>
+                            </div>
                           </div>
-                        ))}
+                        )})}
                       </div>
 
                       {/* Financial Summary Breakdown */}
@@ -327,10 +351,16 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                              <span className="text-slate-500 font-medium">Subtotal Barang</span>
                              <span className="font-black text-slate-700">{formatRupiah(detailData.total_amount)}</span>
                            </div>
-                           {detailData.discount_amount > 0 && (
+                           {purchaseLineDiscountTotal > 0 && (
                               <div className="flex justify-between text-sm">
-                                <span className="text-rose-500 font-medium italic">Diskon Global</span>
-                                <span className="font-black text-rose-600">-{formatRupiah(detailData.discount_amount)}</span>
+                                <span className="text-rose-500 font-medium italic">Diskon Item</span>
+                                <span className="font-black text-rose-600">-{formatRupiah(purchaseLineDiscountTotal)}</span>
+                              </div>
+                           )}
+                           {purchaseHeaderDiscountAmount > 0 && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-rose-500 font-medium italic">Diskon Header / Faktur</span>
+                                <span className="font-black text-rose-600">-{formatRupiah(purchaseHeaderDiscountAmount)}</span>
                               </div>
                            )}
                            {detailData.tax_amount > 0 && (

@@ -243,7 +243,7 @@ export default function ReportsClient({
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Status Struktur</span>
           <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-wider ${isParentOrg ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
-            {isParentOrg ? 'Parent (Holding)' : 'Child (Anak Perusahaan)'}
+            {isParentOrg ? 'Induk (Holding)' : 'Entitas Anak'}
           </span>
           {isConsolidated && (
             <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-indigo-700">
@@ -255,8 +255,8 @@ export default function ReportsClient({
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <p className="text-sm text-slate-500 font-medium">
             {isParentOrg
-              ? 'Parent dapat menarik laporan gabungan Parent + seluruh Child langsung dari halaman ini.'
-              : 'Child hanya melihat laporan entitas sendiri. Konsolidasi diaktifkan dari akun Parent.'}
+              ? 'Organisasi induk dapat menarik laporan gabungan entitas induk + seluruh entitas anak langsung dari halaman ini.'
+              : 'Entitas anak hanya melihat laporan entitas sendiri. Konsolidasi diaktifkan dari akun holding.'}
           </p>
 
           <button

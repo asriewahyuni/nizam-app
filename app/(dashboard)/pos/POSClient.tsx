@@ -6,15 +6,11 @@ import { Search, Plus, Minus, Trash2, ShoppingCart, User, CreditCard, Banknote, 
 import { clampDiscountAmount } from '@/lib/commerce/discounts'
 import { formatRupiah } from '@/lib/utils'
 import { processPosTransaction } from '@/modules/sales/actions/pos.actions'
+import { getUsableSalesPromoByCode } from '@/modules/sales/actions/promo.actions'
 import { closePosShift, getPosShiftHistory, openPosShift, settlePosShift, type PosShiftHistoryResponse, type PosShiftSnapshot } from '@/modules/sales/actions/pos-shift.actions'
 import { buildPosWhatsappReceiptMessage, normalizeWhatsappPhone } from '@/modules/sales/lib/pos-whatsapp'
 import { resolveDefaultPosAccountId, type PosShiftConfig, type PosShiftMethod } from '@/modules/sales/lib/pos-shift'
-
-const PROMOS = [
-   { code: 'RAMADHAN24', type: 'PERCENT', value: 10, status: 'ACTIVE' },
-   { code: 'NEWCUSTOMER', type: 'FIXED', value: 50000, status: 'ACTIVE' },
-   { code: 'HARBOLSALE', type: 'PERCENT', value: 15, status: 'EXPIRED' }
-]
+import type { SalesPromoRecord } from '@/modules/sales/lib/sales-promos'
 
 type PosSuccessData = {
    total: number
@@ -36,7 +32,7 @@ type PosClientProps = {
    org: any
    products: any[]
    customers: any[]
-   accounts: Array<{ id: string; code?: string | null; name?: string | null }>
+   accounts: Array<{ id: string; code?: string | null; name?: string | null; type?: string | null }>
    warehouses?: any[]
    currentUser: any
    currentUserDisplayName?: string | null
@@ -130,6 +126,23 @@ function createEmptyShiftHistory(snapshot: PosShiftSnapshot): PosShiftHistoryRes
    }
 }
 
+function isLiquidPosAccountOption(account: { code?: string | null; name?: string | null; type?: string | null }) {
+   const type = String(account?.type || '').trim().toUpperCase()
+   const code = String(account?.code || '').trim().toUpperCase()
+   const name = String(account?.name || '').trim().toLowerCase()
+
+   if (type && type !== 'ASSET') return false
+
+   return (
+      code.startsWith('11')
+      || code.startsWith('12')
+      || name.includes('kas')
+      || name.includes('bank')
+      || name.includes('qris')
+      || name.includes('edc')
+   )
+}
+
 export default function POSClient({
    orgId,
    org,
@@ -203,6 +216,7 @@ export default function POSClient({
    const [shiftCashAccountId, setShiftCashAccountId] = useState('')
    const [shiftTransferAccountId, setShiftTransferAccountId] = useState('')
    const [shiftQrisAccountId, setShiftQrisAccountId] = useState('')
+   const [shiftOpeningSourceAccountId, setShiftOpeningSourceAccountId] = useState('')
    const [settlementMethod, setSettlementMethod] = useState<PosShiftMethod>('CASH')
    const [settlementTargetAccountId, setSettlementTargetAccountId] = useState('')
    const [settlementAmountInput, setSettlementAmountInput] = useState('')
@@ -212,9 +226,9 @@ export default function POSClient({
    
    // Promo States
    const [promoCode, setPromoCode] = useState('')
-   const [appliedPromo, setAppliedPromo] = useState<any>(null)
+   const [appliedPromo, setAppliedPromo] = useState<SalesPromoRecord | null>(null)
 
-   const handleApplyPromo = (scannedCode?: string) => {
+   const handleApplyPromo = async (scannedCode?: string) => {
       const code = (typeof scannedCode === 'string' ? scannedCode : promoCode).toUpperCase().trim()
       if (!code) return
       
@@ -223,11 +237,10 @@ export default function POSClient({
          return alert("Peringatan: Kupon Gagal Ditebus! Anda wajib mendaftarkan identitas Pelanggan (serta Nomor WA) yang valid terlebih dahulu.")
       }
 
-      const promo = PROMOS.find(p => p.code === code)
-      if (!promo) return alert(`Kode kupon '${code}' tidak ditemukan!`)
-      if (promo.status !== 'ACTIVE') return alert(`Maaf, kode kupon '${code}' sudah kadaluarsa/tidak aktif!`)
+      const promoResult = await getUsableSalesPromoByCode(orgId, code)
+      if ('error' in promoResult) return alert(promoResult.error)
       
-      setAppliedPromo(promo)
+      setAppliedPromo(promoResult.promo)
       if (typeof scannedCode !== 'string') setPromoCode('')
    }
    const [cart, setCart] = useState<any[]>([])
@@ -260,9 +273,34 @@ export default function POSClient({
    )
    const availableSettlement = latestClosedShift?.totals.remainingByMethod || { CASH: 0, TRANSFER: 0, QRIS: 0 }
    const hasAnySettlementBalance = Object.values(availableSettlement).some((amount) => amount > 0)
-   const fallbackCashAccountId = useMemo(() => resolveDefaultPosAccountId(accounts, 'CASH'), [accounts])
-   const fallbackTransferAccountId = useMemo(() => resolveDefaultPosAccountId(accounts, 'TRANSFER'), [accounts])
-   const fallbackQrisAccountId = useMemo(() => resolveDefaultPosAccountId(accounts, 'QRIS'), [accounts])
+   const liquidAccounts = useMemo(
+      () => accounts.filter((account) => isLiquidPosAccountOption(account)),
+      [accounts]
+   )
+   const posAccountOptions = useMemo(
+      () => liquidAccounts.length > 0 ? liquidAccounts : accounts,
+      [liquidAccounts, accounts]
+   )
+   const fallbackCashAccountId = useMemo(() => resolveDefaultPosAccountId(posAccountOptions, 'CASH'), [posAccountOptions])
+   const fallbackTransferAccountId = useMemo(() => resolveDefaultPosAccountId(posAccountOptions, 'TRANSFER'), [posAccountOptions])
+   const fallbackQrisAccountId = useMemo(() => resolveDefaultPosAccountId(posAccountOptions, 'QRIS'), [posAccountOptions])
+   const fallbackOpeningSourceAccountId = useMemo(() => {
+      const drawerAccountId = String(shiftCashAccountId || fallbackCashAccountId || '').trim()
+
+      return (
+         posAccountOptions.find((account) => (
+            account.id !== drawerAccountId &&
+            (
+               String(account.name || '').toLowerCase().includes('bank')
+               || String(account.code || '').startsWith('1103')
+               || String(account.code || '').startsWith('1104')
+               || String(account.code || '').startsWith('1105')
+            )
+         ))?.id
+         || posAccountOptions.find((account) => account.id !== drawerAccountId)?.id
+         || ''
+      )
+   }, [posAccountOptions, shiftCashAccountId, fallbackCashAccountId])
    const sourceAccountByMethod = useMemo(() => ({
       CASH: activeShiftSession?.cashAccountId || fallbackCashAccountId || '',
       TRANSFER: activeShiftSession?.transferAccountId || fallbackTransferAccountId || '',
@@ -318,18 +356,34 @@ export default function POSClient({
    // (Nantinya Admin bisa mengubah pemetaan ini di Menu Pengaturan -> Organisasi)
    // ─────────────────────────────────────────────────────────────
    useEffect(() => {
-      const targetAccountId = sourceAccountByMethod[paymentMethod] || resolveDefaultPosAccountId(accounts, paymentMethod)
+      const targetAccountId = sourceAccountByMethod[paymentMethod] || resolveDefaultPosAccountId(posAccountOptions, paymentMethod)
       if (targetAccountId) setSelectedAccount(targetAccountId)
-      else if (accounts.length > 0) setSelectedAccount(accounts[0].id)
-   }, [paymentMethod, accounts, sourceAccountByMethod])
+      else if (posAccountOptions.length > 0) setSelectedAccount(posAccountOptions[0].id)
+   }, [paymentMethod, posAccountOptions, sourceAccountByMethod])
 
    useEffect(() => {
       if (activeShiftSession) return
 
-      setShiftCashAccountId((current) => current && accounts.some((account) => account.id === current) ? current : fallbackCashAccountId)
-      setShiftTransferAccountId((current) => current && accounts.some((account) => account.id === current) ? current : fallbackTransferAccountId)
-      setShiftQrisAccountId((current) => current && accounts.some((account) => account.id === current) ? current : fallbackQrisAccountId)
-   }, [accounts, activeShiftSession, fallbackCashAccountId, fallbackTransferAccountId, fallbackQrisAccountId])
+      setShiftCashAccountId((current) => current && posAccountOptions.some((account) => account.id === current) ? current : fallbackCashAccountId)
+      setShiftTransferAccountId((current) => current && posAccountOptions.some((account) => account.id === current) ? current : fallbackTransferAccountId)
+      setShiftQrisAccountId((current) => current && posAccountOptions.some((account) => account.id === current) ? current : fallbackQrisAccountId)
+   }, [posAccountOptions, activeShiftSession, fallbackCashAccountId, fallbackTransferAccountId, fallbackQrisAccountId])
+
+   useEffect(() => {
+      if (activeShiftSession) return
+
+      setShiftOpeningSourceAccountId((current) => {
+         if (
+            current &&
+            current !== shiftCashAccountId &&
+            posAccountOptions.some((account) => account.id === current)
+         ) {
+            return current
+         }
+
+         return fallbackOpeningSourceAccountId
+      })
+   }, [posAccountOptions, activeShiftSession, shiftCashAccountId, fallbackOpeningSourceAccountId])
 
    useEffect(() => {
       if (!showSettlementModal) return
@@ -423,7 +477,7 @@ export default function POSClient({
                
                if (showPayment) {
                   // Mode Pembayaran -> Tangkap tembakan Barcode Scanner sebagai Kupon/Voucher Diskon
-                  handleApplyPromo(scannedCode)
+                  void handleApplyPromo(scannedCode)
                } else {
                   // Mode Katalog -> Tangkap tembakan Scanner sebagai SKU Produk (Tambah ke keranjang)
                   const product = products.find((p: any) =>
@@ -597,15 +651,34 @@ export default function POSClient({
          alert('Isi login NIK kasir beserta sandinya untuk membuka shift.')
          return
       }
+      const openingCashAmount = parseMoneyInput(openingCashInput)
+      if (openingCashAmount > 0 && !shiftCashAccountId) {
+         alert('Pilih akun kas laci terlebih dahulu untuk menjurnal modal awal shift.')
+         return
+      }
+      if (openingCashAmount > 0 && !shiftOpeningSourceAccountId) {
+         alert('Pilih akun sumber modal awal terlebih dahulu.')
+         return
+      }
+      if (
+         openingCashAmount > 0 &&
+         shiftCashAccountId &&
+         shiftOpeningSourceAccountId &&
+         shiftCashAccountId === shiftOpeningSourceAccountId
+      ) {
+         alert('Akun sumber modal awal tidak boleh sama dengan akun kas laci.')
+         return
+      }
 
       setShiftBusy(true)
       const result = await openPosShift(orgId, {
-         openingCash: parseMoneyInput(openingCashInput),
+         openingCash: openingCashAmount,
          registerCode: shiftRegisterCode,
          openingNotes: openShiftNotes,
          cashAccountId: shiftCashAccountId || null,
          transferAccountId: shiftTransferAccountId || null,
          qrisAccountId: shiftQrisAccountId || null,
+         openingSourceAccountId: shiftOpeningSourceAccountId || null,
          cashierNik: openShiftCashierNik,
          cashierPassword: openShiftCashierPassword,
       })
@@ -627,7 +700,11 @@ export default function POSClient({
          latestClosedSession: current.latestClosedSession,
          message: null,
       }))
-      setShiftNotice(null)
+      setShiftNotice(
+         result.warning || (openingCashAmount > 0
+            ? 'Shift POS berhasil dibuka. Modal awal kas sudah dijurnal otomatis.'
+            : null)
+      )
       setShowOpenShiftModal(false)
       setOpeningCashInput('')
       setOpenShiftNotes('')
@@ -683,7 +760,8 @@ export default function POSClient({
          latestClosedSession: result.session || null,
          message: result.warning || null,
       }))
-      setShiftNotice(result.warning || 'Shift POS berhasil ditutup.')
+      setShiftNotice(result.warning || 'Shift POS berhasil ditutup. Review laporan shift harian, lalu klik Logout POS untuk keluar.')
+      setShowShiftHistory(true)
       setShowCloseShiftModal(false)
       setClosingCashInput('')
       setCloseShiftNotes('')
@@ -781,6 +859,7 @@ export default function POSClient({
          lines: cart.map((c: any) => ({ product_id: c.id, product_name: c.name, quantity: c.qty, unit_price: c.price })),
          discount_amount: parsedDiscount,
          tax_amount: taxNominal,
+         promo_code: appliedPromo?.code || null,
          notes: `POS - ${paymentMethod}${showAddCustomer ? ` | Pelanggan Baru: ${newCustomerName} (${newCustomerPhone})` : ''}${appliedPromo ? ` | [VOUCHER REDEEMED: ${appliedPromo.code}]` : ''}`
       }
 
@@ -886,6 +965,38 @@ export default function POSClient({
       return accounts.find((account) => account.id === accountId)?.name || 'Akun tidak ditemukan'
    }
 
+   const openCloseShiftFlow = () => {
+      if (!activeShiftSession) return
+
+      setClosingCashInput(formatMoneyInput(activeShiftSession.expectedCash))
+      setCloseShiftCashierNik(activeShiftSession.cashierNik || '')
+      setCloseShiftCashierPassword('')
+      setShiftNotice('Tutup shift terlebih dahulu sebelum keluar dan logout dari POS.')
+      setShowCloseShiftModal(true)
+   }
+
+   const handleExitPos = () => {
+      if (cart.length > 0) {
+         alert('Selesaikan atau kosongkan keranjang terlebih dahulu sebelum keluar dari POS.')
+         return
+      }
+
+      if (activeShiftSession?.id) {
+         openCloseShiftFlow()
+         return
+      }
+
+      const pendingSettlementTotal = availableSettlement.CASH + availableSettlement.TRANSFER + availableSettlement.QRIS
+      const confirmMessage = latestClosedShift?.id
+         ? pendingSettlementTotal > 0
+            ? `Shift ${latestClosedShift.registerCode} sudah ditutup. Laporan shift sudah tersedia di halaman ini, tetapi masih ada pending settlement sebesar ${formatRupiah(pendingSettlementTotal)}. Logout POS sekarang?`
+            : `Shift ${latestClosedShift.registerCode} sudah ditutup. Pastikan laporan shift harian sudah dicek. Logout POS sekarang?`
+         : 'Logout dari POS sekarang?'
+
+      if (!window.confirm(confirmMessage)) return
+      window.location.assign('/auth/signout')
+   }
+
    return (
       <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col h-screen overflow-hidden">
          {/* Top Bar Navigation (POS Specific) */}
@@ -909,12 +1020,27 @@ export default function POSClient({
                <div className="px-3 py-1.5 bg-white/10 rounded-lg md:rounded-xl text-[10px] md:text-xs font-bold border border-white/10 flex items-center gap-2">
                   <User size={12} className="md:w-[14px]" /> <span className="hidden sm:inline">{currentUserDisplayName || currentUser?.email?.split('@')[0]}</span>
                </div>
-               <a href="/dashboard" className="px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg md:rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-colors shadow-sm cursor-pointer block">
-                  <span className="md:hidden">EXIT</span>
-                  <span className="hidden md:inline">Tutup POS</span>
-               </a>
+               <button
+                  type="button"
+                  onClick={handleExitPos}
+                  disabled={loading || shiftBusy}
+                  className="px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg md:rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-colors shadow-sm cursor-pointer block disabled:opacity-50 disabled:cursor-not-allowed"
+               >
+                  <span className="md:hidden">{activeShiftSession ? 'SHIFT' : 'LOGOUT'}</span>
+                  <span className="hidden md:inline">{activeShiftSession ? 'Tutup Shift' : 'Logout POS'}</span>
+               </button>
             </div>
          </div>
+
+         {!shiftState.enabled && (
+            <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 md:px-6 py-3 text-[11px] font-medium text-amber-800 flex items-start gap-2">
+               <ShieldAlert size={14} className="mt-0.5 shrink-0" />
+               <span>
+                  Mode shift POS sedang nonaktif. Jika POS wajib dibuka dengan login NIK kasir, aktifkan
+                  {' '}<strong>Wajib Buka Shift Sebelum Checkout POS</strong> di Pengaturan Bisnis.
+               </span>
+            </div>
+         )}
 
          {shiftState.enabled && (
             <div className="shrink-0 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
@@ -1479,11 +1605,16 @@ export default function POSClient({
                                     value={promoCode}
                                     onChange={e => setPromoCode(e.target.value)}
                                     style={{ textTransform: 'uppercase' }}
-                                    onKeyDown={e => e.key === 'Enter' && handleApplyPromo()}
+                                    onKeyDown={e => {
+                                       if (e.key === 'Enter') {
+                                          e.preventDefault()
+                                          void handleApplyPromo()
+                                       }
+                                    }}
                                     className="w-full h-8 pl-7 pr-3 bg-black/20 border border-white/10 rounded-lg text-[10px] font-bold text-white placeholder-slate-500 outline-none focus:border-blue-500 shadow-inner" 
                                  />
                               </div>
-                              <button onClick={() => handleApplyPromo()} className="h-8 px-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-black text-[10px] tracking-widest uppercase transition-colors">CEK</button>
+                              <button onClick={() => void handleApplyPromo()} className="h-8 px-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-black text-[10px] tracking-widest uppercase transition-colors">CEK</button>
                            </div>
                         )}
                      </div>
@@ -1545,14 +1676,14 @@ export default function POSClient({
 
          <AnimatePresence>
             {showOpenShiftModal && (
-               <div className="fixed inset-0 z-[180] flex items-center justify-center p-4 md:p-6 bg-slate-900/75 backdrop-blur-sm">
+               <div className="fixed inset-0 z-[180] flex items-start md:items-center justify-center overflow-y-auto p-4 md:p-6 bg-slate-900/75 backdrop-blur-sm">
                   <motion.div
                      initial={{ opacity: 0, y: 20, scale: 0.98 }}
                      animate={{ opacity: 1, y: 0, scale: 1 }}
                      exit={{ opacity: 0, y: 20, scale: 0.98 }}
-                     className="w-full max-w-2xl rounded-[32px] bg-white shadow-2xl overflow-hidden"
+                     className="my-auto flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl md:max-h-[90vh] md:rounded-[32px]"
                   >
-                     <div className="px-6 md:px-8 py-5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                     <div className="px-5 md:px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                         <div>
                            <h3 className="text-lg md:text-xl font-black text-slate-900">Buka Shift POS</h3>
                            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mt-1">Unit {activeBranchName || 'Aktif'}</p>
@@ -1562,8 +1693,8 @@ export default function POSClient({
                         </button>
                      </div>
 
-                     <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div className="md:col-span-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-800">
+                     <div className="flex-1 overflow-y-auto p-5 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-[11px] md:text-xs font-semibold text-blue-800">
                            Buka shift wajib otorisasi kasir dengan login NIK. Shift akan tercatat atas nama NIK yang lolos verifikasi.
                         </div>
                         <div className="space-y-2">
@@ -1571,7 +1702,7 @@ export default function POSClient({
                            <input
                               value={openShiftCashierNik}
                               onChange={(e) => setOpenShiftCashierNik(e.target.value.toUpperCase())}
-                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
                               placeholder="Contoh: K-0001"
                            />
                         </div>
@@ -1581,7 +1712,7 @@ export default function POSClient({
                               type="password"
                               value={openShiftCashierPassword}
                               onChange={(e) => setOpenShiftCashierPassword(e.target.value)}
-                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
                               placeholder="••••••••"
                            />
                         </div>
@@ -1590,7 +1721,7 @@ export default function POSClient({
                            <input
                               value={shiftRegisterCode}
                               onChange={(e) => setShiftRegisterCode(e.target.value.toUpperCase())}
-                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
                               placeholder="REG-1"
                            />
                         </div>
@@ -1599,7 +1730,7 @@ export default function POSClient({
                            <input
                               value={openingCashInput}
                               onChange={(e) => setOpeningCashInput(formatMoneyInput(parseMoneyInput(e.target.value)))}
-                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
                               placeholder="0"
                            />
                         </div>
@@ -1608,23 +1739,41 @@ export default function POSClient({
                            <select
                               value={shiftCashAccountId}
                               onChange={(e) => setShiftCashAccountId(e.target.value)}
-                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
                            >
                               <option value="">Pilih akun kas...</option>
-                              {accounts.map((account) => (
+                              {posAccountOptions.map((account) => (
                                  <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
                               ))}
                            </select>
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Akun Sumber Modal Awal</label>
+                           <select
+                              value={shiftOpeningSourceAccountId}
+                              onChange={(e) => setShiftOpeningSourceAccountId(e.target.value)}
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                           >
+                              <option value="">Pilih akun sumber modal...</option>
+                              {posAccountOptions
+                                 .filter((account) => account.id !== shiftCashAccountId)
+                                 .map((account) => (
+                                    <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
+                                 ))}
+                           </select>
+                           <p className="text-[11px] text-slate-500 leading-relaxed">
+                              Jika modal awal diisi, jurnal otomatis: debit kas laci, kredit akun sumber.
+                           </p>
                         </div>
                         <div className="space-y-2">
                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Akun Transfer</label>
                            <select
                               value={shiftTransferAccountId}
                               onChange={(e) => setShiftTransferAccountId(e.target.value)}
-                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
                            >
                               <option value="">Pilih akun transfer...</option>
-                              {accounts.map((account) => (
+                              {posAccountOptions.map((account) => (
                                  <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
                               ))}
                            </select>
@@ -1634,10 +1783,10 @@ export default function POSClient({
                            <select
                               value={shiftQrisAccountId}
                               onChange={(e) => setShiftQrisAccountId(e.target.value)}
-                              className="w-full h-12 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
+                              className="w-full h-11 px-4 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none"
                            >
                               <option value="">Pilih akun QRIS...</option>
-                              {accounts.map((account) => (
+                              {posAccountOptions.map((account) => (
                                  <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
                               ))}
                            </select>
@@ -1647,13 +1796,13 @@ export default function POSClient({
                            <textarea
                               value={openShiftNotes}
                               onChange={(e) => setOpenShiftNotes(e.target.value)}
-                              className="w-full min-h-[110px] px-4 py-3 bg-white border border-slate-200 rounded-2xl font-medium text-sm outline-none"
+                              className="w-full min-h-[88px] px-4 py-3 bg-white border border-slate-200 rounded-2xl font-medium text-sm outline-none"
                               placeholder="Contoh: Buka shift pagi, float awal lengkap."
                            />
                         </div>
                      </div>
 
-                     <div className="px-6 md:px-8 py-5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
+                     <div className="px-5 md:px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
                         <button
                            onClick={() => {
                               setShowOpenShiftModal(false)

@@ -251,7 +251,7 @@ export async function getBankAccounts(orgId: string, branchId?: string | null) {
 
 // ─────────────────────────────────────────────────────────────
 // createBankAccount — Add a new bank account
-// HANYA untuk Parent/Holding. Child/Branch gunakan:
+// HANYA untuk organisasi induk/holding. Entitas anak gunakan:
 // → /accounting/coa-requests untuk mengajukan rekening baru
 // ─────────────────────────────────────────────────────────────
 export async function createBankAccount(orgId: string, formData: FormData) {
@@ -264,7 +264,7 @@ export async function createBankAccount(orgId: string, formData: FormData) {
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  // ── Guard 2: Hanya Parent/Holding yang boleh membuat rekening bank langsung ──
+  // ── Guard 2: Hanya organisasi induk/holding yang boleh membuat rekening bank langsung ──
   let canManageDirect = true;
   try {
     const result = await checkCanManageCoA(orgId);
@@ -276,7 +276,7 @@ export async function createBankAccount(orgId: string, formData: FormData) {
   if (!canManageDirect) {
     return {
       error:
-        'Hanya Organisasi Utama (Parent/Holding) yang dapat menambahkan rekening bank secara langsung. ' +
+        'Hanya Organisasi Utama (Induk/Holding) yang dapat menambahkan rekening bank secara langsung. ' +
         'Silakan ajukan melalui menu "Pengajuan Rekening CoA".',
       requiresRequest: true,
     }
@@ -435,10 +435,10 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// createInterOrgCapitalTransfer — Parent transfer modal ke Child/Cabang
+// createInterOrgCapitalTransfer — organisasi induk transfer modal ke entitas tujuan
 // Mencatat 2 transaksi atomik:
-// 1) OUT di org sumber (parent)
-// 2) IN  di org tujuan (child/cabang)
+// 1) OUT di org sumber (induk)
+// 2) IN  di org tujuan (entitas penerima)
 // ─────────────────────────────────────────────────────────────
 export async function createInterOrgCapitalTransfer(orgId: string, formData: FormData) {
   const supabase = await createClient()
@@ -473,13 +473,13 @@ export async function createInterOrgCapitalTransfer(orgId: string, formData: For
     .maybeSingle()
 
   if (sourceCounterError || !sourceCounterAccount?.id) {
-    return { error: 'Akun investasi parent (sumber) tidak ditemukan.' }
+    return { error: 'Akun investasi organisasi sumber tidak ditemukan.' }
   }
 
   if (!isInvestingTransferAccount(sourceCounterAccount)) {
     return {
       error:
-        'Akun lawan parent harus akun investasi (kelompok 16xx), misalnya 1601 Investasi pada Entitas Anak / Unit.',
+        'Akun lawan organisasi sumber harus akun investasi (kelompok 16xx), misalnya 1601 Investasi pada Entitas Anak / Unit.',
     }
   }
 
