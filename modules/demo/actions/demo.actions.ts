@@ -211,7 +211,14 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
 
   // 6. Set Demo Org ID in Cookie for session-specific tracking
   const cookieStore = await cookies()
-  cookieStore.delete('nizam_active_org_id') // Reset shared org cache for fresh demo
+  // Set nizam_active_org_id ke demo org baru agar getActiveOrg() tidak null
+  // dan DashboardLayout tidak redirect ke /onboarding.
+  cookieStore.set('nizam_active_org_id', orgId, {
+    maxAge: DEMO_SESSION_MAX_AGE,
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+  })
   cookieStore.delete('nizam_active_branch_id')
   cookieStore.set('nizam_demo_org_id', orgId, { 
     maxAge: DEMO_SESSION_MAX_AGE, // 12 hours — demo session lifetime
