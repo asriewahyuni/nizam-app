@@ -31,6 +31,7 @@ Dokumentasi lengkap proyek ada di [DOCUMENTATION.md](./DOCUMENTATION.md).
 
 Dokumen operasional tambahan:
 
+- [DOKUMENTASI_OPEN_API_NIZAM.md](./DOKUMENTASI_OPEN_API_NIZAM.md) untuk panduan fitur Open API, API key, endpoint publik, webhook, dan spesifikasi `/api/openapi`.
 - [PLAYBOOK_MIGRASI_KE_NIZAM.md](./PLAYBOOK_MIGRASI_KE_NIZAM.md) untuk panduan onboarding user pindahan dari Excel atau aplikasi lain.
 - [CHECKLIST_ONBOARDING_MIGRASI_NIZAM.md](./CHECKLIST_ONBOARDING_MIGRASI_NIZAM.md) untuk checklist internal tim onboarding saat menangani migrasi client.
 - [RAILWAY_DECOUPLING_PLAN.md](./RAILWAY_DECOUPLING_PLAN.md) untuk roadmap migrasi ke Railway dan pelepasan dependency runtime Supabase.
