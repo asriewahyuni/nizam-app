@@ -78,7 +78,7 @@ export default function PurchasingClient({
    useEffect(() => {
      if (payId && purchaseRows.length > 0) {
        const purchase = purchaseRows.find((p: any) => p.id === payId)
-       if (purchase) {
+       if (purchase && purchase.payment_status !== 'PAID') {
          handleOpenPayment(purchase)
        }
      }
@@ -472,6 +472,9 @@ export default function PurchasingClient({
 
   const isPurchaseSalam = (purchase: any) => String(purchase?.shariah_mode || '').trim().toUpperCase() === 'SALAM'
 
+  const isReceiveBlockedByPayment = (purchase: any) =>
+    isPurchaseSalam(purchase) && String(purchase?.payment_status || '').trim().toUpperCase() !== 'PAID'
+
   const getOutstandingAmount = (purchase: any) => {
     const paid = (purchase?.purchase_payments || []).reduce((sum: number, pay: any) => sum + (Number(pay.amount) + Number(pay.discount_amount)), 0)
     const returned = (purchase?.purchase_returns || []).reduce((sum: number, ret: any) => sum + Number(ret.total_amount), 0)
@@ -493,10 +496,14 @@ export default function PurchasingClient({
     setLoading(false)
   }
 
-  const handleReceivePO = async (id: string) => {
+  const handleReceivePO = async (purchase: any) => {
+    if (isReceiveBlockedByPayment(purchase)) {
+      setError('Akad SALAM pembelian wajib lunas terlebih dahulu sebelum penerimaan barang.')
+      return
+    }
     if (!confirm('Tandai bahwa barang sudah diterima (Status -> RECEIVED)?')) return
     setLoading(true)
-    const res = await receivePurchase(orgId, id)
+    const res = await receivePurchase(orgId, purchase.id)
     if (res?.error) {
       setError(res.error)
     } else {
@@ -567,6 +574,7 @@ export default function PurchasingClient({
     else {
       setSuccess('Pembayaran berhasil dicatat!')
       setShowPaymentModal(false)
+      router.refresh()
       setTimeout(() => setSuccess(null), 3000)
     }
     setLoading(false)
@@ -815,24 +823,30 @@ export default function PurchasingClient({
               {purchaseRows.length === 0 ? (
                 <tr><td colSpan={5} className="py-24 text-center text-slate-400 font-bold text-xs uppercase italic">Belum ada data pembelian.</td></tr>
               ) : (
-                purchaseRows.map((p: any) => (
-                  <tr key={p.id} className="group hover:bg-slate-50 transition-colors">
-                    <td className="px-8 py-6">
-                       <div className="text-xs font-black text-rose-600 tracking-tighter">{p.purchase_number}</div>
-                       <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(p.purchase_date)}</div>
-                    </td>
-                    <td className="px-8 py-6">
-                       <div className="text-sm font-bold text-slate-900">{p.contacts?.name || 'Unknown Vendor'}</div>
-                       <div className="flex gap-2 mt-1.5 overflow-hidden max-w-[300px]">
-                          <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-md border border-slate-200 uppercase tracking-tighter">
-                            {p.purchase_items?.length || 0} SKU
-                          </span>
-                          <span className="text-[10px] text-slate-400 truncate font-medium">
-                            {p.purchase_items?.[0]?.description}{p.purchase_items?.length > 1 ? ` & ${p.purchase_items.length - 1} lainnya` : ''}
-                          </span>
-                       </div>
-                    </td>
-                    <td className="px-8 py-6 text-right">
+                purchaseRows.map((p: any) => {
+                  const receiveBlockedByPayment = p.status === 'ORDERED' && isReceiveBlockedByPayment(p)
+                  const receiveButtonTitle = receiveBlockedByPayment
+                    ? 'Akad SALAM: lakukan pembayaran lunas terlebih dahulu sebelum penerimaan barang'
+                    : 'Terima Barang'
+
+                  return (
+                    <tr key={p.id} className="group hover:bg-slate-50 transition-colors">
+                      <td className="px-8 py-6">
+                         <div className="text-xs font-black text-rose-600 tracking-tighter">{p.purchase_number}</div>
+                         <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(p.purchase_date)}</div>
+                      </td>
+                      <td className="px-8 py-6">
+                         <div className="text-sm font-bold text-slate-900">{p.contacts?.name || 'Unknown Vendor'}</div>
+                         <div className="flex gap-2 mt-1.5 overflow-hidden max-w-[300px]">
+                            <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-md border border-slate-200 uppercase tracking-tighter">
+                              {p.purchase_items?.length || 0} SKU
+                            </span>
+                            <span className="text-[10px] text-slate-400 truncate font-medium">
+                              {p.purchase_items?.[0]?.description}{p.purchase_items?.length > 1 ? ` & ${p.purchase_items.length - 1} lainnya` : ''}
+                            </span>
+                         </div>
+                      </td>
+                      <td className="px-8 py-6 text-right">
                        {(() => {
                          const paid = (p.purchase_payments || []).reduce((sum: number, pay: any) => sum + (Number(pay.amount) + Number(pay.discount_amount)), 0)
                          const returned = (p.purchase_returns || []).reduce((sum: number, ret: any) => sum + Number(ret.total_amount), 0)
@@ -854,14 +868,14 @@ export default function PurchasingClient({
                            </div>
                          )
                        })()}
-                    </td>
-                    <td className="px-8 py-6 text-center">
+                      </td>
+                      <td className="px-8 py-6 text-center">
                        <StatusBadge 
                          label={p.status} 
                          variant={p.status === 'RECEIVED' ? 'success' : p.status === 'VOIDED' ? 'error' : 'warning'} 
                        />
-                    </td>
-                     <td className="px-8 py-6">
+                      </td>
+                       <td className="px-8 py-6">
                        <div className="flex flex-wrap items-center justify-end gap-2">
                          <button onClick={() => handleOpenDetail(p)} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-500 hover:text-white transition-all border border-blue-100" title="Detail Dokumen PO">
                            <FileText size={16}/>
@@ -874,9 +888,20 @@ export default function PurchasingClient({
                          )}
                          
                          {p.status === 'ORDERED' && (
-                           <button onClick={() => handleReceivePO(p.id)} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm border border-emerald-100 group/btn" title="Terima Barang">
-                             <CheckSquare size={16}/>
-                           </button>
+                           <span className="inline-flex" title={receiveButtonTitle}>
+                             <button
+                               onClick={() => handleReceivePO(p)}
+                               disabled={receiveBlockedByPayment}
+                               aria-disabled={receiveBlockedByPayment}
+                               className={`p-2.5 rounded-xl transition-all shadow-sm border group/btn ${
+                                 receiveBlockedByPayment
+                                   ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed shadow-none'
+                                   : 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-500 hover:text-white'
+                               }`}
+                             >
+                               <CheckSquare size={16}/>
+                             </button>
+                           </span>
                          )}
                          
                          {(p.status === 'DRAFT' || p.status === 'ORDERED' || (p.status === 'RECEIVED' && p.payment_status === 'UNPAID')) && (
@@ -897,9 +922,10 @@ export default function PurchasingClient({
                            </button>
                          )}
                        </div>
-                     </td>
-                  </tr>
-                ))
+                       </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
