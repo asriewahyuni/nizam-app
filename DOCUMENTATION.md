@@ -1,6 +1,6 @@
 # NIZAM ERP — Comprehensive Codebase Documentation
 
-> **Last updated:** 17 April 2026 — refreshed to match current repository structure, PostgreSQL-native runtime, internal auth transition, new developer docs, and migrations through `1215`.
+> **Last updated:** 19 April 2026 — refreshed to match current repository structure, PostgreSQL-native runtime, POS shift opening journal fix, EDU realtime session schema, Railway migration-history normalization, and migrations through `1226`.
 
 ---
 
@@ -15,7 +15,7 @@ NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** with a
 | Page routes (`page.tsx`) | **78** |
 | Client components (`*Client.tsx`) | **52** |
 | Server action files | **59** |
-| Migration SQL files | **235** (latest: `1215`) |
+| Migration SQL files | **245** (latest: `1226`) |
 | Test files | **49** |
 | API route handlers | **14** |
 | Proxy (middleware) | `proxy.ts` |
@@ -97,7 +97,7 @@ nizam-app/
 │   └── database.types.ts # Auto-generated Supabase types
 ├── __tests__/           # Vitest test suites (49 files)
 ├── supabase/
-│   └── migrations/      # 235 SQL migration files
+│   └── migrations/      # 245 SQL migration files
 ├── scripts/             # Data migration scripts
 └── public/              # PWA manifest, logo, static assets
 ```
@@ -667,9 +667,12 @@ Core reusable components:
 
 ### 9.1 Overview
 
-- **193 migration files** in `supabase/migrations/`
+- **245 migration files** in `supabase/migrations/`
 - `master_init.sql` — legacy bootstrap SQL (foundation reference)
-- Latest migration: `1152_bsc_configuration_and_scoring.sql`
+- Latest migration: `1226_edu_mode_sessions.sql`
+- Recent normalization:
+  - Duplicate migration versions have been normalized into unique files such as `1199_syirkah_tables.sql` and `1226_edu_mode_sessions.sql`
+  - `1223_remote_history_placeholder.sql` and `1224_remote_history_placeholder.sql` keep `schema_migrations` continuity aligned with Railway after historical remote/local drift
 
 ### 9.2 Core Entities
 
@@ -689,6 +692,10 @@ Core reusable components:
 | Fleet | `fleet_assets`, `fleet_bookings`, `fleet_routes`, `fleet_schedules`, `fleet_tickets`, `fleet_maintenance_labs`, `fleet_terminals` |
 | Services | `service_orders` |
 | SaaS | `saas_packages`, `saas_invoices`, `saas_vouchers`, `saas_config` |
+| Syirkah | `syirkah_contracts`, `syirkah_members` |
+| POS Shift | `pos_shift_sessions`, `pos_shift_settlements` |
+| Open API | `api_keys`, `api_rate_limit_log`, `api_configurations`, `api_call_logs`, `api_idempotency_keys` |
+| Education / Training | `training_events`, `training_teams`, `training_sessions`, `training_session_steps`, `training_progress_events` |
 | Zakat | `zakat_haul`, `zakat_haul_events`, `zakat_asset_timeline` |
 | BSC / Strategy | `bsc_cycles`, `bsc_perspective_weights`, `bsc_kpis`, `bsc_kpi_measurements`, `v_bsc_latest_kpi_measurements` |
 | AI Tokens | `ai_token_wallets`, `ai_token_usage_logs`, `ai_token_topup_packages`, `ai_token_topup_orders` |
@@ -802,6 +809,18 @@ Core reusable components:
 | `1151` | **Shariah CoA cleanup** — `inject_shariah_coa` tidak lagi membuat/mengaktifkan akun legacy `3100 Ekuitas Syariah`; menjaga akun Syirkah `3110`/`3120` tetap aktif di bawah parent `3000`; backfill menghapus/menonaktifkan `3100` lama secara aman. |
 | `1152` | **BSC configuration + KPI scoring engine** — tabel siklus/weight/KPI/measurement, helper function scoring (achievement %, score 100, score 4), trigger auto-fill score, view latest measurement per KPI, serta RLS berbasis permission `strategy:*`/`reports:read`. |
 | `1153`–`1176` | **Railway PostgreSQL Decoupling** — Migrasi data dan logika dari ekosistem Supabase Cloud ke *database* Railway secara penuh. Penggantian Supabase Auth dengan skema otentikasi internal mandiri (`internal_auth_users`), refaktor ekstensif pada *nested query builder* menjadi Native Postgres SQL JOIN dari modul kasir, pembelian hingga pembukuan agar visibilitas saldo & jurnal akurat. Pemutusan SDK _auth_ pada Demo Mode. Sistem ERP kini 100% otonom tanpa dependensi RLS Supabase eksternal. |
+| `1177` | Internal auth password resets — tabel `internal_auth_password_resets` untuk token reset sandi native. |
+| `1178` | Subscription end enforcement — tambah `organizations.subscription_end` dan normalisasi durasi Trial legacy. |
+| `1179` | POS shift foundation — sesi shift POS, settlement audit trail, dan relasi transaksi POS ke shift. |
+| `1199`–`1202` | Syirkah + Open API foundations — normalisasi file `syirkah_tables` ke versi unik `1199`, Open API keys/configuration/logging, serta `syirkah_contracts.current_debt`. |
+| `1206`–`1213` | Education scoreboard, org expiry sync, sales discount contra journal/backfill, audit FK repair, schema repair `roles.department_ids`, holding role sync, dan refresh injeksi CoA Syariah SALAM/ISTISHNA. |
+| `1214`–`1219` | Purchase insurance column, normalisasi `roles.department_ids` ke `text[]`, sinkronisasi arsitektur bundle SaaS, repricing paket, serta aturan Trial 3 hari + one-time claim tracking. |
+| `1220` | Harden sales delivery journal idempotency — cegah duplicate journal mentah, auto-heal status `FINISHED`, dan beri error bisnis yang lebih jelas untuk delivery legacy yang setengah sinkron. |
+| `1221` | POS shift opening funding metadata — simpan `opening_source_account_id` dan `opening_journal_entry_id` pada `pos_shift_sessions`. |
+| `1222` | Open API idempotency keys — tabel `api_idempotency_keys` untuk POST retry yang aman tanpa duplikasi transaksi. |
+| `1223`–`1224` | Railway migration history placeholders — file no-op untuk menjaga kontinuitas `supabase_migrations.schema_migrations` ketika histori remote sudah lebih dulu mencatat versi yang file sumbernya tidak lagi tersedia. |
+| `1225` | POS shift opening journal enum fix — tambah `POS_SHIFT_OPENING` ke enum `journal_reference_type` agar jurnal modal awal shift bisa diposting. |
+| `1226` | EDU realtime session mode — tambah `training_sessions`, `training_session_steps`, dan `training_progress_events` untuk mode latihan realtime. |
 
 ### 9.5 Storage Buckets
 
@@ -859,8 +878,10 @@ Notes:
 ```bash
 # Development
 npm run dev               # Start Next.js dev server
+npm run dev:webpack       # Start dev server without Turbopack
 npm run build             # Production build
 npm run start             # Start production server
+npm run perf:local        # Build + start standalone locally
 npm run lint              # ESLint
 
 # Testing
@@ -880,11 +901,22 @@ npm run supabase:migrate-local-data  # Clone online data to local
 # Railway / PostgreSQL cutover helpers
 npm run db:railway:sync          # Dry-run schema sync
 npm run db:railway:sync:apply    # Apply schema sync
+npm run db:railway:sync:all      # Apply schema sync including earlier remote-missing migrations
 npm run db:railway:data:sync     # Dry-run data sync
 npm run db:railway:data:sync:apply # Apply data sync
+npm run db:railway:data:sync:rest # Dry-run REST/admin data sync
+npm run db:railway:data:sync:rest:apply # Apply REST/admin data sync
+npm run db:railway:parity        # Compare Supabase vs Railway schema/data parity
 npm run db:railway:readiness     # Cutover readiness checks
 npm run db:railway:cutover       # Orchestrated dry-run cutover
 npm run db:railway:cutover:apply # Apply cutover flow
+npm run db:railway:auth:backfill # Dry-run internal auth/user backfill
+npm run db:railway:auth:backfill:apply # Apply auth/user backfill
+npm run db:railway:internal-auth:bootstrap # Dry-run bootstrap internal auth users
+npm run db:railway:internal-auth:bootstrap:apply # Apply bootstrap internal auth users
+
+# Utilities
+npm run templates:migrasi # Generate migration template workbook
 ```
 
 ### 11.3 Runtime and Compatibility Modes
@@ -1277,6 +1309,35 @@ When adding new modules to the SaaS system, update:
 ---
 
 ## 16. Changelog (Recent Updates)
+
+### POS Shift Opening, EDU Realtime Sessions, and Railway Migration History Normalization (April 2026)
+
+- **Migration history normalization for Railway / Supabase CLI compatibility:**
+  - Duplicate migration versions dinormalisasi menjadi file unik:
+    - `1199_syirkah_tables.sql`
+    - `1226_edu_mode_sessions.sql`
+  - Ditambahkan placeholder:
+    - `1223_remote_history_placeholder.sql`
+    - `1224_remote_history_placeholder.sql`
+  - Tujuan utamanya adalah menjaga kontinuitas `supabase_migrations.schema_migrations` ketika histori remote lebih dulu menyimpan versi yang file sumbernya sudah tidak ada di repo aktif.
+  - Setelah normalisasi ini, `supabase db push --dry-run` terhadap Railway kembali bersih.
+
+- **POS shift opening journal hardening:**
+  - `1221_pos_shift_opening_funding.sql` menambahkan metadata `opening_source_account_id` dan `opening_journal_entry_id` pada `pos_shift_sessions`.
+  - `1225_add_pos_shift_opening_reference_type.sql` menambahkan enum `POS_SHIFT_OPENING` ke `journal_reference_type`.
+  - Ini memperbaiki kegagalan jurnal modal awal shift dengan error `invalid input value for enum journal_reference_type: "POS_SHIFT_OPENING"`.
+
+- **Sales delivery journal idempotency hardening (`1220_harden_sales_delivery_journal_idempotency.sql`):**
+  - Mencegah duplicate key mentah pada jurnal delivery `SALE`.
+  - Auto-heal `sales.status = 'FINISHED'` ketika jurnal dan mutasi stok legacy memang sudah ada.
+  - Menghasilkan error bisnis yang lebih jelas saat data lama belum sinkron penuh.
+
+- **Open API hardening:**
+  - `1222_open_api_idempotency.sql` menambahkan `api_idempotency_keys` agar retry POST dari integrasi eksternal tidak menggandakan transaksi.
+
+- **EDU realtime session mode (`1226_edu_mode_sessions.sql`):**
+  - Menambahkan `training_sessions`, `training_session_steps`, dan `training_progress_events`.
+  - Struktur ini dipakai untuk mode latihan realtime, step validation per soal, heartbeat, pause/resume, dan event log pelatihan.
 
 ### BSC Configuration + Shariah CoA Cleanup (April 2026)
 

@@ -1,5 +1,5 @@
 -- ============================================================
--- MIGRATION 1213: EDU realtime session mode
+-- MIGRATION 1226: EDU realtime session mode
 -- Menambahkan session latihan aktif, step per soal, dan event log.
 -- ============================================================
 

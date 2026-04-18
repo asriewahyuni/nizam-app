@@ -11,9 +11,9 @@ async function run() {
     await client.connect()
     console.log('Connected to Railway DB')
 
-    const sql1 = fs.readFileSync('supabase/migrations/1201_syirkah_tables.sql', 'utf8')
+    const sql1 = fs.readFileSync('supabase/migrations/1199_syirkah_tables.sql', 'utf8')
     await client.query(sql1)
-    console.log('Migrated 1201_syirkah_tables.sql')
+    console.log('Migrated 1199_syirkah_tables.sql')
 
     const sql2 = fs.readFileSync('supabase/migrations/1202_syirkah_current_debt.sql', 'utf8')
     await client.query(sql2)

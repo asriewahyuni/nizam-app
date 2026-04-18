@@ -45,7 +45,7 @@ Yang sudah diimplementasikan:
   - `training_sessions`
   - `training_session_steps`
   - `training_progress_events`
-- migration `1213_edu_mode_sessions.sql` sudah dibuat dan telah diaplikasikan ke Railway PostgreSQL,
+- migration `1226_edu_mode_sessions.sql` sudah dibuat dan telah diaplikasikan ke Railway PostgreSQL,
 - dashboard asli sudah memuat overlay global `EduModeShell`,
 - state sesi aktif tersedia lewat `GET/POST/DELETE /api/edu/session/active`,
 - timer global sesi, progress, mission drawer, dan log event sudah tampil di dashboard,

@@ -1,4 +1,4 @@
--- Migration: 1201_syirkah_tables.sql
+-- Migration: 1199_syirkah_tables.sql
 -- Description: Create tables for Syirkah Module (Contracts and Members)
 
 CREATE OR REPLACE FUNCTION set_updated_at_column()

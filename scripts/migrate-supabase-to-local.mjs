@@ -70,6 +70,7 @@ function ensureLocalImportCompatibility() {
   sql(`
     ALTER TYPE journal_reference_type ADD VALUE IF NOT EXISTS 'INVENTORY_ADJ';
     ALTER TYPE journal_reference_type ADD VALUE IF NOT EXISTS 'PRODUCTION';
+    ALTER TYPE journal_reference_type ADD VALUE IF NOT EXISTS 'POS_SHIFT_OPENING';
   `)
 }
 
