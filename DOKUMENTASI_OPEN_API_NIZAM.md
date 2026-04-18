@@ -27,6 +27,7 @@ Sumber utama:
 - `supabase/migrations/1201_api_call_logs.sql`
 - `supabase/migrations/1222_open_api_idempotency.sql`
 - `supabase/migrations/1223_open_api_inventory_webhook_outbox.sql`
+- `supabase/migrations/1226_open_api_ip_allowlist.sql`
 
 ## 1. Ringkasan
 
@@ -43,6 +44,7 @@ Fitur yang aktif di implementasi saat ini:
 - spesifikasi OpenAPI 3.1 mesin-baca di `/api/openapi`
 - portal internal owner/admin di `/developers/api`
 - API key per organisasi, opsional dibatasi satu cabang
+- whitelist IP/CIDR opsional per API key
 - rate limit per menit
 - audit trail request
 - subscription webhook untuk event kas, sales, purchase, dan inventory movement
@@ -177,6 +179,20 @@ atau:
 ```http
 Authorization: Bearer nzm_live_xxxxxxxxxxxxxxxxxxxxxxxx
 ```
+
+### Whitelist IP
+
+Setiap API key bisa memiliki whitelist IP/CIDR opsional.
+
+- jika `ip_allowlist` kosong, key dapat dipakai dari semua IP
+- jika `ip_allowlist` terisi, request hanya diterima dari IP yang match
+- format yang didukung:
+  - IP tunggal, misalnya `203.0.113.10`
+  - IPv4 CIDR, misalnya `203.0.113.0/24`
+  - IPv6 CIDR, misalnya `2001:db8::/64`
+- validasi whitelist dilakukan sebelum rate limit dihitung
+- request dari IP di luar whitelist akan menerima `403` dengan `error_code = ip_not_allowed`
+- jika whitelist aktif tetapi runtime tidak bisa menentukan IP caller dari proxy header, request akan menerima `403` dengan `error_code = ip_address_unavailable`
 
 Format key:
 

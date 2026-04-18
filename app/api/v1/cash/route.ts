@@ -1067,7 +1067,7 @@ export async function GET(request: NextRequest) {
   const rawKey = extractApiKeyFromRequest(request)
   if (!rawKey) return withNoStore(apiError('API key diperlukan. Sertakan header x-api-key.', 401))
 
-  const validation = await validateApiKey(rawKey)
+  const validation = await validateApiKey(rawKey, request)
   if (!validation.success) {
     return withNoStore(apiError(validation.error, validation.statusCode, { errorCode: validation.errorCode }))
   }
@@ -1212,7 +1212,7 @@ export async function POST(request: NextRequest) {
   const rawKey = extractApiKeyFromRequest(request)
   if (!rawKey) return withNoStore(apiError('API key diperlukan.', 401))
 
-  const validation = await validateApiKey(rawKey)
+  const validation = await validateApiKey(rawKey, request)
   if (!validation.success) {
     return withNoStore(apiError(validation.error, validation.statusCode, { errorCode: validation.errorCode }))
   }

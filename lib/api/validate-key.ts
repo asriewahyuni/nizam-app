@@ -10,6 +10,8 @@
  * Bagian secret (24 char) di-hash SHA-256 dan disimpan sebagai hex string.
  */
 
+import { BlockList, isIP } from 'node:net'
+
 import { createAdminClient } from '@/lib/supabase/server'
 
 export const API_KEY_PREFIX = 'nzm_live_'
@@ -54,6 +56,7 @@ type ApiKeyRow = {
   is_active: boolean
   expires_at: string | null
   rate_limit_rpm: number | null
+  ip_allowlist?: unknown
   request_count?: number | null
 }
 
@@ -77,6 +80,11 @@ type SupabaseAdminClient = {
   from(table: string): SupabaseTableBuilder
 }
 
+type NormalizedIpAllowlist = {
+  normalized: string[]
+  invalid: string[]
+}
+
 function inferApiErrorCode(message: string, statusCode: number, fallback?: string) {
   if (fallback) return fallback
 
@@ -89,6 +97,9 @@ function inferApiErrorCode(message: string, statusCode: number, fallback?: strin
   if (normalized.includes('api key tidak ditemukan')) return 'api_key_not_found'
   if (normalized.includes('api key sudah dinonaktifkan')) return 'api_key_revoked'
   if (normalized.includes('api key sudah kadaluarsa')) return 'api_key_expired'
+  if (normalized.includes('whitelist ip pada api key tidak valid')) return 'ip_allowlist_invalid'
+  if (normalized.includes('alamat ip caller tidak dapat ditentukan')) return 'ip_address_unavailable'
+  if (normalized.includes('ip tidak diizinkan untuk api key ini')) return 'ip_not_allowed'
   if (normalized.includes('scope tidak mencukupi')) return 'scope_missing'
   if (normalized.includes('request body harus berformat json valid')) return 'request_body_invalid'
   if (normalized.includes('branch_id diperlukan')) return 'branch_id_required'
@@ -181,11 +192,118 @@ export function generateRawApiKey(): { fullKey: string; prefix: string; secret: 
   }
 }
 
+function getBlockListType(value: string): 'ipv4' | 'ipv6' | null {
+  const family = isIP(value)
+  if (family === 4) return 'ipv4'
+  if (family === 6) return 'ipv6'
+  return null
+}
+
+export function normalizeIpAddress(value: string | null | undefined): string | null {
+  let candidate = String(value ?? '').trim()
+  if (!candidate || candidate.toLowerCase() === 'unknown') return null
+
+  if (candidate.startsWith('[') && candidate.includes(']')) {
+    candidate = candidate.slice(1, candidate.indexOf(']'))
+  }
+
+  if (candidate.startsWith('::ffff:')) {
+    const mappedIpv4 = candidate.slice('::ffff:'.length)
+    if (isIP(mappedIpv4) === 4) return mappedIpv4
+  }
+
+  if (isIP(candidate) > 0) return candidate
+
+  if (candidate.includes('.') && candidate.includes(':')) {
+    const portSeparatorIndex = candidate.lastIndexOf(':')
+    const maybeIp = candidate.slice(0, portSeparatorIndex)
+    const maybePort = candidate.slice(portSeparatorIndex + 1)
+    if (/^\d+$/.test(maybePort) && isIP(maybeIp) === 4) {
+      return maybeIp
+    }
+  }
+
+  return null
+}
+
+function normalizeIpAllowlistEntry(value: string): string | null {
+  const rawValue = String(value ?? '').trim()
+  if (!rawValue) return null
+
+  if (!rawValue.includes('/')) {
+    return normalizeIpAddress(rawValue)
+  }
+
+  const segments = rawValue.split('/')
+  if (segments.length !== 2) return null
+
+  const networkAddress = normalizeIpAddress(segments[0])
+  const prefixText = String(segments[1] ?? '').trim()
+  const prefix = Number.parseInt(prefixText, 10)
+  const family = networkAddress ? isIP(networkAddress) : 0
+
+  if (!networkAddress || !Number.isInteger(prefix)) return null
+  if (family === 4 && (prefix < 0 || prefix > 32)) return null
+  if (family === 6 && (prefix < 0 || prefix > 128)) return null
+  if (family !== 4 && family !== 6) return null
+
+  return `${networkAddress}/${prefix}`
+}
+
+export function normalizeIpAllowlistEntries(values: string[] | readonly string[] | null | undefined): NormalizedIpAllowlist {
+  const normalized: string[] = []
+  const invalid: string[] = []
+  const seen = new Set<string>()
+
+  for (const value of values ?? []) {
+    const rawValue = String(value ?? '').trim()
+    if (!rawValue) continue
+
+    const entry = normalizeIpAllowlistEntry(rawValue)
+    if (!entry) {
+      invalid.push(rawValue)
+      continue
+    }
+
+    if (!seen.has(entry)) {
+      seen.add(entry)
+      normalized.push(entry)
+    }
+  }
+
+  return { normalized, invalid }
+}
+
+function isIpAllowedByAllowlist(ipAddress: string, allowlist: string[]) {
+  if (allowlist.length === 0) return true
+
+  const blockListType = getBlockListType(ipAddress)
+  if (!blockListType) return false
+
+  const matcher = new BlockList()
+
+  for (const entry of allowlist) {
+    if (!entry.includes('/')) {
+      const entryType = getBlockListType(entry)
+      if (!entryType) continue
+      matcher.addAddress(entry, entryType)
+      continue
+    }
+
+    const [networkAddress, prefixText] = entry.split('/')
+    const entryType = getBlockListType(networkAddress)
+    if (!entryType) continue
+    matcher.addSubnet(networkAddress, Number.parseInt(prefixText, 10), entryType)
+  }
+
+  return matcher.check(ipAddress, blockListType)
+}
+
 /**
  * Validate an API key from a request.
  * Checks: format → existence → active → not expired → rate limit → return context.
  */
-export async function validateApiKey(rawKey: string): Promise<ApiKeyValidationResult> {
+export async function validateApiKey(rawKey: string, request?: Request): Promise<ApiKeyValidationResult> {
   // 1. Format check
   if (!rawKey || !rawKey.startsWith(API_KEY_PREFIX)) {
     return { success: false, error: 'API key tidak valid.', errorCode: 'api_key_invalid', statusCode: 401 }
@@ -210,7 +328,7 @@ export async function validateApiKey(rawKey: string): Promise<ApiKeyValidationRe
 
   const { data: keyRow, error: keyError } = await adminClient
     .from('api_keys')
-    .select('id, org_id, branch_id, scopes, is_active, expires_at, rate_limit_rpm')
+    .select('id, org_id, branch_id, scopes, is_active, expires_at, rate_limit_rpm, ip_allowlist, request_count')
     .eq('key_hash', keyHash)
     .maybeSingle<ApiKeyRow>()
 
@@ -226,6 +344,61 @@ export async function validateApiKey(rawKey: string): Promise<ApiKeyValidationRe
   // 5. Expiry check
   if (keyRow.expires_at && new Date(keyRow.expires_at) < new Date()) {
     return { success: false, error: 'API key sudah kadaluarsa.', errorCode: 'api_key_expired', statusCode: 401 }
+  }
+
+  const rawIpAllowlist = Array.isArray(keyRow.ip_allowlist)
+    ? keyRow.ip_allowlist.map((entry) => String(entry ?? '').trim()).filter(Boolean)
+    : []
+  const ipAllowlistResult = normalizeIpAllowlistEntries(rawIpAllowlist)
+  const requestIp = extractIpFromRequest(request)
+
+  if (rawIpAllowlist.length > 0 && ipAllowlistResult.invalid.length > 0) {
+    return {
+      success: false,
+      error: 'Whitelist IP pada API key tidak valid. Hubungi admin untuk memperbarui konfigurasi key.',
+      errorCode: 'ip_allowlist_invalid',
+      statusCode: 500,
+    }
+  }
+
+  if (ipAllowlistResult.normalized.length > 0 && !requestIp) {
+    void logApiCall({
+      orgId: keyRow.org_id,
+      apiKeyId: keyRow.id,
+      method: request?.method ?? 'UNKNOWN',
+      endpoint: request ? new URL(request.url).pathname : 'unknown',
+      statusCode: 403,
+      ipAddress: null,
+      userAgent: request?.headers.get('user-agent'),
+      errorMessage: 'ip_address_unavailable',
+    })
+
+    return {
+      success: false,
+      error: 'Alamat IP caller tidak dapat ditentukan. Pastikan request melewati proxy yang mengisi header IP.',
+      errorCode: 'ip_address_unavailable',
+      statusCode: 403,
+    }
+  }
+
+  if (requestIp && !isIpAllowedByAllowlist(requestIp, ipAllowlistResult.normalized)) {
+    void logApiCall({
+      orgId: keyRow.org_id,
+      apiKeyId: keyRow.id,
+      method: request?.method ?? 'UNKNOWN',
+      endpoint: request ? new URL(request.url).pathname : 'unknown',
+      statusCode: 403,
+      ipAddress: requestIp,
+      userAgent: request?.headers.get('user-agent'),
+      errorMessage: 'ip_not_allowed',
+    })
+
+    return {
+      success: false,
+      error: 'IP tidak diizinkan untuk API key ini.',
+      errorCode: 'ip_not_allowed',
+      statusCode: 403,
+    }
   }
 
   // 6. Rate limit check (sliding window per minute)
@@ -399,9 +572,11 @@ export async function logApiCall(input: ApiCallLogInput): Promise<void> {
  * Extract caller IP from request headers.
  */
 export function extractIpFromRequest(request: Request): string | null {
+  if (!request) return null
+
   return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
+    normalizeIpAddress(request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()) ||
+    normalizeIpAddress(request.headers.get('x-real-ip')) ||
     null
   )
 }

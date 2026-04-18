@@ -14,12 +14,13 @@ import {
   Key, Plus, Trash2, Copy, Check, X, Eye, EyeOff,
   Globe, Shield, Clock, Activity,
   ArrowDownCircle, ArrowUpCircle, Webhook, AlertCircle,
-  Code, Lock, History, CheckCircle2, XCircle,
+  Code, Lock, History, CheckCircle2, XCircle, Pencil,
 } from 'lucide-react'
 import {
   generateApiKey,
   revokeApiKey,
   saveApiConfiguration,
+  updateApiKeySettings,
   type ApiKeyRecord,
   type ApiConfigurationRecord,
   type GenerateApiKeyInput,
@@ -223,6 +224,26 @@ function toSafeAmount(value: number | string | null | undefined, fallback: numbe
 
 function formatJson(value: unknown) {
   return JSON.stringify(value, null, 2)
+}
+
+function parseLineSeparatedValues(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+}
+
+function formatIpAllowlistSummary(entries: string[]) {
+  if (entries.length === 0) return 'All IPs'
+  if (entries.length === 1) return entries[0]
+  return `${entries[0]} +${entries.length - 1} lainnya`
+}
+
+function formatOptionalDateLabel(value: string) {
+  if (!value) return 'Tanpa expiry'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleDateString('id-ID', { dateStyle: 'medium' })
 }
 
 function hasConfigAccountMapping(value: unknown) {
@@ -540,8 +561,17 @@ export function ApiSettingsClient({
   const [genBranchId, setGenBranchId] = useState('')
   const [genRpm, setGenRpm] = useState(60)
   const [genExpiry, setGenExpiry] = useState('')
+  const [genIpAllowlist, setGenIpAllowlist] = useState('')
   const [generatedKey, setGeneratedKey] = useState<string | null>(null)
   const [keyCopied, setKeyCopied] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editKeyId, setEditKeyId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editScopes, setEditScopes] = useState<ApiScope[]>([])
+  const [editBranchId, setEditBranchId] = useState('')
+  const [editRpm, setEditRpm] = useState(60)
+  const [editExpiry, setEditExpiry] = useState('')
+  const [editIpAllowlist, setEditIpAllowlist] = useState('')
 
   // ── Config state ──
   const [config, setConfig] = useState<ApiConfigurationRecord>(
@@ -697,6 +727,14 @@ export function ApiSettingsClient({
     },
   ]
   const onboardingReadyCount = onboardingItems.filter((item) => item.ready).length
+  const selectedGenScopeDefs = SCOPES.filter((scope) => genScopes.includes(scope.value))
+  const selectedGenBranch = branches.find((branch) => branch.id === genBranchId) ?? null
+  const genAllowlistEntries = parseLineSeparatedValues(genIpAllowlist)
+  const generateChecklist = [
+    { id: 'name', label: 'Nama key', ready: Boolean(genName.trim()) },
+    { id: 'scopes', label: 'Minimal satu scope', ready: genScopes.length > 0 },
+    { id: 'whitelist', label: 'Whitelist valid atau kosong', ready: true },
+  ]
 
   const exampleBranchId = defaultBranch?.id ?? 'branch-id'
   const exampleBranchLabel = defaultBranch?.name ?? 'Cabang Utama'
@@ -2073,6 +2111,7 @@ export function ApiSettingsClient({
       rateLimitRpm: genRpm,
       branchId: genBranchId || null,
       expiresAt: genExpiry || null,
+      ipAllowlist: parseLineSeparatedValues(genIpAllowlist),
     }
     const res = await generateApiKey(orgId, input)
     setLoading(false)
@@ -2083,12 +2122,12 @@ export function ApiSettingsClient({
     setApiKeys(prev => [{
       id: res.keyId, name: genName.trim(), key_prefix: 'nzm_live_',
       scopes: genScopes, branch_id: genBranchId || null,
-      is_active: true, rate_limit_rpm: genRpm, request_count: 0,
+      is_active: true, rate_limit_rpm: genRpm, ip_allowlist: parseLineSeparatedValues(genIpAllowlist), request_count: 0,
       last_used_at: null, expires_at: genExpiry || null,
       created_at: new Date().toISOString(),
     }, ...prev])
 
-    setGenName(''); setGenScopes([]); setGenBranchId(''); setGenRpm(60); setGenExpiry('')
+    setGenName(''); setGenScopes([]); setGenBranchId(''); setGenRpm(60); setGenExpiry(''); setGenIpAllowlist('')
   }
 
   const handleRevoke = async (keyId: string, keyName: string) => {
@@ -2098,6 +2137,46 @@ export function ApiSettingsClient({
     setLoading(false)
     if ('error' in res) return alert(res.error)
     setApiKeys(prev => prev.map(k => k.id === keyId ? { ...k, is_active: false } : k))
+  }
+
+  const handleOpenEditKey = (key: ApiKeyRecord) => {
+    setEditKeyId(key.id)
+    setEditName(key.name)
+    setEditScopes(key.scopes as ApiScope[])
+    setEditBranchId(key.branch_id ?? '')
+    setEditRpm(key.rate_limit_rpm)
+    setEditExpiry(key.expires_at ? key.expires_at.slice(0, 10) : '')
+    setEditIpAllowlist((key.ip_allowlist ?? []).join('\n'))
+    setShowEditModal(true)
+  }
+
+  const handleUpdateKey = async () => {
+    if (!editKeyId) return
+    if (!editName.trim()) return alert('Nama API key wajib diisi.')
+    if (editScopes.length === 0) return alert('Minimal pilih satu scope.')
+
+    setLoading(true)
+    const res = await updateApiKeySettings(orgId, editKeyId, {
+      name: editName.trim(),
+      scopes: editScopes,
+      branchId: editBranchId || null,
+      rateLimitRpm: editRpm,
+      expiresAt: editExpiry || null,
+      ipAllowlist: parseLineSeparatedValues(editIpAllowlist),
+    })
+    setLoading(false)
+
+    if ('error' in res) return alert(res.error)
+
+    setApiKeys((prev) => prev.map((key) => (key.id === res.key.id ? res.key : key)))
+    setShowEditModal(false)
+    setEditKeyId(null)
+    setEditName('')
+    setEditScopes([])
+    setEditBranchId('')
+    setEditRpm(60)
+    setEditExpiry('')
+    setEditIpAllowlist('')
   }
 
   const handleCopyKey = async (text: string) => {
@@ -2559,6 +2638,9 @@ export function ApiSettingsClient({
                       <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
                         <Clock size={10} /> {key.rate_limit_rpm} req/menit
                       </span>
+                      <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
+                        <Shield size={10} /> {key.ip_allowlist.length > 0 ? `${key.ip_allowlist.length} IP/range` : 'All IPs'}
+                      </span>
                       {key.last_used_at && (
                         <span className="text-[10px] text-slate-400 font-bold">
                           Terakhir: {new Date(key.last_used_at).toLocaleDateString('id-ID')}
@@ -2570,16 +2652,32 @@ export function ApiSettingsClient({
                         </span>
                       )}
                     </div>
+                    {key.ip_allowlist.length > 0 && (
+                      <p className="text-[10px] text-slate-500 font-medium">
+                        Whitelist: {formatIpAllowlistSummary(key.ip_allowlist)}
+                      </p>
+                    )}
                   </div>
                 </div>
-                {isAdmin && key.is_active && (
-                  <button
-                    onClick={() => handleRevoke(key.id, key.name)}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all disabled:opacity-50 shrink-0"
-                  >
-                    <Trash2 size={13} /> Revoke
-                  </button>
+                {isAdmin && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleOpenEditKey(key)}
+                      disabled={loading}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50"
+                    >
+                      <Pencil size={13} /> Edit
+                    </button>
+                    {key.is_active && (
+                      <button
+                        onClick={() => handleRevoke(key.id, key.name)}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all disabled:opacity-50"
+                      >
+                        <Trash2 size={13} /> Revoke
+                      </button>
+                    )}
+                  </div>
                 )}
               </motion.div>
             ))}
@@ -2593,6 +2691,9 @@ export function ApiSettingsClient({
   -H "x-api-key: nzm_live_<your-key>" \\
   -H "Content-Type: application/json"`}
             </pre>
+            <p className="mt-3 text-[11px] text-slate-500 font-medium">
+              Jika whitelist IP diisi, key hanya bisa dipakai dari IP atau CIDR yang terdaftar.
+            </p>
           </div>
         </div>
       )}
@@ -3565,16 +3666,22 @@ if (signature !== expected) {
               initial={{ opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12 }}
-              className="relative w-full max-w-lg rounded-[40px] bg-white shadow-2xl overflow-hidden"
+              className="relative w-full max-w-5xl max-h-[calc(100vh-2rem)] rounded-[40px] bg-white shadow-2xl overflow-hidden"
             >
-              <div className="p-8 space-y-6">
+              <div className="p-5 md:p-8 space-y-6 overflow-y-auto max-h-[calc(100vh-2rem)]">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="text-xl font-black text-slate-900">
-                      {generatedKey ? '🔑 Simpan API Key Ini!' : 'Buat API Key Baru'}
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 text-violet-700 text-[10px] font-black uppercase tracking-[0.18em] mb-3">
+                      <Shield size={12} />
+                      API Key Security
+                    </div>
+                    <h3 className="text-xl md:text-2xl font-black text-slate-900">
+                      {generatedKey ? 'Simpan API Key Ini' : 'Buat API Key Baru'}
                     </h3>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {generatedKey ? 'Key HANYA ditampilkan sekali. Salin sekarang!' : 'Konfigurasi scope dan batas akses key Anda.'}
+                    <p className="text-xs md:text-sm text-slate-500 mt-2 font-medium max-w-2xl">
+                      {generatedKey
+                        ? 'Key plaintext hanya muncul sekali. Salin sekarang sebelum modal ditutup.'
+                        : 'Atur akses key, pembatasan cabang, rate limit, dan whitelist IP dalam satu flow yang lebih ringkas.'}
                     </p>
                   </div>
                   {!generatedKey && (
@@ -3586,114 +3693,421 @@ if (signature !== expected) {
 
                 {generatedKey ? (
                   /* ── Show generated key ── */
-                  <div className="space-y-4">
-                    <div className="rounded-2xl bg-slate-950 p-4 relative">
-                      <code className="text-emerald-400 text-xs font-mono break-all leading-relaxed">{generatedKey}</code>
+                  <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-5">
+                    <div className="space-y-4">
+                      <div className="rounded-[28px] bg-slate-950 p-5 relative">
+                        <div className="flex items-center gap-2 mb-3 text-slate-300">
+                          <Key size={14} />
+                          <p className="text-[10px] font-black uppercase tracking-widest">Plaintext Key</p>
+                        </div>
+                        <code className="text-emerald-400 text-xs md:text-sm font-mono break-all leading-relaxed">{generatedKey}</code>
+                        <button
+                          onClick={() => handleCopyKey(generatedKey)}
+                          className="absolute top-4 right-4 p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all"
+                        >
+                          {keyCopied ? <Check size={14} /> : <Copy size={14} />}
+                        </button>
+                      </div>
+
+                      <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-4 flex gap-3">
+                        <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-800 font-bold leading-relaxed">
+                          Key ini tidak akan bisa dilihat lagi setelah panel ini ditutup. Simpan di password manager atau secret vault partner Anda.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[28px] border border-slate-100 bg-slate-50 p-5 space-y-4">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Next Step</p>
+                        <h4 className="text-lg font-black text-slate-900 mt-2">Sebelum Menutup Modal</h4>
+                      </div>
+
+                      <div className="space-y-3">
+                        {[
+                          'Salin key ke sistem partner atau vault internal.',
+                          'Pastikan header request memakai x-api-key atau Authorization Bearer.',
+                          'Jika memakai whitelist IP, cocokkan dengan IP publik integrator.',
+                        ].map((item) => (
+                          <div key={item} className="flex items-start gap-3 rounded-2xl bg-white border border-slate-200 px-4 py-3">
+                            <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                            <p className="text-xs font-medium text-slate-600 leading-relaxed">{item}</p>
+                          </div>
+                        ))}
+                      </div>
+
                       <button
-                        onClick={() => handleCopyKey(generatedKey)}
-                        className="absolute top-3 right-3 p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all"
+                        onClick={() => { setGeneratedKey(null); setShowGenModal(false) }}
+                        className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all"
                       >
-                        {keyCopied ? <Check size={14} /> : <Copy size={14} />}
+                        Sudah Disimpan, Tutup
                       </button>
                     </div>
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 flex gap-3">
-                      <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
-                      <p className="text-xs text-amber-800 font-bold leading-relaxed">
-                        Key ini tidak akan bisa dilihat lagi setelah panel ini ditutup. Pastikan Anda sudah menyimpannya di tempat yang aman.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => { setGeneratedKey(null); setShowGenModal(false) }}
-                      className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all"
-                    >
-                      Sudah Disimpan, Tutup
-                    </button>
                   </div>
                 ) : (
                   /* ── Form generate ── */
-                  <div className="space-y-5">
+                  <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-5">
+                    <div className="space-y-5">
+                      <div className="rounded-[28px] border border-slate-100 bg-white p-5 md:p-6 space-y-5">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Step 1</p>
+                            <h4 className="text-lg font-black text-slate-900 mt-1">Identitas & Akses</h4>
+                          </div>
+                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest">
+                            {selectedGenScopeDefs.length} scope dipilih
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Nama Key</label>
+                          <input
+                            value={genName}
+                            onChange={e => setGenName(e.target.value)}
+                            placeholder="Contoh: Integrasi Tokopedia, Webhook POS"
+                            className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
+                          />
+                          <p className="text-[10px] text-slate-400 font-medium">
+                            Gunakan nama yang mudah dikenali tim support, misalnya nama partner atau use case.
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Scope Akses</label>
+                          {selectedGenScopeDefs.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {selectedGenScopeDefs.map((scope) => (
+                                <ScopeBadge key={`selected-${scope.value}`} scope={scope.value} />
+                              ))}
+                            </div>
+                          )}
+                          <div className="grid grid-cols-1 gap-2">
+                            {SCOPES.map(s => (
+                              <label key={s.value} className={`flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all ${
+                                genScopes.includes(s.value)
+                                  ? 'border-violet-400 bg-violet-50 shadow-sm'
+                                  : 'border-slate-200 bg-white hover:border-slate-300'
+                              }`}>
+                                <input
+                                  type="checkbox"
+                                  checked={genScopes.includes(s.value)}
+                                  onChange={e => setGenScopes(prev =>
+                                    e.target.checked ? [...prev, s.value] : prev.filter(x => x !== s.value)
+                                  )}
+                                  className="rounded"
+                                />
+                                <div className="flex-1">
+                                  <p className="text-xs font-black text-slate-800">{s.label}</p>
+                                  <p className="text-[10px] text-slate-400">{s.desc}</p>
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-[28px] border border-slate-100 bg-white p-5 md:p-6 space-y-5">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Step 2</p>
+                          <h4 className="text-lg font-black text-slate-900 mt-1">Limit & Boundary</h4>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Rate Limit (req/menit)</label>
+                            <input
+                              type="number" min={1} max={1000}
+                              value={genRpm}
+                              onChange={e => setGenRpm(Number(e.target.value))}
+                              className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Berlaku Sampai (opsional)</label>
+                            <input
+                              type="date"
+                              value={genExpiry}
+                              onChange={e => setGenExpiry(e.target.value)}
+                              className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
+                            />
+                          </div>
+                        </div>
+
+                        {branches.length > 0 && (
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Scope Cabang (opsional)</label>
+                            <select
+                              value={genBranchId}
+                              onChange={e => setGenBranchId(e.target.value)}
+                              className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold bg-white"
+                            >
+                              <option value="">— Semua Cabang —</option>
+                              {branches.map(b => (
+                                <option key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ''}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Whitelist IP / CIDR (opsional)</label>
+                          <textarea
+                            value={genIpAllowlist}
+                            onChange={e => setGenIpAllowlist(e.target.value)}
+                            rows={4}
+                            placeholder={'203.0.113.10\n203.0.113.0/24\n2001:db8::/64'}
+                            className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
+                          />
+                          <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3">
+                            <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                              Satu IP atau CIDR per baris. Kosongkan jika key boleh dipakai dari semua IP. Whitelist aktif akan dicek sebelum rate limit.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                          onClick={() => setShowGenModal(false)}
+                          className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                        >
+                          Batal
+                        </button>
+                        <button
+                          onClick={handleGenerate}
+                          disabled={loading || !genName.trim() || genScopes.length === 0}
+                          className="flex-1 py-4 bg-violet-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
+                        >
+                          {loading ? 'Membuat Key...' : 'Generate API Key'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-5">
+                      <div className="rounded-[28px] border border-slate-100 bg-slate-950 p-5 md:p-6 text-white space-y-4">
+                        <div className="flex items-center gap-2 text-slate-300">
+                          <Lock size={14} />
+                          <p className="text-[10px] font-black uppercase tracking-widest">Preview Policy</p>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                          <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black">Key Label</p>
+                          <p className="mt-2 text-sm font-black text-white">
+                            {genName.trim() || 'Belum diberi nama'}
+                          </p>
+                          <p className="mt-1 text-[11px] font-mono text-slate-400">nzm_live_••••••••••••••••••••••••</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                            <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black">Scope</p>
+                            <p className="mt-2 text-lg font-black">{selectedGenScopeDefs.length}</p>
+                            <p className="text-[10px] text-slate-400">scope aktif</p>
+                          </div>
+                          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                            <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black">Rate Limit</p>
+                            <p className="mt-2 text-lg font-black">{genRpm}</p>
+                            <p className="text-[10px] text-slate-400">req/menit</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3 text-[11px]">
+                          <div className="flex items-start justify-between gap-4">
+                            <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Cabang</span>
+                            <span className="text-right font-medium text-slate-100">
+                              {selectedGenBranch ? `${selectedGenBranch.name}${selectedGenBranch.code ? ` (${selectedGenBranch.code})` : ''}` : 'Semua Cabang'}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-4">
+                            <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Expiry</span>
+                            <span className="text-right font-medium text-slate-100">{formatOptionalDateLabel(genExpiry)}</span>
+                          </div>
+                          <div className="flex items-start justify-between gap-4">
+                            <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Whitelist</span>
+                            <span className="text-right font-medium text-slate-100">
+                              {genAllowlistEntries.length > 0 ? `${genAllowlistEntries.length} IP/range` : 'Semua IP'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {selectedGenScopeDefs.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {selectedGenScopeDefs.map((scope) => (
+                              <ScopeBadge key={`preview-${scope.value}`} scope={scope.value} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="rounded-[28px] border border-slate-100 bg-slate-50 p-5 md:p-6 space-y-4">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Readiness</p>
+                          <h4 className="text-lg font-black text-slate-900 mt-1">Sebelum Generate</h4>
+                        </div>
+                        <div className="space-y-3">
+                          {generateChecklist.map((item) => (
+                            <div key={item.id} className="flex items-center gap-3 rounded-2xl bg-white border border-slate-200 px-4 py-3">
+                              {item.ready
+                                ? <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                                : <AlertCircle size={16} className="text-amber-500 shrink-0" />
+                              }
+                              <p className="text-xs font-medium text-slate-600">{item.label}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Catatan Security</p>
+                          <div className="space-y-2">
+                            <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                              Plaintext key hanya muncul sekali setelah generate.
+                            </p>
+                            <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                              Whitelist IP cocok untuk partner dengan IP publik tetap.
+                            </p>
+                            <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                              Batasi scope serendah mungkin agar blast radius kecil.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showEditModal && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowEditModal(false)}
+              className="absolute inset-0 bg-slate-950/70 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              className="relative w-full max-w-2xl rounded-[40px] bg-white shadow-2xl overflow-hidden"
+            >
+              <div className="p-8 space-y-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900">Edit API Key</h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Perbarui scope, rate limit, expiry, cabang, dan whitelist IP tanpa revoke key.
+                    </p>
+                  </div>
+                  <button onClick={() => setShowEditModal(false)} className="p-2 rounded-xl bg-slate-100 text-slate-400 hover:bg-slate-200 transition-all">
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="space-y-5">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Nama Key</label>
+                    <input
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      placeholder="Contoh: Integrasi Tokopedia, Webhook POS"
+                      className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Scope Akses</label>
+                    <div className="grid grid-cols-1 gap-2">
+                      {SCOPES.map(s => (
+                        <label key={`edit-${s.value}`} className={`flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all ${
+                          editScopes.includes(s.value)
+                            ? 'border-violet-400 bg-violet-50'
+                            : 'border-slate-200 bg-white hover:border-slate-300'
+                        }`}>
+                          <input
+                            type="checkbox"
+                            checked={editScopes.includes(s.value)}
+                            onChange={e => setEditScopes(prev =>
+                              e.target.checked ? [...prev, s.value] : prev.filter(x => x !== s.value)
+                            )}
+                            className="rounded"
+                          />
+                          <div className="flex-1">
+                            <p className="text-xs font-black text-slate-800">{s.label}</p>
+                            <p className="text-[10px] text-slate-400">{s.desc}</p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Nama Key</label>
+                      <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Rate Limit (req/menit)</label>
                       <input
-                        value={genName}
-                        onChange={e => setGenName(e.target.value)}
-                        placeholder="Contoh: Integrasi Tokopedia, Webhook POS"
+                        type="number" min={1} max={1000}
+                        value={editRpm}
+                        onChange={e => setEditRpm(Number(e.target.value))}
                         className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
                       />
                     </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Berlaku Sampai (opsional)</label>
+                      <input
+                        type="date"
+                        value={editExpiry}
+                        onChange={e => setEditExpiry(e.target.value)}
+                        className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
+                      />
+                    </div>
+                  </div>
 
-                    <div className="space-y-2">
-                      <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Scope Akses</label>
-                      <div className="grid grid-cols-1 gap-2">
-                        {SCOPES.map(s => (
-                          <label key={s.value} className={`flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all ${
-                            genScopes.includes(s.value)
-                              ? 'border-violet-400 bg-violet-50'
-                              : 'border-slate-200 bg-white hover:border-slate-300'
-                          }`}>
-                            <input
-                              type="checkbox"
-                              checked={genScopes.includes(s.value)}
-                              onChange={e => setGenScopes(prev =>
-                                e.target.checked ? [...prev, s.value] : prev.filter(x => x !== s.value)
-                              )}
-                              className="rounded"
-                            />
-                            <div className="flex-1">
-                              <p className="text-xs font-black text-slate-800">{s.label}</p>
-                              <p className="text-[10px] text-slate-400">{s.desc}</p>
-                            </div>
-                          </label>
+                  {branches.length > 0 && (
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Scope Cabang (opsional)</label>
+                      <select
+                        value={editBranchId}
+                        onChange={e => setEditBranchId(e.target.value)}
+                        className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold bg-white"
+                      >
+                        <option value="">— Semua Cabang —</option>
+                        {branches.map(b => (
+                          <option key={`edit-branch-${b.id}`} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ''}</option>
                         ))}
-                      </div>
+                      </select>
                     </div>
+                  )}
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Rate Limit (req/menit)</label>
-                        <input
-                          type="number" min={1} max={1000}
-                          value={genRpm}
-                          onChange={e => setGenRpm(Number(e.target.value))}
-                          className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Berlaku Sampai (opsional)</label>
-                        <input
-                          type="date"
-                          value={genExpiry}
-                          onChange={e => setGenExpiry(e.target.value)}
-                          className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold"
-                        />
-                      </div>
-                    </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Whitelist IP / CIDR (opsional)</label>
+                    <textarea
+                      value={editIpAllowlist}
+                      onChange={e => setEditIpAllowlist(e.target.value)}
+                      rows={4}
+                      placeholder={'203.0.113.10\n203.0.113.0/24\n2001:db8::/64'}
+                      className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-mono"
+                    />
+                    <p className="text-[10px] text-slate-400 font-medium">
+                      Satu IP atau CIDR per baris. Jika diisi, request dari IP lain akan ditolak sebelum rate limit dihitung.
+                    </p>
+                  </div>
 
-                    {branches.length > 0 && (
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Scope Cabang (opsional)</label>
-                        <select
-                          value={genBranchId}
-                          onChange={e => setGenBranchId(e.target.value)}
-                          className="w-full px-4 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-violet-50 focus:border-violet-500 font-bold bg-white"
-                        >
-                          <option value="">— Semua Cabang —</option>
-                          {branches.map(b => (
-                            <option key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ''}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <button
-                      onClick={handleGenerate}
-                      disabled={loading || !genName.trim() || genScopes.length === 0}
-                      className="w-full py-4 bg-violet-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
+                      onClick={() => setShowEditModal(false)}
+                      className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
                     >
-                      {loading ? 'Membuat Key...' : 'Generate API Key'}
+                      Batal
+                    </button>
+                    <button
+                      onClick={handleUpdateKey}
+                      disabled={loading || !editName.trim() || editScopes.length === 0}
+                      className="flex-1 py-4 bg-violet-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
+                    >
+                      {loading ? 'Menyimpan...' : 'Simpan Perubahan'}
                     </button>
                   </div>
-                )}
+                </div>
               </div>
             </motion.div>
           </div>

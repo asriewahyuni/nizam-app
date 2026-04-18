@@ -46,10 +46,10 @@ describe('Open API key validation helpers', () => {
 
   it('extracts caller IP from proxy headers', () => {
     const forwardedRequest = new Request('http://localhost/api/v1/cash', {
-      headers: { 'x-forwarded-for': '198.51.100.1, 203.0.113.8' },
+      headers: { 'x-forwarded-for': '::ffff:198.51.100.1, 203.0.113.8' },
     })
     const realIpRequest = new Request('http://localhost/api/v1/cash', {
-      headers: { 'x-real-ip': '203.0.113.7' },
+      headers: { 'x-real-ip': '203.0.113.7:443' },
     })
 
     expect(extractIpFromRequest(forwardedRequest)).toBe('198.51.100.1')
@@ -149,6 +149,63 @@ describe('Open API key validation helpers', () => {
     })
   })
 
+  it('rejects requests from IPs outside the key allowlist and logs the denial', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        api_keys: [{
+          maybeSingleResult: success({
+            id: 'key-1',
+            org_id: 'org-1',
+            branch_id: null,
+            scopes: ['cash:read'],
+            is_active: true,
+            expires_at: null,
+            rate_limit_rpm: 60,
+            ip_allowlist: ['203.0.113.0/24'],
+          }),
+        }],
+        api_call_logs: [{ result: success([]) }],
+      },
+    })
+    mocks.createAdminClient.mockResolvedValue(supabase.client)
+
+    const request = new Request('http://localhost/api/v1/cash', {
+      method: 'GET',
+      headers: {
+        'x-forwarded-for': '198.51.100.10',
+        'user-agent': 'Vitest',
+      },
+    })
+
+    const result = await validateApiKey(RAW_KEY, request)
+
+    expect(result).toEqual({
+      success: false,
+      error: 'IP tidak diizinkan untuk API key ini.',
+      errorCode: 'ip_not_allowed',
+      statusCode: 403,
+    })
+
+    const insertCall = supabase.calls.find((call) => call.table === 'api_call_logs')
+    expect(insertCall?.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: 'insert',
+          args: [
+            expect.objectContaining({
+              org_id: 'org-1',
+              api_key_id: 'key-1',
+              endpoint: '/api/v1/cash',
+              status_code: 403,
+              ip_address: '198.51.100.10',
+              error_message: 'ip_not_allowed',
+            }),
+          ],
+        }),
+      ])
+    )
+  })
+
   it('enforces per-minute rate limits', async () => {
     const supabase = createSupabaseMock({
       tables: {
@@ -192,6 +249,7 @@ describe('Open API key validation helpers', () => {
             is_active: true,
             expires_at: null,
             rate_limit_rpm: 10,
+            ip_allowlist: ['198.51.100.0/24'],
           }),
         }],
         api_rate_limit_log: [
@@ -202,7 +260,9 @@ describe('Open API key validation helpers', () => {
     })
     mocks.createAdminClient.mockResolvedValue(supabase.client)
 
-    const result = await validateApiKey(RAW_KEY)
+    const result = await validateApiKey(RAW_KEY, new Request('http://localhost/api/v1/inventory', {
+      headers: { 'x-forwarded-for': '198.51.100.42' },
+    }))
 
     expect(result).toEqual({
       success: true,

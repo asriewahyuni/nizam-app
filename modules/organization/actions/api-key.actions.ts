@@ -11,7 +11,13 @@
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { INVENTORY_WEBHOOK_DIRECTIONS, VALID_WEBHOOK_EVENTS } from '@/lib/api/webhook-events'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-import { generateRawApiKey, hashApiKeySecret, VALID_SCOPES, type ApiScope } from '@/lib/api/validate-key'
+import {
+  generateRawApiKey,
+  hashApiKeySecret,
+  normalizeIpAllowlistEntries,
+  VALID_SCOPES,
+  type ApiScope,
+} from '@/lib/api/validate-key'
 import { revalidatePath } from 'next/cache'
 
 // ─────────────────────────────────────────────────────────────
@@ -26,6 +32,7 @@ export type ApiKeyRecord = {
   branch_id: string | null
   is_active: boolean
   rate_limit_rpm: number
+  ip_allowlist: string[]
   request_count: number
   last_used_at: string | null
   expires_at: string | null
@@ -54,6 +61,16 @@ export type GenerateApiKeyInput = {
   scopes: ApiScope[]
   rateLimitRpm?: number
   expiresAt?: string | null
+  ipAllowlist?: string[]
+}
+
+export type UpdateApiKeyInput = {
+  name: string
+  branchId?: string | null
+  scopes: ApiScope[]
+  rateLimitRpm?: number
+  expiresAt?: string | null
+  ipAllowlist?: string[]
 }
 
 export type SaveApiConfigurationInput = {
@@ -75,6 +92,7 @@ type MaybeSingleResult<T> = Promise<{ data: T | null; error: QueryError }>
 type MutationResult = Promise<{ error: QueryError }>
 
 type SupabaseQueryBuilder<T> = PromiseLike<{ data: T[] | null; error: QueryError }> & {
+  select(columns: string): SupabaseQueryBuilder<T>
   eq(column: string, value: unknown): SupabaseQueryBuilder<T>
   is(column: string, value: null): SupabaseQueryBuilder<T>
   order(column: string, options: { ascending: boolean }): SupabaseQueryBuilder<T>
@@ -169,7 +187,7 @@ export async function listApiKeys(orgId: string): Promise<ApiKeyRecord[]> {
 
   const { data, error } = await ctx.admin
     .from('api_keys')
-    .select('id, name, key_prefix, scopes, branch_id, is_active, rate_limit_rpm, request_count, last_used_at, expires_at, created_at')
+    .select('id, name, key_prefix, scopes, branch_id, is_active, rate_limit_rpm, ip_allowlist, request_count, last_used_at, expires_at, created_at')
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
 
@@ -199,6 +217,11 @@ export async function generateApiKey(
     return { error: `Scope tidak valid: ${invalidScopes.join(', ')}` }
   }
 
+  const ipAllowlistResult = normalizeIpAllowlistEntries(input.ipAllowlist)
+  if (ipAllowlistResult.invalid.length > 0) {
+    return { error: `Whitelist IP tidak valid: ${ipAllowlistResult.invalid.join(', ')}` }
+  }
+
   const { fullKey, prefix, secret } = generateRawApiKey()
   const keyHash = await hashApiKeySecret(secret)
 
@@ -210,6 +233,7 @@ export async function generateApiKey(
     scopes: input.scopes,
     is_active: true,
     rate_limit_rpm: input.rateLimitRpm ?? 60,
+    ip_allowlist: ipAllowlistResult.normalized,
     created_by: ctx.orgData.user?.id ?? null,
   }
 
@@ -229,6 +253,60 @@ export async function generateApiKey(
   revalidatePath('/developers/api')
   revalidatePath('/settings/api')
   return { success: true, fullKey, keyId: data.id }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Action: updateApiKeySettings
+// ─────────────────────────────────────────────────────────────
+
+export async function updateApiKeySettings(
+  orgId: string,
+  keyId: string,
+  input: UpdateApiKeyInput
+): Promise<{ success: true; key: ApiKeyRecord } | { error: string }> {
+  const ctx = await getAdminOrgContext(orgId)
+  if ('error' in ctx) return { error: String(ctx.error ?? 'Tidak terautentikasi.') }
+
+  if (!input.name?.trim()) return { error: 'Nama API key wajib diisi.' }
+  if (!Array.isArray(input.scopes) || input.scopes.length === 0) {
+    return { error: 'Minimal satu scope harus dipilih.' }
+  }
+
+  const invalidScopes = input.scopes.filter((scope) => !(VALID_SCOPES as readonly string[]).includes(scope))
+  if (invalidScopes.length > 0) {
+    return { error: `Scope tidak valid: ${invalidScopes.join(', ')}` }
+  }
+
+  const ipAllowlistResult = normalizeIpAllowlistEntries(input.ipAllowlist)
+  if (ipAllowlistResult.invalid.length > 0) {
+    return { error: `Whitelist IP tidak valid: ${ipAllowlistResult.invalid.join(', ')}` }
+  }
+
+  const updatePayload: Record<string, unknown> = {
+    name: input.name.trim(),
+    branch_id: input.branchId ?? null,
+    scopes: input.scopes,
+    rate_limit_rpm: input.rateLimitRpm ?? 60,
+    expires_at: input.expiresAt ?? null,
+    ip_allowlist: ipAllowlistResult.normalized,
+    updated_at: new Date().toISOString(),
+  }
+
+  const { data, error } = await ctx.admin
+    .from('api_keys')
+    .update(updatePayload)
+    .eq('id', keyId)
+    .eq('org_id', orgId)
+    .select('id, name, key_prefix, scopes, branch_id, is_active, rate_limit_rpm, ip_allowlist, request_count, last_used_at, expires_at, created_at')
+    .maybeSingle<ApiKeyRecord>()
+
+  if (error || !data) {
+    return { error: error?.message || 'Gagal memperbarui API key.' }
+  }
+
+  revalidatePath('/developers/api')
+  revalidatePath('/settings/api')
+  return { success: true, key: data as ApiKeyRecord }
 }
 
 // ─────────────────────────────────────────────────────────────

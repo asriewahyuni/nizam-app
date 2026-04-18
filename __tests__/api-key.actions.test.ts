@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
   generateRawApiKey: vi.fn(),
   hashApiKeySecret: vi.fn(),
+  normalizeIpAllowlistEntries: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -28,6 +29,7 @@ vi.mock('@/lib/api/validate-key', () => ({
   VALID_SCOPES: ['cash:read', 'cash:write', 'sales:read', 'inventory:read', 'ledger:read', 'contacts:read', 'contacts:write', 'purchases:read', 'bank_transactions:read'],
   generateRawApiKey: mocks.generateRawApiKey,
   hashApiKeySecret: mocks.hashApiKeySecret,
+  normalizeIpAllowlistEntries: mocks.normalizeIpAllowlistEntries,
 }))
 
 import {
@@ -38,6 +40,7 @@ import {
   listWebhookDeliveries,
   revokeApiKey,
   saveApiConfiguration,
+  updateApiKeySettings,
 } from '@/modules/organization/actions/api-key.actions'
 
 describe('Open API settings server actions', () => {
@@ -54,6 +57,10 @@ describe('Open API settings server actions', () => {
       secret: 'DETERMINISTICKEY123456',
     })
     mocks.hashApiKeySecret.mockResolvedValue('hashed-secret')
+    mocks.normalizeIpAllowlistEntries.mockImplementation((values: string[] | undefined) => ({
+      normalized: Array.from(new Set((values ?? []).map((value) => String(value ?? '').trim()).filter(Boolean))),
+      invalid: [],
+    }))
   })
 
   it('lists API keys for the active organization', async () => {
@@ -69,6 +76,7 @@ describe('Open API settings server actions', () => {
               branch_id: null,
               is_active: true,
               rate_limit_rpm: 60,
+              ip_allowlist: ['203.0.113.0/24'],
               request_count: 4,
               last_used_at: null,
               expires_at: null,
@@ -102,6 +110,7 @@ describe('Open API settings server actions', () => {
       scopes: ['cash:read', 'inventory:read'],
       rateLimitRpm: 120,
       expiresAt: '2026-05-01T00:00:00.000Z',
+      ipAllowlist: ['203.0.113.10', '203.0.113.0/24'],
     })
 
     expect(result).toEqual({
@@ -123,6 +132,7 @@ describe('Open API settings server actions', () => {
               scopes: ['cash:read', 'inventory:read'],
               branch_id: 'branch-1',
               rate_limit_rpm: 120,
+              ip_allowlist: ['203.0.113.10', '203.0.113.0/24'],
               expires_at: '2026-05-01T00:00:00.000Z',
               created_by: 'user-1',
             }),
@@ -132,6 +142,24 @@ describe('Open API settings server actions', () => {
     )
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/developers/api')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/settings/api')
+  })
+
+  it('rejects invalid IP allowlist entries before inserting a key', async () => {
+    mocks.createAdminClient.mockResolvedValue(createSupabaseMock().client)
+    mocks.normalizeIpAllowlistEntries.mockReturnValueOnce({
+      normalized: ['203.0.113.0/24'],
+      invalid: ['invalid-ip'],
+    })
+
+    const result = await generateApiKey('org-1', {
+      name: 'Restricted',
+      scopes: ['cash:read'],
+      ipAllowlist: ['203.0.113.0/24', 'invalid-ip'],
+    })
+
+    expect(result).toEqual({
+      error: 'Whitelist IP tidak valid: invalid-ip',
+    })
   })
 
   it('rejects invalid scopes before inserting a key', async () => {
@@ -167,6 +195,66 @@ describe('Open API settings server actions', () => {
         }),
         expect.objectContaining({ method: 'eq', args: ['id', 'key-1'] }),
         expect.objectContaining({ method: 'eq', args: ['org_id', 'org-1'] }),
+      ])
+    )
+  })
+
+  it('updates API key settings including whitelist IP', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        api_keys: [{
+          maybeSingleResult: success({
+            id: 'key-1',
+            name: 'Partner',
+            key_prefix: 'nzm_live_',
+            scopes: ['cash:read'],
+            branch_id: 'branch-1',
+            is_active: true,
+            rate_limit_rpm: 90,
+            ip_allowlist: ['203.0.113.0/24'],
+            request_count: 3,
+            last_used_at: '2026-04-18T01:00:00.000Z',
+            expires_at: '2026-05-02T00:00:00.000Z',
+            created_at: '2026-04-18T00:00:00.000Z',
+          }),
+        }],
+      },
+    })
+    mocks.createAdminClient.mockResolvedValue(supabase.client)
+
+    const result = await updateApiKeySettings('org-1', 'key-1', {
+      name: 'Partner Updated',
+      branchId: 'branch-1',
+      scopes: ['cash:read', 'inventory:read'],
+      rateLimitRpm: 90,
+      expiresAt: '2026-05-02T00:00:00.000Z',
+      ipAllowlist: ['203.0.113.0/24'],
+    })
+
+    expect(result).toEqual({
+      success: true,
+      key: expect.objectContaining({
+        id: 'key-1',
+        name: 'Partner',
+      }),
+    })
+
+    const updateCall = supabase.calls.find((call) => call.table === 'api_keys')
+    expect(updateCall?.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: 'update',
+          args: [
+            expect.objectContaining({
+              name: 'Partner Updated',
+              branch_id: 'branch-1',
+              scopes: ['cash:read', 'inventory:read'],
+              rate_limit_rpm: 90,
+              ip_allowlist: ['203.0.113.0/24'],
+              expires_at: '2026-05-02T00:00:00.000Z',
+            }),
+          ],
+        }),
       ])
     )
   })
