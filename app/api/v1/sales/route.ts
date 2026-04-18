@@ -5,6 +5,9 @@
  * GET /api/v1/sales  → daftar invoice/sales order (scope: sales:read)
  */
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { type NextRequest } from 'next/server'
 import {
   validateApiKey,
@@ -15,57 +18,106 @@ import {
   logApiCall,
   extractIpFromRequest,
 } from '@/lib/api/validate-key'
-import { createAdminClient } from '@/lib/supabase/server'
+import { queryPostgres } from '@/lib/db/postgres'
+
+type SalesApiRow = {
+  id: string
+  sale_number: string | null
+  customer_name: string | null
+  total_amount: number | string | null
+  status: string | null
+  branch_id: string | null
+  order_date: string | null
+  created_at: string
+}
+
+function withNoStore(response: Response) {
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+  return response
+}
+
+function normalizeLimit(rawLimit: string | null) {
+  const parsed = Number.parseInt(rawLimit ?? '', 10)
+  if (!Number.isFinite(parsed) || parsed < 1) return 50
+  return Math.min(parsed, 200)
+}
+
+function toSafeNumber(value: number | string | null | undefined) {
+  const numericValue = Number(value ?? 0)
+  return Number.isFinite(numericValue) ? numericValue : 0
+}
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now()
   const rawKey = extractApiKeyFromRequest(request)
-  if (!rawKey) return apiError('API key diperlukan. Sertakan header x-api-key.', 401)
+  if (!rawKey) return withNoStore(apiError('API key diperlukan. Sertakan header x-api-key.', 401))
 
   const validation = await validateApiKey(rawKey)
-  if (!validation.success) return apiError(validation.error, validation.statusCode)
+  if (!validation.success) {
+    return withNoStore(apiError(validation.error, validation.statusCode, { errorCode: validation.errorCode }))
+  }
 
   if (!requireScope(validation.key, 'sales:read')) {
-    return apiError('Scope tidak mencukupi. Diperlukan: sales:read', 403)
+    return withNoStore(apiError('Scope tidak mencukupi. Diperlukan: sales:read', 403))
   }
 
   const { orgId, branchId } = validation.key
 
   const response = await (async () => {
-  const { searchParams } = new URL(request.url)
-  const limitParam = Math.min(Number(searchParams.get('limit') ?? '50'), 200)
-  const status = searchParams.get('status')
-  const dateFrom = searchParams.get('date_from')
-  const dateTo = searchParams.get('date_to')
+    const { searchParams } = new URL(request.url)
+    const limitParam = normalizeLimit(searchParams.get('limit'))
+    const status = searchParams.get('status')
+    const dateFrom = searchParams.get('date_from')
+    const dateTo = searchParams.get('date_to')
 
-  let admin: Awaited<ReturnType<typeof createAdminClient>>
-  try {
-    admin = await createAdminClient()
-  } catch {
-    return apiError('Server error.', 500)
-  }
+    let rows: SalesApiRow[]
+    try {
+      const result = await queryPostgres<SalesApiRow>(
+        `
+          SELECT
+            s.id::text AS id,
+            s.sale_number,
+            c.name AS customer_name,
+            COALESCE(s.grand_total, s.total_amount, 0) AS total_amount,
+            s.status::text AS status,
+            s.branch_id::text AS branch_id,
+            s.sale_date::text AS order_date,
+            s.created_at
+          FROM public.sales s
+          LEFT JOIN public.contacts c
+            ON c.id = s.customer_id
+          WHERE s.org_id = $1::uuid
+            AND ($2::uuid IS NULL OR s.branch_id = $2::uuid)
+            AND ($3::text IS NULL OR s.status::text = $3::text)
+            AND ($4::date IS NULL OR s.sale_date >= $4::date)
+            AND ($5::date IS NULL OR s.sale_date <= $5::date)
+          ORDER BY s.created_at DESC
+          LIMIT $6::int
+        `,
+        [orgId, branchId, status, dateFrom, dateTo, limitParam]
+      )
 
-  let query = (admin as any)
-    .from('sales_orders')
-    .select('id, so_number, customer_name, total_amount, status, branch_id, order_date, created_at')
-    .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
-    .limit(limitParam)
+      rows = result.rows
+    } catch {
+      return withNoStore(apiError('Gagal mengambil data penjualan.', 500))
+    }
 
-  if (branchId) query = query.eq('branch_id', branchId)
-  if (status) query = query.eq('status', status)
-  if (dateFrom) query = query.gte('order_date', dateFrom)
-  if (dateTo) query = query.lte('order_date', dateTo)
+    const data = rows.map((row) => ({
+      id: row.id,
+      so_number: row.sale_number,
+      customer_name: row.customer_name,
+      total_amount: toSafeNumber(row.total_amount),
+      status: row.status,
+      branch_id: row.branch_id,
+      order_date: row.order_date,
+      created_at: row.created_at,
+    }))
 
-  const { data, error } = await query
-
-  if (error) return apiError('Gagal mengambil data penjualan.', 500)
-
-  return apiSuccess(data ?? [], {
-    org_id: orgId,
-    branch_scope: branchId ?? 'all',
-    count: (data ?? []).length,
-  })
+    return withNoStore(apiSuccess(data, {
+      org_id: orgId,
+      branch_scope: branchId ?? 'all',
+      count: data.length,
+    }))
   })()
 
   void logApiCall({

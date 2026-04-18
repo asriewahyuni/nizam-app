@@ -12,16 +12,52 @@ import {
 } from '@/lib/api/validate-key'
 import { createAdminClient } from '@/lib/supabase/server'
 
+type ContactApiRow = {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  type: string | null
+  company: string | null
+  is_active: boolean
+  created_at: string
+}
+
+type ContactsQueryResult = {
+  data: ContactApiRow[] | null
+  error: unknown
+}
+
+type ContactsQueryBuilder = PromiseLike<ContactsQueryResult> & {
+  eq(column: string, value: unknown): ContactsQueryBuilder
+  order(column: string, options: { ascending: boolean }): ContactsQueryBuilder
+  limit(value: number): ContactsQueryBuilder
+  ilike(column: string, pattern: string): ContactsQueryBuilder
+}
+
+type ContactsAdminClient = {
+  from(table: string): {
+    select(columns: string): ContactsQueryBuilder
+  }
+}
+
+function withNoStore(response: Response) {
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+  return response
+}
+
 export async function GET(request: NextRequest) {
   const startTime = Date.now()
   const rawKey = extractApiKeyFromRequest(request)
-  if (!rawKey) return apiError('API key diperlukan. Sertakan header x-api-key.', 401)
+  if (!rawKey) return withNoStore(apiError('API key diperlukan. Sertakan header x-api-key.', 401))
 
   const validation = await validateApiKey(rawKey)
-  if (!validation.success) return apiError(validation.error, validation.statusCode)
+  if (!validation.success) {
+    return withNoStore(apiError(validation.error, validation.statusCode, { errorCode: validation.errorCode }))
+  }
 
   if (!requireScope(validation.key, 'contacts:read')) {
-    return apiError('Scope tidak mencukupi. Diperlukan: contacts:read', 403)
+    return withNoStore(apiError('Scope tidak mencukupi. Diperlukan: contacts:read', 403))
   }
 
   const { orgId } = validation.key
@@ -33,9 +69,10 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get('search') ?? ''
 
   let admin: Awaited<ReturnType<typeof createAdminClient>>
-  try { admin = await createAdminClient() } catch { return apiError('Server error.', 500) }
+  try { admin = await createAdminClient() } catch { return withNoStore(apiError('Server error.', 500)) }
+  const adminClient = admin as unknown as ContactsAdminClient
 
-  let query = (admin as any)
+  let query = adminClient
     .from('contacts')
     .select('id, name, email, phone, type, company, is_active, created_at')
     .eq('org_id', orgId)
@@ -47,9 +84,9 @@ export async function GET(request: NextRequest) {
   if (search) query = query.ilike('name', `%${search}%`)
 
   const { data, error } = await query
-  if (error) return apiError('Gagal mengambil data kontak.', 500)
+  if (error) return withNoStore(apiError('Gagal mengambil data kontak.', 500))
 
-  return apiSuccess(data ?? [], { org_id: orgId, count: (data ?? []).length })
+  return withNoStore(apiSuccess(data ?? [], { org_id: orgId, count: (data ?? []).length }))
   })()
 
   void logApiCall({

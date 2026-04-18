@@ -36,17 +36,20 @@ export function buildOpenApiSpec(serverUrl: string) {
     properties: {
       success: { type: 'boolean', const: false },
       error: { type: 'string' },
+      message: { type: 'string' },
+      error_code: { type: 'string' },
+      request_id: { type: 'string', format: 'uuid' },
     },
-    required: ['success', 'error'],
+    required: ['success', 'error', 'message', 'error_code', 'request_id'],
   }
 
   return {
     openapi: '3.1.0',
     info: {
       title: 'Nizam Open API',
-      version: '1.0.0',
+      version: '1.1.0',
       summary: 'Public REST API for Nizam ERP integrations.',
-      description: 'Standar integrasi eksternal untuk membaca data inventori, membaca rekening kas, dan membuat transaksi kas.',
+      description: 'Standar integrasi eksternal untuk membaca inventory, kontak, penjualan, rekening kas, dan membuat transaksi kas dengan kontrak error yang konsisten.',
       contact: {
         name: 'Nizam Support',
         url: 'https://brain.kliknizam.app',
@@ -65,6 +68,8 @@ export function buildOpenApiSpec(serverUrl: string) {
     tags: [
       { name: 'Cash', description: 'Cash and bank integrations.' },
       { name: 'Inventory', description: 'Inventory and stock visibility.' },
+      { name: 'Sales', description: 'Sales order and invoice visibility.' },
+      { name: 'Contacts', description: 'Customer and supplier directory access.' },
     ],
     paths: {
       '/cash': {
@@ -143,11 +148,20 @@ export function buildOpenApiSpec(serverUrl: string) {
         post: {
           tags: ['Cash'],
           summary: 'Create a cash transaction',
-          description: 'Membuat transaksi kas masuk atau keluar ke modul kas/bank aktif. `account_id` bisa menunjuk langsung ke akun kas/bank CoA (11xx) atau ke `bank_accounts`. Untuk skenario sederhana gunakan satu akun lawan; untuk pembelian inventory, pajak, diskon, hutang, atau biaya lain gunakan `journal_lines` agar jurnal split tetap masuk ke buku besar secara balance.',
+          description: 'Membuat transaksi kas masuk atau keluar ke modul kas/bank aktif. `account_id` bisa menunjuk langsung ke akun kas/bank CoA (11xx) atau ke `bank_accounts`. Untuk integrasi production, kirim `Idempotency-Key` atau `idempotency_key` agar retry tidak membuat transaksi ganda. Untuk skenario sederhana gunakan satu akun lawan; untuk pembelian inventory, pajak, diskon, hutang, atau biaya lain gunakan `journal_lines` agar jurnal split tetap masuk ke buku besar secara balance.',
           operationId: 'createCashTransaction',
           security: [
             { ApiKeyAuth: [] },
             { BearerAuth: [] },
+          ],
+          parameters: [
+            {
+              name: 'Idempotency-Key',
+              in: 'header',
+              required: false,
+              description: 'Kunci idempotensi untuk memastikan retry POST yang sama tidak membuat transaksi duplikat.',
+              schema: { type: 'string', minLength: 1, maxLength: 255 },
+            },
           ],
           requestBody: {
             required: true,
@@ -159,6 +173,7 @@ export function buildOpenApiSpec(serverUrl: string) {
                   amount: 250000,
                   description: 'Pelunasan invoice INV-2026-001',
                   reference: 'INV-2026-001',
+                  idempotency_key: 'cash-inv-2026-001',
                   branch_id: 'branch-id',
                   transaction_date: '2026-04-15',
                   account_id: 'cash-bank-11xx-account-id',
@@ -173,6 +188,7 @@ export function buildOpenApiSpec(serverUrl: string) {
                       amount: 250000,
                       description: 'Pelunasan invoice INV-2026-001',
                       reference: 'INV-2026-001',
+                      idempotency_key: 'cash-inv-2026-001',
                       branch_id: 'branch-id',
                       transaction_date: '2026-04-15',
                       account_id: 'cash-bank-11xx-account-id',
@@ -187,6 +203,7 @@ export function buildOpenApiSpec(serverUrl: string) {
                       amount: 15000,
                       description: 'Push marketplace pembelian BMS3 - BUKU MATEMATIKA SERIES 3',
                       reference: 'PO-MP-BOOK-2026-0001',
+                      idempotency_key: 'cash-po-mp-book-2026-0001',
                       branch_id: 'branch-id',
                       transaction_date: '2026-04-15',
                       account_id: 'cash-bank-11xx-account-id',
@@ -316,6 +333,10 @@ export function buildOpenApiSpec(serverUrl: string) {
               description: 'Cash account configuration is incomplete.',
               content: jsonContent(apiErrorSchema),
             },
+            '409': {
+              description: 'Idempotency key conflict or request replay still processing.',
+              content: jsonContent(apiErrorSchema),
+            },
             '429': {
               description: 'Rate limit exceeded.',
               content: jsonContent(apiErrorSchema),
@@ -384,6 +405,162 @@ export function buildOpenApiSpec(serverUrl: string) {
             },
             '403': {
               description: 'Missing `inventory:read` scope.',
+              content: jsonContent(apiErrorSchema),
+            },
+            '429': {
+              description: 'Rate limit exceeded.',
+              content: jsonContent(apiErrorSchema),
+            },
+          },
+        },
+      },
+      '/sales': {
+        get: {
+          tags: ['Sales'],
+          summary: 'List sales documents',
+          description: 'Mengembalikan daftar penjualan terbaru dari schema `sales`, dapat difilter berdasarkan status dan rentang tanggal.',
+          operationId: 'listSalesDocuments',
+          security: [
+            { ApiKeyAuth: [] },
+            { BearerAuth: [] },
+          ],
+          parameters: [
+            {
+              name: 'limit',
+              in: 'query',
+              required: false,
+              description: 'Maximum number of records to return. Default 50, maximum 200.',
+              schema: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
+            },
+            {
+              name: 'status',
+              in: 'query',
+              required: false,
+              description: 'Exact sales status filter.',
+              schema: { type: 'string' },
+            },
+            {
+              name: 'date_from',
+              in: 'query',
+              required: false,
+              description: 'Inclusive lower bound for `sale_date`.',
+              schema: { type: 'string', format: 'date' },
+            },
+            {
+              name: 'date_to',
+              in: 'query',
+              required: false,
+              description: 'Inclusive upper bound for `sale_date`.',
+              schema: { type: 'string', format: 'date' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Sales documents retrieved successfully.',
+              content: jsonContent(
+                { $ref: '#/components/schemas/SalesListResponse' },
+                {
+                  success: true,
+                  data: [
+                    {
+                      id: 'sale-id',
+                      so_number: 'SO-2026-000001',
+                      customer_name: 'CV Maju',
+                      total_amount: 250000,
+                      status: 'ORDERED',
+                      branch_id: 'branch-id',
+                      order_date: '2026-04-18',
+                      created_at: '2026-04-18T00:00:00.000Z',
+                    },
+                  ],
+                  meta: {
+                    org_id: 'org-id',
+                    branch_scope: 'branch-id',
+                    count: 1,
+                  },
+                }
+              ),
+            },
+            '401': {
+              description: 'Missing or invalid API key.',
+              content: jsonContent(apiErrorSchema),
+            },
+            '403': {
+              description: 'Missing `sales:read` scope.',
+              content: jsonContent(apiErrorSchema),
+            },
+            '429': {
+              description: 'Rate limit exceeded.',
+              content: jsonContent(apiErrorSchema),
+            },
+          },
+        },
+      },
+      '/contacts': {
+        get: {
+          tags: ['Contacts'],
+          summary: 'List contacts',
+          description: 'Mengembalikan daftar kontak aktif customer atau supplier, dengan filter tipe dan pencarian nama.',
+          operationId: 'listContacts',
+          security: [
+            { ApiKeyAuth: [] },
+            { BearerAuth: [] },
+          ],
+          parameters: [
+            {
+              name: 'limit',
+              in: 'query',
+              required: false,
+              description: 'Maximum number of records to return. Default 100, maximum 500.',
+              schema: { type: 'integer', minimum: 1, maximum: 500, default: 100 },
+            },
+            {
+              name: 'type',
+              in: 'query',
+              required: false,
+              description: 'Contact type filter.',
+              schema: { type: 'string', enum: ['customer', 'supplier'] },
+            },
+            {
+              name: 'search',
+              in: 'query',
+              required: false,
+              description: 'Case-insensitive name search.',
+              schema: { type: 'string' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Contacts retrieved successfully.',
+              content: jsonContent(
+                { $ref: '#/components/schemas/ContactsListResponse' },
+                {
+                  success: true,
+                  data: [
+                    {
+                      id: 'contact-id',
+                      name: 'Andi Supplier',
+                      email: 'andi@example.com',
+                      phone: '08123',
+                      type: 'supplier',
+                      company: 'PT Supplier',
+                      is_active: true,
+                      created_at: '2026-04-18T00:00:00.000Z',
+                    },
+                  ],
+                  meta: {
+                    org_id: 'org-id',
+                    count: 1,
+                  },
+                }
+              ),
+            },
+            '401': {
+              description: 'Missing or invalid API key.',
+              content: jsonContent(apiErrorSchema),
+            },
+            '403': {
+              description: 'Missing `contacts:read` scope.',
               content: jsonContent(apiErrorSchema),
             },
             '429': {
@@ -518,6 +695,34 @@ export function buildOpenApiSpec(serverUrl: string) {
           },
           required: ['id', 'name', 'unit', 'selling_price', 'cost_price', 'stock_quantity', 'is_active'],
         },
+        SalesItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            so_number: { type: 'string', nullable: true },
+            customer_name: { type: 'string', nullable: true },
+            total_amount: { type: 'number' },
+            status: { type: 'string', nullable: true },
+            branch_id: { type: 'string', format: 'uuid', nullable: true },
+            order_date: { type: 'string', format: 'date', nullable: true },
+            created_at: { type: 'string', format: 'date-time' },
+          },
+          required: ['id', 'total_amount', 'created_at'],
+        },
+        ContactItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            email: { type: 'string', nullable: true },
+            phone: { type: 'string', nullable: true },
+            type: { type: 'string', nullable: true },
+            company: { type: 'string', nullable: true },
+            is_active: { type: 'boolean' },
+            created_at: { type: 'string', format: 'date-time' },
+          },
+          required: ['id', 'name', 'is_active', 'created_at'],
+        },
         CashTransactionResult: {
           type: 'object',
           properties: {
@@ -574,6 +779,30 @@ export function buildOpenApiSpec(serverUrl: string) {
           },
           required: ['success', 'data'],
         },
+        SalesListResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', const: true },
+            data: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/SalesItem' },
+            },
+            meta: { $ref: '#/components/schemas/ResponseMeta' },
+          },
+          required: ['success', 'data'],
+        },
+        ContactsListResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', const: true },
+            data: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/ContactItem' },
+            },
+            meta: { $ref: '#/components/schemas/ResponseMeta' },
+          },
+          required: ['success', 'data'],
+        },
         CreateCashRequest: {
           type: 'object',
           properties: {
@@ -585,6 +814,10 @@ export function buildOpenApiSpec(serverUrl: string) {
             },
             description: { type: 'string' },
             reference: { type: 'string' },
+            idempotency_key: {
+              type: 'string',
+              description: 'Kunci idempotensi alternatif di body request. Bila juga mengirim header `Idempotency-Key`, nilainya harus sama.',
+            },
             branch_id: {
               type: 'string',
               format: 'uuid',

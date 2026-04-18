@@ -15,6 +15,7 @@
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+import { createHash } from 'node:crypto'
 import { type NextRequest } from 'next/server'
 import type { PoolClient } from 'pg'
 import {
@@ -88,6 +89,16 @@ type CashTransactionRow = {
   journal_entry_id: string | null
 }
 
+type ApiIdempotencyRow = {
+  id: string
+  request_hash: string
+  status: 'processing' | 'completed'
+  response_status: number | null
+  response_body: JsonObject | null
+  resource_type: string | null
+  resource_id: string | null
+}
+
 type ManualCashJournalLine = {
   accountId: string
   debit: number
@@ -108,6 +119,7 @@ type SettlementType =
   | 'other_charge'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const CASH_ENDPOINT = '/api/v1/cash'
 
 function withNoStore(response: Response) {
   response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
@@ -126,6 +138,68 @@ function pickString(value: unknown): string | null {
 
 function pickUuid(value: unknown): string | null {
   return isUuid(value) ? value.trim() : null
+}
+
+function omitIdempotencyKey(body: JsonObject): JsonObject {
+  const nextBody = { ...body }
+  delete nextBody.idempotency_key
+  return nextBody
+}
+
+function stableSerialize(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value)
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => stableSerialize(entry)).join(',')}]`
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, entryValue]) => entryValue !== undefined)
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+
+  return `{${entries
+    .map(([key, entryValue]) => `${JSON.stringify(key)}:${stableSerialize(entryValue)}`)
+    .join(',')}}`
+}
+
+function buildRequestHash(value: JsonObject) {
+  return createHash('sha256').update(stableSerialize(value)).digest('hex')
+}
+
+function resolveIdempotencyKey(
+  request: NextRequest,
+  body: JsonObject
+): { key: string | null } | { error: string; errorCode: string } {
+  const headerKey = pickString(request.headers.get('idempotency-key'))
+  const bodyKey = pickString(body.idempotency_key)
+
+  if (headerKey && bodyKey && headerKey !== bodyKey) {
+    return {
+      error: 'Header `Idempotency-Key` dan field `idempotency_key` harus sama bila keduanya dikirim.',
+      errorCode: 'idempotency_key_mismatch',
+    }
+  }
+
+  const key = headerKey ?? bodyKey
+  if (!key) return { key: null }
+
+  if (key.length > 255) {
+    return {
+      error: 'Nilai idempotency key terlalu panjang. Maksimal 255 karakter.',
+      errorCode: 'idempotency_key_invalid',
+    }
+  }
+
+  return { key }
+}
+
+function applyIdempotencyHeaders(response: Response, idempotencyKey: string | null, replayed = false) {
+  if (!idempotencyKey) return response
+  response.headers.set('Idempotency-Key', idempotencyKey)
+  if (replayed) response.headers.set('X-Idempotent-Replay', 'true')
+  return response
 }
 
 function asObject(value: unknown): JsonObject {
@@ -804,6 +878,187 @@ async function createManualJournalForCashTransaction(
   return journalEntryId
 }
 
+async function findIdempotencyRecord(
+  orgId: string,
+  apiKeyId: string,
+  endpoint: string,
+  idempotencyKey: string
+) {
+  const result = await queryPostgres<ApiIdempotencyRow>(
+    `
+      SELECT
+        id,
+        request_hash,
+        status,
+        response_status,
+        response_body,
+        resource_type,
+        resource_id
+      FROM public.api_idempotency_keys
+      WHERE org_id = $1::uuid
+        AND api_key_id = $2::uuid
+        AND endpoint = $3::text
+        AND idempotency_key = $4::text
+      LIMIT 1
+    `,
+    [orgId, apiKeyId, endpoint, idempotencyKey]
+  )
+
+  return result.rows[0] ?? null
+}
+
+async function reserveIdempotencyKey(
+  client: PoolClient,
+  payload: {
+    orgId: string
+    apiKeyId: string
+    endpoint: string
+    idempotencyKey: string
+    requestHash: string
+  }
+) {
+  const result = await client.query<{ id: string }>(
+    `
+      INSERT INTO public.api_idempotency_keys (
+        org_id,
+        api_key_id,
+        endpoint,
+        idempotency_key,
+        request_hash,
+        status
+      ) VALUES (
+        $1::uuid,
+        $2::uuid,
+        $3::text,
+        $4::text,
+        $5::text,
+        'processing'
+      )
+      RETURNING id
+    `,
+    [
+      payload.orgId,
+      payload.apiKeyId,
+      payload.endpoint,
+      payload.idempotencyKey,
+      payload.requestHash,
+    ]
+  )
+
+  return result.rows[0]?.id ?? null
+}
+
+async function completeIdempotencyKey(
+  client: PoolClient,
+  payload: {
+    id: string
+    responseStatus: number
+    responseBody: JsonObject
+    resourceType: string
+    resourceId: string
+  }
+) {
+  await client.query(
+    `
+      UPDATE public.api_idempotency_keys
+      SET status = 'completed',
+          response_status = $2::int,
+          response_body = $3::jsonb,
+          resource_type = $4::text,
+          resource_id = $5::uuid
+      WHERE id = $1::uuid
+    `,
+    [
+      payload.id,
+      payload.responseStatus,
+      JSON.stringify(payload.responseBody),
+      payload.resourceType,
+      payload.resourceId,
+    ]
+  )
+}
+
+function buildCashSuccessPayload(payload: {
+  cashTransaction: CashTransactionRow
+  bankAccountId: string
+  categoryId: string | null
+  transactionDate: string
+  type: CashType
+  autoPost: boolean
+  settlementType: SettlementType
+}): JsonObject {
+  return {
+    success: true,
+    data: {
+      id: payload.cashTransaction.id,
+      reference_number: payload.cashTransaction.reference_number,
+      amount: toSafeNumber(payload.cashTransaction.amount),
+      description: payload.cashTransaction.description,
+      status: payload.cashTransaction.status,
+      created_at: payload.cashTransaction.created_at,
+      journal_entry_id: payload.cashTransaction.journal_entry_id,
+      bank_account_id: payload.bankAccountId,
+      category_id: payload.categoryId,
+      transaction_date: payload.transactionDate,
+    },
+    meta: {
+      type: payload.type === 'in' ? 'cash_in' : 'cash_out',
+      auto_post: payload.autoPost,
+      settlement_type: payload.settlementType,
+    },
+  }
+}
+
+function handleExistingIdempotencyRecord(
+  existingRecord: ApiIdempotencyRow,
+  requestHash: string,
+  idempotencyKey: string
+) {
+  if (existingRecord.request_hash !== requestHash) {
+    return withNoStore(
+      applyIdempotencyHeaders(
+        apiError(
+          'Idempotency key ini sudah dipakai untuk payload berbeda.',
+          409,
+          { errorCode: 'idempotency_key_conflict' }
+        ),
+        idempotencyKey
+      )
+    )
+  }
+
+  if (
+    existingRecord.status === 'completed' &&
+    existingRecord.response_status &&
+    existingRecord.response_body
+  ) {
+    return withNoStore(
+      applyIdempotencyHeaders(
+        Response.json(existingRecord.response_body, {
+          status: existingRecord.response_status,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Nizam-API': '1.0',
+          },
+        }),
+        idempotencyKey,
+        true
+      )
+    )
+  }
+
+  return withNoStore(
+    applyIdempotencyHeaders(
+      apiError(
+        'Request dengan idempotency key ini sedang diproses.',
+        409,
+        { errorCode: 'idempotency_key_in_progress' }
+      ),
+      idempotencyKey
+    )
+  )
+}
+
 // ─────────────────────────────────────────────────────────────
 // GET /api/v1/cash — daftar rekening kas/bank aktif + saldo posted
 // ─────────────────────────────────────────────────────────────
@@ -813,7 +1068,9 @@ export async function GET(request: NextRequest) {
   if (!rawKey) return withNoStore(apiError('API key diperlukan. Sertakan header x-api-key.', 401))
 
   const validation = await validateApiKey(rawKey)
-  if (!validation.success) return withNoStore(apiError(validation.error, validation.statusCode))
+  if (!validation.success) {
+    return withNoStore(apiError(validation.error, validation.statusCode, { errorCode: validation.errorCode }))
+  }
 
   if (!requireScope(validation.key, 'cash:read')) {
     return withNoStore(apiError('Scope tidak mencukupi. Diperlukan: cash:read', 403))
@@ -956,7 +1213,9 @@ export async function POST(request: NextRequest) {
   if (!rawKey) return withNoStore(apiError('API key diperlukan.', 401))
 
   const validation = await validateApiKey(rawKey)
-  if (!validation.success) return withNoStore(apiError(validation.error, validation.statusCode))
+  if (!validation.success) {
+    return withNoStore(apiError(validation.error, validation.statusCode, { errorCode: validation.errorCode }))
+  }
 
   if (!requireScope(validation.key, 'cash:write')) {
     return withNoStore(apiError('Scope tidak mencukupi. Diperlukan: cash:write', 403))
@@ -996,6 +1255,14 @@ export async function POST(request: NextRequest) {
   if (!transactionDate) {
     return withNoStore(apiError('Field "transaction_date" tidak valid. Gunakan format YYYY-MM-DD atau ISO date.', 400))
   }
+
+  const idempotencyResolution = resolveIdempotencyKey(request, body)
+  if ('error' in idempotencyResolution) {
+    return withNoStore(apiError(idempotencyResolution.error, 400, { errorCode: idempotencyResolution.errorCode }))
+  }
+
+  const idempotencyKey = idempotencyResolution.key
+  const requestHash = idempotencyKey ? buildRequestHash(omitIdempotencyKey(body)) : null
 
   const autoPost = resolveAutoPostFlag(params)
   const defaultCashAccountId = type === 'in'
@@ -1084,31 +1351,61 @@ export async function POST(request: NextRequest) {
     ? manualJournalLines.find((line) => line.accountId !== bankAccount.account_id)?.accountId ?? null
     : simpleCounterAccountId
 
+  if (idempotencyKey && requestHash) {
+    const existingIdempotencyRecord = await findIdempotencyRecord(
+      validation.key.orgId,
+      validation.key.keyId,
+      CASH_ENDPOINT,
+      idempotencyKey
+    )
+
+    if (existingIdempotencyRecord) {
+      return handleExistingIdempotencyRecord(existingIdempotencyRecord, requestHash, idempotencyKey)
+    }
+  }
+
   let cashTransaction: CashTransactionRow | null = null
 
-  if (usesManualJournalLines) {
-    const bankJournalLine: ManualCashJournalLine = {
-      accountId: bankAccount.account_id,
-      debit: type === 'in' ? amount : 0,
-      credit: type === 'out' ? amount : 0,
-      memo: description,
-      settlementType: 'general',
-    }
+  if (usesManualJournalLines || (idempotencyKey && requestHash)) {
+    const journalLines = usesManualJournalLines
+      ? [
+        {
+          accountId: bankAccount.account_id,
+          debit: type === 'in' ? amount : 0,
+          credit: type === 'out' ? amount : 0,
+          memo: description,
+          settlementType: 'general' as const,
+        },
+        ...manualJournalLines,
+      ]
+      : []
 
-    const journalLines = [bankJournalLine, ...manualJournalLines]
-    const totalDebit = journalLines.reduce((sum, line) => sum + line.debit, 0)
-    const totalCredit = journalLines.reduce((sum, line) => sum + line.credit, 0)
+    if (usesManualJournalLines) {
+      const totalDebit = journalLines.reduce((sum, line) => sum + line.debit, 0)
+      const totalCredit = journalLines.reduce((sum, line) => sum + line.credit, 0)
 
-    if (Math.abs(totalDebit - totalCredit) > 0.01) {
-      return withNoStore(apiError(
-        '`journal_lines` + akun kas/bank harus balance pada debit/kredit.',
-        422
-      ))
+      if (Math.abs(totalDebit - totalCredit) > 0.01) {
+        return withNoStore(apiError(
+          '`journal_lines` + akun kas/bank harus balance pada debit/kredit.',
+          422
+        ))
+      }
     }
 
     const client = await getPostgresPool().connect()
     try {
       await client.query('BEGIN')
+
+      let idempotencyRecordId: string | null = null
+      if (idempotencyKey && requestHash) {
+        idempotencyRecordId = await reserveIdempotencyKey(client, {
+          orgId: validation.key.orgId,
+          apiKeyId: validation.key.keyId,
+          endpoint: CASH_ENDPOINT,
+          idempotencyKey,
+          requestHash,
+        })
+      }
 
       cashTransaction = await insertCashTransactionWithClient(client, {
         orgId: validation.key.orgId,
@@ -1119,7 +1416,7 @@ export async function POST(request: NextRequest) {
         amount,
         type: transactionType,
         referenceNumber: reference,
-        categoryId: null,
+        categoryId: usesManualJournalLines ? null : primaryCounterAccountId,
         status,
       })
 
@@ -1131,28 +1428,65 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const journalEntryId = await createManualJournalForCashTransaction(client, {
-        orgId: validation.key.orgId,
-        branchId,
-        transactionDate,
-        description,
-        cashTransactionId: cashTransaction.id,
-        type: transactionType,
-        lines: journalLines,
-        primaryCounterAccountId,
-      })
+      if (usesManualJournalLines) {
+        const journalEntryId = await createManualJournalForCashTransaction(client, {
+          orgId: validation.key.orgId,
+          branchId,
+          transactionDate,
+          description,
+          cashTransactionId: cashTransaction.id,
+          type: transactionType,
+          lines: journalLines,
+          primaryCounterAccountId,
+        })
+
+        cashTransaction = {
+          ...cashTransaction,
+          journal_entry_id: journalEntryId,
+        }
+      }
+
+      if (idempotencyRecordId && cashTransaction) {
+        await completeIdempotencyKey(client, {
+          id: idempotencyRecordId,
+          responseStatus: 200,
+          responseBody: buildCashSuccessPayload({
+            cashTransaction,
+            bankAccountId: bankAccount.id,
+            categoryId: primaryCounterAccountId,
+            transactionDate,
+            type,
+            autoPost,
+            settlementType: counterResolution.settlementType,
+          }),
+          resourceType: 'bank_transaction',
+          resourceId: cashTransaction.id,
+        })
+      }
 
       await client.query('COMMIT')
-      cashTransaction = {
-        ...cashTransaction,
-        journal_entry_id: journalEntryId,
-      }
     } catch (error) {
       await client.query('ROLLBACK')
+      if (idempotencyKey && requestHash && (error as { code?: string })?.code === '23505') {
+        const existingIdempotencyRecord = await findIdempotencyRecord(
+          validation.key.orgId,
+          validation.key.keyId,
+          CASH_ENDPOINT,
+          idempotencyKey
+        )
+
+        if (existingIdempotencyRecord) {
+          return handleExistingIdempotencyRecord(existingIdempotencyRecord, requestHash, idempotencyKey)
+        }
+      }
+
       const message = error instanceof Error ? error.message : String(error)
-      const detail = (error as any)?.detail ?? ''
-      const hint = (error as any)?.hint ?? ''
-      console.error('[POST /api/v1/cash] manual journal error:', message, detail, hint)
+      const errorContext = (error && typeof error === 'object'
+        ? error
+        : null) as { detail?: string; hint?: string } | null
+      const detail = errorContext?.detail ?? ''
+      const hint = errorContext?.hint ?? ''
+      console.error('[POST /api/v1/cash] transactional write error:', message, detail, hint)
       if (message.toLowerCase().includes('saldo kas tidak mencukupi')) {
         return withNoStore(apiError(message, 422))
       }
@@ -1181,7 +1515,10 @@ export async function POST(request: NextRequest) {
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      const detail = (error as any)?.detail ?? ''
+      const errorContext = (error && typeof error === 'object'
+        ? error
+        : null) as { detail?: string } | null
+      const detail = errorContext?.detail ?? ''
       console.error('[POST /api/v1/cash] simple insert error:', message, detail)
       if (message.toLowerCase().includes('saldo kas tidak mencukupi')) {
         return withNoStore(apiError(message, 422))
@@ -1204,6 +1541,16 @@ export async function POST(request: NextRequest) {
     ))
   }
 
+  const successPayload = buildCashSuccessPayload({
+    cashTransaction,
+    bankAccountId: bankAccount.id,
+    categoryId: primaryCounterAccountId,
+    transactionDate,
+    type,
+    autoPost,
+    settlementType: counterResolution.settlementType,
+  })
+
   void deliverWebhook(validation.key.orgId, branchId, type === 'in' ? 'cash_in' : 'cash_out', {
     transaction_id: cashTransaction.id,
     bank_account_id: bankAccount.id,
@@ -1217,22 +1564,18 @@ export async function POST(request: NextRequest) {
     transaction_date: transactionDate,
   })
 
-  return withNoStore(apiSuccess({
-    id: cashTransaction.id,
-    reference_number: cashTransaction.reference_number,
-    amount: toSafeNumber(cashTransaction.amount),
-    description: cashTransaction.description,
-    status: cashTransaction.status,
-    created_at: cashTransaction.created_at,
-    journal_entry_id: cashTransaction.journal_entry_id,
-    bank_account_id: bankAccount.id,
-    category_id: primaryCounterAccountId,
-    transaction_date: transactionDate,
-  }, {
-    type: type === 'in' ? 'cash_in' : 'cash_out',
-    auto_post: autoPost,
-    settlement_type: counterResolution.settlementType,
-  }))
+  return withNoStore(
+    applyIdempotencyHeaders(
+      Response.json(successPayload, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Nizam-API': '1.0',
+        },
+      }),
+      idempotencyKey
+    )
+  )
   })()
 
   void logApiCall({

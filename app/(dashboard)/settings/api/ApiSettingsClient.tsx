@@ -3,11 +3,9 @@
 /**
  * app/(dashboard)/settings/api/ApiSettingsClient.tsx
  *
- * UI Pengaturan Open API Nizam — 3 tab:
- * 1. API Keys   — generate, tampilkan (sekali), revoke
- * 2. Cash In    — mapping akun penerima + parameter
- * 3. Cash Out   — mapping akun sumber + parameter
- * + Webhook section di bawah konfigurasi
+ * UI Pengaturan Open API Nizam:
+ * API keys, cash mapping, webhook, API reference, tryout console,
+ * history log, dan onboarding checklist integrasi.
  */
 
 import React, { useEffect, useState } from 'react'
@@ -93,10 +91,10 @@ type EndpointExample = {
   response: string
 }
 type EndpointDoc = {
-  id: 'cash-read' | 'inventory-read' | 'cash-create'
+  id: 'cash-read' | 'inventory-read' | 'sales-read' | 'contacts-read' | 'cash-create'
   label: string
   method: 'GET' | 'POST'
-  path: '/cash' | '/inventory'
+  path: '/cash' | '/inventory' | '/sales' | '/contacts'
   summary: string
   operationId: string
   scope: ApiScope
@@ -200,6 +198,10 @@ function formatJson(value: unknown) {
   return JSON.stringify(value, null, 2)
 }
 
+function hasConfigAccountMapping(value: unknown) {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
 function buildCurlExample(args: {
   baseUrl: string
   method: 'GET' | 'POST'
@@ -241,7 +243,7 @@ export function ApiSettingsClient({
   baseUrl,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'keys' | 'cashin' | 'cashout' | 'webhook' | 'tryout' | 'history'>('keys')
-  const [activeDoc, setActiveDoc] = useState<'cash-read' | 'inventory-read' | 'cash-create'>('cash-read')
+  const [activeDoc, setActiveDoc] = useState<'cash-read' | 'inventory-read' | 'sales-read' | 'contacts-read' | 'cash-create'>('cash-read')
   const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>(initialApiKeys)
   const [loading, setLoading] = useState(false)
   const [resolvedBaseUrl, setResolvedBaseUrl] = useState(baseUrl)
@@ -331,6 +333,73 @@ export function ApiSettingsClient({
     initialAccounts.find((account) => account.code === '5003')
     ?? initialAccounts.find((account) => account.code === '4002')
     ?? null
+  const cashInParams = (config.cash_in_params && typeof config.cash_in_params === 'object'
+    ? config.cash_in_params
+    : {}) as Record<string, unknown>
+  const cashOutParams = (config.cash_out_params && typeof config.cash_out_params === 'object'
+    ? config.cash_out_params
+    : {}) as Record<string, unknown>
+  const hasActiveApiKey = apiKeys.some((key) => key.is_active)
+  const hasCashInDefault = Boolean(config.cash_in_account_id) && [
+    cashInParams.counter_account_id,
+    cashInParams.revenue_account_id,
+    cashInParams.receivable_account_id,
+    cashInParams.tax_account_id,
+    cashInParams.discount_account_id,
+    cashInParams.other_charge_account_id,
+  ].some(hasConfigAccountMapping)
+  const hasCashOutDefault = Boolean(config.cash_out_account_id) && [
+    cashOutParams.counter_account_id,
+    cashOutParams.expense_account_id,
+    cashOutParams.payable_account_id,
+    cashOutParams.tax_account_id,
+    cashOutParams.discount_account_id,
+    cashOutParams.other_charge_account_id,
+  ].some(hasConfigAccountMapping)
+  const hasWebhookSetup =
+    Boolean(config.webhook_url) &&
+    Boolean(config.webhook_is_active) &&
+    Array.isArray(config.webhook_events) &&
+    config.webhook_events.length > 0
+  const onboardingItems = [
+    {
+      id: 'api-key',
+      label: 'API key aktif',
+      detail: hasActiveApiKey ? 'Minimal satu key siap dipakai untuk autentikasi.' : 'Buat API key sebelum partner mulai integrasi.',
+      ready: hasActiveApiKey,
+    },
+    {
+      id: 'cash-account',
+      label: 'Akun kas/bank 11xx',
+      detail: cashAccounts.length > 0 ? `${cashAccounts.length} akun kas/bank likuid siap dipakai.` : 'Belum ada akun kas/bank liquid dari CoA 11xx.',
+      ready: cashAccounts.length > 0,
+    },
+    {
+      id: 'bank-bridge',
+      label: 'Bridge bank_accounts',
+      detail: initialBankAccounts.length > 0 ? `${initialBankAccounts.length} rekening bridge aktif tersedia.` : 'Belum ada row bank_accounts aktif untuk rekening tujuan/sumber.',
+      ready: initialBankAccounts.length > 0,
+    },
+    {
+      id: 'cash-in-default',
+      label: 'Default cash-in',
+      detail: hasCashInDefault ? 'Mapping kas masuk default sudah lengkap.' : 'Isi akun kas masuk dan akun lawan default agar POST cash-in siap dipakai.',
+      ready: hasCashInDefault,
+    },
+    {
+      id: 'cash-out-default',
+      label: 'Default cash-out',
+      detail: hasCashOutDefault ? 'Mapping kas keluar default sudah lengkap.' : 'Isi akun kas keluar dan akun lawan default agar POST cash-out siap dipakai.',
+      ready: hasCashOutDefault,
+    },
+    {
+      id: 'webhook',
+      label: 'Webhook aktif',
+      detail: hasWebhookSetup ? 'Webhook URL, event, dan status aktif sudah terpasang.' : 'Aktifkan webhook bila integrasi butuh notifikasi push.',
+      ready: hasWebhookSetup,
+    },
+  ]
+  const onboardingReadyCount = onboardingItems.filter((item) => item.ready).length
 
   const exampleBranchId = defaultBranch?.id ?? 'branch-id'
   const exampleBranchLabel = defaultBranch?.name ?? 'Cabang Utama'
@@ -383,6 +452,7 @@ export function ApiSettingsClient({
     amount: 250000,
     description: 'Pelunasan invoice INV-2026-001',
     reference: 'INV-2026-001',
+    idempotency_key: 'cash-inv-2026-001',
     branch_id: exampleBranchId,
     transaction_date: '2026-04-15',
     account_id: exampleCashAccountId,
@@ -394,6 +464,7 @@ export function ApiSettingsClient({
     amount: bookCashPaidAmount,
     description: `Push marketplace pembelian ${exampleBookSku} - ${exampleBookProductName}`,
     reference: 'PO-MP-BOOK-2026-0001',
+    idempotency_key: 'cash-po-mp-book-2026-0001',
     branch_id: exampleBranchId,
     transaction_date: '2026-04-15',
     account_id: exampleCashAccountId,
@@ -617,6 +688,13 @@ export function ApiSettingsClient({
           schema: 'Bearer <api-key>',
           description: 'Alternative bearer authentication using the same API key.',
         },
+        {
+          name: 'Idempotency-Key',
+          in: 'header',
+          required: false,
+          schema: 'string',
+          description: 'Disarankan untuk retry-safe POST agar request yang sama tidak membuat transaksi ganda.',
+        },
       ],
       requestBody: {
         required: true,
@@ -626,6 +704,7 @@ export function ApiSettingsClient({
           '`amount` number > 0',
           '`description` string',
           '`reference` string, optional',
+          '`idempotency_key` string, optional tetapi disarankan untuk retry-safe write',
           '`branch_id` UUID, required only when API key tidak branch-scoped',
           '`transaction_date` date string (YYYY-MM-DD), optional',
           '`bank_account_id` UUID, optional override untuk row `bank_accounts` spesifik',
@@ -640,10 +719,12 @@ export function ApiSettingsClient({
         { status: '400', description: 'Invalid JSON or missing required fields.' },
         { status: '401', description: 'API key missing, invalid, expired, or revoked.' },
         { status: '403', description: 'API key does not include `cash:write` scope.' },
+        { status: '409', description: 'Idempotency key conflict or same request masih diproses.' },
         { status: '422', description: 'Default cash account configuration is incomplete.' },
         { status: '429', description: 'Per-key rate limit exceeded.' },
       ],
       notes: [
+        'Gunakan `Idempotency-Key` header atau `idempotency_key` di body untuk semua write dari middleware, marketplace, atau POS yang bisa retry otomatis.',
         '`journal_lines` hanya dipakai ketika `auto_post` aktif; akun kas/bank utama akan ditambahkan sistem otomatis dari `amount` dan `type`.',
         'Pada mode split, `amount` harus sama dengan arus kas aktual. Sisa yang belum dibayar dicatat sebagai `credit` ke hutang atau `debit` ke piutang di `journal_lines`.',
         'Setiap line wajib punya tepat satu sisi `debit` atau `credit`, dan total semua line harus balance terhadap baris kas/bank.',
@@ -711,6 +792,170 @@ export function ApiSettingsClient({
               type: 'cash_out',
               auto_post: true,
               settlement_type: 'general',
+            },
+          }),
+        },
+      ],
+    },
+    {
+      id: 'sales-read',
+      label: 'Read Sales',
+      method: 'GET',
+      path: '/sales',
+      summary: 'List sales documents',
+      operationId: 'listSalesDocuments',
+      scope: 'sales:read',
+      description: 'Ambil daftar penjualan dari schema `sales` yang sudah dipakai sistem, lengkap dengan nomor transaksi, customer, nominal, status, dan tanggal order.',
+      auth: ['ApiKeyAuth', 'BearerAuth'],
+      parameters: [
+        {
+          name: 'limit',
+          in: 'query',
+          required: false,
+          schema: 'integer (1..200)',
+          description: 'Maximum records returned. Default 50, maximum 200.',
+        },
+        {
+          name: 'status',
+          in: 'query',
+          required: false,
+          schema: 'string',
+          description: 'Filter exact status penjualan, mis. `ORDERED`.',
+        },
+        {
+          name: 'date_from',
+          in: 'query',
+          required: false,
+          schema: 'date (YYYY-MM-DD)',
+          description: 'Batas bawah tanggal penjualan (inklusif).',
+        },
+        {
+          name: 'date_to',
+          in: 'query',
+          required: false,
+          schema: 'date (YYYY-MM-DD)',
+          description: 'Batas atas tanggal penjualan (inklusif).',
+        },
+      ],
+      requestBody: null,
+      responses: [
+        { status: '200', description: 'Sales list returned successfully.' },
+        { status: '401', description: 'API key missing, invalid, expired, or revoked.' },
+        { status: '403', description: 'API key does not include `sales:read` scope.' },
+        { status: '429', description: 'Per-key rate limit exceeded.' },
+      ],
+      notes: [
+        'Data berasal dari tabel `sales`, bukan schema sementara atau `sales_orders` lama.',
+        'Gunakan kombinasi `status`, `date_from`, dan `date_to` untuk sinkronisasi incremental.',
+      ],
+      examples: [
+        {
+          id: 'sales-read-default',
+          label: 'Sales List',
+          description: 'Contoh sinkronisasi dokumen penjualan terbaru untuk ERP atau middleware eksternal.',
+          query: 'limit=10&status=ORDERED&date_from=2026-04-01&date_to=2026-04-30',
+          curl: buildCurlExample({
+            baseUrl,
+            method: 'GET',
+            path: '/api/v1/sales',
+            query: 'limit=10&status=ORDERED&date_from=2026-04-01&date_to=2026-04-30',
+          }),
+          response: formatJson({
+            success: true,
+            data: [
+              {
+                id: 'sale-id',
+                so_number: 'SO-2026-000001',
+                customer_name: 'CV Maju',
+                total_amount: 250000,
+                status: 'ORDERED',
+                branch_id: exampleBranchId,
+                order_date: '2026-04-18',
+                created_at: '2026-04-18T00:00:00.000Z',
+              },
+            ],
+            meta: {
+              org_id: orgId,
+              branch_scope: exampleBranchId,
+              count: 1,
+            },
+          }),
+        },
+      ],
+    },
+    {
+      id: 'contacts-read',
+      label: 'Read Contacts',
+      method: 'GET',
+      path: '/contacts',
+      summary: 'List contacts',
+      operationId: 'listContacts',
+      scope: 'contacts:read',
+      description: 'Ambil daftar kontak aktif customer atau supplier untuk kebutuhan sinkronisasi master data eksternal.',
+      auth: ['ApiKeyAuth', 'BearerAuth'],
+      parameters: [
+        {
+          name: 'limit',
+          in: 'query',
+          required: false,
+          schema: 'integer (1..500)',
+          description: 'Maximum records returned. Default 100, maximum 500.',
+        },
+        {
+          name: 'type',
+          in: 'query',
+          required: false,
+          schema: '`customer` | `supplier`',
+          description: 'Filter tipe kontak.',
+        },
+        {
+          name: 'search',
+          in: 'query',
+          required: false,
+          schema: 'string',
+          description: 'Case-insensitive filter by contact name.',
+        },
+      ],
+      requestBody: null,
+      responses: [
+        { status: '200', description: 'Contacts list returned successfully.' },
+        { status: '401', description: 'API key missing, invalid, expired, or revoked.' },
+        { status: '403', description: 'API key does not include `contacts:read` scope.' },
+        { status: '429', description: 'Per-key rate limit exceeded.' },
+      ],
+      notes: [
+        'Route ini hanya mengembalikan kontak aktif.',
+        'Gunakan `type=supplier` atau `type=customer` untuk sinkronisasi master data per channel.',
+      ],
+      examples: [
+        {
+          id: 'contacts-read-default',
+          label: 'Contacts List',
+          description: 'Contoh sinkronisasi supplier aktif berdasarkan nama.',
+          query: 'limit=20&type=supplier&search=andi',
+          curl: buildCurlExample({
+            baseUrl,
+            method: 'GET',
+            path: '/api/v1/contacts',
+            query: 'limit=20&type=supplier&search=andi',
+          }),
+          response: formatJson({
+            success: true,
+            data: [
+              {
+                id: 'contact-id',
+                name: 'Andi Supplier',
+                email: 'andi@example.com',
+                phone: '08123',
+                type: 'supplier',
+                company: 'PT Supplier',
+                is_active: true,
+                created_at: '2026-04-18T00:00:00.000Z',
+              },
+            ],
+            meta: {
+              org_id: orgId,
+              count: 1,
             },
           }),
         },
@@ -938,6 +1183,45 @@ export function ApiSettingsClient({
               </span>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-[32px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-amber-50 p-6 shadow-sm space-y-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">Onboarding Checklist</p>
+            <h2 className="text-xl font-black text-slate-900">Kesiapan Integrasi Open API</h2>
+            <p className="text-sm text-slate-600 font-medium">
+              Checklist ini memastikan endpoint write tidak macet karena key, rekening, atau mapping default belum siap.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 self-start rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-slate-700">
+            <CheckCircle2 size={16} className="text-emerald-600" />
+            {onboardingReadyCount}/{onboardingItems.length} siap
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {onboardingItems.map((item) => (
+            <div
+              key={item.id}
+              className={`rounded-[24px] border p-4 ${
+                item.ready
+                  ? 'border-emerald-200 bg-white'
+                  : 'border-amber-200 bg-amber-50/70'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`mt-0.5 ${item.ready ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {item.ready ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-black text-slate-900">{item.label}</p>
+                  <p className="text-xs leading-relaxed text-slate-600">{item.detail}</p>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

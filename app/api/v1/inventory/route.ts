@@ -49,7 +49,9 @@ export async function GET(request: NextRequest) {
   if (!rawKey) return withNoStore(apiError('API key diperlukan. Sertakan header x-api-key.', 401))
 
   const validation = await validateApiKey(rawKey)
-  if (!validation.success) return withNoStore(apiError(validation.error, validation.statusCode))
+  if (!validation.success) {
+    return withNoStore(apiError(validation.error, validation.statusCode, { errorCode: validation.errorCode }))
+  }
 
   if (!requireScope(validation.key, 'inventory:read')) {
     return withNoStore(apiError('Scope tidak mencukupi. Diperlukan: inventory:read', 403))
