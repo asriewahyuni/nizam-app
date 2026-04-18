@@ -3,7 +3,7 @@
 import React, { Suspense, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Building2, ArrowRight, ShieldCheck, Sparkles, Globe, Wallet, CheckCircle2, AlertCircle } from 'lucide-react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createOrganization } from '@/modules/organization/actions/org.actions'
 import { SafeButton } from '@/components/ui/NizamUI'
 
@@ -39,6 +39,7 @@ function OnboardingContent() {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const searchParams = useSearchParams()
+  const router = useRouter()
   const plan = searchParams.get('plan')
   const type = searchParams.get('type')
   const businessName = searchParams.get('businessName') || ''
@@ -56,15 +57,16 @@ function OnboardingContent() {
         setError(res.error)
         setLoading(false)
       } else {
-        // If no error, it likely redirected or success.
-        // If it returns nothing (redirect internally), it will be handled by router.
+        // Org berhasil dibuat — tampilkan success state lalu arahkan ke dashboard.
+        // router.push memastikan navigasi aktif terjadi meski redirect dari server
+        // action tidak otomatis ter-handle oleh client Next.js router.
         setSuccess(true)
+        router.push('/dashboard')
       }
     } catch (err: unknown) {
-      // Next.js redirect "error" shouldn't be caught here if possible, 
-      // but if it is, it's the router's job.
+      // Next.js redirect error: biarkan framework menanganinya.
       if (err instanceof Error && err.message === 'NEXT_REDIRECT') throw err
-      setError("Terjadi kesalahan sistem. Silakan coba lagi.")
+      setError('Terjadi kesalahan sistem. Silakan coba lagi.')
       setLoading(false)
     }
   }
