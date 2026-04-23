@@ -30,6 +30,19 @@ const SENSITIVE_KEY_PATTERNS = [
   /webhook_secret/i,
 ]
 
+export type SentryActorContextInput = {
+  userId?: string | null
+  email?: string | null
+  fullName?: string | null
+  orgId?: string | null
+  orgName?: string | null
+  branchId?: string | null
+  branchName?: string | null
+  role?: string | null
+  route?: string | null
+  feature?: string | null
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
@@ -151,6 +164,48 @@ function buildCommonOptions() {
     },
     beforeBreadcrumb(breadcrumb: Breadcrumb) {
       return sanitizeBreadcrumb(breadcrumb)
+    },
+  }
+}
+
+export function buildSentryActorContext(input: SentryActorContextInput) {
+  const safeInput = {
+    userId: String(input.userId || '').trim() || null,
+    email: String(input.email || '').trim() || null,
+    fullName: String(input.fullName || '').trim() || null,
+    orgId: String(input.orgId || '').trim() || null,
+    orgName: String(input.orgName || '').trim() || null,
+    branchId: String(input.branchId || '').trim() || null,
+    branchName: String(input.branchName || '').trim() || null,
+    role: String(input.role || '').trim() || null,
+    route: String(input.route || '').trim() || null,
+    feature: String(input.feature || '').trim() || null,
+  }
+
+  return {
+    user: safeInput.userId || safeInput.email
+      ? {
+          id: safeInput.userId || undefined,
+          email: safeInput.email || undefined,
+          username: safeInput.fullName || undefined,
+        }
+      : null,
+    tags: {
+      org_id: safeInput.orgId || undefined,
+      branch_id: safeInput.branchId || undefined,
+      role: safeInput.role || undefined,
+      route: safeInput.route || undefined,
+      feature: safeInput.feature || undefined,
+    },
+    context: {
+      organization: {
+        id: safeInput.orgId || undefined,
+        name: safeInput.orgName || undefined,
+      },
+      branch: {
+        id: safeInput.branchId || undefined,
+        name: safeInput.branchName || undefined,
+      },
     },
   }
 }

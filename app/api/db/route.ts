@@ -10,8 +10,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createPostgresNativeClient } from '@/lib/db/postgres-client'
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
+import { buildSentryActorContext } from '@/lib/monitoring/sentry'
 
 // Tabel yang boleh diakses via browser client
 const ALLOWED_TABLES = new Set([
@@ -44,6 +46,8 @@ const ALLOWED_TABLES = new Set([
 ])
 
 export async function POST(request: NextRequest) {
+  let requestBody: Record<string, unknown> | null = null
+
   try {
     // Verifikasi session
     const session = await getInternalAuthSession()
@@ -55,6 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+    requestBody = (body && typeof body === 'object') ? body as Record<string, unknown> : null
     const { table, method, columns, filters, orders, limit, payload, upsertPayload, onConflict } = body
 
     if (!table || typeof table !== 'string') {
@@ -119,6 +124,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result ?? { data: null, error: null })
   } catch (e: any) {
     console.error('[api/db] Error:', e.message)
+
+    const session = await getInternalAuthSession().catch(() => null)
+    const actor = buildSentryActorContext({
+      userId: session?.user?.id || null,
+      email: session?.user?.email || null,
+      fullName: String(session?.user?.user_metadata?.full_name || session?.user?.email || ''),
+      route: '/api/db',
+      feature: 'database_proxy',
+    })
+
+    Sentry.withScope((scope) => {
+      if (actor.user) scope.setUser(actor.user)
+      Object.entries(actor.tags).forEach(([key, value]) => {
+        if (value) scope.setTag(key, value)
+      })
+      scope.setContext('organization', actor.context.organization)
+      scope.setContext('branch', actor.context.branch)
+      scope.setContext('db_proxy_request', {
+        table: String(requestBody?.table || ''),
+        method: String(requestBody?.method || ''),
+        columns: String(requestBody?.columns || ''),
+        filters_count: Array.isArray(requestBody?.filters) ? requestBody.filters.length : 0,
+        has_payload: Boolean(requestBody?.payload || requestBody?.upsertPayload),
+      })
+      Sentry.captureException(e)
+    })
+
     return NextResponse.json(
       { data: null, error: { message: e.message } },
       { status: 500 }

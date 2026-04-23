@@ -10,6 +10,7 @@ import { AppSidebar } from '@/components/shared/AppSidebar'
 import { AppHeader } from '@/components/shared/AppHeader'
 import { AdminImpersonationBanner } from '@/components/shared/AdminImpersonationBanner'
 import { DemoBanner } from '@/components/shared/DemoBanner'
+import { SentryUserContext } from '@/components/shared/SentryUserContext'
 import { StartupWizard } from '@/components/shared/StartupWizard'
 import { FloatingPlanBadge } from '@/components/shared/FloatingPlanBadge'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
@@ -137,6 +138,18 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 print:block print:h-auto print:overflow-visible print:bg-white">
+      <SentryUserContext
+        userId={orgData.user?.id || null}
+        email={orgData.user?.email || null}
+        fullName={String(orgData.user?.user_metadata?.full_name || orgData.user?.email || '')}
+        orgId={orgData.org.id}
+        orgName={orgData.org.name}
+        branchId={activeBranch?.id || null}
+        branchName={activeBranch?.name || null}
+        role={orgData.role}
+        route={requestPathname}
+        feature="dashboard"
+      />
       <RouteProgressBar />
       <EduModeShell />
       {/* Sidebar */}

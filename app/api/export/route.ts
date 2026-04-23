@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/server'
 import { getDateInTimeZone } from '@/lib/utils'
+import { buildSentryActorContext } from '@/lib/monitoring/sentry'
 import { getBranchAccessScope } from '@/modules/organization/lib/branch-access.server'
 import {
   exportProfitLossXLSX,
@@ -95,6 +97,36 @@ export async function GET(request: NextRequest) {
     })
   } catch (error: any) {
     (console as any).error('[Export] Error:', error.message)
+
+    const actor = buildSentryActorContext({
+      userId: user.id,
+      email: user.email || null,
+      fullName: String(user.user_metadata?.full_name || user.email || ''),
+      orgId,
+      orgName,
+      branchId,
+      role: branchAccessScope.role,
+      route: '/api/export',
+      feature: 'report_export',
+    })
+
+    Sentry.withScope((scope) => {
+      if (actor.user) scope.setUser(actor.user)
+      Object.entries(actor.tags).forEach(([key, value]) => {
+        if (value) scope.setTag(key, value)
+      })
+      scope.setContext('organization', actor.context.organization)
+      scope.setContext('branch', actor.context.branch)
+      scope.setContext('export_request', {
+        type,
+        consolidated,
+        startDate,
+        endDate,
+        asOfDate,
+      })
+      Sentry.captureException(error)
+    })
+
     return NextResponse.json({ error: 'Gagal menghasilkan export: ' + error.message }, { status: 500 })
   }
 }

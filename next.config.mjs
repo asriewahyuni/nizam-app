@@ -52,4 +52,9 @@ export default withSentryConfig(nextConfig, {
       removeDebugLogging: true,
     },
   },
+
+  sourcemaps: {
+    disable: !canUploadSourceMaps,
+    deleteSourcemapsAfterUpload: true,
+  },
 });
