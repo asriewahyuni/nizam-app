@@ -8,7 +8,7 @@ import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 
 type ProductInventoryFields = Pick<
   Product,
-  'id' | 'name' | 'sku' | 'type' | 'unit' | 'purchase_price' | 'selling_price' | 'category' | 'is_active'
+  'id' | 'name' | 'sku' | 'type' | 'unit' | 'purchase_price' | 'selling_price' | 'category' | 'is_active' | 'created_at' | 'updated_at'
 > & {
   barcode?: string | null
   average_cost?: number | null
@@ -198,7 +198,7 @@ export async function getProducts(orgId: string, branchId?: string | null): Prom
 
   const { data: productsData } = await supabase
     .from('products')
-    .select('id, name, sku, barcode, type, unit, purchase_price, selling_price, category, average_cost, is_active')
+    .select('id, name, sku, barcode, type, unit, purchase_price, selling_price, category, average_cost, is_active, created_at, updated_at')
     .eq('org_id', orgId)
     .order('name', { ascending: true })
 
