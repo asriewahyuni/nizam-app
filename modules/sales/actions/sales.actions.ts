@@ -158,6 +158,24 @@ function normalizeShariahMode(value?: string | null): string {
   return 'CASH'
 }
 
+function calculateConfiguredHeaderDiscount(baseAmount: number, mode: unknown, value: unknown): number {
+  const normalizedBase = Math.max(0, Number(baseAmount || 0))
+  const normalizedValue = Math.max(0, Number(value || 0))
+  if (!Number.isFinite(normalizedBase) || !Number.isFinite(normalizedValue) || normalizedBase <= 0 || normalizedValue <= 0) {
+    return 0
+  }
+
+  const normalizedMode = String(mode || '').trim().toUpperCase() === 'PERCENT' ? 'PERCENT' : 'FIXED'
+  if (normalizedMode === 'PERCENT') {
+    return Math.min(
+      normalizedBase,
+      Math.round(normalizedBase * (Math.min(100, normalizedValue) / 100))
+    )
+  }
+
+  return Math.min(normalizedBase, Math.round(normalizedValue))
+}
+
 function isSalamMode(value?: string | null): boolean {
   return normalizeShariahMode(value) === 'SALAM'
 }
@@ -1726,9 +1744,13 @@ export async function createQuotation(orgId: string, payload: any) {
     (acc: number, l: any) => acc + (Number(l.quantity || 0) * Number(l.discount_amount || 0)),
     0
   )
-  let headerDiscount = Number(payload.discount_amount || 0)
+  const legacyHeaderDiscount = Math.max(0, Number(payload.discount_amount || 0))
+  const manualHeaderDiscount = typeof payload.manual_discount_value === 'undefined'
+    ? legacyHeaderDiscount
+    : calculateConfiguredHeaderDiscount(total, payload.manual_discount_mode, payload.manual_discount_value)
   const taxAmount = Number(payload.tax_amount || 0)
   let appliedPromoId: string | null = null
+  let promoDiscount = 0
 
   const promoCode = String(payload.promo_code || '').trim()
   if (promoCode) {
@@ -1738,10 +1760,13 @@ export async function createQuotation(orgId: string, payload: any) {
     }
 
     appliedPromoId = promoResult.promo.id
-    headerDiscount = calculateSalesPromoDiscount(promoResult.promo, total)
+    promoDiscount = calculateSalesPromoDiscount(promoResult.promo, total)
   }
 
-  const grandTotal = total - lineDiscountTotal - headerDiscount + taxAmount
+  const maxHeaderDiscount = Math.max(0, total - lineDiscountTotal)
+  const headerDiscount = Math.min(maxHeaderDiscount, manualHeaderDiscount + promoDiscount)
+  const netSubtotal = Math.max(0, total - lineDiscountTotal - headerDiscount)
+  const grandTotal = netSubtotal + taxAmount
   const resellerSnapshot = await getResellerCommissionSnapshot(orgId, payload.reseller_id)
 
   if (resellerSnapshot?.error) {

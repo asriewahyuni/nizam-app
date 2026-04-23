@@ -78,6 +78,8 @@ type DraftLine = {
   discount_amount: number
 }
 
+type HeaderDiscountMode = 'FIXED' | 'PERCENT'
+
 function sanitizeDraftNumber(value: string | number, fallback = 0): number {
   const parsed = typeof value === 'number' ? value : Number.parseFloat(value)
   return Number.isFinite(parsed) ? parsed : fallback
@@ -144,6 +146,21 @@ function createEmptyCustomerForm(): CustomerFormState {
   }
 }
 
+function calculateHeaderDiscount(baseAmount: number, mode: HeaderDiscountMode, value: number): number {
+  const normalizedBase = Math.max(0, sanitizeDraftNumber(baseAmount))
+  const normalizedValue = Math.max(0, sanitizeDraftNumber(value))
+  if (normalizedBase <= 0 || normalizedValue <= 0) return 0
+
+  if (mode === 'PERCENT') {
+    return Math.min(
+      normalizedBase,
+      Math.round(normalizedBase * (Math.min(100, normalizedValue) / 100))
+    )
+  }
+
+  return Math.min(normalizedBase, Math.round(normalizedValue))
+}
+
 export default function QuotationClient({
   orgId,
   orgName,
@@ -168,6 +185,8 @@ export default function QuotationClient({
   const [quoteDate, setQuoteDate] = useState(new Date().toISOString().split('T')[0])
   const [notes, setNotes] = useState('')
   const [promoCode, setPromoCode] = useState('')
+  const [manualDiscountMode, setManualDiscountMode] = useState<HeaderDiscountMode>('FIXED')
+  const [manualDiscountValue, setManualDiscountValue] = useState(0)
   const [appliedPromo, setAppliedPromo] = useState<SalesPromoRecord | null>(null)
   const [lines, setLines] = useState<DraftLine[]>(() => [createDraftLine()])
 
@@ -193,9 +212,13 @@ export default function QuotationClient({
     0
   )
   const promoDiscount = appliedPromo
-    ? Math.round(appliedPromo.type === 'PERCENT' ? subtotal * (appliedPromo.value / 100) : appliedPromo.value)
+    ? calculateHeaderDiscount(subtotal, appliedPromo.type, appliedPromo.value)
     : 0
-  const grandTotal = subtotal - totalLineDiscount - promoDiscount
+  const manualDiscount = calculateHeaderDiscount(subtotal, manualDiscountMode, manualDiscountValue)
+  const maxHeaderDiscount = Math.max(0, subtotal - totalLineDiscount)
+  const headerDiscount = Math.min(maxHeaderDiscount, promoDiscount + manualDiscount)
+  const isHeaderDiscountClamped = (promoDiscount + manualDiscount) > maxHeaderDiscount
+  const grandTotal = Math.max(0, subtotal - totalLineDiscount - headerDiscount)
 
   const handleApplyPromo = async () => {
     const code = promoCode.toUpperCase().trim()
@@ -279,7 +302,9 @@ export default function QuotationClient({
       customer_id: customerId,
       sale_date: quoteDate,
       notes: finalNotes,
-      discount_amount: promoDiscount,
+      discount_amount: manualDiscount,
+      manual_discount_mode: manualDiscountMode,
+      manual_discount_value: manualDiscountValue,
       promo_code: appliedPromo?.code || null,
       lines: usableLines.map((line) => ({
         product_id: line.product_id || undefined,
@@ -597,26 +622,85 @@ export default function QuotationClient({
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex justify-end">
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                    <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+                          Diskon Tambahan
+                        </label>
+                        <div className="inline-flex rounded-xl border border-amber-200 bg-white p-1">
+                          <button
+                            type="button"
+                            onClick={() => setManualDiscountMode('FIXED')}
+                            className={`px-3 py-1 text-[10px] font-black rounded-lg transition-all ${
+                              manualDiscountMode === 'FIXED'
+                                ? 'bg-amber-500 text-white shadow-sm'
+                                : 'text-amber-700 hover:text-amber-900'
+                            }`}
+                          >
+                            Flat (Rp)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setManualDiscountMode('PERCENT')}
+                            className={`px-3 py-1 text-[10px] font-black rounded-lg transition-all ${
+                              manualDiscountMode === 'PERCENT'
+                                ? 'bg-amber-500 text-white shadow-sm'
+                                : 'text-amber-700 hover:text-amber-900'
+                            }`}
+                          >
+                            Prosentase (%)
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-3">
+                        {manualDiscountMode === 'FIXED' ? (
+                          <CurrencyInput
+                            label=""
+                            value={manualDiscountValue}
+                            onChange={setManualDiscountValue}
+                            className="!h-11 bg-white"
+                            placeholder="Masukkan diskon flat"
+                          />
+                        ) : (
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={manualDiscountValue || ''}
+                            onChange={(e) => setManualDiscountValue(sanitizeDraftNumber(e.target.value))}
+                            placeholder="Masukkan diskon %"
+                            className="w-full h-11 rounded-xl border border-amber-200 bg-white px-4 text-sm font-bold outline-none focus:border-amber-500"
+                          />
+                        )}
+                      </div>
+
+                      <p className="mt-2 text-xs font-bold text-amber-700">
+                        Potongan tambahan: {manualDiscount > 0 ? formatRupiah(manualDiscount) : 'Belum ada'}
+                      </p>
+                    </div>
+
                     {!appliedPromo ? (
-                      <div className="flex gap-2 w-full md:max-w-xs">
+                      <div className="flex gap-2 w-full">
                         <input
                           placeholder="Kode Kupon/Voucher..."
                           value={promoCode}
                           onChange={(e) => setPromoCode(e.target.value)}
                           style={{ textTransform: 'uppercase' }}
-                          className="flex-1 h-10 px-4 border rounded-xl text-xs font-bold outline-none focus:border-blue-500 bg-white"
+                          className="flex-1 h-11 px-4 border rounded-xl text-xs font-bold outline-none focus:border-blue-500 bg-white"
                         />
                         <button
                           type="button"
                           onClick={handleApplyPromo}
-                          className="px-4 h-10 bg-slate-900 text-white font-black text-[10px] tracking-widest uppercase rounded-xl hover:bg-slate-800 transition-colors"
+                          className="px-4 h-11 bg-slate-900 text-white font-black text-[10px] tracking-widest uppercase rounded-xl hover:bg-slate-800 transition-colors"
                         >
                           Terapkan
                         </button>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between w-full md:max-w-xs bg-emerald-50 border border-emerald-100 p-3 rounded-xl text-emerald-700 text-[10px] md:text-xs">
+                      <div className="flex items-center justify-between w-full bg-emerald-50 border border-emerald-100 p-3 rounded-xl text-emerald-700 text-[10px] md:text-xs">
                         <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider">
                           🎟️ Kupon: <strong>{appliedPromo.code}</strong> (-{formatRupiah(promoDiscount)})
                         </span>
@@ -631,11 +715,40 @@ export default function QuotationClient({
                     )}
                   </div>
 
-                  <div className="bg-blue-50 p-6 rounded-2xl flex justify-between items-center shadow-inner border border-blue-100">
-                    <div className="text-[10px] md:text-xs font-black text-blue-900 uppercase tracking-widest">
-                      Total Penawaran Estimasi
+                  <div className="space-y-3 rounded-2xl border border-blue-100 bg-blue-50 p-6 shadow-inner">
+                    <div className="flex items-center justify-between text-sm font-bold text-blue-900">
+                      <span>Subtotal Barang</span>
+                      <span>{formatRupiah(subtotal)}</span>
                     </div>
-                    <div className="text-xl md:text-3xl font-black text-blue-600 drop-shadow-sm">{formatRupiah(grandTotal)}</div>
+                    {totalLineDiscount > 0 && (
+                      <div className="flex items-center justify-between text-sm font-bold text-rose-500">
+                        <span>Diskon per Item</span>
+                        <span>-{formatRupiah(totalLineDiscount)}</span>
+                      </div>
+                    )}
+                    {manualDiscount > 0 && (
+                      <div className="flex items-center justify-between text-sm font-bold text-amber-600">
+                        <span>Diskon Tambahan</span>
+                        <span>-{formatRupiah(manualDiscount)}</span>
+                      </div>
+                    )}
+                    {promoDiscount > 0 && (
+                      <div className="flex items-center justify-between text-sm font-bold text-emerald-600">
+                        <span>Diskon Voucher</span>
+                        <span>-{formatRupiah(promoDiscount)}</span>
+                      </div>
+                    )}
+                    {isHeaderDiscountClamped && (
+                      <p className="text-[11px] font-bold text-blue-700">
+                        Diskon otomatis dibatasi supaya total penawaran tidak minus.
+                      </p>
+                    )}
+                    <div className="border-t border-blue-200 pt-3 flex justify-between items-center">
+                      <div className="text-[10px] md:text-xs font-black text-blue-900 uppercase tracking-widest">
+                        Total Penawaran Estimasi
+                      </div>
+                      <div className="text-xl md:text-3xl font-black text-blue-600 drop-shadow-sm">{formatRupiah(grandTotal)}</div>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
