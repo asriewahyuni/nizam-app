@@ -18,6 +18,7 @@ import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { ACTIVE_BRANCH_COOKIE, ACTIVE_ORG_COOKIE } from '@/modules/organization/lib/org-context'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import {
   getStoredActiveOrgIdForUser,
   persistMembershipActiveContext,
@@ -28,6 +29,8 @@ const ADMIN_IMPERSONATION_COOKIE = 'nizam_admin_impersonation'
 const ADMIN_IMPERSONATION_MAX_AGE = 60 * 60 * 4
 const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 const DEMO_ACCOUNT_EMAIL = 'demo@nizam.app'
+const HRIS_IMPERSONATION_PERMISSION_MARKERS = ['hris', 'employee', 'employees', 'attendance', 'payroll', 'leave', 'learning']
+const HRIS_IMPERSONATION_LEGACY_ROLES = new Set(['owner', 'admin', 'hr'])
 
 type AdminImpersonationPayload =
   | {
@@ -43,6 +46,60 @@ type AdminImpersonationPayload =
       email: string
       activeOrgId: string | null
     }
+
+export type HrisImpersonationCandidate = {
+  rawUserId: string
+  targetUserId: string
+  displayName: string
+  email: string | null
+  nik: string | null
+  legacyRole: string | null
+  roleLabel: string
+  customRoleName: string | null
+  branchName: string | null
+  isCurrentUser: boolean
+}
+
+type InternalImpersonationIdentity = {
+  internalUserId: string
+  email: string | null
+  nik: string | null
+  displayName: string | null
+}
+
+type InternalAuthLookupRow = {
+  id: string | null
+  login_email: string | null
+  login_nik: string | null
+  display_name: string | null
+}
+
+type HrisImpersonationMemberRow = {
+  user_id: string | null
+  role: string | null
+  role_id: string | null
+}
+
+type HrisImpersonationRoleRow = {
+  id: string | null
+  name: string | null
+  permissions: string[] | null
+}
+
+type HrisImpersonationEmployeeRow = {
+  id: string | null
+  user_id: string | null
+  first_name: string | null
+  last_name: string | null
+  nik: string | null
+  email: string | null
+  branch_id: string | null
+}
+
+type HrisImpersonationBranchRow = {
+  id: string | null
+  name: string | null
+}
 
 function encodeAdminImpersonation(payload: AdminImpersonationPayload) {
   return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
@@ -122,6 +179,42 @@ function normalizeUuid(value: unknown) {
     return null
   }
   return normalized
+}
+
+function normalizePermissionList(value: unknown) {
+  return Array.isArray(value)
+    ? value
+        .filter((permission): permission is string => typeof permission === 'string')
+        .map((permission) => permission.trim().toLowerCase())
+        .filter(Boolean)
+    : []
+}
+
+function hasHrisImpersonationAccess(legacyRole: unknown, permissions: unknown) {
+  const normalizedLegacyRole = String(legacyRole || '').trim().toLowerCase()
+  if (HRIS_IMPERSONATION_LEGACY_ROLES.has(normalizedLegacyRole)) return true
+
+  const normalizedPermissions = normalizePermissionList(permissions)
+  return normalizedPermissions.some((permission) =>
+    HRIS_IMPERSONATION_PERMISSION_MARKERS.some((marker) => permission.includes(marker))
+  )
+}
+
+function getLegacyRoleDisplayLabel(role: unknown) {
+  const normalizedRole = String(role || '').trim().toLowerCase()
+  if (normalizedRole === 'owner') return 'Owner'
+  if (normalizedRole === 'admin') return 'Admin'
+  if (normalizedRole === 'hr') return 'HR'
+  if (normalizedRole === 'manager') return 'Manager'
+  if (normalizedRole === 'staff') return 'Staff'
+  if (normalizedRole === 'viewer') return 'Viewer'
+  return null
+}
+
+function resolveHrisRoleLabel(role: unknown, customRoleName: unknown) {
+  const normalizedCustomRoleName = String(customRoleName || '').trim()
+  if (normalizedCustomRoleName) return normalizedCustomRoleName
+  return getLegacyRoleDisplayLabel(role) || 'Akun HRIS'
 }
 
 function isDuplicateAuthRegistrationError(message: unknown) {
@@ -217,7 +310,7 @@ async function findAuthUserByEmail(
     }
 
     const users = Array.isArray(data?.users) ? data.users : []
-    const matchedUser = users.find((user: any) => normalizeEmail(user?.email) === normalizedTargetEmail)
+    const matchedUser = users.find((user: { email?: string | null }) => normalizeEmail(user?.email) === normalizedTargetEmail)
     if (matchedUser) {
       return { user: matchedUser, error: null }
     }
@@ -227,6 +320,100 @@ async function findAuthUserByEmail(
   }
 
   return { user: null as { id?: string; email?: string | null } | null, error: null }
+}
+
+async function getSupabaseAuthEmailByUserId(
+  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
+  userId: string | null | undefined
+) {
+  const normalizedUserId = normalizeUuid(userId)
+  if (!normalizedUserId) return null
+
+  const { data, error } = await adminClient.auth.admin.getUserById(normalizedUserId)
+  if (error && !isAuthUserNotFoundError(error.message)) {
+    return { error: `Gagal membaca akun autentikasi user target: ${error.message}` }
+  }
+
+  return { email: normalizeEmail(data.user?.email) || null }
+}
+
+async function resolveInternalImpersonationIdentity(
+  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
+  input: {
+    userId?: string | null
+    email?: string | null
+    nik?: string | null
+    displayName?: string | null
+    userType?: string | null
+  }
+) {
+  const normalizedUserId = normalizeUuid(input.userId)
+  const normalizedEmail = normalizeEmail(input.email)
+  const normalizedNik = String(input.nik || '').trim().toUpperCase() || null
+
+  const findActiveInternalUser = async (input: {
+    field: 'id' | 'legacy_user_id' | 'login_nik' | 'login_email'
+    value: string
+    mode?: 'eq' | 'ilike'
+  }) => {
+    let query = adminClient
+      .from('internal_auth_users')
+      .select('id, login_email, login_nik, display_name')
+      .eq('is_active', true)
+      .limit(1)
+
+    query = input.mode === 'ilike'
+      ? query.ilike(input.field, input.value)
+      : query.eq(input.field, input.value)
+
+    const { data } = await query.maybeSingle()
+    const row = data as InternalAuthLookupRow | null
+    if (!row?.id) return null
+
+    return {
+      internalUserId: normalizeUuid(row.id) || null,
+      email: normalizeEmail(row.login_email) || null,
+      nik: String(row.login_nik || '').trim().toUpperCase() || null,
+      displayName: String(row.display_name || '').trim() || null,
+    }
+  }
+
+  if (normalizedUserId) {
+    const byId = await findActiveInternalUser({ field: 'id', value: normalizedUserId })
+    if (byId?.internalUserId) return byId as InternalImpersonationIdentity
+
+    const byLegacy = await findActiveInternalUser({ field: 'legacy_user_id', value: normalizedUserId })
+    if (byLegacy?.internalUserId) return byLegacy as InternalImpersonationIdentity
+  }
+
+  if (normalizedEmail) {
+    const byEmail = await findActiveInternalUser({ field: 'login_email', value: normalizedEmail, mode: 'ilike' })
+    if (byEmail?.internalUserId) return byEmail as InternalImpersonationIdentity
+  }
+
+  if (normalizedNik) {
+    const byNik = await findActiveInternalUser({ field: 'login_nik', value: normalizedNik })
+    if (byNik?.internalUserId) return byNik as InternalImpersonationIdentity
+  }
+
+  const ensuredUser = await ensureInternalAuthUserRecord({
+    userId: normalizedUserId,
+    email: normalizedEmail,
+    nik: normalizedNik,
+    fullName: input.displayName,
+    userType: input.userType || 'staff',
+  })
+
+  if ('error' in ensuredUser) {
+    return { error: ensuredUser.error }
+  }
+
+  return {
+    internalUserId: ensuredUser.userId,
+    email: normalizedEmail,
+    nik: normalizedNik,
+    displayName: String(input.displayName || '').trim() || null,
+  } satisfies InternalImpersonationIdentity
 }
 
 type StaffLoginCandidate = {
@@ -1104,6 +1291,295 @@ export async function getAdminImpersonationState() {
     email: payload.email,
     activeOrgId: payload.activeOrgId,
   }
+}
+
+async function requirePlatformAdminImpersonation() {
+  const cookieStore = await cookies()
+  const payload = decodeAdminImpersonation(cookieStore.get(ADMIN_IMPERSONATION_COOKIE)?.value)
+  const adminEmail = normalizeEmail(payload?.email) || ''
+
+  if (!payload || !adminEmail || !isPlatformAdminEmail(adminEmail)) {
+    return {
+      error: 'Akses ditolak. Fitur ini hanya aktif saat platform admin sedang impersonate tenant.' as const,
+    }
+  }
+
+  return {
+    cookieStore,
+    payload,
+    adminEmail,
+  }
+}
+
+/**
+ * Mengambil daftar akun tenant yang relevan untuk pengujian akses HRIS saat
+ * platform admin sedang berada dalam mode impersonation.
+ */
+export async function getTenantHrisImpersonationCandidates(orgId: string) {
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) {
+    return { error: 'Organisasi tidak valid.', data: [] as HrisImpersonationCandidate[] }
+  }
+
+  const impersonationState = await requirePlatformAdminImpersonation()
+  if ('error' in impersonationState) {
+    return { error: impersonationState.error, data: [] as HrisImpersonationCandidate[] }
+  }
+
+  const activeOrg = await getActiveOrg()
+  if (!activeOrg || String(activeOrg.org?.id || '').trim() !== trimmedOrgId) {
+    return { error: 'Konteks tenant aktif tidak sesuai.', data: [] as HrisImpersonationCandidate[] }
+  }
+
+  const adminClient = await createAdminClient()
+
+  const [membersResult, rolesResult, employeesResult, branchesResult] = await Promise.all([
+    adminClient
+      .from('org_members')
+      .select('user_id, role, role_id')
+      .eq('org_id', trimmedOrgId)
+      .eq('is_active', true),
+    adminClient
+      .from('roles')
+      .select('id, name, permissions')
+      .eq('org_id', trimmedOrgId),
+    adminClient
+      .from('employees')
+      .select('id, user_id, first_name, last_name, nik, email, branch_id')
+      .eq('org_id', trimmedOrgId),
+    adminClient
+      .from('branches')
+      .select('id, name')
+      .eq('org_id', trimmedOrgId)
+      .eq('is_active', true),
+  ])
+
+  if (membersResult.error) {
+    return { error: `Gagal memuat anggota tenant: ${membersResult.error.message}`, data: [] as HrisImpersonationCandidate[] }
+  }
+
+  const roleRows = (Array.isArray(rolesResult.data) ? rolesResult.data : []) as HrisImpersonationRoleRow[]
+  const employeeRows = (Array.isArray(employeesResult.data) ? employeesResult.data : []) as HrisImpersonationEmployeeRow[]
+  const branchRows = (Array.isArray(branchesResult.data) ? branchesResult.data : []) as HrisImpersonationBranchRow[]
+  const rawMembers = (Array.isArray(membersResult.data) ? membersResult.data : []) as HrisImpersonationMemberRow[]
+
+  const rolesById = new Map(
+    roleRows
+      .filter((role) => role?.id)
+      .map((role) => [String(role.id), role])
+  )
+  const employeesByUserId = new Map(
+    employeeRows
+      .filter((employee) => employee?.user_id)
+      .map((employee) => [String(employee.user_id), employee])
+  )
+  const branchNameById = new Map(
+    branchRows
+      .filter((branch) => branch?.id)
+      .map((branch) => [String(branch.id), String(branch.name || '')])
+  )
+
+  const seenUserIds = new Set<string>()
+
+  const candidateRows = rawMembers.filter((member) => {
+    const rawUserId = String(member?.user_id || '').trim()
+    if (!rawUserId || seenUserIds.has(rawUserId)) return false
+    seenUserIds.add(rawUserId)
+
+    const customRole = rolesById.get(String(member?.role_id || '').trim())
+    return hasHrisImpersonationAccess(member?.role, customRole?.permissions)
+  })
+
+  const candidates = await Promise.all(
+    candidateRows.map(async (member) => {
+      const rawUserId = String(member?.user_id || '').trim()
+      const customRole = rolesById.get(String(member?.role_id || '').trim())
+      const employee = employeesByUserId.get(rawUserId) || null
+      const employeeFullName = [
+        String(employee?.first_name || '').trim(),
+        String(employee?.last_name || '').trim(),
+      ]
+        .filter(Boolean)
+        .join(' ')
+      const branchName = employee?.branch_id
+        ? branchNameById.get(String(employee.branch_id)) || null
+        : null
+
+      if (isInternalAuthProvider()) {
+        const internalIdentity = await resolveInternalImpersonationIdentity(adminClient, {
+          userId: rawUserId,
+          email: employee?.email || null,
+          nik: employee?.nik || null,
+          displayName: employeeFullName || null,
+          userType: 'staff',
+        })
+
+        if ('error' in internalIdentity) return null
+
+        const displayName =
+          internalIdentity.displayName ||
+          employeeFullName ||
+          (internalIdentity.email ? internalIdentity.email.split('@')[0] : null) ||
+          'User Tenant'
+
+        return {
+          rawUserId,
+          targetUserId: internalIdentity.internalUserId,
+          displayName,
+          email: internalIdentity.email || normalizeEmail(employee?.email) || null,
+          nik: internalIdentity.nik || String(employee?.nik || '').trim().toUpperCase() || null,
+          legacyRole: String(member?.role || '').trim().toLowerCase() || null,
+          roleLabel: resolveHrisRoleLabel(member?.role, customRole?.name),
+          customRoleName: String(customRole?.name || '').trim() || null,
+          branchName,
+          isCurrentUser: rawUserId === String(activeOrg.user?.id || '').trim(),
+        } satisfies HrisImpersonationCandidate
+      }
+
+      const authUserResult = await getSupabaseAuthEmailByUserId(adminClient, rawUserId)
+      if (authUserResult && 'error' in authUserResult) return null
+
+      const resolvedEmail = authUserResult?.email || normalizeEmail(employee?.email) || null
+      const displayName =
+        employeeFullName ||
+        (resolvedEmail ? resolvedEmail.split('@')[0] : null) ||
+        'User Tenant'
+
+      return {
+        rawUserId,
+        targetUserId: rawUserId,
+        displayName,
+        email: resolvedEmail,
+        nik: String(employee?.nik || '').trim().toUpperCase() || null,
+        legacyRole: String(member?.role || '').trim().toLowerCase() || null,
+        roleLabel: resolveHrisRoleLabel(member?.role, customRole?.name),
+        customRoleName: String(customRole?.name || '').trim() || null,
+        branchName,
+        isCurrentUser: rawUserId === String(activeOrg.user?.id || '').trim(),
+      } satisfies HrisImpersonationCandidate
+    })
+  )
+
+  const roleWeight = (candidate: HrisImpersonationCandidate) => {
+    if (candidate.legacyRole === 'hr') return 0
+    if (candidate.customRoleName) return 1
+    if (candidate.legacyRole === 'admin') return 2
+    if (candidate.legacyRole === 'owner') return 3
+    return 4
+  }
+
+  return {
+    data: candidates
+      .filter((candidate): candidate is HrisImpersonationCandidate => Boolean(candidate))
+      .sort((left, right) => {
+        const weightDiff = roleWeight(left) - roleWeight(right)
+        if (weightDiff !== 0) return weightDiff
+        return left.displayName.localeCompare(right.displayName, 'id', { sensitivity: 'base' })
+      }),
+  }
+}
+
+/**
+ * Mengganti sesi tenant saat ini ke akun yang punya akses HR/HRIS.
+ * Fitur ini hanya aktif jika user berasal dari platform admin impersonation.
+ */
+export async function signInAsTenantHrisUser(orgId: string, targetUserId: string) {
+  const trimmedOrgId = String(orgId || '').trim()
+  const trimmedTargetUserId = String(targetUserId || '').trim()
+
+  if (!trimmedOrgId || !trimmedTargetUserId) {
+    return { error: 'Target impersonation HRIS tidak valid.' }
+  }
+
+  const impersonationState = await requirePlatformAdminImpersonation()
+  if ('error' in impersonationState) {
+    return { error: impersonationState.error }
+  }
+
+  const candidateResult = await getTenantHrisImpersonationCandidates(trimmedOrgId)
+  if (candidateResult.error) {
+    return { error: candidateResult.error }
+  }
+
+  const targetCandidate = candidateResult.data.find((candidate) => candidate.targetUserId === trimmedTargetUserId)
+  if (!targetCandidate) {
+    return { error: 'Akun HR/HRIS target tidak ditemukan atau tidak memiliki akses.' }
+  }
+
+  if (targetCandidate.isCurrentUser) {
+    return { success: true as const }
+  }
+
+  const cookieStore = impersonationState.cookieStore
+
+  if (isInternalAuthProvider()) {
+    const switched = await createInternalAuthSessionByUserId(targetCandidate.targetUserId)
+    if ('error' in switched) {
+      return { error: `Gagal mengganti sesi ke akun HRIS: ${switched.error}` }
+    }
+
+    cookieStore.delete('nizam_demo_org_id')
+    cookieStore.set(ACTIVE_ORG_COOKIE, trimmedOrgId, {
+      maxAge: ADMIN_IMPERSONATION_MAX_AGE,
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    })
+    cookieStore.delete(ACTIVE_BRANCH_COOKIE)
+
+    revalidatePath('/', 'layout')
+    redirect('/hris')
+  }
+
+  const adminClient = await createAdminClient()
+  const supabase = await createClient()
+  const targetEmailResult = await getSupabaseAuthEmailByUserId(adminClient, targetCandidate.targetUserId)
+
+  if (!targetEmailResult || 'error' in targetEmailResult) {
+    return { error: targetEmailResult?.error || 'Email login akun HRIS tidak ditemukan.' }
+  }
+
+  const targetEmail = normalizeEmail(targetEmailResult.email)
+  if (!targetEmail) {
+    return { error: 'Akun HRIS target belum memiliki email login yang bisa dipakai.' }
+  }
+
+  const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+    type: 'magiclink',
+    email: targetEmail,
+  })
+
+  if (linkError) {
+    return { error: `Gagal membuat magic link HRIS: ${linkError.message}` }
+  }
+
+  const tokenHash = linkData.properties?.hashed_token
+  if (!tokenHash) {
+    return { error: 'Magic link HRIS tidak memiliki token yang bisa diverifikasi.' }
+  }
+
+  const { error: verifyError } = await supabase.auth.verifyOtp({
+    type: 'magiclink',
+    token_hash: tokenHash,
+  })
+
+  if (verifyError) {
+    return { error: `Gagal mengganti sesi ke akun HRIS: ${verifyError.message}` }
+  }
+
+  cookieStore.delete('nizam_demo_org_id')
+  cookieStore.set(ACTIVE_ORG_COOKIE, trimmedOrgId, {
+    maxAge: ADMIN_IMPERSONATION_MAX_AGE,
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  })
+  cookieStore.delete(ACTIVE_BRANCH_COOKIE)
+
+  revalidatePath('/', 'layout')
+  redirect('/hris')
 }
 
 export async function deleteInactiveTenantByPlatformAdmin(orgId: string) {

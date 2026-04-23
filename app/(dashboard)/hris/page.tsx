@@ -7,6 +7,10 @@ import { getLeaveRequests } from '@/modules/hris/actions/leave.actions'
 import { getAccountBalances } from '@/modules/accounting/actions/coa.actions'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { isInternalAuthProvider } from '@/lib/auth/provider'
+import {
+  getAdminImpersonationState,
+  getTenantHrisImpersonationCandidates,
+} from '@/modules/auth/actions/auth.actions'
 import HrisClient from './HrisClient'
 
 type SiblingOrgRow = {
@@ -87,12 +91,16 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
   const activeBranch = await getActiveBranch(orgData.org.id)
+  const adminImpersonation = await getAdminImpersonationState()
 
   const supabase = await createClient()
   const admin = await createAdminClient()
   const readClient = (isInternalAuthProvider() ? admin : supabase) as any
   const { data: roles } = await readClient.from('roles').select('*').eq('org_id', orgData.org.id).order('name')
   const { data: branches } = await readClient.from('branches').select('id, name, code, pic_employee_id').eq('org_id', orgData.org.id).eq('is_active', true).order('name')
+  const hrisImpersonationTargetsResult = adminImpersonation
+    ? await getTenantHrisImpersonationCandidates(orgData.org.id)
+    : { data: [] as unknown[] }
 
   let transferTargets: TransferTarget[] = []
   let transferDisabledReason: string | null = null
@@ -268,6 +276,7 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
     initialLeaveRequests={clientSafeLeaveRequests}
     accounts={clientSafeAccounts}
     settings={clientSafeSettings}
+    currentUserId={String(orgData.user?.id || '')}
     roles={clientSafeRoles}
     branches={clientSafeBranches}
     childOrgOptions={clientSafeChildOrgOptions}
@@ -275,6 +284,8 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
     transferDisabledReason={transferDisabledReason}
     initialTransferHistory={clientSafeTransferHistory}
     initialInvitations={clientSafeInvitations}
+    adminImpersonation={serializeHrisClientValue(adminImpersonation)}
+    hrisImpersonationTargets={serializeHrisClientValue(hrisImpersonationTargetsResult.data || [])}
     defaultTab={defaultTab}
   />
 }
