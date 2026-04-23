@@ -338,9 +338,9 @@ export function ManufacturingClient({
 
   return (
     <>
-      <motion.div variants={container} initial="hidden" animate="show" className="max-w-7xl mx-auto space-y-10">
+      <div className="max-w-7xl mx-auto space-y-10">
       {/* Header */}
-      <motion.div variants={item} className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
             <Factory size={28} className="text-blue-600" />
@@ -391,10 +391,10 @@ export function ManufacturingClient({
             </button>
           )}
         </div>
-      </motion.div>
+      </div>
 
       {!activeBranchId && (
-        <motion.div variants={item} className="rounded-[28px] border border-amber-200 bg-amber-50 px-6 py-5 flex items-start gap-4">
+        <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-6 py-5 flex items-start gap-4">
           <div className="w-12 h-12 rounded-2xl bg-white text-amber-500 border border-amber-100 flex items-center justify-center shrink-0">
             <AlertTriangle size={22} />
           </div>
@@ -404,12 +404,12 @@ export function ManufacturingClient({
               Anda sedang melihat data lintas unit. Pilih satu unit dari header untuk membuat BoM, menerbitkan SPK, mencatat biaya produksi, atau menyelesaikan produksi.
             </p>
           </div>
-        </motion.div>
+        </div>
       )}
 
-      <AnimatePresence mode="wait">
+      <AnimatePresence initial={false} mode="wait">
         {activeTab === 'SPK' ? (
-          <motion.div key="spk" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
+          <div key="spk" className="space-y-6">
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {spkStats.map((stat, i) => (
                   <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
@@ -539,7 +539,7 @@ export function ManufacturingClient({
                 </table>
                 </div>
              </div>
-          </motion.div>
+          </div>
         ) : (
           <motion.div key="bom" variants={container} initial="hidden" animate="show" exit="hidden" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
              {boms.length === 0 ? (
@@ -1284,7 +1284,7 @@ export function ManufacturingClient({
         )}
       </AnimatePresence>
 
-      </motion.div>
+      </div>
     </>
   )
 }
