@@ -2,10 +2,16 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Settings, Save, Fingerprint, Building, Receipt, FileText, Upload, Check, AlertCircle, Plus, Trash2, Link as LinkIcon, Copy, X, Key, ShieldCheck, Clock, Zap, RotateCcw, MessageCircle } from 'lucide-react'
+import { Settings, Save, Fingerprint, Building, FileText, Upload, Check, X, Key, Clock, Zap, RotateCcw, MessageCircle, Eye, EyeOff, Sparkles } from 'lucide-react'
 import { updateOrgSettings, uploadLogo, checkSlugAvailability } from '@/modules/organization/actions/org.actions'
 import { resetOrganizationData, type ResetOrganizationMode } from '@/modules/settings/actions/audit.actions'
 import { motion, AnimatePresence } from 'framer-motion'
+import {
+  STARTUP_WIZARD_HIDE_STORAGE_KEY,
+  STARTUP_WIZARD_VISIBILITY_EVENT,
+  isStartupWizardHiddenInBrowser,
+  setStartupWizardHiddenInBrowser,
+} from '@/lib/startup-wizard/preferences'
 
 type BusinessSettingsMap = Record<string, string | number | boolean | null | undefined>
 type BusinessProfile = {
@@ -38,14 +44,34 @@ export default function BusinessClient({
   const [logoUploading, setLogoUploading] = useState(false)
   const [logoControlsReady, setLogoControlsReady] = useState(false)
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
+  const [startupWizardHiddenInBrowserState, setStartupWizardHiddenInBrowserState] = useState(false)
   const [isResetModalOpen, setIsResetModalOpen] = useState(false)
   const [resetMode, setResetMode] = useState<ResetOrganizationMode>('transactions')
   const [resetConfirmation, setResetConfirmation] = useState('')
 
   useEffect(() => {
     setLogoControlsReady(true)
+
+    const syncStartupWizardState = () => {
+      setStartupWizardHiddenInBrowserState(isStartupWizardHiddenInBrowser())
+    }
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key && event.key !== STARTUP_WIZARD_HIDE_STORAGE_KEY) return
+      syncStartupWizardState()
+    }
+
+    syncStartupWizardState()
+    window.addEventListener(STARTUP_WIZARD_VISIBILITY_EVENT, syncStartupWizardState as EventListener)
+    window.addEventListener('storage', handleStorage)
+
+    return () => {
+      window.removeEventListener(STARTUP_WIZARD_VISIBILITY_EVENT, syncStartupWizardState as EventListener)
+      window.removeEventListener('storage', handleStorage)
+    }
   }, [])
 
+  const startupWizardEnabled = settings.startup_wizard_enabled !== false
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -65,6 +91,7 @@ export default function BusinessClient({
       po_format: (formData.get('po_format') as string) || 'PO-{YYYY}{MM}-{0000}',
       so_format: (formData.get('so_format') as string) || 'SO/{YY}/{MM}/{000}',
       inv_format: (formData.get('inv_format') as string) || 'INV/NIZ/{YYYY}/{0000}',
+      startup_wizard_enabled: formData.get('startup_wizard_enabled') === 'on',
       pos_wa_custom_message: (formData.get('pos_wa_custom_message') as string) || '',
       pos_require_open_shift: formData.get('pos_require_open_shift') === 'on',
       pos_enable_shift_settlement: formData.get('pos_enable_shift_settlement') === 'on',
@@ -199,6 +226,7 @@ export default function BusinessClient({
               <div className="md:col-span-3 bg-white p-8 rounded-3xl border border-slate-200 flex flex-col md:flex-row gap-8 items-center shadow-sm">
                  <div className="w-32 h-32 bg-slate-50 rounded-[28px] border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-inner group relative">
                     {savedLogoUrl ? (
+                       // eslint-disable-next-line @next/next/no-img-element
                        <img src={savedLogoUrl} alt="Logo" className="w-full h-full object-contain" />
                     ) : (
                        <Building size={32} className="text-slate-300" />
@@ -344,6 +372,63 @@ export default function BusinessClient({
               <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Alamat Headquarter</label>
               <textarea name="company_address" defaultValue={String(settings.company_address ?? '')} placeholder="Jl..." className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold min-h-[100px]" />
            </div>
+        </div>
+
+        <div className="space-y-8">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
+              <Sparkles size={20} className="text-slate-400" /> Startup Wizard
+            </h3>
+          </div>
+
+          <div className="rounded-[32px] border border-amber-100 bg-amber-50/40 p-8 shadow-inner space-y-6">
+            <label className="flex items-start gap-4 rounded-3xl border border-slate-200 bg-white px-5 py-4 cursor-pointer">
+              <input
+                type="checkbox"
+                name="startup_wizard_enabled"
+                defaultChecked={startupWizardEnabled}
+                className="mt-1 h-5 w-5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-black text-slate-900">Tampilkan Startup Wizard di Dashboard</span>
+                <span className="block text-[11px] font-medium text-slate-500 leading-6">
+                  Jika aktif, banner panduan langkah awal akan tampil di dashboard organisasi. Cocok untuk onboarding tim baru atau tenant yang masih setup awal.
+                </span>
+              </span>
+            </label>
+
+            <div className="rounded-3xl border border-slate-200 bg-white px-5 py-5 space-y-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Status Browser Saat Ini</div>
+                  <p className="mt-1 text-sm font-bold text-slate-900">
+                    {startupWizardHiddenInBrowserState ? 'Wizard sedang disembunyikan di browser ini.' : 'Wizard sedang diizinkan tampil di browser ini.'}
+                  </p>
+                  <p className="mt-1 text-[11px] font-medium text-slate-500 leading-6">
+                    Pengaturan ini hanya berlaku untuk browser yang sedang Anda pakai sekarang, bukan untuk semua perangkat.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextHiddenState = !startupWizardHiddenInBrowserState
+                    setStartupWizardHiddenInBrowser(nextHiddenState)
+                  }}
+                  disabled={!startupWizardEnabled}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-900 px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {startupWizardHiddenInBrowserState ? <Eye size={14} /> : <EyeOff size={14} />}
+                  {startupWizardHiddenInBrowserState ? 'Show Lagi di Browser Ini' : 'Hide di Browser Ini'}
+                </button>
+              </div>
+
+              {!startupWizardEnabled && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-bold text-amber-700 leading-6">
+                  Startup Wizard sedang dimatikan dari setting bisnis. Simpan perubahan dulu bila ingin menampilkannya lagi di dashboard.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="space-y-8">
