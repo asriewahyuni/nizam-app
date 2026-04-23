@@ -10,8 +10,24 @@ export type UserActivitySummary = {
   uniqueUsers24h: number
 }
 
+export type UserActivityWeeklySummary = {
+  activeUsers10m: number
+  routeVisits7d: number
+  usersLoggedIn7d: number
+  uniqueUsers7d: number
+  activeOrgs7d: number
+  activeBranches7d: number
+}
+
 export type UserActivityTopRoute = {
   routePath: string
+  visits: number
+  uniqueUsers: number
+}
+
+export type UserActivityTopTenant = {
+  orgId: string | null
+  orgName: string
   visits: number
   uniqueUsers: number
 }
@@ -66,4 +82,33 @@ export type UserActivitySnapshot = {
   topRoutes: UserActivityTopRoute[]
   currentUsers: UserActivityPresence[]
   recentActivities: UserActivityItem[]
+}
+
+export type UserActivityWeeklyPeakHour = {
+  dateKey: string
+  dayLabel: string
+  dateLabel: string
+  hour: number
+  activityCount: number
+  uniqueUsers: number
+}
+
+export type UserActivityWeeklyPeakDay = {
+  dateKey: string
+  dayLabel: string
+  dateLabel: string
+  activityCount: number
+  uniqueUsers: number
+}
+
+export type UserActivityWeeklyReport = {
+  periodStart: string
+  periodEnd: string
+  periodLabel: string
+  summary: UserActivityWeeklySummary
+  heatmap: UserActivityHeatmapCell[]
+  topRoutes: UserActivityTopRoute[]
+  topTenants: UserActivityTopTenant[]
+  peakHour: UserActivityWeeklyPeakHour | null
+  peakDay: UserActivityWeeklyPeakDay | null
 }

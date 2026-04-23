@@ -10,8 +10,13 @@ import type {
   UserActivityItem,
   UserActivityPresence,
   UserActivitySnapshot,
+  UserActivityTopTenant,
   UserActivitySummary,
   UserActivityTopRoute,
+  UserActivityWeeklyPeakDay,
+  UserActivityWeeklyPeakHour,
+  UserActivityWeeklyReport,
+  UserActivityWeeklySummary,
 } from './user-activity.types'
 
 type ActivityEventType = 'route_view' | 'heartbeat' | 'login'
@@ -96,6 +101,105 @@ function formatJakartaDayLabel(dateKey: string) {
   return date.toLocaleDateString('id-ID', {
     weekday: 'short',
   })
+}
+
+function formatJakartaLongDateLabel(dateKey: string) {
+  const date = new Date(`${dateKey}T00:00:00+07:00`)
+  if (Number.isNaN(date.getTime())) return dateKey
+
+  return date.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+function buildPeriodLabel(periodStart: string, periodEnd: string) {
+  return `${formatJakartaLongDateLabel(periodStart)} - ${formatJakartaLongDateLabel(periodEnd)}`
+}
+
+async function getHeatmapRows7d() {
+  return queryPostgres<{
+    date_key: string
+    hour_of_day: number | string | null
+    activity_count: number | string | null
+    unique_users: number | string | null
+  }>(
+    `
+      with date_series as (
+        select generate_series(
+          (timezone('Asia/Jakarta', now())::date - interval '6 days')::date,
+          timezone('Asia/Jakarta', now())::date,
+          interval '1 day'
+        )::date as activity_date
+      ),
+      hour_series as (
+        select generate_series(0, 23) as hour_of_day
+      ),
+      aggregated as (
+        select
+          (occurred_at at time zone 'Asia/Jakarta')::date as activity_date,
+          extract(hour from occurred_at at time zone 'Asia/Jakarta')::int as hour_of_day,
+          count(*)::int as activity_count,
+          count(distinct coalesce(actor_user_id::text, email, session_id::text))::int as unique_users
+        from public.user_activity_logs
+        where event_type in ('route_view', 'heartbeat')
+          and occurred_at >= now() - interval '7 days'
+        group by 1, 2
+      )
+      select
+        to_char(date_series.activity_date, 'YYYY-MM-DD') as date_key,
+        hour_series.hour_of_day,
+        coalesce(aggregated.activity_count, 0)::int as activity_count,
+        coalesce(aggregated.unique_users, 0)::int as unique_users
+      from date_series
+      cross join hour_series
+      left join aggregated
+        on aggregated.activity_date = date_series.activity_date
+       and aggregated.hour_of_day = hour_series.hour_of_day
+      order by date_series.activity_date asc, hour_series.hour_of_day asc
+    `
+  )
+}
+
+function mapHeatmapRows(
+  rows: Array<{
+    date_key: string
+    hour_of_day: number | string | null
+    activity_count: number | string | null
+    unique_users: number | string | null
+  }>
+): UserActivityHeatmapCell[] {
+  return rows.map((row) => ({
+    dateKey: String(row.date_key || ''),
+    dayLabel: formatJakartaDayLabel(String(row.date_key || '')),
+    dateLabel: formatJakartaDateLabel(String(row.date_key || '')),
+    hour: toNumber(row.hour_of_day),
+    activityCount: toNumber(row.activity_count),
+    uniqueUsers: toNumber(row.unique_users),
+  }))
+}
+
+function getPeakHourFromHeatmap(heatmap: UserActivityHeatmapCell[]): UserActivityWeeklyPeakHour | null {
+  const sorted = [...heatmap]
+    .filter((cell) => cell.activityCount > 0)
+    .sort((left, right) => {
+      if (right.activityCount !== left.activityCount) return right.activityCount - left.activityCount
+      if (right.uniqueUsers !== left.uniqueUsers) return right.uniqueUsers - left.uniqueUsers
+      if (left.dateKey !== right.dateKey) return left.dateKey.localeCompare(right.dateKey)
+      return left.hour - right.hour
+    })
+
+  if (!sorted[0]) return null
+
+  return {
+    dateKey: sorted[0].dateKey,
+    dayLabel: sorted[0].dayLabel,
+    dateLabel: sorted[0].dateLabel,
+    hour: sorted[0].hour,
+    activityCount: sorted[0].activityCount,
+    uniqueUsers: sorted[0].uniqueUsers,
+  }
 }
 
 async function resolveMembershipRole(userId: string | null, orgId: string | null) {
@@ -275,56 +379,8 @@ export async function getUserActivitySnapshot(): Promise<UserActivitySnapshot> {
     uniqueUsers24h: toNumber(summaryRow?.unique_users_24h),
   }
 
-  const heatmapResult = await queryPostgres<{
-    date_key: string
-    hour_of_day: number | string | null
-    activity_count: number | string | null
-    unique_users: number | string | null
-  }>(
-    `
-      with date_series as (
-        select generate_series(
-          (timezone('Asia/Jakarta', now())::date - interval '6 days')::date,
-          timezone('Asia/Jakarta', now())::date,
-          interval '1 day'
-        )::date as activity_date
-      ),
-      hour_series as (
-        select generate_series(0, 23) as hour_of_day
-      ),
-      aggregated as (
-        select
-          (occurred_at at time zone 'Asia/Jakarta')::date as activity_date,
-          extract(hour from occurred_at at time zone 'Asia/Jakarta')::int as hour_of_day,
-          count(*)::int as activity_count,
-          count(distinct coalesce(actor_user_id::text, email, session_id::text))::int as unique_users
-        from public.user_activity_logs
-        where event_type in ('route_view', 'heartbeat')
-          and occurred_at >= now() - interval '7 days'
-        group by 1, 2
-      )
-      select
-        to_char(date_series.activity_date, 'YYYY-MM-DD') as date_key,
-        hour_series.hour_of_day,
-        coalesce(aggregated.activity_count, 0)::int as activity_count,
-        coalesce(aggregated.unique_users, 0)::int as unique_users
-      from date_series
-      cross join hour_series
-      left join aggregated
-        on aggregated.activity_date = date_series.activity_date
-       and aggregated.hour_of_day = hour_series.hour_of_day
-      order by date_series.activity_date asc, hour_series.hour_of_day asc
-    `
-  )
-
-  const heatmap: UserActivityHeatmapCell[] = heatmapResult.rows.map((row) => ({
-    dateKey: String(row.date_key || ''),
-    dayLabel: formatJakartaDayLabel(String(row.date_key || '')),
-    dateLabel: formatJakartaDateLabel(String(row.date_key || '')),
-    hour: toNumber(row.hour_of_day),
-    activityCount: toNumber(row.activity_count),
-    uniqueUsers: toNumber(row.unique_users),
-  }))
+  const heatmapResult = await getHeatmapRows7d()
+  const heatmap: UserActivityHeatmapCell[] = mapHeatmapRows(heatmapResult.rows)
 
   const topRoutesResult = await queryPostgres<{
     route_path: string | null
@@ -504,5 +560,187 @@ export async function getUserActivitySnapshot(): Promise<UserActivitySnapshot> {
     topRoutes,
     currentUsers,
     recentActivities,
+  }
+}
+
+/**
+ * Ringkasan pemakaian sistem 7 hari terakhir untuk laporan email admin.
+ * Fokusnya pada analytics aktivitas platform dan insight heatmap mingguan.
+ */
+export async function getWeeklyUserActivityReport(): Promise<UserActivityWeeklyReport> {
+  const summaryResult = await queryPostgres<{
+    active_users_10m: number | string | null
+    route_visits_7d: number | string | null
+    users_logged_in_7d: number | string | null
+    unique_users_7d: number | string | null
+    active_orgs_7d: number | string | null
+    active_branches_7d: number | string | null
+  }>(
+    `
+      with route_summary as (
+        select
+          count(distinct coalesce(actor_user_id::text, email, session_id::text))
+            filter (
+              where occurred_at >= now() - interval '10 minutes'
+                and event_type in ('route_view', 'heartbeat')
+            )::int as active_users_10m,
+          count(*)
+            filter (
+              where occurred_at >= now() - interval '7 days'
+                and event_type = 'route_view'
+            )::int as route_visits_7d,
+          count(distinct coalesce(actor_user_id::text, email, session_id::text))
+            filter (
+              where occurred_at >= now() - interval '7 days'
+                and event_type = 'route_view'
+            )::int as unique_users_7d,
+          count(distinct org_id::text)
+            filter (
+              where occurred_at >= now() - interval '7 days'
+                and event_type = 'route_view'
+                and org_id is not null
+            )::int as active_orgs_7d,
+          count(distinct branch_id::text)
+            filter (
+              where occurred_at >= now() - interval '7 days'
+                and event_type = 'route_view'
+                and branch_id is not null
+            )::int as active_branches_7d
+        from public.user_activity_logs
+      ),
+      login_summary as (
+        select
+          count(*)::int as users_logged_in_7d
+        from public.internal_auth_users
+        where is_active = true
+          and last_login_at >= now() - interval '7 days'
+      )
+      select
+        route_summary.active_users_10m,
+        route_summary.route_visits_7d,
+        route_summary.unique_users_7d,
+        route_summary.active_orgs_7d,
+        route_summary.active_branches_7d,
+        login_summary.users_logged_in_7d
+      from route_summary
+      cross join login_summary
+    `
+  )
+
+  const summaryRow = summaryResult.rows[0]
+  const summary: UserActivityWeeklySummary = {
+    activeUsers10m: toNumber(summaryRow?.active_users_10m),
+    routeVisits7d: toNumber(summaryRow?.route_visits_7d),
+    usersLoggedIn7d: toNumber(summaryRow?.users_logged_in_7d),
+    uniqueUsers7d: toNumber(summaryRow?.unique_users_7d),
+    activeOrgs7d: toNumber(summaryRow?.active_orgs_7d),
+    activeBranches7d: toNumber(summaryRow?.active_branches_7d),
+  }
+
+  const heatmapResult = await getHeatmapRows7d()
+  const heatmap = mapHeatmapRows(heatmapResult.rows)
+
+  const topRoutesResult = await queryPostgres<{
+    route_path: string | null
+    visits: number | string | null
+    unique_users: number | string | null
+  }>(
+    `
+      select
+        route_path,
+        count(*)::int as visits,
+        count(distinct coalesce(actor_user_id::text, email, session_id::text))::int as unique_users
+      from public.user_activity_logs
+      where event_type = 'route_view'
+        and route_path is not null
+        and occurred_at >= now() - interval '7 days'
+      group by route_path
+      order by visits desc, route_path asc
+      limit 10
+    `
+  )
+
+  const topRoutes: UserActivityTopRoute[] = topRoutesResult.rows
+    .filter((row) => normalizeText(row.route_path))
+    .map((row) => ({
+      routePath: normalizeText(row.route_path) || '/',
+      visits: toNumber(row.visits),
+      uniqueUsers: toNumber(row.unique_users),
+    }))
+
+  const topTenantsResult = await queryPostgres<{
+    org_id: string | null
+    org_name: string | null
+    visits: number | string | null
+    unique_users: number | string | null
+  }>(
+    `
+      select
+        user_activity_logs.org_id::text as org_id,
+        coalesce(organizations.name, 'Tanpa Tenant') as org_name,
+        count(*)::int as visits,
+        count(distinct coalesce(user_activity_logs.actor_user_id::text, user_activity_logs.email, user_activity_logs.session_id::text))::int as unique_users
+      from public.user_activity_logs
+      left join public.organizations
+        on organizations.id = user_activity_logs.org_id
+      where user_activity_logs.event_type = 'route_view'
+        and user_activity_logs.occurred_at >= now() - interval '7 days'
+      group by user_activity_logs.org_id::text, coalesce(organizations.name, 'Tanpa Tenant')
+      order by visits desc, org_name asc
+      limit 10
+    `
+  )
+
+  const topTenants: UserActivityTopTenant[] = topTenantsResult.rows.map((row) => ({
+    orgId: normalizeText(row.org_id),
+    orgName: normalizeText(row.org_name) || 'Tanpa Tenant',
+    visits: toNumber(row.visits),
+    uniqueUsers: toNumber(row.unique_users),
+  }))
+
+  const peakDayResult = await queryPostgres<{
+    date_key: string
+    activity_count: number | string | null
+    unique_users: number | string | null
+  }>(
+    `
+      select
+        to_char((occurred_at at time zone 'Asia/Jakarta')::date, 'YYYY-MM-DD') as date_key,
+        count(*)::int as activity_count,
+        count(distinct coalesce(actor_user_id::text, email, session_id::text))::int as unique_users
+      from public.user_activity_logs
+      where event_type in ('route_view', 'heartbeat')
+        and occurred_at >= now() - interval '7 days'
+      group by (occurred_at at time zone 'Asia/Jakarta')::date
+      order by activity_count desc, date_key asc
+      limit 1
+    `
+  )
+
+  const peakHour = getPeakHourFromHeatmap(heatmap)
+  const peakDayRow = peakDayResult.rows[0]
+  const peakDay: UserActivityWeeklyPeakDay | null = peakDayRow
+    ? {
+        dateKey: String(peakDayRow.date_key || ''),
+        dayLabel: formatJakartaDayLabel(String(peakDayRow.date_key || '')),
+        dateLabel: formatJakartaDateLabel(String(peakDayRow.date_key || '')),
+        activityCount: toNumber(peakDayRow.activity_count),
+        uniqueUsers: toNumber(peakDayRow.unique_users),
+      }
+    : null
+
+  const periodStart = heatmap[0]?.dateKey || ''
+  const periodEnd = heatmap[heatmap.length - 1]?.dateKey || ''
+
+  return {
+    periodStart,
+    periodEnd,
+    periodLabel: buildPeriodLabel(periodStart, periodEnd),
+    summary,
+    heatmap,
+    topRoutes,
+    topTenants,
+    peakHour,
+    peakDay,
   }
 }

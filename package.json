@@ -32,6 +32,7 @@
     "db:railway:auth:backfill:apply": "node scripts/backfill-railway-auth-users.mjs --apply",
     "db:railway:internal-auth:bootstrap": "node scripts/bootstrap-railway-internal-auth-users.mjs",
     "db:railway:internal-auth:bootstrap:apply": "node scripts/bootstrap-railway-internal-auth-users.mjs --apply",
+    "report:weekly-system-usage": "tsx scripts/send-weekly-system-usage-report.ts",
     "templates:migrasi": "node scripts/generate-migration-template-xlsx.mjs",
     "test": "vitest run",
     "test:erp": "vitest run __tests__/accounting.test.ts __tests__/auth.actions.test.ts __tests__/fleet.actions.test.ts __tests__/middleware.test.ts __tests__/proxy.test.ts",
@@ -72,6 +73,7 @@
     "react-barcode": "^1.6.1",
     "react-dom": "^19.2.4",
     "recharts": "^3.8.0",
+    "server-only": "^0.0.1",
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {

@@ -596,7 +596,10 @@ Guards both `/admin` and `/saas/*` routes.
 - Invoice email sending
 - Promo broadcast
 - Internal password reset email
+- Weekly admin system usage report (analytics + heatmap)
 - Requires `MAILKETING_API_TOKEN` and `MAILKETING_FROM_EMAIL` (no fallback)
+- CLI trigger: `npm run report:weekly-system-usage`
+- Scheduler endpoint: `GET/POST /api/internal/weekly-system-usage-report` + secret header
 
 ### 7.14 SaaS Operator
 
@@ -854,6 +857,8 @@ Core reusable components:
 | `GOOGLE_AI_STUDIO_KEY` | For AI features | OCR, AI content generation |
 | `MAILKETING_API_TOKEN` | For email | Invoice, promo, reset password email via Mailketing |
 | `MAILKETING_FROM_EMAIL` | For email | Default alamat pengirim email |
+| `WEEKLY_SYSTEM_USAGE_REPORT_RECIPIENTS` | For weekly admin report | Daftar email admin dipisah koma |
+| `WEEKLY_SYSTEM_USAGE_REPORT_SECRET` | For scheduler endpoint | Secret untuk trigger laporan mingguan |
 | `NEXT_PUBLIC_APP_URL` | Optional | Public base URL fallback |
 | `NEXT_PUBLIC_SITE_URL` | Optional | Password reset redirect URL |
 | `VERCEL_URL` | Auto (Vercel) | Vercel deployment origin |

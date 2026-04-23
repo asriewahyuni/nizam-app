@@ -1,9 +1,8 @@
-import 'server-only'
 const MAILKETING_API_URL = 'https://api.mailketing.co.id/api/v1/send'
 
 type MailketingPayload = Record<string, unknown> | string
 
-type MailketingSendInput = {
+export type MailketingSendInput = {
   fromName: string
   fromEmail?: string
   toEmail: string
@@ -133,11 +132,22 @@ function getErrorMessage(error: unknown) {
 }
 
 /**
+ * Pengirim email umum untuk kebutuhan sistem internal seperti report admin.
+ */
+export async function sendSystemEmail(input: MailketingSendInput) {
+  try {
+    const data = await sendMailketingEmail(input)
+    return { success: true as const, data }
+  } catch (error) {
+    return { error: getErrorMessage(error) as string }
+  }
+}
+
+/**
  * Utilitas untuk mengirim Invoice / Tagihan ke email pelanggan
  */
 export async function sendInvoiceEmail(toEmail: string, invoiceNumber: string, amount: number) {
-  try {
-    const data = await sendMailketingEmail({
+  return sendSystemEmail({
       fromName: 'Nizam SaaS',
       toEmail,
       subject: `[Tagihan Baru] Invoice ${invoiceNumber} dari NIZAM`,
@@ -155,19 +165,13 @@ export async function sendInvoiceEmail(toEmail: string, invoiceNumber: string, a
         </div>
       `,
     })
-
-    return { success: true, data }
-  } catch (error) {
-    return { error: getErrorMessage(error) }
-  }
 }
 
 /**
  * Utilitas untuk mengirim Broadcast Promo ke Pengguna
  */
 export async function sendPromoBroadcast(toEmail: string, promoTitle: string) {
-  try {
-    const data = await sendMailketingEmail({
+  return sendSystemEmail({
       fromName: 'Promo Nizam',
       toEmail,
       subject: `🔥 Penawaran Spesial: ${promoTitle}!`,
@@ -181,19 +185,13 @@ export async function sendPromoBroadcast(toEmail: string, promoTitle: string) {
         </div>
       `,
     })
-
-    return { success: true, data }
-  } catch (error) {
-    return { error: getErrorMessage(error) }
-  }
 }
 
 /**
  * Utilitas untuk mengirim link reset password ke pengguna (Internal Auth)
  */
 export async function sendPasswordResetEmailInternal(toEmail: string, resetLink: string) {
-  try {
-    const data = await sendMailketingEmail({
+  return sendSystemEmail({
       fromName: 'Nizam Security',
       toEmail,
       subject: `[NIZAM] Permintaan Reset Password`,
@@ -213,9 +211,4 @@ export async function sendPasswordResetEmailInternal(toEmail: string, resetLink:
         </div>
       `,
     })
-
-    return { success: true, data }
-  } catch (error) {
-    return { error: getErrorMessage(error) }
-  }
 }

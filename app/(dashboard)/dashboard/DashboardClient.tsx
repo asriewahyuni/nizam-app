@@ -1,6 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import { useLayoutEffect, useRef } from 'react'
 import {
    Search,
    ChevronRight,
@@ -103,6 +104,130 @@ const item = {
    show: { opacity: 1, y: 0 }
 }
 
+function AutoFitMetricAmount({ value, className }: { value: string, className: string }) {
+   const wrapperRef = useRef<HTMLSpanElement | null>(null)
+   const textRef = useRef<HTMLSpanElement | null>(null)
+
+   useLayoutEffect(() => {
+      const wrapper = wrapperRef.current
+      const text = textRef.current
+
+      if (!wrapper || !text) return
+
+      let frameId = 0
+
+      const fitText = () => {
+         const availableWidth = wrapper.clientWidth
+
+         if (!availableWidth) return
+
+         text.style.fontSize = ''
+
+         const computedFontSize = Number.parseFloat(window.getComputedStyle(text).fontSize)
+
+         if (!Number.isFinite(computedFontSize) || computedFontSize <= 0) return
+
+         const minFontSize = Math.max(26, computedFontSize * 0.58)
+         let nextFontSize = computedFontSize
+
+         while (nextFontSize > minFontSize && text.scrollWidth > availableWidth) {
+            nextFontSize -= 1
+            text.style.fontSize = `${nextFontSize}px`
+         }
+      }
+
+      const scheduleFit = () => {
+         cancelAnimationFrame(frameId)
+         frameId = requestAnimationFrame(fitText)
+      }
+
+      scheduleFit()
+
+      const resizeObserver = new ResizeObserver(scheduleFit)
+      resizeObserver.observe(wrapper)
+
+      return () => {
+         cancelAnimationFrame(frameId)
+         resizeObserver.disconnect()
+      }
+   }, [value])
+
+   return (
+      <span ref={wrapperRef} className="block w-full max-w-full min-w-0 overflow-hidden">
+         <span ref={textRef} className={className}>
+            {value}
+         </span>
+      </span>
+   )
+}
+
+function normalizeMetricValue(value: string) {
+   return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function getMetricValueClass(value: string) {
+   const normalizedValue = normalizeMetricValue(value)
+   const valueParts = normalizedValue.split('/').map((part) => part.trim()).filter(Boolean)
+   const longestAmount = valueParts.reduce((max, part) => {
+      const currencyMatch = /^(?<sign>-)?\s*(?<currency>Rp)\s*(?<amount>.+)$/i.exec(part)
+      const amountLength = currencyMatch?.groups?.amount?.trim().length ?? part.length
+
+      return Math.max(max, amountLength)
+   }, 0)
+
+   if (valueParts.length > 1) {
+      if (longestAmount >= 10) {
+         return 'text-[clamp(2rem,2.2vw,2.7rem)]'
+      }
+
+      return 'text-[clamp(2.2rem,2.45vw,3rem)]'
+   }
+
+   if (longestAmount >= 13) {
+      return 'text-[clamp(2.1rem,2.6vw,3rem)]'
+   }
+
+   if (longestAmount >= 10) {
+      return 'text-[clamp(2.5rem,3.1vw,3.6rem)]'
+   }
+
+   return 'text-[clamp(2.8rem,3.6vw,4.4rem)]'
+}
+
+function renderMetricValue(value: string) {
+   const normalizedValue = normalizeMetricValue(value)
+   const valueParts = normalizedValue.split('/').map((part) => part.trim()).filter(Boolean)
+
+   return valueParts.map((part, index) => {
+      const currencyMatch = /^(?<sign>-)?\s*(?<currency>Rp)\s*(?<amount>.+)$/i.exec(part)
+
+      return (
+         <span key={`${part}-${index}`} className="block w-full">
+            {index > 0 ? (
+               <span className="mb-1 block text-[0.42em] font-black leading-none text-current/45">/</span>
+            ) : null}
+            {currencyMatch?.groups ? (
+               <span className="flex w-full flex-col items-start gap-1 min-w-0">
+                  <span className="flex items-center gap-1 text-[0.3em] font-black uppercase leading-none tracking-[0.12em] text-current/60">
+                     {currencyMatch.groups.sign ? <span className="text-[1.15em] tracking-normal">{currencyMatch.groups.sign}</span> : null}
+                     <span>{currencyMatch.groups.currency}</span>
+                  </span>
+                  <AutoFitMetricAmount
+                     value={currencyMatch.groups.amount}
+                     className="block max-w-full min-w-0 whitespace-nowrap font-mono tabular-nums tracking-[-0.05em]"
+                  />
+               </span>
+            ) : (
+               <AutoFitMetricAmount
+                  value={part}
+                  className="block max-w-full whitespace-nowrap font-mono tabular-nums tracking-[-0.05em]"
+               />
+            )}
+         </span>
+      )
+   })
+}
+
 export function DashboardClient({ data }: DashboardClientProps) {
    const router = useRouter()
    // Safety fallback for new fields
@@ -147,7 +272,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
             {data.metrics.map((m) => {
                const Icon = ICON_MAP[m.icon] || Wallet
                const isDanger = m.danger
-
+               const metricValueClass = getMetricValueClass(m.value)
                const href = m.href || '#'
 
                return (
@@ -177,12 +302,12 @@ export function DashboardClient({ data }: DashboardClientProps) {
                      </div>
                      <div className="space-y-1.5 mt-auto pointer-events-none">
                         <h3
-                           className={`font-black font-mono tracking-tighter leading-none break-words
-                             text-xl sm:text-2xl 
+                           className={`w-full font-black leading-[0.9]
+                             ${metricValueClass}
                              ${isDanger ? 'text-rose-700' : 'text-slate-900 group-hover:text-blue-700'}`}
                            title={String(m.value)}
                         >
-                           {m.value}
+                           {renderMetricValue(m.value)}
                         </h3>
                         <p className={`text-[10px] font-bold leading-relaxed italic opacity-70 ${isDanger ? 'text-rose-500' : 'text-slate-400'}`}>{m.hint}</p>
                      </div>
