@@ -838,6 +838,11 @@ export async function getSales(orgId: string, branchId?: string | null) {
         c.name           AS customer_name,
         b.name           AS branch_name,
         b.code           AS branch_code,
+        COALESCE(
+          NULLIF(trim(concat_ws(' ', emp.first_name, emp.last_name)), ''),
+          NULLIF(trim(proc_auth.display_name), ''),
+          NULL
+        )                AS processor_name,
         sr.id            AS reseller_id_val,
         sr.name          AS reseller_name,
         sr.reseller_type AS reseller_type,
@@ -846,6 +851,14 @@ export async function getSales(orgId: string, branchId?: string | null) {
       FROM   public.sales s
       LEFT JOIN public.contacts       c  ON c.id  = s.customer_id
       LEFT JOIN public.branches       b  ON b.id  = s.branch_id
+      LEFT JOIN public.employees      emp ON emp.org_id = s.org_id AND emp.user_id = s.created_by
+      LEFT JOIN LATERAL (
+        SELECT u.display_name
+        FROM   public.internal_auth_users u
+        WHERE  u.legacy_user_id = s.created_by OR u.id = s.created_by
+        ORDER  BY CASE WHEN u.legacy_user_id = s.created_by THEN 0 ELSE 1 END, u.updated_at DESC
+        LIMIT 1
+      ) proc_auth ON TRUE
       LEFT JOIN public.sales_resellers sr ON sr.id = s.reseller_id
       WHERE  s.org_id = $1${branchFilter}
       ORDER  BY s.created_at DESC
@@ -920,6 +933,7 @@ export async function getSales(orgId: string, branchId?: string | null) {
       branches: (row.branch_name || row.branch_code)
         ? { name: row.branch_name, code: row.branch_code }
         : null,
+      processor_name: String(row.processor_name || '').trim() || null,
       sales_resellers: row.reseller_name ? {
         id: row.reseller_id_val,
         name: row.reseller_name,

@@ -51,6 +51,26 @@ function normalizeDateInputValue(value: unknown): string {
   return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
 }
 
+type HeaderDiscountMode = 'FIXED' | 'PERCENT'
+
+function calculateHeaderDiscountValue(baseAmount: number, mode: HeaderDiscountMode, value: number | null): number | null {
+  if (value === null) return null
+
+  const normalizedBase = Math.max(0, Number(baseAmount || 0))
+  const normalizedValue = Math.max(0, Number(value || 0))
+  if (!Number.isFinite(normalizedBase) || !Number.isFinite(normalizedValue)) return 0
+  if (normalizedBase <= 0 || normalizedValue <= 0) return 0
+
+  if (mode === 'PERCENT') {
+    return Math.min(
+      normalizedBase,
+      Math.round(normalizedBase * (Math.min(100, normalizedValue) / 100))
+    )
+  }
+
+  return Math.min(normalizedBase, Math.round(normalizedValue))
+}
+
 export default function SalesClient({
   orgId,
   orgName,
@@ -138,6 +158,7 @@ export default function SalesClient({
   const [paymentTerm, setPaymentTerm] = useState<'TEMPO' | 'LUNAS'>('TEMPO')
   const [paymentAccountId, setPaymentAccountId] = useState('')
   const [customGlobalDiscount, setCustomGlobalDiscount] = useState<number | null>(null)
+  const [customGlobalDiscountMode, setCustomGlobalDiscountMode] = useState<HeaderDiscountMode>('FIXED')
   const [headerTaxPercent, setHeaderTaxPercent] = useState(0)
   const [shariahMode, setShariahMode] = useState<'CASH' | 'SALAM' | 'ISTISHNA'>('CASH')
 
@@ -186,8 +207,10 @@ export default function SalesClient({
     (sum: number, line: typeof lines[0]) => sum + getStoredLineDiscountAmount(line.discount_amount || 0, line.quantity),
     0
   )
-  
-  const appliedDiscount = customGlobalDiscount !== null ? customGlobalDiscount : autoLineDiscounts
+
+  const manualGlobalDiscount = calculateHeaderDiscountValue(grossSubTotal, customGlobalDiscountMode, customGlobalDiscount)
+  const isUsingManualDiscount = manualGlobalDiscount !== null
+  const appliedDiscount = manualGlobalDiscount !== null ? manualGlobalDiscount : autoLineDiscounts
   const taxableAmount = Math.max(0, grossSubTotal - appliedDiscount)
   const calculatedTax = (taxableAmount * headerTaxPercent) / 100
   const grandTotal = taxableAmount + calculatedTax
@@ -203,6 +226,7 @@ export default function SalesClient({
     setPaymentTerm('TEMPO')
     setPaymentAccountId('')
     setCustomGlobalDiscount(null)
+    setCustomGlobalDiscountMode('FIXED')
     setHeaderTaxPercent(0)
     setShariahMode('CASH')
     setHasDp(false)
@@ -261,6 +285,7 @@ export default function SalesClient({
     setPaymentTerm(nextPaymentTerm)
     setPaymentAccountId(String(sale?.payment_account_id || ''))
     setCustomGlobalDiscount(discount)
+    setCustomGlobalDiscountMode('FIXED')
     setHeaderTaxPercent(Number.isFinite(taxPercent) ? Number(taxPercent.toFixed(2)) : 0)
     setShariahMode(nextShariahMode)
     setHasDp(false)
@@ -742,6 +767,9 @@ export default function SalesClient({
                          {s.sale_number}
                        </button>
                        <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(s.sale_date, 'short')}</div>
+                       <div className="text-[10px] font-bold text-slate-500 mt-1">
+                         Diproses: <span className="text-slate-700">{s.processor_name || '-'}</span>
+                       </div>
                     </td>
                     <td className="px-8 py-6">
                        <div className="text-sm font-bold text-slate-900">{s.contacts?.name || 'Unknown Client'}</div>
@@ -1160,16 +1188,63 @@ export default function SalesClient({
                      </div>
                      <div className="flex justify-between items-center text-sm font-semibold text-blue-900">
                        <div className="flex flex-col">
-                         <span>Diskon Global Faktur (Rp)</span>
-                         <span className="text-[10px] font-normal opacity-70">Otomatis dari diskon per barang, bisa ditimpa.</span>
+                         <span>Diskon Global Faktur</span>
+                         <span className="text-[10px] font-normal opacity-70">Default ikut total diskon item. Bisa diganti ke flat atau prosentase.</span>
                        </div>
-                       <CurrencyInput
-                         label=""
-                         value={customGlobalDiscount !== null ? customGlobalDiscount : autoLineDiscounts}
-                         onChange={(val) => setCustomGlobalDiscount(val)}
-                         className="!w-48 !py-2 !rounded-lg !text-right !font-bold !text-slate-900 bg-white"
-                         placeholder="0"
-                       />
+                       <div className="flex flex-col items-end gap-2">
+                         <div className="flex items-center gap-2">
+                           <div className="flex rounded-lg border border-slate-200 bg-white p-1">
+                             <button
+                               type="button"
+                               onClick={() => setCustomGlobalDiscountMode('FIXED')}
+                               className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${customGlobalDiscountMode === 'FIXED' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                             >
+                               Flat (Rp)
+                             </button>
+                             <button
+                               type="button"
+                               onClick={() => setCustomGlobalDiscountMode('PERCENT')}
+                               className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${customGlobalDiscountMode === 'PERCENT' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                             >
+                               Prosentase (%)
+                             </button>
+                           </div>
+                           {isUsingManualDiscount && (
+                             <button
+                               type="button"
+                               onClick={() => setCustomGlobalDiscount(null)}
+                               className="px-3 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-500 hover:text-slate-700"
+                             >
+                               Pakai Otomatis
+                             </button>
+                           )}
+                         </div>
+
+                         {customGlobalDiscountMode === 'FIXED' ? (
+                           <CurrencyInput
+                             label=""
+                             value={customGlobalDiscount ?? 0}
+                             onChange={(val) => setCustomGlobalDiscount(val)}
+                             className="!w-48 !py-2 !rounded-lg !text-right !font-bold !text-slate-900 bg-white"
+                             placeholder="0"
+                           />
+                         ) : (
+                           <input
+                             type="number"
+                             min="0"
+                             max="100"
+                             step="0.01"
+                             value={customGlobalDiscount ?? ''}
+                             onChange={(e) => setCustomGlobalDiscount(e.target.value === '' ? null : parseFloat(e.target.value) || 0)}
+                             className="w-48 px-3 py-2 border border-slate-200 rounded-lg outline-none text-right font-bold text-slate-900 bg-white"
+                             placeholder="0"
+                           />
+                         )}
+                       </div>
+                     </div>
+                     <div className="flex justify-between items-center text-xs font-semibold text-blue-800">
+                       <span>{isUsingManualDiscount ? 'Diskon manual yang dipakai:' : 'Diskon otomatis dari item yang dipakai:'}</span>
+                       <span>-{formatCurrency(appliedDiscount)}</span>
                      </div>
                      <div className="flex justify-between items-center text-sm font-semibold text-blue-900">
                        <div className="flex flex-col">
@@ -1447,11 +1522,14 @@ export default function SalesClient({
                    </button>
                 </div>
                 
-                <div className="p-6 overflow-y-auto w-full print:overflow-visible print:px-0 print:py-0">
+                   <div className="p-6 overflow-y-auto w-full print:overflow-visible print:px-0 print:py-0">
                    <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
                       <div>
                          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">Customer / Klien</p>
                          <p className="font-bold text-slate-900">{viewSale.contacts?.name || 'Unknown'}</p>
+                         <p className="mt-2 text-[11px] font-bold text-slate-500">
+                           Diproses oleh: <span className="text-slate-800">{viewSale.processor_name || '-'}</span>
+                         </p>
                          {pickRelation(viewSale.sales_resellers) && (
                            <p className="mt-2 text-[11px] font-bold text-indigo-600">
                              Reseller: {getResellerDisplayName(pickRelation(viewSale.sales_resellers))}
