@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { checkCanManageCoA } from '@/modules/accounting/actions/coa.actions'
+import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 import type { Account, BankAccount } from '@/types/database.types'
 import type { CashBankAccount, RecentTransactionOption } from '@/modules/cash/types'
@@ -81,6 +82,57 @@ function isMissingColumnError(error: { message?: string | null } | null | undefi
   if (!error) return false
   const message = String(error.message || '').toLowerCase()
   return message.includes('column') && message.includes('does not exist')
+}
+
+async function getCurrentCashPlacementAccess(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string
+) {
+  const { data: authData } = await supabase.auth.getUser()
+  const userId = String(authData?.user?.id || '').trim()
+
+  if (!userId) {
+    return { role: null, permissions: [] as string[] }
+  }
+
+  const { data: membership } = await supabase
+    .from('org_members')
+    .select('role, role_id')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  let resolvedRoleId = String(membership?.role_id || '').trim()
+
+  if (!resolvedRoleId) {
+    const { data: employee } = await supabase
+      .from('employees')
+      .select('role_id')
+      .eq('org_id', orgId)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    resolvedRoleId = String(employee?.role_id || '').trim()
+  }
+
+  let permissions: string[] = []
+  if (resolvedRoleId) {
+    const { data: roleData } = await supabase
+      .from('roles')
+      .select('permissions')
+      .eq('id', resolvedRoleId)
+      .maybeSingle()
+
+    permissions = Array.isArray(roleData?.permissions)
+      ? roleData.permissions.filter((permission: unknown): permission is string => typeof permission === 'string')
+      : []
+  }
+
+  return {
+    role: typeof membership?.role === 'string' ? membership.role : null,
+    permissions,
+  }
 }
 
 function decorateCashAccountsWithBalance<T extends CashBankAccountRecord & {
@@ -269,7 +321,7 @@ export async function createBankAccount(orgId: string, formData: FormData) {
   try {
     const result = await checkCanManageCoA(orgId);
     canManageDirect = result.canManageDirect;
-  } catch (e) {
+  } catch {
     // If the check fails (e.g., missing tables in test environment), assume permission granted.
     canManageDirect = true;
   }
@@ -282,6 +334,12 @@ export async function createBankAccount(orgId: string, formData: FormData) {
     }
   }
 
+  const activeOrgData = await getCurrentCashPlacementAccess(supabase, orgId)
+  const canUseFullPlacementScope = hasRolePermission(
+    activeOrgData?.role,
+    activeOrgData?.permissions,
+    'bank'
+  )
 
   const accountId = formData.get('account_id') as string // The GL Account ID
   const bankName = String(formData.get('bank_name') || '').trim()
@@ -302,6 +360,13 @@ export async function createBankAccount(orgId: string, formData: FormData) {
     }
     // parts[1] might be empty if "Kantor Utama" is selected and it has no default branch ID? Actually branches are mandatory. But if it's empty, use NULL (kantor utama fallback)
     finalBranchId = parts.length >= 2 && parts[1].trim() ? parts[1].trim() : null;
+  }
+
+  if (finalOrgId !== orgId && !canUseFullPlacementScope) {
+    return {
+      error:
+        'Role ini belum punya akses Kas & Bank, jadi tidak bisa memilih penempatan rekening lintas organisasi & unit.',
+    }
   }
 
   if (!accountId || !bankName) {

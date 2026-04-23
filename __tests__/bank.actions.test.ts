@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   revalidatePath: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
+  checkCanManageCoA: vi.fn(),
+  nudgeEduModeValidation: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -18,6 +20,14 @@ vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
 }))
 
+vi.mock('@/modules/accounting/actions/coa.actions', () => ({
+  checkCanManageCoA: mocks.checkCanManageCoA,
+}))
+
+vi.mock('@/modules/edu/lib/progress-hooks.server', () => ({
+  nudgeEduModeValidation: mocks.nudgeEduModeValidation,
+}))
+
 import {
   createBankAccount,
   createBankTransaction,
@@ -29,6 +39,8 @@ import {
 describe('Cash & Bank Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.checkCanManageCoA.mockResolvedValue({ canManageDirect: true })
+    mocks.nudgeEduModeValidation.mockResolvedValue(undefined)
   })
 
   it('stamps active branch when creating a bank account', async () => {
@@ -48,9 +60,44 @@ describe('Cash & Bank Branch Context', () => {
     })
 
     mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
       from: vi.fn((table: string) => {
-        if (table !== 'bank_accounts') throw new Error(`Unexpected table ${table}`)
-        return { insert: insertMock }
+        if (table === 'org_members') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => ({
+                    maybeSingle: vi.fn().mockResolvedValue({
+                      data: { role: 'owner', role_id: null },
+                      error: null,
+                    }),
+                  })),
+                })),
+              })),
+            })),
+          }
+        }
+        if (table === 'employees') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  maybeSingle: vi.fn().mockResolvedValue({
+                    data: { role_id: null },
+                    error: null,
+                  }),
+                })),
+              })),
+            })),
+          }
+        }
+        if (table === 'bank_accounts') return { insert: insertMock }
+        throw new Error(`Unexpected table ${table}`)
       }),
     })
 
@@ -71,6 +118,148 @@ describe('Cash & Bank Branch Context', () => {
       })
     )
     expect(result).toEqual({ success: true })
+  })
+
+  it('rejects cross-org account placement when role has no Kas & Bank access', async () => {
+    const insertMock = vi.fn().mockResolvedValue({
+      error: null,
+    })
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: {
+        accessibleBranches: [],
+        accessibleBranchIds: ['branch-1'],
+        canAccessAllBranches: false,
+        membershipId: 'member-1',
+        role: 'manager',
+      },
+      branchId: 'branch-1',
+    })
+
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'org_members') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => ({
+                    maybeSingle: vi.fn().mockResolvedValue({
+                      data: { role: 'manager', role_id: 'role-1' },
+                      error: null,
+                    }),
+                  })),
+                })),
+              })),
+            })),
+          }
+        }
+        if (table === 'roles') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: { permissions: ['journal:read'] },
+                  error: null,
+                }),
+              })),
+            })),
+          }
+        }
+        if (table === 'bank_accounts') return { insert: insertMock }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const formData = new FormData()
+    formData.set('account_id', 'acc-1')
+    formData.set('bank_name', 'BCA Anak')
+    formData.set('target_org_branch', 'child-org|branch-2')
+
+    const result = await createBankAccount('org-1', formData)
+
+    expect(result).toEqual({
+      error:
+        'Role ini belum punya akses Kas & Bank, jadi tidak bisa memilih penempatan rekening lintas organisasi & unit.',
+    })
+    expect(insertMock).not.toHaveBeenCalled()
+  })
+
+  it('allows cross-org account placement when role has Kas & Bank access', async () => {
+    const insertMock = vi.fn().mockResolvedValue({
+      error: null,
+    })
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: {
+        accessibleBranches: [],
+        accessibleBranchIds: ['branch-1'],
+        canAccessAllBranches: false,
+        membershipId: 'member-1',
+        role: 'manager',
+      },
+      branchId: 'branch-1',
+    })
+
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'org_members') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => ({
+                    maybeSingle: vi.fn().mockResolvedValue({
+                      data: { role: 'manager', role_id: 'role-1' },
+                      error: null,
+                    }),
+                  })),
+                })),
+              })),
+            })),
+          }
+        }
+        if (table === 'roles') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: { permissions: ['bank:read'] },
+                  error: null,
+                }),
+              })),
+            })),
+          }
+        }
+        if (table === 'bank_accounts') return { insert: insertMock }
+        throw new Error(`Unexpected table ${table}`)
+      }),
+    })
+
+    const formData = new FormData()
+    formData.set('account_id', 'acc-1')
+    formData.set('bank_name', 'BCA Anak')
+    formData.set('target_org_branch', 'child-org|branch-2')
+
+    const result = await createBankAccount('org-1', formData)
+
+    expect(result).toEqual({ success: true })
+    expect(insertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: 'child-org',
+        branch_id: 'branch-2',
+      })
+    )
   })
 
   it('rejects bank transactions when selected bank account is outside the active branch', async () => {
