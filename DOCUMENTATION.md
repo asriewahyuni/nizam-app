@@ -595,7 +595,8 @@ Guards both `/admin` and `/saas/*` routes.
 **Email capabilities:**
 - Invoice email sending
 - Promo broadcast
-- Requires `RESEND_API_KEY` (no fallback)
+- Internal password reset email
+- Requires `MAILKETING_API_TOKEN` and `MAILKETING_FROM_EMAIL` (no fallback)
 
 ### 7.14 SaaS Operator
 
@@ -851,7 +852,8 @@ Core reusable components:
 | `NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY` | When local | Local anon key |
 | `SUPABASE_LOCAL_SERVICE_ROLE_KEY` | When local | Local service role |
 | `GOOGLE_AI_STUDIO_KEY` | For AI features | OCR, AI content generation |
-| `RESEND_API_KEY` | For email | Invoice, promo email |
+| `MAILKETING_API_TOKEN` | For email | Invoice, promo, reset password email via Mailketing |
+| `MAILKETING_FROM_EMAIL` | For email | Default alamat pengirim email |
 | `NEXT_PUBLIC_APP_URL` | Optional | Public base URL fallback |
 | `NEXT_PUBLIC_SITE_URL` | Optional | Password reset redirect URL |
 | `VERCEL_URL` | Auto (Vercel) | Vercel deployment origin |

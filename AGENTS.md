@@ -52,7 +52,7 @@ Panduan ini ditujukan untuk asisten AI agar memahami struktur kode, konvensi, da
    - Error harus selesai disanitasi (contoh: `getErrorMessage` dalam `email/sender.ts`).
 
 4. **Library Pihak Ketiga**:
-   - Email: [Resend API](https://resend.com).
+   - Email: Mailketing API.
    - Database: [Supabase](https://supabase.com).
    - Animasi: [Framer Motion](https://www.framer.com/motion/).
 

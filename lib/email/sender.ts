@@ -1,14 +1,130 @@
 import 'server-only'
-import { Resend } from 'resend';
+const MAILKETING_API_URL = 'https://api.mailketing.co.id/api/v1/send'
 
-function getResendClient() {
-  const apiKey = process.env.RESEND_API_KEY
+type MailketingPayload = Record<string, unknown> | string
 
-  if (!apiKey) {
-    throw new Error('Missing RESEND_API_KEY')
+type MailketingSendInput = {
+  fromName: string
+  fromEmail?: string
+  toEmail: string
+  subject: string
+  html: string
+  attachments?: string[]
+}
+
+/**
+ * Ambil konfigurasi Mailketing dari environment agar token tidak ditanam di kode.
+ */
+function getMailketingConfig() {
+  const apiToken = String(process.env.MAILKETING_API_TOKEN || '').trim()
+  const defaultFromEmail = String(process.env.MAILKETING_FROM_EMAIL || '').trim()
+
+  if (!apiToken) {
+    throw new Error('Missing MAILKETING_API_TOKEN')
   }
 
-  return new Resend(apiKey)
+  if (!defaultFromEmail) {
+    throw new Error('Missing MAILKETING_FROM_EMAIL')
+  }
+
+  return { apiToken, defaultFromEmail }
+}
+
+function parseMailketingPayload(rawPayload: string): MailketingPayload {
+  const trimmedPayload = rawPayload.trim()
+  if (!trimmedPayload) return ''
+
+  try {
+    return JSON.parse(trimmedPayload) as Record<string, unknown>
+  } catch {
+    return trimmedPayload
+  }
+}
+
+function isMailketingFailure(payload: MailketingPayload) {
+  if (!payload || typeof payload === 'string') return false
+
+  const status = payload.status
+  if (typeof status === 'boolean') return !status
+  if (typeof status === 'string') {
+    const normalizedStatus = status.trim().toLowerCase()
+    if (['error', 'failed', 'false', '0'].includes(normalizedStatus)) return true
+    if (['success', 'ok', 'true', '1', 'sent'].includes(normalizedStatus)) return false
+  }
+
+  const success = payload.success
+  if (typeof success === 'boolean') return !success
+
+  return false
+}
+
+function getMailketingErrorMessage(payload: MailketingPayload, fallbackStatus?: number) {
+  if (typeof payload === 'string') {
+    const message = payload.trim()
+    if (message) return message
+  }
+
+  if (payload && typeof payload === 'object') {
+    const directMessage = payload.message
+    if (typeof directMessage === 'string' && directMessage.trim()) return directMessage.trim()
+
+    const errorMessage = payload.error
+    if (typeof errorMessage === 'string' && errorMessage.trim()) return errorMessage.trim()
+
+    const responseMessage = payload.response
+    if (typeof responseMessage === 'string' && responseMessage.trim()) return responseMessage.trim()
+  }
+
+  if (fallbackStatus) {
+    return `Mailketing request failed with status ${fallbackStatus}`
+  }
+
+  return 'Unknown email delivery error'
+}
+
+/**
+ * Helper umum untuk kirim email lewat API Mailketing.
+ */
+async function sendMailketingEmail(input: MailketingSendInput) {
+  const { apiToken, defaultFromEmail } = getMailketingConfig()
+  const toEmail = String(input.toEmail || '').trim()
+
+  if (!toEmail) {
+    throw new Error('Email penerima wajib diisi')
+  }
+
+  const params = new URLSearchParams({
+    from_name: String(input.fromName || '').trim(),
+    from_email: String(input.fromEmail || defaultFromEmail).trim(),
+    recipient: toEmail,
+    subject: String(input.subject || '').trim(),
+    content: input.html,
+    api_token: apiToken,
+  })
+
+  for (const [index, attachment] of (input.attachments || []).entries()) {
+    const normalizedAttachment = String(attachment || '').trim()
+    if (!normalizedAttachment) continue
+    if (index >= 3) break
+    params.set(`attach${index + 1}`, normalizedAttachment)
+  }
+
+  const response = await fetch(MAILKETING_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: params.toString(),
+  })
+
+  const rawPayload = await response.text()
+  const payload = parseMailketingPayload(rawPayload)
+
+  if (!response.ok || isMailketingFailure(payload)) {
+    throw new Error(getMailketingErrorMessage(payload, response.status))
+  }
+
+  return payload
 }
 
 function getErrorMessage(error: unknown) {
@@ -21,10 +137,9 @@ function getErrorMessage(error: unknown) {
  */
 export async function sendInvoiceEmail(toEmail: string, invoiceNumber: string, amount: number) {
   try {
-    const resend = getResendClient()
-    const data = await resend.emails.send({
-      from: 'Nizam SaaS <team-noreply@nizam.xales.id>', // Pastikan domain ini verified di Resend
-      to: [toEmail],
+    const data = await sendMailketingEmail({
+      fromName: 'Nizam SaaS',
+      toEmail,
       subject: `[Tagihan Baru] Invoice ${invoiceNumber} dari NIZAM`,
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
@@ -39,10 +154,11 @@ export async function sendInvoiceEmail(toEmail: string, invoiceNumber: string, a
           <p>Salam hangat,<br/><strong>Tim Operasional NIZAM</strong></p>
         </div>
       `,
-    });
-    return { success: true, data };
+    })
+
+    return { success: true, data }
   } catch (error) {
-    return { error: getErrorMessage(error) };
+    return { error: getErrorMessage(error) }
   }
 }
 
@@ -51,10 +167,9 @@ export async function sendInvoiceEmail(toEmail: string, invoiceNumber: string, a
  */
 export async function sendPromoBroadcast(toEmail: string, promoTitle: string) {
   try {
-    const resend = getResendClient()
-    const data = await resend.emails.send({
-      from: 'Promo Nizam <team-noreply@nizam.xales.id>',
-      to: [toEmail],
+    const data = await sendMailketingEmail({
+      fromName: 'Promo Nizam',
+      toEmail,
       subject: `🔥 Penawaran Spesial: ${promoTitle}!`,
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; text-align: center;">
@@ -65,10 +180,11 @@ export async function sendPromoBroadcast(toEmail: string, promoTitle: string) {
           </a>
         </div>
       `,
-    });
-    return { success: true, data };
+    })
+
+    return { success: true, data }
   } catch (error) {
-    return { error: getErrorMessage(error) };
+    return { error: getErrorMessage(error) }
   }
 }
 
@@ -77,10 +193,9 @@ export async function sendPromoBroadcast(toEmail: string, promoTitle: string) {
  */
 export async function sendPasswordResetEmailInternal(toEmail: string, resetLink: string) {
   try {
-    const resend = getResendClient()
-    const data = await resend.emails.send({
-      from: 'Nizam Security <team-noreply@nizam.xales.id>',
-      to: [toEmail],
+    const data = await sendMailketingEmail({
+      fromName: 'Nizam Security',
+      toEmail,
       subject: `[NIZAM] Permintaan Reset Password`,
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px;">
@@ -97,9 +212,10 @@ export async function sendPasswordResetEmailInternal(toEmail: string, resetLink:
           <p style="font-size: 12px; color: #94A3B8; text-align: center;">Jika Anda tidak merasa meminta reset password ini, abaikan saja email ini. Link ini akan kadaluarsa dalam 1 jam.</p>
         </div>
       `,
-    });
-    return { success: true, data };
+    })
+
+    return { success: true, data }
   } catch (error) {
-    return { error: getErrorMessage(error) };
+    return { error: getErrorMessage(error) }
   }
 }
