@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Activity, PlayCircle, CircleDashed, CheckCircle2, TrendingUp, DollarSign, Maximize2, Minimize2, Plus, Phone, Mail, ExternalLink, Bell, Edit2, Trash2 } from 'lucide-react'
+import { Activity, PlayCircle, CircleDashed, CheckCircle2, TrendingUp, DollarSign, Maximize2, Minimize2, Plus, Phone, Mail, Bell, Edit2, Trash2, ChevronLeft, ChevronRight, LoaderCircle } from 'lucide-react'
 import { PageHeader, SafeButton } from '@/components/ui/NizamUI'
 import { formatRupiah } from '@/lib/utils'
 import { updateSaleStatus, createQuickKanbanCard, deleteSalesCard, updateSalesCard } from '@/modules/sales/actions/sales.actions'
@@ -14,14 +14,59 @@ const PIPELINE_STAGES = [
   { id: 'DRAFT', title: 'Negosiasi (Draft)', icon: PlayCircle, col: 'border-amber-200 bg-amber-50/30' },
   { id: 'ORDERED', title: 'Surat Jalan (Proses)', icon: TrendingUp, col: 'border-emerald-200 bg-emerald-50/30' },
   { id: 'FINISHED', title: 'Closed Won (Selesai)', icon: CheckCircle2, col: 'border-indigo-200 bg-indigo-50/30' }
-]
+] as const
 
-export default function PipelineClient({ orgId, sales }: any) {
+type PipelineStageId = (typeof PIPELINE_STAGES)[number]['id']
+
+type PipelineContact = {
+  name: string | null
+  phone: string | null
+  email: string | null
+}
+
+const EMPTY_CONTACT: PipelineContact = {
+  name: null,
+  phone: null,
+  email: null,
+}
+
+type PipelineSale = {
+  id: string
+  sale_number: string | null
+  sale_date: string | null
+  grand_total: number
+  notes: string | null
+  status: PipelineStageId
+  contacts: PipelineContact | null
+}
+
+type PipelineFormState = {
+  id: string
+  name: string
+  phone: string
+  email: string
+  amount: number
+  notes: string
+  status: PipelineStageId
+}
+
+type PipelineClientProps = {
+  orgId: string
+  sales: PipelineSale[]
+}
+
+function getStageIndex(stageId: PipelineStageId) {
+  return PIPELINE_STAGES.findIndex((stage) => stage.id === stageId)
+}
+
+export default function PipelineClient({ orgId, sales }: PipelineClientProps) {
   const router = useRouter()
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [movingSaleId, setMovingSaleId] = useState<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [localSales, setLocalSales] = useState<PipelineSale[]>(sales)
   
   // Toast State
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' } | null>(null)
@@ -38,7 +83,7 @@ export default function PipelineClient({ orgId, sales }: any) {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'sales', filter: `org_id=eq.${orgId}` },
-        (payload) => {
+        () => {
            showToast('Lead Baru / Penawaran masuk ke Pipeline!', 'success')
            // User must manually refresh to see it to avoid Next.js dev loops
         }
@@ -50,8 +95,20 @@ export default function PipelineClient({ orgId, sales }: any) {
     }
   }, [orgId])
 
+  useEffect(() => {
+    setLocalSales(sales)
+  }, [sales])
+
   // Add / Edit Card Form State
-  const [formState, setFormState] = useState({ id: '', name: '', phone: '', email: '', amount: 0, notes: '', status: 'QUOTATION' })
+  const [formState, setFormState] = useState<PipelineFormState>({
+    id: '',
+    name: '',
+    phone: '',
+    email: '',
+    amount: 0,
+    notes: '',
+    status: 'QUOTATION',
+  })
 
   const handleDragStart = (id: string) => setDraggedId(id)
 
@@ -64,19 +121,52 @@ export default function PipelineClient({ orgId, sales }: any) {
     e.currentTarget.classList.remove('bg-black/5')
   }
 
-  const handleDrop = async (stageId: string, e: React.DragEvent) => {
+  const moveSaleToStage = async (saleId: string, currentStatus: PipelineStageId, nextStatus: PipelineStageId) => {
+    if (currentStatus === nextStatus) {
+      setDraggedId(null)
+      return
+    }
+
+    const targetStage = PIPELINE_STAGES.find((stage) => stage.id === nextStatus)
+
+    setMovingSaleId(saleId)
+    setLocalSales((currentSales) =>
+      currentSales.map((sale) => (sale.id === saleId ? { ...sale, status: nextStatus } : sale))
+    )
+
+    try {
+      const res = await updateSaleStatus(orgId, saleId, nextStatus)
+      if (res?.error) {
+        setLocalSales((currentSales) =>
+          currentSales.map((sale) => (sale.id === saleId ? { ...sale, status: currentStatus } : sale))
+        )
+        showToast(res.error, 'info')
+        return
+      }
+
+      showToast(
+        targetStage ? `Card dipindah ke ${targetStage.title}` : 'Card berhasil dipindah',
+        'success'
+      )
+      router.refresh()
+    } finally {
+      setMovingSaleId(null)
+      setDraggedId(null)
+    }
+  }
+
+  const handleDrop = async (stageId: PipelineStageId, e: React.DragEvent) => {
     e.preventDefault()
     e.currentTarget.classList.remove('bg-black/5')
     if (!draggedId) return
 
-    const draggedItem = sales.find((s: any) => s.id === draggedId)
-    if (draggedItem.status === stageId) return
+    const draggedItem = localSales.find((sale) => sale.id === draggedId)
+    if (!draggedItem) {
+      setDraggedId(null)
+      return
+    }
 
-    setIsUpdating(true)
-    const res = await updateSaleStatus(orgId, draggedId, stageId)
-    if (res?.error) showToast(res.error, 'info')
-    setIsUpdating(false)
-    setDraggedId(null)
+    await moveSaleToStage(draggedId, draggedItem.status, stageId)
   }
 
   const handleAddSubmit = async (e: React.FormEvent) => {
@@ -98,7 +188,7 @@ export default function PipelineClient({ orgId, sales }: any) {
     setIsUpdating(false)
   }
 
-  const handleEditClick = (item: any) => {
+  const handleEditClick = (item: PipelineSale) => {
     setFormState({
       id: item.id,
       name: item.contacts?.name || '',
@@ -159,8 +249,8 @@ export default function PipelineClient({ orgId, sales }: any) {
 
       <div className={`flex-1 grid grid-cols-4 gap-6 overflow-hidden ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}>
         {PIPELINE_STAGES.map(stage => {
-           const items = sales.filter((s: any) => s.status === stage.id)
-           const totalValue = items.reduce((acc: number, item: any) => acc + item.grand_total, 0)
+           const items = localSales.filter((sale) => sale.status === stage.id)
+           const totalValue = items.reduce((acc, item) => acc + item.grand_total, 0)
            const Icon = stage.icon
 
            return (
@@ -187,15 +277,22 @@ export default function PipelineClient({ orgId, sales }: any) {
                 </div>
 
                 <div className="flex-1 p-4 space-y-4 overflow-y-auto no-scrollbar">
-                  {items.map((item: any) => {
-                    const contacts = item.contacts || {}
+                  {items.map((item) => {
+                    const contacts: PipelineContact = item.contacts ?? EMPTY_CONTACT
                     const waPhone = contacts.phone ? contacts.phone.replace(/[^0-9]/g, '') : ''
                     const isSalesPage = String(item.notes || '').toLowerCase().includes('salespage')
+                    const isMovingThisSale = movingSaleId === item.id
+                    const currentStageIndex = getStageIndex(item.status)
+                    const previousStage = currentStageIndex > 0 ? PIPELINE_STAGES[currentStageIndex - 1] : null
+                    const nextStage =
+                      currentStageIndex >= 0 && currentStageIndex < PIPELINE_STAGES.length - 1
+                        ? PIPELINE_STAGES[currentStageIndex + 1]
+                        : null
                     
                     return (
                       <motion.div 
                         key={item.id} 
-                        draggable 
+                        draggable={!isUpdating && movingSaleId === null}
                         onDragStart={() => handleDragStart(item.id)}
                         layoutId={item.id}
                         className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md cursor-grab active:cursor-grabbing transition-all hover:-translate-y-1 group relative"
@@ -222,12 +319,50 @@ export default function PipelineClient({ orgId, sales }: any) {
                         <div className="font-bold text-sm text-slate-800 leading-tight mb-3">
                           {contacts.name || 'Unknown Client'}
                         </div>
-                        
+                                                    <div
+                              className={`inline-flex items-center rounded-full border border-slate-200 bg-slate-50 transition-all ${
+                                isMovingThisSale
+                                  ? 'px-2 py-1 opacity-100'
+                                  : 'p-1 opacity-0 translate-y-1 pointer-events-none group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto'
+                              }`}
+                            >
+                              {isMovingThisSale ? (
+                                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-600">
+                                  <LoaderCircle size={11} className="animate-spin" />
+                                  Memindahkan...
+                                </span>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    draggable={false}
+                                    disabled={!previousStage || isUpdating || movingSaleId !== null}
+                                    onClick={() => previousStage && moveSaleToStage(item.id, item.status, previousStage.id)}
+                                    title={previousStage ? `Pindah ke ${previousStage.title}` : 'Sudah di tahap pertama'}
+                                    aria-label={previousStage ? `Pindah ke ${previousStage.title}` : 'Sudah di tahap pertama'}
+                                    className="inline-flex h-6 w-6 items-center justify-center rounded-full text-slate-500 transition hover:bg-white hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+                                  >
+                                    <ChevronLeft size={12} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    draggable={false}
+                                    disabled={!nextStage || isUpdating || movingSaleId !== null}
+                                    onClick={() => nextStage && moveSaleToStage(item.id, item.status, nextStage.id)}
+                                    title={nextStage ? `Pindah ke ${nextStage.title}` : 'Sudah di tahap terakhir'}
+                                    aria-label={nextStage ? `Pindah ke ${nextStage.title}` : 'Sudah di tahap terakhir'}
+                                    className="inline-flex h-6 w-6 items-center justify-center rounded-full text-slate-500 transition hover:bg-white hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+                                  >
+                                    <ChevronRight size={12} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                         {(contacts.phone || contacts.email) && (
                           <div className="flex gap-2 mb-3">
                             {contacts.phone && (
                               <a 
-                                href={`https://wa.me/${waPhone}?text=Halo%20${encodeURIComponent(contacts.name)}%2C%20saya%20menghubungi%20terkait%20penawaran%20kami...`} 
+                                href={`https://wa.me/${waPhone}?text=Halo%20${encodeURIComponent(contacts.name || 'Pelanggan')}%2C%20saya%20menghubungi%20terkait%20penawaran%20kami...`} 
                                 target="_blank" rel="noreferrer"
                                 className="flex-1 inline-flex justify-center items-center gap-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-colors"
                               >
@@ -247,10 +382,13 @@ export default function PipelineClient({ orgId, sales }: any) {
 
                         <div className="flex items-center justify-between pt-3 border-t border-slate-50">
                           <span className="text-[10px] font-bold text-slate-400">{item.sale_date}</span>
-                          <div className="flex items-center gap-1 text-[11px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                            <DollarSign size={10} /> {new Intl.NumberFormat('id-ID').format(item.grand_total)}
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 text-[11px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                               {formatRupiah(item.grand_total)}
+                            </div>
                           </div>
                         </div>
+                        
                       </motion.div>
                     )
                   })}
@@ -278,7 +416,7 @@ export default function PipelineClient({ orgId, sales }: any) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-bold text-slate-500">Grup / Status</label>
-                  <select className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500 bg-white" value={formState.status} onChange={e => setFormState({...formState, status: e.target.value})}>
+                  <select className="w-full border rounded-xl px-4 py-2 mt-1 text-sm outline-none focus:border-blue-500 bg-white" value={formState.status} onChange={e => setFormState({...formState, status: e.target.value as PipelineStageId})}>
                     {PIPELINE_STAGES.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                   </select>
                 </div>
