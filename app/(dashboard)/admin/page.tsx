@@ -35,6 +35,7 @@ import { createClient } from '@/lib/supabase/client'
 import { deleteInactiveTenantByPlatformAdmin, signInAsTenantOwner } from '@/modules/auth/actions/auth.actions'
 import { Organization } from '@/types/database.types'
 import Link from 'next/link'
+import { UserActivityMonitor } from '@/components/admin/UserActivityMonitor'
 import {
   SAAS_ADDON_ITEMS,
   SAAS_FULL_CORE_EXTENSION_ITEMS,
@@ -108,7 +109,7 @@ function buildPlanExpiryIso(durationDays: number | null | undefined): string | n
   return expiresAt.toISOString()
 }
 
-type Tab = 'users' | 'packages' | 'invoices' | 'settings' | 'ai_tokens'
+type Tab = 'users' | 'packages' | 'invoices' | 'settings' | 'ai_tokens' | 'activity'
 
 export default function SaaSAdminPage() {
   const db = supabase as any
@@ -715,8 +716,9 @@ export default function SaaSAdminPage() {
             </h1>
             <p className="text-slate-400 font-bold text-sm tracking-widest mt-1 uppercase">NIZAM SaaS Platform Administration</p>
          </div>
-         <div className="flex gap-4">
+	         <div className="flex gap-4">
 	            <button onClick={() => setActiveTab('users')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Tenants</button>
+	            <button onClick={() => setActiveTab('activity')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'activity' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Activity</button>
 	            <button onClick={() => setActiveTab('packages')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'packages' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>SaaS Plans</button>
 	            <button onClick={() => setActiveTab('ai_tokens')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'ai_tokens' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>AI Tokens</button>
 	            <button onClick={() => setActiveTab('invoices')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'invoices' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Billing</button>
@@ -732,6 +734,8 @@ export default function SaaSAdminPage() {
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
         >
+	          {activeTab === 'activity' && <UserActivityMonitor />}
+
 	          {activeTab === 'ai_tokens' && (
 	            <div className="space-y-8">
 	              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">

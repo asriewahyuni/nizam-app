@@ -16,6 +16,7 @@ import { FloatingPlanBadge } from '@/components/shared/FloatingPlanBadge'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import { MobilePullToRefresh } from '@/components/shared/MobilePullToRefresh'
 import { RouteProgressBar } from '@/components/shared/RouteProgressBar'
+import { UserActivityTracker } from '@/components/shared/UserActivityTracker'
 import { EduModeShell } from '@/components/edu/EduModeShell'
 
 type RouteModuleEntry = {
@@ -151,6 +152,7 @@ export default async function DashboardLayout({
         feature="dashboard"
       />
       <RouteProgressBar />
+      <UserActivityTracker />
       <EduModeShell />
       {/* Sidebar */}
       <AppSidebar 
