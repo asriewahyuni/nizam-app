@@ -599,7 +599,9 @@ Guards both `/admin` and `/saas/*` routes.
 - Weekly admin system usage report (analytics + heatmap)
 - Requires `MAILKETING_API_TOKEN` and `MAILKETING_FROM_EMAIL` (no fallback)
 - CLI trigger: `npm run report:weekly-system-usage`
+- Laravel-like scheduler: `npm run schedule:list` dan `npm run schedule:run`
 - Scheduler endpoint: `GET/POST /api/internal/weekly-system-usage-report` + secret header
+- Scheduler runner endpoint: `GET/POST /api/internal/schedule-run` + secret header
 
 ### 7.14 SaaS Operator
 
@@ -859,6 +861,10 @@ Core reusable components:
 | `MAILKETING_FROM_EMAIL` | For email | Default alamat pengirim email |
 | `WEEKLY_SYSTEM_USAGE_REPORT_RECIPIENTS` | For weekly admin report | Daftar email admin dipisah koma |
 | `WEEKLY_SYSTEM_USAGE_REPORT_SECRET` | For scheduler endpoint | Secret untuk trigger laporan mingguan |
+| `WEEKLY_SYSTEM_USAGE_REPORT_DAY` | Optional weekly schedule | Hari kirim mingguan (`0` Minggu s/d `6` Sabtu) |
+| `WEEKLY_SYSTEM_USAGE_REPORT_TIME` | Optional weekly schedule | Jam kirim format `HH:MM` |
+| `WEEKLY_SYSTEM_USAGE_REPORT_TIMEZONE` | Optional weekly schedule | Default `Asia/Jakarta` |
+| `SCHEDULER_SECRET` | For scheduler runner endpoint | Secret untuk trigger `/api/internal/schedule-run` |
 | `NEXT_PUBLIC_APP_URL` | Optional | Public base URL fallback |
 | `NEXT_PUBLIC_SITE_URL` | Optional | Password reset redirect URL |
 | `VERCEL_URL` | Auto (Vercel) | Vercel deployment origin |

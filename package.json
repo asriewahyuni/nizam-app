@@ -33,6 +33,8 @@
     "db:railway:internal-auth:bootstrap": "node scripts/bootstrap-railway-internal-auth-users.mjs",
     "db:railway:internal-auth:bootstrap:apply": "node scripts/bootstrap-railway-internal-auth-users.mjs --apply",
     "report:weekly-system-usage": "tsx scripts/send-weekly-system-usage-report.ts",
+    "schedule:list": "tsx scripts/schedule-list.ts",
+    "schedule:run": "tsx scripts/schedule-run.ts",
     "templates:migrasi": "node scripts/generate-migration-template-xlsx.mjs",
     "test": "vitest run",
     "test:erp": "vitest run __tests__/accounting.test.ts __tests__/auth.actions.test.ts __tests__/fleet.actions.test.ts __tests__/middleware.test.ts __tests__/proxy.test.ts",

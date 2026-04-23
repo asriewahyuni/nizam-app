@@ -63,3 +63,10 @@ export async function queryPostgres<T extends QueryResultRow>(
   return getPostgresPool().query<T>(text, values)
 }
 
+export async function closePostgresPool() {
+  const pool = globalWithPostgresPool.__nizamPostgresPool
+  if (!pool) return
+
+  globalWithPostgresPool.__nizamPostgresPool = undefined
+  await pool.end()
+}

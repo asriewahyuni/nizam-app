@@ -1,20 +1,20 @@
 /**
- * Endpoint internal untuk trigger laporan pekanan penggunaan sistem.
- * Cocok dipanggil oleh scheduler eksternal atau cron dari hosting.
+ * Endpoint internal untuk menjalankan scheduler pusat.
+ * Bisa dipakai oleh cron berbasis HTTP dari hosting.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { sendWeeklySystemUsageReport } from '@/lib/activity/weekly-usage-report.server'
+import { runScheduledTasks } from '@/lib/scheduler/scheduler.server'
 
-function getCronSecret() {
+function getSchedulerSecret() {
   return (
-    String(process.env.WEEKLY_SYSTEM_USAGE_REPORT_SECRET || '').trim() ||
-    String(process.env.SCHEDULER_SECRET || '').trim()
+    String(process.env.SCHEDULER_SECRET || '').trim() ||
+    String(process.env.WEEKLY_SYSTEM_USAGE_REPORT_SECRET || '').trim()
   )
 }
 
 function isAuthorized(request: NextRequest) {
-  const configuredSecret = getCronSecret()
+  const configuredSecret = getSchedulerSecret()
   if (!configuredSecret) return false
 
   const bearerToken = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim() || ''
@@ -23,10 +23,15 @@ function isAuthorized(request: NextRequest) {
   return bearerToken === configuredSecret || headerSecret === configuredSecret
 }
 
+function readBooleanQuery(value: string | null) {
+  const normalized = String(value || '').trim().toLowerCase()
+  return ['1', 'true', 'yes'].includes(normalized)
+}
+
 async function handleRequest(request: NextRequest) {
-  if (!getCronSecret()) {
+  if (!getSchedulerSecret()) {
     return NextResponse.json(
-      { ok: false, error: 'Missing WEEKLY_SYSTEM_USAGE_REPORT_SECRET' },
+      { ok: false, error: 'Missing SCHEDULER_SECRET' },
       { status: 500, headers: { 'Cache-Control': 'no-store' } }
     )
   }
@@ -38,26 +43,22 @@ async function handleRequest(request: NextRequest) {
     )
   }
 
-  const dryRun = ['1', 'true', 'yes'].includes(
-    String(request.nextUrl.searchParams.get('dryRun') || '').trim().toLowerCase()
-  )
-
   try {
-    const result = await sendWeeklySystemUsageReport({ dryRun })
-    const failedRecipients = result.results.filter((item) => !item.success)
+    const results = await runScheduledTasks({
+      dryRun: readBooleanQuery(request.nextUrl.searchParams.get('dryRun')),
+      force: readBooleanQuery(request.nextUrl.searchParams.get('force')),
+      taskName: request.nextUrl.searchParams.get('task'),
+    })
+
+    const failedTasks = results.filter((item) => item.success === false)
 
     return NextResponse.json(
       {
-        ok: failedRecipients.length === 0,
-        dryRun: result.dryRun,
-        recipients: result.recipients,
-        subject: result.subject,
-        periodLabel: result.report.periodLabel,
-        summary: result.report.summary,
-        failedRecipients,
+        ok: failedTasks.length === 0,
+        results,
       },
       {
-        status: failedRecipients.length === 0 ? 200 : 502,
+        status: failedTasks.length === 0 ? 200 : 502,
         headers: { 'Cache-Control': 'no-store' },
       }
     )
@@ -65,7 +66,7 @@ async function handleRequest(request: NextRequest) {
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : 'Gagal mengirim laporan pekanan.',
+        error: error instanceof Error ? error.message : 'Gagal menjalankan scheduler.',
       },
       {
         status: 500,

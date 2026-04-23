@@ -6,6 +6,7 @@
  */
 
 import { loadEnvConfig } from '@next/env'
+import { closePostgresPool } from '../lib/db/postgres'
 import { sendWeeklySystemUsageReport } from '../lib/activity/weekly-usage-report.server'
 loadEnvConfig(process.cwd())
 
@@ -39,4 +40,6 @@ async function main() {
 main().catch((error) => {
   console.error(error instanceof Error ? error.message : 'Gagal menjalankan laporan pekanan.')
   process.exitCode = 1
+}).finally(async () => {
+  await closePostgresPool()
 })
