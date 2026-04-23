@@ -1527,6 +1527,18 @@ export default function SalesClient({
                       <div>
                          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">Customer / Klien</p>
                          <p className="font-bold text-slate-900">{viewSale.contacts?.name || 'Unknown'}</p>
+                         {printMode === 'DELIVERY_ORDER' && (
+                           <div className="mt-2 space-y-2 text-[11px] leading-relaxed">
+                             <div>
+                               <p className="font-bold text-slate-500">Alamat Customer</p>
+                               <p className="text-slate-800 whitespace-pre-line">{viewSale.contacts?.address || '-'}</p>
+                             </div>
+                             <div>
+                               <p className="font-bold text-slate-500">Telp / WA</p>
+                               <p className="text-slate-800">{viewSale.contacts?.phone || '-'}</p>
+                             </div>
+                           </div>
+                         )}
                          <p className="mt-2 text-[11px] font-bold text-slate-500">
                            Diproses oleh: <span className="text-slate-800">{viewSale.processor_name || '-'}</span>
                          </p>
@@ -1537,8 +1549,17 @@ export default function SalesClient({
                          )}
                       </div>
                       <div className="text-right">
-                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">Tanggal & Status</p>
-                         <p className="font-bold text-slate-900 mb-1">{formatDate(viewSale.sale_date, 'long')} {viewSale.due_date ? `| Tempo: ${formatDate(viewSale.due_date, 'long')}` : ''}</p>
+                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">{printMode === 'DELIVERY_ORDER' ? 'Tanggal Dokumen' : 'Tanggal & Status'}</p>
+                         {printMode === 'DELIVERY_ORDER' ? (
+                           <>
+                             <p className="font-bold text-slate-900 mb-1">Tgl Order: {formatDate(viewSale.sale_date, 'long')}</p>
+                             <p className="mb-2 text-[11px] font-bold text-slate-500">
+                               Tgl Kirim: <span className="text-slate-800">{viewSale.delivered_at ? formatDate(viewSale.delivered_at, 'long') : 'Belum dicatat'}</span>
+                             </p>
+                           </>
+                         ) : (
+                           <p className="font-bold text-slate-900 mb-1">{formatDate(viewSale.sale_date, 'long')} {viewSale.due_date ? `| Tempo: ${formatDate(viewSale.due_date, 'long')}` : ''}</p>
+                         )}
                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border border-blue-200 bg-blue-50 text-blue-600`}>{viewSale.status === 'FINISHED' ? 'DELIVERED' : viewSale.status}</span>
                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border border-emerald-200 bg-emerald-50 text-emerald-600 ml-1 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>{viewSale.payment_status}</span>
                       </div>

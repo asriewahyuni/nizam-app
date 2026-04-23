@@ -667,12 +667,12 @@ Core reusable components:
 
 ### 9.1 Overview
 
-- **245 migration files** in `supabase/migrations/`
+- **251 migration files** in `supabase/migrations/`
 - `master_init.sql` — legacy bootstrap SQL (foundation reference)
-- Latest migration: `1226_edu_mode_sessions.sql`
+- Latest migration: `1232_open_api_ip_allowlist.sql`
 - Recent normalization:
-  - Duplicate migration versions have been normalized into unique files such as `1199_syirkah_tables.sql` and `1226_edu_mode_sessions.sql`
-  - `1223_remote_history_placeholder.sql` and `1224_remote_history_placeholder.sql` keep `schema_migrations` continuity aligned with Railway after historical remote/local drift
+  - Duplicate migration versions have been normalized into unique files such as `1199_syirkah_tables.sql`, `1231_fix_inventory_webhook_reversal_legacy_stock_movements.sql`, and `1232_open_api_ip_allowlist.sql`
+  - Placeholder continuity files yang masih dipakai saat ini adalah `1227_remote_history_placeholder.sql` dan `1228_remote_history_placeholder.sql`
 
 ### 9.2 Core Entities
 
@@ -1316,11 +1316,13 @@ When adding new modules to the SaaS system, update:
   - Duplicate migration versions dinormalisasi menjadi file unik:
     - `1199_syirkah_tables.sql`
     - `1226_edu_mode_sessions.sql`
-  - Ditambahkan placeholder:
-    - `1223_remote_history_placeholder.sql`
-    - `1224_remote_history_placeholder.sql`
+    - `1231_fix_inventory_webhook_reversal_legacy_stock_movements.sql`
+    - `1232_open_api_ip_allowlist.sql`
+  - Placeholder yang tetap dipakai untuk menjaga kontinuitas histori remote:
+    - `1227_remote_history_placeholder.sql`
+    - `1228_remote_history_placeholder.sql`
   - Tujuan utamanya adalah menjaga kontinuitas `supabase_migrations.schema_migrations` ketika histori remote lebih dulu menyimpan versi yang file sumbernya sudah tidak ada di repo aktif.
-  - Setelah normalisasi ini, `supabase db push --dry-run` terhadap Railway kembali bersih.
+  - Setelah normalisasi ini, histori lokal kembali satu arah dan tidak lagi bentrok pada versi `1223` sampai `1226`.
 
 - **POS shift opening journal hardening:**
   - `1221_pos_shift_opening_funding.sql` menambahkan metadata `opening_source_account_id` dan `opening_journal_entry_id` pada `pos_shift_sessions`.

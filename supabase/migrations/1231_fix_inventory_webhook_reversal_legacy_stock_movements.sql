@@ -1,5 +1,5 @@
 -- ============================================================
--- MIGRATION 1225: Fix Inventory Webhook Reversal Legacy Schema
+-- MIGRATION 1231: Fix Inventory Webhook Reversal Legacy Schema
 -- ============================================================
 -- Some production databases still expose stock_movements without warehouse_id.
 -- The reversal function introduced in 1224 must remain compatible with both

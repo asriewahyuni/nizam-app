@@ -150,6 +150,34 @@ function normalizeDateOnlyValue(value: unknown): string | null {
   return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
 }
 
+/**
+ * Convert timestamp-like values into ISO strings that are safe to pass to client components.
+ */
+function normalizeDateTimeValue(value: unknown): string | null {
+  if (!value) return null
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+
+    const parsed = new Date(trimmed)
+    if (Number.isNaN(parsed.getTime())) return null
+    return parsed.toISOString()
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null
+    return value.toISOString()
+  }
+
+  const normalized = String(value).trim()
+  if (!normalized) return null
+
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString()
+}
+
 function normalizeShariahMode(value?: string | null): string {
   const normalized = String(value || '')
     .trim()
@@ -836,6 +864,12 @@ export async function getSales(orgId: string, branchId?: string | null) {
       SELECT
         s.*,
         c.name           AS customer_name,
+        c.address        AS customer_address,
+        COALESCE(
+          NULLIF(trim(c.phone_wa), ''),
+          NULLIF(trim(c.phone), ''),
+          NULL
+        )                AS customer_phone,
         b.name           AS branch_name,
         b.code           AS branch_code,
         COALESCE(
@@ -928,8 +962,13 @@ export async function getSales(orgId: string, branchId?: string | null) {
       ...row,
       sale_date: normalizeDateOnlyValue(row.sale_date),
       due_date: normalizeDateOnlyValue(row.due_date),
+      delivered_at: normalizeDateTimeValue(row.delivered_at),
       // UI expects sale.contacts?.name for the customer
-      contacts: row.customer_name ? { name: row.customer_name } : null,
+      contacts: row.customer_name ? {
+        name: row.customer_name,
+        address: String(row.customer_address || '').trim() || null,
+        phone: String(row.customer_phone || '').trim() || null,
+      } : null,
       branches: (row.branch_name || row.branch_code)
         ? { name: row.branch_name, code: row.branch_code }
         : null,
@@ -1489,6 +1528,25 @@ export async function deliverSale(orgId: string, saleId: string, warehouseId?: s
   if (error) {
     (console as any).error('Failed to deliver sale via atomic engine:', error)
     return { error: getSalesDeliveryRpcErrorMessage(error) }
+  }
+
+  const { error: markDeliveredError } = await (supabase as any)
+    .from('sales')
+    .update({
+      delivered_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', saleId)
+    .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
+
+  if (markDeliveredError) {
+    const markDeliveredMessage = String(markDeliveredError.message || '')
+    if (!markDeliveredMessage.toLowerCase().includes('delivered_at')) {
+      return { error: 'Pengiriman berhasil, tetapi tanggal kirim gagal disimpan: ' + markDeliveredMessage }
+    }
+
+    ;(console as any).warn('[deliverSale] delivered_at belum tersedia, tanggal kirim dilewati:', markDeliveredMessage)
   }
 
   revalidatePath('/sales')

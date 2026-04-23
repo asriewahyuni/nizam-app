@@ -1,5 +1,5 @@
 -- ============================================================
--- MIGRATION 1226: Open API IP Allowlist per API Key
+-- MIGRATION 1232: Open API IP Allowlist per API Key
 -- Menambahkan whitelist IP/CIDR opsional untuk setiap API key.
 -- Jika kosong, key dapat dipakai dari semua IP.
 -- ============================================================
