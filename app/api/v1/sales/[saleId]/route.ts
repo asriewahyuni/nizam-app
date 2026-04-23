@@ -30,7 +30,10 @@ type SaleHeaderRow = {
   customer_id: string | null
   customer_name: string | null
   total_amount: number | string | null
+  tax_breakdown: unknown | null
   tax_amount: number | string | null
+  other_charge_breakdown: unknown | null
+  other_charge_amount: number | string | null
   discount_amount: number | string | null
   grand_total: number | string | null
   status: string | null
@@ -97,6 +100,18 @@ function toSafeNumber(value: number | string | null | undefined) {
   return Number.isFinite(numericValue) ? numericValue : 0
 }
 
+function isSalesAdjustmentColumnMissingError(error: unknown) {
+  const message = String((error as { message?: string } | null | undefined)?.message || '').toLowerCase()
+  return (
+    (
+      message.includes('tax_breakdown')
+      || message.includes('other_charge_breakdown')
+      || message.includes('other_charge_amount')
+    ) &&
+    (message.includes('column') || message.includes('does not exist'))
+  )
+}
+
 export async function GET(request: NextRequest, context: RouteContext) {
   const startTime = Date.now()
   const rawKey = extractApiKeyFromRequest(request)
@@ -129,7 +144,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
             s.customer_id::text AS customer_id,
             c.name AS customer_name,
             s.total_amount,
+            s.tax_breakdown,
             s.tax_amount,
+            s.other_charge_breakdown,
+            s.other_charge_amount,
             s.discount_amount,
             s.grand_total,
             s.status::text AS status,
@@ -159,8 +177,59 @@ export async function GET(request: NextRequest, context: RouteContext) {
       )
 
       sale = saleResult.rows[0] ?? null
-    } catch {
-      return withNoStore(apiError('Gagal mengambil data penjualan.', 500))
+    } catch (error) {
+      if (!isSalesAdjustmentColumnMissingError(error)) {
+        return withNoStore(apiError('Gagal mengambil data penjualan.', 500))
+      }
+
+      try {
+        const fallbackSaleResult = await queryPostgres<
+          Omit<SaleHeaderRow, 'tax_breakdown' | 'other_charge_breakdown' | 'other_charge_amount'>
+          & { tax_breakdown?: unknown; other_charge_breakdown?: unknown; other_charge_amount?: unknown }
+        >(
+          `
+            SELECT
+              s.id::text AS id,
+              s.sale_number,
+              s.customer_id::text AS customer_id,
+              c.name AS customer_name,
+              s.total_amount,
+              s.tax_amount,
+              s.discount_amount,
+              s.grand_total,
+              s.status::text AS status,
+              s.payment_status::text AS payment_status,
+              s.branch_id::text AS branch_id,
+              b.name AS branch_name,
+              s.warehouse_id::text AS warehouse_id,
+              w.name AS warehouse_name,
+              s.sale_date::text AS sale_date,
+              s.due_date::text AS due_date,
+              s.notes,
+              s.created_at,
+              s.updated_at
+            FROM public.sales s
+            LEFT JOIN public.contacts c
+              ON c.id = s.customer_id
+            LEFT JOIN public.branches b
+              ON b.id = s.branch_id
+            LEFT JOIN public.warehouses w
+              ON w.id = s.warehouse_id
+            WHERE s.org_id = $1::uuid
+              AND s.id = $2::uuid
+              AND ($3::uuid IS NULL OR s.branch_id = $3::uuid)
+            LIMIT 1
+          `,
+          [orgId, saleId, branchId]
+        )
+
+        const fallbackSale = fallbackSaleResult.rows[0]
+        sale = fallbackSale
+          ? { ...fallbackSale, tax_breakdown: null, other_charge_breakdown: null, other_charge_amount: 0 }
+          : null
+      } catch {
+        return withNoStore(apiError('Gagal mengambil data penjualan.', 500))
+      }
     }
 
     if (!sale) {
@@ -243,7 +312,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
         customer_id: sale.customer_id,
         customer_name: sale.customer_name,
         total_amount: toSafeNumber(sale.total_amount),
+        tax_breakdown: sale.tax_breakdown,
         tax_amount: toSafeNumber(sale.tax_amount),
+        other_charge_breakdown: sale.other_charge_breakdown,
+        other_charge_amount: toSafeNumber(sale.other_charge_amount),
         discount_amount: toSafeNumber(sale.discount_amount),
         grand_total: toSafeNumber(sale.grand_total),
         status: sale.status,

@@ -186,6 +186,169 @@ function normalizeShariahMode(value?: string | null): string {
   return 'CASH'
 }
 
+type SalesAdjustmentMode = 'FIXED' | 'PERCENT'
+type NormalizedSalesTaxBreakdown = Record<'PPN' | 'PPH_21' | 'PPH_23' | 'PAJAK_DAERAH', {
+  mode: SalesAdjustmentMode
+  value: number
+  amount: number
+}>
+type NormalizedSalesOtherChargeLine = {
+  label: string
+  mode: SalesAdjustmentMode
+  value: number
+  amount: number
+}
+const DEFAULT_SALES_ADJUSTMENT_MODE: SalesAdjustmentMode = 'PERCENT'
+
+function roundSalesTaxValue(value: unknown): number {
+  const normalized = Number(value || 0)
+  if (!Number.isFinite(normalized)) return 0
+  return Number(Math.max(0, normalized).toFixed(2))
+}
+
+function normalizeSalesAdjustmentMode(value: unknown): SalesAdjustmentMode {
+  return String(value || '').trim().toUpperCase() === 'FIXED' ? 'FIXED' : 'PERCENT'
+}
+
+function normalizeSalesTaxPercent(value: unknown): number {
+  const normalized = Number(value || 0)
+  if (!Number.isFinite(normalized) || normalized <= 0) return 0
+  return Number(Math.min(100, Math.max(0, normalized)).toFixed(2))
+}
+
+function normalizeSalesAdjustmentValue(mode: SalesAdjustmentMode, value: unknown): number {
+  return mode === 'PERCENT' ? normalizeSalesTaxPercent(value) : roundSalesTaxValue(value)
+}
+
+function calculateSalesAdjustmentAmount(baseAmount: number, mode: SalesAdjustmentMode, value: unknown): number {
+  const normalizedValue = normalizeSalesAdjustmentValue(mode, value)
+  if (normalizedValue <= 0) return 0
+  if (mode === 'PERCENT') {
+    return roundSalesTaxValue((Math.max(0, baseAmount) * normalizedValue) / 100)
+  }
+  return roundSalesTaxValue(normalizedValue)
+}
+
+function createEmptySalesTaxBreakdown(): NormalizedSalesTaxBreakdown {
+  return {
+    PPN: { mode: DEFAULT_SALES_ADJUSTMENT_MODE, value: 0, amount: 0 },
+    PPH_21: { mode: DEFAULT_SALES_ADJUSTMENT_MODE, value: 0, amount: 0 },
+    PPH_23: { mode: DEFAULT_SALES_ADJUSTMENT_MODE, value: 0, amount: 0 },
+    PAJAK_DAERAH: { mode: DEFAULT_SALES_ADJUSTMENT_MODE, value: 0, amount: 0 },
+  }
+}
+
+function getSalesTaxBreakdownTotal(taxBreakdown: NormalizedSalesTaxBreakdown): number {
+  return roundSalesTaxValue(
+    taxBreakdown.PPN.amount +
+    taxBreakdown.PPH_21.amount +
+    taxBreakdown.PPH_23.amount +
+    taxBreakdown.PAJAK_DAERAH.amount
+  )
+}
+
+function normalizeSalesTaxBreakdown(
+  value: unknown,
+  taxableAmount: number,
+  fallbackTaxAmount?: unknown
+): NormalizedSalesTaxBreakdown {
+  const safeTaxableAmount = roundSalesTaxValue(taxableAmount)
+  const normalizedBreakdown = createEmptySalesTaxBreakdown()
+
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const source = value as Record<string, unknown>
+    let hasActiveTax = false
+
+    for (const taxType of ['PPN', 'PPH_21', 'PPH_23', 'PAJAK_DAERAH'] as const) {
+      const rawEntry = source[taxType]
+      if (!rawEntry || typeof rawEntry !== 'object' || Array.isArray(rawEntry)) continue
+
+      const entry = rawEntry as Record<string, unknown>
+      const mode = normalizeSalesAdjustmentMode(
+        entry.mode ?? (Number(entry.percent || 0) > 0 ? 'PERCENT' : 'FIXED')
+      )
+      const normalizedValue = normalizeSalesAdjustmentValue(
+        mode,
+        entry.value ?? (mode === 'PERCENT' ? entry.percent : entry.amount)
+      )
+      const amount = roundSalesTaxValue(
+        entry.amount ?? calculateSalesAdjustmentAmount(safeTaxableAmount, mode, normalizedValue)
+      )
+
+      normalizedBreakdown[taxType] = { mode, value: normalizedValue, amount }
+      if (normalizedValue > 0 || amount > 0) {
+        hasActiveTax = true
+      }
+    }
+
+    if (hasActiveTax) {
+      return normalizedBreakdown
+    }
+  }
+
+  const safeFallbackTaxAmount = roundSalesTaxValue(fallbackTaxAmount)
+  if (safeFallbackTaxAmount > 0) {
+    normalizedBreakdown.PPN = {
+      mode: safeTaxableAmount > 0 ? 'PERCENT' : 'FIXED',
+      value: safeTaxableAmount > 0 ? roundSalesTaxValue((safeFallbackTaxAmount / safeTaxableAmount) * 100) : safeFallbackTaxAmount,
+      amount: safeFallbackTaxAmount,
+    }
+  }
+
+  return normalizedBreakdown
+}
+
+function getSalesOtherChargeTotal(lines: NormalizedSalesOtherChargeLine[]): number {
+  return roundSalesTaxValue(lines.reduce((sum, line) => sum + Number(line.amount || 0), 0))
+}
+
+function normalizeSalesOtherChargeBreakdown(
+  value: unknown,
+  baseAmount: number,
+  fallbackOtherChargeAmount?: unknown
+): NormalizedSalesOtherChargeLine[] {
+  if (Array.isArray(value)) {
+    const normalizedLines = value.flatMap((entry) => {
+      if (!entry || typeof entry !== 'object') return []
+
+      const rawEntry = entry as Record<string, unknown>
+      const mode = normalizeSalesAdjustmentMode(rawEntry.mode)
+      const normalizedValue = normalizeSalesAdjustmentValue(
+        mode,
+        rawEntry.value ?? (mode === 'PERCENT' ? rawEntry.percent : rawEntry.amount)
+      )
+      const amount = roundSalesTaxValue(
+        rawEntry.amount ?? calculateSalesAdjustmentAmount(baseAmount, mode, normalizedValue)
+      )
+
+      if (normalizedValue <= 0 && amount <= 0) return []
+
+      return [{
+        label: String(rawEntry.label || '').trim() || 'Biaya Lain',
+        mode,
+        value: normalizedValue,
+        amount,
+      }]
+    })
+
+    if (normalizedLines.length > 0) {
+      return normalizedLines
+    }
+  }
+
+  const safeFallbackOtherChargeAmount = roundSalesTaxValue(fallbackOtherChargeAmount)
+  if (safeFallbackOtherChargeAmount > 0) {
+    return [{
+      label: 'Biaya Lain',
+      mode: 'FIXED',
+      value: safeFallbackOtherChargeAmount,
+      amount: safeFallbackOtherChargeAmount,
+    }]
+  }
+
+  return []
+}
+
 function calculateConfiguredHeaderDiscount(baseAmount: number, mode: unknown, value: unknown): number {
   const normalizedBase = Math.max(0, Number(baseAmount || 0))
   const normalizedValue = Math.max(0, Number(value || 0))
@@ -437,6 +600,79 @@ function omitSalesCommissionColumns<T extends Record<string, unknown>>(
     reseller_id: _resellerId,
     commission_type: _commissionType,
     commission_value: _commissionValue,
+    ...rest
+  } = payload
+
+  return rest
+}
+
+function isSalesTaxBreakdownColumnSchemaCacheMiss(
+  error: { code?: string | null; message?: string | null } | null | undefined
+): boolean {
+  if (!error) return false
+
+  const code = String(error.code || '')
+  const message = String(error.message || '').toLowerCase()
+  const touchesTaxBreakdownColumn = message.includes(`'tax_breakdown'`) || message.includes('tax_breakdown')
+
+  if (code === 'PGRST204' || code === '42703') {
+    return touchesTaxBreakdownColumn || message.includes('schema cache')
+  }
+
+  return (
+    touchesTaxBreakdownColumn &&
+    (
+      message.includes('schema cache')
+      || message.includes('column')
+      || message.includes('undefined column')
+    )
+  )
+}
+
+function isSalesOtherChargeColumnSchemaCacheMiss(
+  error: { code?: string | null; message?: string | null } | null | undefined
+): boolean {
+  if (!error) return false
+
+  const code = String(error.code || '')
+  const message = String(error.message || '').toLowerCase()
+  const touchesOtherChargeColumn =
+    message.includes(`'other_charge_breakdown'`)
+    || message.includes('other_charge_breakdown')
+    || message.includes(`'other_charge_amount'`)
+    || message.includes('other_charge_amount')
+
+  if (code === 'PGRST204' || code === '42703') {
+    return touchesOtherChargeColumn || message.includes('schema cache')
+  }
+
+  return (
+    touchesOtherChargeColumn &&
+    (
+      message.includes('schema cache')
+      || message.includes('column')
+      || message.includes('undefined column')
+    )
+  )
+}
+
+function omitSalesTaxBreakdownColumn<T extends Record<string, unknown>>(
+  payload: T
+): Omit<T, 'tax_breakdown'> {
+  const {
+    tax_breakdown: _taxBreakdown,
+    ...rest
+  } = payload
+
+  return rest
+}
+
+function omitSalesOtherChargeColumns<T extends Record<string, unknown>>(
+  payload: T
+): Omit<T, 'other_charge_breakdown' | 'other_charge_amount'> {
+  const {
+    other_charge_breakdown: _otherChargeBreakdown,
+    other_charge_amount: _otherChargeAmount,
     ...rest
   } = payload
 
@@ -1049,7 +1285,21 @@ export async function createSaleEntry(orgId: string, payload: any) {
   }
 
   const totalAmount = normalizedLines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)
-  const computedTotal = totalAmount - (payload.discount_amount || 0) + (payload.tax_amount || 0)
+  const normalizedDiscountAmount = roundSalesTaxValue(payload.discount_amount)
+  const taxableAmount = Math.max(0, totalAmount - normalizedDiscountAmount)
+  const normalizedTaxBreakdown = normalizeSalesTaxBreakdown(
+    payload.tax_breakdown,
+    taxableAmount,
+    payload.tax_amount
+  )
+  const normalizedTaxAmount = getSalesTaxBreakdownTotal(normalizedTaxBreakdown)
+  const normalizedOtherChargeBreakdown = normalizeSalesOtherChargeBreakdown(
+    payload.other_charge_breakdown,
+    taxableAmount,
+    payload.other_charge_amount
+  )
+  const normalizedOtherChargeAmount = getSalesOtherChargeTotal(normalizedOtherChargeBreakdown)
+  const computedTotal = totalAmount - normalizedDiscountAmount + normalizedTaxAmount + normalizedOtherChargeAmount
   const resellerSnapshot = await getResellerCommissionSnapshot(orgId, payload.reseller_id)
 
   if (resellerSnapshot?.error) {
@@ -1064,9 +1314,12 @@ export async function createSaleEntry(orgId: string, payload: any) {
     sale_date: payload.sale_date,
     due_date: dueDate,
     payment_term: paymentTerm,
-    total_amount: totalAmount,
-    tax_amount: payload.tax_amount || 0,
-    discount_amount: payload.discount_amount || 0,
+    total_amount: totalAmount + normalizedOtherChargeAmount,
+    tax_breakdown: normalizedTaxBreakdown,
+    tax_amount: normalizedTaxAmount,
+    other_charge_breakdown: normalizedOtherChargeBreakdown,
+    other_charge_amount: normalizedOtherChargeAmount,
+    discount_amount: normalizedDiscountAmount,
     grand_total: computedTotal,
     shariah_mode: shariahMode,
     notes: payload.notes,
@@ -1103,14 +1356,29 @@ export async function createSaleEntry(orgId: string, payload: any) {
       .eq('org_id', orgId)
       .eq('branch_id', activeBranchId)
 
-    if (updateSaleError && isSalesCommissionColumnSchemaCacheMiss(updateSaleError)) {
-      if (resellerSnapshot.resellerId) {
+    if (updateSaleError && (
+      isSalesCommissionColumnSchemaCacheMiss(updateSaleError)
+      || isSalesTaxBreakdownColumnSchemaCacheMiss(updateSaleError)
+      || isSalesOtherChargeColumnSchemaCacheMiss(updateSaleError)
+    )) {
+      if (resellerSnapshot.resellerId && isSalesCommissionColumnSchemaCacheMiss(updateSaleError)) {
         return { error: getLegacySalesCommissionMigrationMessage() }
+      }
+
+      let fallbackDraftPayload: Record<string, unknown> = draftPayload
+      if (isSalesCommissionColumnSchemaCacheMiss(updateSaleError)) {
+        fallbackDraftPayload = omitSalesCommissionColumns(fallbackDraftPayload)
+      }
+      if (isSalesTaxBreakdownColumnSchemaCacheMiss(updateSaleError)) {
+        fallbackDraftPayload = omitSalesTaxBreakdownColumn(fallbackDraftPayload)
+      }
+      if (isSalesOtherChargeColumnSchemaCacheMiss(updateSaleError)) {
+        fallbackDraftPayload = omitSalesOtherChargeColumns(fallbackDraftPayload)
       }
 
       const { error: fallbackUpdateError } = await (supabase as any)
         .from('sales')
-        .update(omitSalesCommissionColumns(draftPayload))
+        .update(fallbackDraftPayload)
         .eq('id', payload.draft_id)
         .eq('org_id', orgId)
         .eq('branch_id', activeBranchId)
@@ -1143,14 +1411,29 @@ export async function createSaleEntry(orgId: string, payload: any) {
       .select('id')
       .single()
 
-    if (saleErr && isSalesCommissionColumnSchemaCacheMiss(saleErr)) {
-      if (resellerSnapshot.resellerId) {
+    if (saleErr && (
+      isSalesCommissionColumnSchemaCacheMiss(saleErr)
+      || isSalesTaxBreakdownColumnSchemaCacheMiss(saleErr)
+      || isSalesOtherChargeColumnSchemaCacheMiss(saleErr)
+    )) {
+      if (resellerSnapshot.resellerId && isSalesCommissionColumnSchemaCacheMiss(saleErr)) {
         return { error: getLegacySalesCommissionMigrationMessage() }
+      }
+
+      let fallbackInsertPayload: Record<string, unknown> = draftInsertPayload
+      if (isSalesCommissionColumnSchemaCacheMiss(saleErr)) {
+        fallbackInsertPayload = omitSalesCommissionColumns(fallbackInsertPayload)
+      }
+      if (isSalesTaxBreakdownColumnSchemaCacheMiss(saleErr)) {
+        fallbackInsertPayload = omitSalesTaxBreakdownColumn(fallbackInsertPayload)
+      }
+      if (isSalesOtherChargeColumnSchemaCacheMiss(saleErr)) {
+        fallbackInsertPayload = omitSalesOtherChargeColumns(fallbackInsertPayload)
       }
 
       const fallbackInsertResult = await (supabase as any)
         .from('sales')
-        .insert(omitSalesCommissionColumns(draftInsertPayload))
+        .insert(fallbackInsertPayload)
         .select('id')
         .single()
 
