@@ -24,6 +24,7 @@ export default async function ManufacturingPage() {
     <div className="p-4 md:p-8">
       <ManufacturingClient 
         orgId={orgData.org.id}
+        orgName={orgData.org.name}
         activeBranchId={activeBranch?.id ?? null}
         activeBranchName={activeBranch?.name ?? null}
         boms={boms}

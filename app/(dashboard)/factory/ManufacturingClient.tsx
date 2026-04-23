@@ -1,5 +1,6 @@
 'use client'
 
+// Halaman manufaktur untuk mengelola resep produksi, SPK, dan cetak dokumen per SPK.
 import React, { startTransition, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -11,16 +12,14 @@ import {
   CheckCircle2, 
   Layers, 
   Clock, 
-  MoreVertical,
   X,
   Trash2,
-  Search,
   ChevronRight,
   TrendingUp,
   Package,
   Zap,
   Play,
-  ClipboardList,
+  Printer,
   AlertTriangle,
   Truck
 } from 'lucide-react'
@@ -30,6 +29,7 @@ import { convertQuantityBetweenUnits } from '@/modules/factory/lib/unit-conversi
 
 interface ManufacturingClientProps {
   orgId: string
+  orgName?: string | null
   activeBranchId?: string | null
   activeBranchName?: string | null
   boms: any[]
@@ -48,8 +48,59 @@ const item = {
   show: { opacity: 1, y: 0 }
 }
 
+function createSpkDraftNumber() {
+  return `SPK-${Date.now().toString().slice(-6)}`
+}
+
+function createPrintTimestamp() {
+  return new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'long',
+    timeStyle: 'short',
+  }).format(new Date())
+}
+
+function formatQty(value: number | string | null | undefined) {
+  const safeValue = Number(value ?? 0)
+  if (!Number.isFinite(safeValue)) return '0'
+
+  return new Intl.NumberFormat('id-ID', {
+    minimumFractionDigits: Number.isInteger(safeValue) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(safeValue)
+}
+
+type PrintableBomItem = {
+  product_id?: string | null
+  quantity?: number | string | null
+  unit?: string | null
+  product?: {
+    name?: string | null
+    unit?: string | null
+  } | null
+}
+
+type PrintableWorkOrder = {
+  wo_number?: string | null
+  quantity_planned?: number | string | null
+  status?: string | null
+  created_at?: string | null
+  deadline_date?: string | null
+  notes?: string | null
+  branch?: {
+    name?: string | null
+  } | null
+  bom?: {
+    code?: string | null
+    product?: {
+      name?: string | null
+    } | null
+    items?: PrintableBomItem[] | null
+  } | null
+}
+
 export function ManufacturingClient({
   orgId,
+  orgName = null,
   activeBranchId = null,
   activeBranchName = null,
   boms,
@@ -63,7 +114,10 @@ export function ManufacturingClient({
   const [showSpkModal, setShowSpkModal] = useState(false)
   const [showFinishModal, setShowFinishModal] = useState(false)
   const [selectedWo, setSelectedWo] = useState<any>(null)
+  const [selectedPrintWo, setSelectedPrintWo] = useState<PrintableWorkOrder | null>(null)
   const [loading, setLoading] = useState(false)
+  const [draftSpkNumber, setDraftSpkNumber] = useState('')
+  const [printIssuedAt, setPrintIssuedAt] = useState('')
   const [bomItems, setBomItems] = useState<Array<{ productId: string; quantity: number; unit: string }>>([])
   const [editingBom, setEditingBom] = useState<any>(null)
   
@@ -79,11 +133,28 @@ export function ManufacturingClient({
   const [pendingWo, setPendingWo] = useState<any>(null)
   const [showQuotationPrompt, setShowQuotationPrompt] = useState(false)
   const branchGuardMessage = 'Pilih satu unit aktif terlebih dahulu untuk memakai modul manufaktur.'
+  const spkStats = [
+    { label: 'SPK Aktif', value: workOrders.filter(w => w.status === 'RELEASED').length, icon: Play, color: 'text-blue-600 bg-blue-50' },
+    { label: 'Draft', value: workOrders.filter(w => w.status === 'DRAFT').length, icon: FileText, color: 'text-slate-600 bg-slate-50' },
+    { label: 'Selesai (Bulan ini)', value: workOrders.filter(w => w.status === 'COMPLETED').length, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
+    { label: 'Efisiensi Produksi', value: '94%', icon: TrendingUp, color: 'text-amber-600 bg-amber-50' },
+  ]
+  const companyName = orgName || 'Nizam Manufacturing'
 
   const refreshFactoryPage = () => {
     startTransition(() => {
       router.refresh()
     })
+  }
+
+  const handleOpenPrintPreview = (wo: PrintableWorkOrder) => {
+    setSelectedPrintWo(wo)
+    setPrintIssuedAt(createPrintTimestamp())
+  }
+
+  const handlePrintCurrentWo = () => {
+    if (typeof window === 'undefined' || !selectedPrintWo) return
+    window.setTimeout(() => window.print(), 100)
   }
 
   // Load bins when warehouse is selected
@@ -266,7 +337,8 @@ export function ManufacturingClient({
   }
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="max-w-7xl mx-auto space-y-10">
+    <>
+      <motion.div variants={container} initial="hidden" animate="show" className="max-w-7xl mx-auto space-y-10">
       {/* Header */}
       <motion.div variants={item} className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
@@ -307,7 +379,10 @@ export function ManufacturingClient({
             </button>
           ) : (
             <button
-              onClick={() => setShowSpkModal(true)}
+              onClick={() => {
+                setDraftSpkNumber(createSpkDraftNumber())
+                setShowSpkModal(true)
+              }}
               disabled={!activeBranchId}
               className="flex items-center gap-2 px-6 py-3 text-sm font-bold text-white bg-emerald-500 rounded-xl hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -336,12 +411,7 @@ export function ManufacturingClient({
         {activeTab === 'SPK' ? (
           <motion.div key="spk" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[
-                  { label: 'SPK Aktif', value: workOrders.filter(w => w.status === 'RELEASED').length, icon: Play, color: 'text-blue-600 bg-blue-50' },
-                  { label: 'Draft', value: workOrders.filter(w => w.status === 'DRAFT').length, icon: FileText, color: 'text-slate-600 bg-slate-50' },
-                  { label: 'Selesai (Bulan ini)', value: workOrders.filter(w => w.status === 'COMPLETED').length, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
-                  { label: 'Efisiensi Produksi', value: '94%', icon: TrendingUp, color: 'text-amber-600 bg-amber-50' },
-                ].map((stat, i) => (
+                {spkStats.map((stat, i) => (
                   <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${stat.color}`}>
                         <stat.icon size={24} />
@@ -355,6 +425,7 @@ export function ManufacturingClient({
              </div>
 
              <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
                 <table className="w-full text-left">
                    <thead className="bg-slate-50 border-b border-slate-100">
                       <tr>
@@ -394,7 +465,7 @@ export function ManufacturingClient({
                                   )}
                                 </div>
                              </td>
-                             <td className="px-6 py-5 text-right font-black text-slate-900">{Number(wo.quantity_planned).toFixed(2)} Unit</td>
+                             <td className="px-6 py-5 text-right font-black text-slate-900">{formatQty(wo.quantity_planned)} Unit</td>
                              <td className="px-6 py-5">
                                 <span className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-tighter border ${
                                   wo.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
@@ -412,7 +483,15 @@ export function ManufacturingClient({
                                  </p>
                                )}
                              </td>
-                             <td className="px-8 py-5 text-right flex justify-end gap-2">
+                             <td className="px-8 py-5">
+                                 <div className="flex justify-end gap-2">
+                                 <button
+                                   onClick={() => handleOpenPrintPreview(wo)}
+                                   className="px-4 py-2 bg-white text-slate-700 text-[10px] font-black uppercase rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
+                                 >
+                                   <Printer size={14} />
+                                   Cetak SPK
+                                 </button>
                                  {wo.status === 'DRAFT' && (
                                    <button 
                                      disabled={!activeBranchId || loading}
@@ -450,6 +529,7 @@ export function ManufacturingClient({
                                 >
                                   <Trash2 size={16} />
                                 </button>
+                                </div>
                              </td>
                           </tr>
                           )
@@ -457,6 +537,7 @@ export function ManufacturingClient({
                       )}
                    </tbody>
                 </table>
+                </div>
              </div>
           </motion.div>
         ) : (
@@ -560,6 +641,211 @@ export function ManufacturingClient({
 
       {/* NEW SPK MODAL */}
       <AnimatePresence>
+        {selectedPrintWo && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 print:static print:block print:p-0">
+            <style>{`
+              @media print {
+                @page { size: A4 portrait; margin: 12mm; }
+                body {
+                  background: #fff !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                body * { visibility: hidden !important; }
+                #wo-print-area, #wo-print-area * { visibility: visible !important; }
+                #wo-print-area {
+                  position: absolute;
+                  left: 0;
+                  top: 0;
+                  width: 100%;
+                  max-width: none;
+                  margin: 0;
+                  padding: 0;
+                  border: none;
+                  box-shadow: none;
+                  overflow: visible;
+                  background: #fff;
+                }
+                #wo-print-area table {
+                  width: 100%;
+                  border-collapse: collapse;
+                }
+                #wo-print-area thead {
+                  display: table-header-group;
+                }
+                #wo-print-area tr {
+                  break-inside: avoid;
+                  page-break-inside: avoid;
+                }
+                .wo-print-no-print { display: none !important; }
+              }
+            `}</style>
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedPrintWo(null)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden wo-print-no-print"
+            />
+
+            <motion.div
+              id="wo-print-area"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col print:shadow-none print:max-h-none print:h-auto print:max-w-none print:w-full print:mx-auto print:rounded-none print:text-[11px] print:leading-relaxed"
+            >
+              <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-4 wo-print-no-print print:hidden">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">Preview SPK</h3>
+                  <p className="text-xs text-slate-500 font-medium">Cetak satu dokumen untuk satu SPK.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handlePrintCurrentWo}
+                    className="px-5 py-2.5 bg-white text-slate-700 font-bold text-sm border border-slate-200 rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
+                  >
+                    <Printer size={16} />
+                    Cetak SPK
+                  </button>
+                  <button
+                    onClick={() => setSelectedPrintWo(null)}
+                    className="w-10 h-10 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-all flex items-center justify-center shadow-sm"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 bg-white print:overflow-visible print:p-0">
+                <div className="border-b-2 border-slate-900 pb-6 mb-6">
+                  <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">{companyName}</p>
+                      <h2 className="text-3xl font-black text-slate-900 tracking-tight mt-2">Surat Perintah Kerja</h2>
+                      <p className="text-sm font-bold text-blue-600 mt-1">{selectedPrintWo.wo_number}</p>
+                      <p className="text-xs text-slate-500 mt-3 max-w-xl">
+                        Dokumen operasional untuk pelaksanaan produksi berdasarkan resep dan target output yang sudah ditetapkan.
+                      </p>
+                    </div>
+                    <div className="text-sm text-slate-600 font-medium space-y-1 md:text-right">
+                      <p>Unit: {selectedPrintWo.branch?.name || activeBranchName || 'Semua Unit'}</p>
+                      <p>BOM: {selectedPrintWo.bom?.code || '-'}</p>
+                      <p>Dicetak: {printIssuedAt || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+                  <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Produk Jadi</p>
+                    <p className="text-lg font-black text-slate-900 mt-2">{selectedPrintWo.bom?.product?.name || '-'}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Qty Target</p>
+                    <p className="text-lg font-black text-slate-900 mt-2">{formatQty(selectedPrintWo.quantity_planned)} Unit</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Status</p>
+                    <div className="mt-2">
+                      <span className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-tighter border ${
+                        selectedPrintWo.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                        selectedPrintWo.status === 'RELEASED' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                        'bg-slate-50 text-slate-500 border-slate-200'
+                      }`}>
+                        {selectedPrintWo.status}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 p-4 bg-white">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tanggal Dibuat</p>
+                    <p className="text-sm font-bold text-slate-900 mt-2">{formatDate(selectedPrintWo.created_at)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 p-4 bg-white">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Batas Selesai</p>
+                    <p className="text-sm font-bold text-slate-900 mt-2">{selectedPrintWo.deadline_date ? formatDate(selectedPrintWo.deadline_date) : '-'}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 p-4 bg-white">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Resep Produksi</p>
+                    <p className="text-sm font-bold text-slate-900 mt-2">{selectedPrintWo.bom?.code || '-'}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-[28px] border border-slate-200 overflow-hidden mb-6">
+                  <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
+                    <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Komposisi Bahan Produksi</h4>
+                    <p className="text-xs text-slate-500 mt-1">Total kebutuhan mengikuti satuan yang dipasang di resep.</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead className="bg-white">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200">Bahan</th>
+                          <th className="px-4 py-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200">Qty per Unit</th>
+                          <th className="px-4 py-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200">Total Kebutuhan</th>
+                          <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200">Satuan</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedPrintWo.bom?.items?.length ? (
+                          selectedPrintWo.bom.items.map((bi, idx) => {
+                            const qtyPerUnit = Number(bi.quantity || 0)
+                            const totalNeed = qtyPerUnit * Number(selectedPrintWo.quantity_planned || 0)
+                            const unitLabel = bi.unit || bi.product?.unit || '-'
+
+                            return (
+                              <tr key={`${bi.product_id || idx}-${idx}`} className="odd:bg-slate-50/40">
+                                <td className="px-6 py-4 text-sm font-bold text-slate-900 border-b border-slate-100">{bi.product?.name || 'Bahan produksi'}</td>
+                                <td className="px-4 py-4 text-sm text-right text-slate-700 border-b border-slate-100">{formatQty(qtyPerUnit)}</td>
+                                <td className="px-4 py-4 text-sm text-right font-black text-slate-900 border-b border-slate-100">{formatQty(totalNeed)}</td>
+                                <td className="px-6 py-4 text-sm text-slate-700 border-b border-slate-100">{unitLabel}</td>
+                              </tr>
+                            )
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={4} className="px-6 py-10 text-center text-sm font-medium text-slate-400 italic">
+                              Resep belum memiliki detail bahan.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-6">
+                  <div className="rounded-[28px] border border-slate-200 p-6">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Catatan Produksi</p>
+                    <p className="text-sm text-slate-700 leading-relaxed mt-3">
+                      {selectedPrintWo.notes?.trim() || 'Tidak ada catatan tambahan pada SPK ini.'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-[28px] border border-slate-200 p-6">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-8">Paraf Operasional</p>
+                    <div className="space-y-8">
+                      <div>
+                        <p className="text-xs text-slate-500 mb-8">Pelaksana Produksi</p>
+                        <div className="border-b border-slate-300" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 mb-8">Supervisor / PIC</p>
+                        <div className="border-b border-slate-300" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 mb-8">Gudang / QC</p>
+                        <div className="border-b border-slate-300" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {showSpkModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSpkModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
@@ -573,7 +859,7 @@ export function ManufacturingClient({
                <form onSubmit={handleCreateSpk} className="space-y-6">
                   <div className="space-y-2 text-left">
                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">No SPK (Internal Number)</label>
-                     <input name="wo_number" required placeholder="SPK-XXXXX" defaultValue={`SPK-${Date.now().toString().slice(-6)}`} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-bold" />
+                     <input name="wo_number" required placeholder="SPK-XXXXX" defaultValue={draftSpkNumber} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-bold" />
                   </div>
                   <div className="space-y-2 text-left">
                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Pilih Resep Produksi (BoM)</label>
@@ -998,6 +1284,7 @@ export function ManufacturingClient({
         )}
       </AnimatePresence>
 
-    </motion.div>
+      </motion.div>
+    </>
   )
 }
