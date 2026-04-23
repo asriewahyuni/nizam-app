@@ -39,6 +39,11 @@ export default async function DashboardLayout({
   const requestPathname = (await headers()).get('x-pathname') || ''
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
+  const orgSettings =
+    orgData.org.settings && typeof orgData.org.settings === 'object' && !Array.isArray(orgData.org.settings)
+      ? orgData.org.settings as Record<string, unknown>
+      : {}
+  const startupWizardEnabled = orgSettings.startup_wizard_enabled !== false
   const [adminImpersonation, activeBranch, allowAllBranchSelection, isDemo] = await Promise.all([
     getAdminImpersonationState(),
     getActiveBranch(orgData.org.id),
@@ -197,7 +202,7 @@ export default async function DashboardLayout({
           allowAllBranchSelection={allowAllBranchSelection}
           canManageBranches={isOwnerOrAdmin}
         />
-        <StartupWizard isDemo={isDemo} />
+        <StartupWizard isDemo={isDemo} enabled={startupWizardEnabled} />
         <MobilePullToRefresh scrollContainerId="dashboard-scroll-root" />
         <main id="dashboard-scroll-root" className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6 print:overflow-visible print:p-0 print:pb-0">
           <div className="max-w-7xl mx-auto print:max-w-none">
