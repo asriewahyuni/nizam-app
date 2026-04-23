@@ -1,10 +1,11 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, FileText, Send, AlertCircle, Trash2, Printer, ArrowRight, XCircle } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createQuotation, convertQuotationToOrder } from '@/modules/sales/actions/sales.actions'
+import { createContact } from '@/modules/contacts/actions/contact.actions'
 import { getUsableSalesPromoByCode } from '@/modules/sales/actions/promo.actions'
 import { formatRupiah } from '@/lib/utils'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
@@ -22,6 +23,15 @@ type ProductOption = {
   name: string
   selling_price?: number | null
   unit?: string | null
+}
+
+type CustomerFormState = {
+  name: string
+  email: string
+  phone: string
+  phone_wa: string
+  instagram: string
+  address: string
 }
 
 type QuotationLine = {
@@ -119,6 +129,21 @@ function createDraftLine(): DraftLine {
   }
 }
 
+function sortContactOptions(items: ContactOption[]) {
+  return [...items].sort((left, right) => left.name.localeCompare(right.name, 'id', { sensitivity: 'base' }))
+}
+
+function createEmptyCustomerForm(): CustomerFormState {
+  return {
+    name: '',
+    email: '',
+    phone: '',
+    phone_wa: '',
+    instagram: '',
+    address: '',
+  }
+}
+
 export default function QuotationClient({
   orgId,
   orgName,
@@ -129,10 +154,15 @@ export default function QuotationClient({
   products,
 }: QuotationClientProps) {
   const [showModal, setShowModal] = useState(false)
+  const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [savingCustomer, setSavingCustomer] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [customerError, setCustomerError] = useState<string | null>(null)
   const [viewQuotation, setViewQuotation] = useState<QuotationRecord | null>(null)
+  const [customerOptions, setCustomerOptions] = useState<ContactOption[]>(() => sortContactOptions(customers))
+  const [customerForm, setCustomerForm] = useState<CustomerFormState>(() => createEmptyCustomerForm())
 
   const [customerId, setCustomerId] = useState('')
   const [quoteDate, setQuoteDate] = useState(new Date().toISOString().split('T')[0])
@@ -140,6 +170,10 @@ export default function QuotationClient({
   const [promoCode, setPromoCode] = useState('')
   const [appliedPromo, setAppliedPromo] = useState<SalesPromoRecord | null>(null)
   const [lines, setLines] = useState<DraftLine[]>(() => [createDraftLine()])
+
+  useEffect(() => {
+    setCustomerOptions(sortContactOptions(customers))
+  }, [customers])
 
   const companyProfile = {
     name: orgSettings.brand_name || orgName || 'Perusahaan',
@@ -179,6 +213,21 @@ export default function QuotationClient({
 
   const handleAddLine = () => {
     setLines((current) => [...current, createDraftLine()])
+  }
+
+  const resetCustomerForm = () => {
+    setCustomerForm(createEmptyCustomerForm())
+    setCustomerError(null)
+  }
+
+  const openCustomerModal = () => {
+    resetCustomerForm()
+    setShowCustomerModal(true)
+  }
+
+  const closeCustomerModal = () => {
+    setShowCustomerModal(false)
+    resetCustomerForm()
   }
 
   const handleLineChange = (id: number, field: keyof DraftLine, value: string | number) => {
@@ -250,6 +299,51 @@ export default function QuotationClient({
     setSuccess('Penawaran berhasil dibuat!')
     setShowModal(false)
     setTimeout(() => window.location.reload(), 1000)
+  }
+
+  const handleCreateCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+
+    if (!customerForm.name.trim()) {
+      setCustomerError('Nama customer wajib diisi.')
+      return
+    }
+
+    setSavingCustomer(true)
+    setCustomerError(null)
+
+    const formData = new FormData()
+    formData.set('type', 'CUSTOMER')
+    formData.set('name', customerForm.name)
+    formData.set('email', customerForm.email)
+    formData.set('phone', customerForm.phone)
+    formData.set('phone_wa', customerForm.phone_wa)
+    formData.set('instagram', customerForm.instagram)
+    formData.set('address', customerForm.address)
+
+    const res = await createContact(orgId, formData)
+
+    if (res?.error) {
+      setCustomerError(res.error)
+      setSavingCustomer(false)
+      return
+    }
+
+    if (res?.data?.id) {
+      const nextCustomer = {
+        id: String(res.data.id),
+        name: String(res.data.name || customerForm.name).trim(),
+      }
+
+      setCustomerOptions((current) => sortContactOptions([
+        ...current.filter((item) => item.id !== nextCustomer.id),
+        nextCustomer,
+      ]))
+      setCustomerId(nextCustomer.id)
+    }
+
+    setSavingCustomer(false)
+    closeCustomerModal()
   }
 
   const handleConvert = async (id: string) => {
@@ -393,7 +487,16 @@ export default function QuotationClient({
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-2xl">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</label>
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</label>
+                      <button
+                        type="button"
+                        onClick={openCustomerModal}
+                        className="text-[10px] font-black text-blue-600 hover:text-blue-800 transition-colors"
+                      >
+                        + CUSTOMER BARU
+                      </button>
+                    </div>
                     <select
                       required
                       value={customerId}
@@ -401,7 +504,7 @@ export default function QuotationClient({
                       className="w-full h-12 px-4 border rounded-xl text-sm font-bold outline-none focus:border-blue-600"
                     >
                       <option value="">Pilih Customer...</option>
-                      {customers.map((customer) => (
+                      {customerOptions.map((customer) => (
                         <option key={customer.id} value={customer.id}>
                           {customer.name}
                         </option>
@@ -788,6 +891,97 @@ export default function QuotationClient({
                   </>
                 )
               })()}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showCustomerModal && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !savingCustomer && closeCustomerModal()}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl"
+            >
+              <h3 className="text-xl font-bold mb-6">Tambah Customer Baru</h3>
+
+              {customerError && (
+                <div className="mb-6 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-600">
+                  {customerError}
+                </div>
+              )}
+
+              <form onSubmit={handleCreateCustomer} className="space-y-4">
+                <input
+                  required
+                  value={customerForm.name}
+                  onChange={(e) => setCustomerForm((current) => ({ ...current, name: e.target.value }))}
+                  placeholder="Nama customer / perusahaan"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                />
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <input
+                    type="email"
+                    value={customerForm.email}
+                    onChange={(e) => setCustomerForm((current) => ({ ...current, email: e.target.value }))}
+                    placeholder="Email"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                  />
+                  <input
+                    value={customerForm.phone}
+                    onChange={(e) => setCustomerForm((current) => ({ ...current, phone: e.target.value }))}
+                    placeholder="No. telepon"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <input
+                    value={customerForm.phone_wa}
+                    onChange={(e) => setCustomerForm((current) => ({ ...current, phone_wa: e.target.value }))}
+                    placeholder="WhatsApp"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                  />
+                  <input
+                    value={customerForm.instagram}
+                    onChange={(e) => setCustomerForm((current) => ({ ...current, instagram: e.target.value }))}
+                    placeholder="Instagram"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <textarea
+                  value={customerForm.address}
+                  onChange={(e) => setCustomerForm((current) => ({ ...current, address: e.target.value }))}
+                  rows={4}
+                  placeholder="Alamat"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                />
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeCustomerModal}
+                    disabled={savingCustomer}
+                    className="px-6 py-3 font-bold text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Batal
+                  </button>
+                  <SafeButton variant="primary" isLoading={savingCustomer} type="submit" className="!px-8">
+                    Simpan Customer
+                  </SafeButton>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}
