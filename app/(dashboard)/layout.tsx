@@ -17,6 +17,7 @@ import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import { MobilePullToRefresh } from '@/components/shared/MobilePullToRefresh'
 import { RouteProgressBar } from '@/components/shared/RouteProgressBar'
 import { UserActivityTracker } from '@/components/shared/UserActivityTracker'
+import { GlobalApprovalNotifier } from '@/components/shared/GlobalApprovalNotifier'
 import { EduModeShell } from '@/components/edu/EduModeShell'
 
 type RouteModuleEntry = {
@@ -158,6 +159,10 @@ export default async function DashboardLayout({
       />
       <RouteProgressBar />
       <UserActivityTracker />
+      <GlobalApprovalNotifier
+        orgId={orgData.org.id}
+        activeBranchId={activeBranch?.id || null}
+      />
       <EduModeShell />
       {/* Sidebar */}
       <AppSidebar 

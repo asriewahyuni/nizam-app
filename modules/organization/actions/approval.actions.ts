@@ -568,6 +568,62 @@ export async function getPendingApprovalsCount(orgId: string, branchId?: string 
   return count || 0
 }
 
+export type PendingApprovalNotificationMarker = {
+  pendingCount: number
+  latestPendingId: string | null
+  latestRequestedAt: string | null
+}
+
+export async function getPendingApprovalNotificationMarker(
+  orgId: string,
+  branchId?: string | null
+): Promise<PendingApprovalNotificationMarker> {
+  const supabase = await createClient()
+  const branchSelection = await resolveApprovalBranchId(orgId, branchId)
+  if ('error' in branchSelection) {
+    return {
+      pendingCount: 0,
+      latestPendingId: null,
+      latestRequestedAt: null,
+    }
+  }
+
+  const effectiveBranchId = branchSelection.branchId
+
+  let query = (supabase as any)
+    .from('approval_requests')
+    .select('id, requested_at', { count: 'exact' })
+    .eq('org_id', orgId)
+    .eq('status', 'PENDING')
+
+  if (effectiveBranchId) {
+    query = query.eq('branch_id', effectiveBranchId)
+  }
+
+  const { data, count, error } = await query
+    .order('requested_at', { ascending: false })
+    .limit(1)
+
+  if (error) {
+    ;(console as any).error('Error fetching approval notification marker:', error)
+    return {
+      pendingCount: 0,
+      latestPendingId: null,
+      latestRequestedAt: null,
+    }
+  }
+
+  const latestRow = Array.isArray(data) && data.length > 0
+    ? data[0] as { id?: string | null; requested_at?: string | null }
+    : null
+
+  return {
+    pendingCount: count || 0,
+    latestPendingId: toTrimmedString(latestRow?.id) || null,
+    latestRequestedAt: toTrimmedString(latestRow?.requested_at) || null,
+  }
+}
+
 export async function decideApproval(id: string, orgId: string, status: 'APPROVED' | 'REJECTED', notes?: string, branchId?: string | null) {
   const supabase = await createClient()
   const { data: { user } } = await (supabase as any).auth.getUser()

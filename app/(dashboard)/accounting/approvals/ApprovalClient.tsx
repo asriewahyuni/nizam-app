@@ -1,15 +1,17 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Check, X, Bell, FileText, View, QrCode, ShieldCheck, AlertTriangle, Clock, Shield } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { decideApproval, getApprovalDetail, getApprovalHistory } from '@/modules/organization/actions/approval.actions'
+import { decideApproval, getApprovalDetail, getApprovalHistory, getPendingApprovals } from '@/modules/organization/actions/approval.actions'
+import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/browser/approval-notifier'
 import { getDocumentHeaderDiscountAmount, getDocumentLineDiscountsForDisplay, getDocumentLineDiscountTotal } from '@/lib/commerce/discounts'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { QRCodeSVG } from 'qrcode.react'
 
 interface ApprovalClientProps {
   orgId: string
+  activeBranchId?: string | null
   initialApprovals: any[]
 }
 
@@ -83,7 +85,7 @@ function getPurchaseLineNetTotal(item: any, displayDiscountAmount: number) {
   return getPurchaseLineGrossTotal(item) - displayDiscountAmount + Number(item?.tax_amount || 0)
 }
 
-export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps) {
+export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals }: ApprovalClientProps) {
   const [approvals, setApprovals] = useState(initialApprovals)
   const [history, setHistory] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'PENDING' | 'HISTORY'>('PENDING')
@@ -109,6 +111,19 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
   const [signOpen, setSignOpen] = useState(false)
   const [signatureData, setSignatureData] = useState<string>('')
 
+  const replaceApprovals = useCallback((nextApprovals: any[] | ((current: any[]) => any[])) => {
+    setApprovals((current) => (
+      typeof nextApprovals === 'function'
+        ? nextApprovals(current)
+        : nextApprovals
+    ))
+  }, [])
+
+  const refreshPendingApprovals = useCallback(async () => {
+    const latestApprovals = await getPendingApprovals(orgId, activeBranchId)
+    replaceApprovals(latestApprovals || [])
+  }, [activeBranchId, orgId, replaceApprovals])
+
   const openConfirm = (id: string, action: 'APPROVED' | 'REJECTED') => {
     setConfirmReqId(id)
     setConfirmAction(action)
@@ -121,12 +136,12 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
     if (!confirmAction) return
     setSubmitting(confirmReqId)
     setConfirmOpen(false)
-    const res = await decideApproval(confirmReqId, orgId, confirmAction, confirmNotes)
+    const res = await decideApproval(confirmReqId, orgId, confirmAction, confirmNotes, activeBranchId)
     if (res.error) {
       alert(res.error)
       setSubmitting(null)
     } else {
-      setApprovals(approvals.filter(a => a.id !== confirmReqId))
+      replaceApprovals((current) => current.filter((approval) => approval.id !== confirmReqId))
       setSubmitting(null)
       if (confirmAction === 'APPROVED') {
         const ts = new Date().toISOString()
@@ -136,23 +151,41 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
     }
   }
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     setLoadingDetail(true)
-    const res = await getApprovalHistory(orgId)
+    const res = await getApprovalHistory(orgId, activeBranchId)
     setHistory(res || [])
     setLoadingDetail(false)
-  }
+  }, [activeBranchId, orgId])
 
-  React.useEffect(() => {
+  useEffect(() => {
+    replaceApprovals(initialApprovals)
+  }, [initialApprovals, replaceApprovals])
+
+  useEffect(() => {
+    return subscribeApprovalSignal((signal) => {
+      if (!approvalSignalMatchesScope(signal, orgId, activeBranchId)) {
+        return
+      }
+
+      void refreshPendingApprovals()
+
+      if (activeTab === 'HISTORY') {
+        void loadHistory()
+      }
+    })
+  }, [activeBranchId, activeTab, loadHistory, orgId, refreshPendingApprovals])
+
+  useEffect(() => {
     if (activeTab === 'HISTORY') loadHistory()
-  }, [activeTab])
+  }, [activeTab, loadHistory])
 
   const handleDetail = async (req: any) => {
     setSelectedReq(req)
     setDetailData(null)
     setDetailOpen(true)
     setLoadingDetail(true)
-    const res = await getApprovalDetail(orgId, req.source_id, req.source_type)
+    const res = await getApprovalDetail(orgId, req.source_id, req.source_type, activeBranchId)
     setDetailData(res.data)
     setDetailLogs(res.logs || [])
     setLoadingDetail(false)

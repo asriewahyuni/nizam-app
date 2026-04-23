@@ -4,12 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { approvalRequestTouchesActiveBranch } from '@/lib/browser/approval-realtime'
+import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/browser/approval-notifier'
 import { scheduleIdleTask } from '@/lib/browser/idle'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
-import { saasModuleMatches, saasModuleCoversCapability, normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
+import { saasModuleCoversCapability, normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
-import { createOptionalClient as createOptionalBrowserSupabaseClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard,
   BookOpen,
@@ -50,7 +49,6 @@ import {
 import { signOut } from '@/modules/auth/actions/auth.actions'
 import { signOutDemo } from '@/modules/demo/actions/demo.actions'
 import { getSidebarChromeMetrics } from '@/modules/organization/actions/dashboard-shell.actions'
-import { getPendingApprovalsCount } from '@/modules/organization/actions/approval.actions'
 import { MiniErpWordmark } from '@/components/shared/MiniErpWordmark'
 
 interface NavGroup {
@@ -301,18 +299,6 @@ export function AppSidebar({
     }
   }, [activeBranchId, orgId])
 
-  const refreshPendingApprovalBadge = useCallback(async () => {
-    try {
-      const pendingApprovals = await getPendingApprovalsCount(orgId, activeBranchId)
-      setBadgeMetrics((current) => ({
-        ...current,
-        pendingApprovals,
-      }))
-    } catch (error) {
-      console.error('[AppSidebar] Failed to refresh approval badge:', error)
-    }
-  }, [activeBranchId, orgId])
-
   const prefetchRoute = useCallback((href: string) => {
     const normalizedHref = String(href || '').trim()
     if (!normalizedHref || normalizedHref === fullPath || prefetchedRoutesRef.current.has(normalizedHref)) {
@@ -370,36 +356,31 @@ export function AppSidebar({
     window.addEventListener('focus', handleWindowFocus)
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
-    const pollInterval = setInterval(() => {
+    const pollInterval = window.setInterval(() => {
       if (document.visibilityState === 'visible') {
         void loadSidebarMetrics()
       }
     }, 15000)
 
-    const supabase = createOptionalBrowserSupabaseClient()
-    const channel = supabase
-      ? supabase
-          .channel(`nizam-approval-sidebar:${orgId}:${activeBranchId || 'all'}`)
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'approval_requests', filter: `org_id=eq.${orgId}` },
-            (payload: any) => {
-              if (!approvalRequestTouchesActiveBranch(payload, activeBranchId)) return
-              void refreshPendingApprovalBadge()
-            }
-          )
-          .subscribe()
-      : null
-
     return () => {
-      clearInterval(pollInterval)
+      window.clearInterval(pollInterval)
       window.removeEventListener('focus', handleWindowFocus)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
-      if (supabase && channel) {
-        void supabase.removeChannel(channel)
-      }
     }
-  }, [activeBranchId, loadSidebarMetrics, orgId, refreshPendingApprovalBadge])
+  }, [loadSidebarMetrics])
+
+  useEffect(() => {
+    return subscribeApprovalSignal((signal) => {
+      if (!approvalSignalMatchesScope(signal, orgId, activeBranchId)) {
+        return
+      }
+
+      setBadgeMetrics((current) => ({
+        ...current,
+        pendingApprovals: signal.pendingCount,
+      }))
+    })
+  }, [activeBranchId, orgId])
 
   const isNavItemActive = (href: string) => {
     return isSidebarItemActive(pathname, fullPath, href, Boolean(tabQuery))

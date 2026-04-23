@@ -2,8 +2,7 @@
 
 import { formatRupiah, getInitials } from '@/lib/utils'
 import { scheduleIdleTask } from '@/lib/browser/idle'
-import { approvalRequestTouchesActiveBranch } from '@/lib/browser/approval-realtime'
-import { createOptionalClient as createOptionalBrowserSupabaseClient } from '@/lib/supabase/client'
+import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/browser/approval-notifier'
 import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
@@ -664,15 +663,6 @@ export function AppHeader({
 
   const isLowBalance = tokenSummary.threshold > 0 && tokenSummary.balance <= tokenSummary.threshold
 
-  const loadPendingApprovals = useCallback(async () => {
-    try {
-      const pendingCount = await getHeaderPendingApprovals(activeOrgId, activeBranchId)
-      setHeaderPendingApprovals(pendingCount)
-    } catch (error) {
-      console.error('[AppHeader] Failed to load approval badge:', error)
-    }
-  }, [activeBranchId, activeOrgId])
-
   useEffect(() => {
     setOrganizations(initialOrganizations)
     setBranches(initialBranches)
@@ -705,49 +695,14 @@ export function AppHeader({
   }, [activeBranchId, activeOrgId])
 
   useEffect(() => {
-    const handleWindowFocus = () => {
-      void loadPendingApprovals()
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        void loadPendingApprovals()
+    return subscribeApprovalSignal((signal) => {
+      if (!approvalSignalMatchesScope(signal, activeOrgId, activeBranchId)) {
+        return
       }
-    }
 
-    window.addEventListener('focus', handleWindowFocus)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    const pollInterval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        void loadPendingApprovals()
-      }
-    }, 15000)
-
-    const supabase = createOptionalBrowserSupabaseClient()
-    const channel = supabase
-      ? supabase
-          .channel(`nizam-approval-header:${activeOrgId}:${activeBranchId || 'all'}`)
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'approval_requests', filter: `org_id=eq.${activeOrgId}` },
-            (payload: any) => {
-              if (!approvalRequestTouchesActiveBranch(payload, activeBranchId)) return
-              void loadPendingApprovals()
-            }
-          )
-          .subscribe()
-      : null
-
-    return () => {
-      clearInterval(pollInterval)
-      window.removeEventListener('focus', handleWindowFocus)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      if (supabase && channel) {
-        void supabase.removeChannel(channel)
-      }
-    }
-  }, [activeBranchId, activeOrgId, loadPendingApprovals])
+      setHeaderPendingApprovals(signal.pendingCount)
+    })
+  }, [activeBranchId, activeOrgId])
 
   useEffect(() => {
     if (!isTokenPopupOpen) return
