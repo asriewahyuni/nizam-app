@@ -10,6 +10,7 @@ import {
   Activity,
   Building2,
   Clock3,
+  Flame,
   LogIn,
   MapPin,
   RefreshCw,
@@ -66,6 +67,22 @@ function buildSearchHaystack(parts: Array<string | null | undefined>) {
     .map((part) => String(part || '').trim().toLowerCase())
     .filter(Boolean)
     .join(' ')
+}
+
+function formatHourLabel(hour: number) {
+  return `${String(hour).padStart(2, '0')}:00`
+}
+
+function getHeatmapCellClass(activityCount: number, maxActivity: number) {
+  if (activityCount <= 0 || maxActivity <= 0) return 'bg-slate-100 border-slate-200 text-slate-300'
+
+  const ratio = activityCount / maxActivity
+
+  if (ratio < 0.2) return 'bg-sky-100 border-sky-200 text-sky-500'
+  if (ratio < 0.4) return 'bg-sky-200 border-sky-300 text-sky-600'
+  if (ratio < 0.6) return 'bg-sky-400 border-sky-500 text-sky-900'
+  if (ratio < 0.8) return 'bg-blue-600 border-blue-700 text-white'
+  return 'bg-slate-900 border-slate-950 text-white'
 }
 
 export function UserActivityMonitor() {
@@ -149,6 +166,25 @@ export function UserActivityMonitor() {
     return haystack.includes(needle)
   })
 
+  const heatmapRows = (() => {
+    const grouped = new Map<string, NonNullable<UserActivitySnapshot['heatmap']>>()
+
+    for (const cell of snapshot?.heatmap || []) {
+      const existing = grouped.get(cell.dateKey) || []
+      existing.push(cell)
+      grouped.set(cell.dateKey, existing)
+    }
+
+    return Array.from(grouped.entries()).map(([, cells]) =>
+      [...cells].sort((left, right) => left.hour - right.hour)
+    )
+  })()
+
+  const heatmapMaxActivity = Math.max(
+    0,
+    ...(snapshot?.heatmap || []).map((cell) => cell.activityCount)
+  )
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -192,6 +228,99 @@ export function UserActivityMonitor() {
           </div>
         </SectionCard>
       </div>
+
+      <SectionCard>
+        <div className="p-6 space-y-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h3 className="text-xl font-black tracking-tight text-slate-900">Heatmap Aktivitas 7 Hari</h3>
+              <p className="mt-1 text-sm font-medium text-slate-500">
+                Semakin gelap warnanya, semakin ramai aktivitas user pada jam itu. Data memakai waktu Jakarta.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-amber-700">
+              <Flame size={14} />
+              Puncak aktivitas: {heatmapMaxActivity} event/jam
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-bold text-slate-500">
+              Memuat heatmap aktivitas...
+            </div>
+          ) : heatmapRows.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-bold text-slate-500">
+              Belum ada data heatmap untuk ditampilkan.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="overflow-x-auto">
+                <div className="min-w-[980px]">
+                  <div className="grid grid-cols-[100px_repeat(24,minmax(24px,1fr))] gap-1">
+                    <div />
+                    {Array.from({ length: 24 }, (_, hour) => (
+                      <div
+                        key={`hour:${hour}`}
+                        className="text-center text-[10px] font-black uppercase tracking-[0.14em] text-slate-400"
+                      >
+                        {String(hour).padStart(2, '0')}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-2 space-y-1">
+                    {heatmapRows.map((row) => {
+                      const firstCell = row[0]
+                      const dailyTotal = row.reduce((total, cell) => total + cell.activityCount, 0)
+
+                      return (
+                        <div key={firstCell?.dateKey || 'heatmap-row'} className="grid grid-cols-[100px_repeat(24,minmax(24px,1fr))] gap-1">
+                          <div className="flex items-center justify-between pr-3">
+                            <div>
+                              <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-700">
+                                {firstCell?.dayLabel || '-'}
+                              </div>
+                              <div className="text-[10px] font-bold text-slate-400">
+                                {firstCell?.dateLabel || '-'}
+                              </div>
+                            </div>
+                            <div className="text-right text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                              {dailyTotal}
+                            </div>
+                          </div>
+
+                          {row.map((cell) => (
+                            <div
+                              key={`${cell.dateKey}:${cell.hour}`}
+                              title={`${firstCell?.dayLabel || ''} ${cell.dateLabel} ${formatHourLabel(cell.hour)} • ${cell.activityCount} event • ${cell.uniqueUsers} user`}
+                              className={`h-7 rounded-md border transition-transform hover:scale-105 ${getHeatmapCellClass(cell.activityCount, heatmapMaxActivity)}`}
+                            />
+                          ))}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                <span>Sepi</span>
+                {[
+                  'bg-slate-100 border-slate-200',
+                  'bg-sky-100 border-sky-200',
+                  'bg-sky-200 border-sky-300',
+                  'bg-sky-400 border-sky-500',
+                  'bg-blue-600 border-blue-700',
+                  'bg-slate-900 border-slate-950',
+                ].map((className) => (
+                  <span key={className} className={`h-3 w-6 rounded-full border ${className}`} />
+                ))}
+                <span>Ramai</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </SectionCard>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.3fr,0.7fr] gap-6">
         <SectionCard>

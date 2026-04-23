@@ -16,6 +16,15 @@ export type UserActivityTopRoute = {
   uniqueUsers: number
 }
 
+export type UserActivityHeatmapCell = {
+  dateKey: string
+  dayLabel: string
+  dateLabel: string
+  hour: number
+  activityCount: number
+  uniqueUsers: number
+}
+
 export type UserActivityPresence = {
   actorUserId: string | null
   internalUserId: string | null
@@ -53,6 +62,7 @@ export type UserActivityItem = {
 
 export type UserActivitySnapshot = {
   summary: UserActivitySummary
+  heatmap: UserActivityHeatmapCell[]
   topRoutes: UserActivityTopRoute[]
   currentUsers: UserActivityPresence[]
   recentActivities: UserActivityItem[]
