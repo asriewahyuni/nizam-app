@@ -19,6 +19,7 @@ import { RouteProgressBar } from '@/components/shared/RouteProgressBar'
 import { UserActivityTracker } from '@/components/shared/UserActivityTracker'
 import { GlobalApprovalNotifier } from '@/components/shared/GlobalApprovalNotifier'
 import { EduModeShell } from '@/components/edu/EduModeShell'
+import { hasEnabledModuleAccess, hasPosOnlyAccess } from '@/modules/organization/lib/navigation-access'
 
 type RouteModuleEntry = {
   path: string
@@ -29,6 +30,10 @@ type RouteModuleEntry = {
 
 function moduleNameMatches(enabledModuleRaw: string, candidateRaw: string) {
   return saasModuleMatches(enabledModuleRaw, candidateRaw)
+}
+
+function isPosCashierRoute(pathname: string) {
+  return pathname === '/pos' || pathname.startsWith('/pos/')
 }
 
 export default async function DashboardLayout({
@@ -73,6 +78,15 @@ export default async function DashboardLayout({
   // ─────────────────────────────────────────────────────────────
   const isOwnerOrAdmin = orgData.role === 'owner' || orgData.role === 'admin'
   const canManageSubOrganizations = isOwnerOrAdmin
+  const isPosOnlyUser = hasPosOnlyAccess(orgData.role, orgData.permissions)
+
+  if (
+    isPosOnlyUser &&
+    hasEnabledModuleAccess(orgData.enabledModules, 'POS') &&
+    !isPosCashierRoute(requestPathname)
+  ) {
+    return redirect('/pos')
+  }
 
   // Map paths to their required module names (matching saas_packages.modules)
   // Each entry can have multiple aliases to support both English & Indonesian module names
@@ -100,7 +114,7 @@ export default async function DashboardLayout({
     { path: '/factory', requiredModule: 'Manufacturing', aliases: ['Manufacturing', 'Factory'], permissionKeys: ['factory', 'manufacturing'] },
     { path: '/purchasing', requiredModule: 'Purchasing', aliases: ['Purchasing', 'Pembelian'], permissionKeys: ['purchasing', 'purchase'] },
     { path: '/sales', requiredModule: 'Sales', aliases: ['Sales', 'Penjualan'], permissionKeys: ['sales', 'quotation'] },
-    { path: '/pos', requiredModule: 'POS', aliases: ['POS', 'POS (Kasir)'], permissionKeys: ['pos', 'sales'] },
+    { path: '/pos', requiredModule: 'POS', aliases: ['POS', 'POS (Kasir)'], permissionKeys: ['pos'] },
     { path: '/fleet', requiredModule: 'Fleet & Rental', aliases: ['Fleet & Rental', 'Fleet Management', 'Smart Fleet Management'], permissionKeys: ['fleet'] },
     { path: '/hris', requiredModule: 'HRIS', aliases: ['HRIS', 'Karyawan (HRIS)', 'Attendance', 'Payroll'], permissionKeys: ['hris', 'employee', 'employees', 'attendance', 'payroll'] },
     { path: '/learning', requiredModule: 'HRIS', aliases: ['HRIS', 'Learning', 'Peningkatan Kompetensi'], permissionKeys: ['learning', 'hris', 'employee', 'employees'] },

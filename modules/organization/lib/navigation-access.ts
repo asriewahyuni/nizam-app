@@ -42,6 +42,10 @@ function normalizePermissionList(permissions?: string[] | null) {
     : []
 }
 
+function isPosPermission(permission: string) {
+  return /^pos($|[:._-])/.test(permission)
+}
+
 function normalizeEnabledModuleList(enabledModules?: string[] | null) {
   return Array.isArray(enabledModules)
     ? enabledModules
@@ -75,6 +79,19 @@ export function hasRolePermission(
   )
 }
 
+export function hasPosOnlyAccess(
+  userRole: string | null | undefined,
+  permissions: string[] | null | undefined
+) {
+  const normalizedRole = normalizeRole(userRole)
+  if (normalizedRole === 'owner' || normalizedRole === 'admin') return false
+
+  const normalizedPermissions = normalizePermissionList(permissions)
+  if (!normalizedPermissions.some(isPosPermission)) return false
+
+  return normalizedPermissions.every(isPosPermission)
+}
+
 export function hasEnabledModuleAccess(
   enabledModules: string[] | null | undefined,
   moduleKey?: string | null
@@ -99,6 +116,10 @@ export function resolveDefaultAuthorizedRoute(input: NavigationAccessInput) {
   const normalizedRole = normalizeRole(input.userRole)
   if (normalizedRole === 'owner' || normalizedRole === 'admin') {
     return '/dashboard'
+  }
+
+  if (hasPosOnlyAccess(input.userRole, input.permissions) && hasEnabledModuleAccess(input.enabledModules, 'POS')) {
+    return '/pos'
   }
 
   for (const candidate of DEFAULT_LANDING_CANDIDATES) {

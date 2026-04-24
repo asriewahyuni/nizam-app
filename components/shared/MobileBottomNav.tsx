@@ -10,7 +10,7 @@ import {
   History, 
   User 
 } from 'lucide-react'
-import { hasEnabledModuleAccess, hasRolePermission } from '@/modules/organization/lib/navigation-access'
+import { hasEnabledModuleAccess, hasPosOnlyAccess, hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { cn } from '@/lib/utils'
 
 const ROUTE_LOADING_START_EVENT = 'nizam_route_loading_start'
@@ -53,7 +53,10 @@ export function MobileBottomNav({
   ]), [])
 
   const visibleItems = useMemo(() => {
+    const isPosOnlyUser = hasPosOnlyAccess(userRole, permissions)
+
     return items.filter((item) => {
+      if (isPosOnlyUser && item.href !== '/pos') return false
       if (item.href === '/profil-saya') return true
       if (!hasRolePermission(userRole, permissions, item.permission_key)) return false
       if (!hasEnabledModuleAccess(enabledModules, item.module_key)) return false

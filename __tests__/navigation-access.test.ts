@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   hasEnabledModuleAccess,
+  hasPosOnlyAccess,
   hasRolePermission,
   resolveDefaultAuthorizedRoute,
 } from '@/modules/organization/lib/navigation-access'
@@ -28,6 +29,12 @@ describe('navigation access helpers', () => {
       permissions: ['pos:read', 'pos:write'],
       enabledModules: ['POS'],
     })).toBe('/pos')
+  })
+
+  it('detects POS-only roles without blocking POS plus other permissions', () => {
+    expect(hasPosOnlyAccess('staff', ['pos:read', 'pos:write'])).toBe(true)
+    expect(hasPosOnlyAccess('staff', ['pos:read', 'sales:read'])).toBe(false)
+    expect(hasPosOnlyAccess('owner', ['pos:read', 'pos:write'])).toBe(false)
   })
 
   it('falls back to profile when no module permission is granted', () => {
