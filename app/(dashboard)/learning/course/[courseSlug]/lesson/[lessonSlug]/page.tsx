@@ -57,6 +57,18 @@ export default async function LearningLessonPage(props: {
             Estimasi {lesson.estimatedMinutes} menit
           </div>
         </div>
+
+        {lesson.actionHref ? (
+          <div className="mt-5">
+            <Link
+              href={lesson.actionHref}
+              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
+            >
+              {lesson.actionLabel || 'Buka Fitur Terkait'}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        ) : null}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">

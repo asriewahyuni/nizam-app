@@ -328,6 +328,7 @@ export default async function LearningPage() {
               'Selesaikan Level 0 Orientasi Perusahaan sebagai fondasi onboarding.',
               'Lanjut ke course Level 1 Pengguna Umum NIZAM.',
               'Pelajari lesson per lesson dengan screenshot nyata.',
+              'Buka lembar asesmen course untuk review teori dan praktik bersama trainer.',
               'Kerjakan checklist dan pahami jalur akses dasar.',
               'Lanjut ke board EDU jika course berikutnya butuh praktik.',
             ].map((item, index) => (
@@ -391,11 +392,11 @@ export default async function LearningPage() {
           <CheckCircle2 className="h-5 w-5 text-emerald-600" />
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Status MVP</div>
-            <h2 className="mt-1 text-xl font-black text-slate-900">Training Center sudah punya home, track, course, dan lesson pertama</h2>
+            <h2 className="mt-1 text-xl font-black text-slate-900">Training Center sudah punya home, track, course, lesson, dan lembar asesmen dasar</h2>
           </div>
         </div>
         <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
-          Tahap berikutnya adalah menambahkan progress peserta yang tersimpan, penilaian dasar per enrollment, dan review trainer.
+          Tahap berikutnya adalah menambahkan progress peserta yang tersimpan, penilaian per enrollment, dan review trainer yang lebih terstruktur.
           Untuk menjaga performa, lesson dipisah per URL dan screenshot hanya dimuat pada halaman yang relevan.
         </p>
       </section>

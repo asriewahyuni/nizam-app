@@ -18,6 +18,7 @@ const PROTECTED_PAGE_PREFIXES = [
   '/factory',
   '/fleet',
   '/hris',
+  '/learning',
   '/pos',
   '/pricing',
   '/profil-saya',

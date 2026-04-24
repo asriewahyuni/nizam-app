@@ -18,6 +18,8 @@ import {
   getTrainingLessonsForCourse,
   getTrainingTrackBySlug,
 } from '@/modules/edu/lib/training-center-mvp'
+import { getTrainingAssessmentByCourseSlug } from '@/modules/edu/lib/training-assessment-mvp'
+import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 
 export default async function LearningCoursePage(props: { params: Promise<{ courseSlug: string }> }) {
   noStore()
@@ -31,6 +33,9 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
 
   const track = getTrainingTrackBySlug(course.trackSlug)
   const lessons = getTrainingLessonsForCourse(course.slug)
+  const assessment = getTrainingAssessmentByCourseSlug(course.slug)
+  const canManageAssessment = hasRolePermission(orgData.role, orgData.permissions, 'learning:write')
+  const canAccessParticipantAssessment = hasRolePermission(orgData.role, orgData.permissions, 'learning') || canManageAssessment
 
   return (
     <div className="space-y-6">
@@ -133,6 +138,44 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
               </div>
             ))}
           </div>
+          {assessment ? (
+            <div className="mt-5 space-y-3">
+              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Masuk Sebagai</div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {canAccessParticipantAssessment ? (
+                  <Link
+                    href={`/learning/course/${course.slug}/assessment/participant`}
+                    className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-white"
+                  >
+                    <div className="font-black text-slate-900">Peserta</div>
+                    <p className="mt-2 leading-6 text-slate-600">
+                      Isi jawaban teori, bukti praktik, dan lihat riwayat review pribadi.
+                    </p>
+                    <div className="mt-3 inline-flex items-center gap-2 font-black text-emerald-700">
+                      Buka Halaman Peserta
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </Link>
+                ) : null}
+
+                {canManageAssessment ? (
+                  <Link
+                    href={`/learning/course/${course.slug}/assessment`}
+                    className="rounded-[22px] border border-slate-900 bg-slate-900 p-4 text-sm text-white shadow-lg shadow-slate-200 transition hover:bg-black"
+                  >
+                    <div className="font-black">Assessor</div>
+                    <p className="mt-2 leading-6 text-slate-200">
+                      Review submission peserta, isi keputusan akhir, dan pantau status kelulusan.
+                    </p>
+                    <div className="mt-3 inline-flex items-center gap-2 font-black text-white">
+                      Buka Panel Assessor
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
 

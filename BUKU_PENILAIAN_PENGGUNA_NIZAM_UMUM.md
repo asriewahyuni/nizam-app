@@ -3,13 +3,14 @@
 ## Identitas Dokumen
 
 - Nama dokumen: `Buku Penilaian Pengguna NIZAM Umum`
-- Versi: `1.0`
+- Level: `Level 1 · Pengguna Umum NIZAM`
+- Versi: `1.1`
 - Tanggal berlaku: `24 April 2026`
-- Fokus penilaian: `kemampuan akses awal pengguna`
+- Fokus penilaian: `kemampuan akses awal pengguna, keamanan akun, dan profil dasar`
 
 ## Tujuan Penilaian
 
-Menilai apakah peserta sudah mampu memahami dan menjalankan alur awal penggunaan NIZAM secara mandiri.
+Menilai apakah peserta sudah mampu memahami dan menjalankan alur awal penggunaan NIZAM secara mandiri, aman, dan sesuai peran.
 
 ## Metode Penilaian
 
@@ -21,8 +22,8 @@ Penilaian dilakukan melalui:
 
 ## Kriteria Penilaian
 
-- `Kompeten` jika peserta mampu menjawab teori dasar dan menyelesaikan uji praktik inti.
-- `Belum Kompeten` jika peserta masih salah memilih jalur login, salah mengisi data utama, atau tidak mampu menyelesaikan reset password dasar.
+- `Kompeten` jika peserta mampu menjawab teori dasar, memilih jalur akses yang benar, menyelesaikan uji praktik inti, dan memahami pengelolaan profil dasar.
+- `Belum Kompeten` jika peserta masih salah memilih jalur login, salah mengisi data utama, tidak mampu menyelesaikan reset atau ganti password dasar, atau tidak memahami fungsi `Profil Saya`.
 
 ## Bagian A. Soal Teori
 
@@ -33,11 +34,13 @@ Jawab singkat pertanyaan berikut:
 3. Data apa yang dipakai untuk login panel staf?
 4. Kapan pengguna memakai halaman `Register`?
 5. Kapan pengguna memakai halaman `Lupa Password`?
-6. Mengapa email bisnis harus aktif saat pendaftaran?
-7. Mengapa pengguna tidak boleh salah memilih tab login?
-8. Sebutkan minimal dua data yang harus disiapkan sebelum login.
-9. Apa tindakan yang harus dilakukan setelah meminta reset password?
-10. Sebutkan satu risiko jika password dibagikan ke orang lain.
+6. Apa beda `reset password` via email dengan `ganti password mandiri` setelah login?
+7. Mengapa password awal sebaiknya segera diganti setelah berhasil masuk?
+8. Di menu mana pengguna mengelola avatar dan profil dasar?
+9. Sebutkan minimal dua data yang dapat diperbarui pada halaman `Profil Saya`.
+10. Mengapa email bisnis harus aktif saat pendaftaran?
+11. Apa tindakan yang harus dilakukan setelah meminta reset password?
+12. Sebutkan satu risiko jika password dibagikan ke orang lain.
 
 ## Kunci Acuan Jawaban
 
@@ -46,11 +49,13 @@ Jawab singkat pertanyaan berikut:
 3. Nomor induk karyawan dan password staf.
 4. Saat belum memiliki akun bisnis NIZAM.
 5. Saat lupa password akun bisnis.
-6. Karena dipakai untuk akses, reset password, dan komunikasi sistem.
-7. Karena setiap jalur memakai identitas dan otorisasi yang berbeda.
-8. Email aktif, password, atau NIK staf sesuai peran.
-9. Memeriksa inbox email atau mengikuti instruksi lanjutan.
-10. Akun bisa diakses pihak yang tidak berwenang.
+6. Reset password dipakai saat lupa akses, sedangkan ganti password mandiri dilakukan dari dalam akun setelah login.
+7. Agar keamanan akun meningkat dan password awal tidak dipakai terlalu lama.
+8. Di halaman `Profil Saya`.
+9. Contohnya avatar, nomor WhatsApp, atau data kontak dasar yang diizinkan.
+10. Karena dipakai untuk akses, reset password, dan komunikasi sistem.
+11. Memeriksa inbox email atau folder spam lalu mengikuti instruksi lanjutan.
+12. Akun bisa diakses pihak yang tidak berwenang.
 
 ## Bagian B. Uji Praktik
 
@@ -70,6 +75,14 @@ Peserta diminta melakukan simulasi login sebagai panel staf.
 
 Peserta diminta menunjukkan cara meminta reset password akun bisnis.
 
+### Tugas Praktik 5
+
+Peserta diminta membuka halaman `Profil Saya` dan menunjukkan lokasi ganti password mandiri.
+
+### Tugas Praktik 6
+
+Peserta diminta menunjukkan lokasi avatar dan profil dasar serta menjelaskan data apa yang boleh diperbarui.
+
 ## Daftar Cek Unjuk Kerja
 
 | No | Unjuk kerja | Ya | Tidak | Catatan |
@@ -82,8 +95,19 @@ Peserta diminta menunjukkan cara meminta reset password akun bisnis.
 | 6 | Mampu menyebutkan data login panel staf |  |  |  |
 | 7 | Mampu membuka halaman lupa password |  |  |  |
 | 8 | Mampu menjelaskan alur reset password |  |  |  |
-| 9 | Mampu menjaga kerahasiaan password |  |  |  |
-| 10 | Mampu menjelaskan perbedaan dua jalur login |  |  |  |
+| 9 | Mampu menjelaskan beda reset password dan ganti password mandiri |  |  |  |
+| 10 | Mampu menunjukkan lokasi ganti password di `Profil Saya` |  |  |  |
+| 11 | Mampu menunjukkan lokasi avatar dan profil dasar |  |  |  |
+| 12 | Mampu menjelaskan pentingnya data profil yang akurat |  |  |  |
+| 13 | Mampu menjaga kerahasiaan password |  |  |  |
+| 14 | Mampu menjelaskan perbedaan dua jalur login |  |  |  |
+
+## Bukti Yang Dikumpulkan
+
+1. jawaban teori singkat peserta,
+2. catatan observasi assessor,
+3. checklist unjuk kerja Level 1,
+4. bukti pemahaman lokasi `Profil Saya` dan fungsi keamanan akun dasar.
 
 ## Rekap Hasil
 
@@ -91,7 +115,8 @@ Peserta diminta menunjukkan cara meminta reset password akun bisnis.
 |---|---|---|
 | Teori |  |  |
 | Praktik |  |  |
-| Sikap ketelitian |  |  |
+| Keamanan akun |  |  |
+| Ketelitian dan kemandirian |  |  |
 | Hasil akhir |  |  |
 
 ## Keputusan
@@ -105,7 +130,7 @@ Tuliskan temuan penting selama peserta mengikuti penilaian:
 
 1. kekuatan peserta,
 2. kesalahan yang masih berulang,
-3. saran tindak lanjut.
+3. saran tindak lanjut atau remedial.
 
 ## Tanda Tangan
 

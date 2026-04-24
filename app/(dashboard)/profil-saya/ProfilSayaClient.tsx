@@ -96,7 +96,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
   const handleChangePassword = async () => {
     if (!employee?.id) return showToast('Data karyawan tidak ditemukan.', 'error')
     if (!newPwd) return showToast('Password baru wajib diisi.', 'error')
-    if (newPwd.length < 6) return showToast('Password minimal 6 karakter.', 'error')
+    if (newPwd.length < 8) return showToast('Password minimal 8 karakter.', 'error')
     if (newPwd !== confirmPwd) return showToast('Konfirmasi password tidak cocok.', 'error')
 
     setPwdSaving(true)

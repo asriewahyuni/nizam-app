@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { isInternalAuthProvider } from '@/lib/auth/provider'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 
@@ -1203,6 +1204,14 @@ export async function updateEmployeePasswordSelf(empId: string, newPassword: str
     .eq('id', empId)
     .single()
   if (!emp?.user_id) return { error: 'User auth tidak ditemukan.' }
+
+  if (isInternalAuthProvider()) {
+    const { resetInternalAuthPasswordById } = await import('@/lib/auth/internal-auth.server')
+    const { error } = await resetInternalAuthPasswordById(emp.user_id, newPassword)
+    if (error) return { error }
+    return { success: true }
+  }
+
   const { error } = await admin.auth.admin.updateUserById(emp.user_id, { password: newPassword })
   if (error) return { error: error.message }
   return { success: true }

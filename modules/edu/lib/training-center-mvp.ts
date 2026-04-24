@@ -40,6 +40,8 @@ export type TrainingLessonSeed = {
   steps: string[]
   checks: string[]
   commonMistakes: string[]
+  actionHref?: string | null
+  actionLabel?: string | null
 }
 
 export const TRAINING_TRACKS: TrainingTrackSeed[] = [
@@ -75,10 +77,10 @@ export const TRAINING_COURSES: TrainingCourseSeed[] = [
     trackSlug: 'onboarding-sop',
     title: 'Level 1 · Pengguna Umum NIZAM',
     levelCode: 'L1',
-    description: 'Pelatihan awal untuk mengenali jalur akses NIZAM: daftar akun, login admin bisnis, login panel staf, dan reset password.',
+    description: 'Pelatihan awal untuk mengenali jalur akses NIZAM: daftar akun, login admin bisnis, login panel staf, reset password, ganti password mandiri, dan kelola profil dasar.',
     audience: 'Pengguna baru, admin bisnis, staf',
-    estimatedMinutes: 45,
-    lessonCount: 4,
+    estimatedMinutes: 65,
+    lessonCount: 6,
     status: 'LIVE',
     coverImage: '/docs/user-guide/umum/login-admin-bisnis.png',
     coverAlt: 'Tampilan login admin bisnis NIZAM',
@@ -86,11 +88,14 @@ export const TRAINING_COURSES: TrainingCourseSeed[] = [
       'Peserta memahami perbedaan jalur admin bisnis dan panel staf.',
       'Peserta mampu melakukan login sesuai peran.',
       'Peserta mampu melakukan reset password dasar.',
+      'Peserta mampu mengganti password mandiri sesudah berhasil masuk.',
+      'Peserta mampu memperbarui avatar dan profil dasar di halaman Profil Saya.',
       'Peserta siap masuk ke tahap onboarding organisasi.',
     ],
     assessmentSummary: [
       'Review teori singkat tentang jalur akses.',
-      'Latihan praktik login dan reset password.',
+      'Latihan praktik login, reset password, dan ganti password mandiri.',
+      'Verifikasi bahwa peserta mampu membuka halaman Profil Saya dan memahami fungsi avatar.',
       'Status lulus diberikan setelah trainer menilai peserta sudah memahami alur dasar.',
     ],
     practiceHref: null,
@@ -391,6 +396,76 @@ export const TRAINING_LESSONS: TrainingLessonSeed[] = [
       'Mengira reset staf selalu sama dengan reset akun bisnis.',
       'Tidak memeriksa inbox setelah mengirim permintaan.',
     ],
+  },
+  {
+    slug: 'ganti-password-pertama',
+    courseSlug: 'pengguna-umum-nizam',
+    title: 'Ganti Password Pertama',
+    order: 5,
+    estimatedMinutes: 10,
+    summary: 'Peserta memahami bahwa setelah berhasil masuk, password kerja sebaiknya segera diganti melalui menu profil agar keamanan akun tetap terjaga.',
+    screenshot: '/docs/user-guide/umum/profil-saya-keamanan.png',
+    screenshotAlt: 'Bagian keamanan akun di halaman Profil Saya NIZAM',
+    objectives: [
+      'Memahami beda antara reset password dan ganti password mandiri.',
+      'Mengetahui bahwa penggantian password pertama adalah langkah keamanan awal.',
+      'Mampu membuka halaman Profil Saya untuk mengelola keamanan akun sendiri.',
+    ],
+    steps: [
+      'Login ke NIZAM dengan akun yang sudah aktif.',
+      'Buka menu Profil Saya dari area dashboard.',
+      'Masuk ke bagian keamanan akun atau ubah password mandiri.',
+      'Isi password baru yang aman dan konfirmasi password dengan benar.',
+      'Simpan perubahan lalu gunakan password baru untuk login berikutnya.',
+    ],
+    checks: [
+      'Peserta tahu bahwa password awal sebaiknya tidak dipakai terlalu lama.',
+      'Peserta memahami bahwa ganti password mandiri berbeda dari reset via email.',
+      'Peserta tahu lokasi fitur perubahan password di Profil Saya.',
+      'Peserta mampu menjelaskan ciri password yang lebih aman.',
+    ],
+    commonMistakes: [
+      'Menganggap reset password email sama dengan ganti password mandiri setelah login.',
+      'Memakai password yang terlalu pendek atau mudah ditebak.',
+      'Lupa mencatat atau mengingat password baru secara aman.',
+    ],
+    actionHref: '/profil-saya',
+    actionLabel: 'Buka Profil Saya',
+  },
+  {
+    slug: 'kelola-avatar-dan-profil-dasar',
+    courseSlug: 'pengguna-umum-nizam',
+    title: 'Kelola Avatar Dan Profil Dasar',
+    order: 6,
+    estimatedMinutes: 10,
+    summary: 'Peserta memahami fungsi halaman Profil Saya untuk memperbarui avatar, nomor WhatsApp, dan identitas dasar agar komunikasi internal lebih rapi.',
+    screenshot: '/docs/user-guide/umum/profil-saya-identitas.png',
+    screenshotAlt: 'Bagian identitas dan kontak di halaman Profil Saya NIZAM',
+    objectives: [
+      'Mengetahui bahwa avatar dan kontak dasar dapat diperbarui sendiri.',
+      'Memahami fungsi profil untuk identitas kerja internal.',
+      'Mampu membuka halaman Profil Saya dan mengenali bagian avatar serta kontak.',
+    ],
+    steps: [
+      'Masuk ke dashboard NIZAM menggunakan akun yang sesuai.',
+      'Buka menu Profil Saya.',
+      'Pilih area avatar untuk mengganti foto profil bila diperlukan.',
+      'Perbarui nomor WhatsApp atau data kontak dasar yang relevan.',
+      'Simpan profil dan pastikan perubahan berhasil diterapkan.',
+    ],
+    checks: [
+      'Peserta tahu lokasi halaman Profil Saya.',
+      'Peserta memahami bahwa avatar membantu identifikasi pengguna internal.',
+      'Peserta tahu data kontak mana yang boleh diperbarui mandiri.',
+      'Peserta memahami pentingnya menyimpan data profil yang akurat.',
+    ],
+    commonMistakes: [
+      'Mengunggah foto yang tidak relevan atau sulit dikenali.',
+      'Mengubah data tanpa menyimpan perubahan.',
+      'Menganggap pembaruan profil tidak penting bagi penggunaan harian.',
+    ],
+    actionHref: '/profil-saya',
+    actionLabel: 'Kelola Profil Saya',
   },
 ]
 

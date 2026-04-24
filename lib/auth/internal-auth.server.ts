@@ -225,10 +225,28 @@ export async function resetInternalAuthPasswordById(userId: string, newPassword:
   if (!normId) return { error: 'ID Anggota tidak valid untuk mereset sandi.' }
 
   try {
-    await queryPostgres(
-      `update public.internal_auth_users set password_hash = $1, updated_at = now() where legacy_user_id = $2::uuid or id = $2::uuid`,
+    const ensured = await ensureInternalAuthUserRecord({
+      userId: normId,
+      userType: 'staff',
+    })
+    if ('error' in ensured) {
+      return { error: ensured.error }
+    }
+
+    const updated = await queryPostgres<{ id: string }>(
+      `
+        update public.internal_auth_users
+        set password_hash = $1, updated_at = now()
+        where legacy_user_id = $2::uuid or id = $2::uuid
+        returning id::text as id
+      `,
       [newHash, normId]
     )
+
+    if (!updated.rows[0]?.id) {
+      return { error: 'Akun internal belum ditemukan untuk pergantian sandi.' }
+    }
+
     return { success: true }
   } catch (error) {
     return { error: resolveInternalAuthDatabaseError(error, 'Gagal menjalankan pergantian sandi massal internal.') }

@@ -22,7 +22,7 @@ export default function GlobalError({
   }, [error])
 
   return (
-    <html lang="id">
+    <html lang="id" data-scroll-behavior="smooth">
       <body className="min-h-screen bg-[#F8F9FA] text-[#212529]">
         <div className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 py-12 text-center">
           <div className="w-full rounded-[32px] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50">
