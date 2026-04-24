@@ -459,3 +459,9 @@ MVP Training Center NIZAM paling tepat dibangun sebagai:
 - `Level 1 Pengguna Umum` sebagai course pertama.
 
 Dengan pola ini, NIZAM bisa segera punya Training Center yang nyata tanpa harus langsung membangun LMS besar dari nol.
+
+## 21. Referensi Skema Akses
+
+Untuk skema role, login trainee, login assessor, dan admin learning, gunakan dokumen berikut:
+
+- [SKEMA_ROLE_DAN_LOGIN_TRAINING_CENTER_MVP.md](/Users/manbook/nizam-app/SKEMA_ROLE_DAN_LOGIN_TRAINING_CENTER_MVP.md:1)
