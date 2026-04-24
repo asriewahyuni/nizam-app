@@ -92,15 +92,15 @@ export default async function LearningPage() {
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
               Versi MVP ini memisahkan jalur belajar per track dan per course supaya ringan, mudah dipahami, dan aman untuk dikembangkan bertahap.
-              Course pertama yang sudah live adalah <span className="font-black text-slate-900">Level 1 Pengguna Umum NIZAM</span>.
+              Tahap onboarding sekarang dimulai dari <span className="font-black text-slate-900">Level 0 Orientasi Perusahaan</span>, lalu peserta lanjut ke <span className="font-black text-slate-900">Level 1 Pengguna Umum NIZAM</span>.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/learning/course/pengguna-umum-nizam"
+              href="/learning/course/orientasi-perusahaan-dasar"
               className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-200 transition hover:bg-black"
             >
-              Mulai Level 1
+              Mulai Level 0
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
@@ -196,7 +196,7 @@ export default async function LearningPage() {
 
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Featured Course</div>
-          <h2 className="mt-2 text-xl font-black text-slate-900">Course pertama yang sudah live</h2>
+          <h2 className="mt-2 text-xl font-black text-slate-900">Course onboarding yang dibuka lebih dulu</h2>
           {featuredCourse ? (
             <div className="mt-5 space-y-4">
               <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50">
@@ -279,7 +279,7 @@ export default async function LearningPage() {
               </div>
             ))}
             <div className="rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-              Track `Operasional Harian` dan `Leadership & Compliance` disiapkan sebagai tahap berikutnya setelah Level 1 stabil.
+              Track `Operasional Harian` dan `Leadership & Compliance` disiapkan sebagai tahap berikutnya setelah onboarding Level 0 sampai Level 1 stabil.
             </div>
           </div>
         </div>
@@ -325,7 +325,8 @@ export default async function LearningPage() {
           <div className="mt-5 space-y-3 text-sm text-slate-600">
             {[
               'Buka Training Center dan pilih track yang sesuai.',
-              'Masuk ke course Level 1 Pengguna Umum NIZAM.',
+              'Selesaikan Level 0 Orientasi Perusahaan sebagai fondasi onboarding.',
+              'Lanjut ke course Level 1 Pengguna Umum NIZAM.',
               'Pelajari lesson per lesson dengan screenshot nyata.',
               'Kerjakan checklist dan pahami jalur akses dasar.',
               'Lanjut ke board EDU jika course berikutnya butuh praktik.',

@@ -100,20 +100,23 @@ export const TRAINING_COURSES: TrainingCourseSeed[] = [
     trackSlug: 'onboarding-sop',
     title: 'Level 0 · Orientasi Perusahaan',
     levelCode: 'L0',
-    description: 'Pengantar budaya kerja, aturan akun, dan SOP dasar sebelum masuk ke sistem.',
-    audience: 'Peserta baru',
-    estimatedMinutes: 30,
+    description: 'Orientasi awal tentang jalur akses NIZAM, aturan akun, keamanan dasar, dan urutan belajar sebelum peserta masuk ke sistem.',
+    audience: 'Peserta baru, staf baru, trainer onboarding',
+    estimatedMinutes: 35,
     lessonCount: 3,
-    status: 'SOON',
+    status: 'LIVE',
     coverImage: '/docs/user-guide/umum/daftar-akun.png',
-    coverAlt: 'Preview materi orientasi perusahaan',
+    coverAlt: 'Preview materi orientasi perusahaan NIZAM',
     outcomes: [
-      'Memahami aturan dasar penggunaan akun.',
-      'Memahami struktur pelatihan NIZAM.',
-      'Siap masuk ke Level 1.',
+      'Memahami perbedaan akun bisnis dan akses staf sebelum mulai login.',
+      'Memahami aturan dasar keamanan akun dan kebiasaan kerja yang aman.',
+      'Memahami urutan belajar dari Level 0 ke Level 1.',
+      'Siap masuk ke pelatihan login dan akses dasar pada Level 1.',
     ],
     assessmentSummary: [
-      'Review trainer internal.',
+      'Review pemahaman peserta tentang jalur akses dan peran pengguna.',
+      'Checklist keamanan akun dasar dan kebiasaan kerja aman.',
+      'Verifikasi trainer bahwa peserta siap lanjut ke Level 1.',
     ],
     practiceHref: null,
   },
@@ -164,6 +167,102 @@ export const TRAINING_COURSES: TrainingCourseSeed[] = [
 ]
 
 export const TRAINING_LESSONS: TrainingLessonSeed[] = [
+  {
+    slug: 'mengenal-jalur-akses-nizam',
+    courseSlug: 'orientasi-perusahaan-dasar',
+    title: 'Mengenal Jalur Akses NIZAM',
+    order: 1,
+    estimatedMinutes: 10,
+    summary: 'Peserta memahami bahwa NIZAM punya jalur akses berbeda untuk admin bisnis dan staf, sehingga tidak semua orang masuk dari halaman yang sama.',
+    screenshot: '/docs/user-guide/umum/daftar-akun.png',
+    screenshotAlt: 'Halaman daftar akun bisnis sebagai pengantar jalur akses NIZAM',
+    objectives: [
+      'Memahami siapa yang membuat akun bisnis dan siapa yang masuk sebagai staf.',
+      'Mengenali bahwa jalur onboarding dimulai dari orientasi, bukan langsung praktik transaksi.',
+      'Mengetahui perbedaan identitas email bisnis dan identitas staf internal.',
+    ],
+    steps: [
+      'Lihat halaman awal akses NIZAM dan kenali bahwa akun bisnis dipakai oleh pemilik atau admin utama.',
+      'Pahami bahwa staf internal tidak dibuat dari halaman daftar akun bisnis.',
+      'Catat perbedaan identitas yang dipakai admin bisnis dan staf sebelum lanjut ke halaman login.',
+      'Pastikan peserta tahu jalur mana yang akan dipakai sesuai perannya di perusahaan.',
+    ],
+    checks: [
+      'Peserta memahami bahwa akun bisnis dan akun staf memiliki jalur berbeda.',
+      'Peserta dapat menjelaskan siapa yang memakai email bisnis.',
+      'Peserta dapat menjelaskan siapa yang memakai identitas staf atau NIK.',
+      'Peserta paham bahwa orientasi harus selesai sebelum masuk ke pelatihan login.',
+    ],
+    commonMistakes: [
+      'Menganggap semua pengguna harus mendaftar akun bisnis terlebih dahulu.',
+      'Tidak membedakan akun owner atau admin dengan akun staf.',
+      'Masuk ke pelatihan operasional tanpa memahami jalur akses yang benar.',
+    ],
+  },
+  {
+    slug: 'aturan-akun-dan-keamanan-dasar',
+    courseSlug: 'orientasi-perusahaan-dasar',
+    title: 'Aturan Akun Dan Keamanan Dasar',
+    order: 2,
+    estimatedMinutes: 10,
+    summary: 'Peserta memahami aturan dasar penggunaan akun: identitas tidak dipinjamkan, sandi dijaga, dan jalur login harus dipilih sesuai peran.',
+    screenshot: '/docs/user-guide/umum/login-admin-bisnis.png',
+    screenshotAlt: 'Halaman login admin bisnis untuk penjelasan aturan akun dan keamanan dasar',
+    objectives: [
+      'Memahami pentingnya menjaga kerahasiaan sandi.',
+      'Memahami bahwa satu akun mewakili satu identitas kerja yang harus jelas.',
+      'Mengetahui kapan peserta harus meminta bantuan trainer atau admin internal.',
+    ],
+    steps: [
+      'Perhatikan halaman login dan pahami bahwa akun NIZAM adalah identitas kerja resmi.',
+      'Gunakan kredensial milik sendiri dan jangan berbagi sandi dengan rekan lain.',
+      'Pilih jalur login yang sesuai peran agar audit dan akses tetap benar.',
+      'Jika ada kendala akses, hubungi trainer, assessor, atau admin internal sebelum mencoba jalur yang salah.',
+    ],
+    checks: [
+      'Peserta paham bahwa sandi tidak boleh dibagikan.',
+      'Peserta paham bahwa akun dipakai sesuai identitas masing-masing.',
+      'Peserta tahu bahwa salah jalur login dapat menimbulkan kebingungan akses.',
+      'Peserta tahu harus eskalasi ke pihak yang tepat jika ada masalah akun.',
+    ],
+    commonMistakes: [
+      'Meminjam akun rekan kerja agar lebih cepat masuk.',
+      'Mencoba login di jalur yang salah berkali-kali tanpa klarifikasi.',
+      'Menyimpan sandi di tempat yang mudah dibaca orang lain.',
+    ],
+  },
+  {
+    slug: 'alur-belajar-sebelum-masuk-sistem',
+    courseSlug: 'orientasi-perusahaan-dasar',
+    title: 'Alur Belajar Sebelum Masuk Sistem',
+    order: 3,
+    estimatedMinutes: 15,
+    summary: 'Peserta memahami urutan onboarding yang benar: orientasi, penentuan jalur akses, pelatihan login, lalu praktik bertahap di modul berikutnya.',
+    screenshot: '/docs/user-guide/umum/login-panel-staf.png',
+    screenshotAlt: 'Halaman login panel staf untuk menjelaskan alur belajar sebelum masuk sistem',
+    objectives: [
+      'Memahami bahwa onboarding dilakukan bertahap dan tidak dilompati.',
+      'Mengetahui bahwa Level 1 fokus pada login dan akses dasar.',
+      'Siap melanjutkan ke pelatihan praktis dengan ekspektasi yang lebih jelas.',
+    ],
+    steps: [
+      'Selesaikan seluruh lesson orientasi di Level 0 sampai peserta memahami jalur akses dan aturan akun.',
+      'Lanjutkan ke Level 1 untuk mempelajari login admin bisnis, panel staf, dan reset password.',
+      'Ikuti checklist lesson satu per satu dan minta verifikasi trainer jika dibutuhkan.',
+      'Masuk ke board EDU atau modul praktik hanya setelah fondasi akses dasar sudah dipahami.',
+    ],
+    checks: [
+      'Peserta tahu bahwa Level 0 mendahului Level 1.',
+      'Peserta paham bahwa Level 1 adalah pelatihan akses dasar, bukan orientasi umum.',
+      'Peserta tahu kapan harus lanjut ke board praktik.',
+      'Peserta siap mengikuti alur belajar berjenjang tanpa melompati tahap dasar.',
+    ],
+    commonMistakes: [
+      'Langsung mencoba praktik operasional tanpa memahami akses dasar.',
+      'Menganggap orientasi hanya formalitas dan bisa dilewati.',
+      'Tidak mencatat urutan belajar sehingga bingung saat pindah ke course berikutnya.',
+    ],
+  },
   {
     slug: 'daftar-akun-bisnis',
     courseSlug: 'pengguna-umum-nizam',
@@ -322,7 +421,15 @@ export function getTrainingLessonsForCourse(courseSlug: string) {
 export function getTrainingCenterSummary() {
   const liveTracks = TRAINING_TRACKS.filter((track) => track.status === 'LIVE').length
   const liveCourses = TRAINING_COURSES.filter((course) => course.status === 'LIVE').length
-  const liveLessons = TRAINING_LESSONS.length
+  const liveCourseSlugs = new Set(
+    TRAINING_COURSES
+      .filter((course) => course.status === 'LIVE')
+      .map((course) => course.slug),
+  )
+  const liveLessons = TRAINING_LESSONS.filter((lesson) => liveCourseSlugs.has(lesson.courseSlug)).length
+  const featuredCourse = getTrainingCoursesForTrack('onboarding-sop').find((course) => course.status === 'LIVE')
+    || TRAINING_COURSES.find((course) => course.status === 'LIVE')
+    || null
 
   return {
     totalTracks: TRAINING_TRACKS.length,
@@ -330,6 +437,6 @@ export function getTrainingCenterSummary() {
     totalCourses: TRAINING_COURSES.length,
     liveCourses,
     liveLessons,
-    featuredCourse: getTrainingCourseBySlug('pengguna-umum-nizam'),
+    featuredCourse,
   }
 }

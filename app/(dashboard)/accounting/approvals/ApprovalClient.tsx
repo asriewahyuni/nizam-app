@@ -164,7 +164,6 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
     setHistory(res || [])
     setLoadingDetail(false)
   }, [activeBranchId, orgId])
-  }, [activeBranchId, orgId])
 
   useEffect(() => {
     replaceApprovals(initialApprovals)
