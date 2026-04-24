@@ -26,6 +26,10 @@ export default async function SyirkahSignPage({ params }: { params: Promise<{ me
   const contract = (member as any).syirkah_contracts
   const org = contract?.organizations
   const alreadySigned = !!member.signed_at
+  const roleBadgeClass =
+    member.role === 'PEMODAL' ? 'bg-emerald-100 text-emerald-700' :
+    member.role === 'PEMODAL_PENGELOLA' ? 'bg-sky-100 text-sky-700' :
+    'bg-amber-100 text-amber-700'
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 py-12 px-4">
@@ -65,12 +69,10 @@ export default async function SyirkahSignPage({ params }: { params: Promise<{ me
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Nama</span>
                   <p className="font-black text-slate-800 text-lg">{member.member_name}</p>
                 </div>
-                <div>
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Peran</span>
-                  <span className={`px-2 py-1 text-xs font-black rounded-lg inline-block ${
-                    member.role === 'PEMODAL' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                  }`}>{member.role}</span>
-                </div>
+	                <div>
+	                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Peran</span>
+	                  <span className={`px-2 py-1 text-xs font-black rounded-lg inline-block ${roleBadgeClass}`}>{member.role}</span>
+	                </div>
                 {member.nik && (
                   <div>
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">NIK</span>

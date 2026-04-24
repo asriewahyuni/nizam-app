@@ -24,6 +24,7 @@ export interface CreateJournalEntryInput {
   lines: JournalLineInput[]
   auto_post?: boolean // if true, immediately post after creation
   allow_org_scope?: boolean
+  skipRevalidate?: boolean
 }
 
 const JOURNAL_ENTRY_MAX_INSERT_RETRIES = 5
@@ -1245,11 +1246,15 @@ export async function createJournalEntry(input: CreateJournalEntryInput) {
 
   // Auto-post if requested
   if (input.auto_post) {
-    const result = await postJournalEntry(entry.id, input.org_id)
+    const result = await postJournalEntry(entry.id, input.org_id, {
+      skipRevalidate: input.skipRevalidate,
+    })
     if ((result as any).error) return result
   }
 
-  revalidatePath('/accounting/journal')
+  if (!input.skipRevalidate) {
+    revalidatePath('/accounting/journal')
+  }
   return { success: true, entryId: entry.id, entryNumber: entry.entry_number }
 }
 
@@ -1257,7 +1262,11 @@ export async function createJournalEntry(input: CreateJournalEntryInput) {
 // postJournalEntry — Post (finalize) a DRAFT entry
 // DB trigger validates balance before allowing this
 // ─────────────────────────────────────────────────────────────
-export async function postJournalEntry(entryId: string, orgId: string) {
+export async function postJournalEntry(
+  entryId: string,
+  orgId: string,
+  options?: { skipRevalidate?: boolean }
+) {
   const supabase = await createClient()
 
   const closedPeriodMessage = await getClosedPeriodMessageForJournalEntry(
@@ -1281,7 +1290,9 @@ export async function postJournalEntry(entryId: string, orgId: string) {
     return { error: error.message || 'Gagal memposting jurnal.' }
   }
 
-  revalidatePath('/accounting/journal')
+  if (!options?.skipRevalidate) {
+    revalidatePath('/accounting/journal')
+  }
   return { success: true }
 }
 

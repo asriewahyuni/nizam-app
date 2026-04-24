@@ -13,10 +13,7 @@ import { revalidatePath } from 'next/cache'
 import type { Account, AccountType, NormalBalance, AccountBalance } from '@/types/database.types'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { isInternalAuthProvider } from '@/lib/auth/provider'
-import {
-  SHARIAH_COA_ACTIVATION_CODES,
-  SHARIAH_COA_DEACTIVATION_CODES,
-} from '@/modules/accounting/lib/shariah-coa'
+import { setShariahAccountsActive as syncShariahAccountsActive } from './shariah.actions'
 
 type MirrorableAccount = Pick<
   Account,
@@ -913,21 +910,5 @@ export async function seedInitialCoA(orgId: string, options?: SeedInitialCoAOpti
 // setShariahAccountsActive — Toggle Syariah Accounts
 // ─────────────────────────────────────────────────────────────
 export async function setShariahAccountsActive(orgId: string, active: boolean) {
-  const supabase = await createClient()
-
-  const syariahCodes = active ? SHARIAH_COA_ACTIVATION_CODES : SHARIAH_COA_DEACTIVATION_CODES
-
-  const { error } = await (supabase as any)
-    .from('accounts')
-    .update({ is_active: active })
-    .eq('org_id', orgId)
-    .in('code', syariahCodes)
-
-  if (error) {
-    (console as any).error('Toggle Syariah Error:', error)
-    return { error: 'Gagal mengubah status akun Syariah.' }
-  }
-
-  revalidatePath('/settings/accounts')
-  return { success: true }
+  return syncShariahAccountsActive(orgId, active)
 }

@@ -30,6 +30,13 @@ function getSourceTypeTone(sourceType: string) {
     }
   }
 
+  if (sourceType === 'CONSTRUCTION_CHANGE_ORDER') {
+    return {
+      icon: 'bg-amber-50 text-amber-600',
+      badge: 'bg-amber-50 text-amber-700',
+    }
+  }
+
   return {
     icon: 'bg-[#003366]/5 text-[#003366]',
     badge: 'bg-[#003366]/5 text-[#003366]',
@@ -156,6 +163,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
     const res = await getApprovalHistory(orgId, activeBranchId)
     setHistory(res || [])
     setLoadingDetail(false)
+  }, [activeBranchId, orgId])
   }, [activeBranchId, orgId])
 
   useEffect(() => {
@@ -587,6 +595,75 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                       )}
                     </>
                   )}
+                  {selectedReq.source_type === 'CONSTRUCTION_CHANGE_ORDER' && (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-amber-50 p-4 rounded-2xl">
+                          <p className="text-xs text-amber-600 uppercase font-black mb-1">Project</p>
+                          <p className="text-base font-black text-slate-900">{detailData.project_name}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{detailData.project_code || 'Tanpa kode proyek'}</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Tahap</p>
+                          <p className="text-base font-black text-slate-900">{detailData.stage_name || 'Semua Tahap'}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{detailData.branch_name || 'Tanpa unit'}</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Jenis Perubahan</p>
+                          <p className="text-base font-black text-slate-900">{detailData.change_type}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{detailData.reference_no || 'Tanpa referensi'}</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Status Dokumen</p>
+                          <p className="text-base font-black text-slate-900">{detailData.status}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {detailData.requested_date ? formatDate(detailData.requested_date) : 'Tanggal request belum diisi'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <div className="bg-emerald-50 p-4 rounded-2xl">
+                          <p className="text-[10px] text-emerald-600 uppercase font-black mb-1">Delta Kontrak</p>
+                          <p className="text-lg font-black text-slate-900">{formatRupiah(detailData.contract_value_delta || 0)}</p>
+                        </div>
+                        <div className="bg-rose-50 p-4 rounded-2xl">
+                          <p className="text-[10px] text-rose-600 uppercase font-black mb-1">Delta Cost</p>
+                          <p className="text-lg font-black text-slate-900">{formatRupiah(detailData.estimated_cost_delta || 0)}</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-[10px] text-slate-400 uppercase font-black mb-1">Delta Waktu</p>
+                          <p className="text-lg font-black text-slate-900">{detailData.schedule_delta_days || 0} hari</p>
+                        </div>
+                      </div>
+
+                      {detailData.reason && (
+                        <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                          <p className="text-[10px] text-amber-600 uppercase font-black mb-1">Alasan Perubahan</p>
+                          <p className="text-sm text-slate-700">{detailData.reason}</p>
+                        </div>
+                      )}
+
+                      {detailData.notes && (
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <p className="text-[10px] text-slate-400 uppercase font-black mb-1">Catatan Tambahan</p>
+                          <p className="text-sm text-slate-700">{detailData.notes}</p>
+                        </div>
+                      )}
+
+                      {(detailData.site_address || detailData.project_status) && (
+                        <div className="p-4 bg-[#003366]/5 rounded-2xl border border-[#003366]/10">
+                          <p className="text-[10px] text-[#003366] uppercase font-black mb-1">Konteks Project</p>
+                          <p className="text-sm text-slate-700">
+                            Status project: <span className="font-bold text-slate-900">{detailData.project_status || 'N/A'}</span>
+                          </p>
+                          {detailData.site_address && (
+                            <p className="text-sm text-slate-600 mt-1">{detailData.site_address}</p>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
 
                   {/* APPROVAL LOGS / HISTORY */}
                   <div className="pt-6 border-t border-slate-100">
@@ -631,7 +708,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                               </p>
                               {log.notes && (
                                 <div className="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 italic">
-                                  "{log.notes}"
+                                  &ldquo;{log.notes}&rdquo;
                                 </div>
                               )}
                             </div>

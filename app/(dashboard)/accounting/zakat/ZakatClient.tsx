@@ -10,7 +10,6 @@ import {
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Bar, BarChart, CartesianGrid, Cell, Tooltip, XAxis, YAxis, AreaChart, Area, ReferenceLine } from 'recharts'
-import { injectShariahPack, setShariahAccountsActive } from '@/modules/accounting/actions/shariah.actions'
 import { getLivePreciousMetalsPrices } from '@/modules/accounting/actions/price.actions'
 import { startZakatHaul, checkAndCancelHaul, payZakat, syncActiveHaulPrices } from '@/modules/accounting/actions/zakat.actions'
 import { SafeResponsiveContainer } from '@/components/ui/SafeResponsiveContainer'
@@ -144,6 +143,7 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
   const hauledPrices = summary.hauledPrices
   const nishabGold   = summary.nishabGold
   const nishabSilver = summary.nishabSilver
+  const shariahSetup = summary.shariahSetup || null
 
   const chartData = [
     { name: 'Total Aset Zakat', value: summary.totalAssets, color: '#6366f1' },
@@ -604,54 +604,67 @@ export default function ZakatClient({ summary, orgId, activeBranchName = null }:
 
           {/* Syariah Add-on */}
           <div className="bg-white p-8 rounded-[48px] border border-slate-100 shadow-sm space-y-4">
-            <p className="text-[10px] font-black text-slate-900 uppercase italic tracking-widest">Syariah Add-on (CoAS)</p>
+            <p className="text-[10px] font-black text-slate-900 uppercase italic tracking-widest">Mode Syariah Organisasi</p>
             <p className="text-[11px] font-medium text-slate-500 leading-relaxed italic">
               {summary.isShariahEnabled 
-                ? 'Struktur akun Syariah (Syirkah, Qard, SALAM, ISTISHNA, Ijarah, Zakat) saat ini AKTIF di CoA Anda.'
-                : 'Suntikkan akun Syariah (Syirkah, Qard, SALAM, ISTISHNA, Ijarah, Zakat) otomatis ke CoA Anda.'}
+                ? 'Mode Syariah organisasi aktif. Struktur akun Syariah (Syirkah, Qard, SALAM, ISTISHNA, Ijarah, Zakat) juga disiapkan di CoA Anda.'
+                : 'Aktifkan mode Syariah organisasi sekaligus siapkan akun Syariah (Syirkah, Qard, SALAM, ISTISHNA, Ijarah, Zakat) di CoA Anda.'}
             </p>
             <div className="rounded-3xl border border-slate-100 bg-slate-50 px-4 py-3 text-[10px] font-medium leading-relaxed text-slate-500">
               <p><strong className="text-slate-700">SALAM:</strong> pembelian dan penjualan wajib tunai lunas di depan, barang menyusul.</p>
               <p><strong className="text-slate-700">ISTISHNA:</strong> pembelian dan penjualan boleh memakai DP atau pembayaran bertahap.</p>
             </div>
-            
-            {summary.isShariahEnabled ? (
-              <button
-                onClick={async () => {
-                  if (confirm('Matikan fitur Syariah? Akun-akun terkait akan dinonaktifkan dari CoA.')) {
-                    setLoading(true)
-                    const res = await setShariahAccountsActive(orgId, false)
-                    if (res.success) {
-                      alert('Struktur Akun Syariah telah dinonaktifkan.')
-                      router.refresh()
-                    } else alert(res.error)
-                    setLoading(false)
-                  }
-                }}
-                disabled={loading}
-                className="w-full py-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-2xl text-[10px] font-black hover:bg-rose-100 transition-all flex items-center justify-center gap-2"
-              >
-                <XCircle size={14}/> NON-AKTIFKAN FITUR SYARIAH
-              </button>
-            ) : (
-              <button
-                onClick={async () => {
-                  if (confirm('Aktifkan struktur akun Syariah (CoAS)?')) {
-                    setLoading(true)
-                    const res = await injectShariahPack(orgId)
-                    if (res.success) {
-                      alert('Struktur Akun Syariah berhasil diaktifkan ulang dan akun SALAM/ISTISHNA sudah disiapkan.')
-                      router.refresh()
-                    } else alert(res.error)
-                    setLoading(false)
-                  }
-                }}
-                disabled={loading}
-                className="w-full py-3 bg-white border border-indigo-200 text-indigo-600 rounded-2xl text-[10px] font-black hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"
-              >
-                <ShieldCheck size={14}/> AKTIFKAN AKUN SYARIAH
-              </button>
+
+            {shariahSetup && (
+              <div className={`rounded-3xl border px-4 py-3 text-[10px] font-medium leading-relaxed ${
+                shariahSetup.status === 'READY'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : shariahSetup.status === 'INCOMPLETE'
+                    ? 'border-amber-200 bg-amber-50 text-amber-700'
+                    : 'border-slate-200 bg-slate-50 text-slate-500'
+              }`}>
+                <p className="text-[9px] font-black uppercase tracking-widest">Health Check Setup</p>
+                {shariahSetup.status === 'READY' ? (
+                  <p className="mt-1">
+                    Akun inti syariah siap dipakai. {shariahSetup.readyCount}/{shariahSetup.requiredCount} akun inti aktif.
+                  </p>
+                ) : shariahSetup.status === 'INCOMPLETE' ? (
+                  <>
+                    <p className="mt-1">
+                      Setup syariah inti belum lengkap. {shariahSetup.missingCount} akun belum ada dan {shariahSetup.inactiveCount} akun masih nonaktif.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(shariahSetup.issues || []).map((issue: any) => (
+                        <span
+                          key={issue.code}
+                          className="rounded-full border border-amber-200 bg-white px-2 py-1 text-[9px] font-black text-amber-700"
+                        >
+                          {issue.code} {issue.status === 'MISSING' ? 'belum ada' : 'nonaktif'}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-1">
+                    Mode syariah belum aktif. Saat diaktifkan, sistem akan mengecek {shariahSetup.requiredCount} akun inti untuk syirkah, sales, dan purchasing.
+                  </p>
+                )}
+              </div>
             )}
+            
+            <div className="rounded-3xl border border-slate-200 bg-white px-4 py-4 text-[10px] font-medium leading-relaxed text-slate-500">
+              <p className="font-black uppercase tracking-widest text-slate-700">Pengaturan Dipindah</p>
+              <p className="mt-1">
+                Aktivasi, perbaikan setup, dan nonaktifkan mode syariah sekarang dipusatkan di menu CoA agar pengaturan akunnya tidak terpencar.
+              </p>
+              <a
+                href="/settings/accounts#shariah-mode"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-[10px] font-black text-indigo-600 transition-all hover:bg-indigo-100"
+              >
+                <Settings2 size={14} />
+                BUKA PENGATURAN MODE SYARIAH
+              </a>
+            </div>
           </div>
         </div>
       </div>

@@ -62,22 +62,22 @@ export default async function SyirkahDocumentValidationPage({ params }: { params
             </h3>
 
             <div className="space-y-4">
-              {syirkah_members?.map((m: any, i: number) => (
-                <div key={i} className="flex flex-col md:flex-row justify-between p-4 border border-slate-100 rounded-2xl print:border-black bg-slate-50/20">
+	              {syirkah_members?.map((m: any, i: number) => (
+	                <div key={i} className="flex flex-col md:flex-row justify-between p-4 border border-slate-100 rounded-2xl print:border-black bg-slate-50/20">
                   <div className="flex-1">
                     <h5 className="font-bold text-slate-800 text-lg flex items-center gap-2">
                       {m.member_name} 
-                      <span className={`text-[10px] uppercase font-black px-2 py-1 rounded-md ${m.role === 'PEMODAL' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'} print:bg-transparent print:border print:border-black print:text-black`}>
-                        {m.role}
-                      </span>
+	                      <span className={`text-[10px] uppercase font-black px-2 py-1 rounded-md ${m.role === 'PEMODAL' ? 'bg-emerald-100 text-emerald-700' : m.role === 'PEMODAL_PENGELOLA' ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-700'} print:bg-transparent print:border print:border-black print:text-black`}>
+	                        {m.role}
+	                      </span>
                     </h5>
                     <p className="text-sm text-slate-500 mt-2"><span className="font-bold text-slate-700">Tanggung Jawab:</span> {m.responsibility || '-'}</p>
                   </div>
                   <div className="mt-4 md:mt-0 md:text-right border-t md:border-t-0 md:border-l border-slate-200 pt-4 md:pt-0 md:pl-6 print:border-black">
                      <span className="block text-[10px] uppercase font-black tracking-wider text-slate-400 mb-1">Porsi Bagi Hasil</span>
                      <span className="font-black text-2xl text-blue-600 print:text-black">{m.profit_share_percentage}%</span>
-                     {m.role === 'PEMODAL' && (
-                       <div className="mt-2">
+	                     {m.role !== 'PENGELOLA' && (
+	                       <div className="mt-2">
                          <span className="block text-[10px] uppercase font-black tracking-wider text-emerald-600 mb-1 print:text-black">Modal Awal</span>
                          <span className="font-bold text-sm text-slate-700">{formatRupiah(m.capital_contribution)}</span>
                        </div>

@@ -24,6 +24,7 @@ const DEFAULT_LANDING_CANDIDATES: LandingCandidate[] = [
   { href: '/inventory', permissionKey: 'inventory', moduleKey: 'Inventory' },
   { href: '/hris', permissionKey: 'employees', moduleKey: 'HRIS' },
   { href: '/learning', permissionKey: 'learning', moduleKey: 'HRIS' },
+  { href: '/construction', permissionKey: 'construction,project,services', moduleKey: 'Project & Construction' },
   { href: '/syirkah', permissionKey: 'syirkah', moduleKey: 'Syirkah' },
   { href: '/profil-saya' },
 ]

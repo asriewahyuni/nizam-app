@@ -507,6 +507,41 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
         }, error: null }
       }
     } catch (err: any) { dataRes = { data: null, error: { message: err?.message || 'Query error' } } }
+  } else if (sourceType === 'CONSTRUCTION_CHANGE_ORDER') {
+    try {
+      const coParams: unknown[] = [sourceId, orgId]
+      let coWhere = `co.id = $1 AND co.org_id = $2`
+      if (effectiveBranchId) {
+        coParams.push(effectiveBranchId)
+        coWhere += ` AND p.branch_id = $${coParams.length}`
+      }
+
+      const changeOrderResult = await queryPostgres<Record<string, unknown>>(`
+        SELECT
+          co.*,
+          p.project_code,
+          p.project_name,
+          p.project_status,
+          p.site_address,
+          p.contract_value AS project_contract_value,
+          p.estimated_cost AS project_estimated_cost,
+          b.name AS branch_name,
+          b.code AS branch_code,
+          s.stage_name
+        FROM public.construction_change_orders co
+        INNER JOIN public.construction_projects p ON p.id = co.project_id
+        LEFT JOIN public.branches b ON b.id = p.branch_id
+        LEFT JOIN public.construction_project_stages s ON s.id = co.stage_id
+        WHERE ${coWhere}
+        LIMIT 1
+      `, coParams)
+
+      if (changeOrderResult.rows.length === 0) {
+        dataRes = { data: null, error: { message: 'Change order tidak ditemukan.' } }
+      } else {
+        dataRes = { data: changeOrderResult.rows[0], error: null }
+      }
+    } catch (err: any) { dataRes = { data: null, error: { message: err?.message || 'Query error' } } }
   } else if (sourceType === 'LEAVE_REQUEST') {
     let query = (supabase as any)
       .from('leave_requests')
@@ -741,6 +776,32 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
         query = query.eq('branch_id', reqData.branch_id)
       }
       await query
+  }
+
+  if (reqData.source_type === 'CONSTRUCTION_CHANGE_ORDER') {
+      const nextStatus = status === 'APPROVED' ? 'APPROVED' : 'REJECTED'
+      const approvalTimestamp = new Date().toISOString()
+
+      const { data: changeOrder } = await (supabase as any)
+        .from('construction_change_orders')
+        .select('project_id')
+        .eq('id', reqData.source_id)
+        .eq('org_id', orgId)
+        .maybeSingle()
+
+      await (supabase as any)
+        .from('construction_change_orders')
+        .update({
+          status: nextStatus,
+          approved_date: status === 'APPROVED' ? approvalTimestamp : null,
+        })
+        .eq('id', reqData.source_id)
+        .eq('org_id', orgId)
+
+      if (changeOrder?.project_id) {
+        revalidatePath(`/construction/${changeOrder.project_id}`)
+      }
+      revalidatePath('/construction')
   }
 
   if (reqData.source_type === 'LEAVE_REQUEST') {

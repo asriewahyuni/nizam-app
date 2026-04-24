@@ -66,6 +66,7 @@ export const SAAS_FULL_CORE_EXTENSION_ITEMS = [
 export const SAAS_VERTICAL_MODULE_ITEMS = [
   { label: 'Fleet & Rental', value: 'Fleet & Rental' },
   { label: 'Job Order (Jasa)', value: 'Job Order (Jasa)' },
+  { label: 'Project & Construction', value: 'Project & Construction' },
   { label: 'Syirkah', value: 'Syirkah' },
 ] as const
 
@@ -156,7 +157,7 @@ export const SAAS_LITE_PACKAGE_MODULES = [...SAAS_LITE_CORE_MODULES, 'Config'] a
 export const SAAS_BASE_PACKAGE_MODULES = [...SAAS_CORE_MODULES, 'Config'] as const
 export const SAAS_PRO_PACKAGE_MODULES = [...SAAS_CORE_MODULES, ...SAAS_PREMIUM_MODULES, 'Config'] as const
 export const SAAS_ENTERPRISE_PACKAGE_MODULES = [...SAAS_PRO_PACKAGE_MODULES] as const
-export const SAAS_DEMO_PACKAGE_MODULES = [...SAAS_PRO_PACKAGE_MODULES, 'Fleet & Rental', 'Job Order (Jasa)', 'Syirkah', 'Warehouse', 'Sales Page', 'Integrasi API'] as const
+export const SAAS_DEMO_PACKAGE_MODULES = [...SAAS_PRO_PACKAGE_MODULES, 'Fleet & Rental', 'Job Order (Jasa)', 'Project & Construction', 'Syirkah', 'Warehouse', 'Sales Page', 'Integrasi API'] as const
 export const SAAS_ABS_SPECIAL_MODULES = [
   ...SAAS_CORE_MODULES,
   'HRIS',
@@ -171,6 +172,8 @@ type CatalogEntry = {
 
 const SAAS_CAPABILITY_COVERAGE: Record<string, readonly string[]> = {
   HRIS: ['Attendance', 'Payroll'],
+  'Job Order (Jasa)': ['Project & Construction'],
+  'Project & Construction': ['Job Order (Jasa)'],
 }
 
 const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
@@ -241,6 +244,24 @@ const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
   {
     canonical: 'Job Order (Jasa)',
     aliases: ['job order (jasa)', 'job order', 'industrial job order', 'services', 'service jasa'],
+  },
+  {
+    canonical: 'Project & Construction',
+    aliases: [
+      'project & construction',
+      'project and construction',
+      'construction',
+      'project construction',
+      'project konstruksi',
+      'konstruksi',
+      'modul kontraktor',
+      'modul arsitek',
+      'arsitek',
+      'kontraktor',
+      'rab',
+      'boq',
+      'site progress',
+    ],
   },
   {
     canonical: 'Warehouse',

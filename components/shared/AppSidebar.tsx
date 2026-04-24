@@ -43,6 +43,7 @@ import {
   Megaphone,
   LifeBuoy,
   Upload,
+  Building2,
   Code2,
   type LucideIcon
 } from 'lucide-react'
@@ -95,6 +96,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Manufaktur (BoM)', href: '/factory', icon: Factory, permission_key: 'factory', module_key: 'Manufacturing' },
       { label: 'Fleet & Rental', href: '/fleet', icon: Truck, permission_key: 'fleet', module_key: 'Fleet & Rental' },
       { label: 'Job Order (Jasa)', href: '/services', icon: Briefcase, permission_key: 'services', module_key: 'Job Order (Jasa)' },
+      { label: 'Project Konstruksi', href: '/construction', icon: Building2, permission_key: 'construction,project,services', module_key: 'Project & Construction' },
     ]
   },
   {

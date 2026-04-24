@@ -37,6 +37,8 @@ const ALLOWED_TABLES = new Set([
   'zakat_haul', 'zakat_haul_events', 'zakat_asset_timeline',
   'intercompany_accounts', 'intercompany_transactions',
   'service_orders',
+  'construction_projects', 'construction_project_stages', 'construction_budget_items',
+  'construction_progress_logs', 'construction_billing_terms', 'construction_change_orders',
   'support_tickets', 'support_ticket_updates',
   'approval_requests', 'coa_account_requests',
   'sales_pages', 'sales_page_leads', 'sales_page_ai_profiles', 'sales_resellers',

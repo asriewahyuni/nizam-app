@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getAccountBalances } from './coa.actions'
 import { createJournalEntry } from './journal.actions'
-import { SHARIAH_COA_ENABLEMENT_CODES } from '@/modules/accounting/lib/shariah-coa'
+import { getShariahSetupSummary } from './shariah.actions'
 
 // Helper: Penentuan Hari Berdasarkan Fiqh (Pergantian hari di waktu Maghrib ~ 18:00 WIB)
 function getIslamicToday(timeZone: string = 'Asia/Jakarta'): string {
@@ -383,18 +383,24 @@ export async function getZakatSummary(orgId: string, currentPrices: { goldPerGra
     }
   }
 
-  // 8. Check if Shariah Accounts are active
-  const { count: shariahCount } = await (supabase as any)
-    .from('accounts')
-    .select('*', { count: 'exact', head: true })
-    .eq('org_id', orgId)
-    .in('code', SHARIAH_COA_ENABLEMENT_CODES)
-    .eq('is_active', true)
+  // 8. Read shariah setup summary from the shared accounting setup helper.
+  const shariahSetupSummary = await getShariahSetupSummary(orgId, supabase as any)
 
   return {
     scopeLevel: 'ORG',
     scopeLabel: 'Level Organisasi',
-    isShariahEnabled: (shariahCount || 0) > 0,
+    isShariahEnabled: shariahSetupSummary.isShariahEnabled,
+    orgLevelShariahEnabled: shariahSetupSummary.orgLevelShariahEnabled,
+    activeShariahAccountCount: shariahSetupSummary.activeShariahAccountCount,
+    shariahSetup: {
+      status: shariahSetupSummary.status,
+      checks: shariahSetupSummary.checks,
+      issues: shariahSetupSummary.issues,
+      readyCount: shariahSetupSummary.readyCount,
+      missingCount: shariahSetupSummary.missingCount,
+      inactiveCount: shariahSetupSummary.inactiveCount,
+      requiredCount: shariahSetupSummary.requiredCount,
+    },
     zakatAssets,
     totalAssets,
     nishabGold,

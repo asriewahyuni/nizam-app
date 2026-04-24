@@ -1,13 +1,32 @@
 'use client'
 
-import React from 'react'
-import { Plus, Briefcase, TrendingUp, AlertCircle, Eye, Handshake } from 'lucide-react'
+import React, { useState } from 'react'
+import { Plus, Briefcase, TrendingUp, AlertCircle, Eye, Handshake, Trash2 } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
 import Link from 'next/link'
+import { deleteSyirkahContract } from '@/modules/syirkah/actions/syirkah.actions'
+import { useRouter } from 'next/navigation'
 
 export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: string; initialData: any }) {
   const { netProfit, totalDebtAllocation, totalCurrentDebt, contracts, allMembers } = initialData
   const debtPercentage = totalDebtAllocation > 0 ? Math.min((totalCurrentDebt / totalDebtAllocation) * 100, 100) : 0
+  const router = useRouter()
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const handleDelete = async (contractId: string, title: string) => {
+    if (!confirm(`Hapus akad "${title}"? Tindakan ini tidak dapat dibatalkan.`)) return
+    setDeletingId(contractId)
+    try {
+      const result = await deleteSyirkahContract(contractId, orgId)
+      if ((result as any).error) {
+        alert((result as any).error)
+      } else {
+        router.refresh()
+      }
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -108,20 +127,21 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
                   const myMembers = allMembers[i]?.members || []
                   const totalEst = myMembers.reduce((sum: number, m: any) => sum + (Number(m.estimatedProfitAmount) || 0), 0)
 
-                  return (
-                    <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition">
+	                  return (
+	                    <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition">
                       <td className="py-4 pl-2 font-bold text-slate-800">{c.title}</td>
                       <td className="py-4">
                         <span className="px-2 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700 whitespace-nowrap">
                           {c.contract_type || '-'}
                         </span>
                       </td>
-                      <td className="py-4">
-                        <span className={`px-2 py-1 text-xs font-bold rounded-lg ${
-                          c.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' :
-                          c.status === 'COMPLETED' ? 'bg-slate-100 text-slate-700' :
-                          'bg-amber-100 text-amber-700'
-                        }`}>
+	                      <td className="py-4">
+	                        <span className={`px-2 py-1 text-xs font-bold rounded-lg ${
+	                          c.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' :
+	                          c.status === 'SIGNING' ? 'bg-sky-100 text-sky-700' :
+	                          c.status === 'COMPLETED' ? 'bg-slate-100 text-slate-700' :
+	                          'bg-amber-100 text-amber-700'
+	                        }`}>
                           {c.status}
                         </span>
                       </td>
@@ -130,13 +150,25 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
                         {formatRupiah(c.current_debt || 0)} <br/>
                         <span className="text-xs text-slate-400">Limit: {formatRupiah(c.debt_allocation || 0)}</span>
                       </td>
-                      <td className="py-4 pr-2 text-center">
-                        <Link
-                          href={`/syirkah/${c.id}`}
-                          className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition"
-                        >
-                          <Eye size={18} />
-                        </Link>
+	                      <td className="py-4 pr-2 text-center">
+	                        <div className="inline-flex items-center gap-1">
+	                          <Link
+	                            href={c.status === 'ACTIVE' || c.status === 'COMPLETED' ? `/syirkah/${c.id}` : `/syirkah/${c.id}?wizard=1`}
+	                            className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition"
+	                          >
+                            <Eye size={18} />
+                          </Link>
+                          {c.status === 'DRAFT' && (
+                            <button
+                              onClick={() => handleDelete(c.id, c.title)}
+                              disabled={deletingId === c.id}
+                              className="inline-flex items-center justify-center p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Hapus akad (hanya DRAFT)"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )

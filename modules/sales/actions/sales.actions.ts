@@ -2142,7 +2142,7 @@ export async function createQuotation(orgId: string, payload: any) {
     tax_amount: taxAmount,
     discount_amount: headerDiscount,
     grand_total: grandTotal,
-    shariah_mode: payload.shariah_mode || 'CASH',
+    shariah_mode: normalizeShariahMode(payload.shariah_mode),
     notes: payload.notes,
     created_by: user.id,
     status: 'QUOTATION',

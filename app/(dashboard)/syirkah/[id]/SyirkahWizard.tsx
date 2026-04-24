@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import {
   ChevronRight, ChevronLeft, Check, Building2, Landmark, Users, ListTodo,
   PieChart, Shield, FileText, QrCode, AlertCircle, Link2, Plus, Trash2, Info, Scale
@@ -30,6 +30,39 @@ const DURATION_OPTIONS = [3, 6, 12, 18, 24, 36, 48, 60]
 
 type Member = SyirkahMemberPayload & { id?: string; sign_token?: string; signed_at?: string }
 
+function createDraftRowId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  const randomSegment = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, '0')
+  return `${randomSegment()}${randomSegment()}-${randomSegment()}-4${randomSegment().slice(1)}-a${randomSegment().slice(1)}-${randomSegment()}${randomSegment()}${randomSegment()}`
+}
+
+function formatDateForInput(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function toDateInputValue(value: unknown) {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null
+    return formatDateForInput(value)
+  }
+
+  const raw = String(value || '').trim()
+  if (!raw) return null
+
+  const datePrefix = raw.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s]|$)/)
+  if (datePrefix) return datePrefix[1]
+
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) return null
+  return formatDateForInput(parsed)
+}
+
 const STEPS = [
   { id: 1, label: 'Informasi Usaha', icon: Building2 },
   { id: 2, label: 'Jenis & Durasi', icon: Landmark },
@@ -43,6 +76,7 @@ const STEPS = [
 ]
 
 const emptyMember = (): Member => ({
+  id: createDraftRowId(),
   member_name: '', role: 'PENGELOLA', nik: '', address: '', phone: '', email: '',
   responsibility: '', profit_share_percentage: 0, capital_contribution: 0
 })
@@ -50,8 +84,18 @@ const emptyMember = (): Member => ({
 type Witness = SyirkahWitnessPayload & { id?: string; sign_token?: string; signed_at?: string }
 
 const emptyWitness = (): Witness => ({
+  id: createDraftRowId(),
   witness_name: '', gender: 'LAKI-LAKI', nik: '', address: '', phone: ''
 })
+
+function normalizeLocalContractStatus(value: unknown) {
+  const normalized = String(value || '').trim().toUpperCase()
+  if (['DRAFT', 'SIGNING', 'ACTIVE', 'COMPLETED'].includes(normalized)) {
+    return normalized as 'DRAFT' | 'SIGNING' | 'ACTIVE' | 'COMPLETED'
+  }
+
+  return 'DRAFT' as const
+}
 
 export default function SyirkahWizard({ orgId, contract, members: initialMembers, witnesses: initialWitnesses }: {
   orgId: string
@@ -76,6 +120,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
   }
 
   const [step, setStep] = useState<number>(contract.wizard_step || 1)
+  const [contractStatus, setContractStatus] = useState(normalizeLocalContractStatus(contract.status))
   const [saving, setSaving] = useState(false)
   const [contractId] = useState<string>(contract.id)
 
@@ -88,11 +133,9 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
   const [contractType, setContractType] = useState(contract.contract_type || 'Syirkah Mudharabah')
   const [durationMonths, setDurationMonths] = useState(contract.duration_months || 12)
   const [startDate, setStartDate] = useState(
-    contract.start_date
-      ? (typeof contract.start_date === 'string' ? contract.start_date : new Date(contract.start_date).toISOString()).split('T')[0]
-      : new Date().toISOString().split('T')[0]
+    toDateInputValue(contract.start_date) || formatDateForInput(new Date())
   )
-  const [currency, setCurrency] = useState<string>(contract.currency || 'IDR')
+  const [currency] = useState<string>(contract.currency || 'IDR')
 
 
   // Step 3 & 4: Members
@@ -123,7 +166,10 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
   )
 
   // Step 9: Signing
-  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const [origin, setOrigin] = useState('')
+  useEffect(() => {
+    setOrigin(window.location.origin)
+  }, [])
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -153,10 +199,23 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
 
   // ─── Save & Navigate ───────────────────────────────────────────────────────
 
+  const resolveDraftStatus = (targetStep: number) => {
+    if (contractStatus === 'ACTIVE' || contractStatus === 'COMPLETED') {
+      return contractStatus
+    }
+
+    if (targetStep >= 9 || contractStatus === 'SIGNING') {
+      return 'SIGNING'
+    }
+
+    return 'DRAFT'
+  }
+
   const saveProgress = async (targetStep: number) => {
     setSaving(true)
     try {
-      await upsertSyirkahContract(orgId, {
+      const nextStatus = resolveDraftStatus(targetStep)
+      const savedContract = await upsertSyirkahContract(orgId, {
         id: contractId,
         title: businessName || contract.title,
         business_name: businessName,
@@ -171,27 +230,42 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
         current_debt: currentDebt,
         clauses: clauses.length > 0 ? clauses : undefined,
         wizard_step: targetStep,
-        status: targetStep === 9 ? 'ACTIVE' : contract.status || 'DRAFT',
+        status: nextStatus,
       })
 
-      // Save all members
+      // Save all members and keep returned ids/tokens in local state so
+      // repeated saves update the same rows instead of inserting duplicates.
+      const nextMembers: Member[] = []
       for (const member of members) {
+        const normalizedRole = isMudharabah(contractType) ? member.role : autoRole(contractType)
         if (member.member_name) {
-          await upsertSyirkahMember(contractId, {
+          const savedMember = await upsertSyirkahMember(contractId, {
             ...member,
-            // Untuk Mudharabah, user bisa set role sendiri. Tipe lain di-lock lewat autoRole
-            role: isMudharabah(contractType) ? member.role : autoRole(contractType),
+            role: normalizedRole,
           })
+          nextMembers.push({ ...member, ...savedMember, role: normalizedRole })
+          continue
         }
-      }
 
-      // Save all witnesses
+        nextMembers.push({ ...member, role: normalizedRole })
+      }
+      setMembers(nextMembers)
+
+      // Witnesses follow the same flow as members: once a row is saved, keep
+      // the database id so the next wizard step performs an update.
+      const nextWitnesses: Witness[] = []
       for (const witness of witnesses) {
         if (witness.witness_name) {
-          await upsertSyirkahWitness(contractId, witness)
+          const savedWitness = await upsertSyirkahWitness(contractId, witness)
+          nextWitnesses.push({ ...witness, ...savedWitness })
+          continue
         }
-      }
 
+        nextWitnesses.push(witness)
+      }
+      setWitnesses(nextWitnesses)
+
+      setContractStatus(normalizeLocalContractStatus(savedContract?.status || nextStatus))
       setStep(targetStep)
     } catch (e: any) {
       alert('Gagal menyimpan: ' + e.message)
@@ -767,7 +841,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
                 <li>Bagikan QR Code kepada masing-masing pihak</li>
                 <li>Setiap pihak scan QR Code-nya masing-masing</li>
                 <li>Buka link → baca akad → klik "Saya Setuju & Tandatangani"</li>
-                <li>Setelah semua TTD, status akad otomatis berubah menjadi AKTIF</li>
+                <li>Setelah semua pihak TTD, status akad berubah menjadi ACTIVE dan modal baru siap dicatat ke Core</li>
               </ol>
             </div>
 

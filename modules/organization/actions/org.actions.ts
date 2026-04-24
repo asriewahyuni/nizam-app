@@ -2394,6 +2394,7 @@ export async function deleteBranch(orgId: string, branchId: string) {
     { table: 'bank_transactions',      label: 'Transaksi Bank'     },
     { table: 'bank_mutations',         label: 'Mutasi Bank'        },
     { table: 'service_orders',         label: 'Order Jasa'         },
+    { table: 'construction_projects',  label: 'Project Konstruksi' },
     { table: 'fleet_assets',           label: 'Armada'             },
     { table: 'fleet_bookings',         label: 'Booking Armada'     },
     { table: 'fleet_routes',           label: 'Rute Armada'        },

@@ -7,6 +7,12 @@ export type ShariahAccountSeed = {
   fallbackParentCodes?: string[]
 }
 
+export type ShariahSetupRequiredAccount = {
+  code: string
+  name: string
+  module: 'SYIRKAH' | 'SALES' | 'PURCHASING'
+}
+
 export const LEGACY_SHARIAH_EQUITY_CODE = '3100'
 
 export const SHARIAH_COA_SEEDS: ShariahAccountSeed[] = [
@@ -42,3 +48,12 @@ export const SHARIAH_COA_DEACTIVATION_CODES = [
 ]
 
 export const SHARIAH_COA_ENABLEMENT_CODES = SHARIAH_COA_ACTIVATION_CODES
+
+export const SHARIAH_SETUP_REQUIRED_ACCOUNTS: ShariahSetupRequiredAccount[] = [
+  { code: '3110', name: 'Modal Syirkah Mudharabah', module: 'SYIRKAH' },
+  { code: '3120', name: 'Modal Syirkah Inan', module: 'SYIRKAH' },
+  { code: '2602', name: 'Hutang Salam', module: 'SALES' },
+  { code: '2603', name: 'Hutang Istishna', module: 'SALES' },
+  { code: '1404', name: 'Piutang Salam Vendor', module: 'PURCHASING' },
+  { code: '1205', name: 'Aset / Piutang Barang Istishna (Pembelian)', module: 'PURCHASING' },
+]

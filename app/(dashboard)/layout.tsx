@@ -106,6 +106,7 @@ export default async function DashboardLayout({
     { path: '/learning', requiredModule: 'HRIS', aliases: ['HRIS', 'Learning', 'Peningkatan Kompetensi'], permissionKeys: ['learning', 'hris', 'employee', 'employees'] },
     { path: '/reports', requiredModule: 'Reports', aliases: ['Reports', 'Laporan', 'Insight'], permissionKeys: ['reports', 'strategy', 'forecast'] },
     { path: '/services', requiredModule: 'Job Order (Jasa)', aliases: ['Job Order (Jasa)', 'Industrial Job Order', 'Services'], permissionKeys: ['services', 'service', 'job_order'] },
+    { path: '/construction', requiredModule: 'Project & Construction', aliases: ['Project & Construction', 'Construction', 'Project Construction', 'Project Konstruksi', 'Job Order (Jasa)'], permissionKeys: ['construction', 'project', 'services', 'job_order'] },
     { path: '/syirkah', requiredModule: 'Syirkah', aliases: ['Syirkah', 'Partnership'], permissionKeys: ['syirkah'] },
   ]
 

@@ -2,7 +2,9 @@ import type { Metadata } from 'next'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 import { getChartOfAccounts, seedInitialCoA, checkCanManageCoA, syncParentCoAToChildOrg } from '@/modules/accounting/actions/coa.actions'
+import { getShariahSetupSummary } from '@/modules/accounting/actions/shariah.actions'
 import AccountRowActions from './components/AccountRowActions'
+import ShariahSettingsCard from './components/ShariahSettingsCard'
 
 import { redirect } from 'next/navigation'
 import type { Account, AccountType } from '@/types/database.types'
@@ -35,9 +37,10 @@ export default async function ChartOfAccountsPage() {
     }
   }
 
-  const [accounts, { canManageDirect, isParentOrg }] = await Promise.all([
+  const [accounts, { canManageDirect, isParentOrg }, shariahSetupSummary] = await Promise.all([
     getChartOfAccounts(orgData.org.id),
     checkCanManageCoA(orgData.org.id),
+    getShariahSetupSummary(orgData.org.id),
   ])
   const canCreateDirectAccount = isParentOrg && canManageDirect
   const isCoAEmpty = accounts.length === 0
@@ -113,6 +116,8 @@ export default async function ChartOfAccountsPage() {
           </div>
         )}
       </div>
+
+      <ShariahSettingsCard orgId={orgData.org.id} summary={shariahSetupSummary} />
 
       {needsCoAActivation && (
         <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">

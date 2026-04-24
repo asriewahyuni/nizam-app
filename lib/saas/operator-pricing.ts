@@ -1,7 +1,5 @@
 import {
-  SAAS_ADDON_ITEMS,
   SAAS_CAPACITY_ADDONS,
-  SAAS_VERTICAL_MODULE_ITEMS,
   getSaasCapabilityDisplayLabel,
   getSaasCapabilityKind,
   getSaasCoreFamilyLabel,
@@ -24,6 +22,14 @@ export type OperatorAddonOption = {
   dependsOnCapabilities?: string[]
 }
 
+const FLEET_MODULE_NAME = 'Fleet & Rental'
+const JOB_ORDER_MODULE_NAME = 'Job Order (Jasa)'
+const CONSTRUCTION_MODULE_NAME = 'Project & Construction'
+const SYIRKAH_MODULE_NAME = 'Syirkah'
+const WAREHOUSE_ADDON_NAME = 'Warehouse'
+const SALES_PAGE_ADDON_NAME = 'Sales Page'
+const API_ADDON_NAME = 'Integrasi API'
+
 export type OperatorMarketplaceKind = 'module' | 'addon' | 'capacity_addon'
 export type OperatorMarketplaceCompatibility = {
   isCompatible: boolean
@@ -34,7 +40,7 @@ export type OperatorMarketplaceCompatibility = {
 export const OPERATOR_ADDON_OPTIONS: OperatorAddonOption[] = [
   {
     id: 'addon_fleet',
-    name: SAAS_VERTICAL_MODULE_ITEMS[0].label,
+    name: FLEET_MODULE_NAME,
     price: 249000,
     anchorPrice: 349000,
     billing: 'Bulan',
@@ -43,7 +49,7 @@ export const OPERATOR_ADDON_OPTIONS: OperatorAddonOption[] = [
   },
   {
     id: 'addon_job_order',
-    name: SAAS_VERTICAL_MODULE_ITEMS[1].label,
+    name: JOB_ORDER_MODULE_NAME,
     price: 199000,
     anchorPrice: 299000,
     billing: 'Bulan',
@@ -51,8 +57,17 @@ export const OPERATOR_ADDON_OPTIONS: OperatorAddonOption[] = [
     minCoreFamily: 'lite',
   },
   {
+    id: 'addon_construction',
+    name: CONSTRUCTION_MODULE_NAME,
+    price: 299000,
+    anchorPrice: 399000,
+    billing: 'Bulan',
+    description: 'Dashboard proyek, RAB/BoQ, progres lapangan, dan termin tagihan untuk arsitek maupun kontraktor.',
+    minCoreFamily: 'starter',
+  },
+  {
     id: 'addon_syirkah',
-    name: SAAS_VERTICAL_MODULE_ITEMS[2].label,
+    name: SYIRKAH_MODULE_NAME,
     price: 149000,
     anchorPrice: 199000,
     billing: 'Bulan',
@@ -63,7 +78,7 @@ export const OPERATOR_ADDON_OPTIONS: OperatorAddonOption[] = [
   },
   {
     id: 'addon_warehouse',
-    name: SAAS_ADDON_ITEMS[0].label,
+    name: WAREHOUSE_ADDON_NAME,
     price: 99000,
     anchorPrice: 149000,
     billing: 'Bulan',
@@ -82,7 +97,7 @@ export const OPERATOR_ADDON_OPTIONS: OperatorAddonOption[] = [
   },
   {
     id: 'addon_sales_page',
-    name: SAAS_ADDON_ITEMS[1].label,
+    name: SALES_PAGE_ADDON_NAME,
     price: 149000,
     anchorPrice: 249000,
     billing: 'Bulan',
@@ -92,7 +107,7 @@ export const OPERATOR_ADDON_OPTIONS: OperatorAddonOption[] = [
   },
   {
     id: 'addon_api',
-    name: SAAS_ADDON_ITEMS[2].label,
+    name: API_ADDON_NAME,
     price: 249000,
     anchorPrice: 349000,
     billing: 'Bulan',
