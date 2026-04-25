@@ -4,9 +4,10 @@ import React, { startTransition, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { Camera, Lock, CheckCircle, AlertCircle, Eye, EyeOff, Phone, User, Briefcase, Shield, X, Clock, CalendarDays, ReceiptText, Trash2, Image as ImageIcon } from 'lucide-react'
-import { uploadEmployeeAvatar, updateEmployeeProfile, updateEmployeePasswordSelf } from '@/modules/hris/actions/employee.actions'
+import { uploadEmployeeAvatar, updateEmployeeProfile } from '@/modules/hris/actions/employee.actions'
 import { uploadReceipt } from '@/modules/accounting/actions/reimburse.actions'
 import { cancelMyLeaveRequest, clockMyAttendance, deleteMyExpenseClaim, submitMyExpenseClaim, submitMyLeaveRequest } from '@/modules/hris/actions/self-service.actions'
+import { updateMyPassword } from '@/modules/auth/actions/auth.actions'
 import { formatDate } from '@/lib/utils'
 
 interface Props {
@@ -94,13 +95,12 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
   }
 
   const handleChangePassword = async () => {
-    if (!employee?.id) return showToast('Data karyawan tidak ditemukan.', 'error')
     if (!newPwd) return showToast('Password baru wajib diisi.', 'error')
     if (newPwd.length < 8) return showToast('Password minimal 8 karakter.', 'error')
     if (newPwd !== confirmPwd) return showToast('Konfirmasi password tidak cocok.', 'error')
 
     setPwdSaving(true)
-    const res = await updateEmployeePasswordSelf(employee.id, newPwd)
+    const res = await updateMyPassword(newPwd)
     setPwdSaving(false)
     if (res.error) showToast(res.error, 'error')
     else { showToast('Password berhasil diperbarui!', 'success'); setNewPwd(''); setConfirmPwd('') }
@@ -723,9 +723,9 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
                 <AlertCircle size={12} /> Password tidak cocok
               </p>
             )}
-            {newPwd && newPwd.length < 6 && (
+            {newPwd && newPwd.length < 8 && (
               <p className="text-[11px] text-amber-500 font-bold flex items-center gap-1.5 ml-1">
-                <AlertCircle size={12} /> Minimal 6 karakter
+                <AlertCircle size={12} /> Minimal 8 karakter
               </p>
             )}
           </div>

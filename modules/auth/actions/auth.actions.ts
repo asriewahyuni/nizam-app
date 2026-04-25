@@ -2155,6 +2155,31 @@ export async function resetEmployeePassword(employeeId: string, newPassword: str
   return { success: true }
 }
 
+export async function updateMyPassword(newPassword: string) {
+  const password = String(newPassword || '')
+  if (password.length < 8) {
+    return { error: 'Password minimal 8 karakter.' }
+  }
+
+  const { user } = await getServerAuthContext()
+  const userId = String(user?.id || '').trim()
+  if (!userId) {
+    return { error: 'Sesi login tidak ditemukan. Silakan login ulang.' }
+  }
+
+  if (isInternalAuthProvider()) {
+    const { error } = await resetInternalAuthPasswordById(userId, password)
+    if (error) return { error }
+  } else {
+    const adminClient = await createAdminClient()
+    const { error } = await adminClient.auth.admin.updateUserById(userId, { password })
+    if (error) return { error: 'Gagal memperbarui password: ' + error.message }
+  }
+
+  revalidatePath('/profil-saya')
+  return { success: true }
+}
+
 export async function sendPasswordResetEmail(formData: FormData) {
   const email = formData.get('email') as string
   const origin = process.env.NEXT_PUBLIC_SITE_URL || 
