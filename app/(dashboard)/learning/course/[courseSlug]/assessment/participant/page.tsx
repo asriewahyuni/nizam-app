@@ -4,11 +4,16 @@ import { notFound, redirect } from 'next/navigation'
 import {
   ArrowLeft,
   ArrowRight,
+  BookOpen,
+  CheckCircle2,
   ClipboardCheck,
   Clock3,
   FileText,
   MessageSquareText,
+  Send,
   ShieldCheck,
+  UserRound,
+  type LucideIcon,
 } from 'lucide-react'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { submitTrainingCourseAnswerSubmission } from '@/modules/edu/actions/training-assessment.actions'
@@ -19,6 +24,7 @@ import {
   getTrainingLessonsForCourse,
 } from '@/modules/edu/lib/training-center-mvp'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
+import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
 
 function formatAssessmentDate(dateLike: string) {
   if (!dateLike) return '-'
@@ -28,6 +34,73 @@ function formatAssessmentDate(dateLike: string) {
     timeStyle: 'short',
     timeZone: 'Asia/Jakarta',
   }).format(new Date(dateLike))
+}
+
+function FlowStep({
+  number,
+  title,
+  description,
+  status,
+  icon: Icon,
+}: {
+  number: number
+  title: string
+  description: string
+  status: 'done' | 'active' | 'todo'
+  icon: LucideIcon
+}) {
+  const styles = {
+    done: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    active: 'border-slate-900 bg-slate-900 text-white',
+    todo: 'border-slate-200 bg-white text-slate-600',
+  }[status]
+
+  const badgeStyles = {
+    done: 'bg-emerald-600 text-white',
+    active: 'bg-white text-slate-900',
+    todo: 'bg-slate-100 text-slate-500',
+  }[status]
+
+  return (
+    <div className={`rounded-[22px] border p-4 ${styles}`}>
+      <div className="flex items-start gap-3">
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-sm font-black ${badgeStyles}`}>
+          {status === 'done' ? <CheckCircle2 className="h-4 w-4" /> : number}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <Icon className="h-4 w-4 shrink-0" />
+            <h3 className="text-sm font-black">{title}</h3>
+          </div>
+          <p className={`mt-1 text-xs leading-5 ${status === 'active' ? 'text-slate-200' : 'opacity-75'}`}>
+            {description}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SubmissionStatusPill({ status }: { status?: string | null }) {
+  if (!status) {
+    return (
+      <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600">
+        Belum Dikirim
+      </span>
+    )
+  }
+
+  const isReviewed = status === 'REVIEWED'
+
+  return (
+    <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${
+      isReviewed
+        ? 'bg-emerald-100 text-emerald-700'
+        : 'bg-amber-100 text-amber-700'
+    }`}>
+      {isReviewed ? 'Sudah Direview' : 'Menunggu Review'}
+    </span>
+  )
 }
 
 export default async function LearningCourseParticipantAssessmentPage(props: {
@@ -51,7 +124,8 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
 
   const searchParams = await props.searchParams
   const firstLesson = getTrainingLessonsForCourse(course.slug)[0] || null
-  const canManageAssessment = hasRolePermission(orgData.role, orgData.permissions, 'learning:write')
+  const assessorContext = await getSaasAssessorContext({ email: orgData.user?.email })
+  const canManageAssessment = assessorContext.hasAccess
   const canAccessLearning = hasRolePermission(orgData.role, orgData.permissions, 'learning')
 
   if (!canAccessLearning && !canManageAssessment) {
@@ -77,6 +151,14 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
     .slice(0, 120)
   const participantReferenceDefault = String(orgData.user?.email || '').trim()
   const participantRoleDefault = String(orgData.jobTitle || '').trim()
+  const latestSubmission = ownAnswerSubmissions[0] || null
+  const hasSubmitted = Boolean(latestSubmission)
+  const hasReviewedSubmission = latestSubmission?.status === 'REVIEWED'
+  const latestStatusLabel = !latestSubmission
+    ? 'Belum ada jawaban'
+    : hasReviewedSubmission
+      ? 'Sudah direview'
+      : 'Menunggu review'
 
   return (
     <div className="space-y-6">
@@ -115,6 +197,13 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
             </div>
 
             <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href="#participant-answer-form"
+                className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white shadow-lg shadow-slate-200 transition hover:bg-black"
+              >
+                Isi Jawaban
+                <ArrowRight className="h-4 w-4" />
+              </Link>
               {canManageAssessment ? (
                 <Link
                   href={`/learning/course/${course.slug}/assessment`}
@@ -137,17 +226,35 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
           </div>
 
           <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Cara Mengisi</div>
-            <div className="mt-4 space-y-3 text-sm text-slate-600">
-              <div className="rounded-[20px] border border-slate-200 bg-white p-4">
-                Jawab pertanyaan teori dengan singkat, jelas, dan sesuai lesson yang sudah dipelajari.
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Alur Peserta</div>
+                <h2 className="mt-1 text-lg font-black text-slate-900">{latestStatusLabel}</h2>
               </div>
-              <div className="rounded-[20px] border border-slate-200 bg-white p-4">
-                Jelaskan langkah praktik yang Anda lakukan atau bukti yang sudah Anda siapkan.
-              </div>
-              <div className="rounded-[20px] border border-slate-200 bg-white p-4">
-                Setelah dikirim, assessor akan meninjau submission dan memberi keputusan akhir.
-              </div>
+              <SubmissionStatusPill status={latestSubmission?.status} />
+            </div>
+            <div className="mt-4 space-y-3">
+              <FlowStep
+                number={1}
+                title="Pelajari materi"
+                description="Buka lesson acuan supaya jawaban mengikuti alur kerja NIZAM."
+                status="done"
+                icon={BookOpen}
+              />
+              <FlowStep
+                number={2}
+                title="Kirim jawaban"
+                description="Isi identitas, jawaban teori, dan bukti praktik secukupnya."
+                status={hasSubmitted ? 'done' : 'active'}
+                icon={Send}
+              />
+              <FlowStep
+                number={3}
+                title="Tunggu review"
+                description="Assessor SaaS akan meninjau submission dan memberi catatan."
+                status={hasReviewedSubmission ? 'done' : hasSubmitted ? 'active' : 'todo'}
+                icon={ShieldCheck}
+              />
             </div>
           </div>
         </div>
@@ -165,36 +272,20 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
         </section>
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Pertanyaan Teori</div>
-          <div className="mt-3 text-3xl font-black tracking-tight text-slate-900">{assessment.theoryQuestions.length}</div>
-          <p className="mt-2 text-sm text-slate-600">Jawab secukupnya sesuai pemahaman dan istilah kerja yang Anda pakai.</p>
-        </div>
-        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Tugas Praktik</div>
-          <div className="mt-3 text-3xl font-black tracking-tight text-slate-900">{assessment.practicalTasks.length}</div>
-          <p className="mt-2 text-sm text-slate-600">Tuliskan langkah, hasil, atau bukti minimal yang sudah Anda siapkan.</p>
-        </div>
-        <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">Sudah Dikirim</div>
-          <div className="mt-3 text-3xl font-black tracking-tight text-emerald-900">{ownAnswerSubmissions.length}</div>
-          <p className="mt-2 text-sm text-emerald-800">Riwayat submission Anda untuk course ini.</p>
-        </div>
-        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Status Terbaru</div>
-          <div className="mt-3 text-sm font-black text-slate-900">
-            {!ownAnswerSubmissions[0]
-              ? 'Belum Ada'
-              : ownAnswerSubmissions[0].status === 'REVIEWED'
-                ? 'Sudah Direview'
-                : 'Menunggu Review'}
+      <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="grid gap-4 lg:grid-cols-[1fr_auto_auto] lg:items-center">
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Ringkasan Tugas</div>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Selesaikan form di bawah ini. Anda cukup mengirim jawaban yang jelas; assessor akan membaca konteks dan memberi review.
+            </p>
           </div>
-          <p className="mt-2 text-sm text-slate-600">
-            {ownAnswerSubmissions[0]
-              ? `Update terakhir ${formatAssessmentDate(ownAnswerSubmissions[0].updatedAt)}`
-              : 'Belum ada jawaban yang dikirim.'}
-          </p>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
+            {assessment.theoryQuestions.length} teori - {assessment.practicalTasks.length} praktik
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
+            {ownAnswerSubmissions.length} submission
+          </div>
         </div>
       </section>
 
@@ -215,61 +306,71 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
         <form action={submitTrainingCourseAnswerSubmission} className="mt-6 space-y-6">
           <input type="hidden" name="courseSlug" value={course.slug} />
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <label className="space-y-2">
-              <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Nama Peserta</span>
-              <input
-                type="text"
-                name="participantName"
-                required
-                defaultValue={participantNameDefault}
-                placeholder="Contoh: Ahmad Fauzan"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white"
-              />
-            </label>
+          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+            <div className="flex items-center gap-3">
+              <UserRound className="h-5 w-5 text-slate-700" />
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Langkah 1</div>
+                <h3 className="mt-1 text-lg font-black text-slate-900">Cek identitas peserta</h3>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <label className="space-y-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Nama Peserta</span>
+                <input
+                  type="text"
+                  name="participantName"
+                  required
+                  defaultValue={participantNameDefault}
+                  placeholder="Contoh: Ahmad Fauzan"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                />
+              </label>
 
-            <label className="space-y-2">
-              <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Referensi Peserta</span>
-              <input
-                type="text"
-                name="participantReference"
-                defaultValue={participantReferenceDefault}
-                placeholder="NIK, email, atau ID peserta"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white"
-              />
-            </label>
+              <label className="space-y-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Referensi Peserta</span>
+                <input
+                  type="text"
+                  name="participantReference"
+                  defaultValue={participantReferenceDefault}
+                  placeholder="NIK, email, atau ID peserta"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                />
+              </label>
 
-            <label className="space-y-2">
-              <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Peran/Jabatan</span>
-              <input
-                type="text"
-                name="participantRole"
-                defaultValue={participantRoleDefault}
-                placeholder="Contoh: Staff Sales"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white"
-              />
-            </label>
+              <label className="space-y-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Peran/Jabatan</span>
+                <input
+                  type="text"
+                  name="participantRole"
+                  defaultValue={participantRoleDefault}
+                  placeholder="Contoh: Staff Sales"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-400"
+                />
+              </label>
+            </div>
           </div>
 
           <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
             <div className="flex items-center gap-3">
               <ClipboardCheck className="h-5 w-5 text-slate-700" />
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Pertanyaan Teori</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Langkah 2 - Pertanyaan Teori</div>
                 <h3 className="mt-1 text-lg font-black text-slate-900">Jawab singkat dan jelas</h3>
               </div>
             </div>
             <div className="mt-4 space-y-4">
               {assessment.theoryQuestions.map((question, index) => (
-                <label key={question} className="block rounded-[20px] border border-slate-200 bg-white p-4">
-                  <span className="block text-sm font-bold leading-6 text-slate-800">
-                    {index + 1}. {question}
+                <label key={question} className="grid gap-3 rounded-[20px] border border-slate-200 bg-white p-4 sm:grid-cols-[2.5rem_1fr]">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-100 text-sm font-black text-slate-700">
+                    {index + 1}
                   </span>
+                  <span className="block text-sm font-bold leading-6 text-slate-800">{question}</span>
                   <textarea
                     name={`theoryAnswer_${index}`}
                     rows={4}
                     placeholder="Tulis jawaban Anda dengan singkat dan jelas."
-                    className="mt-3 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                    className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white sm:col-start-2"
                   />
                 </label>
               ))}
@@ -280,42 +381,45 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
             <div className="flex items-center gap-3">
               <ShieldCheck className="h-5 w-5 text-emerald-600" />
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Bukti Praktik</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Langkah 3 - Bukti Praktik</div>
                 <h3 className="mt-1 text-lg font-black text-slate-900">Jelaskan apa yang Anda lakukan</h3>
               </div>
             </div>
             <div className="mt-4 space-y-4">
               {assessment.practicalTasks.map((task, index) => (
-                <label key={task.title} className="block rounded-[20px] border border-slate-200 bg-white p-4">
-                  <span className="block text-sm font-bold leading-6 text-slate-800">
-                    {index + 1}. {task.title}
+                <label key={task.title} className="grid gap-3 rounded-[20px] border border-slate-200 bg-white p-4 sm:grid-cols-[2.5rem_1fr]">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-emerald-100 text-sm font-black text-emerald-700">
+                    {index + 1}
                   </span>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{task.instruction}</p>
-                  <div className="mt-3 rounded-[18px] border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                    <span className="font-black text-slate-900">Bukti minimum:</span> {task.expectedEvidence}
+                  <div>
+                    <span className="block text-sm font-bold leading-6 text-slate-800">{task.title}</span>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{task.instruction}</p>
+                    <div className="mt-3 rounded-[18px] border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                      <span className="font-black text-slate-900">Bukti minimum:</span> {task.expectedEvidence}
+                    </div>
                   </div>
                   <textarea
                     name={`practicalAnswer_${index}`}
                     rows={4}
                     placeholder="Jelaskan langkah yang Anda lakukan, hasil yang muncul, atau screenshot yang Anda siapkan."
-                    className="mt-3 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                    className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white sm:col-start-2"
                   />
                 </label>
               ))}
             </div>
           </div>
 
-          <label className="block">
-            <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Catatan Tambahan Peserta</span>
+          <label className="block rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+            <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Langkah 4 - Catatan Tambahan</span>
             <textarea
               name="generalNotes"
               rows={5}
               placeholder="Tuliskan kendala, hal yang masih membingungkan, atau penjelasan tambahan untuk assessor."
-              className="mt-2 w-full rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+              className="mt-3 w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400"
             />
           </label>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-3 rounded-[24px] border border-emerald-200 bg-emerald-50 p-5 sm:flex-row sm:items-center sm:justify-between">
             <button
               type="submit"
               className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
@@ -323,7 +427,7 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
               Kirim Jawaban Ke Assessor
               <ArrowRight className="h-4 w-4" />
             </button>
-            <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600">
+            <div className="text-sm font-bold leading-6 text-emerald-800">
               Isi minimal satu jawaban sebelum mengirim.
             </div>
           </div>
@@ -352,13 +456,7 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <div className="flex flex-wrap gap-2">
-                      <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${
-                        submission.status === 'REVIEWED'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        {submission.status === 'REVIEWED' ? 'Sudah Direview' : 'Menunggu Review'}
-                      </span>
+                      <SubmissionStatusPill status={submission.status} />
                       <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600">
                         {submission.assessmentVersion}
                       </span>

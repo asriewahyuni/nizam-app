@@ -571,7 +571,7 @@ export async function logApiCall(input: ApiCallLogInput): Promise<void> {
 /**
  * Extract caller IP from request headers.
  */
-export function extractIpFromRequest(request: Request): string | null {
+export function extractIpFromRequest(request?: Request): string | null {
   if (!request) return null
 
   return (

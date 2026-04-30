@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
+import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
 import { getTrainingAssessmentByCourseSlug } from '@/modules/edu/lib/training-assessment-mvp'
 
 type TheoryStatus = 'UNDERSTOOD' | 'PARTIAL' | 'NOT_YET'
@@ -12,6 +13,17 @@ type PracticeStatus = 'SUCCESS' | 'NEEDS_SUPPORT' | 'FAILED'
 type DecisionStatus = 'COMPETENT' | 'NOT_YET_COMPETENT'
 type ChecklistStatus = 'yes' | 'no' | 'na'
 type PromptAnswer = { prompt: string; answer: string }
+type TrainingAssessmentDbError = { message?: string } | null
+type TrainingAssessmentDb = {
+  from: (table: string) => {
+    insert: (payload: Record<string, unknown>) => Promise<{ error: TrainingAssessmentDbError }>
+    update: (payload: Record<string, unknown>) => {
+      eq: (column: string, value: unknown) => {
+        eq: (column: string, value: unknown) => Promise<{ error?: TrainingAssessmentDbError }>
+      }
+    }
+  }
+}
 
 function normalizeText(value: FormDataEntryValue | null, maxLength: number) {
   const text = String(value || '').trim().replace(/\s+/g, ' ')
@@ -124,7 +136,7 @@ export async function submitTrainingCourseAnswerSubmission(formData: FormData) {
     )
   }
 
-  const db = (await createAdminClient()) as any
+  const db = (await createAdminClient()) as unknown as TrainingAssessmentDb
   const { error } = await db
     .from('training_course_answer_submissions')
     .insert({
@@ -176,8 +188,9 @@ export async function submitTrainingCourseAssessment(formData: FormData) {
     redirect('/onboarding')
   }
 
-  if (!hasRolePermission(orgData.role, orgData.permissions, 'learning:write')) {
-    redirect(buildRedirectPath(courseSlug, { error: 'Hanya assessor atau admin learning yang dapat mengirim asesmen.' }))
+  const assessorContext = await getSaasAssessorContext({ email: orgData.user?.email })
+  if (!assessorContext.hasAccess) {
+    redirect(buildRedirectPath(courseSlug, { error: 'Hanya member SaaS yang diberi mandat assessor yang dapat mengirim asesmen.' }))
   }
 
   const participantName = normalizeText(formData.get('participantName'), 120)
@@ -203,15 +216,23 @@ export async function submitTrainingCourseAssessment(formData: FormData) {
   }))
 
   const assessorName = String(
-    orgData.user?.user_metadata?.full_name
-    || orgData.user?.user_metadata?.name
-    || orgData.user?.email
-    || 'Assessor NIZAM',
+    assessorContext.source === 'impersonation'
+      ? assessorContext.email
+      : (
+          orgData.user?.user_metadata?.full_name
+          || orgData.user?.user_metadata?.name
+          || assessorContext.email
+          || orgData.user?.email
+          || 'Assessor NIZAM'
+        ),
   )
     .trim()
     .slice(0, 120)
+  const assessorUserId = assessorContext.source === 'impersonation'
+    ? null
+    : (orgData.user?.id || null)
 
-  const db = (await createAdminClient()) as any
+  const db = (await createAdminClient()) as unknown as TrainingAssessmentDb
   const { error } = await db
     .from('training_course_assessments')
     .insert({
@@ -221,7 +242,7 @@ export async function submitTrainingCourseAssessment(formData: FormData) {
       participant_name: participantName,
       participant_reference: participantReference,
       participant_role: participantRole,
-      assessor_user_id: orgData.user?.id || null,
+      assessor_user_id: assessorUserId,
       assessor_name: assessorName,
       decision,
       theory_status: theoryStatus,
@@ -247,7 +268,7 @@ export async function submitTrainingCourseAssessment(formData: FormData) {
       .from('training_course_answer_submissions')
       .update({
         status: 'REVIEWED',
-        reviewer_user_id: orgData.user?.id || null,
+        reviewer_user_id: assessorUserId,
         reviewer_name: assessorName,
         reviewer_note: `Submission direview dan dipakai pada asesmen final dengan keputusan ${decision === 'COMPETENT' ? 'Kompeten' : 'Belum Kompeten'}.`,
         reviewed_at: new Date().toISOString(),

@@ -108,6 +108,26 @@ export type SaasCapabilitySection = {
   items: readonly SaasCapabilityOption[]
 }
 
+export type SaasProvisioningModuleOption = {
+  value: string
+  label: string
+  description: string
+  requiredCoreFamily: SaasCoreFamily
+  sectionKey: string
+  sectionTitle: string
+}
+
+export type SaasAddonCompatibilityOption = {
+  value: string
+  label: string
+  description: string
+  requiredCoreFamily: SaasCoreFamily
+  parentModules: readonly string[]
+  requiredModules: readonly string[]
+  requiredAddons?: readonly string[]
+  global?: boolean
+}
+
 export const SAAS_PACKAGE_EDITOR_SECTIONS: readonly SaasCapabilitySection[] = [
   {
     key: 'platform_core',
@@ -150,6 +170,207 @@ export const SAAS_PACKAGE_EDITOR_SECTIONS: readonly SaasCapabilitySection[] = [
     description: 'Ekspansi tambahan di atas core atau vertical module.',
     kind: 'addon',
     items: SAAS_ADDON_ITEMS,
+  },
+] as const
+
+export const SAAS_MODULE_COMPATIBILITY_OPTIONS: readonly SaasProvisioningModuleOption[] = [
+  {
+    value: 'Sales',
+    label: 'Sales',
+    description: 'Penjualan inti, quotation, pipeline, promo, dan commission.',
+    requiredCoreFamily: 'lite',
+    sectionKey: 'lite_core',
+    sectionTitle: 'Lite Core Family',
+  },
+  {
+    value: 'POS',
+    label: 'POS',
+    description: 'Channel kasir untuk transaksi cepat dan operasional outlet.',
+    requiredCoreFamily: 'lite',
+    sectionKey: 'lite_core',
+    sectionTitle: 'Lite Core Family',
+  },
+  {
+    value: 'CRM',
+    label: 'CRM',
+    description: 'Kontak, hubungan pelanggan, dan aktivitas komersial.',
+    requiredCoreFamily: 'lite',
+    sectionKey: 'lite_core',
+    sectionTitle: 'Lite Core Family',
+  },
+  {
+    value: 'Reports',
+    label: 'Reports',
+    description: 'Laporan ringkas, insight dasar, dan monitoring performa.',
+    requiredCoreFamily: 'lite',
+    sectionKey: 'lite_core',
+    sectionTitle: 'Lite Core Family',
+  },
+  {
+    value: 'Accounting',
+    label: 'Accounting',
+    description: 'CoA, jurnal, closing, tax, zakat, dan kontrol akuntansi.',
+    requiredCoreFamily: 'starter',
+    sectionKey: 'starter_core',
+    sectionTitle: 'Starter Core Family',
+  },
+  {
+    value: 'Finance',
+    label: 'Finance',
+    description: 'Kas, bank, aging, reimburse, aset, dan forecast keuangan.',
+    requiredCoreFamily: 'starter',
+    sectionKey: 'starter_core',
+    sectionTitle: 'Starter Core Family',
+  },
+  {
+    value: 'Inventory',
+    label: 'Inventory',
+    description: 'Master barang, stok, mutasi, dan ledger inventori.',
+    requiredCoreFamily: 'starter',
+    sectionKey: 'starter_core',
+    sectionTitle: 'Starter Core Family',
+  },
+  {
+    value: 'Purchasing',
+    label: 'Purchasing',
+    description: 'Permintaan pembelian, PO, penerimaan, dan vendor flow.',
+    requiredCoreFamily: 'starter',
+    sectionKey: 'starter_core',
+    sectionTitle: 'Starter Core Family',
+  },
+  {
+    value: 'HRIS',
+    label: 'HRIS',
+    description: 'Karyawan, absensi, cuti, payroll, dan self-service SDM.',
+    requiredCoreFamily: 'full',
+    sectionKey: 'full_core_extension',
+    sectionTitle: 'Full Core Family',
+  },
+  {
+    value: 'Manufacturing',
+    label: 'Manufacturing',
+    description: 'BOM, produksi, costing, dan workflow manufaktur.',
+    requiredCoreFamily: 'full',
+    sectionKey: 'full_core_extension',
+    sectionTitle: 'Full Core Family',
+  },
+  {
+    value: 'Audit',
+    label: 'Audit',
+    description: 'Audit trail, integrity control, dan governance review.',
+    requiredCoreFamily: 'full',
+    sectionKey: 'full_core_extension',
+    sectionTitle: 'Full Core Family',
+  },
+  {
+    value: 'Fleet & Rental',
+    label: 'Fleet & Rental',
+    description: 'Operasional armada, rental, dan monitoring kendaraan.',
+    requiredCoreFamily: 'lite',
+    sectionKey: 'vertical_module',
+    sectionTitle: 'Vertical Modules',
+  },
+  {
+    value: 'Job Order (Jasa)',
+    label: 'Job Order (Jasa)',
+    description: 'Workflow jasa, order servis, dan pelacakan pekerjaan.',
+    requiredCoreFamily: 'lite',
+    sectionKey: 'vertical_module',
+    sectionTitle: 'Vertical Modules',
+  },
+  {
+    value: 'Project & Construction',
+    label: 'Project & Construction',
+    description: 'RAB, BOQ, progres proyek, dan konstruksi lapangan.',
+    requiredCoreFamily: 'lite',
+    sectionKey: 'vertical_module',
+    sectionTitle: 'Vertical Modules',
+  },
+  {
+    value: 'Syirkah',
+    label: 'Syirkah',
+    description: 'Partnership contract dan workflow syirkah.',
+    requiredCoreFamily: 'lite',
+    sectionKey: 'vertical_module',
+    sectionTitle: 'Vertical Modules',
+  },
+] as const
+
+export const SAAS_ADDON_COMPATIBILITY_OPTIONS: readonly SaasAddonCompatibilityOption[] = [
+  {
+    value: 'Warehouse',
+    label: 'Warehouse',
+    description: 'Advanced WMS untuk bin, batch, expiry, dan kontrol gudang.',
+    requiredCoreFamily: 'starter',
+    parentModules: ['Inventory'],
+    requiredModules: ['Inventory'],
+  },
+  {
+    value: 'Sales Page',
+    label: 'Sales Page',
+    description: 'Landing page dan lead capture yang menempel ke alur revenue.',
+    requiredCoreFamily: 'lite',
+    parentModules: ['Sales', 'CRM'],
+    requiredModules: ['Sales'],
+  },
+  {
+    value: 'Integrasi API',
+    label: 'Integrasi API',
+    description: 'Open API dan webhook untuk partner, integrator, dan automation.',
+    requiredCoreFamily: 'lite',
+    parentModules: [],
+    requiredModules: [],
+    global: true,
+  },
+  {
+    value: 'Multi-Entity (PT/CV)',
+    label: 'Multi-Entity (PT/CV)',
+    description: 'Ekspansi kapasitas untuk multi entitas atau holding structure.',
+    requiredCoreFamily: 'lite',
+    parentModules: [],
+    requiredModules: [],
+    global: true,
+  },
+  {
+    value: 'Quick Bill',
+    label: 'Quick Bill',
+    description: 'Shortcut billing yang paling cocok saat finance dan sales aktif.',
+    requiredCoreFamily: 'starter',
+    parentModules: ['Finance', 'Accounting', 'Sales'],
+    requiredModules: ['Finance'],
+  },
+  {
+    value: 'Fleet Maintenance Pack',
+    label: 'Fleet Maintenance Pack',
+    description: 'Oil, tire, dan maintenance record untuk armada aktif.',
+    requiredCoreFamily: 'lite',
+    parentModules: ['Fleet & Rental'],
+    requiredModules: ['Fleet & Rental'],
+  },
+  {
+    value: 'Package Tracking',
+    label: 'Package Tracking',
+    description: 'Tracking pengiriman dan status paket untuk fulfillment lapangan.',
+    requiredCoreFamily: 'lite',
+    parentModules: ['Sales', 'Job Order (Jasa)', 'Project & Construction'],
+    requiredModules: ['Sales'],
+  },
+  {
+    value: 'Sales AR Cockpit',
+    label: 'Sales AR Cockpit',
+    description: 'Dashboard piutang salesman untuk revenue control yang lebih tajam.',
+    requiredCoreFamily: 'starter',
+    parentModules: ['Sales', 'Finance'],
+    requiredModules: ['Sales', 'Finance'],
+  },
+  {
+    value: 'Sales AR Seat Pack',
+    label: 'Sales AR Seat Pack',
+    description: 'Seat tambahan untuk team yang memakai Sales AR Cockpit.',
+    requiredCoreFamily: 'starter',
+    parentModules: ['Sales'],
+    requiredModules: ['Sales', 'Finance'],
+    requiredAddons: ['Sales AR Cockpit'],
   },
 ] as const
 
@@ -211,7 +432,7 @@ const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
   },
   {
     canonical: 'HRIS',
-    aliases: ['hris', 'karyawan (hris)', 'karyawan (sdm)', 'employees', 'employee', 'akses & jabatan'],
+    aliases: ['hris', 'karyawan (hris)', 'karyawan (sdm)', 'employees', 'employee', 'akses & jabatan', 'learning', 'peningkatan kompetensi'],
   },
   {
     canonical: 'Manufacturing',
@@ -463,6 +684,55 @@ export function saasCoreFamilySatisfies(
   requiredCoreFamily: SaasCoreFamily
 ) {
   return getSaasCoreFamilyRank(currentCoreFamily) >= getSaasCoreFamilyRank(requiredCoreFamily)
+}
+
+export function getSaasProvisioningModulesForCoreFamily(coreFamily: SaasCoreFamily) {
+  return SAAS_MODULE_COMPATIBILITY_OPTIONS.filter((option) =>
+    saasCoreFamilySatisfies(coreFamily, option.requiredCoreFamily)
+  )
+}
+
+export function getSaasAddonCompatibilityOption(value: string) {
+  const normalized = normalizeSaasEntitlementName(value)
+  return SAAS_ADDON_COMPATIBILITY_OPTIONS.find((option) => option.value === normalized) || null
+}
+
+export function isSaasAddonCompatible(
+  value: string,
+  selectedModulesRaw: readonly string[],
+  currentCoreFamily: SaasCoreFamilyLevel,
+  selectedAddonsRaw: readonly string[] = []
+) {
+  const option = getSaasAddonCompatibilityOption(value)
+  if (!option) return true
+  if (!saasCoreFamilySatisfies(currentCoreFamily, option.requiredCoreFamily)) return false
+
+  const selectedModules = normalizeSaasEntitlementList(selectedModulesRaw)
+  const selectedAddons = normalizeSaasEntitlementList(selectedAddonsRaw)
+
+  const hasRequiredModules = option.requiredModules.every((requiredModule) =>
+    selectedModules.some((selectedModule) => saasModuleMatches(selectedModule, requiredModule))
+  )
+  if (!hasRequiredModules) return false
+
+  const hasRequiredAddons = (option.requiredAddons || []).every((requiredAddon) =>
+    selectedAddons.some((selectedAddon) => saasModuleMatches(selectedAddon, requiredAddon))
+  )
+
+  return hasRequiredAddons
+}
+
+export function getSaasRelatedAddonsForModule(
+  moduleValue: string,
+  currentCoreFamily: SaasCoreFamilyLevel
+) {
+  const normalizedModule = normalizeSaasEntitlementName(moduleValue)
+
+  return SAAS_ADDON_COMPATIBILITY_OPTIONS.filter((option) => {
+    if (!saasCoreFamilySatisfies(currentCoreFamily, option.requiredCoreFamily)) return false
+    if (option.global) return true
+    return option.parentModules.some((parentModule) => saasModuleMatches(parentModule, normalizedModule))
+  })
 }
 
 export function getSaasPackageArchitecture(

@@ -20,6 +20,7 @@ import { UserActivityTracker } from '@/components/shared/UserActivityTracker'
 import { GlobalApprovalNotifier } from '@/components/shared/GlobalApprovalNotifier'
 import { EduModeShell } from '@/components/edu/EduModeShell'
 import { hasEnabledModuleAccess, hasPosOnlyAccess } from '@/modules/organization/lib/navigation-access'
+import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
 
 type RouteModuleEntry = {
   path: string
@@ -57,6 +58,10 @@ export default async function DashboardLayout({
     isDemoSession(),
   ])
   const effectivePlanName = isDemo ? 'Demo' : (orgData.org.settings?.plan || 'Trial')
+  const saasAssessorContext = await getSaasAssessorContext({
+    email: orgData.user?.email,
+    impersonationEmail: adminImpersonation?.email || null,
+  })
 
   // ── DEMO SESSION EXPIRY ENFORCEMENT ──────────────────────────────────────
   // isDemoSession() returns false when the 12-hour cookie has expired.
@@ -79,6 +84,9 @@ export default async function DashboardLayout({
   const isOwnerOrAdmin = orgData.role === 'owner' || orgData.role === 'admin'
   const canManageSubOrganizations = isOwnerOrAdmin
   const isPosOnlyUser = hasPosOnlyAccess(orgData.role, orgData.permissions)
+  const isSaasAssessorRouteAccess =
+    requestPathname.startsWith('/learning') &&
+    saasAssessorContext.hasAccess
 
   if (
     isPosOnlyUser &&
@@ -136,13 +144,13 @@ export default async function DashboardLayout({
       ? true  // If no modules are configured, allow access (e.g. during setup)
       : orgData.enabledModules.some((m: string) => allNames.some((candidate) => moduleNameMatches(m, candidate)))
 
-    if (!isModulePaid) {
+    if (!isModulePaid && !isSaasAssessorRouteAccess) {
       console.log(`[ACL] Redirecting - Module not paid: ${requiredModule} (checked aliases: ${allNames.join(', ')}) for path: ${requestPathname}`)
       return redirect('/dashboard')
     }
 
     // 2. RBAC PERMISSION GUARD (Only check if NOT owner/admin)
-    if (!isOwnerOrAdmin && permissionKeys.length > 0) {
+    if (!isOwnerOrAdmin && !isSaasAssessorRouteAccess && permissionKeys.length > 0) {
       const normalizedPermissions = Array.isArray(orgData.permissions)
         ? orgData.permissions
             .filter((permission): permission is string => typeof permission === 'string')
@@ -195,6 +203,7 @@ export default async function DashboardLayout({
         isDemo={isDemo}
         planName={effectivePlanName}
         canManageSubOrganizations={canManageSubOrganizations}
+        isSaasAssessor={saasAssessorContext.hasAccess}
       />
 
       {/* Main content */}

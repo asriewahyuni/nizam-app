@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Zap, CreditCard, History, Package, Plus, CheckCircle2,
   Building2, Warehouse, Users,
-  ArrowUpRight, AlertCircle, Clock, Truck, Edit3, Coins, Megaphone,
-  Copy, Check, Layers3, ShieldCheck, ShoppingCart,
+  ArrowUpRight, Clock, Truck, Edit3, Megaphone,
+  Copy, Check, Layers3, ShieldCheck,
   type LucideIcon
 } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
@@ -15,6 +15,8 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { createBillingInvoice, submitPaymentProof, applyVoucher } from '@/modules/organization/actions/billing.actions'
 import {
+  getSaasProvisioningModulesForCoreFamily,
+  getSaasRelatedAddonsForModule,
   getSaasCoreFamilyLabel,
   getSaasPackageArchitecture,
   normalizeSaasEntitlementList,
@@ -22,11 +24,10 @@ import {
 } from '@/lib/saas/module-catalog'
 import {
   OPERATOR_ADDON_OPTIONS,
-  OPERATOR_GROWTH_ADDON_OPTIONS,
   OPERATOR_MODULE_OPTIONS,
   getOperatorMarketplaceCompatibility,
+  getOperatorMarketplaceKind,
   getOperatorMarketplaceLabel,
-  getOperatorMarketplaceMinCoreFamily,
   isAddonSelfServiceEnabled,
 } from '@/lib/saas/operator-pricing'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
@@ -131,10 +132,6 @@ const BILLING_MARKETPLACE_MODULES = AVAILABLE_ADDONS.filter((addon) =>
   OPERATOR_MODULE_OPTIONS.some((candidate) => candidate.id === addon.id) && isAddonSelfServiceEnabled(addon)
 )
 
-const BILLING_MARKETPLACE_ADDONS = AVAILABLE_ADDONS.filter((addon) =>
-  OPERATOR_GROWTH_ADDON_OPTIONS.some((candidate) => candidate.id === addon.id) && isAddonSelfServiceEnabled(addon)
-)
-
 function buildPackageCheckoutItem(pkg: any): BillingCheckoutItem {
   return {
     id: String(pkg.id),
@@ -189,6 +186,7 @@ function BillingContent() {
   const [aiTokenBalance, setAiTokenBalance] = useState(0)
   const [aiTokenPackages, setAiTokenPackages] = useState<any[]>([])
   const [selectedCheckoutItem, setSelectedCheckoutItem] = useState<BillingCheckoutItem | null>(null)
+  const [provisioningFocusedModule, setProvisioningFocusedModule] = useState<string | null>(null)
   const [flashMessage, setFlashMessage] = useState<FlashMessage | null>(null)
 
   // SaaS Dynamic Config
@@ -472,6 +470,17 @@ function BillingContent() {
     () => packageCatalog.find((pkg) => pkg.name === activeOrg?.settings?.plan) || null,
     [activeOrg?.settings?.plan, packageCatalog]
   )
+  const usesCustomModules = activeOrg?.settings?.use_custom_modules === true
+  const currentEnabledModules = useMemo(
+    () => normalizeSaasEntitlementList(
+      usesCustomModules
+        ? (Array.isArray(activeOrg?.enabled_modules) ? activeOrg.enabled_modules : [])
+            .map((entry: any) => String(entry || '').trim())
+            .filter(Boolean)
+        : (currentPlanPackage?.modules || [])
+    ),
+    [activeOrg?.enabled_modules, currentPlanPackage?.modules, usesCustomModules]
+  )
   const corePackageOptions = useMemo(
     () => packageCatalog
       .filter((pkg) => pkg.is_active !== false && pkg.name !== 'Demo')
@@ -479,8 +488,8 @@ function BillingContent() {
     [packageCatalog]
   )
   const currentPlanArchitecture = useMemo(
-    () => currentPlanPackage ? getSaasPackageArchitecture(currentPlanPackage.modules || [], currentPlanPackage.addons || []) : null,
-    [currentPlanPackage]
+    () => currentEnabledModules.length > 0 ? getSaasPackageArchitecture(currentEnabledModules, []) : null,
+    [currentEnabledModules]
   )
   const activeAddonNames = useMemo(
     () => normalizeSaasEntitlementList(
@@ -489,14 +498,6 @@ function BillingContent() {
         .filter(Boolean)
     ),
     [activeOrg?.active_addons]
-  )
-  const enabledCapabilities = useMemo(
-    () => normalizeSaasEntitlementList([
-      ...(currentPlanPackage?.modules || []),
-      ...(currentPlanPackage?.addons || []),
-      ...activeAddonNames,
-    ]),
-    [activeAddonNames, currentPlanPackage?.addons, currentPlanPackage?.modules]
   )
   const activeAddonDetails = useMemo(
     () => activeAddonNames
@@ -516,30 +517,125 @@ function BillingContent() {
     }
     return null
   }, [inheritsPlanFromHolding, inheritedPlanNotice, selectedCheckoutItem])
-  const marketplaceSections = useMemo(() => ([
-    {
-      title: 'Module Marketplace',
-      description: 'Pilih modul vertikal untuk industri atau workflow bisnis tertentu.',
-      items: BILLING_MARKETPLACE_MODULES.map((addon) => ({
+  const quickAiTokenPackages = useMemo(
+    () => aiTokenPackages.slice(0, 3),
+    [aiTokenPackages]
+  )
+  const provisioningCorePackages = useMemo(() => ({
+    lite: corePackageOptions.find((pkg) => getSaasPackageArchitecture(pkg.modules || [], []).coreFamilyLevel === 'lite') || null,
+    starter: corePackageOptions.find((pkg) => getSaasPackageArchitecture(pkg.modules || [], []).coreFamilyLevel === 'starter') || null,
+    full: corePackageOptions.find((pkg) => getSaasPackageArchitecture(pkg.modules || [], []).coreFamilyLevel === 'full') || null,
+  }), [corePackageOptions])
+  const previewPackage = useMemo(() => {
+    if (selectedCheckoutItem?.type === 'PACKAGE') {
+      return packageCatalog.find((pkg) => String(pkg.id) === selectedCheckoutItem.id) || null
+    }
+    return currentPlanPackage
+  }, [currentPlanPackage, packageCatalog, selectedCheckoutItem])
+  const previewPackageModules = useMemo(
+    () => normalizeSaasEntitlementList(Array.isArray(previewPackage?.modules) ? previewPackage.modules : []),
+    [previewPackage]
+  )
+  const selectedMarketplaceKind = useMemo(() => {
+    if (selectedCheckoutItem?.type !== 'ADDON') return null
+    return getOperatorMarketplaceKind({ name: selectedCheckoutItem.name })
+  }, [selectedCheckoutItem])
+  const previewCoreFamilyLevel = useMemo(() => {
+    if (previewPackage) {
+      return getSaasPackageArchitecture(previewPackage.modules || [], []).coreFamilyLevel
+    }
+    return currentPlanArchitecture?.coreFamilyLevel || 'none'
+  }, [currentPlanArchitecture?.coreFamilyLevel, previewPackage])
+  const previewCoreFamily = previewCoreFamilyLevel === 'none' ? 'lite' : previewCoreFamilyLevel
+  const previewEnabledModules = useMemo(() => {
+    const baseModules =
+      selectedCheckoutItem?.type === 'PACKAGE'
+        ? previewPackageModules
+        : currentEnabledModules
+    const pendingModule =
+      selectedCheckoutItem?.type === 'ADDON' && selectedMarketplaceKind === 'module'
+        ? [selectedCheckoutItem.name]
+        : []
+
+    return normalizeSaasEntitlementList([
+      ...baseModules,
+      ...pendingModule,
+    ])
+  }, [
+    currentEnabledModules,
+    previewPackageModules,
+    selectedCheckoutItem,
+    selectedMarketplaceKind,
+  ])
+  const previewAddonNames = useMemo(() => {
+    const pendingAddon =
+      selectedCheckoutItem?.type === 'ADDON' && selectedMarketplaceKind !== 'module'
+        ? [selectedCheckoutItem.name]
+        : []
+
+    return normalizeSaasEntitlementList([
+      ...activeAddonNames,
+      ...pendingAddon,
+    ])
+  }, [activeAddonNames, selectedCheckoutItem, selectedMarketplaceKind])
+  const previewCapabilities = useMemo(() => normalizeSaasEntitlementList([
+    ...previewEnabledModules,
+    ...previewAddonNames,
+  ]), [previewAddonNames, previewEnabledModules])
+  const provisioningModuleOptions = useMemo(
+    () => getSaasProvisioningModulesForCoreFamily(previewCoreFamily),
+    [previewCoreFamily]
+  )
+  const focusedProvisioningModule = useMemo(
+    () => provisioningModuleOptions.find((option) => normalizeSaasEntitlementName(option.value) === normalizeSaasEntitlementName(provisioningFocusedModule || '')) || null,
+    [provisioningFocusedModule, provisioningModuleOptions]
+  )
+  const provisioningRelatedAddons = useMemo(() => {
+    if (!focusedProvisioningModule) return []
+
+    const relatedNames = getSaasRelatedAddonsForModule(
+      focusedProvisioningModule.value,
+      previewCoreFamily
+    ).map((option) => normalizeSaasEntitlementName(option.value))
+
+    return AVAILABLE_ADDONS
+      .filter((addon) => (
+        relatedNames.includes(normalizeSaasEntitlementName(addon.name)) &&
+        getOperatorMarketplaceKind(addon) !== 'module' &&
+        isAddonSelfServiceEnabled(addon)
+      ))
+      .map((addon) => ({
         ...addon,
         compatibility: getOperatorMarketplaceCompatibility(addon, {
-          coreFamilyLevel: currentPlanArchitecture?.coreFamilyLevel || 'none',
-          enabledCapabilities,
+          coreFamilyLevel: previewCoreFamily,
+          enabledCapabilities: previewCapabilities,
         }),
-      })),
-    },
-    {
-      title: 'Add-on Marketplace',
-      description: 'Aktifkan channel, capacity, atau fitur pelengkap di atas Core Family dan Module.',
-      items: BILLING_MARKETPLACE_ADDONS.map((addon) => ({
-        ...addon,
-        compatibility: getOperatorMarketplaceCompatibility(addon, {
-          coreFamilyLevel: currentPlanArchitecture?.coreFamilyLevel || 'none',
-          enabledCapabilities,
-        }),
-      })),
-    },
-  ]), [currentPlanArchitecture?.coreFamilyLevel, enabledCapabilities])
+      }))
+  }, [focusedProvisioningModule, previewCapabilities, previewCoreFamily])
+
+  useEffect(() => {
+    const nextFocusedModule =
+      provisioningModuleOptions.find((option) =>
+        previewEnabledModules.includes(normalizeSaasEntitlementName(option.value))
+      )?.value ||
+      provisioningModuleOptions[0]?.value ||
+      null
+
+    if (
+      provisioningFocusedModule &&
+      provisioningModuleOptions.some((option) => normalizeSaasEntitlementName(option.value) === normalizeSaasEntitlementName(provisioningFocusedModule))
+    ) {
+      return
+    }
+
+    if (nextFocusedModule !== provisioningFocusedModule) {
+      setProvisioningFocusedModule(nextFocusedModule)
+    }
+  }, [
+    previewEnabledModules,
+    provisioningFocusedModule,
+    provisioningModuleOptions,
+  ])
 
   if (loading) return <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest animate-pulse">Memuat Data Billing...</div>
 
@@ -784,10 +880,10 @@ function BillingContent() {
                    <div className="flex flex-wrap items-center gap-3">
                      <button
                        type="button"
-                       onClick={() => scrollToSection('core-packages')}
+                       onClick={() => scrollToSection('billing-provisioning')}
                        className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-black text-white transition hover:bg-slate-900 shadow-lg shadow-indigo-200"
                      >
-                       <ShieldCheck size={18} /> Pilih Paket Core
+                       <ShieldCheck size={18} /> Buka Provisioning
                      </button>
                      <button
                        type="button"
@@ -831,407 +927,423 @@ function BillingContent() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-        <div id="core-packages" className="rounded-[40px] border border-slate-100 bg-white p-6 md:p-8 shadow-xl shadow-slate-200/50">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-indigo-700">
-                <ShieldCheck size={12} /> 1. Pilih Paket Core
-              </div>
-              <div>
-                <h2 className="text-3xl font-black tracking-tighter text-slate-900">Pilih fondasi yang paling pas untuk bisnis Anda</h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Paket core dipilih dulu, lalu module dan add-on ditambahkan hanya bila memang dibutuhkan.
-                </p>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Paket Aktif Saat Ini</p>
-              <p className="mt-1 text-lg font-black tracking-tight text-slate-900">{activeOrg?.settings?.plan || 'Free'}</p>
-            </div>
+      <section id="billing-provisioning" className="rounded-[40px] border border-slate-100 bg-white p-6 md:p-8 shadow-xl shadow-slate-200/50">
+        <div className="flex flex-col gap-3 border-b border-slate-100 pb-6">
+          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-indigo-700">
+            <Layers3 size={12} /> Provisioning Builder
           </div>
-
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
-            {corePackageOptions.map((pkg) => {
-              const isCurrent = currentPlanPackage?.id === pkg.id
-              const isSelected = selectedCheckoutItem?.type === 'PACKAGE' && selectedCheckoutItem.id === pkg.id
-              const architecture = getSaasPackageArchitecture(pkg.modules || [], pkg.addons || [])
-              const previewCapabilities = [
-                ...architecture.liteCore,
-                ...architecture.starterCore,
-                ...architecture.fullCoreExtensions,
-              ].slice(0, 4)
-
-              return (
-                <div
-                  key={pkg.id}
-                  className={`rounded-[32px] border p-5 transition-all ${
-                    isSelected
-                      ? 'border-indigo-300 bg-indigo-50 shadow-lg shadow-indigo-100'
-                      : isCurrent
-                        ? 'border-emerald-200 bg-emerald-50'
-                        : 'border-slate-200 bg-white hover:-translate-y-1 hover:shadow-xl'
-                  }`}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
-                        {PLAN_UI_META[pkg.name]?.eyebrow || 'Paket Core'}
-                      </p>
-                      <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">{pkg.name}</h3>
-                      <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-600">
-                        {PLAN_UI_META[pkg.name]?.summary || 'Paket inti untuk mengelola proses bisnis utama.'}
-                      </p>
-                    </div>
-                    <div className="text-left md:text-right">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Harga</p>
-                      <p className="mt-1 text-2xl font-black tracking-tighter text-slate-900">{formatRupiah(Number(pkg.price || 0))}</p>
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">/{pkg.billing}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 space-y-3">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Arsitektur Core</p>
-                      <p className="mt-1 text-sm font-black text-slate-900">{architecture.bundleLabel}</p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      {previewCapabilities.map((capability) => (
-                        <div key={`${pkg.id}-${capability}`} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-600">
-                          {capability}
-                        </div>
-                      ))}
-                      {previewCapabilities.length === 0 && (
-                        <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-600">
-                          Platform Core
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-5 flex flex-wrap items-center gap-2">
-                    {isCurrent && (
-                      <div className="rounded-full border border-emerald-200 bg-emerald-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                        Paket Aktif
-                      </div>
-                    )}
-                    {isSelected && !isCurrent && (
-                      <div className="rounded-full border border-indigo-200 bg-indigo-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-indigo-700">
-                        Siap Checkout
-                      </div>
-                    )}
-                    {inheritsPlanFromHolding && (
-                      <div className="rounded-full border border-amber-200 bg-amber-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-amber-700">
-                        Kelola di Holding
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-5">
-                    <button
-                      type="button"
-                      disabled={processing || isCurrent || inheritsPlanFromHolding}
-                      onClick={() => {
-                        setSelectedCheckoutItem(buildPackageCheckoutItem(pkg))
-                        scrollToSection('billing-checkout')
-                      }}
-                      className={`w-full rounded-2xl px-5 py-3 text-xs font-black uppercase tracking-[0.18em] transition ${
-                        isCurrent
-                          ? 'cursor-default border border-emerald-200 bg-emerald-100 text-emerald-700'
-                          : inheritsPlanFromHolding
-                            ? 'cursor-not-allowed border border-amber-200 bg-amber-100 text-amber-700'
-                            : isSelected
-                              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
-                              : 'border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-900 hover:text-white'
-                      }`}
-                    >
-                      {isCurrent ? 'Paket Aktif' : inheritsPlanFromHolding ? 'Kelola di Holding' : isSelected ? 'Siap untuk Checkout' : 'Pilih Paket Ini'}
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
+          <div>
+            <h2 className="text-3xl font-black tracking-tighter text-slate-900">Flow yang sama seperti provisioning admin, tapi khusus untuk billing</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Pilih core untuk preview paket, fokuskan module, lalu pilih add-on yang memang kompatibel untuk dibeli lewat checkout.
+            </p>
           </div>
         </div>
 
-        <div id="billing-checkout" className="space-y-6 xl:sticky xl:top-24 self-start">
-          <div className="rounded-[32px] border border-slate-100 bg-slate-900 p-6 text-white shadow-xl shadow-slate-300/30">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-white/10 p-3">
-                <Layers3 size={20} className="text-indigo-200" />
-              </div>
+        <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.25fr_1.25fr_0.95fr]">
+          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-200">Alur Pembelian</p>
-                <h3 className="mt-1 text-xl font-black tracking-tight">Pilih, review, lalu checkout</h3>
+                <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">1. Core</h3>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">Preview paket core yang akan menjadi fondasi compatibility.</p>
               </div>
+              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">3 opsi</span>
             </div>
-            <div className="mt-5 space-y-3">
-              {[
-                'Pilih satu paket core, add-on, atau top up token yang ingin dibeli.',
-                'Review ringkasan item di panel ini sebelum invoice dibuat.',
-                'Buat invoice, transfer, lalu upload bukti pembayaran.',
-              ].map((step, index) => (
-                <div key={step} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                  <div className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-400/20 text-[10px] font-black text-indigo-100">
-                    {index + 1}
-                  </div>
-                  <p className="text-sm font-semibold leading-relaxed text-slate-100">{step}</p>
-                </div>
-              ))}
+            <div className="mt-4 space-y-3">
+              {(['lite', 'starter', 'full'] as const).map((coreFamily) => {
+                const pkg = provisioningCorePackages[coreFamily]
+                const isSelected = selectedCheckoutItem?.type === 'PACKAGE' && pkg && String(pkg.id) === selectedCheckoutItem.id
+                const isCurrentFamily = currentPlanArchitecture?.coreFamilyLevel === coreFamily
+
+                return (
+                  <button
+                    key={`billing-core-${coreFamily}`}
+                    type="button"
+                    disabled={!pkg || inheritsPlanFromHolding}
+                    onClick={() => {
+                      if (!pkg) return
+                      setSelectedCheckoutItem(buildPackageCheckoutItem(pkg))
+                      scrollToSection('billing-checkout')
+                    }}
+                    className={`w-full rounded-[24px] border px-4 py-4 text-left transition-all ${
+                      isSelected
+                        ? 'border-indigo-200 bg-indigo-50 shadow-sm'
+                        : isCurrentFamily
+                          ? 'border-emerald-200 bg-emerald-50'
+                          : 'border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50'
+                    } ${(!pkg || inheritsPlanFromHolding) ? 'cursor-not-allowed opacity-60' : ''}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-700">
+                          {getSaasCoreFamilyLabel(coreFamily)}
+                        </div>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                          {pkg ? pkg.name : 'Belum ada paket self-service'}
+                        </p>
+                      </div>
+                      {isSelected ? (
+                        <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                          Preview
+                        </span>
+                      ) : isCurrentFamily ? (
+                        <span className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                          Current
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 text-[10px] font-bold text-slate-400">
+                      {pkg ? `${formatRupiah(Number(pkg.price || 0))} / ${pkg.billing}` : 'Hubungi tim Nizam'}
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/50">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-700">
-                <ShoppingCart size={20} />
-              </div>
+          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">2. Review Checkout</p>
-                <h3 className="mt-1 text-xl font-black tracking-tight text-slate-900">Ringkasan item yang dipilih</h3>
+                <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">2. Modules</h3>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">Klik module untuk memfokuskan daftar add-on di kolom sebelah.</p>
               </div>
+              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                {provisioningModuleOptions.length} opsi
+              </span>
             </div>
+            <div className="mt-4 max-h-[26rem] space-y-3 overflow-y-auto pr-1">
+              {provisioningModuleOptions.map((option) => {
+                const normalizedValue = normalizeSaasEntitlementName(option.value)
+                const marketplaceModule = BILLING_MARKETPLACE_MODULES.find((addon) => normalizeSaasEntitlementName(addon.name) === normalizedValue) || null
+                const isFocused = focusedProvisioningModule ? normalizeSaasEntitlementName(focusedProvisioningModule.value) === normalizedValue : false
+                const isProvisioned = previewEnabledModules.includes(normalizedValue)
+                const isCurrentActive = currentEnabledModules.includes(normalizedValue)
+                const isSelected = selectedCheckoutItem?.type === 'ADDON' && normalizeSaasEntitlementName(selectedCheckoutItem.name) === normalizedValue
 
-            {selectedCheckoutItem ? (
-              <div className="mt-5 space-y-4">
-                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                return (
+                  <div
+                    key={`billing-provisioning-module-${option.value}`}
+                    className={`rounded-[24px] border px-4 py-4 transition-all ${
+                      isFocused
+                        ? 'border-indigo-300 bg-indigo-50/80 shadow-sm'
+                        : isProvisioned
+                          ? 'border-slate-300 bg-slate-50'
+                          : 'border-slate-200 bg-white hover:border-indigo-200'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setProvisioningFocusedModule(option.value)}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-[11px] font-black uppercase tracking-[0.1em] text-slate-700">
+                            {option.label}
+                          </div>
+                          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                            {option.description}
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
+                          {option.sectionTitle}
+                        </span>
+                      </div>
+                    </button>
+
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {isCurrentActive && (
+                        <span className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                          Active
+                        </span>
+                      )}
+                      {!isCurrentActive && isProvisioned && (
+                        <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                          Preview Core
+                        </span>
+                      )}
+                      {isSelected && (
+                        <span className="rounded-full border border-indigo-200 bg-indigo-100 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                          Dipilih
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        disabled={processing || isProvisioned || !marketplaceModule}
+                        onClick={() => {
+                          if (!marketplaceModule) return
+                          setSelectedCheckoutItem(buildAddonCheckoutItem(marketplaceModule))
+                          scrollToSection('billing-checkout')
+                        }}
+                        className={`w-full rounded-2xl px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] transition ${
+                          isProvisioned
+                            ? 'cursor-default border border-slate-200 bg-slate-100 text-slate-500'
+                            : !marketplaceModule
+                              ? 'cursor-not-allowed border border-slate-200 bg-slate-50 text-slate-400'
+                              : isSelected
+                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
+                                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-900 hover:text-white'
+                        }`}
+                      >
+                        {isProvisioned
+                          ? 'Sudah Termasuk'
+                          : !marketplaceModule
+                            ? 'Ikut Paket Core'
+                            : isSelected
+                              ? 'Siap untuk Checkout'
+                              : 'Pilih Module Ini'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">3. Add-ons</h3>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">Add-on mengikuti module yang sedang difokuskan dan rule compatibility billing.</p>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                {provisioningRelatedAddons.length} opsi
+              </span>
+            </div>
+            <div className="mt-4 max-h-[26rem] space-y-3 overflow-y-auto pr-1">
+              {focusedProvisioningModule ? (
+                provisioningRelatedAddons.map((addon) => {
+                  const isLocked = !addon.compatibility.isCompatible
+                  const isSelected = selectedCheckoutItem?.type === 'ADDON' && selectedCheckoutItem.id === addon.id
+                  const isActive = activeAddonNames.includes(normalizeSaasEntitlementName(addon.name))
+
+                  return (
+                    <div
+                      key={`billing-provisioning-addon-${addon.id}`}
+                      className={`rounded-[24px] border px-4 py-4 transition-all ${
+                        isActive
+                          ? 'border-emerald-200 bg-emerald-50/80'
+                          : isSelected
+                            ? 'border-indigo-200 bg-indigo-50 shadow-sm'
+                            : isLocked
+                              ? 'border-slate-200 bg-slate-50 opacity-80'
+                              : 'border-slate-200 bg-white hover:border-emerald-200'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-[11px] font-black uppercase tracking-[0.1em] text-slate-700">
+                            {addon.name}
+                          </div>
+                          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                            {addon.desc}
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-blue-700">
+                          {getOperatorMarketplaceLabel(addon)}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {isActive && (
+                          <span className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                            Sudah Aktif
+                          </span>
+                        )}
+                        {isSelected && !isActive && (
+                          <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                            Dipilih
+                          </span>
+                        )}
+                        {isLocked && (
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-amber-700">
+                            Locked
+                          </span>
+                        )}
+                      </div>
+
+                      <p className={`mt-3 text-[11px] font-semibold ${isLocked ? 'text-amber-700' : 'text-slate-500'}`}>
+                        {isLocked ? addon.compatibility.reason : 'Compatible dengan preview capability tenant saat ini.'}
+                      </p>
+
+                      <div className="mt-4 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Harga</p>
+                          <p className="mt-1 text-lg font-black text-slate-900">{formatRupiah(addon.price)}</p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={processing || isLocked || isActive}
+                          onClick={() => {
+                            setSelectedCheckoutItem(buildAddonCheckoutItem(addon))
+                            scrollToSection('billing-checkout')
+                          }}
+                          className={`rounded-2xl px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] transition ${
+                            isActive
+                              ? 'cursor-default border border-emerald-200 bg-emerald-100 text-emerald-700'
+                              : isSelected
+                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
+                                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-900 hover:text-white'
+                          }`}
+                        >
+                          {isActive ? 'Sudah Aktif' : isSelected ? 'Siap untuk Checkout' : 'Pilih Add-on'}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })
+              ) : (
+                <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
+                  Fokuskan satu module dulu untuk melihat add-on yang relevan di billing.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div id="billing-checkout" className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">4. Summary</h3>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">Ringkasan preview, target checkout, dan invoice action ada di sini.</p>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Live</span>
+            </div>
+            <div className="mt-4 space-y-3">
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Preview Core</div>
+                <div className="mt-1 text-sm font-black text-slate-900">{getSaasCoreFamilyLabel(previewCoreFamily)}</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Preview Plan</div>
+                <div className="mt-1 text-sm font-black text-slate-900">{previewPackage?.name || activeOrg?.settings?.plan || 'Belum Ada'}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Modules</div>
+                  <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">{previewEnabledModules.length}</div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Add-ons</div>
+                  <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">{previewAddonNames.length}</div>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-indigo-700">Checkout Target</div>
+                <p className="mt-1 text-[11px] font-semibold text-indigo-700">
+                  {selectedCheckoutItem ? `${selectedCheckoutItem.label}: ${selectedCheckoutItem.name}` : 'Belum ada item dipilih dari builder.'}
+                </p>
+              </div>
+              {selectedCheckoutItem ? (
+                <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="inline-flex rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-indigo-700">
                         {selectedCheckoutItem.label}
                       </div>
-                      <h4 className="mt-3 text-2xl font-black tracking-tight text-slate-900">{selectedCheckoutItem.name}</h4>
-                      <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-600">
+                      <h4 className="mt-3 text-lg font-black tracking-tight text-slate-900">{selectedCheckoutItem.name}</h4>
+                      <p className="mt-2 text-[11px] font-semibold leading-relaxed text-slate-600">
                         {selectedCheckoutItem.description}
                       </p>
                     </div>
-                    <div className="text-left md:text-right">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Harga</p>
-                      <p className="mt-1 text-3xl font-black tracking-tighter text-slate-900">{formatRupiah(selectedCheckoutItem.price)}</p>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">/{selectedCheckoutItem.billing}</p>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Harga</p>
+                      <p className="mt-1 text-xl font-black tracking-tight text-slate-900">{formatRupiah(selectedCheckoutItem.price)}</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">/{selectedCheckoutItem.billing}</p>
                     </div>
                   </div>
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Catatan Aktivasi</p>
+                    <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-600">{selectedCheckoutItem.note}</p>
+                  </div>
                 </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Catatan Aktivasi</p>
-                  <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-600">{selectedCheckoutItem.note}</p>
-                </div>
-
-                {selectedCheckoutDisabledReason && (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-relaxed text-amber-900">
-                    {selectedCheckoutDisabledReason}
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  disabled={processing || Boolean(selectedCheckoutDisabledReason) || !activeOrg}
-                  onClick={() => activeOrg && handleBuyItem(activeOrg, selectedCheckoutItem)}
-                  className="w-full rounded-[28px] bg-slate-900 px-6 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-white transition hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {processing ? 'Membuat Invoice...' : 'Buat Invoice & Lanjut Checkout'}
-                </button>
-
-                <p className="text-[11px] font-semibold leading-relaxed text-slate-500">
-                  Jika item yang sama masih punya invoice `UNPAID`, sistem akan memakai invoice yang sudah ada agar user tidak bingung dengan tagihan ganda.
-                </p>
-              </div>
-            ) : (
-              <div className="mt-5 rounded-[28px] border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Belum Ada Item Dipilih</p>
-                <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-600">
-                  Pilih paket core, add-on, atau top up token terlebih dahulu. Ringkasan checkout akan langsung muncul di panel ini.
-                </p>
-              </div>
-            )}
-
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Invoice UNPAID</p>
-                <p className="mt-1 text-2xl font-black tracking-tighter text-slate-900">{unpaidInvoiceCount}</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Metode Bayar</p>
-                <p className="mt-1 text-sm font-black tracking-tight text-slate-900">Transfer Manual</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Growth Layer Marketplace */}
-      <section className="space-y-8">
-        <div className="text-center space-y-3">
-           <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-100">
-             <Layers3 size={12} /> 2. Module & Add-on Tambahan
-           </div>
-           <h2 className="text-4xl font-black text-slate-900 tracking-tighter">Tambahkan hanya yang benar-benar dibutuhkan</h2>
-           <p className="text-slate-400 font-bold">Setelah core siap, user bisa memilih module vertikal atau add-on tertentu tanpa merasa dipaksa membeli semuanya.</p>
-        </div>
-
-        {marketplaceSections.map((section) => (
-          <div key={section.title} className="space-y-4">
-            <div className="space-y-1">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{section.title}</p>
-              <p className="text-sm font-semibold text-slate-500">{section.description}</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {section.items.map((addon) => {
-                const isLocked = !addon.compatibility.isCompatible
-                const isSelected = selectedCheckoutItem?.type === 'ADDON' && selectedCheckoutItem.id === addon.id
-                const isActive = activeAddonNames.includes(normalizeSaasEntitlementName(addon.name))
-                return (
-                <div
-                  key={addon.id}
-                  className={`rounded-[32px] border p-6 flex flex-col transition-all ${
-                    isActive
-                      ? 'bg-emerald-50 border-emerald-200'
-                      : isSelected
-                        ? 'bg-indigo-50 border-indigo-200 shadow-lg shadow-indigo-100'
-                      : isLocked
-                      ? 'bg-slate-50 border-slate-200 opacity-80'
-                      : 'bg-white border-slate-100 hover:-translate-y-2 hover:shadow-2xl hover:border-indigo-100 group'
-                  }`}
-                >
-                  <div className={`w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center mb-6 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner`}>
-                    <addon.icon size={28} />
-                  </div>
-                  <div className="mb-2 flex items-center gap-2">
-                    <h3 className="text-xl font-black text-slate-900 tracking-tight">{addon.name}</h3>
-                    <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-blue-700">
-                      {getOperatorMarketplaceLabel(addon)}
-                    </span>
-                  </div>
-                  <p className="text-xs font-bold text-slate-500 leading-relaxed mb-6">
-                    {addon.desc}
+              ) : (
+                <div className="rounded-[24px] border border-dashed border-slate-200 bg-white px-4 py-6 text-center">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Belum Ada Item Dipilih</p>
+                  <p className="mt-2 text-[11px] font-semibold leading-relaxed text-slate-600">
+                    Pilih core, module, add-on, atau paket token dari builder supaya checkout target muncul di sini.
                   </p>
-                  <div className="mb-4 flex flex-wrap gap-2">
-                    <span className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-indigo-700">
-                      Min. {getSaasCoreFamilyLabel(getOperatorMarketplaceMinCoreFamily(addon))}
-                    </span>
-                    {isActive && (
-                      <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                        Sudah Aktif
-                      </span>
-                    )}
-                    {isSelected && !isActive && (
-                      <span className="rounded-full border border-indigo-200 bg-indigo-100 px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-indigo-700">
-                        Dipilih
-                      </span>
-                    )}
-                    {isLocked && (
-                      <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-amber-700">
-                        Locked
-                      </span>
-                    )}
-                  </div>
-                  {isLocked && addon.compatibility.reason && (
-                    <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-800">
-                      <div className="flex items-start gap-2">
-                        <AlertCircle size={14} className="mt-0.5 shrink-0" />
-                        <span>{addon.compatibility.reason}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-3 mb-8 flex-1">
-                    {addon.benefits.map((b, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
-                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">{b}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="pt-6 border-t border-slate-50">
-                     <div className="flex items-baseline justify-between mb-4">
-                        <p className="text-xl font-black text-slate-900">{formatRupiah(addon.price)}</p>
-                        <p className="text-[10px] font-bold text-slate-400">/{addon.billing}</p>
-                     </div>
-                     <button
-                      disabled={processing || isLocked || isActive}
-                      onClick={() => {
-                        setSelectedCheckoutItem(buildAddonCheckoutItem(addon))
-                        scrollToSection('billing-checkout')
-                      }}
-                      className={`w-full rounded-xl py-3 text-xs font-black uppercase tracking-widest transition-all shadow-sm disabled:cursor-not-allowed disabled:opacity-50 ${
-                        isActive
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : isSelected
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-900 hover:text-white group-hover:bg-indigo-600 group-hover:text-white'
-                      }`}
-                     >
-                       {isActive ? 'Sudah Aktif' : isLocked ? 'Belum Kompatibel' : isSelected ? 'Siap untuk Checkout' : `Pilih ${getOperatorMarketplaceLabel(addon)}`}
-                     </button>
-                  </div>
                 </div>
-              )})}
-            </div>
-          </div>
-        ))}
-      </section>
-
-      {/* AI Token Topup */}
-      <section id="ai-token" className="space-y-8">
-        <div className="flex flex-col gap-3 text-center">
-          <div className="inline-flex items-center justify-center gap-2 px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-100 mx-auto">
-            <Coins size={12} /> 3. Top Up Token AI
-          </div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tighter">Top Up Token AI</h2>
-          <p className="text-slate-500 font-bold">Saldo token digunakan untuk generator AI seperti Sales Page. Saat habis, Anda bisa top up kapan saja.</p>
-        </div>
-
-        <div className="bg-white rounded-[36px] border border-slate-100 p-6 md:p-8 shadow-lg">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Saldo Token AI Saat Ini</p>
-              <p className="mt-2 text-4xl font-black tracking-tighter text-slate-900">{aiTokenBalance.toLocaleString('id-ID')}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Estimasi Generate</p>
-              <p className="mt-1 text-lg font-black text-slate-900">{Math.floor(aiTokenBalance / 4000).toLocaleString('id-ID')}x generate</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {aiTokenPackages.map((pkg: any) => {
-            const isSelected = selectedCheckoutItem?.type === 'AI_TOKEN_TOPUP' && selectedCheckoutItem.id === pkg.id
-            return (
-            <div key={pkg.id} className={`rounded-[32px] border p-6 flex flex-col transition-all hover:-translate-y-1 hover:shadow-xl ${isSelected ? 'border-indigo-200 bg-indigo-50 shadow-lg shadow-indigo-100' : 'border-slate-100 bg-white'}`}>
-              <div className="flex items-center justify-between">
-                <div className="px-3 py-1 rounded-xl bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-widest border border-indigo-100">
-                  {pkg.name}
+              )}
+              {selectedCheckoutDisabledReason && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-semibold leading-relaxed text-amber-900">
+                  {selectedCheckoutDisabledReason}
                 </div>
-                <Coins size={18} className="text-indigo-400" />
+              )}
+              <button
+                type="button"
+                disabled={processing || Boolean(selectedCheckoutDisabledReason) || !activeOrg || !selectedCheckoutItem}
+                onClick={() => activeOrg && selectedCheckoutItem && handleBuyItem(activeOrg, selectedCheckoutItem)}
+                className="w-full rounded-[24px] bg-slate-900 px-5 py-4 text-[11px] font-black uppercase tracking-[0.18em] text-white transition hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {processing ? 'Membuat Invoice...' : selectedCheckoutItem ? 'Buat Invoice & Lanjut Checkout' : 'Pilih Item Dulu'}
+              </button>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Invoice UNPAID</div>
+                  <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">{unpaidInvoiceCount}</div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Metode Bayar</div>
+                  <div className="mt-1 text-sm font-black tracking-tight text-slate-900">Transfer Manual</div>
+                </div>
               </div>
-              <p className="mt-4 text-4xl font-black tracking-tighter text-slate-900">{Number(pkg.tokens || 0).toLocaleString('id-ID')}</p>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Token</p>
-              <p className="mt-4 text-xs font-bold text-slate-500 leading-relaxed">{pkg.description || 'Tambahan saldo token AI untuk kebutuhan generate konten.'}</p>
-              <div className="mt-6 pt-5 border-t border-slate-100 flex items-end justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Harga</p>
-                  <p className="text-xl font-black text-slate-900">{formatRupiah(Number(pkg.price_idr || 0))}</p>
+              <div id="ai-token" className="rounded-[24px] border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">AI Token Quick Top Up</p>
+                    <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                      Saldo saat ini {aiTokenBalance.toLocaleString('id-ID')} token. Estimasi {Math.floor(aiTokenBalance / 4000).toLocaleString('id-ID')}x generate.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                    3 Paket
+                  </span>
                 </div>
-                <button
-                  disabled={processing || !activeOrg}
-                  onClick={() => {
-                    setSelectedCheckoutItem(buildAiTokenCheckoutItem(pkg))
-                    scrollToSection('billing-checkout')
-                  }}
-                  className={`px-5 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all disabled:opacity-50 ${
-                    isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-white hover:bg-indigo-600'
-                  }`}
-                >
-                  {isSelected ? 'Siap untuk Checkout' : 'Pilih Paket Token'}
-                </button>
+                <div className="mt-4 space-y-2">
+                  {quickAiTokenPackages.map((pkg: any) => {
+                    const isSelected = selectedCheckoutItem?.type === 'AI_TOKEN_TOPUP' && selectedCheckoutItem.id === pkg.id
+                    return (
+                      <button
+                        key={`quick-ai-${pkg.id}`}
+                        type="button"
+                        disabled={processing || !activeOrg}
+                        onClick={() => setSelectedCheckoutItem(buildAiTokenCheckoutItem(pkg))}
+                        className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left transition ${
+                          isSelected
+                            ? 'border-indigo-200 bg-indigo-50'
+                            : 'border-slate-200 bg-slate-50 hover:border-indigo-200 hover:bg-white'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-700">{pkg.name}</div>
+                          <div className="mt-1 text-[11px] font-semibold text-slate-500">
+                            {Number(pkg.tokens || 0).toLocaleString('id-ID')} token
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-black text-slate-900">{formatRupiah(Number(pkg.price_idr || 0))}</div>
+                          <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+                            {isSelected ? 'Dipilih' : 'Pilih'}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
+              {inheritsPlanFromHolding && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-700">Holding Rule</div>
+                  <p className="mt-1 text-[11px] font-semibold text-amber-800">
+                    Core package tetap mengikuti organisasi induk. Builder billing masih bisa dipakai untuk melihat compatibility dan add-on yang diizinkan.
+                  </p>
+                </div>
+              )}
             </div>
-          )})}
+          </div>
         </div>
       </section>
 

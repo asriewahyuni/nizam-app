@@ -85,7 +85,7 @@ function getActiveAddonName(entry: unknown) {
 async function getOrganizationMarketplaceContext(db: any, orgId: string) {
   const { data: org, error: orgError } = await db
     .from('organizations')
-    .select('settings, active_addons')
+    .select('settings, active_addons, enabled_modules')
     .eq('id', orgId)
     .maybeSingle()
 
@@ -99,12 +99,17 @@ async function getOrganizationMarketplaceContext(db: any, orgId: string) {
       .map((entry: unknown) => getActiveAddonName(entry))
       .filter(Boolean)
   )
+  const useCustomModules = (org as any)?.settings?.use_custom_modules === true
+  const customEnabledModules = normalizeSaasEntitlementList(toStringArray((org as any)?.enabled_modules))
 
   if (!planName) {
     return {
       planName: '',
       coreFamilyLevel: 'none' as const,
-      enabledCapabilities: activeAddonNames,
+      enabledCapabilities: normalizeSaasEntitlementList([
+        ...(useCustomModules ? customEnabledModules : []),
+        ...activeAddonNames,
+      ]),
       activeAddonNames,
     }
   }
@@ -125,15 +130,14 @@ async function getOrganizationMarketplaceContext(db: any, orgId: string) {
   }
 
   const packageModules = normalizeSaasEntitlementList(toStringArray((pkg as any).modules))
-  const packageAddons = normalizeSaasEntitlementList(toStringArray((pkg as any).addons))
-  const architecture = getSaasPackageArchitecture(packageModules, packageAddons)
+  const effectiveModules = useCustomModules ? customEnabledModules : packageModules
+  const architecture = getSaasPackageArchitecture(effectiveModules, [])
 
   return {
     planName,
     coreFamilyLevel: architecture.coreFamilyLevel,
     enabledCapabilities: normalizeSaasEntitlementList([
-      ...packageModules,
-      ...packageAddons,
+      ...effectiveModules,
       ...activeAddonNames,
     ]),
     activeAddonNames,

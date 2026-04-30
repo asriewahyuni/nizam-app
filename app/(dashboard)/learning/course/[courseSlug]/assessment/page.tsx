@@ -27,7 +27,7 @@ import {
   getTrainingCourseBySlug,
   getTrainingLessonsForCourse,
 } from '@/modules/edu/lib/training-center-mvp'
-import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
+import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
 
 function formatAssessmentDate(dateLike: string) {
   if (!dateLike) return '-'
@@ -90,7 +90,8 @@ export default async function LearningCourseAssessmentPage(props: {
 
   const firstLesson = getTrainingLessonsForCourse(course.slug)[0] || null
   const searchParams = await props.searchParams
-  const canManageAssessment = hasRolePermission(orgData.role, orgData.permissions, 'learning:write')
+  const assessorContext = await getSaasAssessorContext({ email: orgData.user?.email })
+  const canManageAssessment = assessorContext.hasAccess
   if (!canManageAssessment) {
     return redirect(`/learning/course/${course.slug}/assessment/participant`)
   }
@@ -805,13 +806,13 @@ export default async function LearningCourseAssessmentPage(props: {
                 <ArrowRight className="h-4 w-4" />
               </button>
               <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600">
-                Assessor aktif: {String(orgData.user?.user_metadata?.full_name || orgData.user?.email || 'Tidak diketahui')}
+                Assessor aktif: {assessorContext.email || 'Tidak diketahui'}
               </div>
             </div>
           </form>
         ) : (
           <div className="mt-6 rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-bold text-slate-600">
-            Hanya user dengan akses `learning:write` yang dapat mengirim asesmen online. Peserta biasa tetap bisa membaca rubrik dan kriteria penilaian di halaman ini.
+            Hanya member SaaS yang diberi mandat assessor yang dapat mengirim asesmen online. Peserta tenant tetap bisa membaca rubrik dan kriteria penilaian di halaman ini.
           </div>
         )}
       </section>

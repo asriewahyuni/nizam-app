@@ -33,17 +33,37 @@ import {
 import { PageHeader, SectionCard, SectionHeader, SafeButton, StatusBadge, ConfirmDialog } from '@/components/ui/NizamUI'
 import { createClient } from '@/lib/supabase/client'
 import { deleteInactiveTenantByPlatformAdmin, signInAsTenantOwner } from '@/modules/auth/actions/auth.actions'
+import {
+  addSaasAssessor,
+  deleteSaasAssessor,
+  getSaasAssessorAdminSnapshot,
+  setSaasAssessorActive,
+  type SaasAssessorRecord,
+} from '@/modules/saas/actions/assessor.actions'
 import { Organization } from '@/types/database.types'
 import Link from 'next/link'
 import { UserActivityMonitor } from '@/components/admin/UserActivityMonitor'
 import {
+  type SaasCoreFamily,
+  type SaasCoreFamilyLevel,
   SAAS_ADDON_ITEMS,
   SAAS_FULL_CORE_EXTENSION_ITEMS,
+  SAAS_MODULE_COMPATIBILITY_OPTIONS,
   SAAS_PACKAGE_EDITOR_SECTIONS,
   SAAS_STARTER_CORE_ITEMS,
   SAAS_VERTICAL_MODULE_ITEMS,
+  getSaasAddonCompatibilityOption,
   getSaasCapabilityDisplayLabel,
+  getSaasCapabilityKind,
+  getSaasCoreFamilyLabel,
   getSaasPackageArchitecture,
+  getSaasProvisioningModulesForCoreFamily,
+  getSaasRelatedAddonsForModule,
+  getSaasCoreFamilyRank,
+  isSaasAddonCompatible,
+  normalizeSaasEntitlementList,
+  normalizeSaasEntitlementName,
+  saasCoreFamilySatisfies,
   saasModuleMatches,
 } from '@/lib/saas/module-catalog'
 import {
@@ -109,7 +129,145 @@ function buildPlanExpiryIso(durationDays: number | null | undefined): string | n
   return expiresAt.toISOString()
 }
 
-type Tab = 'users' | 'packages' | 'invoices' | 'settings' | 'ai_tokens' | 'activity'
+type SaasActiveAddonEntry = Record<string, unknown> & {
+  id?: string
+  name: string
+  activated_at?: string
+  source?: string
+}
+
+const SAAS_TENANT_ENTITLEMENT_SECTIONS = [
+  {
+    key: 'starter_core_upsell',
+    title: 'Upsell Starter Core',
+    description: 'Capability operasional yang bisa ditambahkan di atas Lite Core.',
+    items: SAAS_STARTER_CORE_ITEMS,
+  },
+  {
+    key: 'full_core_upsell',
+    title: 'Upsell Full Core',
+    description: 'Capability lanjutan seperti HRIS, Manufacturing, dan Audit.',
+    items: SAAS_FULL_CORE_EXTENSION_ITEMS,
+  },
+  {
+    key: 'vertical_modules',
+    title: 'Vertical Modules',
+    description: 'Module industri atau workflow spesifik yang bisa diaktifkan per tenant.',
+    items: SAAS_VERTICAL_MODULE_ITEMS,
+  },
+  {
+    key: 'addons',
+    title: 'Add-ons',
+    description: 'Ekspansi tambahan seperti WMS, API, sales page, dan capacity pack.',
+    items: SAAS_ADDON_ITEMS,
+  },
+] as const
+
+function toCapabilityArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return normalizeSaasEntitlementList(
+      value
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+    )
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return []
+
+    try {
+      const parsed = JSON.parse(trimmed) as unknown
+      if (Array.isArray(parsed)) {
+        return normalizeSaasEntitlementList(
+          parsed
+            .map((item) => String(item || '').trim())
+            .filter(Boolean)
+        )
+      }
+    } catch {
+      return normalizeSaasEntitlementList(
+        trimmed
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean)
+      )
+    }
+  }
+
+  return []
+}
+
+function normalizeActiveAddonEntries(value: unknown): SaasActiveAddonEntry[] {
+  if (!Array.isArray(value)) return []
+
+  const output: SaasActiveAddonEntry[] = []
+  const seen = new Set<string>()
+
+  value.forEach((entry, index) => {
+    let sourceEntry: Record<string, unknown> | null = null
+    if (typeof entry === 'string') {
+      sourceEntry = { name: entry }
+    } else if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+      sourceEntry = entry as Record<string, unknown>
+    }
+
+    const normalizedName = normalizeSaasEntitlementName(String(sourceEntry?.name || ''))
+    if (!normalizedName || seen.has(normalizedName)) return
+
+    seen.add(normalizedName)
+    output.push({
+      ...sourceEntry,
+      id: String(sourceEntry?.id || `legacy-addon-${index}`),
+      name: normalizedName,
+      activated_at: typeof sourceEntry?.activated_at === 'string' ? sourceEntry.activated_at : undefined,
+      source: typeof sourceEntry?.source === 'string' ? sourceEntry.source : undefined,
+    })
+  })
+
+  return output
+}
+
+function buildActiveAddonPayload(
+  selectedNames: readonly string[],
+  currentEntries: unknown,
+  source: string
+): SaasActiveAddonEntry[] {
+  const existingEntries = normalizeActiveAddonEntries(currentEntries)
+  const existingByName = new Map(existingEntries.map((entry) => [entry.name, entry]))
+
+  return normalizeSaasEntitlementList([...selectedNames]).map((name, index) => {
+    const existing = existingByName.get(name)
+    return {
+      ...(existing || {}),
+      id: String(existing?.id || `${source}:${name}:${index}`),
+      name,
+      activated_at: existing?.activated_at || new Date().toISOString(),
+      source: existing?.source || source,
+    }
+  })
+}
+
+function buildPackageLimitPayload(pkg: any) {
+  return {
+    max_orgs: typeof pkg?.max_orgs === 'number' ? pkg.max_orgs : 1,
+    max_warehouses: typeof pkg?.max_warehouses === 'number' ? pkg.max_warehouses : 1,
+    max_branches: pkg?.max_branches == null || pkg?.max_branches === '' ? null : Number(pkg.max_branches),
+    max_child_orgs: pkg?.max_child_orgs == null || pkg?.max_child_orgs === '' ? null : Number(pkg.max_child_orgs),
+    max_users: pkg?.max_users == null || pkg?.max_users === '' ? null : Number(pkg.max_users),
+  }
+}
+
+type Tab =
+  | 'users'
+  | 'module_management'
+  | 'addon_management'
+  | 'packages'
+  | 'invoices'
+  | 'settings'
+  | 'ai_tokens'
+  | 'activity'
+  | 'assessors'
 
 export default function SaaSAdminPage() {
   const db = supabase as any
@@ -128,6 +286,9 @@ export default function SaaSAdminPage() {
     totalUsed: 0,
   })
   const [aiTopupModal, setAiTopupModal] = useState<{ open: boolean; editData: any | null }>({ open: false, editData: null })
+  const [assessors, setAssessors] = useState<SaasAssessorRecord[]>([])
+  const [loadingAssessors, setLoadingAssessors] = useState(true)
+  const [assessorPending, startAssessorTransition] = useTransition()
 
   const aiPolicy = normalizeAiTokenPolicy(aiTokenPolicyRaw)
   const aiHppPerGenerate = calculateAiHppPerGeneration(aiPolicy)
@@ -183,6 +344,21 @@ export default function SaaSAdminPage() {
   // ======== MODALS STATE ========
   const [pkgModal, setPkgModal] = useState<{ open: boolean; editData: any | null }>({ open: false, editData: null })
   const [orgModal, setOrgModal] = useState<{ open: boolean; editData: any | null }>({ open: false, editData: null })
+  const [entitlementModal, setEntitlementModal] = useState<{
+    open: boolean
+    org: Organization | null
+    selectedPlan: string
+    selectedModules: string[]
+    selectedAddons: string[]
+  }>({
+    open: false,
+    org: null,
+    selectedPlan: '',
+    selectedModules: [],
+    selectedAddons: [],
+  })
+  const [entitlementViewMode, setEntitlementViewMode] = useState<'all' | 'modules' | 'addons'>('all')
+  const [entitlementFocusedModule, setEntitlementFocusedModule] = useState<string | null>(null)
   
   const [confirmState, setConfirmState] = useState<{ open: boolean, title: string, message: string, action: () => Promise<void> }>({
     open: false, title: '', message: '', action: async () => {}
@@ -194,7 +370,98 @@ export default function SaaSAdminPage() {
 
   // State local untuk helper set date di modal org
   const [modalExpireDate, setModalExpireDate] = useState('')
+  const [savingEntitlements, startEntitlementTransition] = useTransition()
   
+  const getOrgSettings = (org: Organization | null | undefined) => (
+    org?.settings && typeof org.settings === 'object' && !Array.isArray(org.settings)
+      ? org.settings as Record<string, unknown>
+      : {}
+  )
+
+  const getOrgCustomEnabledModules = (org: Organization | null | undefined) =>
+    toCapabilityArray((org as any)?.enabled_modules)
+
+  const isOrgUsingCustomModules = (org: Organization | null | undefined) =>
+    getOrgSettings(org).use_custom_modules === true
+
+  const resolveManagedModulesForOrg = (
+    org: Organization | null | undefined,
+    packageModules: string[]
+  ) => {
+    if (isOrgUsingCustomModules(org)) {
+      return getOrgCustomEnabledModules(org)
+    }
+
+    return packageModules
+  }
+
+  const resolvePackageCoreFamily = (pkg: any): SaasCoreFamilyLevel => {
+    if (!pkg) return 'none'
+    return getSaasPackageArchitecture(toCapabilityArray(pkg.modules), []).coreFamilyLevel
+  }
+
+  const getCoreFamilyFromRank = (rank: number): SaasCoreFamily => {
+    if (rank >= 3) return 'full'
+    if (rank >= 2) return 'starter'
+    return 'lite'
+  }
+
+  const deriveCoreFamilyFromModules = (
+    modulesRaw: readonly string[],
+    fallbackCoreFamily: SaasCoreFamily = 'lite'
+  ): SaasCoreFamily => {
+    const highestRequiredRank = normalizeSaasEntitlementList([...modulesRaw]).reduce((currentHighest, capability) => {
+      const matchedOption = SAAS_MODULE_COMPATIBILITY_OPTIONS.find((option) => saasModuleMatches(option.value, capability))
+      if (!matchedOption) return currentHighest
+      return Math.max(currentHighest, getSaasCoreFamilyRank(matchedOption.requiredCoreFamily))
+    }, 0)
+
+    if (highestRequiredRank === 0) return fallbackCoreFamily
+    return getCoreFamilyFromRank(highestRequiredRank)
+  }
+
+  const sanitizeModuleSelectionForCoreFamily = (
+    modulesRaw: readonly string[],
+    coreFamily: SaasCoreFamily
+  ) => {
+    return normalizeSaasEntitlementList([...modulesRaw]).filter((capability) => {
+      const normalizedCapability = normalizeSaasEntitlementName(capability)
+      const matchedOption = SAAS_MODULE_COMPATIBILITY_OPTIONS.find((option) => saasModuleMatches(option.value, normalizedCapability))
+
+      if (matchedOption) {
+        return saasCoreFamilySatisfies(coreFamily, matchedOption.requiredCoreFamily)
+      }
+
+      const capabilityKind = getSaasCapabilityKind(normalizedCapability)
+      return capabilityKind === 'platform_core' || capabilityKind === 'unclassified'
+    })
+  }
+
+  const sanitizeAddonSelectionForCompatibility = (
+    addonsRaw: readonly string[],
+    modulesRaw: readonly string[],
+    coreFamily: SaasCoreFamily
+  ) => {
+    const normalizedAddons = normalizeSaasEntitlementList([...addonsRaw])
+    const normalizedModules = normalizeSaasEntitlementList([...modulesRaw])
+
+    return normalizedAddons.filter((capability) => {
+      const addonRule = getSaasAddonCompatibilityOption(capability)
+      if (!addonRule) return true
+
+      return isSaasAddonCompatible(addonRule.value, normalizedModules, coreFamily, normalizedAddons)
+    })
+  }
+
+  const findPreferredPackageForCoreFamily = (
+    coreFamily: SaasCoreFamily,
+    preferredPlanName?: string
+  ) => {
+    const candidates = packages.filter((pkg) => resolvePackageCoreFamily(pkg) === coreFamily)
+    if (candidates.length === 0) return null
+    return candidates.find((pkg) => pkg.name === preferredPlanName) || candidates[0] || null
+  }
+
 
   const fetchOrganizations = async () => {
     try {
@@ -274,6 +541,64 @@ export default function SaaSAdminPage() {
     )
 
     setAiWalletSummary(summary)
+  }
+
+  const fetchAssessors = async () => {
+    setLoadingAssessors(true)
+    const snapshot = await getSaasAssessorAdminSnapshot()
+    if (snapshot.error) {
+      alert(snapshot.error)
+      setAssessors([])
+    } else {
+      setAssessors(snapshot.assessors)
+    }
+    setLoadingAssessors(false)
+  }
+
+  const saveAssessorForm = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const form = e.currentTarget
+    const formData = new FormData(form)
+
+    startAssessorTransition(async () => {
+      const result = await addSaasAssessor(formData)
+      if (result.error) {
+        alert(result.error)
+        return
+      }
+
+      form.reset()
+      await fetchAssessors()
+    })
+  }
+
+  const toggleAssessorStatus = (id: string, currentStatus: boolean) => {
+    startAssessorTransition(async () => {
+      const result = await setSaasAssessorActive(id, !currentStatus)
+      if (result.error) {
+        alert(result.error)
+        return
+      }
+
+      await fetchAssessors()
+    })
+  }
+
+  const handleDeleteAssessor = (id: string, email: string) => {
+    setConfirmState({
+      open: true,
+      title: 'Hapus Assessor?',
+      message: `Akses assessor ${email} akan dicabut dari panel SaaS. Lanjutkan?`,
+      action: async () => {
+        const result = await deleteSaasAssessor(id)
+        if (result.error) {
+          alert(result.error)
+        } else {
+          await fetchAssessors()
+        }
+        setConfirmState(prev => ({ ...prev, open: false }))
+      },
+    })
   }
 
   const saveAiTokenConfig = async () => {
@@ -458,15 +783,17 @@ export default function SaaSAdminPage() {
         .single()
       if (orgLookupError) return alert('Gagal membaca data organisasi: ' + orgLookupError.message)
 
+      const normalizedAddonName = normalizeSaasEntitlementName(String(invoice.item_name || ''))
+      if (!normalizedAddonName) return alert('Nama add-on pada invoice tidak valid.')
+
       const currentAddons = Array.isArray(org?.active_addons) ? org.active_addons : []
-      const newAddon = {
-        id: invoice.id, // linked to invoice
-        name: invoice.item_name,
-        activated_at: new Date().toISOString()
-      }
-      
+      const mergedAddonNames = normalizeSaasEntitlementList([
+        ...normalizeActiveAddonEntries(currentAddons).map((entry) => entry.name),
+        normalizedAddonName,
+      ])
+
       const { error: addonErr } = await db.from('organizations').update({
-        active_addons: [...currentAddons, newAddon]
+        active_addons: buildActiveAddonPayload(mergedAddonNames, currentAddons, 'billing_manual_approval')
       }).eq('id', invoice.org_id)
       
       if (addonErr) return alert('Gagal aktivasi add-on: ' + addonErr.message)
@@ -493,10 +820,7 @@ export default function SaaSAdminPage() {
           updated_at: new Date().toISOString()
         },
         subscription_end: expiresAt,
-        package_limit: {
-          max_orgs: pkg?.max_orgs || 1,
-          max_warehouses: pkg?.max_warehouses || 1
-        }
+        package_limit: buildPackageLimitPayload(pkg)
       }).eq('id', invoice.org_id)
 
       if (orgErr) return alert('Gagal update plan organisasi: ' + orgErr.message)
@@ -532,6 +856,7 @@ export default function SaaSAdminPage() {
     fetchPackages()
     fetchInvoices()
     fetchAiTokenData()
+    fetchAssessors()
   }, [])
 
   const togglePackageStatus = async (pkgId: string, currentStatus: boolean) => {
@@ -607,6 +932,8 @@ export default function SaaSAdminPage() {
     e.preventDefault()
     try {
       const fd = new FormData(e.currentTarget)
+      const selectedPlanName = String(fd.get('plan') || '').trim()
+      const selectedPackage = packages.find((pkg) => pkg.name === selectedPlanName) || null
       const expiresVal = fd.get('expires_at') as string
       const existingExpiry = resolveOrganizationExpiryDate(orgModal.editData as OrganizationExpirySource)
       const expiresAt = expiresVal
@@ -625,9 +952,12 @@ export default function SaaSAdminPage() {
          is_demo: fd.get('is_demo') === 'on',
          owner_email: fd.get('owner_email'),
          subscription_end: expiresAt,
+         package_limit: selectedPackage
+           ? buildPackageLimitPayload(selectedPackage)
+           : (orgModal.editData as any)?.package_limit || null,
          settings: {
             ...currentSettings,
-            plan: fd.get('plan'),
+            plan: selectedPlanName,
             expires_at: expiresAt,
          }
       }
@@ -679,12 +1009,340 @@ export default function SaaSAdminPage() {
      })
   }
 
+  const resetEntitlementModal = () => {
+    setEntitlementModal({ open: false, org: null, selectedPlan: '', selectedModules: [], selectedAddons: [] })
+    setEntitlementViewMode('all')
+    setEntitlementFocusedModule(null)
+  }
+
+  const openEntitlementModal = (org: Organization, mode: 'all' | 'modules' | 'addons' = 'all') => {
+    const currentPlan = String((org.settings as any)?.plan || '').trim()
+    const fallbackPlan =
+      packages.find((pkg) => pkg.name === currentPlan)?.name ||
+      packages.find((pkg) => pkg.name === 'Demo')?.name ||
+      packages[0]?.name ||
+      currentPlan
+    const selectedPackage = packages.find((pkg) => pkg.name === fallbackPlan) || null
+    const packageModules = selectedPackage ? toCapabilityArray(selectedPackage.modules) : []
+    const selectedAddons = normalizeActiveAddonEntries((org as any).active_addons).map((entry) => entry.name)
+    const selectedModules = resolveManagedModulesForOrg(org, packageModules)
+
+    setEntitlementViewMode(mode)
+    setEntitlementModal({
+      open: true,
+      org,
+      selectedPlan: fallbackPlan,
+      selectedModules,
+      selectedAddons,
+    })
+    setEntitlementFocusedModule(selectedModules[0] || null)
+  }
+
+  const handleEntitlementPlanChange = (nextPlan: string) => {
+    const selectedPackage = packages.find((pkg) => pkg.name === nextPlan) || null
+    const packageModules = selectedPackage ? toCapabilityArray(selectedPackage.modules) : []
+    const packageCoreFamilyLevel = resolvePackageCoreFamily(selectedPackage)
+    const packageFallbackCore = packageCoreFamilyLevel === 'none' ? 'lite' : packageCoreFamilyLevel
+
+    setEntitlementModal((prev) => {
+      const nextModules =
+        entitlementViewMode === 'addons'
+          ? sanitizeModuleSelectionForCoreFamily(prev.selectedModules, packageFallbackCore)
+          : sanitizeModuleSelectionForCoreFamily(packageModules, packageFallbackCore)
+      const nextCoreFamily = deriveCoreFamilyFromModules(nextModules, packageFallbackCore)
+
+      return {
+        ...prev,
+        selectedPlan: nextPlan,
+        selectedModules: nextModules,
+        selectedAddons: sanitizeAddonSelectionForCompatibility(prev.selectedAddons, nextModules, nextCoreFamily),
+      }
+    })
+  }
+
+  const toggleEntitlementModule = (name: string, checked: boolean) => {
+    const normalizedName = normalizeSaasEntitlementName(name)
+    if (!normalizedName) return
+
+    setEntitlementModal((prev) => {
+      const nextSet = new Set(prev.selectedModules)
+      if (checked) {
+        nextSet.add(normalizedName)
+      } else {
+        nextSet.delete(normalizedName)
+      }
+
+      const selectedPackage = packages.find((pkg) => pkg.name === prev.selectedPlan) || null
+      const packageCoreFamilyLevel = resolvePackageCoreFamily(selectedPackage)
+      const packageFallbackCore = packageCoreFamilyLevel === 'none' ? 'lite' : packageCoreFamilyLevel
+      const nextModules = sanitizeModuleSelectionForCoreFamily([...nextSet], packageFallbackCore)
+      const nextCoreFamily = deriveCoreFamilyFromModules(nextModules, packageFallbackCore)
+
+      return {
+        ...prev,
+        selectedModules: nextModules,
+        selectedAddons: sanitizeAddonSelectionForCompatibility(prev.selectedAddons, nextModules, nextCoreFamily),
+      }
+    })
+  }
+
+  const areCapabilitySetsEqual = (left: readonly string[], right: readonly string[]) => {
+    const normalizedLeft = normalizeSaasEntitlementList([...left])
+    const normalizedRight = normalizeSaasEntitlementList([...right])
+
+    if (normalizedLeft.length !== normalizedRight.length) return false
+    return normalizedLeft.every((capability) => normalizedRight.includes(capability))
+  }
+
+  const toggleEntitlementAddon = (name: string, checked: boolean) => {
+    const normalizedName = normalizeSaasEntitlementName(name)
+    if (!normalizedName) return
+
+    setEntitlementModal((prev) => {
+      const nextSet = new Set(prev.selectedAddons)
+      if (checked) {
+        nextSet.add(normalizedName)
+      } else {
+        nextSet.delete(normalizedName)
+      }
+
+      const selectedPackage = packages.find((pkg) => pkg.name === prev.selectedPlan) || null
+      const packageCoreFamilyLevel = resolvePackageCoreFamily(selectedPackage)
+      const packageFallbackCore = packageCoreFamilyLevel === 'none' ? 'lite' : packageCoreFamilyLevel
+      const nextCoreFamily = deriveCoreFamilyFromModules(prev.selectedModules, packageFallbackCore)
+
+      return {
+        ...prev,
+        selectedAddons: sanitizeAddonSelectionForCompatibility([...nextSet], prev.selectedModules, nextCoreFamily),
+      }
+    })
+  }
+
+  const handleEntitlementCoreFamilyChange = (nextCoreFamily: SaasCoreFamily) => {
+    const nextPackage = findPreferredPackageForCoreFamily(nextCoreFamily, entitlementModal.selectedPlan)
+
+    if (!nextPackage) {
+      alert(`Belum ada plan yang kompatibel untuk ${getSaasCoreFamilyLabel(nextCoreFamily)}.`)
+      return
+    }
+
+    const nextPackageModules = toCapabilityArray(nextPackage.modules)
+
+    setEntitlementModal((prev) => {
+      const nextModules = sanitizeModuleSelectionForCoreFamily(
+        [...nextPackageModules, ...prev.selectedModules],
+        nextCoreFamily
+      )
+
+      return {
+        ...prev,
+        selectedPlan: nextPackage.name,
+        selectedModules: nextModules,
+        selectedAddons: sanitizeAddonSelectionForCompatibility(prev.selectedAddons, nextModules, nextCoreFamily),
+      }
+    })
+  }
+
+  const saveTenantEntitlements = () => {
+    if (!entitlementModal.org?.id) return
+
+    const targetOrg = entitlementModal.org
+    const selectedPackage = packages.find((pkg) => pkg.name === entitlementModal.selectedPlan) || null
+    if (!selectedPackage) {
+      alert('Paket tenant tidak ditemukan. Pilih paket yang valid terlebih dahulu.')
+      return
+    }
+
+    const packageModules = toCapabilityArray(selectedPackage.modules)
+    const selectedModules = normalizeSaasEntitlementList(entitlementModal.selectedModules)
+    const currentSettings =
+      targetOrg.settings &&
+      typeof targetOrg.settings === 'object' &&
+      !Array.isArray(targetOrg.settings)
+        ? targetOrg.settings
+        : {}
+    const preservedModules =
+      entitlementViewMode === 'addons'
+        ? resolveManagedModulesForOrg(targetOrg, packageModules)
+        : selectedModules
+    const filteredAddons = normalizeSaasEntitlementList(entitlementModal.selectedAddons).filter(
+      (capability) => !preservedModules.includes(capability)
+    )
+    const useCustomModules =
+      entitlementViewMode === 'addons'
+        ? currentSettings.use_custom_modules === true
+        : !areCapabilitySetsEqual(selectedModules, packageModules)
+
+    startEntitlementTransition(async () => {
+      const { error } = await db
+        .from('organizations')
+        .update({
+          settings: {
+            ...currentSettings,
+            plan: selectedPackage.name,
+            use_custom_modules: useCustomModules,
+            module_management_updated_at:
+              entitlementViewMode === 'addons'
+                ? currentSettings.module_management_updated_at || null
+                : new Date().toISOString(),
+          },
+          package_limit: buildPackageLimitPayload(selectedPackage),
+          enabled_modules:
+            entitlementViewMode === 'addons'
+              ? ((targetOrg as any).enabled_modules || null)
+              : selectedModules,
+          active_addons: buildActiveAddonPayload(filteredAddons, (targetOrg as any).active_addons, 'platform_admin_manual'),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', targetOrg.id)
+
+      if (error) {
+        alert('❌ Gagal menyimpan entitlement tenant: ' + error.message)
+        return
+      }
+
+      alert('✅ Module dan add-on tenant berhasil diperbarui.')
+      resetEntitlementModal()
+      await fetchOrganizations()
+    })
+  }
+
   const filteredOrgs = orgs.filter(o => {
      const matchesSearch = o.name.toLowerCase().includes(searchTxt.toLowerCase()) || (o as any).owner_email?.toLowerCase().includes(searchTxt.toLowerCase())
      const matchesType = typeFilter === 'all' ? true : (typeFilter === 'demo' ? (o as any).is_demo : !(o as any).is_demo)
      const matchesPkg = packageFilter === 'all' ? true : (o.settings as any)?.plan === packageFilter
      return matchesSearch && matchesType && matchesPkg
   })
+
+  const entitlementSelectedPackage = packages.find((pkg) => pkg.name === entitlementModal.selectedPlan) || null
+  const entitlementPackageModules = entitlementSelectedPackage ? toCapabilityArray(entitlementSelectedPackage.modules) : []
+  const entitlementPackageBlueprintAddons = entitlementSelectedPackage ? toCapabilityArray(entitlementSelectedPackage.addons) : []
+  const entitlementManagedModules = normalizeSaasEntitlementList(entitlementModal.selectedModules)
+  const entitlementUsesCustomModules = !areCapabilitySetsEqual(entitlementManagedModules, entitlementPackageModules)
+  const entitlementPackageCoreFamilyLevel = resolvePackageCoreFamily(entitlementSelectedPackage)
+  const entitlementFallbackCoreFamily =
+    entitlementPackageCoreFamilyLevel === 'none' ? 'lite' : entitlementPackageCoreFamilyLevel
+  const entitlementCurrentCoreFamily = deriveCoreFamilyFromModules(
+    entitlementManagedModules,
+    entitlementFallbackCoreFamily
+  )
+  const entitlementProvisioningModules = getSaasProvisioningModulesForCoreFamily(entitlementCurrentCoreFamily)
+  const entitlementFocusedModuleDefinition = entitlementProvisioningModules.find((option) =>
+    saasModuleMatches(option.value, entitlementFocusedModule || '')
+  ) || null
+  const entitlementBuilderAddons = entitlementFocusedModuleDefinition
+    ? getSaasRelatedAddonsForModule(entitlementFocusedModuleDefinition.value, entitlementCurrentCoreFamily)
+    : []
+  const entitlementManualAddonsCount = normalizeSaasEntitlementList(entitlementModal.selectedAddons).filter(
+    (capability) => !entitlementManagedModules.includes(capability)
+  ).length
+  const entitlementModalTitle =
+    entitlementViewMode === 'modules'
+      ? 'Module Management'
+      : entitlementViewMode === 'addons'
+        ? 'Add-on Management'
+        : 'Provisioning Builder'
+  const entitlementModalSubtitle =
+    entitlementViewMode === 'modules'
+      ? 'Kelola plan bundle dan module turunan tenant SaaS.'
+      : entitlementViewMode === 'addons'
+        ? 'Kelola entitlement add-on manual tenant SaaS.'
+        : 'Flow setup tenant ala column browser: pilih core, aktifkan module, lalu pilih add-on yang kompatibel.'
+  const getOrgEntitlementSnapshot = (org: Organization) => {
+    const activePlanName = String((org.settings as any)?.plan || '').trim()
+    const rowPackage = packages.find((pkg) => pkg.name === activePlanName) || null
+    const rowPackageModules = rowPackage ? toCapabilityArray(rowPackage.modules) : []
+    const rowBlueprintAddons = rowPackage ? toCapabilityArray(rowPackage.addons) : []
+    const rowCustomModules = getOrgCustomEnabledModules(org)
+    const useCustomModules = isOrgUsingCustomModules(org)
+    const rowManagedModules = useCustomModules ? rowCustomModules : rowPackageModules
+    const rowManualAddons = normalizeSaasEntitlementList(
+      normalizeActiveAddonEntries((org as any).active_addons).map((entry) => entry.name)
+    ).filter((capability) => !rowManagedModules.includes(capability))
+    const rowArchitecture = rowManagedModules.length > 0
+      ? getSaasPackageArchitecture(rowManagedModules, [])
+      : null
+    const rowFinalCapabilities = normalizeSaasEntitlementList([
+      ...rowManagedModules,
+      ...rowManualAddons,
+    ])
+
+    return {
+      activePlanName,
+      rowPackage,
+      rowPackageModules,
+      rowCustomModules,
+      useCustomModules,
+      rowManagedModules,
+      rowBlueprintAddons,
+      rowManualAddons,
+      rowArchitecture,
+      rowFinalCapabilities,
+    }
+  }
+
+  useEffect(() => {
+    if (!entitlementModal.open) return
+
+    const nextFocusedModule =
+      entitlementProvisioningModules.find((option) =>
+        entitlementManagedModules.some((capability) => saasModuleMatches(capability, option.value))
+      )?.value ||
+      entitlementProvisioningModules[0]?.value ||
+      null
+
+    if (
+      entitlementFocusedModule &&
+      entitlementProvisioningModules.some((option) => saasModuleMatches(option.value, entitlementFocusedModule))
+    ) {
+      return
+    }
+
+    if (nextFocusedModule !== entitlementFocusedModule) {
+      setEntitlementFocusedModule(nextFocusedModule)
+    }
+  }, [
+    entitlementFocusedModule,
+    entitlementManagedModules,
+    entitlementModal.open,
+    entitlementProvisioningModules,
+  ])
+
+  const entitlementUnknownSelectedAddons = normalizeSaasEntitlementList(entitlementModal.selectedAddons).filter((capability) => {
+    const isKnown = SAAS_TENANT_ENTITLEMENT_SECTIONS.some((section) => (
+      section.items.some((item) => saasModuleMatches(item.value, capability))
+    ))
+    return !isKnown
+  })
+  const entitlementFinalCapabilities = normalizeSaasEntitlementList([
+    ...entitlementManagedModules,
+    ...normalizeSaasEntitlementList(entitlementModal.selectedAddons).filter((capability) => !entitlementManagedModules.includes(capability)),
+  ])
+
+  const getAddonCompatibilityMessage = (addonValue: string) => {
+    const addonRule = getSaasAddonCompatibilityOption(addonValue)
+    if (!addonRule) return null
+
+    if (!saasCoreFamilySatisfies(entitlementCurrentCoreFamily, addonRule.requiredCoreFamily)) {
+      return `Butuh ${getSaasCoreFamilyLabel(addonRule.requiredCoreFamily)}.`
+    }
+
+    const missingModules = addonRule.requiredModules.filter((requiredModule) => (
+      !entitlementManagedModules.some((capability) => saasModuleMatches(capability, requiredModule))
+    ))
+    if (missingModules.length > 0) {
+      return `Aktifkan ${missingModules.map((item) => getSaasCapabilityDisplayLabel(item)).join(', ')} terlebih dahulu.`
+    }
+
+    const missingAddons = (addonRule.requiredAddons || []).filter((requiredAddon) => (
+      !entitlementModal.selectedAddons.some((capability) => saasModuleMatches(capability, requiredAddon))
+    ))
+    if (missingAddons.length > 0) {
+      return `Butuh ${missingAddons.map((item) => getSaasCapabilityDisplayLabel(item)).join(', ')} terlebih dahulu.`
+    }
+
+    return 'Compatible dengan konfigurasi tenant saat ini.'
+  }
 
   const handleLoginAsTenant = (org: Organization) => {
     const ownerEmail = String((org as any).owner_email || '').trim()
@@ -716,9 +1374,12 @@ export default function SaaSAdminPage() {
             </h1>
             <p className="text-slate-400 font-bold text-sm tracking-widest mt-1 uppercase">NIZAM SaaS Platform Administration</p>
          </div>
-	         <div className="flex gap-4">
+	         <div className="flex flex-wrap gap-3">
 	            <button onClick={() => setActiveTab('users')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Tenants</button>
+	            <button onClick={() => setActiveTab('module_management')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'module_management' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Manajemen Modul</button>
+	            <button onClick={() => setActiveTab('addon_management')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'addon_management' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Manajemen Add-on</button>
 	            <button onClick={() => setActiveTab('activity')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'activity' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Activity</button>
+	            <button onClick={() => setActiveTab('assessors')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'assessors' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Assessors</button>
 	            <button onClick={() => setActiveTab('packages')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'packages' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>SaaS Plans</button>
 	            <button onClick={() => setActiveTab('ai_tokens')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'ai_tokens' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>AI Tokens</button>
 	            <button onClick={() => setActiveTab('invoices')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'invoices' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Billing</button>
@@ -735,6 +1396,108 @@ export default function SaaSAdminPage() {
           transition={{ duration: 0.2 }}
         >
 	          {activeTab === 'activity' && <UserActivityMonitor />}
+
+	          {activeTab === 'assessors' && (
+	            <div className="space-y-6">
+	              <SectionCard>
+	                <form onSubmit={saveAssessorForm} className="grid grid-cols-1 gap-4 p-6 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+	                  <div>
+	                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Email Member SaaS</label>
+	                    <input
+	                      name="email"
+	                      type="email"
+	                      required
+	                      placeholder="assessor@executive.id"
+	                      className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold"
+	                    />
+	                  </div>
+	                  <div>
+	                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Nama Tampilan</label>
+	                    <input
+	                      name="display_name"
+	                      placeholder="Nama assessor"
+	                      className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold"
+	                    />
+	                  </div>
+	                  <SafeButton type="submit" variant="primary" isLoading={assessorPending} loadingText="Menyimpan..." icon={<Plus size={16} />}>
+	                    Add Assessor
+	                  </SafeButton>
+	                </form>
+	              </SectionCard>
+
+	              <SectionCard>
+	                <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-6 py-4">
+	                  <div>
+	                    <h3 className="text-xl font-black tracking-tight text-slate-900">Assessor SaaS</h3>
+	                    <p className="mt-1 text-xs font-bold text-slate-400">Akses panel assessor di tenant hanya membaca daftar ini.</p>
+	                  </div>
+	                  <button onClick={fetchAssessors} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors shadow-sm">
+	                    <RefreshCw size={18} className={loadingAssessors ? 'animate-spin' : ''} />
+	                  </button>
+	                </div>
+
+	                <div className="overflow-x-auto">
+	                  <table className="w-full border-collapse">
+	                    <thead>
+	                      <tr className="border-b border-slate-100">
+	                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Assessor</th>
+	                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Dibuat</th>
+	                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Status</th>
+	                        <th className="text-right py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Aksi</th>
+	                      </tr>
+	                    </thead>
+	                    <tbody className="divide-y divide-slate-50">
+	                      {assessors.length === 0 && (
+	                        <tr>
+	                          <td colSpan={4} className="px-6 py-10 text-center text-sm font-bold text-slate-400">
+	                            {loadingAssessors ? 'Memuat assessor...' : 'Belum ada assessor SaaS.'}
+	                          </td>
+	                        </tr>
+	                      )}
+	                      {assessors.map((assessor) => (
+	                        <tr key={assessor.id} className="hover:bg-slate-50/50 transition-colors">
+	                          <td className="py-4 px-6">
+	                            <p className="font-bold text-slate-900">{assessor.displayName || 'Assessor SaaS'}</p>
+	                            <p className="text-[10px] text-blue-600 font-black flex items-center gap-1.5 mt-0.5">
+	                              <Mail size={12} /> {assessor.email}
+	                            </p>
+	                          </td>
+	                          <td className="py-4 px-6 text-xs font-bold text-slate-500">
+	                            {assessor.createdAt
+	                              ? new Date(assessor.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+	                              : '-'}
+	                          </td>
+	                          <td className="py-4 px-6">
+	                            <StatusBadge variant={assessor.isActive ? 'success' : 'neutral'} label={assessor.isActive ? 'Aktif' : 'Nonaktif'} />
+	                          </td>
+	                          <td className="py-4 px-6 text-right">
+	                            <div className="flex justify-end gap-2">
+	                              <button
+	                                onClick={() => toggleAssessorStatus(assessor.id, assessor.isActive)}
+	                                disabled={assessorPending}
+	                                title={assessor.isActive ? 'Nonaktifkan assessor' : 'Aktifkan assessor'}
+	                                className={`p-2 rounded-xl transition-all disabled:opacity-50 ${assessor.isActive ? 'text-emerald-600 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-100'}`}
+	                              >
+	                                {assessor.isActive ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+	                              </button>
+	                              <button
+	                                onClick={() => handleDeleteAssessor(assessor.id, assessor.email)}
+	                                disabled={assessorPending}
+	                                title="Hapus assessor"
+	                                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
+	                              >
+	                                <Trash2 size={18} />
+	                              </button>
+	                            </div>
+	                          </td>
+	                        </tr>
+	                      ))}
+	                    </tbody>
+	                  </table>
+	                </div>
+	              </SectionCard>
+	            </div>
+	          )}
 
 	          {activeTab === 'ai_tokens' && (
 	            <div className="space-y-8">
@@ -1035,7 +1798,7 @@ export default function SaaSAdminPage() {
                       <tr className="border-b border-slate-100">
                         <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Organisasi / Pemilik</th>
                         <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Tipe</th>
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Paket / Plan</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Paket / Entitlement</th>
                         <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Masa Berlaku</th>
                         <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Status</th>
                         <th className="text-right py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Aksi</th>
@@ -1048,6 +1811,14 @@ export default function SaaSAdminPage() {
                         const daysRemaining = expiryTime
                           ? Math.ceil((expiryTime - Date.now()) / (1000 * 60 * 60 * 24))
                           : null
+                        const {
+                          activePlanName,
+                          rowManagedModules,
+                          rowManualAddons,
+                          rowArchitecture,
+                          rowFinalCapabilities,
+                          useCustomModules,
+                        } = getOrgEntitlementSnapshot(org)
 
                         return (
                           <tr key={org.id} className="hover:bg-slate-50/50 transition-colors">
@@ -1066,7 +1837,30 @@ export default function SaaSAdminPage() {
                             }
                           </td>
                           <td className="py-4 px-6">
-                            <span className="text-sm font-bold text-slate-700">{(org.settings as any)?.plan || 'Basic'}</span>
+                            <div className="space-y-2">
+                              <span className="text-sm font-bold text-slate-700">{activePlanName || 'Belum Dipilih'}</span>
+                              <div className="flex flex-wrap gap-1.5">
+                                <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                                  {rowArchitecture?.bundleLabel || 'Custom / Unknown'}
+                                </span>
+                                <span className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] border ${
+                                  useCustomModules
+                                    ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                    : 'border-slate-200 bg-white text-slate-500'
+                                }`}>
+                                  {useCustomModules ? 'Custom Modules' : 'Follow Plan'}
+                                </span>
+                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-600">
+                                  {rowManagedModules.length} Module
+                                </span>
+                                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                                  {rowManualAddons.length} Add-on
+                                </span>
+                              </div>
+                              <p className="text-[10px] font-bold text-slate-400">
+                                Total capability aktif: {rowFinalCapabilities.length}
+                              </p>
+                            </div>
                           </td>
                           <td className="py-4 px-6">
                             {expiryDate && expiryTime !== null && daysRemaining !== null ? (
@@ -1091,6 +1885,14 @@ export default function SaaSAdminPage() {
                           </td>
                           <td className="py-4 px-6 text-right">
                             <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => openEntitlementModal(org, 'all')}
+                                title="Buka provisioning builder"
+                                className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[11px] font-black uppercase tracking-wide text-indigo-700 transition-all hover:bg-indigo-100"
+                              >
+                                <Package size={14} />
+                                <span>Builder</span>
+                              </button>
                               <button
                                 onClick={() => handleLoginAsTenant(org)}
                                 disabled={loginAsPending}
@@ -1129,6 +1931,280 @@ export default function SaaSAdminPage() {
             </div>
           )}
 
+          {activeTab === 'module_management' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
+                <div className="lg:col-span-2 relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input
+                    value={searchTxt}
+                    onChange={(e) => setSearchTxt(e.target.value)}
+                    placeholder="Cari tenant untuk manajemen modul..."
+                    className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-slate-700"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-widest">Tipe Akun</label>
+                  <select
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value as any)}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+                  >
+                    <option value="all">Semua Tipe</option>
+                    <option value="official">Resmi / Produksi</option>
+                    <option value="demo">Demo / Latihan</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-widest">Filter Paket</label>
+                  <select
+                    value={packageFilter}
+                    onChange={(e) => setPackageFilter(e.target.value)}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+                  >
+                    <option value="all">Semua Paket</option>
+                    {packages.map((p) => <option key={p.id || p.name} value={p.name}>{p.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-2xl font-black tracking-tight text-slate-900">Manajemen Modul</h3>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    Kelola bundle plan dan module aktif tenant dari tab khusus ini.
+                  </p>
+                </div>
+                <button onClick={fetchOrganizations} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors shadow-sm">
+                  <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                </button>
+              </div>
+
+              <SectionCard>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Tenant</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Plan Aktif</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Core Family</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Module Plan</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Total Capability</th>
+                        <th className="text-right py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {filteredOrgs.map((org) => {
+                        const {
+                          activePlanName,
+                          rowManagedModules,
+                          rowArchitecture,
+                          rowFinalCapabilities,
+                          useCustomModules,
+                        } = getOrgEntitlementSnapshot(org)
+
+                        return (
+                          <tr key={`module-mgmt-${org.id}`} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-4 px-6">
+                              <div>
+                                <p className="font-bold text-slate-900">{org.name}</p>
+                                <p className="text-[10px] text-blue-600 font-black flex items-center gap-1.5 mt-0.5">
+                                  <Mail size={12} /> {(org as any).owner_email || 'No Email'}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="text-sm font-bold text-slate-700">{activePlanName || 'Belum Dipilih'}</span>
+                            </td>
+                            <td className="py-4 px-6">
+                              <div className="flex flex-wrap gap-1.5">
+                                <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                                  {rowArchitecture?.bundleLabel || 'Custom / Unknown'}
+                                </span>
+                                <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] border ${
+                                  useCustomModules
+                                    ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                    : 'border-slate-200 bg-white text-slate-500'
+                                }`}>
+                                  {useCustomModules ? 'Custom' : 'Plan Default'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <div className="flex flex-wrap gap-1.5">
+                                {rowManagedModules.slice(0, 3).map((capability) => (
+                                  <span key={`module-chip-${org.id}-${capability}`} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-600">
+                                    {getSaasCapabilityDisplayLabel(capability)}
+                                  </span>
+                                ))}
+                                {rowManagedModules.length > 3 && (
+                                  <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                                    +{rowManagedModules.length - 3} lagi
+                                  </span>
+                                )}
+                                {rowManagedModules.length === 0 && (
+                                  <span className="text-xs font-bold text-slate-400">Belum ada module aktif.</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-4 px-6 text-sm font-black text-slate-900">
+                              {rowFinalCapabilities.length}
+                            </td>
+                            <td className="py-4 px-6 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => openEntitlementModal(org, 'all')}
+                                  className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[11px] font-black uppercase tracking-wide text-indigo-700 transition-all hover:bg-indigo-100"
+                                >
+                                  <Package size={14} />
+                                  <span>Builder</span>
+                                </button>
+                                <SafeButton variant="white" onClick={() => openEntitlementModal(org, 'modules')} icon={<Package size={16} />}>
+                                  Atur Modul
+                                </SafeButton>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </SectionCard>
+            </div>
+          )}
+
+          {activeTab === 'addon_management' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
+                <div className="lg:col-span-2 relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input
+                    value={searchTxt}
+                    onChange={(e) => setSearchTxt(e.target.value)}
+                    placeholder="Cari tenant untuk manajemen add-on..."
+                    className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold text-slate-700"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-widest">Tipe Akun</label>
+                  <select
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value as any)}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
+                  >
+                    <option value="all">Semua Tipe</option>
+                    <option value="official">Resmi / Produksi</option>
+                    <option value="demo">Demo / Latihan</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-widest">Filter Paket</label>
+                  <select
+                    value={packageFilter}
+                    onChange={(e) => setPackageFilter(e.target.value)}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
+                  >
+                    <option value="all">Semua Paket</option>
+                    {packages.map((p) => <option key={p.id || p.name} value={p.name}>{p.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-2xl font-black tracking-tight text-slate-900">Manajemen Add-on</h3>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    Kelola entitlement add-on manual tenant tanpa mencampurinya dengan module bawaan plan.
+                  </p>
+                </div>
+                <button onClick={fetchOrganizations} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors shadow-sm">
+                  <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                </button>
+              </div>
+
+              <SectionCard>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Tenant</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Plan Aktif</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Add-on Manual</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Blueprint</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Total Capability</th>
+                        <th className="text-right py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {filteredOrgs.map((org) => {
+                        const {
+                          activePlanName,
+                          rowBlueprintAddons,
+                          rowManualAddons,
+                          rowFinalCapabilities,
+                        } = getOrgEntitlementSnapshot(org)
+
+                        return (
+                          <tr key={`addon-mgmt-${org.id}`} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-4 px-6">
+                              <div>
+                                <p className="font-bold text-slate-900">{org.name}</p>
+                                <p className="text-[10px] text-blue-600 font-black flex items-center gap-1.5 mt-0.5">
+                                  <Mail size={12} /> {(org as any).owner_email || 'No Email'}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="text-sm font-bold text-slate-700">{activePlanName || 'Belum Dipilih'}</span>
+                            </td>
+                            <td className="py-4 px-6">
+                              <div className="flex flex-wrap gap-1.5">
+                                {rowManualAddons.slice(0, 3).map((capability) => (
+                                  <span key={`addon-chip-${org.id}-${capability}`} className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                                    {getSaasCapabilityDisplayLabel(capability)}
+                                  </span>
+                                ))}
+                                {rowManualAddons.length > 3 && (
+                                  <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                                    +{rowManualAddons.length - 3} lagi
+                                  </span>
+                                )}
+                                {rowManualAddons.length === 0 && (
+                                  <span className="text-xs font-bold text-slate-400">Belum ada add-on manual.</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-4 px-6 text-sm font-black text-slate-700">
+                              {rowBlueprintAddons.length}
+                            </td>
+                            <td className="py-4 px-6 text-sm font-black text-slate-900">
+                              {rowFinalCapabilities.length}
+                            </td>
+                            <td className="py-4 px-6 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => openEntitlementModal(org, 'all')}
+                                  className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[11px] font-black uppercase tracking-wide text-indigo-700 transition-all hover:bg-indigo-100"
+                                >
+                                  <Package size={14} />
+                                  <span>Builder</span>
+                                </button>
+                                <SafeButton variant="white" onClick={() => openEntitlementModal(org, 'addons')} icon={<Package size={16} />}>
+                                  Atur Add-on
+                                </SafeButton>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </SectionCard>
+            </div>
+          )}
+
           {activeTab === 'packages' && (
             <div className="space-y-6">
               <div className="flex justify-between items-center">
@@ -1137,7 +2213,8 @@ export default function SaaSAdminPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                  {packages.map((pkg) => {
-                    const architecture = getSaasPackageArchitecture(pkg.modules || [], pkg.addons || [])
+                    const architecture = getSaasPackageArchitecture(pkg.modules || [], [])
+                    const blueprintAddons = toCapabilityArray(pkg.addons)
                     const totalCoreItems = architecture.liteCore.length + architecture.starterCore.length
                     return (
                     <div key={pkg.id || pkg.name} className={`
@@ -1187,6 +2264,9 @@ export default function SaaSAdminPage() {
                              Platform Core + {totalCoreItems} core item
                              {architecture.fullCoreExtensions.length > 0 ? ` + ${architecture.fullCoreExtensions.length} full core` : ''}
                              {architecture.verticalModules.length > 0 ? ` + ${architecture.verticalModules.length} vertical module` : ''}
+                           </p>
+                           <p className="text-[10px] font-semibold text-emerald-600">
+                             Blueprint Add-on: {blueprintAddons.length}
                            </p>
                         </div>
                       </div>
@@ -1284,6 +2364,678 @@ export default function SaaSAdminPage() {
             </div>
           )}
         </motion.div>
+      </AnimatePresence>
+
+      {/* TENANT ENTITLEMENT MODAL */}
+      <AnimatePresence>
+        {entitlementModal.open && (
+          <div key="entitlement-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              key="entitlement-modal-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={resetEntitlementModal}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+            />
+            <motion.div
+              key="entitlement-modal-content"
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className={`relative w-full rounded-[40px] border border-white bg-white p-8 shadow-2xl ${
+                entitlementViewMode === 'all' ? 'max-w-7xl' : 'max-w-4xl'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-6 border-b border-slate-100 pb-6">
+                <div>
+                  <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900">
+                    {entitlementModalTitle}
+                  </h2>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    {entitlementModalSubtitle}
+                  </p>
+                </div>
+                <button
+                  onClick={resetEntitlementModal}
+                  className="rounded-2xl border border-slate-200 p-3 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="mt-6 max-h-[72vh] space-y-6 overflow-y-auto pr-2">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.3fr_1fr]">
+                  <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Tenant</div>
+                    <div className="mt-2 text-xl font-black text-slate-900">{entitlementModal.org?.name || 'Tenant'}</div>
+                    <div className="mt-1 text-xs font-bold text-blue-600">{String((entitlementModal.org as any)?.owner_email || '')}</div>
+                  </div>
+
+                  <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+                    <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Plan / Bundle Aktif</label>
+                    <select
+                      value={entitlementModal.selectedPlan}
+                      onChange={(e) => handleEntitlementPlanChange(e.target.value)}
+                      className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-900"
+                    >
+                      {!packages.length && <option value="">Belum ada paket SaaS</option>}
+                      {packages.map((pkg) => (
+                        <option key={pkg.id || pkg.name} value={pkg.name}>
+                          {pkg.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-2 text-[11px] font-semibold text-slate-500">
+                      {entitlementViewMode === 'modules'
+                        ? 'Pilih plan dasar, lalu sesuaikan module tenant secara manual bila diperlukan.'
+                        : entitlementViewMode === 'addons'
+                          ? 'Module aktif tenant tetap mengikuti entitlement saat ini.'
+                          : 'Saat core diganti, builder akan memilih plan yang paling kompatibel secara otomatis.'}
+                    </p>
+                  </div>
+                </div>
+
+                {entitlementSelectedPackage ? (
+                  <>
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                      <div className="rounded-[28px] border border-slate-200 bg-white p-5">
+                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Core Family</div>
+                        <div className="mt-2 text-lg font-black text-slate-900">
+                          {getSaasPackageArchitecture(entitlementSelectedPackage.modules || [], []).bundleLabel}
+                        </div>
+                        <p className="mt-2 text-[11px] font-semibold text-slate-500">
+                          Harga Rp {Number(entitlementSelectedPackage.price || 0).toLocaleString('id-ID')} / {entitlementSelectedPackage.billing}
+                        </p>
+                      </div>
+
+                      <div className="rounded-[28px] border border-slate-200 bg-white p-5">
+                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Module Dari Plan</div>
+                        <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">
+                          {entitlementPackageModules.length}
+                        </div>
+                        <p className="mt-2 text-[11px] font-semibold text-slate-500">
+                          Capability dasar yang langsung aktif lewat bundle.
+                        </p>
+                      </div>
+
+                      <div className="rounded-[28px] border border-slate-200 bg-white p-5">
+                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                          {entitlementViewMode === 'modules'
+                            ? 'Module Tersetel'
+                            : entitlementViewMode === 'addons'
+                              ? 'Add-on Aktif Manual'
+                              : 'Entitlement Tersetel'}
+                        </div>
+                        <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">
+                          {entitlementViewMode === 'modules'
+                            ? entitlementManagedModules.length
+                            : entitlementViewMode === 'all'
+                              ? entitlementManagedModules.length + entitlementManualAddonsCount
+                            : entitlementManualAddonsCount}
+                        </div>
+                        <p className="mt-2 text-[11px] font-semibold text-slate-500">
+                          {entitlementViewMode === 'modules'
+                            ? (entitlementUsesCustomModules ? 'Tenant memakai custom module override.' : 'Tenant masih mengikuti module bawaan plan.')
+                            : entitlementViewMode === 'addons'
+                              ? 'Entitlement tambahan di luar module bawaan plan.'
+                              : 'Gabungan module aktif tenant dan add-on manual yang lolos compatibility guard.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {entitlementViewMode === 'all' && (
+                      <div className="rounded-[32px] border border-slate-200 bg-slate-50 p-6">
+                        <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 xl:flex-row xl:items-end xl:justify-between">
+                          <div>
+                            <h3 className="text-lg font-black text-slate-900">Provisioning Flow</h3>
+                            <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                              Pilih core family, aktifkan module yang diinginkan, lalu pilih add-on yang kompatibel dengan module fokus.
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-indigo-700">
+                              Compatibility Guard Aktif
+                            </span>
+                            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600">
+                              Focus: {entitlementFocusedModuleDefinition?.label || 'Belum Dipilih'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.25fr_1.25fr_0.95fr]">
+                          <div className="rounded-[28px] border border-slate-200 bg-white p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">1. Core</h4>
+                                <p className="mt-1 text-[11px] font-semibold text-slate-500">Core menentukan baseline compatibility tenant.</p>
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">3 opsi</span>
+                            </div>
+                            <div className="mt-4 space-y-3">
+                              {(['lite', 'starter', 'full'] as SaasCoreFamily[]).map((coreFamily) => {
+                                const isSelected = entitlementCurrentCoreFamily === coreFamily
+                                const compatiblePlan = findPreferredPackageForCoreFamily(coreFamily, entitlementModal.selectedPlan)
+
+                                return (
+                                  <button
+                                    key={`core-family-${coreFamily}`}
+                                    type="button"
+                                    onClick={() => handleEntitlementCoreFamilyChange(coreFamily)}
+                                    className={`w-full rounded-[24px] border px-4 py-4 text-left transition-all ${
+                                      isSelected
+                                        ? 'border-indigo-200 bg-indigo-50 shadow-sm'
+                                        : 'border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div>
+                                        <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-700">
+                                          {getSaasCoreFamilyLabel(coreFamily)}
+                                        </div>
+                                        <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                                          {coreFamily === 'lite'
+                                            ? 'Revenue basic dan operasional paling ringan.'
+                                            : coreFamily === 'starter'
+                                              ? 'Tambah accounting, finance, inventory, dan purchasing.'
+                                              : 'Tambah HRIS, manufacturing, dan audit.'}
+                                        </p>
+                                      </div>
+                                      {isSelected && (
+                                        <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                                          Active
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="mt-3 text-[10px] font-bold text-slate-400">
+                                      {compatiblePlan ? `Plan default: ${compatiblePlan.name}` : 'Belum ada plan kompatibel'}
+                                    </div>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="rounded-[28px] border border-slate-200 bg-white p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">2. Modules</h4>
+                                <p className="mt-1 text-[11px] font-semibold text-slate-500">Klik module untuk memfokuskan daftar add-on di kolom sebelah.</p>
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                {entitlementProvisioningModules.length} opsi
+                              </span>
+                            </div>
+                            <div className="mt-4 max-h-[26rem] space-y-3 overflow-y-auto pr-1">
+                              {entitlementProvisioningModules.map((option) => {
+                                const isSelected = entitlementManagedModules.some((capability) => saasModuleMatches(capability, option.value))
+                                const isPlanDefault = entitlementPackageModules.some((capability) => saasModuleMatches(capability, option.value))
+                                const isFocused = entitlementFocusedModuleDefinition
+                                  ? saasModuleMatches(entitlementFocusedModuleDefinition.value, option.value)
+                                  : false
+
+                                return (
+                                  <label
+                                    key={`builder-module-${option.value}`}
+                                    className={`block rounded-[24px] border px-4 py-4 transition-all ${
+                                      isFocused
+                                        ? 'border-indigo-300 bg-indigo-50/80 shadow-sm'
+                                        : isSelected
+                                          ? 'border-slate-300 bg-slate-50'
+                                          : 'border-slate-200 bg-white hover:border-indigo-200'
+                                    }`}
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={(e) => toggleEntitlementModule(option.value, e.target.checked)}
+                                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => setEntitlementFocusedModule(option.value)}
+                                        className="min-w-0 flex-1 text-left"
+                                      >
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div>
+                                            <div className="text-[11px] font-black uppercase tracking-[0.1em] text-slate-700">
+                                              {option.label}
+                                            </div>
+                                            <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                                              {option.description}
+                                            </p>
+                                          </div>
+                                          <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
+                                            {option.sectionTitle}
+                                          </span>
+                                        </div>
+                                        <div className="mt-3 flex flex-wrap gap-1.5">
+                                          {isSelected && (
+                                            <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                                              Active
+                                            </span>
+                                          )}
+                                          {isPlanDefault && (
+                                            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
+                                              Plan Default
+                                            </span>
+                                          )}
+                                          {isFocused && (
+                                            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                                              Focus
+                                            </span>
+                                          )}
+                                        </div>
+                                      </button>
+                                    </div>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="rounded-[28px] border border-slate-200 bg-white p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">3. Add-ons</h4>
+                                <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                                  Add-on difilter dari module yang sedang di-focus dan divalidasi otomatis.
+                                </p>
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                {entitlementBuilderAddons.length} opsi
+                              </span>
+                            </div>
+                            <div className="mt-4 max-h-[26rem] space-y-3 overflow-y-auto pr-1">
+                              {entitlementFocusedModuleDefinition ? (
+                                entitlementBuilderAddons.map((option) => {
+                                  const isSelected = entitlementModal.selectedAddons.some((capability) => saasModuleMatches(capability, option.value))
+                                  const isBlueprintOption = entitlementPackageBlueprintAddons.some((capability) => saasModuleMatches(capability, option.value))
+                                  const isCompatible = isSaasAddonCompatible(
+                                    option.value,
+                                    entitlementManagedModules,
+                                    entitlementCurrentCoreFamily,
+                                    entitlementModal.selectedAddons
+                                  )
+                                  const compatibilityMessage = getAddonCompatibilityMessage(option.value)
+
+                                  return (
+                                    <label
+                                      key={`builder-addon-${option.value}`}
+                                      className={`block rounded-[24px] border px-4 py-4 transition-all ${
+                                        isCompatible
+                                          ? isSelected
+                                            ? 'border-emerald-200 bg-emerald-50/80 shadow-sm'
+                                            : 'border-slate-200 bg-white hover:border-emerald-200'
+                                          : 'border-slate-200 bg-slate-50 opacity-70'
+                                      }`}
+                                    >
+                                      <div className="flex items-start gap-3">
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          disabled={!isCompatible}
+                                          onChange={(e) => toggleEntitlementAddon(option.value, e.target.checked)}
+                                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                          <div className="text-[11px] font-black uppercase tracking-[0.1em] text-slate-700">
+                                            {option.label}
+                                          </div>
+                                          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                                            {option.description}
+                                          </p>
+                                          <div className="mt-3 flex flex-wrap gap-1.5">
+                                            {isSelected && (
+                                              <span className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                                                Active Manual
+                                              </span>
+                                            )}
+                                            {isBlueprintOption && (
+                                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
+                                                Blueprint
+                                              </span>
+                                            )}
+                                            {option.global && (
+                                              <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                                                Global
+                                              </span>
+                                            )}
+                                          </div>
+                                          <p className={`mt-3 text-[11px] font-semibold ${isCompatible ? 'text-slate-500' : 'text-amber-700'}`}>
+                                            {compatibilityMessage}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </label>
+                                  )
+                                })
+                              ) : (
+                                <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
+                                  Pilih atau fokuskan satu module dulu untuk melihat add-on yang relevan.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="rounded-[28px] border border-slate-200 bg-white p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">4. Summary</h4>
+                                <p className="mt-1 text-[11px] font-semibold text-slate-500">Snapshot konfigurasi tenant sebelum disimpan.</p>
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Live</span>
+                            </div>
+                            <div className="mt-4 space-y-3">
+                              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Core</div>
+                                <div className="mt-1 text-sm font-black text-slate-900">{getSaasCoreFamilyLabel(entitlementCurrentCoreFamily)}</div>
+                              </div>
+                              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Plan</div>
+                                <div className="mt-1 text-sm font-black text-slate-900">{entitlementModal.selectedPlan || 'Belum dipilih'}</div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Modules</div>
+                                  <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">{entitlementManagedModules.length}</div>
+                                </div>
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                  <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Add-ons</div>
+                                  <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">{entitlementManualAddonsCount}</div>
+                                </div>
+                              </div>
+                              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">Compatibility</div>
+                                <p className="mt-1 text-[11px] font-semibold text-emerald-700">
+                                  Core yang lebih rendah akan otomatis membuang module dan add-on yang tidak lagi kompatibel.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="rounded-[32px] border border-slate-200 bg-slate-50 p-6">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <h3 className="text-lg font-black text-slate-900">Module Aktif dari Plan</h3>
+                          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                            Ini adalah capability yang akan otomatis aktif berdasarkan bundle tenant.
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-indigo-700">
+                          {entitlementPackageModules.length} module
+                        </span>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {entitlementPackageModules.map((capability) => (
+                          <span key={`plan-module-${capability}`} className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-slate-700">
+                            {getSaasCapabilityDisplayLabel(capability)}
+                          </span>
+                        ))}
+                        {entitlementPackageModules.length === 0 && (
+                          <span className="text-xs font-bold text-slate-400">Belum ada module aktif dari plan.</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {entitlementViewMode === 'modules' && (
+                      <div className="rounded-[32px] border border-slate-200 bg-slate-50 p-6">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <h3 className="text-lg font-black text-slate-900">Module Settings</h3>
+                            <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                              Pilih module yang benar-benar aktif untuk tenant ini. Jika sama persis dengan plan, tenant akan kembali mengikuti plan default.
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] border ${
+                              entitlementUsesCustomModules
+                                ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                : 'border-slate-200 bg-white text-slate-500'
+                            }`}>
+                              {entitlementUsesCustomModules ? 'Custom Modules' : 'Follow Plan'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setEntitlementModal((prev) => ({ ...prev, selectedModules: entitlementPackageModules }))}
+                              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 hover:bg-slate-50"
+                            >
+                              Reset ke Plan
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="mt-5 space-y-5">
+                          {SAAS_PACKAGE_EDITOR_SECTIONS
+                            .filter((section) => section.kind !== 'addon')
+                            .map((section) => (
+                              <div key={`module-settings-${section.key}`} className="space-y-3 rounded-[28px] border border-slate-200 bg-white p-4">
+                                <div className="flex items-center justify-between gap-4">
+                                  <div>
+                                    <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">{section.title}</h4>
+                                    <p className="mt-1 text-[11px] font-semibold text-slate-500">{section.description}</p>
+                                  </div>
+                                  <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                    {section.items.length} opsi
+                                  </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                                  {section.items.map((item) => {
+                                    const isSelected = entitlementManagedModules.some((capability) => saasModuleMatches(capability, item.value))
+                                    const isPlanDefault = entitlementPackageModules.some((capability) => saasModuleMatches(capability, item.value))
+
+                                    return (
+                                      <label
+                                        key={`tenant-module-${section.key}-${item.value}`}
+                                        className={`flex items-start gap-3 rounded-2xl border px-3 py-3 transition-all ${
+                                          isSelected
+                                            ? 'border-indigo-200 bg-indigo-50/70'
+                                            : 'border-slate-200 bg-white hover:border-indigo-200'
+                                        }`}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={(e) => toggleEntitlementModule(item.value, e.target.checked)}
+                                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                          <div className="text-[11px] font-black uppercase tracking-[0.1em] text-slate-700">
+                                            {item.label}
+                                          </div>
+                                          <div className="mt-1 flex flex-wrap gap-1.5">
+                                            {isSelected && (
+                                              <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                                                Active
+                                              </span>
+                                            )}
+                                            {isPlanDefault && (
+                                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
+                                                Plan Default
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </label>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {entitlementViewMode === 'addons' && (
+                    <div className="rounded-[32px] border border-slate-200 bg-slate-50 p-6">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <h3 className="text-lg font-black text-slate-900">Add-on Management</h3>
+                          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                            Pilih capability tambahan yang boleh aktif untuk tenant ini di luar module aktif tenant.
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                          Blueprint {entitlementPackageBlueprintAddons.length}
+                        </span>
+                      </div>
+
+                      <div className="mt-5 space-y-5">
+                        {SAAS_TENANT_ENTITLEMENT_SECTIONS.map((section) => {
+                          const sectionItems = section.items
+
+                          return (
+                            <div key={section.key} className="space-y-3 rounded-[28px] border border-slate-200 bg-white p-4">
+                              <div className="flex items-center justify-between gap-4">
+                                <div>
+                                  <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">{section.title}</h4>
+                                  <p className="mt-1 text-[11px] font-semibold text-slate-500">{section.description}</p>
+                                </div>
+                                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                  {sectionItems.length} opsi
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                                {sectionItems.map((item) => {
+                                  const includedByPlan = entitlementManagedModules.some((capability) => saasModuleMatches(capability, item.value))
+                                  const isSelected = entitlementModal.selectedAddons.some((capability) => saasModuleMatches(capability, item.value))
+                                  const isBlueprintOption = entitlementPackageBlueprintAddons.some((capability) => saasModuleMatches(capability, item.value))
+
+                                  return (
+                                    <label
+                                      key={`tenant-addon-${section.key}-${item.value}`}
+                                      className={`flex items-start gap-3 rounded-2xl border px-3 py-3 transition-all ${
+                                        includedByPlan
+                                          ? 'border-indigo-200 bg-indigo-50/70'
+                                          : isSelected
+                                            ? 'border-emerald-200 bg-emerald-50/70'
+                                            : 'border-slate-200 bg-white hover:border-emerald-200'
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={includedByPlan || isSelected}
+                                        disabled={includedByPlan}
+                                        onChange={(e) => toggleEntitlementAddon(item.value, e.target.checked)}
+                                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
+                                      />
+                                      <div className="min-w-0 flex-1">
+                                        <div className="text-[11px] font-black uppercase tracking-[0.1em] text-slate-700">
+                                          {item.label}
+                                        </div>
+                                        <div className="mt-1 flex flex-wrap gap-1.5">
+                                          {includedByPlan ? (
+                                            <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                                              Included in Plan
+                                            </span>
+                                          ) : isSelected ? (
+                                            <span className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                                              Active Manual
+                                            </span>
+                                          ) : null}
+                                          {!includedByPlan && isBlueprintOption && (
+                                            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
+                                              Blueprint
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </label>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })}
+
+                        {entitlementUnknownSelectedAddons.length > 0 && (
+                          <div className="space-y-3 rounded-[28px] border border-amber-200 bg-amber-50/70 p-4">
+                            <div>
+                              <h4 className="text-sm font-black uppercase tracking-[0.14em] text-amber-700">Legacy / Override Entitlements</h4>
+                              <p className="mt-1 text-[11px] font-semibold text-amber-700/80">
+                                Add-on aktif ini tidak ditemukan di katalog standar saat ini, tetapi masih tersimpan di tenant.
+                              </p>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                              {entitlementUnknownSelectedAddons.map((capability) => (
+                                <label key={`legacy-addon-${capability}`} className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-white px-3 py-3">
+                                  <input
+                                    type="checkbox"
+                                    checked
+                                    onChange={(e) => toggleEntitlementAddon(capability, e.target.checked)}
+                                    className="mt-0.5 h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                                  />
+                                  <div className="text-[11px] font-black uppercase tracking-[0.1em] text-amber-800">
+                                    {getSaasCapabilityDisplayLabel(capability)}
+                                  </div>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    )}
+
+                    <div className="rounded-[32px] border border-slate-200 bg-white p-6">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <h3 className="text-lg font-black text-slate-900">Capability Final Tenant</h3>
+                          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                            Gabungan module aktif tenant dan add-on manual yang dipilih.
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-700">
+                          Total {entitlementFinalCapabilities.length}
+                        </span>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {entitlementFinalCapabilities.map((capability) => (
+                          <span key={`final-capability-${capability}`} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-slate-700">
+                            {getSaasCapabilityDisplayLabel(capability)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-[32px] border border-rose-200 bg-rose-50 p-6 text-sm font-bold text-rose-700">
+                    Paket yang dipilih belum ditemukan. Pilih plan yang valid sebelum menyimpan entitlement tenant.
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-6">
+                <button
+                  type="button"
+                  onClick={resetEntitlementModal}
+                  className="px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-slate-400"
+                >
+                  Batal
+                </button>
+                <SafeButton
+                  variant="primary"
+                  onClick={saveTenantEntitlements}
+                  isLoading={savingEntitlements}
+                  loadingText="Menyimpan..."
+                  icon={<Package size={16} />}
+                >
+                  {entitlementViewMode === 'modules'
+                    ? 'Simpan Modul'
+                    : entitlementViewMode === 'addons'
+                      ? 'Simpan Add-on'
+                      : 'Simpan Entitlement'}
+                </SafeButton>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
       {/* ORG MODAL */}

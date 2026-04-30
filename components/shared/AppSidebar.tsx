@@ -61,6 +61,7 @@ interface NavGroup {
     phase?: string
     permission_key?: string
     module_key?: string
+    saas_assessor_only?: boolean
   }[]
 }
 
@@ -120,6 +121,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Payroll Components', href: '/hris?tab=payroll', icon: FileText, permission_key: 'payroll', module_key: 'Payroll' },
       { label: 'Proses Penggajian', href: '/hris?tab=runs', icon: Wallet, permission_key: 'payroll', module_key: 'Payroll' },
       { label: 'Peningkatan Kompetensi', href: '/learning', icon: BookOpen, permission_key: 'learning', module_key: 'HRIS' },
+      { label: 'Assessor', href: '/learning', icon: ShieldCheck, saas_assessor_only: true },
       { label: 'Akses & Jabatan', href: '/settings/roles', icon: ShieldCheck, permission_key: 'business', module_key: 'HRIS' },
     ]
   },
@@ -193,6 +195,21 @@ function subscribeSidebarCollapsed(onStoreChange: () => void) {
   }
 }
 
+function getHydratedSnapshot() {
+  return true
+}
+
+function getServerHydratedSnapshot() {
+  return false
+}
+
+function subscribeHydration(onStoreChange: () => void) {
+  if (typeof window === 'undefined') return () => {}
+
+  const timeoutId = window.setTimeout(onStoreChange, 0)
+  return () => window.clearTimeout(timeoutId)
+}
+
 function isSidebarItemActive(pathname: string, fullPath: string, href: string, hasTabQuery: boolean) {
   if (href === '/dashboard') {
     return pathname === '/dashboard'
@@ -230,6 +247,7 @@ interface AppSidebarProps {
   isDemo?: boolean
   planName?: string
   canManageSubOrganizations?: boolean
+  isSaasAssessor?: boolean
 }
 
 export function AppSidebar({ 
@@ -248,6 +266,7 @@ export function AppSidebar({
   isDemo = false,
   planName = 'Trial',
   canManageSubOrganizations = true,
+  isSaasAssessor = false,
 }: AppSidebarProps) {
   const router = useRouter()
   const [isSigningOut, startSignOutTransition] = useTransition()
@@ -257,7 +276,6 @@ export function AppSidebar({
   const fullPath = pathname + (tabQuery ? `?tab=${tabQuery}` : '')
   const prefetchedRoutesRef = useRef<Set<string>>(new Set())
 
-  const [hasMounted, setHasMounted] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [badgeMetrics, setBadgeMetrics] = useState(() => ({
     pendingApprovals,
@@ -273,10 +291,11 @@ export function AppSidebar({
     return () => window.removeEventListener(SIDEBAR_TOGGLE_EVENT, handleMobileToggle)
   }, [])
 
-  useEffect(() => {
-    setHasMounted(true)
-  }, [])
-
+  const hasMounted = useSyncExternalStore(
+    subscribeHydration,
+    getHydratedSnapshot,
+    getServerHydratedSnapshot
+  )
   const isCollapsed = useSyncExternalStore(
     subscribeSidebarCollapsed,
     getSidebarCollapsedSnapshot,
@@ -395,6 +414,10 @@ export function AppSidebar({
       return canManageSubOrganizations
     }
 
+    if (item.saas_assessor_only) {
+      return isSaasAssessor
+    }
+
     // Cabang adalah fitur core — selalu tampilkan untuk owner/admin
     if (item.href === '/settings/branches') {
       return isOwnerOrAdmin
@@ -438,6 +461,7 @@ export function AppSidebar({
     enabledModules,
     isDemo,
     isOwnerOrAdmin,
+    isSaasAssessor,
     permissions,
     showSaasOperatorGroup,
     userRole,
@@ -605,7 +629,7 @@ export function AppSidebar({
                       if (item.href === '/cash') badgeCount = badgeMetrics.pendingCoaRequests
 
                       return (
-                        <li key={item.href}>
+                        <li key={`${group.group}:${item.label}:${item.href}`}>
                           <Link
                             href={item.href}
                             onMouseEnter={() => prefetchRoute(item.href)}
@@ -678,7 +702,7 @@ export function AppSidebar({
                     if (item.href === '/cash') badgeCount = badgeMetrics.pendingCoaRequests
 
                     return (
-                      <li key={item.href}>
+                      <li key={`${group.group}:${item.label}:${item.href}`}>
                         <Link
                           href={item.href}
                           onMouseEnter={() => prefetchRoute(item.href)}

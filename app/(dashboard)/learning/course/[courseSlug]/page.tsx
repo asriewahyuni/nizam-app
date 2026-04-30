@@ -20,6 +20,7 @@ import {
 } from '@/modules/edu/lib/training-center-mvp'
 import { getTrainingAssessmentByCourseSlug } from '@/modules/edu/lib/training-assessment-mvp'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
+import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
 
 export default async function LearningCoursePage(props: { params: Promise<{ courseSlug: string }> }) {
   noStore()
@@ -34,7 +35,8 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
   const track = getTrainingTrackBySlug(course.trackSlug)
   const lessons = getTrainingLessonsForCourse(course.slug)
   const assessment = getTrainingAssessmentByCourseSlug(course.slug)
-  const canManageAssessment = hasRolePermission(orgData.role, orgData.permissions, 'learning:write')
+  const assessorContext = await getSaasAssessorContext({ email: orgData.user?.email })
+  const canManageAssessment = assessorContext.hasAccess
   const canAccessParticipantAssessment = hasRolePermission(orgData.role, orgData.permissions, 'learning') || canManageAssessment
 
   return (

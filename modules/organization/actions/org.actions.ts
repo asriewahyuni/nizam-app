@@ -1517,7 +1517,6 @@ const getActiveOrgCached = cache(async () => {
     return null
   }
   const planName = org?.settings?.plan
-  // Note: enabled_modules column may not exist in DB; rely on saas_packages + active_addons
   let enabledModules: string[] = []
   let isSubscriptionExpired = false
   let subscriptionEnd: Date | null = null
@@ -1525,6 +1524,13 @@ const getActiveOrgCached = cache(async () => {
     userEmail: user.email,
     org,
   })
+
+  const useCustomModules = org?.settings?.use_custom_modules === true
+  const customEnabledModules = Array.isArray(org?.enabled_modules)
+    ? org.enabled_modules
+        .map((moduleName: unknown) => normalizeSaasEntitlementName(String(moduleName || '').trim()))
+        .filter(Boolean)
+    : []
 
   // DYNAMIC MODULE RESOLUTION + SUBSCRIPTION EXPIRY CHECK FROM SaaS PACKAGE
   if (planName) {
@@ -1535,7 +1541,7 @@ const getActiveOrgCached = cache(async () => {
       .eq('is_active', true)
       .maybeSingle()
     
-    if (pkgData?.modules) {
+    if (!useCustomModules && pkgData?.modules) {
       try {
         const pkgModules = Array.isArray(pkgData.modules) ? pkgData.modules : JSON.parse(pkgData.modules || '[]')
         enabledModules = [...enabledModules, ...pkgModules]
@@ -1561,6 +1567,10 @@ const getActiveOrgCached = cache(async () => {
       }
       // If both expiry fields are missing (legacy org), we do NOT force-expire.
     }
+  }
+
+  if (useCustomModules) {
+    enabledModules = [...enabledModules, ...customEnabledModules]
   }
 
   // ADD INDUSTRIAL ADD-ONS
@@ -1716,13 +1726,16 @@ export async function setActiveOrg(orgId: string) {
 
   if (!user) return { error: 'Tidak terautentikasi.' }
 
-  let { data: membership, error } = await db
+  const membershipLookup = await db
     .from('org_members')
     .select('id, org_id, role')
     .eq('user_id', user.id)
     .eq('org_id', trimmedOrgId)
     .eq('is_active', true)
     .maybeSingle()
+
+  let membership = membershipLookup.data
+  const error = membershipLookup.error
 
   if (error || !membership) {
     const { data: childOrg } = await admin
