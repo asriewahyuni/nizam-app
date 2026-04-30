@@ -20,7 +20,7 @@
  */
 
 import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
-import { getPostgresPool, queryPostgres } from './postgres'
+import { connectPostgresClient, queryPostgres } from './postgres'
 
 // ─── FK constraint cache (fetched once from information_schema) ──────────────
 // Maps: "sourceTable.sourceCol" → "targetTable"
@@ -849,7 +849,7 @@ async function callRpc(
     let result
 
     if (authClaimValues.length > 0) {
-      const client = await getPostgresPool().connect()
+      const client = await connectPostgresClient()
 
       try {
         await client.query('BEGIN')

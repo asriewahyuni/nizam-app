@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/server'
+import {
+  buildExportStorageKey,
+  buildPrivateStorageObjectPath,
+  isObjectStorageFeatureEnabled,
+  uploadObjectToStorage,
+} from '@/lib/storage/object-storage.server'
 import { getDateInTimeZone } from '@/lib/utils'
 import { buildSentryActorContext } from '@/lib/monitoring/sentry'
 import { getBranchAccessScope } from '@/modules/organization/lib/branch-access.server'
@@ -13,7 +19,7 @@ import {
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
-  const db = supabase as any
+  const db = supabase
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -58,7 +64,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Get org name for header
-  const { data: org } = await (supabase as any).from('organizations').select('name').eq('id', orgId).single()
+  const { data: org } = await supabase.from('organizations').select('name').eq('id', orgId).single()
   const orgName = org?.name || 'Organisasi'
 
   try {
@@ -86,17 +92,44 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Tipe export tidak valid. Gunakan: pl | bs | gl | zakat' }, { status: 400 })
     }
 
+    const attachmentDisposition = buildAttachmentContentDisposition(filename)
+
+    if (isObjectStorageFeatureEnabled('exports')) {
+      try {
+        const storageKey = buildExportStorageKey(orgId, filename, todayInJakarta)
+
+        await uploadObjectToStorage({
+          key: storageKey,
+          body: buffer,
+          contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          cacheControl: 'private, no-store',
+          contentDisposition: attachmentDisposition,
+        })
+
+        const downloadUrl = new URL(buildPrivateStorageObjectPath(storageKey), request.url)
+        return NextResponse.redirect(downloadUrl, {
+          status: 307,
+          headers: {
+            'Cache-Control': 'private, no-store',
+          },
+        })
+      } catch (storageError) {
+        console.error('[Export] Gagal simpan file ke bucket, fallback ke download langsung:', storageError)
+      }
+    }
+
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+        'Content-Disposition': attachmentDisposition,
         'Content-Length': buffer.length.toString(),
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       }
     })
-  } catch (error: any) {
-    (console as any).error('[Export] Error:', error.message)
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error || 'Unknown error')
+    console.error('[Export] Error:', errorMessage)
 
     const actor = buildSentryActorContext({
       userId: user.id,
@@ -127,6 +160,11 @@ export async function GET(request: NextRequest) {
       Sentry.captureException(error)
     })
 
-    return NextResponse.json({ error: 'Gagal menghasilkan export: ' + error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Gagal menghasilkan export: ' + errorMessage }, { status: 500 })
   }
+}
+
+function buildAttachmentContentDisposition(filename: string): string {
+  const asciiFallback = filename.replace(/[^\x20-\x7E]+/g, '_').replace(/[";]/g, '_')
+  return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`
 }

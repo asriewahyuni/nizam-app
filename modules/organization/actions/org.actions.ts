@@ -5,6 +5,14 @@ import { getServerAuthContext } from '@/lib/supabase/auth.server'
 import { isInternalAuthProvider } from '@/lib/auth/provider'
 import { normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
+import {
+  buildLogoStorageKey,
+  buildPublicStorageObjectPath,
+  deleteObjectFromStorage,
+  extractManagedStorageKey,
+  isObjectStorageFeatureEnabled,
+  uploadObjectToStorage,
+} from '@/lib/storage/object-storage.server'
 import { generateSlug } from '@/lib/utils'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -1801,6 +1809,24 @@ function normalizeOrganizationLogoUrl(value: unknown): string | null {
   return normalized || null
 }
 
+/**
+ * Membersihkan file logo lama jika organisasi berpindah ke file logo bucket yang baru.
+ */
+async function cleanupReplacedManagedLogo(previousLogoUrl: string | null, nextLogoUrl: string | null) {
+  const previousKey = extractManagedStorageKey(previousLogoUrl)
+  const nextKey = extractManagedStorageKey(nextLogoUrl)
+
+  if (!previousKey || previousKey === nextKey || !previousKey.startsWith('logos/')) {
+    return
+  }
+
+  try {
+    await deleteObjectFromStorage(previousKey)
+  } catch (error) {
+    console.error('[Organization] Gagal menghapus logo lama dari bucket:', error)
+  }
+}
+
 export async function updateOrgSettings(orgId: string, updates: any) {
   const supabase = await createClient()
   const db = supabase as any
@@ -1813,8 +1839,28 @@ export async function updateOrgSettings(orgId: string, updates: any) {
             : {}),
         }
       : updates
+  const nextLogoUrl = Object.prototype.hasOwnProperty.call(normalizedUpdates || {}, 'logo_url')
+    ? normalizeOrganizationLogoUrl(normalizedUpdates.logo_url)
+    : null
+  let previousLogoUrl: string | null = null
+
+  if (Object.prototype.hasOwnProperty.call(normalizedUpdates || {}, 'logo_url')) {
+    const { data: previousOrg } = await db
+      .from('organizations')
+      .select('logo_url')
+      .eq('id', orgId)
+      .maybeSingle()
+
+    previousLogoUrl = normalizeOrganizationLogoUrl(previousOrg?.logo_url)
+  }
+
   const { error } = await db.from('organizations').update(normalizedUpdates).eq('id', orgId)
   if (error) return { error: 'Gagal menyimpan.' }
+
+  if (Object.prototype.hasOwnProperty.call(normalizedUpdates || {}, 'logo_url')) {
+    await cleanupReplacedManagedLogo(previousLogoUrl, nextLogoUrl)
+  }
+
   revalidatePath('/', 'layout')
   revalidatePath('/settings/business')
   return { success: true }
@@ -1842,6 +1888,54 @@ export async function uploadLogo(orgId: string, formData: FormData) {
   }
   if (file.size > 1024 * 1024) {
     return { success: false, error: 'Ukuran logo maksimal 1 MB agar performa tetap ringan.' }
+  }
+
+  const { data: organization } = await db
+    .from('organizations')
+    .select('logo_url')
+    .eq('id', orgId)
+    .maybeSingle()
+
+  const previousLogoUrl = normalizeOrganizationLogoUrl(organization?.logo_url)
+
+  if (isObjectStorageFeatureEnabled('logos')) {
+    const fileBuffer = Buffer.from(await file.arrayBuffer())
+    const storageKey = buildLogoStorageKey(orgId, file.name)
+    const proxiedLogoUrl = buildPublicStorageObjectPath(storageKey)
+    const normalizedLogoUrl = normalizeOrganizationLogoUrl(proxiedLogoUrl)
+
+    try {
+      await uploadObjectToStorage({
+        key: storageKey,
+        body: fileBuffer,
+        contentType: file.type || 'application/octet-stream',
+        cacheControl: 'public, max-age=31536000, immutable',
+      })
+    } catch (error) {
+      console.error('[Organization] Gagal upload logo ke bucket:', error)
+      return { success: false, error: 'Gagal upload logo ke bucket Railway. Cek kredensial bucket lalu coba lagi.' }
+    }
+
+    const { error } = await db
+      .from('organizations')
+      .update({ logo_url: normalizedLogoUrl })
+      .eq('id', orgId)
+
+    if (error) {
+      try {
+        await deleteObjectFromStorage(storageKey)
+      } catch (cleanupError) {
+        console.error('[Organization] Gagal membersihkan logo baru setelah update database gagal:', cleanupError)
+      }
+
+      return { success: false, error: 'Gagal menyimpan logo perusahaan.' }
+    }
+
+    await cleanupReplacedManagedLogo(previousLogoUrl, normalizedLogoUrl)
+
+    revalidatePath('/', 'layout')
+    revalidatePath('/settings/business')
+    return { success: true, url: normalizedLogoUrl }
   }
 
   const base64Payload = Buffer.from(await file.arrayBuffer()).toString('base64')

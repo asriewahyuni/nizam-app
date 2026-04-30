@@ -205,31 +205,25 @@ export default function JournalClient({
     else window.location.reload()
   }
 
-  const handleExportCSV = () => {
+  const handleExportXLSX = () => {
     const activeEntries = entries.filter((e: any) => e.status === filterStatus)
     if (activeEntries.length === 0) return alert("Tidak ada data untuk diunduh.")
 
-    const headers = ["Tanggal", "No. Jurnal", "Deskripsi", "Tipe Ref", "Breakdown", "Akun", "Debit", "Kredit", "Memo"]
-    const rows = activeEntries.flatMap(entry => 
-      (entry.journal_lines || []).map((line: any) => [
-        entry.entry_date,
-        `"${entry.entry_number}"`,
-        `"${(entry.description || '').replace(/"/g, '""')}"`,
-        entry.reference_type,
-        `"${getLedgerDisclosureNote(entry).replace(/"/g, '""')}"`,
-        `"${line.accounts?.code} - ${(line.accounts?.name || '').replace(/"/g, '""')}"`,
-        line.debit,
-        line.credit,
-        `"${(line.memo || '').replace(/"/g, '""')}"`
-      ])
-    )
+    if (filterStatus !== 'POSTED') {
+      return alert('Export Buku Besar format XLSX hanya untuk jurnal POSTED. Pilih filter POSTED terlebih dahulu.')
+    }
 
-    const csvContent = [headers.join(","), ...rows.map((r: any) => r.join(","))].join("\n")
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
+    const params = new URLSearchParams({
+      type: 'gl',
+      orgId,
+    })
+
+    if (activeBranchId) {
+      params.set('branchId', activeBranchId)
+    }
+
     const link = document.createElement("a")
-    link.href = url
-    link.download = `Ledger_${filterStatus}_${new Date().toISOString().split('T')[0]}.csv`
+    link.href = `/api/export?${params.toString()}`
     link.click()
   }
 
@@ -256,9 +250,9 @@ export default function JournalClient({
             <SafeButton 
               variant="white"
               icon={<Download size={16} />}
-              onClick={handleExportCSV}
+              onClick={handleExportXLSX}
             >
-              Export CSV
+              Export XLSX
             </SafeButton>
             <SafeButton 
               variant="primary"

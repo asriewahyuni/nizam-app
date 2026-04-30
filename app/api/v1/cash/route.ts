@@ -27,7 +27,7 @@ import {
   logApiCall,
   extractIpFromRequest,
 } from '@/lib/api/validate-key'
-import { getPostgresPool, queryPostgres } from '@/lib/db/postgres'
+import { connectPostgresClient, queryPostgres } from '@/lib/db/postgres'
 import { deliverWebhook } from '@/lib/api/webhook'
 
 type JsonObject = Record<string, unknown>
@@ -1392,7 +1392,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const client = await getPostgresPool().connect()
+    const client = await connectPostgresClient()
     try {
       await client.query('BEGIN')
 
