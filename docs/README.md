@@ -8,6 +8,8 @@ Folder `docs/` adalah pusat dokumentasi teknis yang lebih ringkas, terstruktur, 
 2. Lanjut ke [`developer-guide.md`](./developer-guide.md) untuk setup lokal dan workflow harian.
 3. Baca [`architecture.md`](./architecture.md) untuk memahami arsitektur request, auth, tenancy, dan akses data.
 4. Gunakan [`modules.md`](./modules.md) untuk mencari lokasi fitur dan domain business logic.
+5. Jika sedang mengerjakan toko online, lanjut ke [`ecommerce-implementation.md`](./ecommerce-implementation.md).
+6. Jika sedang menyusun pengembangan jangka panjang toko online, baca [`ecommerce-roadmap.md`](./ecommerce-roadmap.md).
 
 ## Peta Dokumen
 
@@ -16,6 +18,8 @@ Folder `docs/` adalah pusat dokumentasi teknis yang lebih ringkas, terstruktur, 
 | [`developer-guide.md`](./developer-guide.md) | Setup lokal, environment, script penting, alur kerja coding, testing, dan troubleshooting |
 | [`architecture.md`](./architecture.md) | Arsitektur aplikasi, route layer, auth, tenancy, RBAC, data access, dan deployment notes |
 | [`modules.md`](./modules.md) | Peta modul bisnis, route dashboard, folder terkait, dan tanggung jawab per domain |
+| [`ecommerce-implementation.md`](./ecommerce-implementation.md) | Dokumentasi lengkap implementasi modul e-commerce, storefront publik, cart, promo, dan draft quotation |
+| [`ecommerce-roadmap.md`](./ecommerce-roadmap.md) | Roadmap wave lengkap e-commerce dari MVP sampai versi matang dan enterprise-ready |
 
 ## Referensi Tambahan Di Root Repo
 

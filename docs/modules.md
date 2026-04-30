@@ -11,6 +11,7 @@ Dokumen ini membantu developer menemukan domain bisnis, route utama, dan lokasi 
 | Contacts | `/contacts` | `modules/contacts`, `app/(dashboard)/contacts` | CRM, pelanggan, kontak |
 | Dashboard | `/dashboard` | `app/(dashboard)/dashboard` | Ringkasan operasional utama |
 | Edu | `/learning`, `/edu` | `modules/edu`, `components/edu`, `app/(dashboard)/learning`, `app/edu` | Mode edukasi dan kompetensi |
+| E-Commerce | `/ecommerce`, `/toko/[orgSlug]` | `modules/ecommerce`, `app/(dashboard)/ecommerce`, `app/toko`, `app/api/ecommerce` | Storefront publik, katalog online, promo, cart, dan order request ke quotation |
 | Factory | `/factory` | `modules/factory`, `app/(dashboard)/factory` | Produksi, BOM, proses manufaktur |
 | Fleet | `/fleet` | `modules/fleet`, `app/(dashboard)/fleet` | Armada, rental, operasional kendaraan |
 | HRIS | `/hris` | `modules/hris`, `app/(dashboard)/hris` | Karyawan, attendance, payroll, leave, expense |
@@ -30,6 +31,7 @@ Dokumen ini membantu developer menemukan domain bisnis, route utama, dan lokasi 
 | Organization | `modules/organization` | Active org, branch, role, billing, approval |
 | Demo | `modules/demo`, `app/demo` | Demo session dan onboarding experience |
 | Public sales pages | `app/sp`, `modules/sales/lib` | Landing page publik dan lead capture |
+| Public store | `app/toko`, `modules/ecommerce/lib` | Etalase produk publik dan order request e-commerce |
 | API & integration | `app/api`, `lib/api` | Export, health check, API key validation, webhook helper |
 
 ## 3. Pola Lokasi Kode
@@ -66,6 +68,7 @@ Selain dashboard, ada beberapa route non-dashboard yang sering perlu diketahui:
 | `/demo` | Demo mode |
 | `/abs` | Landing page ABS |
 | `/sp/[orgSlug]/[pageSlug]` | Sales page publik |
+| `/toko/[orgSlug]` | Storefront publik e-commerce |
 | `/api/healthz` | Health check aplikasi |
 | `/api/healthz-db` | Health check database |
 | `/api/openapi` | Endpoint OpenAPI |

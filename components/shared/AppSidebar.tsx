@@ -16,6 +16,7 @@ import {
   Wallet,
   TrendingUp,
   ShoppingCart,
+  ShoppingBag,
   Package,
   BarChart3,
   ChevronRight,
@@ -104,6 +105,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Pelanggan (CRM)', href: '/contacts', icon: Users, permission_key: 'crm', module_key: 'CRM' },
       { label: 'POS (Kasir)', href: '/pos', icon: Store, permission_key: 'pos', module_key: 'POS' },
+      { label: 'E-Commerce', href: '/ecommerce', icon: ShoppingBag, permission_key: 'sales', module_key: 'E-Commerce' },
       { label: 'Penawaran (Quotation)', href: '/sales/quotations', icon: FileText, permission_key: 'quotation', module_key: 'Sales' },
       { label: 'Penjualan', href: '/sales', icon: TrendingUp, permission_key: 'sales', module_key: 'Sales' },
       { label: 'Sales Pipeline', href: '/sales/pipeline', icon: Activity, permission_key: 'sales', module_key: 'Sales' },
@@ -165,6 +167,10 @@ const SIDEBAR_STATE_EVENT = 'nizam_sidebar_state_change'
 const SIDEBAR_TOGGLE_EVENT = 'nizam_sidebar_toggle'
 const ROUTE_LOADING_START_EVENT = 'nizam_route_loading_start'
 const SIDEBAR_NAV_SKELETON_GROUPS = [3, 4, 3, 4] as const
+
+function subscribeNoop() {
+  return () => {}
+}
 
 function getSidebarCollapsedSnapshot() {
   if (typeof window === 'undefined') return false
@@ -257,7 +263,6 @@ export function AppSidebar({
   const fullPath = pathname + (tabQuery ? `?tab=${tabQuery}` : '')
   const prefetchedRoutesRef = useRef<Set<string>>(new Set())
 
-  const [hasMounted, setHasMounted] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [badgeMetrics, setBadgeMetrics] = useState(() => ({
     pendingApprovals,
@@ -273,9 +278,11 @@ export function AppSidebar({
     return () => window.removeEventListener(SIDEBAR_TOGGLE_EVENT, handleMobileToggle)
   }, [])
 
-  useEffect(() => {
-    setHasMounted(true)
-  }, [])
+  const hasMounted = useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false
+  )
 
   const isCollapsed = useSyncExternalStore(
     subscribeSidebarCollapsed,

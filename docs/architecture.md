@@ -30,7 +30,7 @@ Secara garis besar, aplikasi dibangun dengan pola berikut:
 - `app/(auth)`: halaman login dan registrasi
 - `app/(dashboard)`: area utama ERP setelah login
 - `app/api`: route handler seperti export, health check, openapi
-- `app/demo`, `app/onboarding`, `app/sp`: flow publik atau onboarding
+- `app/demo`, `app/onboarding`, `app/sp`, `app/toko`: flow publik atau onboarding
 
 ### Entry points penting
 
@@ -139,6 +139,18 @@ Beberapa route handler yang aktif saat ini berada di:
 - [`app/api/healthz/route.ts`](/Users/manbook/nizam-app/app/api/healthz/route.ts:1)
 - [`app/api/healthz-db/route.ts`](/Users/manbook/nizam-app/app/api/healthz-db/route.ts:1)
 - [`app/api/openapi/route.ts`](/Users/manbook/nizam-app/app/api/openapi/route.ts:1)
+- `app/api/ecommerce/order-request/route.ts`
+
+### Public commerce flow
+
+Untuk modul e-commerce, ada satu jalur publik tambahan:
+
+1. pelanggan membuka `/toko/[orgSlug]`
+2. route publik memuat katalog aktif organisasi
+3. submit checkout ringan dikirim ke `/api/ecommerce/order-request`
+4. route handler membuat draft quotation di ERP melalui helper `modules/ecommerce/lib/ecommerce.server.ts`
+
+Arsitektur ini membuat storefront publik tetap tipis di layer route, sementara keputusan bisnis utama tetap berada di helper server.
 
 ## 10. Testing dan Build
 
