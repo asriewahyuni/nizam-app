@@ -498,6 +498,59 @@ class PostgresQueryBuilder {
     return { data: rows, error: null }
   }
 
+  private _normalizeSelectedColumn(column: string): string {
+    return column.trim().replace(/^"+|"+$/g, '')
+  }
+
+  private _mergeSelectColumns(selectExpr: string, requiredColumns: string[]): string {
+    if (selectExpr === '*') return '*'
+
+    const columns = new Set(
+      splitTopLevel(selectExpr)
+        .map((column) => this._normalizeSelectedColumn(column))
+        .filter(Boolean)
+    )
+
+    for (const column of requiredColumns) {
+      const normalized = this._normalizeSelectedColumn(column)
+      if (normalized) columns.add(normalized)
+    }
+
+    return Array.from(columns).join(', ')
+  }
+
+  private async _collectSupportColumnsForSubRelations(
+    baseTable: string,
+    subRelations: string[]
+  ): Promise<string[]> {
+    if (subRelations.length === 0) return []
+
+    await loadFkCache()
+
+    const requiredColumns = new Set<string>()
+
+    for (const subRel of subRelations) {
+      const aliasMatch = subRel.match(/^(\w+):([\w!]+)\(([\s\S]*)\)$/)
+      const simpleMatch = subRel.match(/^([\w!]+)\(([\s\S]*)\)$/)
+      if (!aliasMatch && !simpleMatch) continue
+
+      const aliasRaw = aliasMatch ? aliasMatch[1] : simpleMatch![1]
+      const relTableRaw = aliasMatch ? aliasMatch[2] : simpleMatch![1]
+      const alias = aliasRaw.split('!')[0]
+      const relTable = relTableRaw.split('!')[0]
+
+      // Alias-based fallback tetap dipakai karena banyak query mengikuti pola branch -> branch_id, product -> product_id.
+      requiredColumns.add(`${alias}_id`)
+
+      for (const [key, value] of _fkCache.entries()) {
+        if (!key.startsWith(baseTable + '.') || value !== relTable) continue
+        requiredColumns.add(key.split('.')[1])
+      }
+    }
+
+    return Array.from(requiredColumns)
+  }
+
   /**
    * Resolusi nested relations menggunakan FK constraint dari PostgreSQL information_schema.
    *
@@ -540,6 +593,7 @@ class PostgresQueryBuilder {
       
       const relColExpr = flatRelCols
       const relTableQ = `public."${relTable.replace(/"/g, '""')}"`
+      const subRelationSupportCols = await this._collectSupportColumnsForSubRelations(relTable, subRelations)
 
       // --- Custom Strategy for specific FK column mapping (fallback when FK cache misses) ---
       // For instance, purchases -> contacts uses contact_id, but the alias might be 'vendor'
@@ -574,9 +628,7 @@ class PostgresQueryBuilder {
             // Always include 'id' in SELECT so relById map keys are populated
             const idSelectExpr = relColExpr === '*'
               ? '*'
-              : relColExpr.split(', ').map((c) => c.trim()).includes('id')
-                ? relColExpr
-                : `id, ${relColExpr}`
+              : this._mergeSelectColumns(relColExpr, ['id', ...subRelationSupportCols])
             let relResultRows = (await queryPostgres<Record<string, unknown>>(
               'SELECT ' + idSelectExpr + ' FROM ' + relTableQ + ' WHERE id = ANY($1::uuid[])',
               [foreignIds]
@@ -607,9 +659,7 @@ class PostgresQueryBuilder {
               // Always include 'id' in SELECT so relById map keys are populated
               const idSelectExpr2 = relColExpr === '*'
                 ? '*'
-                : relColExpr.split(', ').map((c) => c.trim()).includes('id')
-                  ? relColExpr
-                  : `id, ${relColExpr}`
+                : this._mergeSelectColumns(relColExpr, ['id', ...subRelationSupportCols])
               let relResultRows = (await queryPostgres<Record<string, unknown>>(
                 'SELECT ' + idSelectExpr2 + ' FROM ' + relTableQ + ' WHERE id = ANY($1::uuid[])',
                 [foreignIds]
@@ -650,9 +700,7 @@ class PostgresQueryBuilder {
             const backRefColQ = `"${backRefColFromCache.replace(/"/g, '""')}"`
             const backRefSelectExpr = relColExpr === '*'
               ? '*'
-              : relColExpr.split(', ').map((c) => c.trim()).includes(backRefColFromCache)
-                ? relColExpr
-                : `${relColExpr}, ${backRefColQ}`
+              : this._mergeSelectColumns(relColExpr, [backRefColFromCache, ...subRelationSupportCols])
 
             let relResultRows = (await queryPostgres<Record<string, unknown>>(
               'SELECT ' + backRefSelectExpr + ' FROM ' + relTableQ + ' WHERE ' + backRefColQ + ' = ANY($1::uuid[])',
