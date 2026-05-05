@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Settings, Save, Fingerprint, Building, FileText, Upload, Check, X, Key, Clock, Zap, RotateCcw, MessageCircle, Eye, EyeOff, Sparkles } from 'lucide-react'
+import { Settings, Save, Fingerprint, Building, FileText, Check, X, Key, Clock, Zap, RotateCcw, MessageCircle, Eye, EyeOff, Sparkles } from 'lucide-react'
 import { updateOrgSettings, uploadLogo, checkSlugAvailability } from '@/modules/organization/actions/org.actions'
 import { resetOrganizationData, type ResetOrganizationMode } from '@/modules/settings/actions/audit.actions'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -180,14 +180,6 @@ export default function BusinessClient({
               <FileText size={16} />
               Buka Pusat Migrasi
             </Link>
-            <a
-              href="/templates/migrasi/NIZAM_Migration_Template.xlsx"
-              download
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
-            >
-              <Upload size={16} />
-              Download Template
-            </a>
           </div>
         </div>
       </div>

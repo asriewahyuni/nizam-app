@@ -3,9 +3,10 @@
 import { revalidatePath } from 'next/cache'
 import { generateSlug } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
+import { syncParentAccountToDescendants } from '@/modules/accounting/actions/coa.actions'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
-import type { Database } from '@/types/database.types'
+import type { AccountType, CashFlowCategory, Database, NormalBalance } from '@/types/database.types'
 
 type ParsedMigrationRow = {
   rowNumber: number
@@ -16,6 +17,15 @@ type EntityImportSummary = {
   created: number
   updated: number
   skipped: number
+  errors: string[]
+}
+
+type CoaImportSummary = {
+  created: number
+  updated: number
+  skipped: number
+  headerRows: number
+  detailRows: number
   errors: string[]
 }
 
@@ -47,6 +57,26 @@ export type MasterDataImportResult =
         warehouses: EntityImportSummary
       }
     }
+
+export type CoaImportResult =
+  | {
+      success: false
+      error: string
+    }
+  | {
+      success: true
+      hasErrors: boolean
+      message: string
+      warnings: string[]
+      summary: CoaImportSummary
+      metadata: {
+        syncedAccounts: number
+      }
+    }
+
+type CoaImportPayload = {
+  coaRows: ParsedMigrationRow[]
+}
 
 type MasterDataImportPayload = {
   coaMappingRows: ParsedMigrationRow[]
@@ -164,6 +194,11 @@ type ExistingWarehouseImportRecord = Pick<
 type ExistingAccountRecord = Pick<
   Database['public']['Tables']['accounts']['Row'],
   'id' | 'code' | 'name' | 'type'
+>
+
+type ExistingCoaImportRecord = Pick<
+  Database['public']['Tables']['accounts']['Row'],
+  'id' | 'code' | 'name' | 'type' | 'normal_balance' | 'parent_id' | 'description' | 'cash_flow_category' | 'is_system' | 'is_active'
 >
 
 type OpeningStockResolvedRow = {
@@ -474,6 +509,17 @@ function createSummary(): EntityImportSummary {
   }
 }
 
+function createCoaSummary(): CoaImportSummary {
+  return {
+    created: 0,
+    updated: 0,
+    skipped: 0,
+    headerRows: 0,
+    detailRows: 0,
+    errors: [],
+  }
+}
+
 function createOpeningStockSummary(): OpeningStockImportSummary {
   return {
     created: 0,
@@ -540,6 +586,34 @@ function createEmployeesSummary(): EmployeesImportSummary {
   }
 }
 
+function resolveCoaAccountType(value: string) {
+  const mapping: Record<string, AccountType> = {
+    aset: 'ASSET',
+    liabilitas: 'LIABILITY',
+    hutang: 'LIABILITY',
+    ekuitas: 'EQUITY',
+    pendapatan: 'REVENUE',
+    hpp: 'EXPENSE',
+    beban: 'EXPENSE',
+    'beban operasional': 'EXPENSE',
+    'beban lainnya': 'EXPENSE',
+  }
+
+  return mapping[normalizeLookup(value)] || null
+}
+
+function resolveCoaNormalBalance(value: string): NormalBalance | null {
+  const normalized = String(value || '').trim().toUpperCase()
+  if (normalized === 'DEBIT' || normalized === 'CREDIT') return normalized
+  return null
+}
+
+function resolveCoaCashFlowCategory(value: string): CashFlowCategory | null {
+  const normalized = String(value || '').trim().toUpperCase()
+  if (normalized === 'OPERATING' || normalized === 'INVESTING' || normalized === 'FINANCING') return normalized
+  return null
+}
+
 function buildOpeningStockKey(productId: string, warehouseId: string, batchNumber?: string | null) {
   return `${productId}::${warehouseId}::${String(batchNumber || '').trim().toUpperCase()}`
 }
@@ -554,6 +628,7 @@ function revalidateMigrationImportTargets() {
   revalidatePath('/factory')
   revalidatePath('/hris')
   revalidatePath('/cash')
+  revalidatePath('/settings/accounts')
   revalidatePath('/settings/business')
   revalidatePath('/settings/business/migration')
 }
@@ -564,6 +639,271 @@ const OPENING_AP_IMPORT_TAG = '[AUTO_MIGRATION_OPENING_AP]'
 const OPENING_CASH_BANK_IMPORT_TAG = '[AUTO_MIGRATION_OPENING_CASH_BANK]'
 const FIXED_ASSETS_IMPORT_TAG = '[AUTO_MIGRATION_FIXED_ASSETS]'
 const MANUFACTURING_IMPORT_TAG = '[AUTO_MIGRATION_BOM]'
+
+export async function importCoaMigration(
+  payload: CoaImportPayload
+): Promise<CoaImportResult> {
+  try {
+    const orgData = await getActiveOrg()
+    if (!orgData?.org?.id) {
+      return { success: false, error: 'Organisasi aktif tidak ditemukan.' }
+    }
+
+    if (!['owner', 'admin', 'manager'].includes(String(orgData.role || ''))) {
+      return { success: false, error: 'Hanya owner, admin, atau manager yang boleh menjalankan migrasi Chart of Accounts.' }
+    }
+
+    if (payload.coaRows.length === 0) {
+      return { success: false, error: 'Sheet coa belum berisi data untuk dimigrasikan.' }
+    }
+
+    const supabase = await createClient()
+    const { data: authData } = await supabase.auth.getUser()
+    if (!authData.user) {
+      return { success: false, error: 'Sesi login tidak ditemukan.' }
+    }
+
+    const orgId = orgData.org.id
+    const warnings = new Set<string>([
+      'Kolom sub_kategori dan tipe_akun dipakai untuk validasi struktur workbook. Saat ini kolom tersebut belum disimpan sebagai field terpisah di tabel akun.',
+      'Akun sistem existing tetap dijaga pada tipe dan saldo normal aslinya. Jika workbook mencoba mengubah keduanya, baris terkait akan dilewati.',
+    ])
+    const syncWarnings = new Set<string>()
+    const summary = createCoaSummary()
+
+    const { data: canManage, error: permissionError } = await supabase
+      .rpc('can_manage_finance_master', { p_org_id: orgId })
+
+    if (permissionError || !canManage) {
+      return {
+        success: false,
+        error:
+          'Hanya Organisasi Utama (Parent/Holding) pada konteks Unit Utama yang dapat mengimpor rekening CoA langsung. Silakan gunakan unit parent atau ajukan melalui proses pengajuan rekening.',
+      }
+    }
+
+    const { data: existingAccountRows, error: accountsError } = await supabase
+      .from('accounts')
+      .select('id, code, name, type, normal_balance, parent_id, description, cash_flow_category, is_system, is_active')
+      .eq('org_id', orgId)
+
+    if (accountsError) {
+      return { success: false, error: 'Gagal membaca akun existing sebelum migrasi CoA dijalankan.' }
+    }
+
+    const accountByCode = new Map<string, ExistingCoaImportRecord>()
+    for (const account of (existingAccountRows || []) as ExistingCoaImportRecord[]) {
+      const codeKey = normalizeCode(account.code)
+      if (!codeKey || accountByCode.has(codeKey)) continue
+      accountByCode.set(codeKey, account)
+    }
+
+    const sortedRows = [...payload.coaRows].sort((left, right) => {
+      const leftLevel = Number.parseInt(String(left.values.level || '').trim(), 10)
+      const rightLevel = Number.parseInt(String(right.values.level || '').trim(), 10)
+      const safeLeftLevel = Number.isFinite(leftLevel) && leftLevel > 0 ? leftLevel : Number.MAX_SAFE_INTEGER
+      const safeRightLevel = Number.isFinite(rightLevel) && rightLevel > 0 ? rightLevel : Number.MAX_SAFE_INTEGER
+
+      if (safeLeftLevel !== safeRightLevel) return safeLeftLevel - safeRightLevel
+      return left.rowNumber - right.rowNumber
+    })
+
+    for (const row of sortedRows) {
+      const code = normalizeCode(row.values.kode_akun)
+      const name = String(row.values.nama_akun || '').trim()
+      const categoryLabel = String(row.values.kategori_utama || '').trim()
+      const parentCode = normalizeCode(row.values.parent_kode)
+      const rowType = String(row.values.tipe_akun || '').trim().toUpperCase()
+      const level = Number.parseInt(String(row.values.level || '').trim(), 10)
+      const description = String(row.values.deskripsi || '').trim() || null
+      const accountType = resolveCoaAccountType(categoryLabel)
+      const normalBalance = resolveCoaNormalBalance(row.values.saldo_normal)
+      const cashFlowCategory = resolveCoaCashFlowCategory(row.values.arus_kas)
+      const isActive = parseBoolean(row.values.aktif, true)
+
+      if (!code || !name || !accountType || !normalBalance || !Number.isFinite(level) || level < 1) {
+        summary.skipped += 1
+        summary.errors.push(`Baris ${row.rowNumber}: data akun belum lengkap atau format dasar belum valid.`)
+        continue
+      }
+
+      if (!['HEADER', 'DETAIL'].includes(rowType)) {
+        summary.skipped += 1
+        summary.errors.push(`Baris ${row.rowNumber}: tipe_akun harus HEADER atau DETAIL.`)
+        continue
+      }
+
+      if (level === 1 && parentCode) {
+        summary.skipped += 1
+        summary.errors.push(`Baris ${row.rowNumber}: akun level 1 tidak boleh memiliki parent_kode.`)
+        continue
+      }
+
+      if (level > 1 && !parentCode) {
+        summary.skipped += 1
+        summary.errors.push(`Baris ${row.rowNumber}: akun level ${level} wajib memiliki parent_kode.`)
+        continue
+      }
+
+      if (parentCode && parentCode === code) {
+        summary.skipped += 1
+        summary.errors.push(`Baris ${row.rowNumber}: parent_kode tidak boleh sama dengan kode_akun.`)
+        continue
+      }
+
+      const parentAccount = parentCode ? accountByCode.get(parentCode) || null : null
+      if (parentCode && !parentAccount?.id) {
+        summary.skipped += 1
+        summary.errors.push(`Baris ${row.rowNumber}: parent_kode ${parentCode} belum ditemukan di sistem atau di baris level sebelumnya.`)
+        continue
+      }
+
+      if (parentAccount && parentAccount.type !== accountType) {
+        summary.skipped += 1
+        summary.errors.push(`Baris ${row.rowNumber}: kategori_utama akun anak harus sama dengan tipe akun parent ${parentCode}.`)
+        continue
+      }
+
+      const existingAccount = accountByCode.get(code)
+
+      if (existingAccount?.id) {
+        if (existingAccount.is_system && (existingAccount.type !== accountType || existingAccount.normal_balance !== normalBalance)) {
+          summary.skipped += 1
+          summary.errors.push(
+            `Baris ${row.rowNumber}: akun sistem ${code} tidak boleh mengubah kategori_utama atau saldo_normal dari struktur bawaan NIZAM.`
+          )
+          continue
+        }
+
+        if (existingAccount.is_system && !isActive) {
+          warnings.add(`Akun sistem seperti ${code} akan tetap aktif walaupun kolom aktif diisi FALSE.`)
+        }
+
+        const updatePayload: Database['public']['Tables']['accounts']['Update'] = existingAccount.is_system
+          ? {
+              name,
+              parent_id: parentAccount?.id || null,
+              description,
+              cash_flow_category: cashFlowCategory,
+              is_active: existingAccount.is_active,
+            }
+          : {
+              name,
+              type: accountType,
+              normal_balance: normalBalance,
+              parent_id: parentAccount?.id || null,
+              description,
+              cash_flow_category: cashFlowCategory,
+              is_active: isActive,
+            }
+
+        const { data: updatedAccount, error: updateError } = await supabase
+          .from('accounts')
+          .update(updatePayload)
+          .eq('id', existingAccount.id)
+          .eq('org_id', orgId)
+          .select('id, code, name, type, normal_balance, parent_id, description, cash_flow_category, is_system, is_active')
+          .single()
+
+        if (updateError || !updatedAccount?.id) {
+          summary.skipped += 1
+          summary.errors.push(`Baris ${row.rowNumber}: gagal memperbarui akun ${code}.`)
+          continue
+        }
+
+        const savedAccount = updatedAccount as ExistingCoaImportRecord
+        accountByCode.set(code, savedAccount)
+        summary.updated += 1
+        if (rowType === 'HEADER') summary.headerRows += 1
+        if (rowType === 'DETAIL') summary.detailRows += 1
+
+        try {
+          const syncResult = await syncParentAccountToDescendants(orgId, savedAccount, {
+            previousCode: existingAccount.code,
+          })
+          if (!syncResult.success) {
+            syncWarnings.add('Sebagian akun parent berhasil diperbarui, tetapi sinkronisasi ke unit turunan belum sepenuhnya selesai.')
+            console.warn('CoA sync warning (importCoaMigration:update):', syncResult.errors)
+          }
+        } catch (error) {
+          syncWarnings.add('Sebagian akun parent berhasil diperbarui, tetapi sinkronisasi ke unit turunan gagal dijalankan di server.')
+          console.error('CoA sync exception (importCoaMigration:update):', error)
+        }
+        continue
+      }
+
+      const { data: insertedAccount, error: insertError } = await supabase
+        .from('accounts')
+        .insert({
+          org_id: orgId,
+          code,
+          name,
+          type: accountType,
+          normal_balance: normalBalance,
+          parent_id: parentAccount?.id || null,
+          description,
+          cash_flow_category: cashFlowCategory,
+          is_system: false,
+          is_active: isActive,
+        })
+        .select('id, code, name, type, normal_balance, parent_id, description, cash_flow_category, is_system, is_active')
+        .single()
+
+      if (insertError || !insertedAccount?.id) {
+        summary.skipped += 1
+        summary.errors.push(
+          insertError?.code === '23505'
+            ? `Baris ${row.rowNumber}: kode akun ${code} sudah digunakan.`
+            : `Baris ${row.rowNumber}: gagal membuat akun ${code}.`
+        )
+        continue
+      }
+
+      const savedAccount = insertedAccount as ExistingCoaImportRecord
+      accountByCode.set(code, savedAccount)
+      summary.created += 1
+      if (rowType === 'HEADER') summary.headerRows += 1
+      if (rowType === 'DETAIL') summary.detailRows += 1
+
+      try {
+        const syncResult = await syncParentAccountToDescendants(orgId, savedAccount)
+        if (!syncResult.success) {
+          syncWarnings.add('Sebagian akun parent berhasil dibuat, tetapi sinkronisasi ke unit turunan belum sepenuhnya selesai.')
+          console.warn('CoA sync warning (importCoaMigration:create):', syncResult.errors)
+        }
+      } catch (error) {
+        syncWarnings.add('Sebagian akun parent berhasil dibuat, tetapi sinkronisasi ke unit turunan gagal dijalankan di server.')
+        console.error('CoA sync exception (importCoaMigration:create):', error)
+      }
+    }
+
+    syncWarnings.forEach((warning) => warnings.add(warning))
+
+    revalidatePath('/settings/accounts')
+    revalidateMigrationImportTargets()
+
+    return {
+      success: true,
+      hasErrors: summary.errors.length > 0,
+      message: summary.errors.length > 0
+        ? 'Migrasi Chart of Accounts selesai dengan beberapa baris yang dilewati.'
+        : 'Chart of Accounts berhasil dimigrasikan ke sistem.',
+      warnings: Array.from(warnings),
+      summary,
+      metadata: {
+        syncedAccounts: summary.created + summary.updated,
+      },
+    }
+  } catch (error) {
+    console.error('importCoaMigration failed unexpectedly:', error)
+    return {
+      success: false,
+      error: error instanceof Error
+        ? `Migrasi Chart of Accounts gagal dijalankan: ${error.message}`
+        : 'Migrasi Chart of Accounts gagal dijalankan karena terjadi error di server.',
+    }
+  }
+}
 
 export async function importMasterDataMigration(
   payload: MasterDataImportPayload
@@ -859,7 +1199,7 @@ export async function importMasterDataMigration(
   }
 
   if (payload.coaMappingRows.length > 0) {
-    warnings.push('Sheet coa_mapping belum dimasukkan ke sistem. Saat ini sheet tersebut masih dipakai sebagai bahan review dan mapping manual.')
+    warnings.push('Sheet coa_mapping tetap dibaca sebagai lampiran mapping legacy. Import akun yang benar-benar menulis ke sistem sekarang dijalankan dari bagian Chart of Accounts / sheet coa.')
   }
   if (payload.customers.length > 0 || payload.suppliers.length > 0) {
     warnings.push('Kolom customer_code, supplier_code, city, payment_term_days, npwp, dan notes pada kontak belum punya field tujuan langsung di master kontak, jadi masih dipakai sebagai referensi file sumber.')
