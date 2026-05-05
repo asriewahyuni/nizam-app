@@ -629,7 +629,13 @@ export default function SaasOperatorClient({
         setMsg({ type: 'err', text: res.error })
         return
       }
-      setMsg({ type: 'ok', text: 'Penawaran berhasil dikonversi ke penjualan.' })
+      const warning = 'warning' in res ? res.warning : null
+      setMsg({
+        type: 'ok',
+        text: warning
+          ? `Penawaran berhasil dikonversi ke penjualan. ${warning}`
+          : 'Penawaran berhasil dikonversi ke penjualan.',
+      })
       router.refresh()
     })
   }

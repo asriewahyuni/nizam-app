@@ -1242,6 +1242,9 @@ export async function convertQuotationToSale(invoiceId: string) {
   }
 
   const nextInvoiceNumber = buildSalesNumber()
+
+  // Pencatatan jurnal bersifat best-effort: jika akun COA tenant belum tersedia,
+  // konversi tetap dilanjutkan. Jurnal bisa dicatat manual kemudian.
   const journalResult = await ensureOperatorSaleJournal(admin, actor.id, {
     id: invoice.id,
     org_id: invoice.org_id,
@@ -1250,10 +1253,9 @@ export async function convertQuotationToSale(invoiceId: string) {
     tax_amount: invoice.tax_amount,
     created_at: new Date().toISOString(),
   })
-
-  if (journalResult.error) {
-    return { error: `Gagal membuat jurnal penjualan: ${journalResult.error}` }
-  }
+  const journalWarning = journalResult.error
+    ? `(Jurnal otomatis dilewati: ${journalResult.error})`
+    : null
 
   const baseUpdatePayload = {
     invoice_number: nextInvoiceNumber,
@@ -1283,7 +1285,8 @@ export async function convertQuotationToSale(invoiceId: string) {
   }
 
   if (error) {
-    if (journalResult.entryId && !journalResult.existed) {
+    // Jika update gagal, rollback jurnal yang sudah terbuat (jika ada)
+    if (journalResult.entryId && !journalResult.existed && !journalWarning) {
       await deleteJournalById(admin, journalResult.entryId)
     }
     return { error: `Gagal konversi penawaran: ${error.message}` }
@@ -1292,7 +1295,7 @@ export async function convertQuotationToSale(invoiceId: string) {
   revalidatePath('/saas/penawaran')
   revalidatePath('/saas/penjualan')
   revalidatePath('/accounting/journal')
-  return { success: true }
+  return { success: true, warning: journalWarning ?? undefined }
 }
 
 export async function markOperatorSalePaid(invoiceId: string, paymentMethod: string = 'MANUAL_TRANSFER') {
