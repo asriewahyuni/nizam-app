@@ -36,15 +36,14 @@ Gunakan minimal data berikut selama simulasi:
 
 ## Target Akhir Simulasi
 
-Setelah 15 soal selesai, peserta seharusnya berhasil membuktikan bahwa sistem mampu menangani:
+Setelah 10 soal selesai, peserta seharusnya berhasil membuktikan bahwa sistem mampu menangani:
 
 - master data lintas entitas,
 - pembelian, stok, penjualan, POS, kas/bank,
 - transaksi antar anak perusahaan/holding,
-- mutasi karyawan antar entitas,
-- aset, reimbursement, aging, dan laporan konsolidasi.
+- aset, aging, dan laporan konsolidasi.
 
-## 15 Soal Latihan
+## 10 Soal Latihan
 
 ### 1. Membuat Struktur Grup Usaha
 
@@ -107,17 +106,7 @@ Verifikasi:
 - Hutang usaha bertambah.
 - Nilai persediaan bertambah sesuai total pembelian.
 
-### 6. Pembayaran Sebagian Hutang Supplier
-
-Masih pada `PT Nizam Distribusi Jabar`, lakukan pembayaran hutang ke supplier sebesar `Rp10.000.000` melalui `BCA Distribusi`.
-
-Verifikasi:
-
-- Saldo bank berkurang.
-- Hutang supplier berkurang sebagian, bukan lunas penuh.
-- Sisa hutang tampil di menu Aging/AP.
-
-### 7. Mutasi Stok Antar Gudang
+### 6. Mutasi Stok Antar Gudang
 
 Pindahkan stok pada `PT Nizam Distribusi Jabar`:
 
@@ -132,7 +121,7 @@ Verifikasi:
 - Tidak ada perubahan total stok perusahaan.
 - Riwayat mutasi muncul di Inventory dan kartu stok/ledger.
 
-### 8. Penjualan Kredit ke Customer Grosir
+### 7. Penjualan Kredit ke Customer Grosir
 
 Pada `PT Nizam Distribusi Jabar`, buat penjualan kredit ke `Toko Barokah`:
 
@@ -147,17 +136,7 @@ Verifikasi:
 - Piutang usaha bertambah.
 - Pendapatan penjualan tercatat di jurnal.
 
-### 9. Pelunasan Sebagian Piutang Customer
-
-Catat penerimaan pembayaran dari `Toko Barokah` sebesar `Rp5.000.000` ke `BCA Distribusi`.
-
-Verifikasi:
-
-- Saldo bank bertambah.
-- Piutang customer berkurang sebagian.
-- Sisa tagihan muncul di Aging/AR.
-
-### 10. Penjualan Retail Melalui POS
+### 8. Penjualan Retail Melalui POS
 
 Pada `CV Nizam Retail Bandung`, lakukan transaksi POS tunai:
 
@@ -172,17 +151,7 @@ Verifikasi:
 - Kas/bank bertambah sesuai metode bayar.
 - Penjualan muncul di laporan penjualan harian.
 
-### 11. Reimbursement Biaya Operasional
-
-Pada `CV Nizam Retail Bandung`, catat reimbursement untuk supervisor toko sebesar `Rp750.000` atas biaya transport dan konsumsi.
-
-Verifikasi:
-
-- Pengajuan reimbursement tercatat.
-- Setelah diproses/disetujui, jurnal beban terbentuk.
-- Saldo kas/bank berkurang jika sudah dibayar.
-
-### 12. Pembelian dan Pencatatan Aset Tetap
+### 9. Pembelian dan Pencatatan Aset Tetap
 
 Pada `PT Nizam Distribusi Jabar`, beli 1 unit hand pallet/forklift kecil senilai `Rp22.000.000` dan catat sebagai aset tetap.
 
@@ -192,30 +161,7 @@ Verifikasi:
 - Bukan tercatat sebagai beban operasional biasa.
 - Nilai aset muncul di daftar aset dan Neraca.
 
-### 13. Mutasi Karyawan dari Holding ke Anak Perusahaan
-
-Pindahkan 1 karyawan dari holding ke `CV Nizam Retail Bandung` untuk menjadi PIC cabang/toko.
-
-Verifikasi:
-
-- Riwayat mutasi karyawan tercatat.
-- Profil karyawan muncul di entitas tujuan.
-- Jika fitur PIC dipakai, cabang tujuan dapat menunjuk karyawan tersebut.
-
-### 14. Transaksi Antar Entitas Kedua
-
-Simulasikan dukungan operasional dari `PT Nizam Distribusi Jabar` ke `CV Nizam Retail Bandung` dengan salah satu cara berikut:
-
-- transfer dana operasional `Rp7.500.000`, atau
-- suplai barang dari distribusi ke retail sesuai mekanisme yang tersedia pada environment Anda.
-
-Verifikasi:
-
-- Transaksi tercatat pada entitas sumber dan tujuan.
-- Tidak tercampur sebagai transaksi pihak luar.
-- Saldo, stok, atau akun antar entitas berubah secara konsisten.
-
-### 15. Review Laporan Konsolidasi dan Closing Ringan
+### 10. Review Laporan Konsolidasi dan Closing Ringan
 
 Dari holding, buka laporan:
 
@@ -239,13 +185,13 @@ Jika ingin menjadikannya sebagai penilaian, gunakan skor sederhana berikut:
 - `1 poin` jika peserta memilih entitas/unit yang benar.
 - `1 poin` jika peserta mampu menunjukkan dampaknya pada laporan atau saldo.
 
-Skor maksimal: `45 poin` untuk 15 soal.
+Skor maksimal: `30 poin` untuk 10 soal.
 
 ## Opsi Bonus
 
 Jika waktu masih ada, tambahkan uji lanjutan berikut:
 
-- approval workflow untuk reimbursement atau jurnal,
+- approval workflow untuk jurnal atau transaksi antar entitas,
 - permintaan akun CoA dari anak perusahaan ke holding,
 - audit trail atas transaksi yang sudah dibuat,
 - penutupan periode/closing setelah seluruh transaksi selesai.

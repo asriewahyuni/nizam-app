@@ -129,6 +129,38 @@ function buildPlanExpiryIso(durationDays: number | null | undefined): string | n
   return expiresAt.toISOString()
 }
 
+function buildPlanExpiryDateInput(durationDays: number | null | undefined): string {
+  if (typeof durationDays !== 'number' || durationDays <= 0) return ''
+
+  const expiresAt = new Date()
+  expiresAt.setDate(expiresAt.getDate() + durationDays)
+  return formatDateInputValue(expiresAt)
+}
+
+function resolveNextExpiryDateInput(
+  currentValue: string,
+  currentDurationDays: number | null | undefined,
+  nextDurationDays: number | null | undefined
+): string {
+  const trimmedCurrentValue = String(currentValue || '').trim()
+  const currentSuggestedValue = buildPlanExpiryDateInput(currentDurationDays)
+  const nextSuggestedValue = buildPlanExpiryDateInput(nextDurationDays)
+
+  if (!trimmedCurrentValue) return nextSuggestedValue
+  if (trimmedCurrentValue === currentSuggestedValue) return nextSuggestedValue
+  return trimmedCurrentValue
+}
+
+function toExpiryIsoFromDateInput(value: string): string | null {
+  const trimmedValue = String(value || '').trim()
+  if (!trimmedValue) return null
+
+  const parsed = new Date(`${trimmedValue}T23:59:59`)
+  if (Number.isNaN(parsed.getTime())) return null
+
+  return parsed.toISOString()
+}
+
 type SaasActiveAddonEntry = Record<string, unknown> & {
   id?: string
   name: string
@@ -248,16 +280,6 @@ function buildActiveAddonPayload(
   })
 }
 
-function buildPackageLimitPayload(pkg: any) {
-  return {
-    max_orgs: typeof pkg?.max_orgs === 'number' ? pkg.max_orgs : 1,
-    max_warehouses: typeof pkg?.max_warehouses === 'number' ? pkg.max_warehouses : 1,
-    max_branches: pkg?.max_branches == null || pkg?.max_branches === '' ? null : Number(pkg.max_branches),
-    max_child_orgs: pkg?.max_child_orgs == null || pkg?.max_child_orgs === '' ? null : Number(pkg.max_child_orgs),
-    max_users: pkg?.max_users == null || pkg?.max_users === '' ? null : Number(pkg.max_users),
-  }
-}
-
 type Tab =
   | 'users'
   | 'module_management'
@@ -344,16 +366,19 @@ export default function SaaSAdminPage() {
   // ======== MODALS STATE ========
   const [pkgModal, setPkgModal] = useState<{ open: boolean; editData: any | null }>({ open: false, editData: null })
   const [orgModal, setOrgModal] = useState<{ open: boolean; editData: any | null }>({ open: false, editData: null })
+  const [orgModalPlanName, setOrgModalPlanName] = useState('Demo')
   const [entitlementModal, setEntitlementModal] = useState<{
     open: boolean
     org: Organization | null
     selectedPlan: string
+    expiryDate: string
     selectedModules: string[]
     selectedAddons: string[]
   }>({
     open: false,
     org: null,
     selectedPlan: '',
+    expiryDate: '',
     selectedModules: [],
     selectedAddons: [],
   })
@@ -398,6 +423,34 @@ export default function SaaSAdminPage() {
   const resolvePackageCoreFamily = (pkg: any): SaasCoreFamilyLevel => {
     if (!pkg) return 'none'
     return getSaasPackageArchitecture(toCapabilityArray(pkg.modules), []).coreFamilyLevel
+  }
+
+  const closeOrgModal = () => {
+    setOrgModal({ open: false, editData: null })
+    setOrgModalPlanName('Demo')
+    setModalExpireDate('')
+  }
+
+  const openOrgModal = (org: Organization | null) => {
+    const initialPlan = String((org?.settings as any)?.plan || 'Demo').trim() || 'Demo'
+    const initialPackage = packages.find((pkg) => pkg.name === initialPlan) || null
+    const initialExpiry =
+      formatDateInputValue(resolveOrganizationExpiryDate(org as OrganizationExpirySource)) ||
+      buildPlanExpiryDateInput(initialPackage?.duration_days)
+
+    setOrgModalPlanName(initialPlan)
+    setModalExpireDate(initialExpiry)
+    setOrgModal({ open: true, editData: org })
+  }
+
+  const handleOrgModalPlanChange = (nextPlan: string) => {
+    const currentPackage = packages.find((pkg) => pkg.name === orgModalPlanName) || null
+    const nextPackage = packages.find((pkg) => pkg.name === nextPlan) || null
+
+    setModalExpireDate((currentValue) =>
+      resolveNextExpiryDateInput(currentValue, currentPackage?.duration_days, nextPackage?.duration_days)
+    )
+    setOrgModalPlanName(nextPlan)
   }
 
   const getCoreFamilyFromRank = (rank: number): SaasCoreFamily => {
@@ -820,7 +873,6 @@ export default function SaaSAdminPage() {
           updated_at: new Date().toISOString()
         },
         subscription_end: expiresAt,
-        package_limit: buildPackageLimitPayload(pkg)
       }).eq('id', invoice.org_id)
 
       if (orgErr) return alert('Gagal update plan organisasi: ' + orgErr.message)
@@ -933,12 +985,8 @@ export default function SaaSAdminPage() {
     try {
       const fd = new FormData(e.currentTarget)
       const selectedPlanName = String(fd.get('plan') || '').trim()
-      const selectedPackage = packages.find((pkg) => pkg.name === selectedPlanName) || null
       const expiresVal = fd.get('expires_at') as string
-      const existingExpiry = resolveOrganizationExpiryDate(orgModal.editData as OrganizationExpirySource)
-      const expiresAt = expiresVal
-        ? new Date(expiresVal).toISOString()
-        : (existingExpiry?.toISOString() || null)
+      const expiresAt = toExpiryIsoFromDateInput(expiresVal)
       const currentSettings =
         orgModal.editData?.settings &&
         typeof orgModal.editData.settings === 'object' &&
@@ -952,9 +1000,6 @@ export default function SaaSAdminPage() {
          is_demo: fd.get('is_demo') === 'on',
          owner_email: fd.get('owner_email'),
          subscription_end: expiresAt,
-         package_limit: selectedPackage
-           ? buildPackageLimitPayload(selectedPackage)
-           : (orgModal.editData as any)?.package_limit || null,
          settings: {
             ...currentSettings,
             plan: selectedPlanName,
@@ -969,8 +1014,7 @@ export default function SaaSAdminPage() {
          await db.from('organizations').insert([{ ...payload, slug }])
       }
 
-      setOrgModal({ open: false, editData: null })
-      setModalExpireDate('') // Reset local state
+      closeOrgModal()
       fetchOrganizations()
     } catch (err: any) {
        alert(err.message)
@@ -1010,7 +1054,7 @@ export default function SaaSAdminPage() {
   }
 
   const resetEntitlementModal = () => {
-    setEntitlementModal({ open: false, org: null, selectedPlan: '', selectedModules: [], selectedAddons: [] })
+    setEntitlementModal({ open: false, org: null, selectedPlan: '', expiryDate: '', selectedModules: [], selectedAddons: [] })
     setEntitlementViewMode('all')
     setEntitlementFocusedModule(null)
   }
@@ -1026,12 +1070,16 @@ export default function SaaSAdminPage() {
     const packageModules = selectedPackage ? toCapabilityArray(selectedPackage.modules) : []
     const selectedAddons = normalizeActiveAddonEntries((org as any).active_addons).map((entry) => entry.name)
     const selectedModules = resolveManagedModulesForOrg(org, packageModules)
+    const expiryDate =
+      formatDateInputValue(resolveOrganizationExpiryDate(org as OrganizationExpirySource)) ||
+      buildPlanExpiryDateInput(selectedPackage?.duration_days)
 
     setEntitlementViewMode(mode)
     setEntitlementModal({
       open: true,
       org,
       selectedPlan: fallbackPlan,
+      expiryDate,
       selectedModules,
       selectedAddons,
     })
@@ -1039,6 +1087,7 @@ export default function SaaSAdminPage() {
   }
 
   const handleEntitlementPlanChange = (nextPlan: string) => {
+    const currentPackage = packages.find((pkg) => pkg.name === entitlementModal.selectedPlan) || null
     const selectedPackage = packages.find((pkg) => pkg.name === nextPlan) || null
     const packageModules = selectedPackage ? toCapabilityArray(selectedPackage.modules) : []
     const packageCoreFamilyLevel = resolvePackageCoreFamily(selectedPackage)
@@ -1054,6 +1103,7 @@ export default function SaaSAdminPage() {
       return {
         ...prev,
         selectedPlan: nextPlan,
+        expiryDate: resolveNextExpiryDateInput(prev.expiryDate, currentPackage?.duration_days, selectedPackage?.duration_days),
         selectedModules: nextModules,
         selectedAddons: sanitizeAddonSelectionForCompatibility(prev.selectedAddons, nextModules, nextCoreFamily),
       }
@@ -1127,6 +1177,7 @@ export default function SaaSAdminPage() {
     }
 
     const nextPackageModules = toCapabilityArray(nextPackage.modules)
+    const currentPackage = packages.find((pkg) => pkg.name === entitlementModal.selectedPlan) || null
 
     setEntitlementModal((prev) => {
       const nextModules = sanitizeModuleSelectionForCoreFamily(
@@ -1137,6 +1188,7 @@ export default function SaaSAdminPage() {
       return {
         ...prev,
         selectedPlan: nextPackage.name,
+        expiryDate: resolveNextExpiryDateInput(prev.expiryDate, currentPackage?.duration_days, nextPackage?.duration_days),
         selectedModules: nextModules,
         selectedAddons: sanitizeAddonSelectionForCompatibility(prev.selectedAddons, nextModules, nextCoreFamily),
       }
@@ -1172,6 +1224,7 @@ export default function SaaSAdminPage() {
       entitlementViewMode === 'addons'
         ? currentSettings.use_custom_modules === true
         : !areCapabilitySetsEqual(selectedModules, packageModules)
+    const expiresAt = toExpiryIsoFromDateInput(entitlementModal.expiryDate)
 
     startEntitlementTransition(async () => {
       const { error } = await db
@@ -1180,13 +1233,14 @@ export default function SaaSAdminPage() {
           settings: {
             ...currentSettings,
             plan: selectedPackage.name,
+            expires_at: expiresAt,
             use_custom_modules: useCustomModules,
             module_management_updated_at:
               entitlementViewMode === 'addons'
                 ? currentSettings.module_management_updated_at || null
                 : new Date().toISOString(),
           },
-          package_limit: buildPackageLimitPayload(selectedPackage),
+          subscription_end: expiresAt,
           enabled_modules:
             entitlementViewMode === 'addons'
               ? ((targetOrg as any).enabled_modules || null)
@@ -1215,6 +1269,7 @@ export default function SaaSAdminPage() {
   })
 
   const entitlementSelectedPackage = packages.find((pkg) => pkg.name === entitlementModal.selectedPlan) || null
+  const orgModalSelectedPackage = packages.find((pkg) => pkg.name === orgModalPlanName) || null
   const entitlementPackageModules = entitlementSelectedPackage ? toCapabilityArray(entitlementSelectedPackage.modules) : []
   const entitlementPackageBlueprintAddons = entitlementSelectedPackage ? toCapabilityArray(entitlementSelectedPackage.addons) : []
   const entitlementManagedModules = normalizeSaasEntitlementList(entitlementModal.selectedModules)
@@ -1774,7 +1829,7 @@ export default function SaaSAdminPage() {
               </div>
 
               <div className="flex flex-wrap gap-3">
-                 <SafeButton variant="primary" onClick={() => setOrgModal({ open: true, editData: null })} icon={<Plus size={18} />}>Registrasi Tenant Baru</SafeButton>
+                 <SafeButton variant="primary" onClick={() => openOrgModal(null)} icon={<Plus size={18} />}>Registrasi Tenant Baru</SafeButton>
                  <SafeButton
                    variant={tenantDeleteMode ? 'danger' : 'white'}
                    onClick={() => setTenantDeleteMode(prev => !prev)}
@@ -1906,7 +1961,7 @@ export default function SaaSAdminPage() {
                                 )}
                                 <span>Login As</span>
                               </button>
-                              <button onClick={() => setOrgModal({ open: true, editData: org })} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
+                              <button onClick={() => openOrgModal(org)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
                                  <Edit3 size={18} />
                               </button>
                               {tenantDeleteMode && (
@@ -2433,6 +2488,59 @@ export default function SaaSAdminPage() {
                           ? 'Module aktif tenant tetap mengikuti entitlement saat ini.'
                           : 'Saat core diganti, builder akan memilih plan yang paling kompatibel secara otomatis.'}
                     </p>
+                    <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Masa Berlaku Manual</label>
+                          <div className="flex flex-wrap gap-1">
+                            {[3, 5, 30].map((days) => (
+                              <button
+                                key={`entitlement-expiry-${days}`}
+                                type="button"
+                                onClick={() => {
+                                  const nextDate = new Date()
+                                  nextDate.setDate(nextDate.getDate() + days)
+                                  setEntitlementModal((prev) => ({ ...prev, expiryDate: formatDateInputValue(nextDate) }))
+                                }}
+                                className="rounded bg-slate-100 px-1.5 py-0.5 text-[8px] font-black text-slate-600 transition-colors hover:bg-indigo-600 hover:text-white"
+                              >
+                                +{days} Hari
+                              </button>
+                            ))}
+                            {typeof entitlementSelectedPackage?.duration_days === 'number' && entitlementSelectedPackage.duration_days > 0 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEntitlementModal((prev) => ({
+                                    ...prev,
+                                    expiryDate: buildPlanExpiryDateInput(entitlementSelectedPackage.duration_days),
+                                  }))
+                                }
+                                className="rounded bg-indigo-50 px-1.5 py-0.5 text-[8px] font-black text-indigo-700 transition-colors hover:bg-indigo-600 hover:text-white"
+                              >
+                                Paket ({entitlementSelectedPackage.duration_days}H)
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setEntitlementModal((prev) => ({ ...prev, expiryDate: '' }))}
+                              className="rounded bg-rose-50 px-1.5 py-0.5 text-[8px] font-black text-rose-700 transition-colors hover:bg-rose-600 hover:text-white"
+                            >
+                              Unlimited
+                            </button>
+                          </div>
+                        </div>
+                        <input
+                          type="date"
+                          value={entitlementModal.expiryDate}
+                          onChange={(e) => setEntitlementModal((prev) => ({ ...prev, expiryDate: e.target.value }))}
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900"
+                        />
+                        <p className="text-[11px] font-semibold text-slate-500">
+                          Kosongkan tanggal jika tenant ini harus aktif tanpa batas waktu.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -2735,6 +2843,12 @@ export default function SaaSAdminPage() {
                               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                                 <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Plan</div>
                                 <div className="mt-1 text-sm font-black text-slate-900">{entitlementModal.selectedPlan || 'Belum dipilih'}</div>
+                              </div>
+                              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Expiry</div>
+                                <div className="mt-1 text-sm font-black text-slate-900">
+                                  {entitlementModal.expiryDate || 'Unlimited'}
+                                </div>
                               </div>
                               <div className="grid grid-cols-2 gap-3">
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -3042,7 +3156,7 @@ export default function SaaSAdminPage() {
       <AnimatePresence>
          {orgModal.open && (
            <div key="org-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <motion.div key="org-modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOrgModal({ open: false, editData: null })} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+              <motion.div key="org-modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeOrgModal} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
               <motion.div key="org-modal-content" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-xl bg-white rounded-[40px] shadow-2xl p-10 overflow-hidden border border-white">
                  <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight mb-8">
                     {orgModal.editData ? 'Edit Data Tenant' : 'Registrasi Tenant Manual'}
@@ -3059,7 +3173,12 @@ export default function SaaSAdminPage() {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Paket SaaS</label>
-                           <select name="plan" defaultValue={orgModal.editData?.settings?.plan || 'Demo'} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold">
+                           <select
+                              name="plan"
+                              value={orgModalPlanName}
+                              onChange={(e) => handleOrgModalPlanChange(e.target.value)}
+                              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold"
+                           >
                               <option value="Demo">Demo</option>
                               {packages.map(p => (
                                  <option key={p.id} value={p.name}>{p.name}</option>
@@ -3084,6 +3203,22 @@ export default function SaaSAdminPage() {
                                        +{days} Hari
                                     </button>
                                  ))}
+                                 {typeof orgModalSelectedPackage?.duration_days === 'number' && orgModalSelectedPackage.duration_days > 0 && (
+                                    <button
+                                       type="button"
+                                       onClick={() => setModalExpireDate(buildPlanExpiryDateInput(orgModalSelectedPackage.duration_days))}
+                                       className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded text-[8px] font-black transition-colors"
+                                    >
+                                       Paket ({orgModalSelectedPackage.duration_days}H)
+                                    </button>
+                                 )}
+                                 <button
+                                    type="button"
+                                    onClick={() => setModalExpireDate('')}
+                                    className="px-1.5 py-0.5 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white rounded text-[8px] font-black transition-colors"
+                                 >
+                                    Unlimited
+                                 </button>
                               </div>
                            </div>
                            <input 
@@ -3106,7 +3241,7 @@ export default function SaaSAdminPage() {
                            </label>
                     </div>
                     <div className="flex justify-end gap-4 pt-6">
-                       <button type="button" onClick={() => setOrgModal({ open: false, editData: null })} className="px-6 py-4 text-xs font-black uppercase text-slate-400">Batal</button>
+                       <button type="button" onClick={closeOrgModal} className="px-6 py-4 text-xs font-black uppercase text-slate-400">Batal</button>
                        <SafeButton type="submit" variant="primary">Simpan Tenant</SafeButton>
                     </div>
                  </form>

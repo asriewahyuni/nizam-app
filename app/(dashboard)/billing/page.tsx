@@ -470,6 +470,14 @@ function BillingContent() {
     () => packageCatalog.find((pkg) => pkg.name === activeOrg?.settings?.plan) || null,
     [activeOrg?.settings?.plan, packageCatalog]
   )
+  const currentPlanLimits = useMemo(
+    () => ({
+      maxOrgs: typeof currentPlanPackage?.max_orgs === 'number' ? currentPlanPackage.max_orgs : 1,
+      maxWarehouses: typeof currentPlanPackage?.max_warehouses === 'number' ? currentPlanPackage.max_warehouses : 3,
+      maxUsers: typeof currentPlanPackage?.max_users === 'number' ? currentPlanPackage.max_users : 10,
+    }),
+    [currentPlanPackage]
+  )
   const usesCustomModules = activeOrg?.settings?.use_custom_modules === true
   const currentEnabledModules = useMemo(
     () => normalizeSaasEntitlementList(
@@ -848,9 +856,9 @@ function BillingContent() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-               <UsageMetric icon={Building2} label="Entitas Bisnis" current={1} max={activeOrg?.package_limit?.max_orgs || 1} unit="Org" />
-               <UsageMetric icon={Warehouse} label="Gudang / WMS" current={1} max={activeOrg?.package_limit?.max_warehouses || 3} unit="Loc" />
-               <UsageMetric icon={Users} label="Team Members" current={1} max={activeOrg?.package_limit?.max_users || 10} unit="Staff" />
+               <UsageMetric icon={Building2} label="Entitas Bisnis" current={1} max={currentPlanLimits.maxOrgs} unit="Org" />
+               <UsageMetric icon={Warehouse} label="Gudang / WMS" current={1} max={currentPlanLimits.maxWarehouses} unit="Loc" />
+               <UsageMetric icon={Users} label="Team Members" current={1} max={currentPlanLimits.maxUsers} unit="Staff" />
             </div>
 
             {activeAddonDetails.length > 0 && (
