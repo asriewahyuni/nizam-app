@@ -109,6 +109,7 @@ Lapisan data utama berada di:
 ### Hal yang perlu dipahami
 
 - `lib/db/postgres.ts` membuat koneksi `pg` ke `DATABASE_URL`, `RAILWAY_DATABASE_URL`, atau `DATABASE_PUBLIC_URL`.
+- Urutan prioritas runtime adalah `DATABASE_URL` lalu `RAILWAY_DATABASE_URL` lalu `DATABASE_PUBLIC_URL`.
 - `lib/supabase/server.ts` menjaga antarmuka `createClient()` dan `createAdminClient()` agar modul lama tetap bisa berjalan.
 - `lib/supabase/config.ts` masih ada untuk compatibility dan beberapa flow transisional.
 

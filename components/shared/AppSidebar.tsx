@@ -110,6 +110,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Target & Komisi', href: '/sales/commission', icon: Target, permission_key: 'sales', module_key: 'Sales' },
       { label: 'Promo & Reward', href: '/sales/promos', icon: Zap, permission_key: 'sales', module_key: 'Sales' },
       { label: 'Sales Page', href: '/sales/pages', icon: Megaphone, permission_key: 'sales', module_key: 'Sales Page' },
+      { label: 'E-Commerce', href: '/ecommerce', icon: ShoppingCart, permission_key: 'sales', module_key: 'Sales' },
     ]
   },
   {
@@ -274,7 +275,11 @@ export function AppSidebar({
   }, [])
 
   useEffect(() => {
-    setHasMounted(true)
+    const timeoutId = window.setTimeout(() => {
+      setHasMounted(true)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [])
 
   const isCollapsed = useSyncExternalStore(
@@ -285,7 +290,7 @@ export function AppSidebar({
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
   const isPlatformAdmin = isPlatformAdminEmail(user?.email)
   const showSaasOperatorGroup = isPlatformAdmin
-  const effectiveIsCollapsed = hasMounted ? isCollapsed : false
+  const effectiveIsCollapsed = isCollapsed
   const navGroups = useMemo(() => (
     showSaasOperatorGroup
       ? [...NAV_GROUPS, SAAS_OPERATOR_GROUP]

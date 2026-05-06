@@ -1,0 +1,51 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - img "NIZAM" [ref=e7]
+        - generic [ref=e8]:
+          - generic [ref=e9]: NIZAM
+          - generic [ref=e10]: MiniERP
+      - generic [ref=e11]:
+        - heading "Akses Penuh Keuntungan Tanpa Batas." [level=1] [ref=e12]:
+          - text: Akses Penuh
+          - text: Keuntungan
+          - text: Tanpa Batas.
+        - paragraph [ref=e13]: Kelola aset, penjualan, cabang, hingga SDM secara presisi tinggi dalam satu sentra kontrol.
+      - generic [ref=e19]: +24K Pengguna Aktif
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - heading "Ruang Kendali" [level=2] [ref=e26]
+        - paragraph [ref=e27]: Buka akses untuk melanjutkan sesi aman Anda.
+      - generic [ref=e28]:
+        - button "Admin Bisnis" [ref=e29]:
+          - img [ref=e30]
+          - text: Admin Bisnis
+        - button "Panel Staf" [ref=e34]:
+          - img [ref=e35]
+          - text: Panel Staf
+      - generic [ref=e39]:
+        - generic [ref=e40]:
+          - generic [ref=e41]:
+            - text: Email Bisnis
+            - textbox "arsitek@perusahaan.com" [ref=e42]
+          - generic [ref=e43]:
+            - generic [ref=e44]:
+              - generic [ref=e45]: Sandi Keamanan
+              - link "Lupa Sandi?" [ref=e46] [cursor=pointer]:
+                - /url: /forgot-password
+            - generic [ref=e47]:
+              - textbox "••••••••" [ref=e48]
+              - button [ref=e49]:
+                - img [ref=e50]
+          - button "Inisialisasi Kendali" [ref=e53]:
+            - text: Inisialisasi Kendali
+            - img [ref=e54]
+        - generic [ref=e56]:
+          - paragraph [ref=e57]:
+            - text: Belum terdaftar di ekosistem kami?
+            - link "Daftar Sekarang" [ref=e58] [cursor=pointer]:
+              - /url: /register
+          - link "🎮 Coba Lingkungan Demo" [ref=e59] [cursor=pointer]:
+            - /url: /demo
+  - paragraph [ref=e60]: © 2026 NIZAM ERP. Building Integrity.

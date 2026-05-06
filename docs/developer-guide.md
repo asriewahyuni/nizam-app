@@ -25,6 +25,13 @@ npm install
 cp .env.local.example .env.local
 ```
 
+Aturan praktis file env:
+
+- `.env` = baseline atau referensi default project
+- `.env.local` = override milik mesin Anda sendiri
+- untuk pindah mode lokal ↔ Railway, biasanya yang Anda edit adalah `.env.local`
+- jika nama variabel yang sama ada di keduanya, anggap `.env.local` yang menang saat kerja lokal
+
 Variabel penting yang perlu dipahami:
 
 | Variabel | Keterangan |
@@ -41,8 +48,10 @@ Catatan penting:
 
 - [`.env.local.example`](/Users/manbook/nizam-app/.env.local.example:1) adalah titik awal yang baik, tetapi belum selalu merepresentasikan seluruh kebutuhan mode PostgreSQL native terbaru.
 - Runtime data access utama saat ini membaca PostgreSQL native.
+- Urutan env database runtime adalah `DATABASE_URL` lalu `RAILWAY_DATABASE_URL` lalu `DATABASE_PUBLIC_URL`.
 - Nama file `lib/supabase/*` masih banyak dipakai sebagai compatibility layer.
 - Jangan menghapus env Supabase tanpa memastikan flow yang Anda sentuh memang tidak lagi membutuhkannya.
+- Jika perlu pindah mode lokal ↔ Railway, baca [`database-mode-switching.md`](./database-mode-switching.md).
 
 ## 3. Menjalankan Project
 
@@ -77,6 +86,8 @@ npm run start
 | `npm run test:coverage` | Menjalankan test dengan coverage |
 | `npm run supabase:start` | Menjalankan Supabase local |
 | `npm run supabase:db:reset` | Reset database Supabase local |
+| `npm run db:runtime:show` | Menampilkan database runtime aktif yang benar-benar dipakai aplikasi |
+| `npm run db:clone:local` | Clone penuh database online ke PostgreSQL lokal biasa |
 | `npm run db:railway:sync` | Simulasi sinkronisasi schema |
 | `npm run db:railway:data:sync` | Simulasi sinkronisasi data |
 | `npm run db:railway:readiness` | Pemeriksaan kesiapan cutover |
@@ -164,6 +175,7 @@ Periksa nilai:
 - `DATABASE_URL`
 - `RAILWAY_DATABASE_URL`
 - `DATABASE_PUBLIC_URL`
+- `npm run db:runtime:show`
 
 Error ini biasanya berasal dari [`lib/db/postgres.ts`](/Users/manbook/nizam-app/lib/db/postgres.ts:1).
 

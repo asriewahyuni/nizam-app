@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { queryPostgres } from '@/lib/db/postgres'
+import { resolveRuntimeDatabaseTarget } from '@/lib/db/runtime-target'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +11,7 @@ function getErrorMessage(error: unknown) {
 
 export async function GET() {
   const startedAt = Date.now()
+  const runtimeDb = resolveRuntimeDatabaseTarget()
 
   try {
     const { rows } = await queryPostgres<{
@@ -29,9 +31,10 @@ export async function GET() {
       {
         ok: true,
         service: 'nizam-app',
-        target: 'railway-postgres',
+        target: runtimeDb.mode,
         timestamp: new Date().toISOString(),
         durationMs: Date.now() - startedAt,
+        runtimeDatabaseSource: runtimeDb.sourceKey,
         details: rows[0] || null,
       },
       {
@@ -46,9 +49,10 @@ export async function GET() {
       {
         ok: false,
         service: 'nizam-app',
-        target: 'railway-postgres',
+        target: runtimeDb.mode,
         timestamp: new Date().toISOString(),
         durationMs: Date.now() - startedAt,
+        runtimeDatabaseSource: runtimeDb.sourceKey,
         error: getErrorMessage(error),
       },
       {
@@ -60,4 +64,3 @@ export async function GET() {
     )
   }
 }
-

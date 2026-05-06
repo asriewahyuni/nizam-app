@@ -19,6 +19,7 @@ import { RouteProgressBar } from '@/components/shared/RouteProgressBar'
 import { UserActivityTracker } from '@/components/shared/UserActivityTracker'
 import { GlobalApprovalNotifier } from '@/components/shared/GlobalApprovalNotifier'
 import { EduModeShell } from '@/components/edu/EduModeShell'
+import { resolveRuntimeDatabaseTarget } from '@/lib/db/runtime-target'
 
 type RouteModuleEntry = {
   path: string
@@ -40,6 +41,7 @@ export default async function DashboardLayout({
   const requestPathname = (await headers()).get('x-pathname') || ''
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
+  const runtimeDb = resolveRuntimeDatabaseTarget()
   const orgSettings =
     orgData.org.settings && typeof orgData.org.settings === 'object' && !Array.isArray(orgData.org.settings)
       ? orgData.org.settings as Record<string, unknown>
@@ -96,6 +98,7 @@ export default async function DashboardLayout({
     },
     { path: '/cash', requiredModule: 'Finance', aliases: ['Finance', 'Kas & Bank'], permissionKeys: ['finance', 'bank', 'cash', 'journal'] },
     { path: '/contacts', requiredModule: 'CRM', aliases: ['CRM', 'Pelanggan (CRM)', 'Marketing'], permissionKeys: ['sales', 'crm', 'contacts', 'customer'] },
+    { path: '/ecommerce', requiredModule: 'Sales', aliases: ['Sales', 'E-Commerce', 'Penjualan'], permissionKeys: ['sales', 'crm', 'inventory'] },
     { path: '/inventory', requiredModule: 'Inventory', aliases: ['Inventory', 'Inventori'], permissionKeys: ['inventory', 'warehouse'] },
     { path: '/factory', requiredModule: 'Manufacturing', aliases: ['Manufacturing', 'Factory'], permissionKeys: ['factory', 'manufacturing'] },
     { path: '/purchasing', requiredModule: 'Purchasing', aliases: ['Purchasing', 'Pembelian'], permissionKeys: ['purchasing', 'purchase'] },
@@ -207,6 +210,8 @@ export default async function DashboardLayout({
           activeOrgParentId={(orgData.org as { parent_org_id?: string | null }).parent_org_id ?? null}
           allowAllBranchSelection={allowAllBranchSelection}
           canManageBranches={isOwnerOrAdmin}
+          runtimeDatabaseMode={runtimeDb.mode}
+          runtimeDatabaseSource={runtimeDb.sourceKey}
         />
         <StartupWizard isDemo={isDemo} enabled={startupWizardEnabled} />
         <MobilePullToRefresh scrollContainerId="dashboard-scroll-root" />

@@ -8,14 +8,18 @@ Folder `docs/` adalah pusat dokumentasi teknis yang lebih ringkas, terstruktur, 
 2. Lanjut ke [`developer-guide.md`](./developer-guide.md) untuk setup lokal dan workflow harian.
 3. Baca [`architecture.md`](./architecture.md) untuk memahami arsitektur request, auth, tenancy, dan akses data.
 4. Gunakan [`modules.md`](./modules.md) untuk mencari lokasi fitur dan domain business logic.
+5. Jika mengerjakan storefront, checkout, atau order publik, baca dokumen e-commerce lebih dulu.
 
 ## Peta Dokumen
 
 | Dokumen | Isi |
 |---|---|
 | [`developer-guide.md`](./developer-guide.md) | Setup lokal, environment, script penting, alur kerja coding, testing, dan troubleshooting |
+| [`database-mode-switching.md`](./database-mode-switching.md) | Cara pindah runtime database antara lokal dan Railway, plus cara cek mode aktif |
 | [`architecture.md`](./architecture.md) | Arsitektur aplikasi, route layer, auth, tenancy, RBAC, data access, dan deployment notes |
 | [`modules.md`](./modules.md) | Peta modul bisnis, route dashboard, folder terkait, dan tanggung jawab per domain |
+| [`ecommerce-implementation.md`](./ecommerce-implementation.md) | Kondisi implementasi e-commerce saat ini, flow bisnis yang sudah hidup, route penting, dan batas yang masih ada |
+| [`ecommerce-next-steps.md`](./ecommerce-next-steps.md) | Urutan kerja berikutnya yang disarankan setelah fondasi e-commerce dan theme builder selesai |
 
 ## Referensi Tambahan Di Root Repo
 
