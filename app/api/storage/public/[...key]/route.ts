@@ -6,6 +6,7 @@ import {
   isObjectStorageConfigured,
   isPublicLogoStorageKey,
 } from '@/lib/storage/object-storage.server'
+import { isPublicThemeAssetStorageKey } from '@/modules/ecommerce/lib/ecommerce.server'
 
 export const runtime = 'nodejs'
 
@@ -21,7 +22,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ ke
   const { key: keySegments } = await context.params
   const key = decodeStorageKeySegments(keySegments)
 
-  if (!key || !isPublicLogoStorageKey(key)) {
+  if (!key || (!isPublicLogoStorageKey(key) && !isPublicThemeAssetStorageKey(key))) {
     return NextResponse.json({ error: 'File tidak ditemukan.' }, { status: 404 })
   }
 

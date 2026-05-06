@@ -1,0 +1,85 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - generic [ref=e7]: RR
+          - generic [ref=e8]:
+            - generic [ref=e9]: Rantang Raya
+            - generic [ref=e10]: Rantang Raya Catering
+        - navigation [ref=e11]:
+          - link "Beranda" [ref=e12] [cursor=pointer]:
+            - /url: /toko/testtt/st1
+          - link "Koleksi" [ref=e13] [cursor=pointer]:
+            - /url: /toko/testtt/st1/koleksi
+          - link "Keranjang" [ref=e14] [cursor=pointer]:
+            - /url: /toko/testtt/st1/keranjang
+        - link "Keranjang 0" [ref=e15] [cursor=pointer]:
+          - /url: /toko/testtt/st1/keranjang
+          - img [ref=e16]
+          - generic [ref=e20]: Keranjang
+          - text: "0"
+    - main [ref=e21]:
+      - generic [ref=e22]:
+        - link "Kembali ke koleksi" [ref=e24] [cursor=pointer]:
+          - /url: /toko/testtt/st1/koleksi
+          - img [ref=e25]
+          - text: Kembali ke koleksi
+        - generic [ref=e28]:
+          - generic [ref=e29]: Favorit Meeting
+          - generic [ref=e30]:
+            - heading "Nasi Box Meeting Hemat" [level=1] [ref=e31]
+            - paragraph [ref=e32]: Isi praktis dengan nasi, lauk utama, sayur, sambal, dan pelengkap dasar. Cocok untuk acara kantor yang butuh distribusi cepat dan harga tetap ramah.
+          - generic [ref=e33]:
+            - generic [ref=e34]: Stok habis
+            - generic [ref=e35]: Produk tunggal
+            - generic [ref=e36]: 2 foto
+          - generic [ref=e37]: Stok sedang habis
+          - generic [ref=e38]:
+            - generic [ref=e39]: Rp 30.000
+            - button "Stok Habis" [disabled] [ref=e40]:
+              - img [ref=e41]
+              - text: Stok Habis
+            - link "Buka Keranjang" [ref=e42] [cursor=pointer]:
+              - /url: /toko/testtt/st1/keranjang
+              - text: Buka Keranjang
+              - img [ref=e43]
+          - generic [ref=e45]:
+            - generic [ref=e46]: Checkout tanpa akun
+            - generic [ref=e47]: Upload bukti bayar setelah order
+            - generic [ref=e48]: Status pesanan bisa dibuka lagi kapan saja
+      - generic [ref=e50]:
+        - generic [ref=e51]:
+          - generic [ref=e52]: Catatan untuk Acara
+          - heading "Lihat apakah paket ini paling cocok untuk jenis acara dan jumlah tamu yang Anda siapkan." [level=2] [ref=e53]
+          - paragraph [ref=e54]: Perhatikan isi paket, jumlah porsi, dan nuansa sajiannya supaya pilihan Anda terasa pas untuk momen yang akan digelar.
+        - generic [ref=e55]:
+          - generic [ref=e56]: Cocok untuk acara Anda
+          - generic [ref=e57]: Pilih paket yang paling pas dengan jumlah tamu, suasana acara, dan tingkat layanan yang Anda butuhkan.
+      - generic [ref=e58]:
+        - generic [ref=e60]:
+          - generic [ref=e61]: Kenapa Cepat Dipilih
+          - heading "Paket catering lebih mudah diputuskan kalau manfaatnya langsung jelas" [level=2] [ref=e62]
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - generic [ref=e65]:
+              - img [ref=e66]
+              - img [ref=e69]
+              - img [ref=e72]
+              - img [ref=e75]
+              - img [ref=e78]
+            - generic [ref=e81]: “Cocok untuk acara kantor yang butuh pembagian cepat tanpa repot plating.”
+            - generic [ref=e82]: Porsi rapi dan mudah dibagikan
+            - generic [ref=e83]: Meeting tim
+          - generic [ref=e84]:
+            - generic [ref=e85]:
+              - img [ref=e86]
+              - img [ref=e89]
+              - img [ref=e92]
+              - img [ref=e95]
+              - img [ref=e98]
+            - generic [ref=e101]: “Pelanggan bisa langsung tahu apakah paket ini cocok untuk santai, formal, atau syukuran.”
+            - generic [ref=e102]: Menu terasa lebih lengkap
+            - generic [ref=e103]: Acara keluarga
+  - button "Open Next.js Dev Tools" [ref=e109] [cursor=pointer]:
+    - img [ref=e110]

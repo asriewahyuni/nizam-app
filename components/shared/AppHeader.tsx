@@ -1,9 +1,10 @@
 'use client'
 
 import { formatRupiah, getInitials } from '@/lib/utils'
+import type { RuntimeDatabaseMode, RuntimeDatabaseSourceKey } from '@/lib/db/runtime-target'
 import { scheduleIdleTask } from '@/lib/browser/idle'
 import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/browser/approval-notifier'
-import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2 } from 'lucide-react'
+import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2, Database, CircleDot } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import Link from 'next/link'
@@ -51,6 +52,8 @@ interface AppHeaderProps {
   orgBranchesByOrgId?: Record<string, BranchSummary[]>
   orgCashSummaries?: Record<string, DeckCashSummary>
   branchCashSummaries?: Record<string, DeckCashSummary>
+  runtimeDatabaseMode?: RuntimeDatabaseMode
+  runtimeDatabaseSource?: RuntimeDatabaseSourceKey
 }
 
 type PendingContextSwitch =
@@ -245,6 +248,42 @@ function getDeckMetricValueClass(valueLabel: string, compact: boolean): string {
   return 'text-[11px]'
 }
 
+function getRuntimeDatabaseBadgeMeta(
+  mode: RuntimeDatabaseMode,
+  source: RuntimeDatabaseSourceKey
+) {
+  switch (mode) {
+    case 'local-postgres':
+      return {
+        label: 'DB Local',
+        description: `Mode lokal aktif via ${source}`,
+        className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        dotClassName: 'text-emerald-500',
+      }
+    case 'railway-postgres':
+      return {
+        label: 'DB Railway',
+        description: `Mode Railway aktif via ${source}`,
+        className: 'border-sky-200 bg-sky-50 text-sky-700',
+        dotClassName: 'text-sky-500',
+      }
+    case 'remote-postgres':
+      return {
+        label: 'DB Remote',
+        description: `Mode remote aktif via ${source}`,
+        className: 'border-violet-200 bg-violet-50 text-violet-700',
+        dotClassName: 'text-violet-500',
+      }
+    default:
+      return {
+        label: 'DB Unknown',
+        description: 'Sumber database runtime belum terbaca',
+        className: 'border-slate-200 bg-slate-100 text-slate-600',
+        dotClassName: 'text-slate-400',
+      }
+  }
+}
+
 export function AppHeader({
   user,
   jobTitle,
@@ -265,6 +304,8 @@ export function AppHeader({
   orgBranchesByOrgId = EMPTY_BRANCH_MAP,
   orgCashSummaries = EMPTY_CASH_SUMMARIES,
   branchCashSummaries = EMPTY_CASH_SUMMARIES,
+  runtimeDatabaseMode = 'missing',
+  runtimeDatabaseSource = 'missing',
 }: AppHeaderProps) {
   const router = useRouter()
   const [isCreatingBranch, startCreateBranchTransition] = useTransition()
@@ -653,6 +694,10 @@ export function AppHeader({
   const initials = getInitials(user.fullName || user.email)
   const hasRequests = headerPendingApprovals > 0
   const isPlatformAdmin = isPlatformAdminEmail(user.email)
+  const runtimeDatabaseBadge = useMemo(
+    () => getRuntimeDatabaseBadgeMeta(runtimeDatabaseMode, runtimeDatabaseSource),
+    [runtimeDatabaseMode, runtimeDatabaseSource]
+  )
 
   const tokenSummary = useMemo(() => ({
     balance: aiTokens?.balanceTokens || 0,
@@ -1640,6 +1685,15 @@ export function AppHeader({
       </div>
 
       <div className="flex items-center gap-6">
+        <div
+          title={runtimeDatabaseBadge.description}
+          className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition-all ${runtimeDatabaseBadge.className}`}
+        >
+          <Database size={14} />
+          <span className="hidden sm:inline">{runtimeDatabaseBadge.label}</span>
+          <CircleDot size={12} className={runtimeDatabaseBadge.dotClassName} />
+        </div>
+
         {isPlatformAdmin && (
           <Link
             href="/admin"

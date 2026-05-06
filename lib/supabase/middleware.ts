@@ -15,6 +15,7 @@ const PROTECTED_PAGE_PREFIXES = [
   '/cash',
   '/contacts',
   '/construction',
+  '/ecommerce',
   '/factory',
   '/fleet',
   '/hris',

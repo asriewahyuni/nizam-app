@@ -7,6 +7,10 @@ import {
   isObjectStorageConfigured,
   isPrivateExportStorageKey,
 } from '@/lib/storage/object-storage.server'
+import {
+  getPrivateEcommerceProofOrgId,
+  isPrivateEcommercePaymentProofStorageKey,
+} from '@/modules/ecommerce/lib/ecommerce.server'
 
 export const runtime = 'nodejs'
 
@@ -21,11 +25,13 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ ke
   const { key: keySegments } = await context.params
   const key = decodeStorageKeySegments(keySegments)
 
-  if (!key || !isPrivateExportStorageKey(key)) {
+  if (!key || (!isPrivateExportStorageKey(key) && !isPrivateEcommercePaymentProofStorageKey(key))) {
     return NextResponse.json({ error: 'File tidak ditemukan.' }, { status: 404 })
   }
 
-  const orgId = extractOrgIdFromStorageKey(key)
+  const orgId = isPrivateEcommercePaymentProofStorageKey(key)
+    ? getPrivateEcommerceProofOrgId(key)
+    : extractOrgIdFromStorageKey(key)
   if (!orgId) {
     return NextResponse.json({ error: 'File tidak valid.' }, { status: 400 })
   }

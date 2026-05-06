@@ -111,6 +111,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Target & Komisi', href: '/sales/commission', icon: Target, permission_key: 'sales', module_key: 'Sales' },
       { label: 'Promo & Reward', href: '/sales/promos', icon: Zap, permission_key: 'sales', module_key: 'Sales' },
       { label: 'Sales Page', href: '/sales/pages', icon: Megaphone, permission_key: 'sales', module_key: 'Sales Page' },
+      { label: 'E-Commerce', href: '/ecommerce', icon: ShoppingCart, permission_key: 'sales', module_key: 'Sales' },
     ]
   },
   {

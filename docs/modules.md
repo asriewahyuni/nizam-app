@@ -11,6 +11,7 @@ Dokumen ini membantu developer menemukan domain bisnis, route utama, dan lokasi 
 | Contacts | `/contacts` | `modules/contacts`, `app/(dashboard)/contacts` | CRM, pelanggan, kontak |
 | Dashboard | `/dashboard` | `app/(dashboard)/dashboard` | Ringkasan operasional utama |
 | Edu | `/learning`, `/edu` | `modules/edu`, `components/edu`, `app/(dashboard)/learning`, `app/edu` | Mode edukasi dan kompetensi |
+| E-Commerce | `/ecommerce`, `/toko/[orgSlug]/[storeSlug]` | `modules/ecommerce`, `app/(dashboard)/ecommerce`, `app/toko`, `app/api/ecommerce` | Multi-store storefront, katalog publik, theme builder, checkout, order publik, review pembayaran, dan sinkron ERP |
 | Factory | `/factory` | `modules/factory`, `app/(dashboard)/factory` | Produksi, BOM, proses manufaktur |
 | Fleet | `/fleet` | `modules/fleet`, `app/(dashboard)/fleet` | Armada, rental, operasional kendaraan |
 | HRIS | `/hris` | `modules/hris`, `app/(dashboard)/hris` | Karyawan, attendance, payroll, leave, expense |
@@ -64,6 +65,8 @@ Selain dashboard, ada beberapa route non-dashboard yang sering perlu diketahui:
 | `/register` | Registrasi |
 | `/onboarding` | Setup organisasi |
 | `/demo` | Demo mode |
+| `/toko/[orgSlug]/[storeSlug]` | Storefront publik per store |
+| `/toko/[orgSlug]/[storeSlug]/pesanan/[orderNumber]` | Halaman publik status order dengan token akses |
 | `/abs` | Landing page ABS |
 | `/sp/[orgSlug]/[pageSlug]` | Sales page publik |
 | `/api/healthz` | Health check aplikasi |
