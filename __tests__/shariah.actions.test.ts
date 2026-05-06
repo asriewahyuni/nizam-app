@@ -86,6 +86,12 @@ describe('Shariah CoA Activation', () => {
       parent_id: 'asset-root',
       is_active: true,
     })
+    expect(getUpsertPayload('3130')).toMatchObject({
+      code: '3130',
+      parent_id: 'equity-root',
+      normal_balance: 'DEBIT',
+      is_active: true,
+    })
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/settings/accounts')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/accounting/zakat')
   })

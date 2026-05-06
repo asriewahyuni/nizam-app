@@ -494,6 +494,10 @@ function formatDirectCashFlowItemName(line: CashFlowLine | null, category: CashF
   }
 
   if (code === '1201') {
+    if (referenceType === 'SAAS_CASH_IN') {
+      return isInflow ? 'Penerimaan Penjualan SaaS' : 'Pengembalian Penjualan SaaS'
+    }
+
     if (isGl1201Adjustment) {
       return isInflow
         ? 'Penerimaan Rekonsiliasi Piutang Usaha (GL 1201)'

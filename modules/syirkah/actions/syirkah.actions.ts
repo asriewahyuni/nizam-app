@@ -4,6 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getProfitLoss } from '@/modules/accounting/actions/reports.actions'
 import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
+import {
+  buildSyirkahDistributionContext,
+  resolveSyirkahContractDistribution,
+} from '@/modules/syirkah/lib/syirkah.utils'
+import { SYIRKAH_PROFIT_SHARING_EQUITY_CODE } from '@/modules/accounting/lib/shariah-coa'
 import type { Account } from '@/types/database.types'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -355,15 +360,22 @@ async function resolveSyirkahCoreAccounts(
   if (explicitEquityAccount && explicitEquityAccount.type !== 'EQUITY') {
     return { data: null, error: 'Akun modal syirkah Core harus berasal dari kelompok ekuitas (3xxx).' }
   }
+  if (explicitEquityAccount && String(explicitEquityAccount.code || '').trim() === SYIRKAH_PROFIT_SHARING_EQUITY_CODE) {
+    return { data: null, error: 'Akun Bagi Hasil Syirkah tidak bisa dipakai sebagai akun setoran modal akad.' }
+  }
 
   const cashAccount = explicitCashAccount || pickPreferredAccountByCodes(cashAccounts, SYIRKAH_DEFAULT_CASH_CODES) || cashAccounts[0] || null
   if (!cashAccount) {
     return { data: null, error: 'Belum ada akun kas/bank aktif (11xx) untuk menerima modal syirkah di Core.' }
   }
 
+  const selectableEquityAccounts = equityAccounts.filter(
+    (account) => String(account.code || '').trim() !== SYIRKAH_PROFIT_SHARING_EQUITY_CODE
+  )
+
   const equityAccount = explicitEquityAccount
-    || pickPreferredAccountByCodes(equityAccounts, getSyirkahEquityPreferredCodes(contract.contract_type))
-    || equityAccounts[0]
+    || pickPreferredAccountByCodes(selectableEquityAccounts, getSyirkahEquityPreferredCodes(contract.contract_type))
+    || selectableEquityAccounts[0]
     || null
   if (!equityAccount) {
     return { data: null, error: 'Belum ada akun ekuitas aktif (3xxx) untuk modal syirkah di Core.' }
@@ -627,6 +639,7 @@ export async function upsertSyirkahContract(orgId: string, payload: any) {
       duration_months: payload.duration_months || 12,
       debt_allocation: payload.debt_allocation || 0,
       current_debt: payload.current_debt || 0,
+      profit_sharing_allocation: payload.profit_sharing_allocation || 0,
       status: normalizedStatus,
       start_date: normalizeOptionalSyirkahDate(payload.start_date),
       end_date: normalizeOptionalSyirkahDate(payload.end_date),
@@ -726,10 +739,10 @@ export async function deleteSyirkahMember(id: string, contractId: string) {
 export async function deleteSyirkahContract(contractId: string, orgId: string) {
   const supabase = await createClient()
 
-  // Ambil data kontrak — hanya kolom yang sudah pasti ada di skema
+  // Ambil data kontrak
   const { data: contract, error: fetchError } = await (supabase as any)
     .from('syirkah_contracts')
-    .select('id, org_id, status')
+    .select('id, org_id, status, core_journal_entry_id')
     .eq('id', contractId)
     .eq('org_id', orgId)
     .maybeSingle()
@@ -742,9 +755,19 @@ export async function deleteSyirkahContract(contractId: string, orgId: string) {
     return { error: 'Akad tidak ditemukan.' }
   }
 
-  const status = normalizeSyirkahContractStatus(contract.status)
-  if (status !== 'DRAFT') {
-    return { error: 'Akad hanya bisa dihapus jika masih berstatus DRAFT.' }
+  // Jika akad memiliki jurnal tercatat, void jurnal tersebut terlebih dahulu
+  if (contract.core_journal_entry_id) {
+    const { data: { user } } = await supabase.auth.getUser()
+    const cleanupResult = await cleanupSyirkahCoreJournal(supabase, {
+      orgId,
+      entryId: contract.core_journal_entry_id,
+      userId: user?.id || null,
+      reason: 'Syirkah dihapus oleh pengguna.',
+    })
+    
+    if ('error' in cleanupResult) {
+      return { error: 'Gagal membersihkan jurnal terkait sebelum menghapus akad: ' + cleanupResult.error }
+    }
   }
 
   // Hapus anggota & saksi (cascade seharusnya menangani ini, tapi eksplisit lebih aman)
@@ -1265,10 +1288,12 @@ export async function getSyirkahMemberBySignToken(token: string) {
 
 export async function getSyirkahDashboardData(orgId: string) {
   try {
-    const pnl = await getProfitLoss(orgId)
+    // Ambil all-time Net Profit untuk dasbor Syirkah
+    const pnl = await getProfitLoss(orgId, '2000-01-01')
     const netProfit = pnl.netProfit || 0
 
     const contracts = await getSyirkahContracts(orgId)
+    const distributionContext = buildSyirkahDistributionContext(contracts, netProfit)
     const membersByContract = await Promise.all(
       contracts.map((c: any) => getSyirkahMembers(c.id))
     )
@@ -1278,12 +1303,23 @@ export async function getSyirkahDashboardData(orgId: string) {
 
     const allMembers = contracts.map((c: any, i: number) => {
       const parts = membersByContract[i]
+      const distribution = resolveSyirkahContractDistribution(distributionContext, c)
+      const estimatedNetProfit = distribution.baseAmount
+      const distributionStatus = distribution.status
+
       return {
         contractId: c.id,
         contractTitle: c.title,
+        distributionStatus,
+        distributionSource: distribution.source,
+        distributionMessage: distribution.message,
+        estimatedNetProfit,
         members: parts.map((p: any) => ({
           ...p,
-          estimatedProfitAmount: (netProfit * Number(p.profit_share_percentage || 0)) / 100
+          estimatedProfitAmount:
+            estimatedNetProfit == null
+              ? null
+              : (estimatedNetProfit * Number(p.profit_share_percentage || 0)) / 100
         }))
       }
     })
@@ -1292,6 +1328,7 @@ export async function getSyirkahDashboardData(orgId: string) {
       netProfit,
       totalDebtAllocation,
       totalCurrentDebt,
+      distributionContext,
       contracts,
       allMembers
     }
@@ -1301,6 +1338,7 @@ export async function getSyirkahDashboardData(orgId: string) {
       netProfit: 0,
       totalDebtAllocation: 0,
       totalCurrentDebt: 0,
+      distributionContext: buildSyirkahDistributionContext([], 0),
       contracts: [],
       allMembers: []
     }

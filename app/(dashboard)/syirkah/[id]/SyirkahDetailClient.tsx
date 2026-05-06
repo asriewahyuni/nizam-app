@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 import { formatRupiah } from '@/lib/utils'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
+import { SYIRKAH_PROFIT_SHARING_EQUITY_CODE } from '@/modules/accounting/lib/shariah-coa'
 import {
   upsertSyirkahContract,
   upsertSyirkahMember,
@@ -49,9 +50,11 @@ function createDraftMemberId() {
   return `${randomSegment()}${randomSegment()}-${randomSegment()}-4${randomSegment().slice(1)}-a${randomSegment().slice(1)}-${randomSegment()}${randomSegment()}${randomSegment()}`
 }
 
-export default function SyirkahDetailClient({ orgId, contract, members, netProfit, accounts, coreJournal }: any) {
+export default function SyirkahDetailClient({ orgId, contract, members, netProfit, profitDistribution, accounts, coreJournal }: any) {
   const router = useRouter()
   const normalizedContractStatus = normalizeLocalContractStatus(contract.status)
+  const canEstimateProfit = typeof netProfit === 'number' && Number.isFinite(netProfit)
+  const hasManualProfitSharingAllocation = Number(contract.profit_sharing_allocation || 0) > 0
   const [isEditingContract, setIsEditingContract] = useState(false)
   const [contractData, setContractData] = useState({
     title: contract.title || '',
@@ -59,6 +62,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
     contract_type: contract.contract_type || 'Syirkah Mudharabah',
     debt_allocation: contract.debt_allocation || 0,
     current_debt: contract.current_debt || 0,
+    profit_sharing_allocation: contract.profit_sharing_allocation || 0,
     status: contract.status || 'DRAFT',
     core_cash_account_id: contract.core_cash_account_id || '',
     core_equity_account_id: contract.core_equity_account_id || '',
@@ -91,7 +95,12 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
 
   const activeAccounts = Array.isArray(accounts) ? accounts.filter((account: any) => account?.is_active) : []
   const cashAccounts = activeAccounts.filter((account: any) => account?.type === 'ASSET' && String(account?.code || '').startsWith('11'))
-  const equityAccounts = activeAccounts.filter((account: any) => account?.type === 'EQUITY' && String(account?.code || '').startsWith('3'))
+  const equityAccounts = activeAccounts.filter(
+    (account: any) =>
+      account?.type === 'EQUITY' &&
+      String(account?.code || '').startsWith('3') &&
+      String(account?.code || '').trim() !== SYIRKAH_PROFIT_SHARING_EQUITY_CODE
+  )
   const selectedCashAccount = activeAccounts.find((account: any) => account.id === contractData.core_cash_account_id) || null
   const selectedEquityAccount = activeAccounts.find((account: any) => account.id === contractData.core_equity_account_id) || null
   const suggestedCashAccount = selectedCashAccount || pickPreferredAccountByCodes(cashAccounts, SYIRKAH_DEFAULT_CASH_CODES) || cashAccounts[0] || null
@@ -215,6 +224,18 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
     setQrUrl(`${window.location.origin}/syirkah-doc/${contract.qr_token}`)
   }, [contract.qr_token])
 
+  const renderEstimatedProfit = (member: any) => {
+    if (!canEstimateProfit) {
+      return <span className="font-bold text-slate-500 text-xs">Belum bisa dihitung</span>
+    }
+
+    return (
+      <span className="font-black text-blue-700">
+        {formatRupiah((netProfit * Number(member.profit_share_percentage || 0)) / 100)}
+      </span>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6 relative">
       <div className="flex items-center justify-between">
@@ -293,6 +314,13 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                   <input type="number" className="w-full border rounded-xl p-2" value={contractData.current_debt} onChange={e => setContractData({...contractData, current_debt: Number(e.target.value)})} />
                 </div>
                 <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Nominal Alokasi Bagi Hasil</label>
+                  <input type="number" className="w-full border rounded-xl p-2" value={contractData.profit_sharing_allocation} onChange={e => setContractData({...contractData, profit_sharing_allocation: Number(e.target.value)})} />
+                  <p className="mt-1 text-xs text-slate-400">
+                    Isi nominal laba yang benar-benar ingin dibagikan ke para syarik. Jika 0, sistem memakai basis default saat tersedia.
+                  </p>
+                </div>
+                <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">Deskripsi Tambahan</label>
                   <textarea className="w-full border rounded-xl p-2" rows={3} value={contractData.description} onChange={e => setContractData({...contractData, description: e.target.value})}></textarea>
                 </div>
@@ -318,6 +346,17 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                 <div>
                   <span className="block text-xs font-bold text-slate-400">Hutang Terserap</span>
                   <p className="font-bold text-rose-600 text-lg">{formatRupiah(contractData.current_debt)}</p>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-slate-400">Nominal Alokasi Bagi Hasil</span>
+                  <p className="font-bold text-blue-700 text-lg">
+                    {contractData.profit_sharing_allocation > 0 ? formatRupiah(contractData.profit_sharing_allocation) : 'Belum ditentukan'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {contractData.profit_sharing_allocation > 0
+                      ? 'Nominal ini menjadi dasar pembagian rupiah ke masing-masing syarik.'
+                      : 'Jika belum diisi, sistem memakai basis default yang tersedia.'}
+                  </p>
                 </div>
                 {contractData.description && (
                   <div>
@@ -459,6 +498,23 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
               </button>
             </div>
 
+            {profitDistribution?.message && (
+              <div className={`mb-6 rounded-2xl border px-4 py-3 text-sm font-medium ${
+                canEstimateProfit
+                  ? 'border-blue-200 bg-blue-50 text-blue-800'
+                  : 'border-amber-200 bg-amber-50 text-amber-800'
+              }`}>
+                {profitDistribution.message}
+                {canEstimateProfit && (
+                  <span className="mt-1 block text-xs font-semibold">
+                    Basis pembagian saat ini: {hasManualProfitSharingAllocation ? 'alokasi manual akad' : 'default laba bersih organisasi'}
+                    {' • '}
+                    {formatRupiah(Number(netProfit || 0))}
+                  </span>
+                )}
+              </div>
+            )}
+
             <div className="space-y-6">
 	              {/* PEMODAL SECTION */}
 	              <div>
@@ -481,7 +537,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                           </div>
                           <div className="mt-2 text-right">
                              <span className="block text-[10px] uppercase font-black tracking-wider text-blue-600 mb-1">Estimasi Bagi Hasil</span>
-                             <span className="font-black text-blue-700">{formatRupiah((netProfit * m.profit_share_percentage) / 100)}</span>
+                             {renderEstimatedProfit(m)}
                           </div>
                           <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => editMember(m)} className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg"><Edit2 size={14} /></button>
@@ -518,7 +574,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
 	                          </div>
 	                          <div className="mt-2 text-right">
 	                             <span className="block text-[10px] uppercase font-black tracking-wider text-blue-600 mb-1">Estimasi Bagi Hasil</span>
-	                             <span className="font-black text-blue-700">{formatRupiah((netProfit * m.profit_share_percentage) / 100)}</span>
+	                             {renderEstimatedProfit(m)}
 	                          </div>
 	                          <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
 	                            <button onClick={() => editMember(m)} className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg"><Edit2 size={14} /></button>
@@ -551,7 +607,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                           </div>
                           <div className="mt-2 text-right">
                              <span className="block text-[10px] uppercase font-black tracking-wider text-blue-600 mb-1">Estimasi Bagi Hasil</span>
-                             <span className="font-black text-blue-700">{formatRupiah((netProfit * m.profit_share_percentage) / 100)}</span>
+                             {renderEstimatedProfit(m)}
                           </div>
                           <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => editMember(m)} className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg"><Edit2 size={14} /></button>

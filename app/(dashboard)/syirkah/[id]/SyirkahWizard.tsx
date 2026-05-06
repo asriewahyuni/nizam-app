@@ -155,6 +155,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
 
   // Step 6: Nisbah
   const totalNisbah = members.reduce((sum, m) => sum + Number(m.profit_share_percentage || 0), 0)
+  const [profitSharingAllocation, setProfitSharingAllocation] = useState(contract.profit_sharing_allocation || 0)
 
   // Step 7: Debt
   const [debtAllocation, setDebtAllocation] = useState(contract.debt_allocation || 0)
@@ -225,6 +226,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
         duration_months: durationMonths,
         start_date: startDate,
         debt_allocation: debtAllocation,
+        profit_sharing_allocation: profitSharingAllocation,
         currency,
 
         current_debt: currentDebt,
@@ -649,6 +651,16 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
         {/* ── STEP 6: Nisbah Bagi Hasil (was 5) ── */}
         {step === 6 && (
           <StepCard title="Nisbah Bagi Hasil" desc="Tentukan persentase bagi hasil untuk setiap pihak. Total harus sama dengan 100%." icon={PieChart}>
+            <Field
+              label="Nominal Alokasi Bagi Hasil (Rp)"
+              hint="Isi nominal laba yang benar-benar akan dibagikan. Jika kosong atau 0, sistem memakai basis default saat tersedia."
+            >
+              <MoneyInput
+                value={profitSharingAllocation}
+                onChange={setProfitSharingAllocation}
+              />
+            </Field>
+
             <div className="space-y-4">
               {members.filter(m => m.member_name).map((member, index) => (
                 <div key={index} className="bg-white border border-slate-200 rounded-2xl p-5">
@@ -695,6 +707,35 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
               <p className="text-xs text-center text-rose-600 font-medium -mt-2">
                 {totalNisbah > 100 ? `Kelebihan ${totalNisbah - 100}% — kurangi nisbah salah satu pihak` : `Kekurangan ${100 - totalNisbah}% — tambahkan ke salah satu pihak`}
               </p>
+            )}
+
+            {profitSharingAllocation > 0 && members.filter(m => m.member_name).length > 0 && (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-black text-blue-900">Preview Alokasi Nominal</h4>
+                    <p className="text-sm text-blue-700">
+                      Dengan alokasi {formatRupiah(profitSharingAllocation)}, estimasi nominal per syarik menjadi:
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-700">
+                    Basis {formatRupiah(profitSharingAllocation)}
+                  </span>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {members.filter(m => m.member_name).map((member, index) => (
+                    <div key={`${member.id || member.member_name}-${index}`} className="flex items-center justify-between rounded-xl bg-white px-4 py-3 text-sm">
+                      <div>
+                        <p className="font-bold text-slate-800">{member.member_name}</p>
+                        <p className="text-xs font-medium text-slate-500">{member.profit_share_percentage}% nisbah</p>
+                      </div>
+                      <span className="font-black text-blue-700">
+                        {formatRupiah((profitSharingAllocation * Number(member.profit_share_percentage || 0)) / 100)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </StepCard>
         )}
@@ -840,7 +881,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
               <ol className="list-decimal list-inside space-y-1 text-xs">
                 <li>Bagikan QR Code kepada masing-masing pihak</li>
                 <li>Setiap pihak scan QR Code-nya masing-masing</li>
-                <li>Buka link → baca akad → klik "Saya Setuju & Tandatangani"</li>
+                <li>Buka link → baca akad → klik &quot;Saya Setuju & Tandatangani&quot;</li>
                 <li>Setelah semua pihak TTD, status akad berubah menjadi ACTIVE dan modal baru siap dicatat ke Core</li>
               </ol>
             </div>

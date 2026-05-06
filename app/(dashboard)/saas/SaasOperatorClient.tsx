@@ -3,14 +3,16 @@
 import Link from 'next/link'
 import { useMemo, useState, useSyncExternalStore, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, BadgeDollarSign, CheckCircle2, ClipboardList, Download, Receipt, RefreshCcw } from 'lucide-react'
+import { AlertCircle, BadgeDollarSign, CheckCircle2, ClipboardList, Download, Receipt, RefreshCcw, UserCheck, XCircle } from 'lucide-react'
 import {
   convertQuotationToSale,
   createOperatorQuotation,
   deleteOperatorQuotation,
   markOperatorSalePaid,
+  updateOperatorInvoiceReseller,
   updateOperatorQuotation,
   updateOperatorSaleInvoice,
+  voidOperatorSale,
 } from '@/modules/saas/actions/operator-sales.actions'
 import {
   EXTRA_BRANCH_UNIT_PRICE,
@@ -28,10 +30,21 @@ import {
   normalizeSaasEntitlementList,
 } from '@/lib/saas/module-catalog'
 
+type ResellerOption = {
+  id: string
+  name: string
+  reseller_type: string
+  company_name: string | null
+  commission_type: string | null
+  commission_value: number | null
+  is_active: boolean
+}
+
 type Snapshot = {
   orgs: Array<{ id: string; name: string }>
   packages: Array<{ id: string; name: string; price: number; billing?: string; modules: string[]; addons: string[] }>
   aiTokenPackages: Array<{ id: string; name: string; description: string | null; tokens: number; price: number }>
+  resellers: ResellerOption[]
   quotations: InvoiceRecord[]
   sales: InvoiceRecord[]
   summary: {
@@ -46,6 +59,7 @@ type InvoiceRecord = {
   id: string
   org_id: string
   package_id: string | null
+  reseller_id?: string | null
   invoice_number: string
   item_name: string | null
   item_description: string | null
@@ -58,6 +72,7 @@ type InvoiceRecord = {
   due_date?: string | null
   created_at: string
   organization?: { name: string } | null
+  reseller?: { id: string; name: string; commission_type: string | null; commission_value: number | null } | null
 }
 
 function formatIdr(value: number) {
@@ -287,6 +302,9 @@ export default function SaasOperatorClient({
   const [discountPercent, setDiscountPercent] = useState('0')
   const [taxPercent, setTaxPercent] = useState('0')
   const [note, setNote] = useState('')
+  const [selectedResellerId, setSelectedResellerId] = useState('')
+  const [editingResellerInvoiceId, setEditingResellerInvoiceId] = useState<string | null>(null)
+  const [editingResellerValue, setEditingResellerValue] = useState('')
 
   const isQuotesMode = mode === 'quotes'
 
@@ -480,6 +498,9 @@ export default function SaasOperatorClient({
     setDiscountPercent('0')
     setTaxPercent('0')
     setNote('')
+    setSelectedResellerId('')
+    setEditingResellerInvoiceId(null)
+    setEditingResellerValue('')
   }
 
   const handleSaveQuote = (formData: FormData) => {
@@ -640,6 +661,46 @@ export default function SaasOperatorClient({
     })
   }
 
+  const handleChangeReseller = (invoiceId: string) => {
+    startTransition(async () => {
+      const newResellerId = editingResellerValue || null
+      const res = await updateOperatorInvoiceReseller(invoiceId, newResellerId)
+      if ('error' in res && res.error) {
+        setMsg({ type: 'err', text: res.error })
+        return
+      }
+      setEditingResellerInvoiceId(null)
+      setEditingResellerValue('')
+      setMsg({
+        type: 'ok',
+        text: newResellerId
+          ? `Reseller berhasil diperbarui.`
+          : `Reseller berhasil dihapus dari invoice.`,
+      })
+      router.refresh()
+    })
+  }
+
+  const handleVoidSale = (invoiceId: string, invoiceNumber: string) => {
+    const confirmed = window.confirm(
+      `Void invoice ${invoiceNumber}?\n\nTindakan ini akan:\n• Mengubah status invoice menjadi VOIDED\n• Me-void jurnal GL terkait\n\nInvoice yang sudah PAID tidak bisa di-void.`
+    )
+    if (!confirmed) return
+
+    startTransition(async () => {
+      const res = await voidOperatorSale(invoiceId)
+      if ('error' in res && res.error) {
+        setMsg({ type: 'err', text: res.error })
+        return
+      }
+      if (editingSaleInvoiceId === invoiceId) {
+        resetQuoteForm()
+      }
+      setMsg({ type: 'ok', text: `Invoice ${invoiceNumber} berhasil di-void dan jurnal GL terkait telah dibatalkan.` })
+      router.refresh()
+    })
+  }
+
   const handleMarkPaid = (invoiceId: string) => {
     startTransition(async () => {
       const res = await markOperatorSalePaid(invoiceId, 'MANUAL_TRANSFER')
@@ -791,6 +852,30 @@ export default function SaasOperatorClient({
                   />
                 </label>
               </div>
+              {/* Reseller */}
+              {(snapshot.resellers?.length ?? 0) > 0 && (
+                <div className="mt-3">
+                  <label className="space-y-1.5">
+                    <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      Reseller <span className="font-normal normal-case text-slate-400">(Opsional)</span>
+                    </span>
+                    <select
+                      name="reseller_id"
+                      value={selectedResellerId}
+                      onChange={(e) => setSelectedResellerId(e.target.value)}
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold md:w-1/3"
+                    >
+                      <option value="">— Tanpa Reseller —</option>
+                      {snapshot.resellers.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}{r.company_name && r.company_name !== r.name ? ` (${r.company_name})` : ''}
+                          {r.commission_value ? ` · ${r.commission_value}${r.commission_type === 'PERCENT' ? '%' : ' fix'}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
             </section>
 
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -1148,6 +1233,7 @@ export default function SaasOperatorClient({
                 <th className="px-3 py-3">Diskon</th>
                 <th className="px-3 py-3">Pajak</th>
                 <th className="px-3 py-3">Status</th>
+                <th className="px-3 py-3">Reseller</th>
                 <th className="px-3 py-3">Dibuat</th>
                 <th className="px-3 py-3">Aksi</th>
               </tr>
@@ -1176,11 +1262,75 @@ export default function SaasOperatorClient({
                     <div className="text-[10px] text-slate-400">{Number(item.tax_percent || 0)}%</div>
                   </td>
                   <td className="px-3 py-3">
-                    <span className={`rounded-full px-2 py-1 text-[10px] font-black uppercase ${item.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-black uppercase ${
+                      item.status === 'PAID'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : item.status === 'VOIDED'
+                          ? 'bg-slate-100 text-slate-500 line-through'
+                          : 'bg-amber-100 text-amber-700'
+                    }`}>
                       {item.status}
                     </span>
                   </td>
                   <td className="px-3 py-3 text-xs font-semibold text-slate-500">{formatDate(item.created_at)}</td>
+                  {/* Reseller cell — inline edit */}
+                  <td className="px-3 py-3">
+                    {editingResellerInvoiceId === item.id ? (
+                      <div className="flex items-center gap-1">
+                        <select
+                          value={editingResellerValue}
+                          onChange={(e) => setEditingResellerValue(e.target.value)}
+                          className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-semibold"
+                        >
+                          <option value="">— Hapus —</option>
+                          {(snapshot.resellers || []).map((r) => (
+                            <option key={r.id} value={r.id}>{r.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => handleChangeReseller(item.id)}
+                          className="rounded-lg bg-emerald-600 px-2 py-1 text-[10px] font-black text-white disabled:opacity-60"
+                        >
+                          Simpan
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setEditingResellerInvoiceId(null); setEditingResellerValue('') }}
+                          className="rounded-lg border border-slate-200 px-2 py-1 text-[10px] font-black text-slate-500"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        {item.reseller ? (
+                          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700">
+                            {item.reseller.name}
+                            {item.reseller.commission_value
+                              ? ` ${item.reseller.commission_value}${item.reseller.commission_type === 'PERCENT' ? '%' : ''}`
+                              : ''}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">—</span>
+                        )}
+                        {item.status !== 'VOIDED' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingResellerInvoiceId(item.id)
+                              setEditingResellerValue(item.reseller_id || '')
+                            }}
+                            className="text-[10px] text-slate-400 hover:text-violet-600"
+                            title="Ubah reseller"
+                          >
+                            <UserCheck size={12} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-3 py-3">
                     {isQuotesMode ? (
                       <div className="flex flex-wrap items-center gap-2">
@@ -1215,6 +1365,16 @@ export default function SaasOperatorClient({
                           Hapus
                         </button>
                       </div>
+                    ) : item.status === 'VOIDED' ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-400">Dibatalkan</span>
+                        <Link
+                          href={`/saas/dokumen/${item.id}`}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50"
+                        >
+                          <Download size={11} /> Download
+                        </Link>
+                      </div>
                     ) : item.status !== 'PAID' ? (
                       <div className="flex items-center gap-2">
                         <button
@@ -1232,6 +1392,14 @@ export default function SaasOperatorClient({
                           className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white disabled:opacity-60"
                         >
                           Tandai Paid
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => handleVoidSale(item.id, item.invoice_number)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-rose-700 disabled:opacity-60"
+                        >
+                          <XCircle size={11} /> Void
                         </button>
                         <Link
                           href={`/saas/dokumen/${item.id}`}

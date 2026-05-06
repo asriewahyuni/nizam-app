@@ -2,6 +2,7 @@ import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import {
   getSyirkahContractById,
   getSyirkahCoreJournal,
+  getSyirkahContracts,
   getSyirkahMembers,
   getSyirkahWitnesses,
   syncSyirkahCapitalToCore,
@@ -11,6 +12,10 @@ import SyirkahDetailClient from './SyirkahDetailClient'
 import SyirkahWizard from './SyirkahWizard'
 import { getProfitLoss } from '@/modules/accounting/actions/reports.actions'
 import { getChartOfAccounts } from '@/modules/accounting/actions/coa.actions'
+import {
+  buildSyirkahDistributionContext,
+  resolveSyirkahContractDistribution,
+} from '@/modules/syirkah/lib/syirkah.utils'
 
 export const metadata = {
   title: 'Detail Akad Syirkah | Nizam ERP',
@@ -59,14 +64,16 @@ export default async function SyirkahDetailPage({ params, searchParams }: {
 
   const members = await getSyirkahMembers(contractId)
   const witnesses = await getSyirkahWitnesses(contractId)
-  const [pnl, accounts, coreJournal] = await Promise.all([
-    getProfitLoss(activeOrgData.org.id),
+  const [pnl, contracts, accounts, coreJournal] = await Promise.all([
+    getProfitLoss(activeOrgData.org.id, '2000-01-01'),
+    getSyirkahContracts(activeOrgData.org.id),
     getChartOfAccounts(activeOrgData.org.id),
     contract.core_journal_entry_id
       ? getSyirkahCoreJournal(String(contract.core_journal_entry_id), activeOrgData.org.id)
       : Promise.resolve(null),
   ])
-  const netProfit = pnl.netProfit || 0
+  const distributionContext = buildSyirkahDistributionContext(contracts, pnl.netProfit || 0)
+  const contractDistribution = resolveSyirkahContractDistribution(distributionContext, contract)
 
   return (
     <div className="w-full">
@@ -82,7 +89,8 @@ export default async function SyirkahDetailPage({ params, searchParams }: {
           orgId={activeOrgData.org.id}
           contract={contract}
           members={members}
-          netProfit={netProfit}
+          netProfit={contractDistribution.baseAmount}
+          profitDistribution={contractDistribution}
           accounts={accounts}
           coreJournal={coreJournal}
         />
