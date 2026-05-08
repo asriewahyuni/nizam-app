@@ -177,7 +177,7 @@ function getMetricValueClass(value: string) {
 
    if (valueParts.length > 1) {
       if (longestAmount >= 10) {
-         return 'text-[clamp(2rem,2.2vw,2.7rem)]'
+         return 'text-[clamp(1.5rem,1.8vw,2.2rem)]'
       }
 
       return 'text-[clamp(2.2rem,2.45vw,3rem)]'
