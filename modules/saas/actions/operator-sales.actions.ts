@@ -11,10 +11,12 @@ import {
 import {
   EXTRA_BRANCH_UNIT_PRICE,
   EXTRA_ENTITY_UNIT_PRICE,
+  OPERATOR_ADDON_OPTIONS,
   getOperatorAddonById,
   getOperatorMarketplaceCompatibility,
   getOperatorMarketplaceLabel,
 } from '@/lib/saas/operator-pricing'
+import { getModuleByKey } from '@/modules/marketplace/lib/module-registry'
 
 type OperatorResellerOption = {
   id: string
@@ -28,7 +30,7 @@ type OperatorResellerOption = {
 
 type OperatorSnapshot = {
   orgs: Array<{ id: string; name: string }>
-  packages: Array<{ id: string; name: string; price: number; billing?: string; modules: string[]; addons: string[] }>
+  packages: Array<{ id: string; name: string; price: number; billing?: string; modules: string[]; addons: string[]; corePrices: Record<string, number>; operationalPrices: Record<string, number> }>
   aiTokenPackages: OperatorAiTokenPackageOption[]
   resellers: OperatorResellerOption[]
   quotations: InvoiceRecord[]
@@ -735,7 +737,7 @@ export async function getOperatorSaasSnapshot(): Promise<OperatorSnapshot> {
 
   const [orgRes, pkgRes, invoiceRes, resellerRes] = await Promise.all([
     scoped.from('organizations').select('id, name').order('name', { ascending: true }),
-    scoped.from('saas_packages').select('id, name, price, billing, modules, addons').order('price', { ascending: true }),
+    scoped.from('saas_packages').select('id, name, price, billing, modules, addons, core_prices, operational_prices').order('price', { ascending: true }),
     admin
       .from('saas_invoices')
       .select(SAAS_INVOICE_SELECT_WITH_PRICING_COLUMNS)
@@ -803,6 +805,8 @@ export async function getOperatorSaasSnapshot(): Promise<OperatorSnapshot> {
     billing?: string | null
     modules?: unknown
     addons?: unknown
+    core_prices?: unknown
+    operational_prices?: unknown
   }>
   const resellerRows = (resellerRes.data || []) as Array<{
     id: string
@@ -829,6 +833,8 @@ export async function getOperatorSaasSnapshot(): Promise<OperatorSnapshot> {
     billing: pkg.billing || undefined,
     modules: normalizeSaasEntitlementList(toStringArray(pkg.modules)),
     addons: normalizeSaasEntitlementList(toStringArray(pkg.addons)),
+    corePrices: (pkg.core_prices as Record<string, number>) ?? {},
+    operationalPrices: (pkg.operational_prices as Record<string, number>) ?? {},
   }))
   const resellers: OperatorResellerOption[] = resellerRows.map((r) => ({
     id: r.id,
@@ -917,10 +923,10 @@ async function buildQuotationDraftFromFormData(admin: any, formData: FormData): 
 
   const { data: pkgData } = await admin
     .from('saas_packages')
-    .select('name, price, modules')
+    .select('name, price, modules, core_prices, operational_prices')
     .eq('id', packageId)
     .maybeSingle()
-  const pkg = pkgData as (PackageLookup & { modules?: unknown }) | null
+  const pkg = pkgData as (PackageLookup & { modules?: unknown; core_prices?: unknown; operational_prices?: unknown }) | null
   if (!pkg) {
     return { error: 'Paket SaaS tidak ditemukan.' }
   }
@@ -993,9 +999,22 @@ async function buildQuotationDraftFromFormData(admin: any, formData: FormData): 
     }
   }
 
+  let modulesMonthlyTotal = 0
+  if (selectedModules.length > 0) {
+    const corePrices = (pkg.core_prices as Record<string, number>) || {}
+    const operationalPrices = (pkg.operational_prices as Record<string, number>) || {}
+    
+    modulesMonthlyTotal = selectedModules.reduce((acc, modKey) => {
+      const corePrice = corePrices[modKey] || 0
+      const operationalPrice = operationalPrices[modKey] || 0
+      const isAddon = OPERATOR_ADDON_OPTIONS.some((a: any) => a.name === modKey || a.name.toLowerCase().includes(modKey.toLowerCase().split(' ')[0]))
+      return acc + corePrice + (isAddon ? 0 : operationalPrice)
+    }, 0)
+  }
+
   const extraEntityTotal = extraEntityQty * extraEntityUnitPrice
   const extraBranchTotal = extraBranchQty * extraBranchUnitPrice
-  const monthlySubtotalAmount = baseAmount + monthlyAddonTotal + extraEntityTotal + extraBranchTotal
+  const monthlySubtotalAmount = baseAmount + modulesMonthlyTotal + monthlyAddonTotal + extraEntityTotal + extraBranchTotal
   const oneTimeSubtotalAmount = singleBillAddonTotal + aiTokenTotal
   const durationSubtotalAmount = monthlySubtotalAmount * durationMonths
   const subtotalAmount = durationSubtotalAmount + oneTimeSubtotalAmount
@@ -1031,6 +1050,21 @@ async function buildQuotationDraftFromFormData(admin: any, formData: FormData): 
 
   if (incompatibleAddons.length > 0) {
     return { error: `Module/Add-on belum kompatibel. ${incompatibleAddons.join(' ')}` }
+  }
+
+  const incompatibleModules: string[] = []
+  modulesForQuote.forEach(modName => {
+    const modDef = getModuleByKey(modName)
+    if (modDef?.requires && modDef.requires.length > 0) {
+      const missing = modDef.requires.filter(req => !quoteCapabilities.some(cap => cap.toLowerCase() === req.toLowerCase()))
+      if (missing.length > 0) {
+        incompatibleModules.push(`${modName} (Butuh: ${missing.join(', ')})`)
+      }
+    }
+  })
+
+  if (incompatibleModules.length > 0) {
+    return { error: `Syarat modul belum terpenuhi: ${incompatibleModules.join(' | ')}. Tambahkan modul yang dibutuhkan ke dalam paket.` }
   }
 
   const coreScopeLabels = Array.from(new Set(
@@ -1553,18 +1587,30 @@ export async function markOperatorSalePaid(invoiceId: string, paymentMethod: str
   if (invoice.package_id) {
     const [{ data: pkgData }, { data: orgData }] = await Promise.all([
       admin.from('saas_packages').select('name').eq('id', invoice.package_id).maybeSingle(),
-      admin.from('organizations').select('settings').eq('id', invoice.org_id).maybeSingle(),
+      admin.from('organizations').select('settings, enabled_modules').eq('id', invoice.org_id).maybeSingle(),
     ])
     const pkg = pkgData as { name: string } | null
-    const org = orgData as { settings?: Record<string, unknown> | null } | null
+    const org = orgData as { settings?: Record<string, unknown> | null, enabled_modules?: string[] | null } | null
 
     if (pkg?.name) {
+      let customModules: string[] = []
+      if (invoice.item_description) {
+        const coreScopeLine = invoice.item_description.split('\n').find(l => l.startsWith('Core Family Scope:'))
+        if (coreScopeLine) {
+          customModules = coreScopeLine.replace('Core Family Scope:', '').split(',').map(s => s.trim()).filter(Boolean)
+        }
+      }
+
       const currentSettings = (org?.settings && typeof org.settings === 'object') ? org.settings : {}
+      const isCustom = customModules.length > 0
+
       await (admin.from('organizations') as any)
         .update({
+          enabled_modules: isCustom ? customModules : org?.enabled_modules,
           settings: {
             ...currentSettings,
             plan: pkg.name,
+            use_custom_modules: isCustom ? true : currentSettings.use_custom_modules,
             updated_at: new Date().toISOString(),
           },
         })

@@ -29,6 +29,8 @@ import {
   getSaasPackageArchitecture,
   normalizeSaasEntitlementList,
 } from '@/lib/saas/module-catalog'
+import { CORE_MODULES, MINIMUM_CORE_MODULES, OPERATIONAL_MODULES } from '@/modules/marketplace/lib/module-registry'
+import { OPERATOR_GROWTH_ADDON_OPTIONS } from '@/lib/saas/operator-pricing'
 
 type ResellerOption = {
   id: string
@@ -42,7 +44,7 @@ type ResellerOption = {
 
 type Snapshot = {
   orgs: Array<{ id: string; name: string }>
-  packages: Array<{ id: string; name: string; price: number; billing?: string; modules: string[]; addons: string[] }>
+  packages: Array<{ id: string; name: string; price: number; billing?: string; modules: string[]; addons: string[]; corePrices: Record<string, number>; operationalPrices: Record<string, number> }>
   aiTokenPackages: Array<{ id: string; name: string; description: string | null; tokens: number; price: number }>
   resellers: ResellerOption[]
   quotations: InvoiceRecord[]
@@ -289,7 +291,7 @@ export default function SaasOperatorClient({
   const [selectedOrgId, setSelectedOrgId] = useState('')
   const [selectedPackageId, setSelectedPackageId] = useState('')
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([])
-  const [selectedModules, setSelectedModules] = useState<string[]>([])
+  const [selectedModules, setSelectedModules] = useState<string[]>(MINIMUM_CORE_MODULES)
   const [selectedAiTokenPackageId, setSelectedAiTokenPackageId] = useState('')
   const [extraEntityQty, setExtraEntityQty] = useState(0)
   const [extraBranchQty, setExtraBranchQty] = useState(0)
@@ -463,6 +465,17 @@ export default function SaasOperatorClient({
     }, 0),
     [selectedAddonIds, addonPromoPrices]
   )
+  const selectedModulesMonthlyTotal = useMemo(
+    () => selectedModules.reduce((acc, modKey) => {
+      const corePrice = selectedPackage?.corePrices?.[modKey] || 0
+      const operationalPrice = selectedPackage?.operationalPrices?.[modKey] || 0
+      // Modul operasional yang merupakan add-on sudah dihitung di selectedAddonMonthlyTotal
+      const isAddon = OPERATOR_ADDON_OPTIONS.some(a => a.name === modKey || a.name.toLowerCase().includes(modKey.toLowerCase().split(' ')[0]))
+      return acc + corePrice + (isAddon ? 0 : operationalPrice)
+    }, 0),
+    [selectedModules, selectedPackage]
+  )
+
   const selectedAiTokenTotal = Number(selectedAiTokenPackage?.price || 0)
   const baseAmount = Number(overrideAmount || selectedPackage?.price || 0)
   const safeDurationMonths = Math.max(1, Math.floor(parseSafeNumber(durationMonths, 1)))
@@ -472,7 +485,7 @@ export default function SaasOperatorClient({
   const extraBranchUnitPriceValue = Math.max(0, parseSafeNumber(extraBranchUnitPrice, EXTRA_BRANCH_UNIT_PRICE))
   const extraEntityTotal = extraEntityQty * extraEntityUnitPriceValue
   const extraBranchTotal = extraBranchQty * extraBranchUnitPriceValue
-  const estimateMonthlySubtotal = baseAmount + selectedAddonMonthlyTotal + extraEntityTotal + extraBranchTotal
+  const estimateMonthlySubtotal = baseAmount + selectedModulesMonthlyTotal + selectedAddonMonthlyTotal + extraEntityTotal + extraBranchTotal
   const estimateOneTimeSubtotal = selectedAddonSingleBillTotal + selectedAiTokenTotal
   const estimateSubtotal = (estimateMonthlySubtotal * safeDurationMonths) + estimateOneTimeSubtotal
   const estimateDiscountAmount = (estimateSubtotal * safeDiscountPercent) / 100
@@ -485,7 +498,7 @@ export default function SaasOperatorClient({
     setSelectedOrgId('')
     setSelectedPackageId('')
     setSelectedAddonIds([])
-    setSelectedModules([])
+    setSelectedModules(MINIMUM_CORE_MODULES)
     setSelectedAiTokenPackageId('')
     setExtraEntityQty(0)
     setExtraBranchQty(0)
@@ -779,97 +792,68 @@ export default function SaasOperatorClient({
       {(isQuotesMode || Boolean(editingSaleInvoiceId)) && (
         <div className="rounded-3xl border border-slate-200 bg-white p-5">
           <h2 className="text-sm font-black uppercase tracking-wider text-slate-700">
-            {editingQuoteId
-              ? 'Edit Penawaran SaaS'
-              : editingSaleInvoiceId
-                ? 'Edit Invoice SaaS'
-                : 'Buat Penawaran SaaS Baru'}
+            {editingQuoteId ? 'Edit Penawaran SaaS' : editingSaleInvoiceId ? 'Edit Invoice SaaS' : 'Buat Penawaran SaaS Baru'}
           </h2>
-          <form action={handleSaveQuote} className="mt-4 space-y-4">
+          <form action={handleSaveQuote} className="mt-4 space-y-3">
             {(snapshot.orgs.length === 0 || snapshot.packages.length === 0) && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700">
-                Data tenant/paket belum terbaca. Pastikan daftar tenant & paket tersedia di halaman Admin dan akun ini punya akses ke data tersebut.
+                Data tenant/paket belum terbaca. Pastikan daftar tenant & paket tersedia.
               </div>
             )}
-            <section className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <div className="mb-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">1. Target & Paket</p>
-                <p className="mt-1 text-sm font-semibold text-slate-600">Pilih tenant, paket utama, dan nominal override jika ada penyesuaian khusus.</p>
-              </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+
+            {/* ── STEP 1: Nama & Tenant ── */}
+            <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+              <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">1 · Nama Paket & Tenant</p>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label className="space-y-1.5">
                   <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Tenant</span>
                   <select
-                    name="org_id"
-                    required
-                    value={selectedOrgId}
-                    onChange={(event) => setSelectedOrgId(event.target.value)}
+                    name="org_id" required value={selectedOrgId}
+                    onChange={(e) => setSelectedOrgId(e.target.value)}
                     disabled={Boolean(editingSaleInvoiceId)}
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold"
                   >
                     <option value="">Pilih Tenant</option>
-                    {snapshot.orgs.map((org) => (
-                      <option key={org.id} value={org.id}>{org.name}</option>
-                    ))}
+                    {snapshot.orgs.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
                   </select>
                 </label>
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Paket SaaS</span>
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    Jenis Layanan / Base Plan <span className="font-normal normal-case text-slate-400">(Referensi)</span>
+                  </span>
                   <select
-                    name="package_id"
-                    required
-                    value={selectedPackageId}
-                    onChange={(event) => {
-                      const nextPackageId = event.target.value
-                      setSelectedPackageId(nextPackageId)
-
-                      const pkg = snapshot.packages.find((item) => item.id === nextPackageId)
-                      setSelectedModules(pkg?.modules || [])
+                    name="package_id" required value={selectedPackageId}
+                    onChange={(e) => {
+                      const nextId = e.target.value
+                      setSelectedPackageId(nextId)
+                      const pkg = snapshot.packages.find((p) => p.id === nextId)
+                      // No longer overwriting selectedModules with pkg.modules to preserve the standard minimal configuration
                       setSelectedAddonIds([])
                       setAddonPromoPrices(createDefaultAddonPromoMap())
                       setAddonAnchorPrices(createDefaultAddonAnchorMap())
                     }}
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold"
                   >
-                    <option value="">Pilih Paket</option>
+                    <option value="">Pilih Base Plan</option>
                     {snapshot.packages.map((pkg) => (
-                      <option key={pkg.id} value={pkg.id}>
-                        {pkg.name} - {formatIdr(pkg.price)}
-                      </option>
+                      <option key={pkg.id} value={pkg.id}>{pkg.name} — {formatIdr(pkg.price)}</option>
                     ))}
                   </select>
                 </label>
-                <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Nominal Override</span>
-                  <input
-                    name="amount"
-                    type="number"
-                    min="0"
-                    value={overrideAmount}
-                    onChange={(event) => setOverrideAmount(event.target.value)}
-                    placeholder="Kosongkan jika ikut harga paket"
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold"
-                  />
-                </label>
               </div>
-              {/* Reseller */}
               {(snapshot.resellers?.length ?? 0) > 0 && (
                 <div className="mt-3">
                   <label className="space-y-1.5">
-                    <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">
-                      Reseller <span className="font-normal normal-case text-slate-400">(Opsional)</span>
-                    </span>
+                    <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Reseller <span className="font-normal normal-case text-slate-400">(Opsional)</span></span>
                     <select
-                      name="reseller_id"
-                      value={selectedResellerId}
+                      name="reseller_id" value={selectedResellerId}
                       onChange={(e) => setSelectedResellerId(e.target.value)}
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold md:w-1/3"
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold md:w-1/2"
                     >
                       <option value="">— Tanpa Reseller —</option>
                       {snapshot.resellers.map((r) => (
                         <option key={r.id} value={r.id}>
-                          {r.name}{r.company_name && r.company_name !== r.name ? ` (${r.company_name})` : ''}
-                          {r.commission_value ? ` · ${r.commission_value}${r.commission_type === 'PERCENT' ? '%' : ' fix'}` : ''}
+                          {r.name}{r.commission_value ? ` · ${r.commission_value}${r.commission_type === 'PERCENT' ? '%' : ' fix'}` : ''}
                         </option>
                       ))}
                     </select>
@@ -878,281 +862,291 @@ export default function SaasOperatorClient({
               )}
             </section>
 
+            {/* ── STEP 2: Entitas ── */}
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="mb-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">2. Penyesuaian Harga</p>
-                <p className="mt-1 text-sm font-semibold text-slate-600">
-                  Atur durasi, diskon setelah durasi, pajak, dan catatan {editingSaleInvoiceId ? 'invoice' : 'penawaran'} dalam satu blok.
-                </p>
+              <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">2 · Kebutuhan Entitas</p>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <label className="space-y-1.5">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Child Entity (Anak Perusahaan)</span>
+                  <input type="number" min="0" value={extraEntityQty}
+                    onChange={(e) => setExtraEntityQty(Math.max(0, Number(e.target.value || 0)))}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Harga / Child Entity</span>
+                  <input type="number" min="0" value={extraEntityUnitPrice}
+                    onChange={(e) => setExtraEntityUnitPrice(e.target.value)}
+                    placeholder={String(199000)}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Unit / Cabang</span>
+                  <input type="number" min="0" value={extraBranchQty}
+                    onChange={(e) => setExtraBranchQty(Math.max(0, Number(e.target.value || 0)))}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Harga / Unit</span>
+                  <input type="number" min="0" value={extraBranchUnitPrice}
+                    onChange={(e) => setExtraBranchUnitPrice(e.target.value)}
+                    placeholder={String(99000)}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold"
+                  />
+                </label>
               </div>
+              {(extraEntityQty > 0 || extraBranchQty > 0) && (
+                <div className="mt-2 text-[11px] font-semibold text-slate-500">
+                  {extraEntityQty > 0 && <span>{extraEntityQty} child × {formatIdr(extraEntityUnitPriceValue)} = {formatIdr(extraEntityQty * extraEntityUnitPriceValue)} / bln</span>}
+                  {extraEntityQty > 0 && extraBranchQty > 0 && <span className="mx-2 text-slate-300">|</span>}
+                  {extraBranchQty > 0 && <span>{extraBranchQty} unit × {formatIdr(extraBranchUnitPriceValue)} = {formatIdr(extraBranchQty * extraBranchUnitPriceValue)} / bln</span>}
+                </div>
+              )}
+            </section>
+
+            {/* ── STEP 3: Gudang ── */}
+            <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+              <p className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">3 · Gudang Tambahan (WMS)</p>
+              <p className="mb-3 text-[11px] font-medium text-slate-500">Setiap paket sudah termasuk 1 gudang utama. Tambahkan gudang jika bisnis membutuhkan multi-lokasi stok.</p>
+              {(() => {
+                const warehouseAddon = OPERATOR_GROWTH_ADDON_OPTIONS.find(a => a.id === 'addon_warehouse')
+                if (!warehouseAddon) return null
+                const isSelected = selectedAddonIds.includes('addon_warehouse')
+                return (
+                  <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleAddon('addon_warehouse')}
+                      className="h-4 w-4 rounded border-slate-300"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-bold text-slate-800">🏬 Gudang Tambahan</span>
+                      <p className="text-[11px] text-slate-500">{warehouseAddon.description}</p>
+                    </div>
+                    <span className="text-sm font-black text-indigo-700">{formatIdr(parseSafeNumber(addonPromoPrices['addon_warehouse'], warehouseAddon.price))} / bln</span>
+                  </label>
+                )
+              })()}
+            </section>
+
+            {/* ── STEP 4: Modul Inti ── */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">4 · Modul Inti</p>
+              <p className="mb-3 text-[11px] font-medium text-slate-500">Pilih modul-modul inti yang disertakan dalam paket. Harga per modul sesuai katalog SaaS.</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {CORE_MODULES.map((mod) => {
+                  const isSelected = selectedModules.includes(mod.key)
+                  const isMinimum = MINIMUM_CORE_MODULES.includes(mod.key)
+                  const unmet = (mod.requires || []).filter(req => !selectedModules.some(m => m.toLowerCase() === req.toLowerCase()))
+                  const isBlocked = !isSelected && unmet.length > 0
+                  const isLocked = isMinimum // minimum modules cannot be unchecked
+                  const price = selectedPackage?.corePrices?.[mod.key] || 0
+                  return (
+                    <label key={mod.key} className={`flex items-start gap-3 rounded-xl border px-3 py-3 transition-all ${isLocked ? 'cursor-default border-emerald-300 bg-emerald-50/80' : isSelected ? 'cursor-pointer border-emerald-200 bg-emerald-50' : isBlocked ? 'cursor-not-allowed border-slate-100 bg-slate-50 opacity-60' : 'cursor-pointer border-slate-200 bg-slate-50/60 hover:border-emerald-200'}`}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        disabled={isBlocked || isLocked}
+                        onChange={() => !isLocked && toggleModule(mod.key)}
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{mod.icon}</span>
+                            <span className="text-sm font-bold text-slate-800">{mod.name}</span>
+                            {isMinimum && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-emerald-700">Wajib</span>}
+                          </div>
+                          {price > 0 && <span className="text-xs font-black text-emerald-700">{formatIdr(price)}/bln</span>}
+                        </div>
+                        <p className="mt-0.5 text-[10px] text-slate-500">{mod.tagline}</p>
+                        {isBlocked && <p className="mt-1 text-[10px] font-bold text-rose-500">Butuh: {unmet.join(', ')}</p>}
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </section>
+
+            {/* ── STEP 5: Modul Operasional ── */}
+            <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+              <p className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">5 · Modul Operasional</p>
+              <p className="mb-3 text-[11px] font-medium text-slate-500">Tambahkan ekstensi bisnis spesifik. Harga muncul setelah diset di Pengaturan SaaS.</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {OPERATIONAL_MODULES.map((mod) => {
+                  const addonEntry = OPERATOR_ADDON_OPTIONS.find(a => a.name === mod.key || a.name.toLowerCase().includes(mod.key.toLowerCase().split(' ')[0]))
+                  const addonId = addonEntry?.id
+                  const isSelected = addonId ? selectedAddonIds.includes(addonId) : selectedModules.includes(mod.key)
+                  const unmet = (mod.requires || []).filter(req => !selectedModules.some(m => m.toLowerCase() === req.toLowerCase()))
+                  const isBlocked = !isSelected && unmet.length > 0
+                  
+                  let price = 0
+                  if (addonId) {
+                    price = parseSafeNumber(addonPromoPrices[addonId], addonEntry?.price || 0)
+                  } else {
+                    price = selectedPackage?.operationalPrices?.[mod.key] || 0
+                  }
+
+                  return (
+                    <label key={mod.key} className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition-all ${isSelected ? 'border-blue-200 bg-blue-50' : isBlocked ? 'cursor-not-allowed border-slate-100 bg-slate-50 opacity-60' : 'border-slate-200 bg-white hover:border-blue-200'}`}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        disabled={isBlocked}
+                        onChange={() => addonId ? toggleAddon(addonId) : toggleModule(mod.key)}
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{mod.icon}</span>
+                            <span className="text-sm font-bold text-slate-800">{mod.name}</span>
+                          </div>
+                          {price > 0 && <span className="text-xs font-black text-blue-700">{formatIdr(price)}/bln</span>}
+                        </div>
+                        <p className="mt-0.5 text-[10px] text-slate-500">{mod.tagline}</p>
+                        {isBlocked && <p className="mt-1 text-[10px] font-bold text-rose-500">Butuh: {unmet.join(', ')}</p>}
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </section>
+
+            {/* ── STEP 6: Add-on ── */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">6 · Add-on</p>
+              <p className="mb-3 text-[11px] font-medium text-slate-500">Fitur tambahan yang memperkuat kapasitas bisnis tanpa mengubah model operasional.</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {OPERATOR_GROWTH_ADDON_OPTIONS.filter(a => a.id !== 'addon_warehouse').map((addon) => {
+                  const isSelected = selectedAddonIds.includes(addon.id)
+                  const compatibility = addonCompatibilityById[addon.id]
+                  const isLocked = !isSelected && compatibility && !compatibility.isCompatible
+                  return (
+                    <div key={addon.id} className={`rounded-xl border px-3 py-3 transition-all ${isSelected ? 'border-indigo-200 bg-indigo-50' : isLocked ? 'border-slate-100 bg-slate-50 opacity-60' : 'border-slate-200 bg-slate-50/60 hover:border-indigo-200'}`}>
+                      <label className="flex cursor-pointer items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          disabled={Boolean(isLocked)}
+                          onChange={() => toggleAddon(addon.id)}
+                          className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-bold text-slate-800">{addon.name}</span>
+                            <span className="text-sm font-black text-indigo-700">{formatIdr(parseSafeNumber(addonPromoPrices[addon.id], addon.price))}</span>
+                          </div>
+                          <p className="mt-0.5 text-[10px] text-slate-500">{addon.description}</p>
+                          <span className="mt-1 inline-block rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[9px] font-black uppercase text-slate-500">{addon.billing}</span>
+                          {isLocked && compatibility?.reason && <p className="mt-1 text-[10px] font-bold text-amber-600">{compatibility.reason}</p>}
+                        </div>
+                      </label>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+
+            {/* ── STEP 7: Durasi ── */}
+            <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+              <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">7 · Durasi & Harga Override</p>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <label className="space-y-1.5">
                   <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Durasi (Bulan)</span>
-                  <input
-                    name="duration_months"
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={durationMonths}
-                    onChange={(event) => setDurationMonths(event.target.value)}
-                    placeholder="1"
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold"
-                  />
-                </label>
-                <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Diskon Setelah Durasi (%)</span>
-                  <input
-                    name="discount_percent"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={discountPercent}
-                    onChange={(event) => setDiscountPercent(event.target.value)}
-                    placeholder="0"
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold"
-                  />
-                </label>
-                <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Pajak (%)</span>
-                  <input
-                    name="tax_percent"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={taxPercent}
-                    onChange={(event) => setTaxPercent(event.target.value)}
-                    placeholder="0"
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold"
-                  />
-                </label>
-              </div>
-              <label className="mt-3 block space-y-1.5">
-                <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">
-                  {editingSaleInvoiceId ? 'Catatan Invoice' : 'Catatan Penawaran'}
-                </span>
-                <textarea
-                  name="note"
-                  rows={2}
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  placeholder="Catatan penawaran (opsional)"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold"
-                />
-              </label>
-            </section>
-
-            <section className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <div className="mb-3 flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">3. Ekspansi Operasional</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-600">Hitung kebutuhan entitas dan cabang tambahan dengan urutan quantity lalu harga satuan.</p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-500">
-                  Entitas: {extraEntityQty} x {formatIdr(extraEntityUnitPriceValue)}<br />
-                  Cabang: {extraBranchQty} x {formatIdr(extraBranchUnitPriceValue)}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Entitas Tambahan</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={extraEntityQty}
-                    onChange={(event) => setExtraEntityQty(Math.max(0, Number(event.target.value || 0)))}
-                    placeholder="0"
+                  <input name="duration_months" type="number" min="1" step="1"
+                    value={durationMonths} onChange={(e) => setDurationMonths(e.target.value)}
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold"
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Harga Satuan Entitas</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={extraEntityUnitPrice}
-                    onChange={(event) => setExtraEntityUnitPrice(event.target.value)}
-                    placeholder="Harga satuan entitas"
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Harga Base Override <span className="font-normal normal-case text-slate-400">(Opsional)</span></span>
+                  <input name="amount" type="number" min="0"
+                    value={overrideAmount} onChange={(e) => setOverrideAmount(e.target.value)}
+                    placeholder="Kosongkan = ikut template"
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold"
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Cabang Tambahan</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={extraBranchQty}
-                    onChange={(event) => setExtraBranchQty(Math.max(0, Number(event.target.value || 0)))}
-                    placeholder="0"
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold"
-                  />
-                </label>
-                <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Harga Satuan Cabang</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={extraBranchUnitPrice}
-                    onChange={(event) => setExtraBranchUnitPrice(event.target.value)}
-                    placeholder="Harga satuan cabang"
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Catatan</span>
+                  <input name="note" type="text"
+                    value={note} onChange={(e) => setNote(e.target.value)}
+                    placeholder="Catatan opsional..."
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold"
                   />
                 </label>
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="mb-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">4. Aktivasi Fitur</p>
-                <p className="mt-1 text-sm font-semibold text-slate-600">Review bundle core, vertical module, add-on, dan topup token AI dalam satu area.</p>
-              </div>
-              <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Core Family</p>
-                  {selectedPackageArchitecture && (
-                    <div className="mt-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600">{quoteArchitecture.bundleLabel}</p>
-                      <p className="mt-1 text-[11px] font-semibold text-slate-600">
-                        Platform Core + {quoteArchitecture.liteCore.length + quoteArchitecture.starterCore.length} core item
-                        {quoteArchitecture.fullCoreExtensions.length > 0 ? ` + ${quoteArchitecture.fullCoreExtensions.length} full core extension` : ''}
-                        {selectedPackageArchitecture.verticalModules.length > 0 ? ` + ${selectedPackageArchitecture.verticalModules.length} vertical module` : ''}
-                      </p>
-                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
-                        Minimum capability: {getSaasCoreFamilyLabel(quoteArchitecture.coreFamilyLevel)}
-                      </p>
+            {/* ── STEP 8-10: Kalkulasi Total ── */}
+            <section className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-400">8–10 · Subtotal · Diskon & Pajak · Total</p>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-1 rounded-xl border border-indigo-100 bg-white p-3">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">8 · Subtotal per Bulan</p>
+                  <div className="space-y-0.5 text-[11px] text-slate-600 font-semibold">
+                    {(overrideAmount || selectedPackage?.price) ? <div className="flex justify-between"><span>Base paket</span><span>{formatIdr(baseAmount)}</span></div> : null}
+                    {selectedModulesMonthlyTotal > 0 && <div className="flex justify-between text-emerald-700"><span>Modul custom</span><span>{formatIdr(selectedModulesMonthlyTotal)}</span></div>}
+                    {selectedAddonMonthlyTotal > 0 && <div className="flex justify-between"><span>Add-on bulanan</span><span>{formatIdr(selectedAddonMonthlyTotal)}</span></div>}
+                    {extraEntityQty > 0 && <div className="flex justify-between"><span>Child entity ×{extraEntityQty}</span><span>{formatIdr(extraEntityTotal)}</span></div>}
+                    {extraBranchQty > 0 && <div className="flex justify-between"><span>Unit ×{extraBranchQty}</span><span>{formatIdr(extraBranchTotal)}</span></div>}
+                    {selectedAddonSingleBillTotal > 0 && <div className="flex justify-between text-slate-400"><span>One-time add-on</span><span>{formatIdr(selectedAddonSingleBillTotal)}</span></div>}
+                  </div>
+                  <div className="mt-2 flex justify-between border-t border-indigo-100 pt-2">
+                    <span className="text-xs font-black text-slate-700">Subtotal × {safeDurationMonths} bulan</span>
+                    <span className="text-sm font-black text-slate-900">{formatIdr(estimateSubtotal)}</span>
+                  </div>
+                </div>
+                <div className="space-y-3 rounded-xl border border-indigo-100 bg-white p-3">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">9 · Diskon & Pajak</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="space-y-1">
+                      <span className="block text-[10px] font-bold text-slate-500">Diskon (%)</span>
+                      <input name="discount_percent" type="number" min="0" max="100" step="0.01"
+                        value={discountPercent} onChange={(e) => setDiscountPercent(e.target.value)}
+                        className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block text-[10px] font-bold text-slate-500">Pajak (%)</span>
+                      <input name="tax_percent" type="number" min="0" max="100" step="0.01"
+                        value={taxPercent} onChange={(e) => setTaxPercent(e.target.value)}
+                        className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold"
+                      />
+                    </label>
+                  </div>
+                  {(estimateDiscountAmount > 0 || estimateTaxAmount > 0) && (
+                    <div className="space-y-0.5 text-[11px] text-slate-600 font-semibold">
+                      {estimateDiscountAmount > 0 && <div className="flex justify-between text-rose-600"><span>Diskon {safeDiscountPercent}%</span><span>- {formatIdr(estimateDiscountAmount)}</span></div>}
+                      {estimateTaxAmount > 0 && <div className="flex justify-between text-amber-700"><span>Pajak {safeTaxPercent}%</span><span>+ {formatIdr(estimateTaxAmount)}</span></div>}
                     </div>
                   )}
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {visiblePackageModules.length > 0 ? (
-                      visiblePackageModules.map((moduleName) => (
-                        <label key={moduleName} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600">
-                          <input
-                            type="checkbox"
-                            checked={selectedModules.includes(moduleName)}
-                            onChange={() => toggleModule(moduleName)}
-                            className="h-3 w-3 rounded border-slate-300 text-[#003366]"
-                          />
-                          {moduleName}
-                        </label>
-                      ))
-                    ) : (
-                      <span className="text-xs font-semibold text-slate-400">Pilih paket dulu.</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Marketplace Layers</p>
-                  <div className="mt-2 space-y-3">
-                    {marketplaceSections.map((section) => (
-                      <div key={section.title} className="space-y-1.5">
-                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{section.title}</p>
-                        {section.items.map((addon) => {
-                          const isLocked = !addon.compatibility?.isCompatible
-                          return (
-                          <div
-                            key={addon.id}
-                            className={`rounded-lg border px-2 py-2 text-[11px] ${
-                              isLocked ? 'border-amber-200 bg-amber-50/60' : 'border-slate-200 bg-white'
-                            }`}
-                          >
-                            <label className="flex items-center justify-between gap-2">
-                              <span className="inline-flex items-center gap-2 font-bold text-slate-700">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedAddonIds.includes(addon.id)}
-                                  disabled={isLocked && !selectedAddonIds.includes(addon.id)}
-                                  onChange={() => toggleAddon(addon.id)}
-                                  className="h-3.5 w-3.5 rounded border-slate-300 text-[#003366]"
-                                />
-                                {addon.name}
-                                <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-500">
-                                  {addon.billing}
-                                </span>
-                                <span className="rounded-full border border-blue-100 bg-blue-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-blue-700">
-                                  {getOperatorMarketplaceLabel(addon)}
-                                </span>
-                                <span className="rounded-full border border-indigo-100 bg-indigo-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-indigo-700">
-                                  Min. {getSaasCoreFamilyLabel(getOperatorMarketplaceMinCoreFamily(addon))}
-                                </span>
-                              </span>
-                              <span className="font-black text-indigo-700">{formatIdr(parseSafeNumber(addonPromoPrices[addon.id], addon.price))}</span>
-                            </label>
-                            {isLocked && addon.compatibility?.reason && (
-                              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[10px] font-bold text-amber-800">
-                                <div className="flex items-start gap-1.5">
-                                  <AlertCircle size={12} className="mt-0.5 shrink-0" />
-                                  <span>{addon.compatibility.reason}</span>
-                                </div>
-                              </div>
-                            )}
-                            {(addon.capacityNote || addon.description) && (
-                              <div className="mt-2 space-y-1">
-                                {addon.capacityNote && (
-                                  <div className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-blue-700">
-                                    {addon.capacityNote}
-                                  </div>
-                                )}
-                                <p className="text-[10px] font-semibold leading-relaxed text-slate-500">
-                                  {addon.description}
-                                </p>
-                              </div>
-                            )}
-                            <div className="mt-2 grid grid-cols-2 gap-2">
-                              <input
-                                type="number"
-                                min="0"
-                                value={addonAnchorPrices[addon.id] || ''}
-                                onChange={(event) => setAddonAnchorPrices((prev) => ({ ...prev, [addon.id]: event.target.value }))}
-                                placeholder="Harga coret"
-                                disabled={isLocked && !selectedAddonIds.includes(addon.id)}
-                                className="h-8 rounded-md border border-slate-200 px-2 text-[10px] font-bold disabled:bg-slate-100"
-                              />
-                              <input
-                                type="number"
-                                min="0"
-                                value={addonPromoPrices[addon.id] || ''}
-                                onChange={(event) => setAddonPromoPrices((prev) => ({ ...prev, [addon.id]: event.target.value }))}
-                                placeholder="Harga jual"
-                                disabled={isLocked && !selectedAddonIds.includes(addon.id)}
-                                className="h-8 rounded-md border border-slate-200 px-2 text-[10px] font-bold disabled:bg-slate-100"
-                              />
-                            </div>
-                          </div>
-                        )})}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Token AI (Opsional)</p>
-                  <select
-                    value={selectedAiTokenPackageId}
-                    onChange={(event) => setSelectedAiTokenPackageId(event.target.value)}
-                    className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-700"
-                  >
-                    <option value="">Tanpa topup token</option>
-                    {snapshot.aiTokenPackages.map((pkg) => (
-                      <option key={pkg.id} value={pkg.id}>
-                        {pkg.name} - {pkg.tokens.toLocaleString('id-ID')} token ({formatIdr(pkg.price)})
-                      </option>
-                    ))}
-                  </select>
-                  <div className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold text-slate-500">
-                    Cocok untuk kebutuhan generator AI seperti Sales Page dan drafting konten penawaran.
+                  <div className="mt-2 flex items-baseline justify-between border-t border-indigo-100 pt-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400">10 · Grand Total</span>
+                    <span className="text-2xl font-black text-indigo-700">{formatIdr(estimateGrandTotal)}</span>
                   </div>
                 </div>
               </div>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                {(editingQuoteId || editingSaleInvoiceId) && (
+                  <button type="button" disabled={isPending} onClick={resetQuoteForm}
+                    className="h-11 rounded-xl border border-slate-300 bg-white px-5 text-xs font-black uppercase tracking-wider text-slate-600 disabled:opacity-60">
+                    Batal Edit
+                  </button>
+                )}
+                <button type="submit" disabled={isPending || !selectedOrgId || !selectedPackageId}
+                  className="h-11 rounded-xl bg-[#003366] px-6 text-xs font-black uppercase tracking-wider text-white disabled:opacity-60 hover:bg-indigo-700 transition-colors">
+                  {isPending ? 'Menyimpan...' : editingQuoteId || editingSaleInvoiceId ? 'Simpan Perubahan' : 'Buat Penawaran'}
+                </button>
+              </div>
             </section>
 
-            {selectedAddonIds.map((addonId) => (
-              <input key={`addon-${addonId}`} type="hidden" name="selected_addons" value={addonId} />
-            ))}
-            {selectedModules.map((moduleName) => (
-              <input key={`module-${moduleName}`} type="hidden" name="selected_modules" value={moduleName} />
-            ))}
+            {/* Hidden fields */}
+            {selectedAddonIds.map((id) => <input key={`addon-${id}`} type="hidden" name="selected_addons" value={id} />)}
+            {selectedModules.map((m) => <input key={`module-${m}`} type="hidden" name="selected_modules" value={m} />)}
             <input type="hidden" name="ai_token_package_id" value={selectedAiTokenPackageId} />
             <input type="hidden" name="extra_entity_qty" value={extraEntityQty} />
             <input type="hidden" name="extra_branch_qty" value={extraBranchQty} />
@@ -1162,48 +1156,6 @@ export default function SaasOperatorClient({
             <input type="hidden" name="addon_anchor_overrides_json" value={JSON.stringify(addonAnchorPrices)} />
             {editingQuoteId && <input type="hidden" name="quote_id" value={editingQuoteId} />}
             {editingSaleInvoiceId && <input type="hidden" name="invoice_id" value={editingSaleInvoiceId} />}
-
-            <div className="flex flex-col gap-2 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
-              <div className="text-xs font-bold text-slate-600">
-                Estimasi Total: <span className="text-base font-black text-indigo-700">{formatIdr(estimateGrandTotal)}</span>
-                <div className="text-[10px] text-slate-500">
-                  Subtotal bulanan {formatIdr(estimateMonthlySubtotal)} x {safeDurationMonths} bulan + one-time {formatIdr(estimateOneTimeSubtotal)} = {formatIdr(estimateSubtotal)} • Diskon {formatIdr(estimateDiscountAmount)} • Pajak {formatIdr(estimateTaxAmount)}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {editingQuoteId && (
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={resetQuoteForm}
-                    className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-xs font-black uppercase tracking-wider text-slate-600 disabled:opacity-60"
-                  >
-                    Batal Edit
-                  </button>
-                )}
-                {editingSaleInvoiceId && !editingQuoteId && (
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={resetQuoteForm}
-                    className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-xs font-black uppercase tracking-wider text-slate-600 disabled:opacity-60"
-                  >
-                    Batal Edit
-                  </button>
-                )}
-                <button
-                  type="submit"
-                  disabled={isPending || !selectedOrgId || !selectedPackageId}
-                  className="h-11 rounded-xl bg-[#003366] px-4 text-xs font-black uppercase tracking-wider text-white disabled:opacity-60"
-                >
-                  {isPending
-                    ? 'Menyimpan...'
-                    : editingQuoteId || editingSaleInvoiceId
-                      ? 'Simpan Perubahan'
-                      : 'Buat Penawaran'}
-                </button>
-              </div>
-            </div>
           </form>
         </div>
       )}

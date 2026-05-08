@@ -66,6 +66,8 @@ import {
   saasCoreFamilySatisfies,
   saasModuleMatches,
 } from '@/lib/saas/module-catalog'
+import { CORE_MODULES, MINIMUM_CORE_MODULES, OPERATIONAL_MODULES } from '@/modules/marketplace/lib/module-registry'
+import { OPERATOR_GROWTH_ADDON_OPTIONS } from '@/lib/saas/operator-pricing'
 import {
   calculateAiHppPerGeneration,
   calculateAiRecommendedSellPer1kTokens,
@@ -3313,123 +3315,99 @@ export default function SaaSAdminPage() {
                     </div>
 
                     <div className="space-y-6">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Bundle Core, Module, dan Add-on</label>
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Bundle Core & Modul Operasional</label>
                        
                        <div className="space-y-6 p-6 bg-slate-50 border border-slate-100 rounded-[32px]">
-                          {SAAS_PACKAGE_EDITOR_SECTIONS.map((cat) => (
-                             <div key={cat.key} className="space-y-2" data-module-group={cat.key}>
-                                <div className="flex items-center gap-2 px-2">
-                                   <div className="h-[1px] flex-1 bg-slate-200" />
-                                   <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{cat.title}</span>
-                                   <div className="h-[1px] flex-1 bg-slate-200" />
-                                </div>
-                                <p className="px-2 text-[11px] font-semibold text-slate-500">{cat.description}</p>
-                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                                   {/* Opsi untuk centang "SATU GRUP" sekaligus — hanya toggle UI, tidak submit value sendiri */}
-                                   <label className="flex items-center gap-2 p-2.5 bg-indigo-50/50 rounded-xl border border-indigo-100/50 cursor-pointer hover:bg-indigo-100/50 transition-colors group">
+                          <div className="space-y-2">
+                             <div className="flex items-center gap-2 px-2">
+                                <div className="h-[1px] flex-1 bg-slate-200" />
+                                <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Modul Inti</span>
+                                <div className="h-[1px] flex-1 bg-slate-200" />
+                             </div>
+                             <p className="px-2 text-[11px] font-semibold text-slate-500 mb-2">Pilih modul-modul inti yang disertakan dalam paket ini.</p>
+                             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                {CORE_MODULES.map((mod) => {
+                                  const isMinimum = MINIMUM_CORE_MODULES.includes(mod.key)
+                                  return (
+                                    <label key={mod.key} className={`flex items-start gap-3 rounded-xl border px-3 py-3 transition-all ${isMinimum ? 'cursor-default border-emerald-300 bg-emerald-50/80' : 'cursor-pointer border-slate-200 bg-white hover:border-emerald-200'}`}>
+                                       <input 
+                                          type="checkbox" 
+                                          name="modules" 
+                                          value={mod.key} 
+                                          defaultChecked={isMinimum || isCapabilitySelected(pkgModal.editData?.modules, mod.key)}
+                                          disabled={isMinimum}
+                                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" 
+                                       />
+                                       <div className="flex-1 min-w-0">
+                                         <div className="flex items-center gap-2 flex-wrap">
+                                           <span className="text-base">{mod.icon}</span>
+                                           <span className="text-sm font-bold text-slate-800">{mod.name}</span>
+                                           {isMinimum && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-emerald-700">Wajib</span>}
+                                         </div>
+                                         <p className="mt-0.5 text-[10px] text-slate-500">{mod.tagline}</p>
+                                       </div>
+                                    </label>
+                                  )
+                                })}
+                             </div>
+                          </div>
+
+                          <div className="space-y-2 mt-6">
+                             <div className="flex items-center gap-2 px-2">
+                                <div className="h-[1px] flex-1 bg-slate-200" />
+                                <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Modul Operasional</span>
+                                <div className="h-[1px] flex-1 bg-slate-200" />
+                             </div>
+                             <p className="px-2 text-[11px] font-semibold text-slate-500 mb-2">Tambahkan ekstensi bisnis spesifik.</p>
+                             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                {OPERATIONAL_MODULES.map((mod) => (
+                                   <label key={mod.key} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-blue-200 transition-all group">
                                       <input 
                                          type="checkbox" 
-                                         defaultChecked={cat.items.every((item) => isCapabilitySelected(pkgModal.editData?.modules, item.value))}
-                                         onChange={(e) => {
-                                           const container = e.target.closest('[data-module-group]')
-                                           if (!container) return
-                                           const checkboxes = container.querySelectorAll<HTMLInputElement>('input[name="modules"]')
-                                           checkboxes.forEach((cb) => { cb.checked = e.target.checked })
-                                         }}
-                                         className="w-4 h-4 rounded text-indigo-600" 
+                                         name="modules" 
+                                         value={mod.key} 
+                                         defaultChecked={isCapabilitySelected(pkgModal.editData?.modules, mod.key)}
+                                         className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
                                       />
-                                      <span className="text-[9px] font-black uppercase text-indigo-600 group-hover:underline italic">Pilih Semua {cat.title}</span>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-base">{mod.icon}</span>
+                                          <span className="text-sm font-bold text-slate-800">{mod.name}</span>
+                                        </div>
+                                        <p className="mt-0.5 text-[10px] text-slate-500">{mod.tagline}</p>
+                                      </div>
                                    </label>
-
-                                   {cat.items.map((item) => (
-                                      <label key={item.value} className="flex items-center gap-2 p-2.5 bg-white rounded-xl border border-slate-100 hover:border-blue-200 cursor-pointer transition-all group">
-                                         <input 
-                                            type="checkbox" 
-                                            name="modules" 
-                                            value={item.value} 
-                                            defaultChecked={isCapabilitySelected(pkgModal.editData?.modules, item.value)}
-                                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                                         />
-                                         <span className="text-[9px] font-black text-slate-500 group-hover:text-blue-600 truncate">{item.label}</span>
-                                      </label>
-                                   ))}
-                                </div>
+                                ))}
                              </div>
-                          ))}
+                          </div>
                        </div>
                     </div>
 
                     <div className="space-y-6">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Growth Layer Opsional</label>
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Add-on Opsional</label>
 
                        <div className="space-y-6 p-6 bg-slate-50 border border-slate-100 rounded-[32px]">
-                          {[
-                            {
-                              key: 'starter_core_upsell',
-                              title: 'Upsell Starter Core',
-                              description: 'Ekstensi operasional dari Lite menuju Starter Core Family.',
-                              items: SAAS_STARTER_CORE_ITEMS,
-                            },
-                            {
-                              key: 'full_core_upsell',
-                              title: 'Upsell Full Core',
-                              description: 'Capability tambahan yang bisa ditawarkan di atas Starter Core.',
-                              items: SAAS_FULL_CORE_EXTENSION_ITEMS,
-                            },
-                            {
-                              key: 'vertical_modules',
-                              title: 'Vertical Modules',
-                              description: 'Modul industri yang bisa diaktifkan terpisah dari core.',
-                              items: SAAS_VERTICAL_MODULE_ITEMS,
-                            },
-                            {
-                              key: 'addons',
-                              title: 'Add-ons',
-                              description: 'Ekspansi tambahan seperti WMS, sales page, API, dan capacity pack.',
-                              items: SAAS_ADDON_ITEMS,
-                            },
-                          ].map((cat) => (
-                             <div key={cat.key} className="space-y-2" data-addon-group={cat.key}>
-                                <div className="flex items-center gap-2 px-2">
-                                   <div className="h-[1px] flex-1 bg-slate-200" />
-                                   <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{cat.title}</span>
-                                   <div className="h-[1px] flex-1 bg-slate-200" />
-                                </div>
-                                <p className="px-2 text-[11px] font-semibold text-slate-500">{cat.description}</p>
-                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                                   <label className="flex items-center gap-2 p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100/50 cursor-pointer hover:bg-emerald-100/50 transition-colors group">
-                                      <input
-                                         type="checkbox"
-                                         defaultChecked={cat.items.every((item) => isCapabilitySelected(pkgModal.editData?.addons, item.value))}
-                                         onChange={(e) => {
-                                           const container = e.target.closest('[data-addon-group]')
-                                           if (!container) return
-                                           const checkboxes = container.querySelectorAll<HTMLInputElement>('input[name="addons"]')
-                                           checkboxes.forEach((cb) => { cb.checked = e.target.checked })
-                                         }}
-                                         className="w-4 h-4 rounded text-emerald-600"
+                          <div className="space-y-2">
+                             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                {OPERATOR_GROWTH_ADDON_OPTIONS.map((addon) => (
+                                   <label key={addon.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-indigo-200 transition-all group">
+                                      <input 
+                                         type="checkbox" 
+                                         name="addons" 
+                                         value={addon.name} 
+                                         defaultChecked={isCapabilitySelected(pkgModal.editData?.addons, addon.name)}
+                                         className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" 
                                       />
-                                      <span className="text-[9px] font-black uppercase text-emerald-700 group-hover:underline italic">Pilih Semua {cat.title}</span>
+                                      <div className="flex-1 min-w-0">
+                                        <span className="text-sm font-bold text-slate-800">{addon.name}</span>
+                                        <p className="mt-0.5 text-[10px] text-slate-500">{addon.description}</p>
+                                      </div>
                                    </label>
-
-                                   {cat.items.map((item) => (
-                                      <label key={`addon-${item.value}`} className="flex items-center gap-2 p-2.5 bg-white rounded-xl border border-slate-100 hover:border-emerald-200 cursor-pointer transition-all group">
-                                         <input
-                                            type="checkbox"
-                                            name="addons"
-                                            value={item.value}
-                                            defaultChecked={isCapabilitySelected(pkgModal.editData?.addons, item.value)}
-                                            className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                                         />
-                                         <span className="text-[9px] font-black text-slate-500 group-hover:text-emerald-600 truncate">{item.label}</span>
-                                      </label>
-                                   ))}
-                                </div>
+                                ))}
                              </div>
-                          ))}
+                          </div>
                        </div>
                     </div>
-
                     <div className="flex justify-end gap-4 pt-4">
                        <button type="button" onClick={() => setPkgModal({ open: false, editData: null })} className="px-6 py-4 text-xs font-black uppercase text-slate-400">Batal</button>
                        <SafeButton type="submit" variant="primary">Simpan Paket</SafeButton>
