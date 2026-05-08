@@ -6,6 +6,7 @@ import type { LooseDb } from '@/lib/supabase/loose'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { createJournalEntry } from '@/modules/accounting/actions/journal.actions'
 import type { WorkshopWorkOrder, WorkshopVehicle, WorkshopStatus } from '@/modules/workshop/lib/workshop-types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -222,8 +223,123 @@ export async function updateWorkOrderStatus(orgId: string, orderId: string, stat
 
   if (error) return { error: error.message }
 
+  // Posting jurnal otomatis saat SPK diserahkan ke pelanggan
+  if (status === 'DISERAHKAN') {
+    const journalResult = await postWorkshopJournal(orgId, orderId, db)
+    if ('error' in journalResult) {
+      // Jurnal gagal tidak membatalkan perubahan status; cukup log
+      console.error('postWorkshopJournal error:', journalResult.error)
+    }
+  }
+
   revalidatePath('/workshop')
+  revalidatePath('/accounting/journal')
   return { success: true }
+}
+
+// ─── Journal Posting ──────────────────────────────────────────────────────────
+
+async function postWorkshopJournal(orgId: string, orderId: string, db: LooseDb) {
+  // Ambil data SPK + items
+  const { data: order, error: orderErr } = await db
+    .from('workshop_work_orders')
+    .select('*, items:workshop_work_order_items(*)')
+    .eq('id', orderId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (orderErr || !order) return { error: 'SPK tidak ditemukan untuk posting jurnal.' }
+
+  const total = Number((order as Record<string, unknown>).total || 0)
+  if (total <= 0) return { success: true } // Tidak ada nilai, lewati
+
+  const branchId = (order as Record<string, unknown>).branch_id as string | null
+  const spkNumber = String((order as Record<string, unknown>).spk_number || '')
+  const items = ((order as Record<string, unknown>).items as Record<string, unknown>[]) || []
+
+  // Hitung total per tipe item
+  const totalJasa = items
+    .filter(i => String(i.item_type) === 'JASA')
+    .reduce((s, i) => s + Number(i.subtotal || 0), 0)
+  const totalPart = items
+    .filter(i => String(i.item_type) === 'PART')
+    .reduce((s, i) => s + Number(i.subtotal || 0), 0)
+
+  // Lookup akun: Piutang Usaha (1201) & Pendapatan (4001)
+  const { data: accAR } = await db
+    .from('accounts')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('code', '1201')
+    .maybeSingle()
+
+  const arAccountId = (accAR as Record<string, unknown> | null)?.id as string | undefined
+  if (!arAccountId) {
+    // Fallback: cari berdasarkan nama
+    const { data: altAR } = await db
+      .from('accounts')
+      .select('id')
+      .eq('org_id', orgId)
+      .ilike('name', '%piutang usaha%')
+      .limit(1)
+      .maybeSingle()
+    if (!(altAR as Record<string, unknown> | null)?.id) {
+      return { error: 'Akun Piutang Usaha (1201) tidak ditemukan. Periksa COA.' }
+    }
+  }
+
+  const { data: accRevenue } = await db
+    .from('accounts')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('code', '4001')
+    .maybeSingle()
+
+  const revenueAccountId = (accRevenue as Record<string, unknown> | null)?.id as string | undefined
+  if (!revenueAccountId) {
+    const { data: altRev } = await db
+      .from('accounts')
+      .select('id')
+      .eq('org_id', orgId)
+      .ilike('name', '%pendapatan%')
+      .limit(1)
+      .maybeSingle()
+    if (!(altRev as Record<string, unknown> | null)?.id) {
+      return { error: 'Akun Pendapatan (4001) tidak ditemukan. Periksa COA.' }
+    }
+  }
+
+  const finalArId = arAccountId as string
+  const finalRevId = revenueAccountId as string
+
+  // Susun baris jurnal
+  const lines: { account_id: string; debit: number; credit: number; memo: string }[] = []
+
+  // Debit: Piutang Usaha (total SPK)
+  lines.push({ account_id: finalArId, debit: total, credit: 0, memo: `Piutang bengkel ${spkNumber}` })
+
+  // Credit: Pendapatan Jasa
+  if (totalJasa > 0) {
+    lines.push({ account_id: finalRevId, debit: 0, credit: totalJasa, memo: `Pendapatan jasa servis ${spkNumber}` })
+  }
+  // Credit: Pendapatan Part (gunakan akun yang sama jika tidak ada akun terpisah)
+  if (totalPart > 0) {
+    lines.push({ account_id: finalRevId, debit: 0, credit: totalPart, memo: `Pendapatan spare part ${spkNumber}` })
+  }
+
+  if (lines.length < 2) return { success: true }
+
+  return createJournalEntry({
+    org_id: orgId,
+    branch_id: branchId ?? undefined,
+    entry_date: new Date().toISOString().split('T')[0],
+    description: `Pendapatan Bengkel — ${spkNumber}`,
+    reference_type: 'WORKSHOP',
+    reference_id: orderId,
+    auto_post: true,
+    skipRevalidate: true,
+    lines,
+  })
 }
 
 export async function addWorkOrderItem(
