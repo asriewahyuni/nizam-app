@@ -13,6 +13,7 @@ import {
   upsertSyirkahMember,
   deleteSyirkahMember,
   syncSyirkahCapitalToCore,
+  syncSyirkahProfitSharingToCore,
 } from '@/modules/syirkah/actions/syirkah.actions'
 
 const SYIRKAH_DEFAULT_CASH_CODES = ['1103', '1101', '1102', '1105']
@@ -50,7 +51,7 @@ function createDraftMemberId() {
   return `${randomSegment()}${randomSegment()}-${randomSegment()}-4${randomSegment().slice(1)}-a${randomSegment().slice(1)}-${randomSegment()}${randomSegment()}${randomSegment()}`
 }
 
-export default function SyirkahDetailClient({ orgId, contract, members, netProfit, profitDistribution, accounts, coreJournal }: any) {
+export default function SyirkahDetailClient({ orgId, contract, members, netProfit, profitDistribution, accounts, coreJournal, profitSharingJournal }: any) {
   const router = useRouter()
   const normalizedContractStatus = normalizeLocalContractStatus(contract.status)
   const canEstimateProfit = typeof netProfit === 'number' && Number.isFinite(netProfit)
@@ -66,12 +67,14 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
     status: contract.status || 'DRAFT',
     core_cash_account_id: contract.core_cash_account_id || '',
     core_equity_account_id: contract.core_equity_account_id || '',
+    profit_sharing_cash_account_id: contract.profit_sharing_cash_account_id || '',
   })
 
   const SYIRKAH_TYPES = ['Abdan', 'Syirkah Inan', 'Syirkah Mudharabah', 'Syirkah Wujuh', 'Syirkah Muwafadhah']
 
   const [isSavingContract, setIsSavingContract] = useState(false)
   const [isSyncingCore, setIsSyncingCore] = useState(false)
+  const [isSyncingProfitSharing, setIsSyncingProfitSharing] = useState(false)
   const [showQR, setShowQR] = useState(false)
 
   // Member form state
@@ -103,14 +106,26 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
   )
   const selectedCashAccount = activeAccounts.find((account: any) => account.id === contractData.core_cash_account_id) || null
   const selectedEquityAccount = activeAccounts.find((account: any) => account.id === contractData.core_equity_account_id) || null
+  const selectedProfitSharingCashAccount = activeAccounts.find((account: any) => account.id === contractData.profit_sharing_cash_account_id) || null
   const suggestedCashAccount = selectedCashAccount || pickPreferredAccountByCodes(cashAccounts, SYIRKAH_DEFAULT_CASH_CODES) || cashAccounts[0] || null
   const suggestedEquityAccount =
     selectedEquityAccount
     || pickPreferredAccountByCodes(equityAccounts, getPreferredEquityCodes(contractData.contract_type))
     || equityAccounts[0]
     || null
+  const suggestedProfitSharingCashAccount =
+    selectedProfitSharingCashAccount
+    || suggestedCashAccount
+    || pickPreferredAccountByCodes(cashAccounts, SYIRKAH_DEFAULT_CASH_CODES)
+    || cashAccounts[0]
+    || null
   const totalCapital = members.reduce((sum: number, member: any) => sum + Number(member.capital_contribution || 0), 0)
   const canPostCoreCapital = ['ACTIVE', 'COMPLETED'].includes(normalizedContractStatus)
+  const profitSharingBaseAmount = canEstimateProfit ? Number(netProfit || 0) : 0
+  const canPostProfitSharing =
+    ['ACTIVE', 'COMPLETED'].includes(normalizedContractStatus)
+    && profitDistribution?.status === 'ESTIMATED'
+    && profitSharingBaseAmount > 0
 
   const runCoreSync = async (showSuccessAlert = false) => {
     setIsSyncingCore(true)
@@ -140,6 +155,34 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
     }
   }
 
+  const runProfitSharingSync = async (showSuccessAlert = false) => {
+    setIsSyncingProfitSharing(true)
+    try {
+      const result = await syncSyirkahProfitSharingToCore(contract.id)
+      if ((result as any).error) {
+        alert(`Posting bagi hasil belum berhasil disinkronkan: ${(result as any).error}`)
+        return false
+      }
+
+      if (showSuccessAlert) {
+        if ((result as any).skipped && (result as any).message) {
+          alert((result as any).message)
+        } else {
+          const entryNumber = String((result as any).entryNumber || '').trim()
+          if (entryNumber) {
+            alert(`Bagi hasil syirkah tersinkron ke jurnal Core ${entryNumber}.`)
+          } else {
+            alert((result as any).message || 'Posting bagi hasil syirkah di Core sudah diperbarui.')
+          }
+        }
+      }
+
+      return true
+    } finally {
+      setIsSyncingProfitSharing(false)
+    }
+  }
+
   const handleSaveContract = async () => {
     setIsSavingContract(true)
     try {
@@ -148,6 +191,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
         ...contractData
       })
       await runCoreSync(false)
+      await runProfitSharingSync(false)
       setIsEditingContract(false)
       router.refresh()
     } catch {
@@ -213,6 +257,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
   const pengelolaList = members.filter((m: any) => m.role === 'PENGELOLA')
   const dualRoleList = members.filter((m: any) => m.role === 'PEMODAL_PENGELOLA')
   const coreJournalStatus = String(coreJournal?.status || '').trim().toUpperCase()
+  const profitSharingJournalStatus = String(profitSharingJournal?.status || '').trim().toUpperCase()
   const statusBadgeClass =
     normalizedContractStatus === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' :
     normalizedContractStatus === 'COMPLETED' ? 'bg-slate-100 text-slate-700' :
@@ -482,6 +527,118 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                   {canPostCoreCapital
                     ? 'Total setoran modal dari akad syirkah ini akan masuk ke jurnal Core agar terbaca di buku besar utama.'
                     : 'Pencatatan modal ke Core baru dilakukan setelah akad efektif dan berstatus ACTIVE.'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-slate-800">Posting Bagi Hasil</h3>
+              {!isEditingContract && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await runProfitSharingSync(true)
+                    router.refresh()
+                  }}
+                  disabled={isSyncingProfitSharing}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <RefreshCw size={14} className={isSyncingProfitSharing ? 'animate-spin' : ''} />
+                  {isSyncingProfitSharing ? 'Proses...' : 'Posting / Sinkronkan'}
+                </button>
+              )}
+            </div>
+
+            {isEditingContract ? (
+              <div className="space-y-4">
+                {cashAccounts.length > 0 ? (
+                  <SearchableSelect
+                    label="Rekening Pembayaran Bagi Hasil"
+                    options={cashAccounts}
+                    value={contractData.profit_sharing_cash_account_id}
+                    onChange={(value) => setContractData((prev) => ({ ...prev, profit_sharing_cash_account_id: value }))}
+                    placeholder="Pilih rekening kas/bank untuk payout..."
+                  />
+                ) : (
+                  <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
+                    Belum ada akun kas/bank aktif (11xx) yang bisa dipakai untuk pembayaran bagi hasil.
+                  </p>
+                )}
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+                  Posting otomatis akan menggunakan jurnal:
+                  <span className="mt-1 block font-semibold text-slate-800">
+                    Debit 3130 - Bagi Hasil Syirkah
+                    {' / '}
+                    Kredit {suggestedProfitSharingCashAccount ? `${suggestedProfitSharingCashAccount.code} - ${suggestedProfitSharingCashAccount.name}` : 'rekening kas/bank payout'}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 text-sm">
+                <div>
+                  <span className="block text-xs font-bold text-slate-400">Basis Pembagian</span>
+                  <p className="font-bold text-slate-900">
+                    {profitDistribution?.source === 'MANUAL_ALLOCATION'
+                      ? 'Alokasi Manual Akad'
+                      : profitDistribution?.source === 'ORG_NET_PROFIT'
+                        ? 'Laba Bersih Organisasi'
+                        : 'Belum Ada Basis Valid'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {profitDistribution?.message || 'Sistem akan mengevaluasi basis bagi hasil dari akad aktif yang berjalan.'}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-slate-400">Nominal Akan Diposting</span>
+                  <p className={`font-bold text-lg ${profitSharingBaseAmount > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
+                    {canEstimateProfit ? formatRupiah(profitSharingBaseAmount) : 'Belum tersedia'}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-slate-400">Rekening Pembayaran</span>
+                  <p className="font-medium text-slate-700">
+                    {suggestedProfitSharingCashAccount
+                      ? `${suggestedProfitSharingCashAccount.code} - ${suggestedProfitSharingCashAccount.name}`
+                      : 'Belum dipilih'}
+                  </p>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-slate-400">Status Jurnal Bagi Hasil</span>
+                  {profitSharingJournalStatus === 'POSTED' ? (
+                    <div className="mt-1 space-y-1">
+                      <span className="inline-flex rounded-lg bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">
+                        Sudah Diposting
+                      </span>
+                      <p className="text-xs font-medium text-slate-600">
+                        {profitSharingJournal?.entry_number || 'Jurnal Bagi Hasil'} • {profitSharingJournal?.entry_date ? new Date(profitSharingJournal.entry_date).toLocaleDateString('id-ID') : 'Tanggal belum tersedia'}
+                      </p>
+                    </div>
+                  ) : contract.profit_sharing_journal_entry_id ? (
+                    <span className="mt-1 inline-flex rounded-lg bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">
+                      Perlu sinkron ulang
+                    </span>
+                  ) : !canPostProfitSharing ? (
+                    <div className="mt-1 space-y-1">
+                      <span className="inline-flex rounded-lg bg-sky-100 px-2 py-1 text-xs font-bold text-sky-700">
+                        Menunggu basis valid
+                      </span>
+                      <p className="text-xs font-medium text-slate-600">
+                        {profitDistribution?.message || 'Isi alokasi manual atau pastikan akad aktif agar nominal bagi hasil bisa diposting.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <span className="mt-1 inline-flex rounded-lg bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">
+                      Belum diposting
+                    </span>
+                  )}
+                </div>
+                <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+                  {canPostProfitSharing
+                    ? 'Saat tombol dijalankan, sistem akan membuat jurnal otomatis untuk pembagian laba syirkah dan menghindari jurnal dobel bila nominalnya belum berubah.'
+                    : 'Sistem hanya akan memposting bagi hasil jika akad sudah ACTIVE/COMPLETED dan nominal dasar pembagian bernilai positif.'}
                 </p>
               </div>
             )}

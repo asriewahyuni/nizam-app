@@ -45,6 +45,7 @@ import {
   Upload,
   Building2,
   Code2,
+  GraduationCap,
   type LucideIcon
 } from 'lucide-react'
 import { signOut } from '@/modules/auth/actions/auth.actions'
@@ -62,6 +63,7 @@ interface NavGroup {
     permission_key?: string
     module_key?: string
     saas_assessor_only?: boolean
+    admin_only?: boolean
   }[]
 }
 
@@ -70,6 +72,7 @@ const NAV_GROUPS: NavGroup[] = [
     group: 'Utama',
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission_key: 'dashboard' },
+      { label: 'Modul Marketplace', href: '/marketplace', icon: Store, permission_key: 'config', admin_only: true },
       { label: 'Audit Integritas', href: '/accounting/audit', icon: ShieldCheck, permission_key: 'audit', module_key: 'Audit' },
     ]
   },
@@ -98,6 +101,8 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Fleet & Rental', href: '/fleet', icon: Truck, permission_key: 'fleet', module_key: 'Fleet & Rental' },
       { label: 'Job Order (Jasa)', href: '/services', icon: Briefcase, permission_key: 'services', module_key: 'Job Order (Jasa)' },
       { label: 'Project Konstruksi', href: '/construction', icon: Building2, permission_key: 'construction,project,services', module_key: 'Project & Construction' },
+      { label: 'LMS (Pelatihan Komersial)', href: '/lms', icon: GraduationCap, permission_key: 'learning', module_key: 'LMS' },
+      { label: 'Panel Penilai', href: '/lms/assessment-center', icon: ShieldCheck, permission_key: 'learning:write', saas_assessor_only: true },
     ]
   },
   {
@@ -121,8 +126,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Absensi & Cuti', href: '/hris?tab=attendance', icon: Clock, permission_key: 'attendance', module_key: 'Attendance' },
       { label: 'Payroll Components', href: '/hris?tab=payroll', icon: FileText, permission_key: 'payroll', module_key: 'Payroll' },
       { label: 'Proses Penggajian', href: '/hris?tab=runs', icon: Wallet, permission_key: 'payroll', module_key: 'Payroll' },
-      { label: 'Peningkatan Kompetensi', href: '/learning', icon: BookOpen, permission_key: 'learning', module_key: 'HRIS' },
-      { label: 'Assessor', href: '/learning', icon: ShieldCheck, saas_assessor_only: true },
+      { label: 'Peningkatan Kompetensi', href: '/learning', icon: BookOpen, permission_key: 'employees', module_key: 'HRIS' },
       { label: 'Akses & Jabatan', href: '/settings/roles', icon: ShieldCheck, permission_key: 'business', module_key: 'HRIS' },
     ]
   },
@@ -160,6 +164,7 @@ const SAAS_OPERATOR_GROUP: NavGroup = {
     { label: 'Penawaran SaaS', href: '/saas/penawaran', icon: FileText, permission_key: 'sales' },
     { label: 'Penjualan SaaS', href: '/saas/penjualan', icon: TrendingUp, permission_key: 'sales' },
     { label: 'Support Ticket SaaS', href: '/saas/ticketing', icon: LifeBuoy, permission_key: 'sales' },
+    { label: 'Pengaturan', href: '/saas/pengaturan', icon: Settings, permission_key: 'config:write' },
   ],
 }
 
@@ -240,6 +245,7 @@ interface AppSidebarProps {
   user?: { fullName?: string; email: string }
   permissions?: string[]
   enabledModules?: string[]
+  pendingModules?: string[]  // modul yang aktif tapi belum selesai onboarding
   pendingApprovals?: number
   unpostedJournals?: number
   pendingPurchaseRequests?: number
@@ -259,6 +265,7 @@ export function AppSidebar({
   user,
   permissions = [],
   enabledModules = [],
+  pendingModules = [],
   pendingApprovals = 0, 
   unpostedJournals = 0, 
   pendingPurchaseRequests = 0,
@@ -416,7 +423,7 @@ export function AppSidebar({
     }
 
     if (item.saas_assessor_only) {
-      return isSaasAssessor
+      return isSaasAssessor || hasRolePermission(userRole, permissions, item.permission_key)
     }
 
     // Cabang adalah fitur core — selalu tampilkan untuk owner/admin
@@ -674,6 +681,11 @@ export function AppSidebar({
                                 {badgeCount > 0 && (
                                   <div className={`px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-widest leading-none flex items-center justify-center animate-in fade-in zoom-in ${isActive ? 'bg-white text-[#003366] shadow-sm' : 'bg-[#003366] text-white shadow-sm shadow-[#003366]/10'}`}>
                                     {badgeCount}
+                                  </div>
+                                )}
+                                {item.module_key && pendingModules.includes(item.module_key) && badgeCount === 0 && (
+                                  <div className="px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-widest leading-none bg-amber-400 text-white animate-in fade-in zoom-in">
+                                    SETUP
                                   </div>
                                 )}
                                 <ChevronRight
