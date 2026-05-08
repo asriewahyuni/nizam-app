@@ -23,6 +23,7 @@ import { useRouter } from 'next/navigation'
 import { XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area } from 'recharts'
 import { formatRupiah } from '@/lib/utils'
 import { SafeResponsiveContainer } from '@/components/ui/SafeResponsiveContainer'
+import { MetricCard } from './MetricCard'
 
 interface DashboardClientProps {
    data: {
@@ -267,50 +268,25 @@ export function DashboardClient({ data }: DashboardClientProps) {
             </div>
          </motion.div>
 
-         {/* Grid: Metric Cards - Now with more impact */}
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+         {/* Grid: Metric Cards - Responsive with Status Indicators */}
+         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5 lg:gap-6">
             {data.metrics.map((m) => {
                const Icon = ICON_MAP[m.icon] || Wallet
-               const isDanger = m.danger
-               const metricValueClass = getMetricValueClass(m.value)
+               const isEmpty = String(m.value).trim() === 'Rp 0' || String(m.value).trim() === '0'
                const href = m.href || '#'
 
                return (
-                  <motion.div
-                     key={m.label}
-                     variants={item}
-                     whileHover={{ y: -6 }}
-                     whileTap={{ scale: 0.96 }}
-                     onClick={() => router.push(href)}
-                     className={`relative bg-white flex flex-col justify-between rounded-[32px] p-6 border shadow-[0_10px_30px_-5px_rgba(0,0,0,0.03)] h-full transition-all duration-300 overflow-hidden cursor-pointer group pointer-events-auto z-20
-                ${isDanger ? 'border-rose-100 bg-rose-50/20' : 'border-slate-100 hover:border-blue-500 hover:shadow-blue-100'}`}
-                  >
-                     <div className="flex items-start justify-between gap-4 mb-8 pointer-events-none">
-                        <div className={`shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300
-                  ${isDanger
-                              ? 'bg-rose-100 text-rose-600 shadow-sm border border-rose-200'
-                              : 'bg-slate-50 text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm border border-slate-100'}`}
-                        >
-                           <Icon size={22} strokeWidth={2.5} />
-                        </div>
-                        <div className="flex flex-col items-end flex-1 min-w-0">
-                           <span className={`text-[10px] font-black leading-tight uppercase tracking-[0.1em] text-right break-words ${isDanger ? 'text-rose-400' : 'text-slate-400'} group-hover:text-blue-500 transition-colors`}>
-                              {m.label}
-                           </span>
-                           <ArrowUpRight size={12} className="opacity-0 group-hover:opacity-100 transition-all text-blue-500 mt-1" />
-                        </div>
-                     </div>
-                     <div className="space-y-1.5 mt-auto pointer-events-none">
-                        <h3
-                           className={`w-full font-black leading-[0.9]
-                             ${metricValueClass}
-                             ${isDanger ? 'text-rose-700' : 'text-slate-900 group-hover:text-blue-700'}`}
-                           title={String(m.value)}
-                        >
-                           {renderMetricValue(m.value)}
-                        </h3>
-                        <p className={`text-[10px] font-bold leading-relaxed italic opacity-70 ${isDanger ? 'text-rose-500' : 'text-slate-400'}`}>{m.hint}</p>
-                     </div>
+                  <motion.div key={m.label} variants={item}>
+                     <MetricCard
+                        label={m.label}
+                        value={renderMetricValue(m.value)}
+                        hint={m.hint}
+                        icon={Icon}
+                        href={href}
+                        trend={m.trend}
+                        danger={m.danger}
+                        isEmpty={isEmpty}
+                     />
                   </motion.div>
                )
             })}
