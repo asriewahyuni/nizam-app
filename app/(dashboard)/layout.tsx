@@ -22,6 +22,7 @@ import { EduModeShell } from '@/components/edu/EduModeShell'
 import { hasEnabledModuleAccess, hasPosOnlyAccess } from '@/modules/organization/lib/navigation-access'
 import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
 import { resolveRuntimeDatabaseTarget } from '@/lib/db/runtime-target'
+import { getOrgModuleInstances } from '@/modules/marketplace/actions/marketplace.actions'
 
 type RouteModuleEntry = {
   path: string
@@ -53,11 +54,12 @@ export default async function DashboardLayout({
       ? orgData.org.settings as Record<string, unknown>
       : {}
   const startupWizardEnabled = orgSettings.startup_wizard_enabled !== false
-  const [adminImpersonation, activeBranch, allowAllBranchSelection, isDemo] = await Promise.all([
+  const [adminImpersonation, activeBranch, allowAllBranchSelection, isDemo, moduleInstances] = await Promise.all([
     getAdminImpersonationState(),
     getActiveBranch(orgData.org.id),
     canAccessAllBranchesForOrg(orgData.org.id),
     isDemoSession(),
+    getOrgModuleInstances(orgData.org.id),
   ])
   const effectivePlanName = isDemo ? 'Demo' : (orgData.org.settings?.plan || 'Trial')
   const saasAssessorContext = await getSaasAssessorContext({
@@ -87,7 +89,7 @@ export default async function DashboardLayout({
   const canManageSubOrganizations = isOwnerOrAdmin
   const isPosOnlyUser = hasPosOnlyAccess(orgData.role, orgData.permissions)
   const isSaasAssessorRouteAccess =
-    requestPathname.startsWith('/learning') &&
+    requestPathname.startsWith('/lms') &&
     saasAssessorContext.hasAccess
 
   if (
@@ -101,6 +103,7 @@ export default async function DashboardLayout({
   // Map paths to their required module names (matching saas_packages.modules)
   // Each entry can have multiple aliases to support both English & Indonesian module names
   const routeModuleMap: RouteModuleEntry[] = [
+    { path: '/marketplace', requiredModule: 'Config', aliases: ['Config'], permissionKeys: ['config', 'business'] },
     { path: '/sales/pages', requiredModule: 'Sales Page', aliases: ['Sales Page'], permissionKeys: ['sales'] },
     { path: '/inventory/warehouses', requiredModule: 'Warehouse', aliases: ['Warehouse', 'WMS'], permissionKeys: ['inventory', 'warehouse'] },
     { path: '/accounting/audit', requiredModule: 'Audit', aliases: ['Audit', 'Audit Trail'], permissionKeys: ['audit', 'approval'] },
@@ -129,6 +132,7 @@ export default async function DashboardLayout({
     { path: '/fleet', requiredModule: 'Fleet & Rental', aliases: ['Fleet & Rental', 'Fleet Management', 'Smart Fleet Management'], permissionKeys: ['fleet'] },
     { path: '/hris', requiredModule: 'HRIS', aliases: ['HRIS', 'Karyawan (HRIS)', 'Attendance', 'Payroll'], permissionKeys: ['hris', 'employee', 'employees', 'attendance', 'payroll'] },
     { path: '/learning', requiredModule: 'HRIS', aliases: ['HRIS', 'Learning', 'Peningkatan Kompetensi'], permissionKeys: ['learning', 'hris', 'employee', 'employees'] },
+    { path: '/lms', requiredModule: 'LMS', aliases: ['LMS', 'LMS (E-Learning)', 'Training Center'], permissionKeys: ['learning'] },
     { path: '/reports', requiredModule: 'Reports', aliases: ['Reports', 'Laporan', 'Insight'], permissionKeys: ['reports', 'strategy', 'forecast'] },
     { path: '/services', requiredModule: 'Job Order (Jasa)', aliases: ['Job Order (Jasa)', 'Industrial Job Order', 'Services'], permissionKeys: ['services', 'service', 'job_order'] },
     { path: '/construction', requiredModule: 'Project & Construction', aliases: ['Project & Construction', 'Construction', 'Project Construction', 'Project Konstruksi', 'Job Order (Jasa)'], permissionKeys: ['construction', 'project', 'services', 'job_order'] },
@@ -203,6 +207,7 @@ export default async function DashboardLayout({
         }}
         permissions={orgData.permissions}
         enabledModules={orgData.enabledModules}
+        pendingModules={(moduleInstances as any[]).filter(i => i.status !== 'READY').map(i => i.module_key)}
         isDemo={isDemo}
         planName={effectivePlanName}
         canManageSubOrganizations={canManageSubOrganizations}

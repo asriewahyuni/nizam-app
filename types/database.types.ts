@@ -1,5 +1,5 @@
 // Manually maintained database types
-// Last updated: 2026-03-29 — comprehensive table & RPC definitions
+// Last updated: 2026-05-07 — comprehensive table & RPC definitions
 
 export type Json =
   | string
@@ -13,6 +13,7 @@ export type Json =
 export type NormalBalance = 'DEBIT' | 'CREDIT'
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE'
 export type CashFlowCategory = 'OPERATING' | 'INVESTING' | 'FINANCING'
+export type CoAManagementMode = 'INHERITED' | 'LOCAL'
 export type JournalReferenceType = string
 
 // ─── Row Types ─────────────────────────────────────────────────
@@ -53,7 +54,19 @@ export type Product = {
 }
 export type Organization = {
   id: string; name: string; slug: string; logo_url: string | null
+  parent_org_id?: string | null
+  coa_management_mode?: CoAManagementMode | null
   settings: Json; is_active: boolean; created_at: string; updated_at: string
+}
+export type CoaConsolidationMapping = {
+  id: string
+  parent_org_id: string
+  child_org_id: string
+  local_account_id: string
+  group_account_id: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
 }
 export type Warehouse = {
   id: string; org_id: string; code: string; name: string
@@ -254,6 +267,76 @@ export type TrainingCourseAnswerSubmission = {
   created_at: string
   updated_at: string
 }
+export type HrisCompetencyTraining = {
+  id: string
+  org_id: string
+  branch_id: string | null
+  title: string
+  skill_category: string
+  target_role: string | null
+  training_type: 'INTERNAL' | 'EXTERNAL' | 'CERTIFICATION' | 'COACHING'
+  delivery_mode: 'CLASSROOM' | 'ONLINE' | 'HYBRID' | 'ON_THE_JOB'
+  scope_type: 'ORG' | 'BRANCH'
+  status: 'DRAFT' | 'PLANNED' | 'ONGOING' | 'COMPLETED' | 'ARCHIVED'
+  facilitator_name: string | null
+  start_date: string | null
+  end_date: string | null
+  duration_hours: number
+  objective: string | null
+  notes: string | null
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+export type HrisCompetencyTrainingParticipant = {
+  id: string
+  training_id: string
+  org_id: string
+  employee_id: string
+  status: 'ASSIGNED' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+  assigned_at: string
+  assigned_by: string | null
+  completed_at: string | null
+  note: string | null
+  created_at: string
+  updated_at: string
+}
+export type HrisCompetencyTrainingSession = {
+  id: string
+  training_id: string
+  org_id: string
+  branch_id: string | null
+  title: string
+  session_date: string | null
+  start_time: string | null
+  end_time: string | null
+  location: string | null
+  facilitator_name: string | null
+  status: 'SCHEDULED' | 'DONE' | 'CANCELLED'
+  note: string | null
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+export type HrisCompetencyTrainingEvaluation = {
+  id: string
+  training_id: string
+  org_id: string
+  participant_id: string
+  session_id: string | null
+  evaluator_name: string
+  evaluation_type: 'PRETEST' | 'POSTTEST' | 'OBSERVATION' | 'ASSESSMENT' | 'CERTIFICATION'
+  result_status: 'OBSERVED' | 'PASS' | 'REMEDIAL' | 'FAIL'
+  score: number | null
+  note: string | null
+  evaluated_at: string
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
 
 // ─── Workshop / Bengkel Motor ─────────────────────────────────────────────────
 
@@ -429,6 +512,16 @@ export interface Database {
         Update: Partial<Organization>
         Relationships: []
       }
+      coa_consolidation_mappings: {
+        Row: CoaConsolidationMapping
+        Insert: Omit<CoaConsolidationMapping, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<CoaConsolidationMapping>
+        Relationships: []
+      }
       training_course_assessments: {
         Row: TrainingCourseAssessment
         Insert: Omit<TrainingCourseAssessment, 'id' | 'created_at' | 'updated_at'> & {
@@ -447,6 +540,46 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<TrainingCourseAnswerSubmission>
+        Relationships: []
+      }
+      hris_competency_trainings: {
+        Row: HrisCompetencyTraining
+        Insert: Omit<HrisCompetencyTraining, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<HrisCompetencyTraining>
+        Relationships: []
+      }
+      hris_competency_training_participants: {
+        Row: HrisCompetencyTrainingParticipant
+        Insert: Omit<HrisCompetencyTrainingParticipant, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<HrisCompetencyTrainingParticipant>
+        Relationships: []
+      }
+      hris_competency_training_sessions: {
+        Row: HrisCompetencyTrainingSession
+        Insert: Omit<HrisCompetencyTrainingSession, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<HrisCompetencyTrainingSession>
+        Relationships: []
+      }
+      hris_competency_training_evaluations: {
+        Row: HrisCompetencyTrainingEvaluation
+        Insert: Omit<HrisCompetencyTrainingEvaluation, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<HrisCompetencyTrainingEvaluation>
         Relationships: []
       }
       warehouses: {

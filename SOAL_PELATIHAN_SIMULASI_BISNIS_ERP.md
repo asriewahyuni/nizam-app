@@ -195,3 +195,71 @@ Jika waktu masih ada, tambahkan uji lanjutan berikut:
 - permintaan akun CoA dari anak perusahaan ke holding,
 - audit trail atas transaksi yang sudah dibuat,
 - penutupan periode/closing setelah seluruh transaksi selesai.
+
+## Checklist Smoke Test UI CoA Child-Org
+
+Gunakan checklist ini setelah migration `1244` aktif untuk memastikan flow CoA child-org berjalan dari UI.
+
+### A. Ubah Mode CoA Anak Perusahaan
+
+1. Login sebagai `owner` holding.
+2. Buka `Settings > Sub Orgs`.
+3. Pilih salah satu child org, lalu ubah mode dari `Ikuti CoA Holding` ke `Kelola CoA Lokal`.
+
+Verifikasi:
+
+- Badge mode CoA pada card child berubah menjadi `CoA Lokal`.
+- Tidak muncul error permission.
+- Setelah refresh halaman, mode tetap tersimpan.
+
+### B. Buka Workspace Mapping Konsolidasi
+
+1. Pada child yang sudah `CoA Lokal`, klik `Atur Mapping Konsolidasi`.
+2. Pastikan modal mapping berhasil terbuka.
+
+Verifikasi:
+
+- Daftar akun lokal child tampil.
+- Daftar akun holding tampil sebagai target mapping.
+- Summary `total`, `mapped`, `unmapped`, dan `suggested` terisi.
+
+### C. Uji Auto-Suggestion
+
+1. Klik tombol `Isi Saran Kode Sama`.
+2. Perhatikan akun child yang memiliki kode sama dengan akun holding.
+
+Verifikasi:
+
+- Akun dengan kode sama terisi otomatis.
+- Akun dengan tipe berbeda tidak ikut dipasangkan otomatis.
+
+### D. Simpan Mapping Manual
+
+1. Ubah atau lengkapi beberapa mapping yang masih kosong.
+2. Klik `Simpan Mapping`.
+
+Verifikasi:
+
+- Tidak muncul error validasi.
+- Setelah modal ditutup dan dibuka lagi, mapping tetap tersimpan.
+- Jika satu mapping dikosongkan lalu disimpan ulang, mapping tersebut benar-benar hilang dari draft berikutnya.
+
+### E. Uji Guard Balik ke Inherited
+
+1. Saat child masih punya akun lokal aktif yang belum selaras dengan holding, ubah mode kembali ke `Ikuti CoA Holding`.
+
+Verifikasi:
+
+- Sistem menolak perubahan mode.
+- Pesan error menjelaskan masih ada akun lokal child yang belum ada di holding.
+
+### F. Verifikasi Dampak di Laporan
+
+1. Dari holding, buka `Reports`.
+2. Bandingkan `parent only` vs `consolidated`.
+
+Verifikasi:
+
+- Laporan konsolidasi tetap bisa dibuka tanpa error schema.
+- Akun child `LOCAL` yang sudah dimapping tetap teragregasi ke struktur akun holding.
+- Angka pada Neraca, Laba Rugi, dan Arus Kas konsisten dengan transaksi latihan.

@@ -33,7 +33,7 @@ export default async function LearningLessonPage(props: {
     <div className="space-y-6">
       <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
         <Link
-          href={`/learning/course/${course.slug}`}
+          href={`/lms/course/${course.slug}`}
           className="inline-flex items-center gap-2 text-sm font-black text-slate-600 hover:text-slate-900"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -169,7 +169,7 @@ export default async function LearningLessonPage(props: {
           <div className="flex flex-wrap gap-3">
             {previousLesson ? (
               <Link
-                href={`/learning/course/${course.slug}/lesson/${previousLesson.slug}`}
+                href={`/lms/course/${course.slug}/lesson/${previousLesson.slug}`}
                 className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -177,7 +177,7 @@ export default async function LearningLessonPage(props: {
               </Link>
             ) : (
               <Link
-                href={`/learning/course/${course.slug}`}
+                href={`/lms/course/${course.slug}`}
                 className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -187,7 +187,7 @@ export default async function LearningLessonPage(props: {
 
             {nextLesson ? (
               <Link
-                href={`/learning/course/${course.slug}/lesson/${nextLesson.slug}`}
+                href={`/lms/course/${course.slug}/lesson/${nextLesson.slug}`}
                 className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
               >
                 Lesson Berikutnya
@@ -195,7 +195,7 @@ export default async function LearningLessonPage(props: {
               </Link>
             ) : (
               <Link
-                href={`/learning/course/${course.slug}`}
+                href={`/lms/course/${course.slug}`}
                 className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white shadow-lg shadow-slate-200 transition hover:bg-black"
               >
                 Selesai Belajar

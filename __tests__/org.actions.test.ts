@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   nudgeEduModeValidation: vi.fn(),
   getBranchAccessScope: vi.fn(),
   getCurrentAccessibleBranch: vi.fn(),
+  syncParentCoAToChildOrg: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -25,6 +26,8 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/supabase/auth.server', () => ({
   getServerAuthContext: mocks.getServerAuthContext,
 }))
+
+vi.mock('server-only', () => ({}))
 
 vi.mock('next/headers', () => ({
   cookies: mocks.cookies,
@@ -62,6 +65,10 @@ vi.mock('@/modules/organization/lib/active-context.server', () => ({
   resolveActiveMembership: mocks.resolveActiveMembership,
 }))
 
+vi.mock('@/modules/accounting/actions/coa.actions', () => ({
+  syncParentCoAToChildOrg: mocks.syncParentCoAToChildOrg,
+}))
+
 import {
   createBranch,
   getActiveOrg,
@@ -70,6 +77,9 @@ import {
   getActiveBranch,
   setActiveBranch,
   setActiveOrg,
+  getChildCoAConsolidationWorkspace,
+  saveChildCoAConsolidationMappings,
+  setChildOrganizationCoAManagementMode,
   updateOrgSettings,
   uploadLogo,
 } from '@/modules/organization/actions/org.actions'
@@ -107,79 +117,150 @@ function createEmptyTrialClaimsBuilder() {
   }
 }
 
-describe('Organization Branch Bootstrap', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mocks.cookies.mockResolvedValue(createCookieStore())
-    mocks.getServerAuthContext.mockImplementation(async () => {
-      const supabase = await mocks.createClient()
-      const authResult = await supabase.auth.getUser()
+function setupHoldingActionContext(options?: {
+  role?: 'owner' | 'admin'
+  activeOrgId?: string
+  userId?: string
+  email?: string
+}) {
+  const role = options?.role ?? 'owner'
+  const activeOrgId = options?.activeOrgId ?? 'parent-1'
+  const userId = options?.userId ?? 'user-1'
+  const email = options?.email ?? 'owner@example.com'
+  const session = createSupabaseMock({
+    tables: {
+      saas_packages: [
+        {
+          maybeSingleResult: success({
+            modules: ['Accounting'],
+            duration_days: null,
+          }),
+        },
+      ],
+      employees: [
+        {
+          maybeSingleResult: success({
+            job_title: role === 'admin' ? 'Admin' : 'Owner',
+            role_id: null,
+          }),
+        },
+      ],
+    },
+  })
 
-      return {
-        supabase,
-        user: authResult?.data?.user ?? null,
-        error: authResult?.error ?? null,
-      }
-    })
-    mocks.persistMembershipActiveContext.mockImplementation(async (admin: any, input: any) => {
-      return admin
-        .from('org_members')
-        .update({
-          last_active_at: new Date().toISOString(),
-          last_active_branch_id: input.branchId,
-        })
-        .eq('user_id', input.userId)
-        .eq('org_id', input.orgId)
-        .eq('is_active', true)
-    })
-    mocks.resolveActiveMembership.mockImplementation(async (db: any, user: any, cookieStore: any, select: string) => {
-      const activeOrgId = cookieStore.get('nizam_active_org_id')?.value
+  mocks.createClient.mockResolvedValue({
+    ...session.client,
+    auth: {
+      getUser: vi.fn().mockResolvedValue({
+        data: {
+          user: {
+            id: userId,
+            email,
+            user_metadata: {},
+          },
+        },
+        error: null,
+      }),
+    },
+  })
+  mocks.resolveActiveMembership.mockResolvedValue({
+    org_id: activeOrgId,
+    role,
+    role_id: null,
+    organizations: {
+      id: activeOrgId,
+      parent_org_id: null,
+      settings: { plan: 'Demo' },
+      active_addons: [],
+    },
+    roles: {
+      permissions: ['dashboard:read', 'settings:write'],
+    },
+  })
 
-      if (activeOrgId) {
-        const { data } = await db
-          .from('org_members')
-          .select(select)
-          .eq('user_id', user.id)
-          .eq('org_id', activeOrgId)
-          .eq('is_active', true)
-          .maybeSingle()
+  return session
+}
 
-        if (data) return data
-      }
+function primeOrgActionModuleMocks() {
+  vi.clearAllMocks()
+  mocks.cookies.mockResolvedValue(createCookieStore())
+  mocks.getServerAuthContext.mockImplementation(async () => {
+    const supabase = await mocks.createClient()
+    const authResult = await supabase.auth.getUser()
 
-      const { data: storedMembership } = await db
-        .from('org_members')
-        .select('org_id, last_active_at, joined_at')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('last_active_at', { ascending: false, nullsFirst: false })
-        .order('joined_at', { ascending: true })
-        .limit(1)
-        .maybeSingle()
+    return {
+      supabase,
+      user: authResult?.data?.user ?? null,
+      error: authResult?.error ?? null,
+    }
+  })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mocks.persistMembershipActiveContext.mockImplementation(async (admin: any, input: any) => {
+    return admin
+      .from('org_members')
+      .update({
+        last_active_at: new Date().toISOString(),
+        last_active_branch_id: input.branchId,
+      })
+      .eq('user_id', input.userId)
+      .eq('org_id', input.orgId)
+      .eq('is_active', true)
+  })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mocks.resolveActiveMembership.mockImplementation(async (db: any, user: any, cookieStore: any, select: string) => {
+    const activeOrgId = cookieStore.get('nizam_active_org_id')?.value
 
-      if (storedMembership?.org_id) {
-        const { data } = await db
-          .from('org_members')
-          .select(select)
-          .eq('user_id', user.id)
-          .eq('org_id', storedMembership.org_id)
-          .eq('is_active', true)
-          .maybeSingle()
-
-        if (data) return data
-      }
-
+    if (activeOrgId) {
       const { data } = await db
         .from('org_members')
         .select(select)
         .eq('user_id', user.id)
+        .eq('org_id', activeOrgId)
         .eq('is_active', true)
-        .order('joined_at', { ascending: true })
-        .limit(1)
         .maybeSingle()
 
-      return data
-    })
+      if (data) return data
+    }
+
+    const { data: storedMembership } = await db
+      .from('org_members')
+      .select('org_id, last_active_at, joined_at')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('last_active_at', { ascending: false, nullsFirst: false })
+      .order('joined_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (storedMembership?.org_id) {
+      const { data } = await db
+        .from('org_members')
+        .select(select)
+        .eq('user_id', user.id)
+        .eq('org_id', storedMembership.org_id)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (data) return data
+    }
+
+    const { data } = await db
+      .from('org_members')
+      .select(select)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('joined_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    return data
+  })
+  mocks.syncParentCoAToChildOrg.mockResolvedValue({ success: true })
+}
+
+describe('Organization Branch Bootstrap', () => {
+  beforeEach(() => {
+    primeOrgActionModuleMocks()
   })
 
   it('falls back to the sole active branch when no branch cookie is set', async () => {
@@ -452,11 +533,20 @@ describe('Organization Branch Bootstrap', () => {
   it('normalizes blank logo_url when updating organization settings', async () => {
     const updateEq = vi.fn().mockResolvedValue({ error: null })
     const update = vi.fn(() => ({ eq: updateEq }))
+    const organizationsTable = {
+      select: vi.fn(() => organizationsTable),
+      eq: vi.fn(() => organizationsTable),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { logo_url: 'https://cdn.example.com/logo-lama.png' },
+        error: null,
+      }),
+      update,
+    }
 
     mocks.createClient.mockResolvedValue({
       from: vi.fn((table: string) => {
         if (table === 'organizations') {
-          return { update }
+          return organizationsTable
         }
         throw new Error(`Unexpected table ${table}`)
       }),
@@ -480,6 +570,15 @@ describe('Organization Branch Bootstrap', () => {
   it('stores uploaded logo as a usable data url in Railway mode', async () => {
     const updateEq = vi.fn().mockResolvedValue({ error: null })
     const update = vi.fn(() => ({ eq: updateEq }))
+    const organizationsTable = {
+      select: vi.fn(() => organizationsTable),
+      eq: vi.fn(() => organizationsTable),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { logo_url: null },
+        error: null,
+      }),
+      update,
+    }
 
     mocks.createClient.mockResolvedValue({
       auth: {
@@ -496,7 +595,7 @@ describe('Organization Branch Bootstrap', () => {
       },
       from: vi.fn((table: string) => {
         if (table === 'organizations') {
-          return { update }
+          return organizationsTable
         }
         throw new Error(`Unexpected table ${table}`)
       }),
@@ -1573,5 +1672,419 @@ describe('Organization Branch Bootstrap', () => {
     expect(result).toEqual({
       error: 'Hanya owner atau admin yang dapat menambahkan unit.',
     })
+  })
+})
+
+describe('Child Org CoA Governance', () => {
+  beforeEach(() => {
+    primeOrgActionModuleMocks()
+    setupHoldingActionContext()
+  })
+
+  it('blocks returning a child LOCAL CoA to inherited when the child still has local-only active accounts', async () => {
+    const admin = createSupabaseMock({
+      tables: {
+        organizations: [
+          {
+            maybeSingleResult: success({
+              id: 'child-1',
+              name: 'PT Child Lokal',
+              parent_org_id: 'parent-1',
+              coa_management_mode: 'LOCAL',
+            }),
+          },
+        ],
+        accounts: [
+          {
+            result: success([
+              { code: '1001' },
+              { code: '2001' },
+            ]),
+          },
+          {
+            result: success([
+              { code: '1001' },
+              { code: '9999' },
+              { code: '9999' },
+            ]),
+          },
+        ],
+      },
+    })
+
+    mocks.createAdminClient.mockResolvedValue(admin.client)
+
+    const result = await setChildOrganizationCoAManagementMode('child-1', 'INHERITED')
+
+    expect(result).toMatchObject({
+      error: expect.stringContaining('9999'),
+    })
+    expect(result).toMatchObject({
+      error: expect.stringContaining('Rapikan akun lokal tersebut terlebih dahulu'),
+    })
+    expect(mocks.syncParentCoAToChildOrg).not.toHaveBeenCalled()
+    expect(mocks.revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('switches a child from inherited to local mode and revalidates related pages', async () => {
+    const admin = createSupabaseMock({
+      tables: {
+        organizations: [
+          {
+            maybeSingleResult: success({
+              id: 'child-1',
+              name: 'PT Child Shared',
+              parent_org_id: 'parent-1',
+              coa_management_mode: 'INHERITED',
+            }),
+          },
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createAdminClient.mockResolvedValue(admin.client)
+
+    const result = await setChildOrganizationCoAManagementMode('child-1', 'LOCAL')
+
+    expect(result).toEqual({
+      success: true,
+      managementMode: 'LOCAL',
+      changed: true,
+    })
+    expect(mocks.syncParentCoAToChildOrg).not.toHaveBeenCalled()
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/settings/sub-orgs')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/settings/accounts')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/accounting/coa-requests')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/reports')
+  })
+
+  it('builds a consolidation workspace with same-code suggestions for child LOCAL accounts', async () => {
+    const admin = createSupabaseMock({
+      tables: {
+        organizations: [
+          {
+            maybeSingleResult: success({
+              id: 'child-1',
+              name: 'PT Child Lokal',
+              parent_org_id: 'parent-1',
+            }),
+          },
+          {
+            maybeSingleResult: success({
+              id: 'child-1',
+              name: 'PT Child Lokal',
+              parent_org_id: 'parent-1',
+              coa_management_mode: 'LOCAL',
+            }),
+          },
+        ],
+        accounts: [
+          {
+            result: success([
+              {
+                id: 'local-1',
+                code: '1101',
+                name: 'Kas Cabang',
+                type: 'asset',
+                normal_balance: 'debit',
+              },
+              {
+                id: 'local-2',
+                code: '4101',
+                name: 'Penjualan Cabang',
+                type: 'income',
+                normal_balance: 'credit',
+              },
+            ]),
+          },
+          {
+            result: success([
+              {
+                id: 'group-1',
+                code: '1101',
+                name: 'Kas Grup',
+                type: 'asset',
+                normal_balance: 'debit',
+              },
+              {
+                id: 'group-2',
+                code: '4101',
+                name: 'Pendapatan Grup',
+                type: 'income',
+                normal_balance: 'credit',
+              },
+            ]),
+          },
+        ],
+        coa_consolidation_mappings: [
+          {
+            result: success([
+              {
+                local_account_id: 'local-2',
+                group_account_id: 'group-2',
+                is_active: true,
+              },
+            ]),
+          },
+        ],
+      },
+    })
+
+    mocks.createAdminClient.mockResolvedValue(admin.client)
+
+    const result = await getChildCoAConsolidationWorkspace('child-1')
+
+    expect(result).toMatchObject({
+      success: true,
+      workspace: {
+        childOrgId: 'child-1',
+        parentOrgId: 'parent-1',
+        summary: {
+          totalLocalAccounts: 2,
+          mappedLocalAccounts: 1,
+          unmappedLocalAccounts: 1,
+          suggestedLocalAccounts: 1,
+        },
+      },
+    })
+
+    if (!('workspace' in result)) {
+      throw new Error('Expected consolidation workspace to be returned.')
+    }
+
+    const suggestedAccount = result.workspace.localAccounts.find((account) => account.id === 'local-1')
+    const mappedAccount = result.workspace.localAccounts.find((account) => account.id === 'local-2')
+
+    expect(suggestedAccount).toMatchObject({
+      suggested_group_account_id: 'group-1',
+      mapped_group_account_id: null,
+    })
+    expect(mappedAccount).toMatchObject({
+      mapped_group_account_id: 'group-2',
+    })
+  })
+
+  it('rejects consolidation mappings when the holding account type does not match the child local account type', async () => {
+    const admin = createSupabaseMock({
+      tables: {
+        organizations: [
+          {
+            maybeSingleResult: success({
+              id: 'child-1',
+              name: 'PT Child Lokal',
+              parent_org_id: 'parent-1',
+              coa_management_mode: 'LOCAL',
+            }),
+          },
+        ],
+        accounts: [
+          {
+            result: success([
+              {
+                id: 'local-1',
+                code: '1101',
+                name: 'Kas Cabang',
+                type: 'asset',
+                normal_balance: 'debit',
+              },
+            ]),
+          },
+          {
+            result: success([
+              {
+                id: 'group-9',
+                code: '2101',
+                name: 'Utang Grup',
+                type: 'liability',
+                normal_balance: 'credit',
+              },
+            ]),
+          },
+        ],
+        coa_consolidation_mappings: [
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createAdminClient.mockResolvedValue(admin.client)
+
+    const result = await saveChildCoAConsolidationMappings('child-1', [
+      {
+        localAccountId: 'local-1',
+        groupAccountId: 'group-9',
+      },
+    ])
+
+    expect(result).toMatchObject({
+      error: expect.stringContaining('tidak satu kategori'),
+    })
+
+    const mappingWrites = admin.calls
+      .filter((call) => call.table === 'coa_consolidation_mappings')
+      .flatMap((call) => call.operations)
+      .filter((operation) => operation.method === 'delete' || operation.method === 'upsert')
+
+    expect(mappingWrites).toHaveLength(0)
+  })
+
+  it('saves consolidation mappings, clears emptied rows, and returns the refreshed workspace', async () => {
+    const localAccounts = [
+      {
+        id: 'local-1',
+        code: '1101',
+        name: 'Kas Cabang',
+        type: 'asset',
+        normal_balance: 'debit',
+      },
+      {
+        id: 'local-2',
+        code: '4101',
+        name: 'Pendapatan Cabang',
+        type: 'income',
+        normal_balance: 'credit',
+      },
+    ]
+    const groupAccounts = [
+      {
+        id: 'group-1',
+        code: '1101',
+        name: 'Kas Grup',
+        type: 'asset',
+        normal_balance: 'debit',
+      },
+      {
+        id: 'group-2',
+        code: '4101',
+        name: 'Pendapatan Grup',
+        type: 'income',
+        normal_balance: 'credit',
+      },
+    ]
+    const admin = createSupabaseMock({
+      tables: {
+        organizations: [
+          {
+            maybeSingleResult: success({
+              id: 'child-1',
+              name: 'PT Child Lokal',
+              parent_org_id: 'parent-1',
+              coa_management_mode: 'LOCAL',
+            }),
+          },
+        ],
+        accounts: [
+          {
+            result: success(localAccounts),
+          },
+          {
+            result: success(groupAccounts),
+          },
+          {
+            result: success(localAccounts),
+          },
+          {
+            result: success(groupAccounts),
+          },
+        ],
+        coa_consolidation_mappings: [
+          {
+            result: success([
+              {
+                local_account_id: 'local-2',
+                group_account_id: 'group-2',
+                is_active: true,
+              },
+            ]),
+          },
+          {
+            result: success([]),
+          },
+          {
+            result: success([]),
+          },
+          {
+            result: success([
+              {
+                local_account_id: 'local-1',
+                group_account_id: 'group-1',
+                is_active: true,
+              },
+            ]),
+          },
+        ],
+      },
+    })
+
+    mocks.createAdminClient.mockResolvedValue(admin.client)
+
+    const result = await saveChildCoAConsolidationMappings('child-1', [
+      {
+        localAccountId: 'local-1',
+        groupAccountId: 'group-1',
+      },
+      {
+        localAccountId: 'local-2',
+        groupAccountId: null,
+      },
+    ])
+
+    expect(result).toMatchObject({
+      success: true,
+      workspace: {
+        childOrgId: 'child-1',
+        summary: {
+          totalLocalAccounts: 2,
+          mappedLocalAccounts: 1,
+          unmappedLocalAccounts: 1,
+          suggestedLocalAccounts: 1,
+        },
+      },
+    })
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/settings/sub-orgs')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/reports')
+
+    const mappingCalls = admin.calls.filter((call) => call.table === 'coa_consolidation_mappings')
+    const deleteCall = mappingCalls.find((call) =>
+      call.operations.some((operation) => operation.method === 'delete')
+    )
+    const upsertCall = mappingCalls.find((call) =>
+      call.operations.some((operation) => operation.method === 'upsert')
+    )
+
+    expect(deleteCall?.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: 'in',
+          args: ['local_account_id', ['local-2']],
+        }),
+      ])
+    )
+    expect(upsertCall?.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: 'upsert',
+          args: [
+            [
+              expect.objectContaining({
+                parent_org_id: 'parent-1',
+                child_org_id: 'child-1',
+                local_account_id: 'local-1',
+                group_account_id: 'group-1',
+                is_active: true,
+              }),
+            ],
+            {
+              onConflict: 'parent_org_id,child_org_id,local_account_id',
+            },
+          ],
+        }),
+      ])
+    )
   })
 })

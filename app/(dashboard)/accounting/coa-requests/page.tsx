@@ -25,6 +25,10 @@ export default async function CoaRequestsPage() {
   const { canManageDirect, isParentOrg } = await checkCanManageCoA(orgId)
   const parentOrgId = orgEntity.parent_org_id ?? null
 
+  if (!isParentOrg && canManageDirect) {
+    redirect('/settings/accounts/new')
+  }
+
   // Parent: tampilkan request yang masuk
   // Child/Branch: tampilkan request yang mereka ajukan
   const [incomingRequests, myRequests, parentCoaGuideAccounts] = await Promise.all([

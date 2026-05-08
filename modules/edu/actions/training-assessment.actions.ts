@@ -5,8 +5,8 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
-import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
 import { getTrainingAssessmentByCourseSlug } from '@/modules/edu/lib/training-assessment-mvp'
+import { getLearningAccessContext } from '@/modules/edu/lib/learning-access.server'
 
 type TheoryStatus = 'UNDERSTOOD' | 'PARTIAL' | 'NOT_YET'
 type PracticeStatus = 'SUCCESS' | 'NEEDS_SUPPORT' | 'FAILED'
@@ -129,7 +129,7 @@ export async function submitTrainingCourseAnswerSubmission(formData: FormData) {
     redirect(
       buildRedirectPath(
         courseSlug,
-        { answerError: 'Isi minimal satu jawaban sebelum mengirim ke assessor.' },
+        { answerError: 'Isi minimal satu jawaban sebelum mengirim ke penilai.' },
         'participant-answer-form',
         'participant',
       ),
@@ -188,9 +188,13 @@ export async function submitTrainingCourseAssessment(formData: FormData) {
     redirect('/onboarding')
   }
 
-  const assessorContext = await getSaasAssessorContext({ email: orgData.user?.email })
-  if (!assessorContext.hasAccess) {
-    redirect(buildRedirectPath(courseSlug, { error: 'Hanya member SaaS yang diberi mandat assessor yang dapat mengirim asesmen.' }))
+  const learningAccess = await getLearningAccessContext({
+    userRole: orgData.role,
+    permissions: orgData.permissions,
+    email: orgData.user?.email,
+  })
+  if (!learningAccess.canReviewAssessments) {
+    redirect(buildRedirectPath(courseSlug, { error: 'Hanya pengelola kompetensi internal atau assessor SaaS yang dapat mengirim asesmen.' }))
   }
 
   const participantName = normalizeText(formData.get('participantName'), 120)
@@ -215,6 +219,7 @@ export async function submitTrainingCourseAssessment(formData: FormData) {
     status: normalizeChecklistStatus(formData.get(`check_${index}`)),
   }))
 
+  const assessorContext = learningAccess.saasAssessor
   const assessorName = String(
     assessorContext.source === 'impersonation'
       ? assessorContext.email
@@ -223,7 +228,7 @@ export async function submitTrainingCourseAssessment(formData: FormData) {
           || orgData.user?.user_metadata?.name
           || assessorContext.email
           || orgData.user?.email
-          || 'Assessor NIZAM'
+          || 'Penilai NIZAM'
         ),
   )
     .trim()

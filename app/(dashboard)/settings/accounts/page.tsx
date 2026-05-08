@@ -7,6 +7,7 @@ import AccountRowActions from './components/AccountRowActions'
 import ShariahSettingsCard from './components/ShariahSettingsCard'
 
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import type { Account, AccountType } from '@/types/database.types'
 
 export const metadata: Metadata = { title: 'Chart of Accounts | NIZAM' }
@@ -27,22 +28,24 @@ export default async function ChartOfAccountsPage() {
   const orgEntity = orgData.org as typeof orgData.org & { parent_org_id?: string | null }
   const parentOrgId = orgEntity.parent_org_id ?? null
   const isChildOrganization = Boolean(parentOrgId)
+  const { canManageDirect, managementMode } = await checkCanManageCoA(orgData.org.id)
+  const isInheritedChildOrganization = isChildOrganization && managementMode !== 'LOCAL'
+  const isLocalChildOrganization = isChildOrganization && managementMode === 'LOCAL'
 
   // Self-healing sync:
-  // setiap child membuka halaman CoA, tarik pembaruan terbaru dari parent dulu.
-  if (parentOrgId) {
+  // hanya untuk child mode INHERITED, tarik pembaruan terbaru dari parent dulu.
+  if (parentOrgId && isInheritedChildOrganization) {
     const syncResult = await syncParentCoAToChildOrg(parentOrgId, orgData.org.id)
     if (!syncResult.success) {
       ;(console as any).warn('CoA sync warning (ChartOfAccountsPage):', syncResult.error)
     }
   }
 
-  const [accounts, { canManageDirect, isParentOrg }, shariahSetupSummary] = await Promise.all([
+  const [accounts, shariahSetupSummary] = await Promise.all([
     getChartOfAccounts(orgData.org.id),
-    checkCanManageCoA(orgData.org.id),
     getShariahSetupSummary(orgData.org.id),
   ])
-  const canCreateDirectAccount = isParentOrg && canManageDirect
+  const canCreateDirectAccount = canManageDirect
   const isCoAEmpty = accounts.length === 0
   const hasCorePsaK = CORE_PSAK_CODES.every((code) => accounts.some((account) => account.code === code))
   const needsCoAActivation = !hasCorePsaK
@@ -65,7 +68,13 @@ export default async function ChartOfAccountsPage() {
         <div>
           <h1 className="text-xl font-bold text-gray-900">Chart of Accounts</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {accounts.length} akun • Standar PSAK • {needsCoAActivation ? 'Aktivasi awal via tombol CoA' : (isChildOrganization ? 'Mengikuti organisasi induk (holding)' : 'Siap digunakan')}
+            {accounts.length} akun • Standar PSAK • {needsCoAActivation
+              ? 'Aktivasi awal via tombol CoA'
+              : isInheritedChildOrganization
+                ? 'Mengikuti organisasi induk (holding)'
+                : isLocalChildOrganization
+                  ? 'CoA mandiri untuk entitas anak'
+                  : 'Siap digunakan'}
           </p>
         </div>
         {needsCoAActivation ? (
@@ -76,32 +85,20 @@ export default async function ChartOfAccountsPage() {
             <button
               type="submit"
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-all"
-              style={{ background: isChildOrganization ? 'linear-gradient(135deg, #0f766e, #14b8a6)' : 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
+              style={{ background: isInheritedChildOrganization ? 'linear-gradient(135deg, #0f766e, #14b8a6)' : 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
             >
-              {isChildOrganization ? 'Sinkronkan CoA Induk' : 'Aktifkan CoA PSAK'}
+              {isInheritedChildOrganization ? 'Sinkronkan CoA Induk' : 'Aktifkan CoA PSAK'}
             </button>
           </form>
-        ) : isParentOrg ? (
-          canCreateDirectAccount ? (
-            <a
-              href="/settings/accounts/new"
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-all"
-              style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
-            >
-              + Tambah Akun
-            </a>
-          ) : (
-            <button
-              type="button"
-              disabled
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white opacity-60 cursor-not-allowed"
-              style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
-              title="Pindah ke konteks Unit Utama organisasi induk untuk membuat rekening."
-            >
-              + Tambah Akun
-            </button>
-          )
-        ) : (
+        ) : canCreateDirectAccount ? (
+          <Link
+            href="/settings/accounts/new"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-all"
+            style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
+          >
+            + Tambah Akun
+          </Link>
+        ) : isInheritedChildOrganization ? (
           <div className="flex items-center gap-2">
             <a
               href="/accounting/coa-requests"
@@ -114,6 +111,16 @@ export default async function ChartOfAccountsPage() {
               Ajukan Rekening Baru
             </a>
           </div>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white opacity-60 cursor-not-allowed"
+            style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
+            title="Pindah ke konteks Unit Utama organisasi aktif untuk membuat rekening."
+          >
+            + Tambah Akun
+          </button>
         )}
       </div>
 
@@ -127,13 +134,17 @@ export default async function ChartOfAccountsPage() {
             </svg>
           </div>
           <h3 className="text-lg font-bold text-gray-900 mb-2">
-            {isChildOrganization
+            {isInheritedChildOrganization
               ? 'CoA entitas anak belum tersinkron'
+              : isLocalChildOrganization
+                ? 'CoA lokal entitas anak belum diaktivasi'
               : (isCoAEmpty ? 'CoA belum diaktivasi' : 'CoA belum lengkap')}
           </h3>
           <p className="text-gray-500 max-w-sm mx-auto mb-8 text-sm">
-            {isChildOrganization
+            {isInheritedChildOrganization
               ? 'Untuk entitas anak, struktur rekening mengikuti organisasi induk. Jalankan sinkronisasi agar CoA tetap konsisten dengan holding.'
+              : isLocalChildOrganization
+                ? 'Entitas anak ini memakai CoA lokal. Aktifkan CoA standar PSAK sebagai baseline sebelum menambah akun khusus entitas.'
               : (isCoAEmpty
                 ? 'Aktifkan Chart of Accounts (CoA) standar PSAK agar modul akuntansi siap dipakai.'
                 : 'Ditemukan akun parsial. Jalankan aktivasi CoA agar sistem melengkapi seluruh struktur PSAK.')}
@@ -146,20 +157,20 @@ export default async function ChartOfAccountsPage() {
             <button
               type="submit"
               className="px-6 py-2.5 text-white rounded-lg font-semibold transition-colors"
-              style={{ backgroundColor: isChildOrganization ? '#0f766e' : '#2563eb' }}
+              style={{ backgroundColor: isInheritedChildOrganization ? '#0f766e' : '#2563eb' }}
             >
-              {isChildOrganization ? 'Sinkronkan CoA Dari Induk' : 'Aktifkan CoA Standar PSAK'}
+              {isInheritedChildOrganization ? 'Sinkronkan CoA Dari Induk' : 'Aktifkan CoA Standar PSAK'}
             </button>
           </form>
 
-          {!isParentOrg && (
+          {isInheritedChildOrganization && !canManageDirect && (
             <p className="text-xs text-slate-400 mt-4">
               Pengajuan rekening baru tetap melalui menu Pengajuan CoA setelah sinkronisasi selesai.
             </p>
           )}
-          {isParentOrg && !canManageDirect && (
+          {!isInheritedChildOrganization && !canManageDirect && (
             <p className="text-xs text-amber-600 mt-4">
-              Organisasi induk terdeteksi, namun pembuatan rekening dikunci karena konteks unit aktif bukan Unit Utama.
+              Pembuatan rekening dikunci karena konteks unit aktif bukan Unit Utama organisasi ini.
             </p>
           )}
         </div>
