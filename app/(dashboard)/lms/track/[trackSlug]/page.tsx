@@ -31,7 +31,7 @@ export default async function LearningTrackPage(props: { params: Promise<{ track
     <div className="space-y-6">
       <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
         <Link
-          href="/learning"
+          href="/lms"
           className="inline-flex items-center gap-2 text-sm font-black text-slate-600 hover:text-slate-900"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -97,7 +97,7 @@ export default async function LearningTrackPage(props: { params: Promise<{ track
 
             {course.status === 'LIVE' ? (
               <Link
-                href={`/learning/course/${course.slug}`}
+                href={`/lms/course/${course.slug}`}
                 className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
               >
                 Buka Course

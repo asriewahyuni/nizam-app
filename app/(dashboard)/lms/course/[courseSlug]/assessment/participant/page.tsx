@@ -24,7 +24,7 @@ import {
   getTrainingLessonsForCourse,
 } from '@/modules/edu/lib/training-center-mvp'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
-import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
+import { getLearningAccessContext } from '@/modules/edu/lib/learning-access.server'
 
 function formatAssessmentDate(dateLike: string) {
   if (!dateLike) return '-'
@@ -124,12 +124,16 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
 
   const searchParams = await props.searchParams
   const firstLesson = getTrainingLessonsForCourse(course.slug)[0] || null
-  const assessorContext = await getSaasAssessorContext({ email: orgData.user?.email })
-  const canManageAssessment = assessorContext.hasAccess
+  const learningAccess = await getLearningAccessContext({
+    userRole: orgData.role,
+    permissions: orgData.permissions,
+    email: orgData.user?.email,
+  })
+  const canManageAssessment = learningAccess.canReviewAssessments
   const canAccessLearning = hasRolePermission(orgData.role, orgData.permissions, 'learning')
 
   if (!canAccessLearning && !canManageAssessment) {
-    return redirect(`/learning/course/${course.slug}`)
+    return redirect(`/lms/course/${course.slug}`)
   }
 
   const ownAnswerSubmissions = orgData.user?.id
@@ -164,7 +168,7 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
     <div className="space-y-6">
       <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
         <Link
-          href={`/learning/course/${course.slug}`}
+          href={`/lms/course/${course.slug}`}
           className="inline-flex items-center gap-2 text-sm font-black text-slate-600 hover:text-slate-900"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -181,7 +185,7 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
               Jawaban Asesmen Peserta
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
-              Peserta mengisi jawaban teori dan bukti praktik di halaman ini. Assessor akan meninjau submission yang masuk dari panel assessor.
+              Peserta mengisi jawaban teori dan bukti praktik di halaman ini. Penilai akan meninjau submission yang masuk dari panel review entitas.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3 text-sm font-bold text-slate-600">
@@ -206,16 +210,16 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
               </Link>
               {canManageAssessment ? (
                 <Link
-                  href={`/learning/course/${course.slug}/assessment`}
+                  href={`/lms/course/${course.slug}/assessment`}
                   className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
                 >
-                  Buka Panel Assessor
+                  Buka Panel Penilai
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               ) : null}
               {firstLesson ? (
                 <Link
-                  href={`/learning/course/${course.slug}/lesson/${firstLesson.slug}`}
+                  href={`/lms/course/${course.slug}/lesson/${firstLesson.slug}`}
                   className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
                 >
                   Buka Materi Acuan
@@ -251,7 +255,7 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
               <FlowStep
                 number={3}
                 title="Tunggu review"
-                description="Assessor SaaS akan meninjau submission dan memberi catatan."
+                description="Penilai internal atau assessor SaaS akan meninjau submission dan memberi catatan."
                 status={hasReviewedSubmission ? 'done' : hasSubmitted ? 'active' : 'todo'}
                 icon={ShieldCheck}
               />
@@ -262,7 +266,7 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
 
       {searchParams?.answerSaved === '1' ? (
         <section className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
-          Jawaban peserta berhasil dikirim. Tunggu assessor meninjau submission Anda.
+          Jawaban peserta berhasil dikirim. Tunggu penilai meninjau submission Anda.
         </section>
       ) : null}
 
@@ -277,7 +281,7 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Ringkasan Tugas</div>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Selesaikan form di bawah ini. Anda cukup mengirim jawaban yang jelas; assessor akan membaca konteks dan memberi review.
+              Selesaikan form di bawah ini. Anda cukup mengirim jawaban yang jelas; penilai akan membaca konteks dan memberi review.
             </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
@@ -293,7 +297,7 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
         <div className="flex items-center justify-between gap-4">
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Form Peserta</div>
-            <h2 className="mt-2 text-xl font-black text-slate-900">Isi jawaban sebelum direview assessor</h2>
+            <h2 className="mt-2 text-xl font-black text-slate-900">Isi jawaban sebelum direview penilai</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               Gunakan form ini untuk menjawab pertanyaan teori dan menjelaskan bukti praktik. Tidak harus panjang, yang penting jelas dan bisa ditelusuri.
             </p>
@@ -414,7 +418,7 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
             <textarea
               name="generalNotes"
               rows={5}
-              placeholder="Tuliskan kendala, hal yang masih membingungkan, atau penjelasan tambahan untuk assessor."
+              placeholder="Tuliskan kendala, hal yang masih membingungkan, atau penjelasan tambahan untuk penilai."
               className="mt-3 w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400"
             />
           </label>
@@ -424,7 +428,7 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
               type="submit"
               className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
             >
-              Kirim Jawaban Ke Assessor
+              Kirim Jawaban Ke Penilai
               <ArrowRight className="h-4 w-4" />
             </button>
             <div className="text-sm font-bold leading-6 text-emerald-800">
@@ -474,7 +478,7 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
                   {submission.reviewedAt ? (
                     <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
                       <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Direview Oleh</div>
-                      <div className="mt-2 font-black text-slate-900">{submission.reviewerName || 'Assessor'}</div>
+                      <div className="mt-2 font-black text-slate-900">{submission.reviewerName || 'Penilai'}</div>
                       <div className="mt-1 text-xs text-slate-500">{formatAssessmentDate(submission.reviewedAt)}</div>
                     </div>
                   ) : null}
@@ -500,7 +504,7 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
-              href={`/learning/course/${course.slug}`}
+              href={`/lms/course/${course.slug}`}
               className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -508,7 +512,7 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
             </Link>
             {firstLesson ? (
               <Link
-                href={`/learning/course/${course.slug}/lesson/${firstLesson.slug}`}
+                href={`/lms/course/${course.slug}/lesson/${firstLesson.slug}`}
                 className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
               >
                 Buka Materi Acuan
@@ -525,20 +529,20 @@ export default async function LearningCourseParticipantAssessmentPage(props: {
               Tips Peserta
             </div>
             <p className="mt-2 leading-6">
-              Jika submission Anda belum direview, lanjutkan penguatan lesson terkait dan siapkan bukti tambahan bila assessor memintanya.
+              Jika submission Anda belum direview, lanjutkan penguatan lesson terkait dan siapkan bukti tambahan bila penilai memintanya.
             </p>
           </div>
           {canManageAssessment ? (
             <div className="rounded-[22px] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">Akses Tambahan</div>
               <p className="mt-2 leading-6">
-                Akun Anda juga memiliki akses assessor. Gunakan panel assessor untuk review submission peserta dan menetapkan keputusan akhir.
+                Akun Anda juga memiliki akses penilai. Gunakan panel penilai untuk review submission peserta dan menetapkan keputusan akhir.
               </p>
               <Link
-                href={`/learning/course/${course.slug}/assessment`}
+                href={`/lms/course/${course.slug}/assessment`}
                 className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
               >
-                Buka Panel Assessor
+                Buka Panel Penilai
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>

@@ -27,7 +27,7 @@ import {
   getTrainingCourseBySlug,
   getTrainingLessonsForCourse,
 } from '@/modules/edu/lib/training-center-mvp'
-import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
+import { getLearningAccessContext } from '@/modules/edu/lib/learning-access.server'
 
 function formatAssessmentDate(dateLike: string) {
   if (!dateLike) return '-'
@@ -90,10 +90,14 @@ export default async function LearningCourseAssessmentPage(props: {
 
   const firstLesson = getTrainingLessonsForCourse(course.slug)[0] || null
   const searchParams = await props.searchParams
-  const assessorContext = await getSaasAssessorContext({ email: orgData.user?.email })
-  const canManageAssessment = assessorContext.hasAccess
+  const learningAccess = await getLearningAccessContext({
+    userRole: orgData.role,
+    permissions: orgData.permissions,
+    email: orgData.user?.email,
+  })
+  const canManageAssessment = learningAccess.canReviewAssessments
   if (!canManageAssessment) {
-    return redirect(`/learning/course/${course.slug}/assessment/participant`)
+    return redirect(`/lms/course/${course.slug}/assessment/participant`)
   }
   const participantFilter = String(searchParams?.participant || '').trim()
   const selectedSubmissionId = String(searchParams?.submission || '').trim()
@@ -123,12 +127,19 @@ export default async function LearningCourseAssessmentPage(props: {
   const notYetParticipantCount = participantStatuses.filter((item) => item.latestDecision === 'NOT_YET_COMPETENT').length
   const pendingAnswerReviewCount = participantAnswerSubmissions.filter((item) => item.status === 'SUBMITTED').length
   const reviewedAnswerCount = participantAnswerSubmissions.filter((item) => item.status === 'REVIEWED').length
+  const activeReviewerLabel = String(
+    orgData.user?.user_metadata?.full_name
+    || orgData.user?.user_metadata?.name
+    || learningAccess.saasAssessor.email
+    || orgData.user?.email
+    || 'Tidak diketahui',
+  ).trim()
 
   return (
     <div className="space-y-6">
       <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
         <Link
-          href={`/learning/course/${course.slug}`}
+          href={`/lms/course/${course.slug}`}
           className="inline-flex items-center gap-2 text-sm font-black text-slate-600 hover:text-slate-900"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -162,7 +173,7 @@ export default async function LearningCourseAssessmentPage(props: {
 
             <div className="mt-5 flex flex-wrap gap-3">
               <Link
-                href={`/learning/course/${course.slug}/assessment/participant`}
+                href={`/lms/course/${course.slug}/assessment/participant`}
                 className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
               >
                 Lihat Halaman Peserta
@@ -263,7 +274,7 @@ export default async function LearningCourseAssessmentPage(props: {
             <ClipboardCheck className="h-5 w-5 text-slate-700" />
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Teori</div>
-              <h2 className="mt-1 text-xl font-black text-slate-900">Pertanyaan acuan assessor</h2>
+              <h2 className="mt-1 text-xl font-black text-slate-900">Pertanyaan acuan penilai</h2>
             </div>
           </div>
           <div className="mt-5 space-y-3 text-sm text-slate-600">
@@ -342,7 +353,7 @@ export default async function LearningCourseAssessmentPage(props: {
           <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Bukti</div>
-              <h2 className="mt-2 text-xl font-black text-slate-900">Bukti yang dikumpulkan assessor</h2>
+              <h2 className="mt-2 text-xl font-black text-slate-900">Bukti yang dikumpulkan penilai</h2>
             </div>
             <div className="mt-5 space-y-3 text-sm text-slate-600">
               {assessment.evidenceChecklist.map((item) => (
@@ -404,7 +415,7 @@ export default async function LearningCourseAssessmentPage(props: {
               </button>
               {participantFilter ? (
                 <Link
-                  href={`/learning/course/${course.slug}/assessment#submissions`}
+                  href={`/lms/course/${course.slug}/assessment#submissions`}
                   className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
                 >
                   Reset
@@ -513,7 +524,7 @@ export default async function LearningCourseAssessmentPage(props: {
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Review Jawaban</div>
               <h2 className="mt-2 text-xl font-black text-slate-900">Jawaban peserta yang masuk</h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Pilih submission peserta untuk ditarik ke form asesmen assessor. Saat asesmen final disimpan, submission ini otomatis ditandai sudah direview.
+                Pilih submission peserta untuk ditarik ke form asesmen penilai. Saat asesmen final disimpan, submission ini otomatis ditandai sudah direview.
               </p>
             </div>
             <div className="rounded-full bg-slate-100 px-3 py-2 text-xs font-black uppercase tracking-[0.16em] text-slate-600">
@@ -533,7 +544,7 @@ export default async function LearningCourseAssessmentPage(props: {
                 const submissionLinkParams = new URLSearchParams()
                 if (participantFilter) submissionLinkParams.set('participant', participantFilter)
                 submissionLinkParams.set('submission', submission.id)
-                const submissionHref = `/learning/course/${course.slug}/assessment?${submissionLinkParams.toString()}#assessor-form`
+                const submissionHref = `/lms/course/${course.slug}/assessment?${submissionLinkParams.toString()}#assessor-form`
 
                 return (
                   <div
@@ -627,7 +638,7 @@ export default async function LearningCourseAssessmentPage(props: {
         <div className="flex items-center justify-between gap-4">
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Form Online</div>
-            <h2 className="mt-2 text-xl font-black text-slate-900">Input hasil asesmen assessor</h2>
+            <h2 className="mt-2 text-xl font-black text-slate-900">Input hasil asesmen penilai</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               Form ini dipakai untuk asesmen online tanpa cetak. Hasilnya tersimpan per course dan bisa dipakai sebagai arsip penilaian internal.
             </p>
@@ -653,7 +664,7 @@ export default async function LearningCourseAssessmentPage(props: {
                   </div>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-700">
-                  Form assessor sekarang diprefill dari submission peserta ini. Saat asesmen final disimpan, submission akan otomatis ditandai sudah direview.
+                  Form penilai sekarang diprefill dari submission peserta ini. Saat asesmen final disimpan, submission akan otomatis ditandai sudah direview.
                 </p>
               </div>
             ) : null}
@@ -806,13 +817,13 @@ export default async function LearningCourseAssessmentPage(props: {
                 <ArrowRight className="h-4 w-4" />
               </button>
               <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600">
-                Assessor aktif: {assessorContext.email || 'Tidak diketahui'}
+                Penilai aktif: {activeReviewerLabel}
               </div>
             </div>
           </form>
         ) : (
           <div className="mt-6 rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-bold text-slate-600">
-            Hanya member SaaS yang diberi mandat assessor yang dapat mengirim asesmen online. Peserta tenant tetap bisa membaca rubrik dan kriteria penilaian di halaman ini.
+            Pengelola kompetensi internal dengan akses `learning:write` atau assessor SaaS dapat mengirim asesmen online. Peserta tenant tetap bisa membaca rubrik dan kriteria penilaian di halaman ini.
           </div>
         )}
       </section>
@@ -825,14 +836,14 @@ export default async function LearningCourseAssessmentPage(props: {
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
-              href={`/learning/course/${course.slug}`}
+              href={`/lms/course/${course.slug}`}
               className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
             >
               <ArrowLeft className="h-4 w-4" />
               Kembali ke Course
             </Link>
             <Link
-              href={firstLesson ? `/learning/course/${course.slug}/lesson/${firstLesson.slug}` : `/learning/course/${course.slug}`}
+              href={firstLesson ? `/lms/course/${course.slug}/lesson/${firstLesson.slug}` : `/lms/course/${course.slug}`}
               className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
             >
               Buka Materi Acuan
@@ -889,7 +900,7 @@ export default async function LearningCourseAssessmentPage(props: {
                           {submission.participantReference ? ` • ${submission.participantReference}` : ''}
                         </div>
                         <div className="mt-3 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                          <span>Assessor: {submission.assessorName}</span>
+                          <span>Penilai: {submission.assessorName}</span>
                           <span className="inline-flex items-center gap-1">
                             <Clock3 className="h-3.5 w-3.5" />
                             {formatAssessmentDate(submission.createdAt)}

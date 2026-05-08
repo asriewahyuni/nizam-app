@@ -318,19 +318,24 @@ export async function createBankAccount(orgId: string, formData: FormData) {
 
   // ── Guard 2: Hanya organisasi induk/holding yang boleh membuat rekening bank langsung ──
   let canManageDirect = true;
+  let managementMode: 'INHERITED' | 'LOCAL' = 'INHERITED';
+  let isParentOrg = false;
   try {
     const result = await checkCanManageCoA(orgId);
     canManageDirect = result.canManageDirect;
+    managementMode = result.managementMode;
+    isParentOrg = result.isParentOrg;
   } catch {
     // If the check fails (e.g., missing tables in test environment), assume permission granted.
     canManageDirect = true;
   }
   if (!canManageDirect) {
+    const requiresMainUnitContext = isParentOrg || managementMode === 'LOCAL';
     return {
-      error:
-        'Hanya Organisasi Utama (Induk/Holding) yang dapat menambahkan rekening bank secara langsung. ' +
-        'Silakan ajukan melalui menu "Pengajuan Rekening CoA".',
-      requiresRequest: true,
+      error: requiresMainUnitContext
+        ? 'Pindah ke konteks Unit Utama organisasi aktif terlebih dahulu untuk menambahkan rekening bank secara langsung.'
+        : 'Organisasi ini masih memakai CoA terpusat. Silakan ajukan melalui menu "Pengajuan Rekening CoA".',
+      requiresRequest: !requiresMainUnitContext,
     }
   }
 

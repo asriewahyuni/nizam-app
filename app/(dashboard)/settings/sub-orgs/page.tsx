@@ -45,6 +45,7 @@ export default async function SubOrgsPage() {
   // Using getHoldingEmployees (admin client) so the list is NOT sliced by user's active branch RLS
   const employees = picFeatureEnabled ? await getHoldingEmployees(orgData.org.id) : []
   const canMutate = orgData.role === 'owner'
+  const canManageConsolidationMappings = orgData.role === 'owner' || orgData.role === 'admin'
 
   return (
     <SubOrgClient
@@ -53,9 +54,9 @@ export default async function SubOrgsPage() {
       unlinkedOrgs={unlinkedOrgs.map((o) => o.org)}
       employees={employees}
       canMutate={canMutate}
+      canManageConsolidationMappings={canManageConsolidationMappings}
       picFeatureEnabled={picFeatureEnabled}
       limits={limits}
     />
   )
 }
-

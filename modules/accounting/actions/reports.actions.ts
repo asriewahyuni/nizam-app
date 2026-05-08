@@ -49,6 +49,17 @@ type CashFlowItem = {
   details: CashFlowItemDetail[]
 }
 
+type EffectiveReferenceAccount = {
+  id: string | null
+  org_id: string | null
+  code: string | null
+  name: string | null
+  type: string | null
+  normal_balance: string | null
+  parent_id: string | null
+  cash_flow_category: CashFlowCategory | null
+}
+
 type CashFlowOptions = {
   startDate?: string
   endDate?: string
@@ -79,6 +90,87 @@ const getResolvedOrgIdsForReport = cache(async (orgId: string, consolidated: boo
 
 async function resolveOrgIdsForReport(_db: any, orgId: string, consolidated: boolean = false) {
   return getResolvedOrgIdsForReport(orgId, consolidated)
+}
+
+function isMissingConsolidationMappingSchemaError(error: unknown) {
+  const rawMessage = String((error as any)?.message || '').trim().toLowerCase()
+  const errorCode = String((error as any)?.code || '').trim()
+  return (
+    errorCode === '42P01' ||
+    rawMessage.includes('coa_consolidation_mappings') ||
+    rawMessage.includes('relation "public.coa_consolidation_mappings" does not exist')
+  )
+}
+
+async function getEffectiveReferenceAccounts(
+  db: any,
+  orgIdsToSearch: string[],
+  rootOrgId: string,
+  consolidated: boolean
+): Promise<EffectiveReferenceAccount[]> {
+  if (!consolidated) {
+    const { data: accountRows } = await db
+      .from('accounts')
+      .select('id, org_id, code, name, type, normal_balance, parent_id, cash_flow_category')
+      .in('org_id', orgIdsToSearch)
+      .eq('is_active', true)
+      .order('code', { ascending: true })
+
+    return Array.isArray(accountRows) ? accountRows : []
+  }
+
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  try {
+    const { rows } = await queryPostgres<Record<string, unknown>>(
+      `
+        SELECT
+          source_accounts.org_id AS source_org_id,
+          COALESCE(group_accounts.id, source_accounts.id) AS effective_account_id,
+          COALESCE(group_accounts.code, source_accounts.code) AS effective_account_code,
+          COALESCE(group_accounts.name, source_accounts.name) AS effective_account_name,
+          COALESCE(group_accounts.type::text, source_accounts.type::text) AS effective_account_type,
+          COALESCE(group_accounts.normal_balance::text, source_accounts.normal_balance::text) AS effective_normal_balance,
+          COALESCE(group_accounts.parent_id, source_accounts.parent_id) AS effective_parent_id,
+          COALESCE(group_accounts.cash_flow_category, source_accounts.cash_flow_category) AS effective_cash_flow_category
+        FROM public.accounts source_accounts
+        LEFT JOIN public.coa_consolidation_mappings mappings
+          ON mappings.parent_org_id = $1::uuid
+         AND mappings.child_org_id = source_accounts.org_id
+         AND mappings.local_account_id = source_accounts.id
+         AND mappings.is_active = TRUE
+        LEFT JOIN public.accounts group_accounts
+          ON group_accounts.id = mappings.group_account_id
+        WHERE source_accounts.org_id = ANY($2::uuid[])
+          AND source_accounts.is_active = TRUE
+      `,
+      [rootOrgId, orgIdsToSearch]
+    )
+
+    return rows.map((row) => ({
+      id: row.effective_account_id ? String(row.effective_account_id) : null,
+      org_id: row.source_org_id ? String(row.source_org_id) : null,
+      code: row.effective_account_code ? String(row.effective_account_code) : null,
+      name: row.effective_account_name ? String(row.effective_account_name) : null,
+      type: row.effective_account_type ? String(row.effective_account_type) : null,
+      normal_balance: row.effective_normal_balance ? String(row.effective_normal_balance) : null,
+      parent_id: row.effective_parent_id ? String(row.effective_parent_id) : null,
+      cash_flow_category: (row.effective_cash_flow_category as CashFlowCategory | null) ?? null,
+    }))
+  } catch (error) {
+    if (!isMissingConsolidationMappingSchemaError(error)) {
+      ;(console as any).error('[getEffectiveReferenceAccounts]', error)
+    }
+
+    const { data: fallbackRows } = await db
+      .from('accounts')
+      .select('id, org_id, code, name, type, normal_balance, parent_id, cash_flow_category')
+      .in('org_id', orgIdsToSearch)
+      .eq('is_active', true)
+      .order('code', { ascending: true })
+
+    return Array.isArray(fallbackRows) ? fallbackRows : []
+  }
 }
 
 async function getPostedEntryIds(
@@ -122,30 +214,57 @@ async function getPostedEntryIds(
 async function getAccountBalancesFromEntries(
   db: any,
   entryIds: string[],
-  codeFilter?: string[]
+  codeFilter?: string[],
+  consolidationParentOrgId?: string | null
 ) {
   if (entryIds.length === 0) return []
 
   const { queryPostgres } = await import('@/lib/db/postgres')
-  let sql = `
-    SELECT
-      jl.debit,
-      jl.credit,
-      a.id AS account_id,
-      a.code AS account_code,
-      a.name AS account_name,
-      a.type AS account_type,
-      a.normal_balance AS account_normal_balance,
-      a.parent_id AS account_parent_id,
-      a.cash_flow_category AS account_cash_flow_category
-    FROM public.journal_lines jl
-    JOIN public.accounts a ON a.id = jl.account_id
-    WHERE jl.entry_id = ANY($1::uuid[])
-  `
-  const params: any[] = [entryIds]
+  let sql = consolidationParentOrgId
+    ? `
+      SELECT
+        jl.debit,
+        jl.credit,
+        COALESCE(group_accounts.id, source_accounts.id) AS account_id,
+        COALESCE(group_accounts.code, source_accounts.code) AS account_code,
+        COALESCE(group_accounts.name, source_accounts.name) AS account_name,
+        COALESCE(group_accounts.type::text, source_accounts.type::text) AS account_type,
+        COALESCE(group_accounts.normal_balance::text, source_accounts.normal_balance::text) AS account_normal_balance,
+        COALESCE(group_accounts.parent_id, source_accounts.parent_id) AS account_parent_id,
+        COALESCE(group_accounts.cash_flow_category, source_accounts.cash_flow_category) AS account_cash_flow_category
+      FROM public.journal_lines jl
+      JOIN public.journal_entries je ON je.id = jl.entry_id
+      JOIN public.accounts source_accounts ON source_accounts.id = jl.account_id
+      LEFT JOIN public.coa_consolidation_mappings mappings
+        ON mappings.parent_org_id = $2::uuid
+       AND mappings.child_org_id = je.org_id
+       AND mappings.local_account_id = source_accounts.id
+       AND mappings.is_active = TRUE
+      LEFT JOIN public.accounts group_accounts
+        ON group_accounts.id = mappings.group_account_id
+      WHERE jl.entry_id = ANY($1::uuid[])
+    `
+    : `
+      SELECT
+        jl.debit,
+        jl.credit,
+        a.id AS account_id,
+        a.code AS account_code,
+        a.name AS account_name,
+        a.type AS account_type,
+        a.normal_balance AS account_normal_balance,
+        a.parent_id AS account_parent_id,
+        a.cash_flow_category AS account_cash_flow_category
+      FROM public.journal_lines jl
+      JOIN public.accounts a ON a.id = jl.account_id
+      WHERE jl.entry_id = ANY($1::uuid[])
+    `
+  const params: any[] = consolidationParentOrgId ? [entryIds, consolidationParentOrgId] : [entryIds]
 
   if (codeFilter && codeFilter.length > 0) {
-    sql += ` AND a.code = ANY($2)`
+    sql += consolidationParentOrgId
+      ? ` AND COALESCE(group_accounts.code, source_accounts.code) = ANY($3)`
+      : ` AND a.code = ANY($2)`
     params.push(codeFilter)
   }
 
@@ -154,6 +273,10 @@ async function getAccountBalancesFromEntries(
     const { rows } = await queryPostgres(sql, params)
     data = rows
   } catch (e) {
+    if (consolidationParentOrgId && isMissingConsolidationMappingSchemaError(e)) {
+      return getAccountBalancesFromEntries(db, entryIds, codeFilter)
+    }
+
     ;(console as any).error(e)
     return []
   }
@@ -185,12 +308,59 @@ async function getAccountBalancesFromEntries(
 }
 
 async function getCashAccountCodes(
+  db: any,
   supabase: Awaited<ReturnType<typeof createClient>>,
   orgIdsToSearch: string[],
   branchId?: BranchFilter,
-  consolidated: boolean = false
+  consolidated: boolean = false,
+  consolidationParentOrgId?: string | null
 ): Promise<string[]> {
   const fallbackCashAccountCodes = ['1101', '1102', '1103', '1104', '1105']
+
+  if (consolidated && consolidationParentOrgId) {
+    const effectiveAccounts = await getEffectiveReferenceAccounts(db, orgIdsToSearch, consolidationParentOrgId, true)
+    const cashLikeAccountCodes = effectiveAccounts.reduce<string[]>((codes, account) => {
+      const code = typeof account.code === 'string' ? account.code.trim() : ''
+      if (code.startsWith('11')) codes.push(code)
+      return codes
+    }, [])
+
+    try {
+      const { queryPostgres } = await import('@/lib/db/postgres')
+      const { rows } = await queryPostgres<Record<string, unknown>>(
+        `
+          SELECT DISTINCT COALESCE(group_accounts.code, source_accounts.code) AS effective_account_code
+          FROM public.bank_accounts bank_accounts
+          JOIN public.accounts source_accounts
+            ON source_accounts.id = bank_accounts.account_id
+          LEFT JOIN public.coa_consolidation_mappings mappings
+            ON mappings.parent_org_id = $1::uuid
+           AND mappings.child_org_id = bank_accounts.org_id
+           AND mappings.local_account_id = source_accounts.id
+           AND mappings.is_active = TRUE
+          LEFT JOIN public.accounts group_accounts
+            ON group_accounts.id = mappings.group_account_id
+          WHERE bank_accounts.org_id = ANY($2::uuid[])
+            AND bank_accounts.is_active = TRUE
+        `,
+        [consolidationParentOrgId, orgIdsToSearch]
+      )
+
+      const linkedCodes = rows.reduce<string[]>((codes, row) => {
+        const code = String(row.effective_account_code || '').trim()
+        if (code) codes.push(code)
+        return codes
+      }, [])
+
+      linkedCodes.push(...cashLikeAccountCodes, ...fallbackCashAccountCodes)
+      return Array.from(new Set(linkedCodes))
+    } catch (error) {
+      if (!isMissingConsolidationMappingSchemaError(error)) {
+        ;(console as any).error('[getCashAccountCodes]', error)
+      }
+    }
+  }
+
   let linkedAccountsQuery = (supabase as any)
     .from('bank_accounts')
     .select('account_id, accounts(code)')
@@ -339,9 +509,17 @@ async function getCashBalance(
   consolidated: boolean = false
 ) {
   const orgIdsToSearch = await resolveOrgIdsForReport(db, orgId, consolidated)
-  const cashAccountCodes = await getCashAccountCodes(supabase, orgIdsToSearch, branchId, consolidated)
+  const consolidationParentOrgId = consolidated ? orgId : null
+  const cashAccountCodes = await getCashAccountCodes(
+    db,
+    supabase,
+    orgIdsToSearch,
+    branchId,
+    consolidated,
+    consolidationParentOrgId
+  )
   const entryIds = await getPostedEntryIds(db, orgId, { branchId, consolidated })
-  const balances = await getAccountBalancesFromEntries(db, entryIds, cashAccountCodes)
+  const balances = await getAccountBalancesFromEntries(db, entryIds, cashAccountCodes, consolidationParentOrgId)
 
   return balances.reduce((sum: number, account: any) => {
     const totalDebit = Number(account?.total_debit || 0)
@@ -611,38 +789,71 @@ function formatCashFlowReferenceLabel(parts: Array<string | null | undefined>) {
 async function getJournalLinesForEntries(
   db: any,
   entryIds: string[],
-  cashAccountCodes?: string[]
+  cashAccountCodes?: string[],
+  consolidationParentOrgId?: string | null
 ): Promise<CashFlowLine[]> {
   if (entryIds.length === 0) return []
 
   const { queryPostgres } = await import('@/lib/db/postgres')
 
-  let sql = `
-    SELECT
-      jl.entry_id,
-      jl.debit,
-      jl.credit,
-      a.id AS account_id,
-      a.code AS account_code,
-      a.name AS account_name,
-      a.type AS account_type,
-      a.normal_balance AS account_normal_balance,
-      a.parent_id AS account_parent_id,
-      a.cash_flow_category AS account_cash_flow_category,
-      je.entry_date AS je_entry_date,
-      je.description AS je_description,
-      je.notes AS je_notes,
-      je.reference_type AS je_reference_type,
-      je.reference_id AS je_reference_id
-    FROM public.journal_lines jl
-    JOIN public.accounts a ON a.id = jl.account_id
-    JOIN public.journal_entries je ON je.id = jl.entry_id
-    WHERE jl.entry_id = ANY($1::uuid[])
-  `
-  const params: any[] = [entryIds]
+  let sql = consolidationParentOrgId
+    ? `
+      SELECT
+        jl.entry_id,
+        jl.debit,
+        jl.credit,
+        COALESCE(group_accounts.id, source_accounts.id) AS account_id,
+        COALESCE(group_accounts.code, source_accounts.code) AS account_code,
+        COALESCE(group_accounts.name, source_accounts.name) AS account_name,
+        COALESCE(group_accounts.type::text, source_accounts.type::text) AS account_type,
+        COALESCE(group_accounts.normal_balance::text, source_accounts.normal_balance::text) AS account_normal_balance,
+        COALESCE(group_accounts.parent_id, source_accounts.parent_id) AS account_parent_id,
+        COALESCE(group_accounts.cash_flow_category, source_accounts.cash_flow_category) AS account_cash_flow_category,
+        je.entry_date AS je_entry_date,
+        je.description AS je_description,
+        je.notes AS je_notes,
+        je.reference_type AS je_reference_type,
+        je.reference_id AS je_reference_id
+      FROM public.journal_lines jl
+      JOIN public.journal_entries je ON je.id = jl.entry_id
+      JOIN public.accounts source_accounts ON source_accounts.id = jl.account_id
+      LEFT JOIN public.coa_consolidation_mappings mappings
+        ON mappings.parent_org_id = $2::uuid
+       AND mappings.child_org_id = je.org_id
+       AND mappings.local_account_id = source_accounts.id
+       AND mappings.is_active = TRUE
+      LEFT JOIN public.accounts group_accounts
+        ON group_accounts.id = mappings.group_account_id
+      WHERE jl.entry_id = ANY($1::uuid[])
+    `
+    : `
+      SELECT
+        jl.entry_id,
+        jl.debit,
+        jl.credit,
+        a.id AS account_id,
+        a.code AS account_code,
+        a.name AS account_name,
+        a.type AS account_type,
+        a.normal_balance AS account_normal_balance,
+        a.parent_id AS account_parent_id,
+        a.cash_flow_category AS account_cash_flow_category,
+        je.entry_date AS je_entry_date,
+        je.description AS je_description,
+        je.notes AS je_notes,
+        je.reference_type AS je_reference_type,
+        je.reference_id AS je_reference_id
+      FROM public.journal_lines jl
+      JOIN public.accounts a ON a.id = jl.account_id
+      JOIN public.journal_entries je ON je.id = jl.entry_id
+      WHERE jl.entry_id = ANY($1::uuid[])
+    `
+  const params: any[] = consolidationParentOrgId ? [entryIds, consolidationParentOrgId] : [entryIds]
 
   if (Array.isArray(cashAccountCodes) && cashAccountCodes.length > 0) {
-    sql += ` AND a.code = ANY($2)`
+    sql += consolidationParentOrgId
+      ? ` AND COALESCE(group_accounts.code, source_accounts.code) = ANY($3)`
+      : ` AND a.code = ANY($2)`
     params.push(cashAccountCodes)
   }
 
@@ -670,6 +881,10 @@ async function getJournalLinesForEntries(
       }
     }))
   } catch (err) {
+    if (consolidationParentOrgId && isMissingConsolidationMappingSchemaError(err)) {
+      return getJournalLinesForEntries(db, entryIds, cashAccountCodes)
+    }
+
     ;(console as any).error('[getJournalLinesForEntries]', err)
     return []
   }
@@ -1023,14 +1238,10 @@ export async function getBalanceSheet(
   const finalAsOfDate = asOfDate || getDateInTimeZone('Asia/Jakarta')
 
   const orgIdsToSearch = await resolveOrgIdsForReport(db, orgId, consolidated)
+  const consolidationParentOrgId = consolidated ? orgId : null
 
   // 1. Fetch reference accounts from selected org scope
-  const { data: accountRows } = await db
-    .from('accounts')
-    .select('id, org_id, code, name, type, normal_balance, parent_id')
-    .in('org_id', orgIdsToSearch)
-    .eq('is_active', true)
-    .order('code', { ascending: true })
+  const accountRows = await getEffectiveReferenceAccounts(db, orgIdsToSearch, orgId, consolidated)
 
   const dedupedByCode = new Map<string, any>()
   const sortedRows = (Array.isArray(accountRows) ? accountRows : []).sort((a: any, b: any) => {
@@ -1049,7 +1260,9 @@ export async function getBalanceSheet(
 
   const entryIds = await getPostedEntryIds(db, orgId, { branchId, asOfDate: finalAsOfDate, consolidated })
 
-  const balances = entryIds.length > 0 ? await getAccountBalancesFromEntries(db, entryIds) : []
+  const balances = entryIds.length > 0
+    ? await getAccountBalancesFromEntries(db, entryIds, undefined, consolidationParentOrgId)
+    : []
   const balancesByCode = new Map<string, any>(balances.map((b: any) => [b.code, b]))
 
   const mapBalance = (account: any, positiveSide: 'DEBIT' | 'CREDIT') => {
@@ -1143,6 +1356,7 @@ export async function getProfitLoss(orgId: string, startDate?: string, endDate?:
   const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
   const sDate = startDate || `${todayInJakarta.slice(0, 7)}-01`
   const eDate = endDate || todayInJakarta
+  const consolidationParentOrgId = consolidated ? orgId : null
 
   const entryIds = await getPostedEntryIds(db, orgId, {
     branchId,
@@ -1155,7 +1369,7 @@ export async function getProfitLoss(orgId: string, startDate?: string, endDate?:
     return { revenue: [], expenses: [], totalRevenue: 0, totalExpenses: 0, netProfit: 0 }
   }
 
-  const balances = await getAccountBalancesFromEntries(db, entryIds)
+  const balances = await getAccountBalancesFromEntries(db, entryIds, undefined, consolidationParentOrgId)
   if (balances.length === 0) return { revenue: [], expenses: [], totalRevenue: 0, totalExpenses: 0, netProfit: 0 }
 
   const results = balances.map((a: any) => ({
@@ -1184,6 +1398,7 @@ export async function getCashFlow(
   const supabase = await createClient()
   const db = supabase as any
   const orgIdsToSearch = await resolveOrgIdsForReport(db, orgId, consolidated)
+  const consolidationParentOrgId = consolidated ? orgId : null
 
   const todayInJakarta = getDateInTimeZone('Asia/Jakarta')
   const startDate = options.startDate || `${todayInJakarta.slice(0, 7)}-01`
@@ -1192,7 +1407,14 @@ export async function getCashFlow(
   const previousEndDate = addDaysToDateString(startDate, -1)
   const previousStartDate = addDaysToDateString(previousEndDate, -(periodLengthDays - 1))
 
-  const cashAccountCodes = await getCashAccountCodes(supabase, orgIdsToSearch, branchId, consolidated)
+  const cashAccountCodes = await getCashAccountCodes(
+    db,
+    supabase,
+    orgIdsToSearch,
+    branchId,
+    consolidated,
+    consolidationParentOrgId
+  )
 
   const currentEntryIds = await getPostedEntryIds(db, orgId, {
     branchId,
@@ -1209,8 +1431,8 @@ export async function getCashFlow(
   })
 
   const [currentLines, previousCashLines] = await Promise.all([
-    getJournalLinesForEntries(db, currentEntryIds),
-    getJournalLinesForEntries(db, previousEntryIds, cashAccountCodes),
+    getJournalLinesForEntries(db, currentEntryIds, undefined, consolidationParentOrgId),
+    getJournalLinesForEntries(db, previousEntryIds, cashAccountCodes, consolidationParentOrgId),
   ])
 
   const referenceLabels = await getCashFlowReferenceLabels(currentLines)

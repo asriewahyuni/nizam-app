@@ -27,6 +27,7 @@ import {
   type AccessibleOrganization,
   type BranchSummary,
 } from '@/modules/organization/lib/org-context'
+import type { CoAManagementMode } from '@/types/database.types'
 import {
   persistMembershipActiveContext,
   resolveActiveMembership,
@@ -267,6 +268,7 @@ type CreateOrganizationSuccess = {
     is_active: boolean
     created_at: string
     manager_employee_id: string | null
+    coa_management_mode: CoAManagementMode
   }
 }
 
@@ -299,7 +301,8 @@ type RpcClient = {
   ) => Promise<{ error: { message?: string | null } | null }>
 }
 
-const OPTIONAL_ORGANIZATION_COLUMNS = new Set(['owner_email', 'parent_org_id', 'is_demo'])
+const OPTIONAL_ORGANIZATION_COLUMNS = new Set(['owner_email', 'parent_org_id', 'is_demo', 'coa_management_mode'])
+const DEFAULT_COA_MANAGEMENT_MODE: CoAManagementMode = 'INHERITED'
 
 function extractErrorMessage(error: unknown): string {
   if (!error) return ''
@@ -323,6 +326,22 @@ function extractMissingColumnName(error: unknown): string | null {
   if (postgresMatch?.[1]) return postgresMatch[1]
 
   return null
+}
+
+function normalizeCoAManagementMode(value: unknown): CoAManagementMode {
+  return String(value || '').trim().toUpperCase() === 'LOCAL' ? 'LOCAL' : 'INHERITED'
+}
+
+function isMissingOrganizationColumn(error: unknown, columnName: string) {
+  return extractMissingColumnName(error) === columnName
+}
+
+function isMissingCoAConsolidationMappingsSchemaError(error: unknown) {
+  const rawMessage = extractErrorMessage(error).trim().toLowerCase()
+  return (
+    rawMessage.includes('coa_consolidation_mappings') &&
+    (rawMessage.includes('does not exist') || rawMessage.includes('schema cache') || rawMessage.includes('relation'))
+  )
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -1027,6 +1046,7 @@ async function createOrganizationRecord(
         is_active: true,
         created_at: createdAt,
         manager_employee_id: null,
+        coa_management_mode: DEFAULT_COA_MANAGEMENT_MODE,
       },
     }
   } catch (error) {
@@ -1293,6 +1313,584 @@ export async function updateChildOrganization(childOrgId: string, name: string) 
   revalidatePath('/settings/sub-orgs')
   revalidatePath('/reports')
   return { success: true }
+}
+
+async function readOrganizationRowWithCoAManagementMode(reader: any, orgId: string) {
+  const { data, error } = await reader
+    .from('organizations')
+    .select('id, name, parent_org_id, coa_management_mode')
+    .eq('id', orgId)
+    .maybeSingle()
+
+  if (error && isMissingOrganizationColumn(error, 'coa_management_mode')) {
+    const fallback = await reader
+      .from('organizations')
+      .select('id, name, parent_org_id')
+      .eq('id', orgId)
+      .maybeSingle()
+
+    if (fallback.error || !fallback.data) {
+      return {
+        data: null,
+        error: fallback.error,
+      }
+    }
+
+    return {
+      data: {
+        ...fallback.data,
+        coa_management_mode: DEFAULT_COA_MANAGEMENT_MODE,
+      },
+      error: null,
+    }
+  }
+
+  if (error || !data) {
+    return {
+      data: null,
+      error,
+    }
+  }
+
+  return {
+    data: {
+      ...data,
+      coa_management_mode: normalizeCoAManagementMode((data as { coa_management_mode?: unknown }).coa_management_mode),
+    },
+    error: null,
+  }
+}
+
+async function updateOrganizationCoAManagementMode(
+  writer: any,
+  orgId: string,
+  parentOrgId: string,
+  mode: CoAManagementMode
+) {
+  const { error } = await writer
+    .from('organizations')
+    .update({
+      coa_management_mode: mode,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', orgId)
+    .eq('parent_org_id', parentOrgId)
+
+  if (error && isMissingOrganizationColumn(error, 'coa_management_mode')) {
+    return {
+      error: 'Database belum update untuk mode CoA child org. Jalankan migrasi terbaru lalu coba lagi.',
+    }
+  }
+
+  if (error) {
+    return {
+      error: error.message || 'Gagal memperbarui mode CoA entitas anak.',
+    }
+  }
+
+  return { success: true as const }
+}
+
+type ConsolidationWorkspaceAccount = {
+  id: string
+  code: string
+  name: string
+  type: string
+  normal_balance: string
+}
+
+type ConsolidationWorkspaceRow = ConsolidationWorkspaceAccount & {
+  mapped_group_account_id: string | null
+  suggested_group_account_id: string | null
+}
+
+type ConsolidationWorkspaceSummary = {
+  totalLocalAccounts: number
+  mappedLocalAccounts: number
+  unmappedLocalAccounts: number
+  suggestedLocalAccounts: number
+}
+
+async function readCoAConsolidationMappings(
+  reader: any,
+  parentOrgId: string,
+  childOrgId: string
+) {
+  const { data, error } = await reader
+    .from('coa_consolidation_mappings')
+    .select('local_account_id, group_account_id, is_active')
+    .eq('parent_org_id', parentOrgId)
+    .eq('child_org_id', childOrgId)
+    .eq('is_active', true)
+
+  if (error && isMissingCoAConsolidationMappingsSchemaError(error)) {
+    return {
+      data: null,
+      error: {
+        message: 'Database belum update untuk mapping konsolidasi CoA. Jalankan migrasi 1244 lalu coba lagi.',
+      },
+    }
+  }
+
+  return { data, error }
+}
+
+async function buildChildCoAConsolidationWorkspace(
+  reader: any,
+  parentOrgId: string,
+  childOrgId: string,
+  childOrgName: string
+) {
+  const [{ data: localAccounts, error: localAccountsError }, { data: groupAccounts, error: groupAccountsError }, mappingsResult] = await Promise.all([
+    reader
+      .from('accounts')
+      .select('id, code, name, type, normal_balance')
+      .eq('org_id', childOrgId)
+      .eq('is_active', true)
+      .order('code', { ascending: true }),
+    reader
+      .from('accounts')
+      .select('id, code, name, type, normal_balance')
+      .eq('org_id', parentOrgId)
+      .eq('is_active', true)
+      .order('code', { ascending: true }),
+    readCoAConsolidationMappings(reader, parentOrgId, childOrgId),
+  ])
+
+  if (localAccountsError || groupAccountsError) {
+    return {
+      error:
+        localAccountsError?.message ||
+        groupAccountsError?.message ||
+        'Gagal membaca akun untuk workspace mapping konsolidasi.',
+    }
+  }
+
+  if (mappingsResult.error) {
+    return {
+      error: mappingsResult.error.message || 'Gagal membaca mapping konsolidasi CoA.',
+    }
+  }
+
+  const normalizedGroupAccounts = ((groupAccounts || []) as Array<Record<string, unknown>>).map((row) => ({
+    id: String(row.id || '').trim(),
+    code: String(row.code || '').trim(),
+    name: String(row.name || '').trim(),
+    type: String(row.type || '').trim(),
+    normal_balance: String(row.normal_balance || '').trim(),
+  })).filter((row) => Boolean(row.id && row.code && row.name))
+
+  const groupAccountsByCode = new Map<string, ConsolidationWorkspaceAccount>()
+  normalizedGroupAccounts.forEach((account) => {
+    groupAccountsByCode.set(account.code, account)
+  })
+
+  const activeMappingsByLocalAccountId = new Map<string, string>()
+  ;((mappingsResult.data || []) as Array<{ local_account_id?: string | null; group_account_id?: string | null }>)
+    .forEach((row) => {
+      const localAccountId = String(row?.local_account_id || '').trim()
+      const groupAccountId = String(row?.group_account_id || '').trim()
+      if (!localAccountId || !groupAccountId) return
+      activeMappingsByLocalAccountId.set(localAccountId, groupAccountId)
+    })
+
+  const normalizedLocalAccounts = ((localAccounts || []) as Array<Record<string, unknown>>).map((row) => {
+    const id = String(row.id || '').trim()
+    const code = String(row.code || '').trim()
+    const localAccountType = String(row.type || '').trim()
+    const suggestedGroupAccount = groupAccountsByCode.get(code) || null
+    const suggestedGroupAccountId = suggestedGroupAccount?.type === localAccountType
+      ? suggestedGroupAccount.id
+      : null
+    const mappedGroupAccountId = activeMappingsByLocalAccountId.get(id) || null
+
+    return {
+      id,
+      code,
+      name: String(row.name || '').trim(),
+      type: localAccountType,
+      normal_balance: String(row.normal_balance || '').trim(),
+      mapped_group_account_id: mappedGroupAccountId,
+      suggested_group_account_id: suggestedGroupAccountId,
+    } satisfies ConsolidationWorkspaceRow
+  }).filter((row) => Boolean(row.id && row.code && row.name))
+
+  const summary: ConsolidationWorkspaceSummary = {
+    totalLocalAccounts: normalizedLocalAccounts.length,
+    mappedLocalAccounts: normalizedLocalAccounts.filter((account) => Boolean(account.mapped_group_account_id)).length,
+    unmappedLocalAccounts: normalizedLocalAccounts.filter((account) => !account.mapped_group_account_id).length,
+    suggestedLocalAccounts: normalizedLocalAccounts.filter((account) => !account.mapped_group_account_id && account.suggested_group_account_id).length,
+  }
+
+  return {
+    success: true as const,
+    workspace: {
+      childOrgId,
+      childOrgName,
+      parentOrgId,
+      localAccounts: normalizedLocalAccounts,
+      groupAccounts: normalizedGroupAccounts,
+      summary,
+    },
+  }
+}
+
+export async function getChildCoAConsolidationWorkspace(childOrgId: string) {
+  const trimmedChildOrgId = String(childOrgId || '').trim()
+  if (!trimmedChildOrgId) {
+    return { error: 'Anak perusahaan tidak valid.' }
+  }
+
+  const holdingContext = await getHoldingManagementContext()
+  if ('error' in holdingContext) return { error: holdingContext.error }
+
+  const { db, activeOrgId } = holdingContext
+  let admin: any = db
+  try {
+    admin = (await createAdminClient()) as any
+  } catch {
+    admin = db
+  }
+
+  const { data: childOrg, error: childOrgError } = await admin
+    .from('organizations')
+    .select('id, name, parent_org_id')
+    .eq('id', trimmedChildOrgId)
+    .maybeSingle()
+
+  if (childOrgError || !childOrg) {
+    return { error: childOrgError?.message || 'Organisasi anak tidak ditemukan.' }
+  }
+
+  if (String(childOrg.parent_org_id || '').trim() !== activeOrgId) {
+    return { error: 'Organisasi tersebut tidak terdaftar sebagai anak dari holding aktif.' }
+  }
+
+  const childContextResult = await readOrganizationRowWithCoAManagementMode(admin, trimmedChildOrgId)
+  if (childContextResult.error || !childContextResult.data) {
+    return { error: childContextResult.error?.message || 'Gagal membaca mode CoA entitas anak.' }
+  }
+
+  if (childContextResult.data.coa_management_mode !== 'LOCAL') {
+    return {
+      error: 'Entitas anak ini masih mengikuti CoA holding. Mapping konsolidasi manual hanya diperlukan untuk mode CoA lokal.',
+    }
+  }
+
+  return buildChildCoAConsolidationWorkspace(
+    admin,
+    activeOrgId,
+    trimmedChildOrgId,
+    String(childOrg.name || '').trim() || 'Entitas Anak'
+  )
+}
+
+export async function saveChildCoAConsolidationMappings(
+  childOrgId: string,
+  entries: Array<{ localAccountId: string; groupAccountId: string | null }>
+) {
+  const trimmedChildOrgId = String(childOrgId || '').trim()
+  if (!trimmedChildOrgId) {
+    return { error: 'Anak perusahaan tidak valid.' }
+  }
+
+  if (!Array.isArray(entries)) {
+    return { error: 'Payload mapping konsolidasi tidak valid.' }
+  }
+
+  const holdingContext = await getHoldingManagementContext()
+  if ('error' in holdingContext) return { error: holdingContext.error }
+
+  const { db, activeOrgId } = holdingContext
+  let admin: any = db
+  try {
+    admin = (await createAdminClient()) as any
+  } catch {
+    admin = db
+  }
+
+  const childContextResult = await readOrganizationRowWithCoAManagementMode(admin, trimmedChildOrgId)
+  if (childContextResult.error || !childContextResult.data) {
+    return { error: childContextResult.error?.message || 'Gagal membaca konteks entitas anak.' }
+  }
+
+  const childOrg = childContextResult.data
+  if (childOrg.parent_org_id !== activeOrgId) {
+    return { error: 'Organisasi tersebut tidak terdaftar sebagai anak dari holding aktif.' }
+  }
+
+  if (childOrg.coa_management_mode !== 'LOCAL') {
+    return {
+      error: 'Entitas anak ini tidak berada di mode CoA lokal. Simpan mapping hanya tersedia untuk child LOCAL.',
+    }
+  }
+
+  const [{ data: localAccounts, error: localAccountsError }, { data: groupAccounts, error: groupAccountsError }, mappingsResult] = await Promise.all([
+    admin
+      .from('accounts')
+      .select('id, code, name, type, normal_balance')
+      .eq('org_id', trimmedChildOrgId)
+      .eq('is_active', true),
+    admin
+      .from('accounts')
+      .select('id, code, name, type, normal_balance')
+      .eq('org_id', activeOrgId)
+      .eq('is_active', true),
+    readCoAConsolidationMappings(admin, activeOrgId, trimmedChildOrgId),
+  ])
+
+  if (localAccountsError || groupAccountsError) {
+    return {
+      error:
+        localAccountsError?.message ||
+        groupAccountsError?.message ||
+        'Gagal membaca akun untuk penyimpanan mapping konsolidasi.',
+    }
+  }
+
+  if (mappingsResult.error) {
+    return {
+      error: mappingsResult.error.message || 'Gagal membaca tabel mapping konsolidasi CoA.',
+    }
+  }
+
+  const localAccountById = new Map<string, ConsolidationWorkspaceAccount>()
+  ;((localAccounts || []) as Array<Record<string, unknown>>).forEach((row) => {
+    const id = String(row.id || '').trim()
+    if (!id) return
+    localAccountById.set(id, {
+      id,
+      code: String(row.code || '').trim(),
+      name: String(row.name || '').trim(),
+      type: String(row.type || '').trim(),
+      normal_balance: String(row.normal_balance || '').trim(),
+    })
+  })
+
+  const groupAccountById = new Map<string, ConsolidationWorkspaceAccount>()
+  ;((groupAccounts || []) as Array<Record<string, unknown>>).forEach((row) => {
+    const id = String(row.id || '').trim()
+    if (!id) return
+    groupAccountById.set(id, {
+      id,
+      code: String(row.code || '').trim(),
+      name: String(row.name || '').trim(),
+      type: String(row.type || '').trim(),
+      normal_balance: String(row.normal_balance || '').trim(),
+    })
+  })
+
+  const normalizedEntries = entries.map((entry) => ({
+    localAccountId: String(entry?.localAccountId || '').trim(),
+    groupAccountId: String(entry?.groupAccountId || '').trim() || null,
+  }))
+
+  const seenLocalAccountIds = new Set<string>()
+  for (const entry of normalizedEntries) {
+    if (!entry.localAccountId) {
+      return { error: 'Ditemukan baris mapping tanpa akun lokal.' }
+    }
+
+    if (seenLocalAccountIds.has(entry.localAccountId)) {
+      return { error: 'Ada akun lokal yang dikirim lebih dari satu kali pada payload mapping.' }
+    }
+    seenLocalAccountIds.add(entry.localAccountId)
+
+    const localAccount = localAccountById.get(entry.localAccountId)
+    if (!localAccount) {
+      return { error: 'Salah satu akun lokal tidak ditemukan atau sudah nonaktif.' }
+    }
+
+    if (!entry.groupAccountId) continue
+
+    const groupAccount = groupAccountById.get(entry.groupAccountId)
+    if (!groupAccount) {
+      return { error: `Akun holding untuk ${localAccount.code} - ${localAccount.name} tidak ditemukan.` }
+    }
+
+    if (groupAccount.type !== localAccount.type) {
+      return {
+        error:
+          `Akun holding ${groupAccount.code} - ${groupAccount.name} tidak satu kategori dengan akun lokal ` +
+          `${localAccount.code} - ${localAccount.name}. Pilih akun dengan tipe yang sama.`,
+      }
+    }
+  }
+
+  const activeMappingRows = (mappingsResult.data || []) as Array<{ local_account_id?: string | null }>
+  const currentlyMappedIds = new Set(
+    activeMappingRows
+      .map((row) => String(row?.local_account_id || '').trim())
+      .filter(Boolean)
+  )
+
+  const upsertPayload = normalizedEntries
+    .filter((entry) => entry.groupAccountId)
+    .map((entry) => ({
+      parent_org_id: activeOrgId,
+      child_org_id: trimmedChildOrgId,
+      local_account_id: entry.localAccountId,
+      group_account_id: entry.groupAccountId,
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    }))
+
+  const clearLocalAccountIds = normalizedEntries
+    .filter((entry) => !entry.groupAccountId && currentlyMappedIds.has(entry.localAccountId))
+    .map((entry) => entry.localAccountId)
+
+  if (clearLocalAccountIds.length > 0) {
+    const { error: clearError } = await admin
+      .from('coa_consolidation_mappings')
+      .delete()
+      .eq('parent_org_id', activeOrgId)
+      .eq('child_org_id', trimmedChildOrgId)
+      .in('local_account_id', clearLocalAccountIds)
+
+    if (clearError) {
+      return {
+        error: clearError.message || 'Gagal menghapus mapping konsolidasi yang dikosongkan.',
+      }
+    }
+  }
+
+  if (upsertPayload.length > 0) {
+    const { error: upsertError } = await admin
+      .from('coa_consolidation_mappings')
+      .upsert(upsertPayload, {
+        onConflict: 'parent_org_id,child_org_id,local_account_id',
+      })
+
+    if (upsertError) {
+      return {
+        error: upsertError.message || 'Gagal menyimpan mapping konsolidasi CoA.',
+      }
+    }
+  }
+
+  revalidatePath('/settings/sub-orgs')
+  revalidatePath('/reports')
+
+  return buildChildCoAConsolidationWorkspace(
+    admin,
+    activeOrgId,
+    trimmedChildOrgId,
+    String(childOrg.name || '').trim() || 'Entitas Anak'
+  )
+}
+
+export async function setChildOrganizationCoAManagementMode(
+  childOrgId: string,
+  mode: CoAManagementMode
+) {
+  const trimmedChildOrgId = String(childOrgId || '').trim()
+  const normalizedMode = normalizeCoAManagementMode(mode)
+
+  if (!trimmedChildOrgId) {
+    return { error: 'Anak perusahaan tidak valid.' }
+  }
+
+  const holdingContext = await getHoldingManagementContext(undefined, { ownerOnly: true })
+  if ('error' in holdingContext) return { error: holdingContext.error }
+
+  const { db, activeOrgId } = holdingContext
+  let admin: any = db
+  try {
+    admin = (await createAdminClient()) as any
+  } catch {
+    admin = db
+  }
+
+  const { data: childOrg, error: childOrgError } = await readOrganizationRowWithCoAManagementMode(admin, trimmedChildOrgId)
+  if (childOrgError || !childOrg) {
+    return { error: childOrgError?.message || 'Organisasi anak tidak ditemukan.' }
+  }
+
+  if (childOrg.parent_org_id !== activeOrgId) {
+    return { error: 'Organisasi tersebut tidak terdaftar sebagai anak dari holding aktif.' }
+  }
+
+  if (childOrg.coa_management_mode === normalizedMode) {
+    return { success: true, managementMode: normalizedMode, changed: false }
+  }
+
+  if (normalizedMode === 'INHERITED') {
+    const [{ data: parentAccounts, error: parentAccountsError }, { data: childAccounts, error: childAccountsError }] = await Promise.all([
+      admin
+        .from('accounts')
+        .select('code')
+        .eq('org_id', activeOrgId)
+        .eq('is_active', true),
+      admin
+        .from('accounts')
+        .select('code')
+        .eq('org_id', trimmedChildOrgId)
+        .eq('is_active', true),
+    ])
+
+    if (parentAccountsError || childAccountsError) {
+      return {
+        error:
+          parentAccountsError?.message ||
+          childAccountsError?.message ||
+          'Gagal memeriksa keselarasan CoA parent-child.',
+      }
+    }
+
+    const parentCodes = new Set(
+      ((parentAccounts || []) as Array<{ code?: string | null }>)
+        .map((row) => String(row?.code || '').trim())
+        .filter(Boolean)
+    )
+
+    const localOnlyCodes = Array.from(
+      new Set(
+        ((childAccounts || []) as Array<{ code?: string | null }>)
+          .map((row) => String(row?.code || '').trim())
+          .filter((code) => Boolean(code) && !parentCodes.has(code))
+      )
+    )
+
+    if (localOnlyCodes.length > 0) {
+      const preview = localOnlyCodes.slice(0, 4).join(', ')
+      const suffix = localOnlyCodes.length > 4 ? ' dan lainnya' : ''
+      return {
+        error:
+          `Entitas anak masih memiliki ${localOnlyCodes.length} akun aktif yang belum ada di holding: ${preview}${suffix}. ` +
+          'Rapikan akun lokal tersebut terlebih dahulu sebelum kembali ke mode inherited.',
+      }
+    }
+  }
+
+  const updateResult = await updateOrganizationCoAManagementMode(admin, trimmedChildOrgId, activeOrgId, normalizedMode)
+  if ('error' in updateResult) {
+    return updateResult
+  }
+
+  if (normalizedMode === 'INHERITED') {
+    const coaSync = await syncParentCoAToChildOrg(activeOrgId, trimmedChildOrgId)
+    if (!coaSync.success) {
+      const rollbackResult = await updateOrganizationCoAManagementMode(admin, trimmedChildOrgId, activeOrgId, 'LOCAL')
+      if ('error' in rollbackResult) {
+        ;(console as any).warn('Rollback mode CoA child org gagal:', rollbackResult.error)
+      }
+
+      return {
+        error: coaSync.error || 'Mode CoA sudah diubah, tetapi sinkronisasi CoA parent gagal. Perubahan dibatalkan.',
+      }
+    }
+  }
+
+  revalidatePath('/settings/sub-orgs')
+  revalidatePath('/settings/accounts')
+  revalidatePath('/accounting/coa-requests')
+  revalidatePath('/reports')
+
+  return {
+    success: true,
+    managementMode: normalizedMode,
+    changed: true,
+  }
 }
 
 export async function deleteChildOrganization(childOrgId: string) {
@@ -2115,31 +2713,54 @@ export async function getChildOrgs(parentOrgId: string) {
   if ('error' in holdingContext) return []
   const { db } = holdingContext
   const managerFeatureEnabled = await isSubOrgManagerFeatureEnabled()
-  const selectFields = managerFeatureEnabled
-    ? 'id, name, slug, logo_url, settings, is_active, created_at, manager_employee_id'
-    : 'id, name, slug, logo_url, settings, is_active, created_at'
+  const buildSelectFields = (includeCoAManagementMode: boolean) => {
+    const baseFields = managerFeatureEnabled
+      ? 'id, name, slug, logo_url, settings, is_active, created_at, manager_employee_id'
+      : 'id, name, slug, logo_url, settings, is_active, created_at'
 
-  const admin = (await createAdminClient()) as any
-  const { data: adminData, error: adminError } = await admin
-    .from('organizations')
-    .select(selectFields)
-    .eq('parent_org_id', trimmedParentOrgId)
-    .order('created_at', { ascending: false })
-
-  if (!adminError) {
-    if (managerFeatureEnabled) return adminData || []
-    return (adminData || []).map((row: any) => ({ ...row, manager_employee_id: null }))
+    return includeCoAManagementMode
+      ? `${baseFields}, coa_management_mode`
+      : baseFields
   }
 
-  const { data: userData, error: userError } = await db
-    .from('organizations')
-    .select(selectFields)
-    .eq('parent_org_id', trimmedParentOrgId)
-    .order('created_at', { ascending: false })
+  const readChildOrgs = async (reader: any) => {
+    let includeCoAManagementMode = true
+
+    while (true) {
+      const { data, error } = await reader
+        .from('organizations')
+        .select(buildSelectFields(includeCoAManagementMode))
+        .eq('parent_org_id', trimmedParentOrgId)
+        .order('created_at', { ascending: false })
+
+      if (error && includeCoAManagementMode && isMissingOrganizationColumn(error, 'coa_management_mode')) {
+        includeCoAManagementMode = false
+        continue
+      }
+
+      if (error) return { data: null, error }
+
+      const normalizedRows = (data || []).map((row: any) => ({
+        ...row,
+        manager_employee_id: managerFeatureEnabled ? (row?.manager_employee_id ? String(row.manager_employee_id) : null) : null,
+        coa_management_mode: normalizeCoAManagementMode(row?.coa_management_mode),
+      }))
+
+      return { data: normalizedRows, error: null }
+    }
+  }
+
+  const admin = (await createAdminClient()) as any
+  const { data: adminData, error: adminError } = await readChildOrgs(admin)
+
+  if (!adminError) {
+    return adminData || []
+  }
+
+  const { data: userData, error: userError } = await readChildOrgs(db)
 
   if (!userError) {
-    if (managerFeatureEnabled) return userData || []
-    return (userData || []).map((row: any) => ({ ...row, manager_employee_id: null }))
+    return userData || []
   }
 
   return []

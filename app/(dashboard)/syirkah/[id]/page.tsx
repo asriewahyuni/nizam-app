@@ -6,6 +6,7 @@ import {
   getSyirkahMembers,
   getSyirkahWitnesses,
   syncSyirkahCapitalToCore,
+  syncSyirkahProfitSharingToCore,
 } from '@/modules/syirkah/actions/syirkah.actions'
 import { redirect } from 'next/navigation'
 import SyirkahDetailClient from './SyirkahDetailClient'
@@ -51,25 +52,46 @@ export default async function SyirkahDetailPage({ params, searchParams }: {
     (normalizedStatus === 'ACTIVE' || normalizedStatus === 'COMPLETED') && !contract.core_journal_entry_id
   const shouldCleanupPrematureCoreSync =
     normalizedStatus !== 'ACTIVE' && normalizedStatus !== 'COMPLETED' && !!contract.core_journal_entry_id
+  const shouldEnsureProfitSharingSync =
+    normalizedStatus === 'ACTIVE' || normalizedStatus === 'COMPLETED'
+  const shouldCleanupPrematureProfitSharingSync =
+    normalizedStatus !== 'ACTIVE' && normalizedStatus !== 'COMPLETED' && !!contract.profit_sharing_journal_entry_id
 
+  let shouldRefreshContract = false
   if (shouldEnsureCoreSync || shouldCleanupPrematureCoreSync) {
     const syncResult = await syncSyirkahCapitalToCore(contractId, {
       skipRevalidate: true,
     })
-    if (!(syncResult as any)?.error) {
-      contract = await getSyirkahContractById(contractId, activeOrgData.org.id)
-      if (!contract) redirect('/syirkah')
+    if (!('error' in syncResult)) {
+      shouldRefreshContract = true
     }
+  }
+
+  if (shouldEnsureProfitSharingSync || shouldCleanupPrematureProfitSharingSync) {
+    const syncResult = await syncSyirkahProfitSharingToCore(contractId, {
+      skipRevalidate: true,
+    })
+    if (!('error' in syncResult)) {
+      shouldRefreshContract = true
+    }
+  }
+
+  if (shouldRefreshContract) {
+    contract = await getSyirkahContractById(contractId, activeOrgData.org.id)
+    if (!contract) redirect('/syirkah')
   }
 
   const members = await getSyirkahMembers(contractId)
   const witnesses = await getSyirkahWitnesses(contractId)
-  const [pnl, contracts, accounts, coreJournal] = await Promise.all([
+  const [pnl, contracts, accounts, coreJournal, profitSharingJournal] = await Promise.all([
     getProfitLoss(activeOrgData.org.id, '2000-01-01'),
     getSyirkahContracts(activeOrgData.org.id),
     getChartOfAccounts(activeOrgData.org.id),
     contract.core_journal_entry_id
       ? getSyirkahCoreJournal(String(contract.core_journal_entry_id), activeOrgData.org.id)
+      : Promise.resolve(null),
+    contract.profit_sharing_journal_entry_id
+      ? getSyirkahCoreJournal(String(contract.profit_sharing_journal_entry_id), activeOrgData.org.id)
       : Promise.resolve(null),
   ])
   const distributionContext = buildSyirkahDistributionContext(contracts, pnl.netProfit || 0)
@@ -93,6 +115,7 @@ export default async function SyirkahDetailPage({ params, searchParams }: {
           profitDistribution={contractDistribution}
           accounts={accounts}
           coreJournal={coreJournal}
+          profitSharingJournal={profitSharingJournal}
         />
       )}
     </div>

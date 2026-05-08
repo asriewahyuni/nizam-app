@@ -13,14 +13,9 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-import {
-  getTrainingCourseBySlug,
-  getTrainingLessonsForCourse,
-  getTrainingTrackBySlug,
-} from '@/modules/edu/lib/training-center-mvp'
-import { getTrainingAssessmentByCourseSlug } from '@/modules/edu/lib/training-assessment-mvp'
+import { getLmsCourseBySlug, getLmsLessonsByCourseId } from '@/modules/edu/actions/lms-commercial.actions'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
-import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
+import { getLearningAccessContext } from '@/modules/edu/lib/learning-access.server'
 
 export default async function LearningCoursePage(props: { params: Promise<{ courseSlug: string }> }) {
   noStore()
@@ -29,21 +24,29 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
   if (!orgData) return redirect('/onboarding')
 
   const params = await props.params
-  const course = getTrainingCourseBySlug(params.courseSlug)
+  const course = await getLmsCourseBySlug(orgData.org.id, params.courseSlug)
   if (!course) notFound()
 
-  const track = getTrainingTrackBySlug(course.trackSlug)
-  const lessons = getTrainingLessonsForCourse(course.slug)
-  const assessment = getTrainingAssessmentByCourseSlug(course.slug)
-  const assessorContext = await getSaasAssessorContext({ email: orgData.user?.email })
-  const canManageAssessment = assessorContext.hasAccess
+  const lessons = await getLmsLessonsByCourseId(orgData.org.id, course.id)
+  const track: any = null // Optional fallback if you want to support track UI later
+  
+  // Dummy fallbacks for UI styling since we no longer have MVP hardcoded attributes
+  const outcomes = ['Peningkatan skill teknis', 'Pemahaman operasional', 'Kesiapan terjun lapangan']
+  const assessmentSummary = ['Ujian Pilihan Ganda', 'Ujian Praktik', 'Review Penilai']
+  
+  const learningAccess = await getLearningAccessContext({
+    userRole: orgData.role,
+    permissions: orgData.permissions,
+    email: orgData.user?.email,
+  })
+  const canManageAssessment = learningAccess.canReviewAssessments
   const canAccessParticipantAssessment = hasRolePermission(orgData.role, orgData.permissions, 'learning') || canManageAssessment
 
   return (
     <div className="space-y-6">
       <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
         <Link
-          href={track ? `/learning/track/${track.slug}` : '/learning'}
+          href={track ? `/lms/track/${track.slug}` : '/lms'}
           className="inline-flex items-center gap-2 text-sm font-black text-slate-600 hover:text-slate-900"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -54,33 +57,33 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-600">
               <GraduationCap className="h-3.5 w-3.5" />
-              {course.levelCode} • {course.status === 'LIVE' ? 'Live' : 'Soon'}
+              {course.level_code || 'ALL'} • {course.is_active ? 'Live' : 'Soon'}
             </div>
             <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 md:text-4xl">
               {course.title}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
-              {course.description}
+              {course.description || 'Tidak ada deskripsi'}
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3 text-sm font-bold text-slate-600">
               <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2">
                 <Clock className="h-4 w-4" />
-                {course.estimatedMinutes} menit
+                60 menit
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2">
                 <BookOpen className="h-4 w-4" />
-                {course.lessonCount} lesson
+                {lessons.length} lesson
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2">
                 <ShieldCheck className="h-4 w-4" />
-                {course.audience}
+                Internal & External
               </div>
             </div>
 
-            {course.status === 'LIVE' && lessons[0] ? (
+            {course.is_active && lessons[0] ? (
               <Link
-                href={`/learning/course/${course.slug}/lesson/${lessons[0].slug}`}
+                href={`/lms/course/${course.slug}/lesson/${lessons[0].slug}`}
                 className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
               >
                 Mulai Lesson 1
@@ -94,14 +97,8 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
           </div>
 
           <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-slate-50">
-            <div className="relative aspect-[4/3] w-full overflow-hidden">
-              <Image
-                src={course.coverImage}
-                alt={course.coverAlt}
-                fill
-                className="object-cover object-top"
-                sizes="(max-width: 1280px) 100vw, 520px"
-              />
+            <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100 flex items-center justify-center">
+              <GraduationCap className="w-24 h-24 text-slate-200" />
             </div>
           </div>
         </div>
@@ -117,7 +114,7 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
             </div>
           </div>
           <div className="mt-5 space-y-3 text-sm text-slate-600">
-            {course.outcomes.map((outcome) => (
+            {outcomes.map((outcome) => (
               <div key={outcome} className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
                 {outcome}
               </div>
@@ -134,19 +131,19 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
             </div>
           </div>
           <div className="mt-5 space-y-3 text-sm text-slate-600">
-            {course.assessmentSummary.map((item) => (
+            {assessmentSummary.map((item) => (
               <div key={item} className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
                 {item}
               </div>
             ))}
           </div>
-          {assessment ? (
+          {course.is_active ? (
             <div className="mt-5 space-y-3">
               <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Masuk Sebagai</div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {canAccessParticipantAssessment ? (
                   <Link
-                    href={`/learning/course/${course.slug}/assessment/participant`}
+                    href={`/lms/course/${course.slug}/assessment/participant`}
                     className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-white"
                   >
                     <div className="font-black text-slate-900">Peserta</div>
@@ -162,15 +159,15 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
 
                 {canManageAssessment ? (
                   <Link
-                    href={`/learning/course/${course.slug}/assessment`}
+                    href={`/lms/course/${course.slug}/assessment`}
                     className="rounded-[22px] border border-slate-900 bg-slate-900 p-4 text-sm text-white shadow-lg shadow-slate-200 transition hover:bg-black"
                   >
-                    <div className="font-black">Assessor</div>
+                    <div className="font-black">Penilai</div>
                     <p className="mt-2 leading-6 text-slate-200">
-                      Review submission peserta, isi keputusan akhir, dan pantau status kelulusan.
+                      Review submission peserta, isi keputusan akhir, dan pantau status kelulusan per entitas.
                     </p>
                     <div className="mt-3 inline-flex items-center gap-2 font-black text-white">
-                      Buka Panel Assessor
+                      Buka Panel Penilai
                       <ArrowRight className="h-4 w-4" />
                     </div>
                   </Link>
@@ -193,23 +190,27 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
         </div>
 
         <div className="mt-5 space-y-4">
-          {lessons.map((lesson) => (
+          {lessons.length === 0 ? (
+             <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-sm font-bold text-slate-500">
+               Belum ada lesson yang diunggah ke course ini.
+             </div>
+          ) : lessons.map((lesson: any, idx: number) => (
             <div key={lesson.slug} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex items-start gap-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-sm font-black text-slate-900 shadow-sm">
-                    {lesson.order}
+                    {lesson.sort_order || idx + 1}
                   </div>
                   <div>
                     <h3 className="text-lg font-black text-slate-900">{lesson.title}</h3>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{lesson.summary}</p>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{lesson.summary || 'Tidak ada ringkasan'}</p>
                     <div className="mt-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                      {lesson.estimatedMinutes} menit
+                      15 menit
                     </div>
                   </div>
                 </div>
                 <Link
-                  href={`/learning/course/${course.slug}/lesson/${lesson.slug}`}
+                  href={`/lms/course/${course.slug}/lesson/${lesson.slug}`}
                   className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-emerald-700 shadow-sm ring-1 ring-slate-200 transition hover:text-emerald-800"
                 >
                   Buka Lesson

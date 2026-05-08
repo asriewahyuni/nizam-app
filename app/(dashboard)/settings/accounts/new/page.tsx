@@ -1,7 +1,8 @@
 /**
  * /settings/accounts/new/page.tsx
  * SERVER COMPONENT — checks CoA governance permission at server side.
- * Child/Branch orgs are redirected to the CoA request workflow instead.
+ * Entitas mode INHERITED diarahkan ke workflow request, sedangkan mode LOCAL
+ * tetap menggunakan halaman CoA biasa bila konteks unit aktif belum sesuai.
  */
 
 import type { Metadata } from 'next'
@@ -18,11 +19,11 @@ export default async function NewAccountPage() {
   // Not logged in / no org → onboarding
   if (!orgData) redirect('/onboarding')
 
-  const { canManageDirect } = await checkCanManageCoA(orgData.org.id)
+  const { canManageDirect, managementMode } = await checkCanManageCoA(orgData.org.id)
 
-  // Child / Branch: wajib melalui request workflow, tidak boleh akses halaman ini
+  // Mode INHERITED: wajib melalui request workflow.
   if (!canManageDirect) {
-    redirect('/accounting/coa-requests')
+    redirect(managementMode === 'LOCAL' ? '/settings/accounts' : '/accounting/coa-requests')
   }
 
   // Parent: lanjut ke form

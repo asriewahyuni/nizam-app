@@ -4,13 +4,21 @@
  * coa.actions.ts
  * Aturan Hierarki Pengendalian Rekening:
  *   - PARENT (Holding/Induk) : Dapat membuat/edit/hapus rekening CoA langsung
- *   - CHILD  (Anak Perusahaan): WAJIB ajukan request ke Parent terlebih dahulu
+ *   - CHILD  (Anak Perusahaan):
+ *       • Mode INHERITED → wajib ajukan request ke Parent
+ *       • Mode LOCAL     → dapat kelola CoA sendiri
  *   - BRANCH (Cabang)        : WAJIB ajukan request ke Parent melalui Child
  * Lihat: coa-request.actions.ts untuk alur pengajuan request
  */
 
 import { revalidatePath } from 'next/cache'
-import type { Account, AccountType, NormalBalance, AccountBalance } from '@/types/database.types'
+import type {
+  Account,
+  AccountType,
+  NormalBalance,
+  AccountBalance,
+  CoAManagementMode as DbCoAManagementMode,
+} from '@/types/database.types'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { isInternalAuthProvider } from '@/lib/auth/provider'
 import { setShariahAccountsActive as syncShariahAccountsActive } from './shariah.actions'
@@ -28,10 +36,70 @@ type StandardCoATemplate = {
   parent_code?: string | null
 }
 
+export type CoAManagementMode = DbCoAManagementMode
+
+type CoAManagementContext = {
+  parentOrgId: string | null
+  mode: CoAManagementMode
+  isParentOrg: boolean
+  inheritsParentCoA: boolean
+}
+
 const CORE_PSAK_CODES = ['1000', '2000', '3000', '4000', '5000', '6000'] as const
 
 type SeedInitialCoAOptions = {
   revalidate?: boolean
+}
+
+function normalizeCoAManagementMode(value: unknown): CoAManagementMode {
+  return String(value || '').trim().toUpperCase() === 'LOCAL' ? 'LOCAL' : 'INHERITED'
+}
+
+function isMissingCoAManagementModeColumnError(error: unknown) {
+  const rawMessage = String((error as any)?.message || '').trim().toLowerCase()
+  return rawMessage.includes('coa_management_mode') && rawMessage.includes('column')
+}
+
+async function getCoAManagementContextFromDb(db: any, orgId: string): Promise<CoAManagementContext> {
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) {
+    return {
+      parentOrgId: null,
+      mode: 'INHERITED',
+      isParentOrg: true,
+      inheritsParentCoA: false,
+    }
+  }
+
+  let parentOrgId: string | null = null
+  let mode: CoAManagementMode = 'INHERITED'
+
+  const { data, error } = await db
+    .from('organizations')
+    .select('parent_org_id, coa_management_mode')
+    .eq('id', trimmedOrgId)
+    .maybeSingle()
+
+  if (error && isMissingCoAManagementModeColumnError(error)) {
+    const { data: fallbackData } = await db
+      .from('organizations')
+      .select('parent_org_id')
+      .eq('id', trimmedOrgId)
+      .maybeSingle()
+
+    parentOrgId = String(fallbackData?.parent_org_id || '').trim() || null
+  } else {
+    parentOrgId = String(data?.parent_org_id || '').trim() || null
+    mode = normalizeCoAManagementMode(data?.coa_management_mode)
+  }
+
+  const isParentOrg = !parentOrgId
+  return {
+    parentOrgId,
+    mode,
+    isParentOrg,
+    inheritsParentCoA: Boolean(parentOrgId) && mode !== 'LOCAL',
+  }
 }
 
 const STANDARD_PSAK_COA_TEMPLATE: StandardCoATemplate[] = [
@@ -197,20 +265,35 @@ async function backfillStandardPsaKCoA(orgId: string) {
   return { success: true, insertedCount, updatedCount }
 }
 
-async function getDescendantOrganizationIds(admin: any, parentOrgId: string): Promise<string[]> {
-  const { data, error } = await admin
+async function getInheritedDescendantOrganizationIds(admin: any, parentOrgId: string): Promise<string[]> {
+  let data: any[] = []
+  const { data: orgRows, error } = await admin
     .from('organizations')
-    .select('id, parent_org_id')
+    .select('id, parent_org_id, coa_management_mode')
 
-  if (error || !Array.isArray(data)) return []
+  if (error && isMissingCoAManagementModeColumnError(error)) {
+    const { data: fallbackRows, error: fallbackError } = await admin
+      .from('organizations')
+      .select('id, parent_org_id')
 
-  const childrenByParent = new Map<string, string[]>()
-  for (const row of data as any[]) {
+    if (fallbackError || !Array.isArray(fallbackRows)) return []
+    data = fallbackRows
+  } else {
+    if (error || !Array.isArray(orgRows)) return []
+    data = orgRows
+  }
+
+  const childrenByParent = new Map<string, Array<{ id: string; mode: CoAManagementMode }>>()
+  for (const row of data) {
     const id = String(row?.id || '').trim()
     const parentId = String(row?.parent_org_id || '').trim()
     if (!id || !parentId) continue
+
     const bucket = childrenByParent.get(parentId) || []
-    bucket.push(id)
+    bucket.push({
+      id,
+      mode: normalizeCoAManagementMode(row?.coa_management_mode),
+    })
     childrenByParent.set(parentId, bucket)
   }
 
@@ -219,14 +302,19 @@ async function getDescendantOrganizationIds(admin: any, parentOrgId: string): Pr
   const visited = new Set<string>()
 
   while (queue.length > 0) {
-    const current = queue.shift() as string
-    if (!current || visited.has(current)) continue
-    visited.add(current)
-    descendants.push(current)
+    const current = queue.shift()
+    if (!current?.id || visited.has(current.id)) continue
+    visited.add(current.id)
 
-    const directChildren = childrenByParent.get(current) || []
-    for (const childId of directChildren) {
-      if (!visited.has(childId)) queue.push(childId)
+    if (current.mode === 'LOCAL') {
+      continue
+    }
+
+    descendants.push(current.id)
+
+    const directChildren = childrenByParent.get(current.id) || []
+    for (const child of directChildren) {
+      if (!visited.has(child.id)) queue.push(child)
     }
   }
 
@@ -254,7 +342,7 @@ export async function syncParentAccountToDescendants(
   options?: { previousCode?: string | null }
 ) {
   const admin = await createAdminClient()
-  const descendants = await getDescendantOrganizationIds(admin as any, parentOrgId)
+  const descendants = await getInheritedDescendantOrganizationIds(admin as any, parentOrgId)
   if (descendants.length === 0) return { success: true, syncedOrgCount: 0, errors: [] as string[] }
 
   const errors: string[] = []
@@ -358,6 +446,18 @@ export async function syncParentAccountToDescendants(
 
 export async function syncParentCoAToChildOrg(parentOrgId: string, childOrgId: string) {
   const admin = await createAdminClient()
+  const childContext = await getCoAManagementContextFromDb(admin as any, childOrgId)
+
+  if (!childContext.inheritsParentCoA) {
+    return {
+      success: true,
+      syncedCount: 0,
+      skipped: true,
+      reason: childContext.isParentOrg
+        ? 'Organisasi target adalah organisasi induk.'
+        : 'Entitas anak menggunakan mode CoA lokal.',
+    }
+  }
 
   const { data: parentAccounts, error: parentAccountsError } = await (admin as any)
     .from('accounts')
@@ -433,7 +533,7 @@ export async function syncParentCoAToChildOrg(parentOrgId: string, childOrgId: s
 
 async function propagateDeletedParentAccountToDescendants(parentOrgId: string, deletedCode: string) {
   const admin = await createAdminClient()
-  const descendants = await getDescendantOrganizationIds(admin as any, parentOrgId)
+  const descendants = await getInheritedDescendantOrganizationIds(admin as any, parentOrgId)
   if (descendants.length === 0) return { success: true, syncedOrgCount: 0, errors: [] as string[] }
 
   const errors: string[] = []
@@ -491,33 +591,34 @@ export async function getChartOfAccounts(orgId: string) {
 
 // ─────────────────────────────────────────────────────────────
 // checkCanManageCoA — Cek apakah org saat ini bisa buat akun
-// langsung (Parent), atau harus lewat sistem request (Child/Branch)
+// langsung (Parent / Child LOCAL), atau harus lewat sistem request.
 // ─────────────────────────────────────────────────────────────
 export async function checkCanManageCoA(orgId: string): Promise<{
   canManageDirect: boolean
   isParentOrg: boolean
+  managementMode: CoAManagementMode
 }> {
   const supabase = await createClient()
-  const { data: orgRow, error: orgError } = await (supabase as any)
-    .from('organizations')
-    .select('parent_org_id')
-    .eq('id', orgId)
-    .maybeSingle()
+  const orgContext = await getCoAManagementContextFromDb(supabase as any, orgId)
+  const isParentOrgByTree = orgContext.isParentOrg
+  const isLocalCoAOrg = !orgContext.isParentOrg && orgContext.mode === 'LOCAL'
 
-  const parentOrgId = String((orgRow as { parent_org_id?: string | null } | null)?.parent_org_id || '').trim() || null
-  const isParentOrgByTree = !parentOrgId
-
-  if (isInternalAuthProvider() && orgRow && !orgError) {
+  if (isInternalAuthProvider()) {
     return {
-      canManageDirect: isParentOrgByTree,
+      canManageDirect: isParentOrgByTree || isLocalCoAOrg,
       isParentOrg: isParentOrgByTree,
+      managementMode: orgContext.mode,
     }
   }
 
   const rpc = (supabase as any)?.rpc
 
   if (typeof rpc !== 'function') {
-    return { canManageDirect: isParentOrgByTree, isParentOrg: isParentOrgByTree }
+    return {
+      canManageDirect: isParentOrgByTree || isLocalCoAOrg,
+      isParentOrg: isParentOrgByTree,
+      managementMode: orgContext.mode,
+    }
   }
 
   const [manageResult, parentResult] = await Promise.all([
@@ -532,33 +633,22 @@ export async function checkCanManageCoA(orgId: string): Promise<{
     return {
       canManageDirect: manageResult.data === true,
       isParentOrg: parentResult.data === true,
+      managementMode: orgContext.mode,
     }
   }
 
   const fallbackIsParentOrg = isParentOrgByTree
 
-  if (orgError || !orgRow) {
-    ;(console as any).warn('checkCanManageCoA fallback warning:', {
-      orgId,
-      manageRpcError: manageResult?.error || null,
-      parentRpcError: parentResult?.error || null,
-      orgLookupError: orgError || null,
-    })
-    return {
-      canManageDirect: manageResult?.data === true,
-      isParentOrg: parentResult?.data === true,
-    }
-  }
-
   // Internal auth memakai service role; fallback parent check lebih stabil bila RPC governance belum sinkron.
   const fallbackCanManageDirect = isInternalAuthProvider()
-    ? fallbackIsParentOrg
-    : (hasManageBoolean ? manageResult.data === true : false)
+    ? (fallbackIsParentOrg || isLocalCoAOrg)
+    : (hasManageBoolean ? manageResult.data === true : (fallbackIsParentOrg || isLocalCoAOrg))
 
   ;(console as any).warn('checkCanManageCoA using fallback:', {
     orgId,
     isInternal: isInternalAuthProvider(),
     fallbackIsParentOrg,
+    managementMode: orgContext.mode,
     manageRpcError: manageResult?.error || null,
     parentRpcError: parentResult?.error || null,
   })
@@ -566,27 +656,30 @@ export async function checkCanManageCoA(orgId: string): Promise<{
   return {
     canManageDirect: fallbackCanManageDirect,
     isParentOrg: fallbackIsParentOrg,
+    managementMode: orgContext.mode,
   }
 }
 
 // ─────────────────────────────────────────────────────────────
 // createAccount — Add a custom account to CoA
-// HANYA untuk Parent/Holding. Child/Branch gunakan:
-// → submitCoaRequest() di coa-request.actions.ts
+// HANYA untuk org yang boleh manage CoA langsung
+// (Holding/Parent atau Child mode LOCAL).
 // ─────────────────────────────────────────────────────────────
 export async function createAccount(orgId: string, formData: FormData) {
   const supabase = await createClient()
+  const orgContext = await getCoAManagementContextFromDb(supabase as any, orgId)
 
-  // ── Validasi Hierarki: Hanya Parent yang boleh buat akun langsung ──
+  // ── Validasi Hierarki: hanya org direct-manage yang boleh buat akun langsung ──
   const { data: canManage, error: permError } = await (supabase as any)
     .rpc('can_manage_finance_master', { p_org_id: orgId })
 
   if (permError || !canManage) {
+    const requiresMainUnitContext = orgContext.isParentOrg || orgContext.mode === 'LOCAL'
     return {
-      error:
-        'Hanya Organisasi Utama (Parent/Holding) pada konteks Unit Utama yang dapat membuat rekening CoA secara langsung. ' +
-        'Silakan ajukan melalui menu "Pengajuan Rekening CoA".',
-      requiresRequest: true,
+      error: requiresMainUnitContext
+        ? 'Pindah ke konteks Unit Utama organisasi aktif terlebih dahulu untuk membuat rekening CoA secara langsung.'
+        : 'Organisasi ini masih memakai CoA terpusat. Silakan ajukan melalui menu "Pengajuan Rekening CoA".',
+      requiresRequest: !requiresMainUnitContext,
     }
   }
 
@@ -634,7 +727,7 @@ export async function createAccount(orgId: string, formData: FormData) {
     success: true,
     warning: syncResult.success
       ? null
-      : 'Akun parent berhasil disimpan, tetapi sinkronisasi ke sebagian cabang/anak belum sempurna.',
+      : 'Akun berhasil disimpan, tetapi sinkronisasi ke sebagian entitas turunan belum sempurna.',
   }
 }
 
@@ -826,17 +919,11 @@ export async function seedInitialCoA(orgId: string, options?: SeedInitialCoAOpti
   if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
   const shouldRevalidate = options?.revalidate !== false
 
-  const { data: orgRow } = await (supabase as any)
-    .from('organizations')
-    .select('parent_org_id')
-    .eq('id', trimmedOrgId)
-    .maybeSingle()
+  const orgContext = await getCoAManagementContextFromDb(supabase as any, trimmedOrgId)
 
-  const parentOrgId = String(orgRow?.parent_org_id || '').trim() || null
-
-  // Child/cabang entity: CoA wajib mengikuti parent (bukan seed PSAK mandiri).
-  if (parentOrgId) {
-    const syncResult = await syncParentCoAToChildOrg(parentOrgId, trimmedOrgId)
+  // Child mode INHERITED: CoA mengikuti parent (bukan seed PSAK mandiri).
+  if (orgContext.inheritsParentCoA && orgContext.parentOrgId) {
+    const syncResult = await syncParentCoAToChildOrg(orgContext.parentOrgId, trimmedOrgId)
     if (!syncResult.success) {
       return { error: syncResult.error || 'Gagal sinkron CoA dari parent.' }
     }

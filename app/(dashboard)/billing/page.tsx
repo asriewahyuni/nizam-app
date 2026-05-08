@@ -886,13 +886,7 @@ function BillingContent() {
                ) : (
                  <div className="grid gap-4 xl:grid-cols-[auto_1fr] xl:items-center">
                    <div className="flex flex-wrap items-center gap-3">
-                     <button
-                       type="button"
-                       onClick={() => scrollToSection('billing-provisioning')}
-                       className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-black text-white transition hover:bg-slate-900 shadow-lg shadow-indigo-200"
-                     >
-                       <ShieldCheck size={18} /> Buka Provisioning
-                     </button>
+
                      <button
                        type="button"
                        onClick={() => scrollToSection('billing-history')}
@@ -935,6 +929,7 @@ function BillingContent() {
         </div>
       </section>
 
+      {false && (
       <section id="billing-provisioning" className="rounded-[40px] border border-slate-100 bg-white p-6 md:p-8 shadow-xl shadow-slate-200/50">
         <div className="flex flex-col gap-3 border-b border-slate-100 pb-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-indigo-700">
@@ -1354,6 +1349,8 @@ function BillingContent() {
           </div>
         </div>
       </section>
+      )}
+
 
       {/* History Penagihan */}
       <section id="billing-history" className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
