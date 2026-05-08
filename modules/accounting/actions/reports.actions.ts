@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { unstable_noStore as noStore } from 'next/cache'
 import { cache } from 'react'
 import { addDaysToDateString, diffDateOnlyStrings, getDateInTimeZone } from '@/lib/utils'
+import { hydratePurchaseTransparencyForEntries } from '@/modules/accounting/lib/purchase-ledger-transparency'
 import type { BranchSummary } from '@/modules/organization/lib/org-context'
 
 type BranchFilter = string | null | undefined
@@ -26,13 +27,26 @@ type CashFlowLine = {
     description?: string | null
     notes?: string | null
     reference_type?: string | null
+    reference_id?: string | null
+    entry_date?: string | null
   } | null
+}
+
+type CashFlowItemDetail = {
+  entryId: string
+  entryDate: string | null
+  amount: number
+  description: string
+  notes: string | null
+  referenceType: string | null
+  referenceLabel: string | null
 }
 
 type CashFlowItem = {
   code: string
   name: string
   amount: number
+  details: CashFlowItemDetail[]
 }
 
 type CashFlowOptions = {
@@ -480,6 +494,10 @@ function formatDirectCashFlowItemName(line: CashFlowLine | null, category: CashF
   }
 
   if (code === '1201') {
+    if (referenceType === 'SAAS_CASH_IN') {
+      return isInflow ? 'Penerimaan Penjualan SaaS' : 'Pengembalian Penjualan SaaS'
+    }
+
     if (isGl1201Adjustment) {
       return isInflow
         ? 'Penerimaan Rekonsiliasi Piutang Usaha (GL 1201)'
@@ -572,6 +590,24 @@ function formatDirectCashFlowItemName(line: CashFlowLine | null, category: CashF
   return isInflow ? `Penerimaan ${baseName}` : `Pembayaran ${baseName}`
 }
 
+function buildCashFlowReferenceKey(
+  referenceTypeRaw: string | null | undefined,
+  referenceIdRaw: string | null | undefined
+) {
+  const referenceType = String(referenceTypeRaw || '').trim().toUpperCase()
+  const referenceId = String(referenceIdRaw || '').trim()
+  if (!referenceType || !referenceId) return null
+  return `${referenceType}:${referenceId}`
+}
+
+function formatCashFlowReferenceLabel(parts: Array<string | null | undefined>) {
+  const compactParts = parts
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+
+  return compactParts.length > 0 ? compactParts.join(' • ') : null
+}
+
 async function getJournalLinesForEntries(
   db: any,
   entryIds: string[],
@@ -593,9 +629,11 @@ async function getJournalLinesForEntries(
       a.normal_balance AS account_normal_balance,
       a.parent_id AS account_parent_id,
       a.cash_flow_category AS account_cash_flow_category,
+      je.entry_date AS je_entry_date,
       je.description AS je_description,
       je.notes AS je_notes,
-      je.reference_type AS je_reference_type
+      je.reference_type AS je_reference_type,
+      je.reference_id AS je_reference_id
     FROM public.journal_lines jl
     JOIN public.accounts a ON a.id = jl.account_id
     JOIN public.journal_entries je ON je.id = jl.entry_id
@@ -624,9 +662,11 @@ async function getJournalLinesForEntries(
         cash_flow_category: r.account_cash_flow_category as CashFlowCategory | undefined
       } : null,
       journal_entries: {
+        entry_date: r.je_entry_date ? String(r.je_entry_date) : undefined,
         description: r.je_description ? String(r.je_description) : undefined,
         notes: r.je_notes ? String(r.je_notes) : undefined,
         reference_type: r.je_reference_type ? String(r.je_reference_type) : undefined,
+        reference_id: r.je_reference_id ? String(r.je_reference_id) : undefined,
       }
     }))
   } catch (err) {
@@ -635,7 +675,180 @@ async function getJournalLinesForEntries(
   }
 }
 
-function summarizeCashFlowFromLines(lines: CashFlowLine[], cashAccountCodes: string[]) {
+async function getCashFlowReferenceLabels(lines: CashFlowLine[]) {
+  const referenceIdsByType = new Map<string, Set<string>>()
+
+  for (const line of lines) {
+    const referenceType = String(line?.journal_entries?.reference_type || '').trim().toUpperCase()
+    const referenceId = String(line?.journal_entries?.reference_id || '').trim()
+    if (!referenceType || !referenceId) continue
+
+    const existing = referenceIdsByType.get(referenceType) || new Set<string>()
+    existing.add(referenceId)
+    referenceIdsByType.set(referenceType, existing)
+  }
+
+  if (referenceIdsByType.size === 0) {
+    return new Map<string, string>()
+  }
+
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const labelMap = new Map<string, string>()
+
+  const saleIds = Array.from(referenceIdsByType.get('SALE') || [])
+  if (saleIds.length > 0) {
+    try {
+      const { rows } = await queryPostgres<Record<string, unknown>>(
+        `
+          SELECT id, sale_number
+          FROM public.sales
+          WHERE id = ANY($1::uuid[])
+        `,
+        [saleIds]
+      )
+
+      rows.forEach((row) => {
+        const referenceId = String(row.id || '').trim()
+        if (!referenceId) return
+        const label = formatCashFlowReferenceLabel([String(row.sale_number || '').trim()])
+        if (!label) return
+        labelMap.set(`SALE:${referenceId}`, label)
+      })
+    } catch (err) {
+      ;(console as any).error('[getCashFlowReferenceLabels:sales]', err)
+    }
+  }
+
+  const purchaseIds = Array.from(referenceIdsByType.get('PURCHASE') || [])
+  if (purchaseIds.length > 0) {
+    try {
+      const { rows } = await queryPostgres<Record<string, unknown>>(
+        `
+          SELECT id, purchase_number
+          FROM public.purchases
+          WHERE id = ANY($1::uuid[])
+        `,
+        [purchaseIds]
+      )
+
+      rows.forEach((row) => {
+        const referenceId = String(row.id || '').trim()
+        if (!referenceId) return
+        const label = formatCashFlowReferenceLabel([String(row.purchase_number || '').trim()])
+        if (!label) return
+        labelMap.set(`PURCHASE:${referenceId}`, label)
+      })
+    } catch (err) {
+      ;(console as any).error('[getCashFlowReferenceLabels:purchases]', err)
+    }
+  }
+
+  const paymentInIds = Array.from(referenceIdsByType.get('PAYMENT_IN') || [])
+  if (paymentInIds.length > 0) {
+    try {
+      const { rows } = await queryPostgres<Record<string, unknown>>(
+        `
+          SELECT
+            sp.id,
+            sp.payment_number,
+            s.sale_number
+          FROM public.sales_payments sp
+          LEFT JOIN public.sales s ON s.id = sp.sale_id
+          WHERE sp.id = ANY($1::uuid[])
+        `,
+        [paymentInIds]
+      )
+
+      rows.forEach((row) => {
+        const referenceId = String(row.id || '').trim()
+        if (!referenceId) return
+        const label = formatCashFlowReferenceLabel([
+          String(row.payment_number || '').trim(),
+          String(row.sale_number || '').trim(),
+        ])
+        if (!label) return
+        labelMap.set(`PAYMENT_IN:${referenceId}`, label)
+      })
+    } catch (err) {
+      ;(console as any).error('[getCashFlowReferenceLabels:sales_payments]', err)
+    }
+  }
+
+  const purchasePaymentIds = Array.from(new Set([
+    ...Array.from(referenceIdsByType.get('PURCHASE_PAYMENT') || []),
+    ...Array.from(referenceIdsByType.get('PAYMENT_OUT') || []),
+  ]))
+  if (purchasePaymentIds.length > 0) {
+    const purchasePaymentIdSet = referenceIdsByType.get('PURCHASE_PAYMENT') || new Set<string>()
+    const paymentOutIdSet = referenceIdsByType.get('PAYMENT_OUT') || new Set<string>()
+
+    try {
+      const { rows } = await queryPostgres<Record<string, unknown>>(
+        `
+          SELECT
+            pp.id,
+            pp.payment_number,
+            p.purchase_number
+          FROM public.purchase_payments pp
+          LEFT JOIN public.purchases p ON p.id = pp.purchase_id
+          WHERE pp.id = ANY($1::uuid[])
+        `,
+        [purchasePaymentIds]
+      )
+
+      rows.forEach((row) => {
+        const referenceId = String(row.id || '').trim()
+        if (!referenceId) return
+        const label = formatCashFlowReferenceLabel([
+          String(row.payment_number || '').trim(),
+          String(row.purchase_number || '').trim(),
+        ])
+        if (!label) return
+        if (purchasePaymentIdSet.has(referenceId)) {
+          labelMap.set(`PURCHASE_PAYMENT:${referenceId}`, label)
+        }
+        if (paymentOutIdSet.has(referenceId)) {
+          labelMap.set(`PAYMENT_OUT:${referenceId}`, label)
+        }
+      })
+    } catch (err) {
+      ;(console as any).error('[getCashFlowReferenceLabels:purchase_payments]', err)
+    }
+  }
+
+  return labelMap
+}
+
+function buildCashFlowItemDetail(
+  line: CashFlowLine | null,
+  amount: number,
+  fallbackDescription: string,
+  referenceLabels: Map<string, string>
+): CashFlowItemDetail {
+  const entryId = String(line?.entry_id || '').trim() || fallbackDescription
+  const entryDate = String(line?.journal_entries?.entry_date || '').trim() || null
+  const description = String(line?.journal_entries?.description || '').trim() || fallbackDescription
+  const notes = String(line?.journal_entries?.notes || '').trim() || null
+  const referenceType = String(line?.journal_entries?.reference_type || '').trim().toUpperCase() || null
+  const referenceId = String(line?.journal_entries?.reference_id || '').trim() || null
+  const referenceKey = buildCashFlowReferenceKey(referenceType, referenceId)
+
+  return {
+    entryId,
+    entryDate,
+    amount,
+    description,
+    notes,
+    referenceType,
+    referenceLabel: referenceKey ? referenceLabels.get(referenceKey) || null : null,
+  }
+}
+
+function summarizeCashFlowFromLines(
+  lines: CashFlowLine[],
+  cashAccountCodes: string[],
+  referenceLabels: Map<string, string> = new Map()
+) {
   if (lines.length === 0) {
     return {
       ocf: 0,
@@ -679,15 +892,18 @@ function summarizeCashFlowFromLines(lines: CashFlowLine[], cashAccountCodes: str
     const primaryLine = resolvePrimaryCashFlowLine(nonCashLines, cashAccountCodes, category, cashAmount)
     const code = String(primaryLine?.accounts?.code || category.slice(0, 3)).trim() || category.slice(0, 3)
     const itemName = formatDirectCashFlowItemName(primaryLine, category, cashAmount)
+    const detail = buildCashFlowItemDetail(primaryLine, cashAmount, itemName, referenceLabels)
     const itemKey = `${category}:${code}:${itemName}`
     const existingItem = itemMap.get(itemKey)
     if (existingItem) {
       existingItem.amount += cashAmount
+      existingItem.details.push(detail)
     } else {
       itemMap.set(itemKey, {
         code,
         name: itemName,
         amount: cashAmount,
+        details: [detail],
       })
     }
 
@@ -699,7 +915,20 @@ function summarizeCashFlowFromLines(lines: CashFlowLine[], cashAccountCodes: str
   const toSortedItems = (category: CashFlowCategory) =>
     Array.from(itemMap.entries())
       .filter(([key]) => key.startsWith(`${category}:`))
-      .map(([, item]) => item)
+      .map(([, item]) => ({
+        ...item,
+        details: item.details
+          .filter((detail) => Math.abs(detail.amount) > 0.01)
+          .sort((left, right) => {
+            const byDate = String(right.entryDate || '').localeCompare(String(left.entryDate || ''))
+            if (byDate !== 0) return byDate
+
+            const byMagnitude = Math.abs(right.amount) - Math.abs(left.amount)
+            if (byMagnitude !== 0) return byMagnitude
+
+            return left.description.localeCompare(right.description, 'id-ID')
+          }),
+      }))
       .filter((item) => Math.abs(item.amount) > 0.01)
       .sort((a, b) => a.code.localeCompare(b.code))
 
@@ -768,10 +997,17 @@ export async function getGeneralLedger(orgId: string, branchId?: BranchFilter, c
     }
   }
 
-  return entryRows.map((row) => ({
+  const entries = entryRows.map((row) => ({
     ...row,
     journal_lines: linesByEntryId[String(row.id ?? '')] ?? []
   }))
+
+  try {
+    return await hydratePurchaseTransparencyForEntries(entries, queryPostgres)
+  } catch (err) {
+    ;(console as any).error('[getGeneralLedger] purchase transparency hydrate error:', err)
+    return entries.map((entry) => ({ ...entry, purchase_transparency: null }))
+  }
 }
 
 
@@ -977,7 +1213,8 @@ export async function getCashFlow(
     getJournalLinesForEntries(db, previousEntryIds, cashAccountCodes),
   ])
 
-  const currentSummary = summarizeCashFlowFromLines(currentLines, cashAccountCodes)
+  const referenceLabels = await getCashFlowReferenceLabels(currentLines)
+  const currentSummary = summarizeCashFlowFromLines(currentLines, cashAccountCodes, referenceLabels)
   const previousChangeTotal = previousCashLines.reduce(
     (sum: number, line: CashFlowLine) => sum + (Number(line.debit || 0) - Number(line.credit || 0)),
     0

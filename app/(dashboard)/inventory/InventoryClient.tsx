@@ -3,14 +3,14 @@
 import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, Package, X, Edit, Trash2, AlertTriangle, Calendar, Info, ShoppingCart, History as HistoryIcon, Search, TrendingUp, Wallet, Clock, Box } from 'lucide-react'
-import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
+import { Plus, Package, X, Edit, Trash2, AlertTriangle, Info, History as HistoryIcon, Search, TrendingUp, Wallet, Box } from 'lucide-react'
+import { PageHeader, StatCard, SectionCard, SectionHeader, SafeButton } from '@/components/ui/NizamUI'
 import { createProduct, updateProduct, deleteProduct, createInventoryAdjustment, createInventoryTransfer, getWarehouseStocks, getProductByBarcode } from '@/modules/inventory/actions/inventory.actions'
 import { BarcodeScanner } from '@/components/shared/BarcodeScanner'
 import type { InventoryMutationRow, InventoryWarehouseStockRow, ProductWithStock } from '@/modules/inventory/actions/inventory.actions'
 import { formatDate, formatRupiah } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeftRight, ArrowRight, CheckCircle2, ChevronDown, ListChecks, Printer, Barcode as BarcodeIcon } from 'lucide-react'
+import { ArrowLeftRight, ArrowRight, CheckCircle2, ChevronDown, ListChecks, Printer } from 'lucide-react'
 import { BarcodeLabel } from '@/components/shared/BarcodeLabel'
 
 interface InventoryClientProps {
@@ -24,6 +24,114 @@ interface InventoryClientProps {
 }
 
 type InventoryCategoryFilter = 'ALL' | 'RAW' | 'WIP' | 'FG' | 'OTHER'
+type InventorySortOption =
+  | 'updated-desc'
+  | 'name-asc'
+  | 'name-desc'
+  | 'stock-desc'
+  | 'stock-asc'
+  | 'value-desc'
+  | 'value-asc'
+  | 'purchase-desc'
+  | 'selling-desc'
+
+const inventorySortOptions: Array<{ value: InventorySortOption; label: string }> = [
+  { value: 'updated-desc', label: 'Update Terakhir' },
+  { value: 'name-asc', label: 'Nama A-Z' },
+  { value: 'name-desc', label: 'Nama Z-A' },
+  { value: 'stock-desc', label: 'Stok Terbanyak' },
+  { value: 'stock-asc', label: 'Stok Tersedikit' },
+  { value: 'value-desc', label: 'Nilai Aset Tertinggi' },
+  { value: 'value-asc', label: 'Nilai Aset Terendah' },
+  { value: 'purchase-desc', label: 'Modal Tertinggi' },
+  { value: 'selling-desc', label: 'Harga Jual Tertinggi' },
+]
+
+function compareInventoryText(left: string | null | undefined, right: string | null | undefined) {
+  return String(left || '').localeCompare(String(right || ''), 'id-ID', { sensitivity: 'base' })
+}
+
+function compareInventoryNumber(left: number | null | undefined, right: number | null | undefined, direction: 'asc' | 'desc') {
+  const leftValue = Number(left || 0)
+  const rightValue = Number(right || 0)
+
+  if (leftValue === rightValue) return 0
+  return direction === 'asc' ? leftValue - rightValue : rightValue - leftValue
+}
+
+function compareInventoryDate(left: string | null | undefined, right: string | null | undefined, direction: 'asc' | 'desc') {
+  const leftValue = left ? new Date(left).getTime() : 0
+  const rightValue = right ? new Date(right).getTime() : 0
+
+  if (leftValue === rightValue) return 0
+  return direction === 'asc' ? leftValue - rightValue : rightValue - leftValue
+}
+
+// Menjaga daftar inventori tetap rapi walau ada data baru dari form tambah atau edit.
+function sortInventoryProducts(items: ProductWithStock[], sort: InventorySortOption) {
+  return [...items].sort((left, right) => {
+    switch (sort) {
+      case 'updated-desc': {
+        const byUpdated = compareInventoryDate(left.updated_at, right.updated_at, 'desc')
+        if (byUpdated !== 0) return byUpdated
+        const byCreated = compareInventoryDate(left.created_at, right.created_at, 'desc')
+        if (byCreated !== 0) return byCreated
+        break
+      }
+      case 'name-desc': {
+        const byName = compareInventoryText(right.name, left.name)
+        if (byName !== 0) return byName
+        break
+      }
+      case 'stock-desc': {
+        const byStock = compareInventoryNumber(left.stock_available, right.stock_available, 'desc')
+        if (byStock !== 0) return byStock
+        const byValue = compareInventoryNumber(left.stock_value, right.stock_value, 'desc')
+        if (byValue !== 0) return byValue
+        break
+      }
+      case 'stock-asc': {
+        const byStock = compareInventoryNumber(left.stock_available, right.stock_available, 'asc')
+        if (byStock !== 0) return byStock
+        const byValue = compareInventoryNumber(left.stock_value, right.stock_value, 'asc')
+        if (byValue !== 0) return byValue
+        break
+      }
+      case 'value-desc': {
+        const byValue = compareInventoryNumber(left.stock_value, right.stock_value, 'desc')
+        if (byValue !== 0) return byValue
+        const byStock = compareInventoryNumber(left.stock_available, right.stock_available, 'desc')
+        if (byStock !== 0) return byStock
+        break
+      }
+      case 'value-asc': {
+        const byValue = compareInventoryNumber(left.stock_value, right.stock_value, 'asc')
+        if (byValue !== 0) return byValue
+        const byStock = compareInventoryNumber(left.stock_available, right.stock_available, 'asc')
+        if (byStock !== 0) return byStock
+        break
+      }
+      case 'purchase-desc': {
+        const byPurchase = compareInventoryNumber(left.purchase_price, right.purchase_price, 'desc')
+        if (byPurchase !== 0) return byPurchase
+        break
+      }
+      case 'selling-desc': {
+        const bySelling = compareInventoryNumber(left.selling_price, right.selling_price, 'desc')
+        if (bySelling !== 0) return bySelling
+        break
+      }
+      default: {
+        const byName = compareInventoryText(left.name, right.name)
+        if (byName !== 0) return byName
+      }
+    }
+
+    const byName = compareInventoryText(left.name, right.name)
+    if (byName !== 0) return byName
+    return compareInventoryText(left.sku, right.sku)
+  })
+}
 
 function getInventoryCategoryMeta(category?: string | null) {
   if (category === 'Bahan') {
@@ -181,6 +289,7 @@ export default function InventoryClient({
   const [editId, setEditId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<InventoryCategoryFilter>('ALL')
+  const [productSort, setProductSort] = useState<InventorySortOption>('updated-desc')
   
   // Real-time stocks per warehouse
   const [whStocks, setWhStocks] = useState<{warehouse_id: string, quantity: number, warehouse_name?: string}[]>([])
@@ -394,7 +503,7 @@ export default function InventoryClient({
     if (!confirm(`Hapus produk "${name}"?`)) return
     try {
       await deleteProduct(id, orgId)
-      setProducts(products.filter(p => p.id !== id))
+      setProducts((current) => current.filter((p) => p.id !== id))
     } catch (e: any) {
       alert("Gagal menghapus produk: " + e.message)
     }
@@ -427,7 +536,9 @@ export default function InventoryClient({
           return
         }
         
-        if (result?.data) setProducts(products.map(p => p.id === editId ? { ...p, ...result.data } : p))
+        if (result?.data) {
+          setProducts((current) => current.map((p) => p.id === editId ? { ...p, ...result.data } : p))
+        }
       } else {
         const result = (await createProduct({
           org_id: orgId,
@@ -446,7 +557,9 @@ export default function InventoryClient({
           return
         }
 
-        if (result?.data) setProducts([{ ...result.data, stock_in: 0, stock_out: 0, stock_available: 0, stock_value: 0 }, ...products])
+        if (result?.data) {
+          setProducts((current) => [{ ...result.data, stock_in: 0, stock_out: 0, stock_available: 0, stock_value: 0 }, ...current])
+        }
       }
       setIsModalOpen(false)
     } catch (error: any) {
@@ -516,19 +629,23 @@ export default function InventoryClient({
   ]
 
   const normalizedSearchTerm = searchTerm.trim().toLowerCase()
-  const filteredProducts = products.filter((product) => {
-    const categoryMeta = getInventoryCategoryMeta(product.category)
-    const matchesCategory = matchesInventoryCategoryFilter(product, activeCategoryFilter)
-    if (!matchesCategory) return false
+  const filteredProducts = sortInventoryProducts(
+    products.filter((product) => {
+      const categoryMeta = getInventoryCategoryMeta(product.category)
+      const matchesCategory = matchesInventoryCategoryFilter(product, activeCategoryFilter)
+      if (!matchesCategory) return false
 
-    return matchesInventorySearch([
-      product.name,
-      product.sku,
-      product.category,
-      product.unit,
-      categoryMeta.label,
-    ], normalizedSearchTerm)
-  })
+      return matchesInventorySearch([
+        product.name,
+        product.sku,
+        product.category,
+        product.unit,
+        categoryMeta.label,
+      ], normalizedSearchTerm)
+    }),
+    productSort
+  )
+  const sortedProductsByName = sortInventoryProducts(products, 'name-asc')
 
   const filteredWarehouseSnapshot = warehouseSnapshot.filter((row) => {
     const categoryMeta = getInventoryCategoryMeta(row.product_category)
@@ -589,6 +706,7 @@ export default function InventoryClient({
   }
 
   const activeFilterLabel = categoryFilterOptions.find((option) => option.value === activeCategoryFilter)?.label || 'Semua'
+  const activeSortLabel = inventorySortOptions.find((option) => option.value === productSort)?.label || 'Update Terakhir'
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto space-y-12 pb-24">
@@ -670,16 +788,33 @@ export default function InventoryClient({
       <SectionCard>
         <SectionHeader 
           title="Daftar Inventori"
-          subtitle={`Manajemen persediaan barang dan nilai aset real-time. Scope aktif: ${activeFilterLabel.toLowerCase()}${normalizedSearchTerm ? `, pencarian "${searchTerm.trim()}"` : ''}.`}
+          subtitle={`Manajemen persediaan barang dan nilai aset real-time. Scope aktif: ${activeFilterLabel.toLowerCase()}${normalizedSearchTerm ? `, pencarian "${searchTerm.trim()}"` : ''}. Urutan saat ini: ${activeSortLabel.toLowerCase()}.`}
           actions={
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Cari nama produk, SKU, kategori..."
-                className="pl-9 pr-4 py-2 text-[10px] font-bold border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-100 transition-all outline-none w-64"
-              />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Cari nama produk, SKU, kategori..."
+                  className="w-64 rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-4 text-[10px] font-bold outline-none transition-all focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                <ListChecks size={14} className="text-slate-400" />
+                <select
+                  value={productSort}
+                  onChange={(e) => setProductSort(e.target.value as InventorySortOption)}
+                  className="bg-transparent text-[10px] font-black uppercase tracking-[0.14em] text-slate-600 outline-none"
+                  aria-label="Urutkan data inventori"
+                >
+                  {inventorySortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           }
         />
@@ -1155,20 +1290,20 @@ export default function InventoryClient({
                       <select required value={adjForm.product_id} 
                         onChange={async (e) => {
                           const id = e.target.value
-                          const p = products.find((x: any) => x.id === id)
+                          const p = products.find((x) => x.id === id)
                           const stocks = await handleFetchWhStocks(id)
-                          const curQty = stocks?.find((s: any) => s.warehouse_id === adjForm.warehouse_id)?.quantity || 0
+                          const curQty = stocks?.find((s) => s.warehouse_id === adjForm.warehouse_id)?.quantity || 0
                           setAdjForm({
                             ...adjForm,
                             product_id: id,
                             current_qty: curQty,
-                            unit_cost: Number((p as any)?.average_cost ?? p?.purchase_price ?? 0),
+                            unit_cost: Number(p?.average_cost ?? p?.purchase_price ?? 0),
                           })
                         }} 
                         className="w-full px-5 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-bold outline-none focus:ring-2 focus:ring-emerald-100 appearance-none"
                       >
                           <option value="">-- Manual Select --</option>
-                          {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} (Stok: {p.stock_available})</option>)}
+                          {sortedProductsByName.map((p) => <option key={p.id} value={p.id}>{p.name} (Stok: {p.stock_available})</option>)}
                       </select>
                     </div>
 
@@ -1225,7 +1360,7 @@ export default function InventoryClient({
                         setTrfForm({...trfForm, product_id: id})
                       }} className="w-full px-5 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-bold outline-none">
                           <option value="">-- Pilih Barang --</option>
-                          {products.map(p => <option key={p.id} value={p.id}>{p.name} (Total Stok: {p.stock_available})</option>)}
+                          {sortedProductsByName.map(p => <option key={p.id} value={p.id}>{p.name} (Total Stok: {p.stock_available})</option>)}
                       </select>
                     </div>
 

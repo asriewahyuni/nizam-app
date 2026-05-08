@@ -1,12 +1,15 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, FileText, Send, AlertCircle, Trash2, Printer, ArrowRight, XCircle } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createQuotation, convertQuotationToOrder } from '@/modules/sales/actions/sales.actions'
+import { createContact } from '@/modules/contacts/actions/contact.actions'
+import { getUsableSalesPromoByCode } from '@/modules/sales/actions/promo.actions'
 import { formatRupiah } from '@/lib/utils'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
+import type { SalesPromoRecord } from '@/modules/sales/lib/sales-promos'
 
 type MaybeRelation<T> = T | T[] | null | undefined
 
@@ -20,6 +23,15 @@ type ProductOption = {
   name: string
   selling_price?: number | null
   unit?: string | null
+}
+
+type CustomerFormState = {
+  name: string
+  email: string
+  phone: string
+  phone_wa: string
+  instagram: string
+  address: string
 }
 
 type QuotationLine = {
@@ -66,6 +78,17 @@ type DraftLine = {
   discount_amount: number
 }
 
+type HeaderDiscountMode = 'FIXED' | 'PERCENT'
+
+function sanitizeDraftNumber(value: string | number, fallback = 0): number {
+  const parsed = typeof value === 'number' ? value : Number.parseFloat(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function getSafeLineNumber(value: number | null | undefined): number {
+  return Number.isFinite(value) ? Number(value) : 0
+}
+
 function pickRelation<T>(value: MaybeRelation<T>): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
@@ -108,11 +131,35 @@ function createDraftLine(): DraftLine {
   }
 }
 
-const PROMOS = [
-  { code: 'RAMADHAN24', type: 'PERCENT', value: 10, status: 'ACTIVE' },
-  { code: 'NEWCUSTOMER', type: 'FIXED', value: 50000, status: 'ACTIVE' },
-  { code: 'HARBOLSALE', type: 'PERCENT', value: 15, status: 'EXPIRED' },
-] as const
+function sortContactOptions(items: ContactOption[]) {
+  return [...items].sort((left, right) => left.name.localeCompare(right.name, 'id', { sensitivity: 'base' }))
+}
+
+function createEmptyCustomerForm(): CustomerFormState {
+  return {
+    name: '',
+    email: '',
+    phone: '',
+    phone_wa: '',
+    instagram: '',
+    address: '',
+  }
+}
+
+function calculateHeaderDiscount(baseAmount: number, mode: HeaderDiscountMode, value: number): number {
+  const normalizedBase = Math.max(0, sanitizeDraftNumber(baseAmount))
+  const normalizedValue = Math.max(0, sanitizeDraftNumber(value))
+  if (normalizedBase <= 0 || normalizedValue <= 0) return 0
+
+  if (mode === 'PERCENT') {
+    return Math.min(
+      normalizedBase,
+      Math.round(normalizedBase * (Math.min(100, normalizedValue) / 100))
+    )
+  }
+
+  return Math.min(normalizedBase, Math.round(normalizedValue))
+}
 
 export default function QuotationClient({
   orgId,
@@ -124,17 +171,28 @@ export default function QuotationClient({
   products,
 }: QuotationClientProps) {
   const [showModal, setShowModal] = useState(false)
+  const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [savingCustomer, setSavingCustomer] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [customerError, setCustomerError] = useState<string | null>(null)
   const [viewQuotation, setViewQuotation] = useState<QuotationRecord | null>(null)
+  const [customerOptions, setCustomerOptions] = useState<ContactOption[]>(() => sortContactOptions(customers))
+  const [customerForm, setCustomerForm] = useState<CustomerFormState>(() => createEmptyCustomerForm())
 
   const [customerId, setCustomerId] = useState('')
   const [quoteDate, setQuoteDate] = useState(new Date().toISOString().split('T')[0])
   const [notes, setNotes] = useState('')
   const [promoCode, setPromoCode] = useState('')
-  const [appliedPromo, setAppliedPromo] = useState<(typeof PROMOS)[number] | null>(null)
+  const [manualDiscountMode, setManualDiscountMode] = useState<HeaderDiscountMode>('FIXED')
+  const [manualDiscountValue, setManualDiscountValue] = useState(0)
+  const [appliedPromo, setAppliedPromo] = useState<SalesPromoRecord | null>(null)
   const [lines, setLines] = useState<DraftLine[]>(() => [createDraftLine()])
+
+  useEffect(() => {
+    setCustomerOptions(sortContactOptions(customers))
+  }, [customers])
 
   const companyProfile = {
     name: orgSettings.brand_name || orgName || 'Perusahaan',
@@ -145,20 +203,34 @@ export default function QuotationClient({
     website: orgSettings.website || '',
   }
 
-  const subtotal = lines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0)
-  const totalLineDiscount = lines.reduce((sum, line) => sum + (line.quantity * (line.discount_amount || 0)), 0)
+  const subtotal = lines.reduce(
+    (sum, line) => sum + (getSafeLineNumber(line.quantity) * getSafeLineNumber(line.unit_price)),
+    0
+  )
+  const totalLineDiscount = lines.reduce(
+    (sum, line) => sum + (getSafeLineNumber(line.quantity) * getSafeLineNumber(line.discount_amount)),
+    0
+  )
   const promoDiscount = appliedPromo
-    ? Math.round(appliedPromo.type === 'PERCENT' ? subtotal * (appliedPromo.value / 100) : appliedPromo.value)
+    ? calculateHeaderDiscount(subtotal, appliedPromo.type, appliedPromo.value)
     : 0
-  const grandTotal = subtotal - totalLineDiscount - promoDiscount
+  const manualDiscount = calculateHeaderDiscount(subtotal, manualDiscountMode, manualDiscountValue)
+  const maxHeaderDiscount = Math.max(0, subtotal - totalLineDiscount)
+  const headerDiscount = Math.min(maxHeaderDiscount, promoDiscount + manualDiscount)
+  const isHeaderDiscountClamped = (promoDiscount + manualDiscount) > maxHeaderDiscount
+  const grandTotal = Math.max(0, subtotal - totalLineDiscount - headerDiscount)
 
-  const handleApplyPromo = () => {
+  const handleApplyPromo = async () => {
     const code = promoCode.toUpperCase().trim()
     if (!code) return
-    const promo = PROMOS.find((item) => item.code === code)
-    if (!promo) return alert('Kode kupon tidak ditemukan!')
-    if (promo.status !== 'ACTIVE') return alert('Maaf, kode kupon sudah kadaluarsa/tidak aktif!')
-    setAppliedPromo(promo)
+
+    const promoResult = await getUsableSalesPromoByCode(orgId, code)
+    if ('error' in promoResult) {
+      alert(promoResult.error)
+      return
+    }
+
+    setAppliedPromo(promoResult.promo)
     setPromoCode('')
   }
 
@@ -166,10 +238,28 @@ export default function QuotationClient({
     setLines((current) => [...current, createDraftLine()])
   }
 
+  const resetCustomerForm = () => {
+    setCustomerForm(createEmptyCustomerForm())
+    setCustomerError(null)
+  }
+
+  const openCustomerModal = () => {
+    resetCustomerForm()
+    setShowCustomerModal(true)
+  }
+
+  const closeCustomerModal = () => {
+    setShowCustomerModal(false)
+    resetCustomerForm()
+  }
+
   const handleLineChange = (id: number, field: keyof DraftLine, value: string | number) => {
     setLines((current) => current.map((line) => {
       if (line.id !== id) return line
-      const updatedLine = { ...line, [field]: value } as DraftLine
+      const nextValue = field === 'product_name' || field === 'product_id'
+        ? String(value)
+        : sanitizeDraftNumber(value)
+      const updatedLine = { ...line, [field]: nextValue } as DraftLine
       if (field === 'product_name') {
         const product = products.find((item) => item.name === value)
         if (product) {
@@ -212,7 +302,10 @@ export default function QuotationClient({
       customer_id: customerId,
       sale_date: quoteDate,
       notes: finalNotes,
-      discount_amount: promoDiscount,
+      discount_amount: manualDiscount,
+      manual_discount_mode: manualDiscountMode,
+      manual_discount_value: manualDiscountValue,
+      promo_code: appliedPromo?.code || null,
       lines: usableLines.map((line) => ({
         product_id: line.product_id || undefined,
         product_name: line.product_name,
@@ -231,6 +324,51 @@ export default function QuotationClient({
     setSuccess('Penawaran berhasil dibuat!')
     setShowModal(false)
     setTimeout(() => window.location.reload(), 1000)
+  }
+
+  const handleCreateCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+
+    if (!customerForm.name.trim()) {
+      setCustomerError('Nama customer wajib diisi.')
+      return
+    }
+
+    setSavingCustomer(true)
+    setCustomerError(null)
+
+    const formData = new FormData()
+    formData.set('type', 'CUSTOMER')
+    formData.set('name', customerForm.name)
+    formData.set('email', customerForm.email)
+    formData.set('phone', customerForm.phone)
+    formData.set('phone_wa', customerForm.phone_wa)
+    formData.set('instagram', customerForm.instagram)
+    formData.set('address', customerForm.address)
+
+    const res = await createContact(orgId, formData)
+
+    if (res?.error) {
+      setCustomerError(res.error)
+      setSavingCustomer(false)
+      return
+    }
+
+    if (res?.data?.id) {
+      const nextCustomer = {
+        id: String(res.data.id),
+        name: String(res.data.name || customerForm.name).trim(),
+      }
+
+      setCustomerOptions((current) => sortContactOptions([
+        ...current.filter((item) => item.id !== nextCustomer.id),
+        nextCustomer,
+      ]))
+      setCustomerId(nextCustomer.id)
+    }
+
+    setSavingCustomer(false)
+    closeCustomerModal()
   }
 
   const handleConvert = async (id: string) => {
@@ -374,7 +512,16 @@ export default function QuotationClient({
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-2xl">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</label>
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</label>
+                      <button
+                        type="button"
+                        onClick={openCustomerModal}
+                        className="text-[10px] font-black text-blue-600 hover:text-blue-800 transition-colors"
+                      >
+                        + CUSTOMER BARU
+                      </button>
+                    </div>
                     <select
                       required
                       value={customerId}
@@ -382,7 +529,7 @@ export default function QuotationClient({
                       className="w-full h-12 px-4 border rounded-xl text-sm font-bold outline-none focus:border-blue-600"
                     >
                       <option value="">Pilih Customer...</option>
-                      {customers.map((customer) => (
+                      {customerOptions.map((customer) => (
                         <option key={customer.id} value={customer.id}>
                           {customer.name}
                         </option>
@@ -434,15 +581,15 @@ export default function QuotationClient({
                       <div className="col-span-2">
                         <input
                           type="number"
-                          value={line.quantity}
-                          onChange={(e) => handleLineChange(line.id, 'quantity', parseFloat(e.target.value))}
+                          value={getSafeLineNumber(line.quantity)}
+                          onChange={(e) => handleLineChange(line.id, 'quantity', e.target.value)}
                           className="w-full h-12 px-4 border rounded-xl text-xs outline-none focus:border-blue-600"
                         />
                       </div>
                       <div className="col-span-3">
                         <CurrencyInput
                           label=""
-                          value={line.unit_price}
+                          value={getSafeLineNumber(line.unit_price)}
                           onChange={(value) => handleLineChange(line.id, 'unit_price', value)}
                           className="!h-12"
                         />
@@ -450,7 +597,7 @@ export default function QuotationClient({
                       <div className="col-span-2">
                         <CurrencyInput
                           label=""
-                          value={line.discount_amount}
+                          value={getSafeLineNumber(line.discount_amount)}
                           onChange={(value) => handleLineChange(line.id, 'discount_amount', value)}
                           className="!h-12 !text-rose-500"
                         />
@@ -475,26 +622,85 @@ export default function QuotationClient({
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex justify-end">
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                    <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+                          Diskon Tambahan
+                        </label>
+                        <div className="inline-flex rounded-xl border border-amber-200 bg-white p-1">
+                          <button
+                            type="button"
+                            onClick={() => setManualDiscountMode('FIXED')}
+                            className={`px-3 py-1 text-[10px] font-black rounded-lg transition-all ${
+                              manualDiscountMode === 'FIXED'
+                                ? 'bg-amber-500 text-white shadow-sm'
+                                : 'text-amber-700 hover:text-amber-900'
+                            }`}
+                          >
+                            Flat (Rp)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setManualDiscountMode('PERCENT')}
+                            className={`px-3 py-1 text-[10px] font-black rounded-lg transition-all ${
+                              manualDiscountMode === 'PERCENT'
+                                ? 'bg-amber-500 text-white shadow-sm'
+                                : 'text-amber-700 hover:text-amber-900'
+                            }`}
+                          >
+                            Prosentase (%)
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-3">
+                        {manualDiscountMode === 'FIXED' ? (
+                          <CurrencyInput
+                            label=""
+                            value={manualDiscountValue}
+                            onChange={setManualDiscountValue}
+                            className="!h-11 bg-white"
+                            placeholder="Masukkan diskon flat"
+                          />
+                        ) : (
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={manualDiscountValue || ''}
+                            onChange={(e) => setManualDiscountValue(sanitizeDraftNumber(e.target.value))}
+                            placeholder="Masukkan diskon %"
+                            className="w-full h-11 rounded-xl border border-amber-200 bg-white px-4 text-sm font-bold outline-none focus:border-amber-500"
+                          />
+                        )}
+                      </div>
+
+                      <p className="mt-2 text-xs font-bold text-amber-700">
+                        Potongan tambahan: {manualDiscount > 0 ? formatRupiah(manualDiscount) : 'Belum ada'}
+                      </p>
+                    </div>
+
                     {!appliedPromo ? (
-                      <div className="flex gap-2 w-full md:max-w-xs">
+                      <div className="flex gap-2 w-full">
                         <input
                           placeholder="Kode Kupon/Voucher..."
                           value={promoCode}
                           onChange={(e) => setPromoCode(e.target.value)}
                           style={{ textTransform: 'uppercase' }}
-                          className="flex-1 h-10 px-4 border rounded-xl text-xs font-bold outline-none focus:border-blue-500 bg-white"
+                          className="flex-1 h-11 px-4 border rounded-xl text-xs font-bold outline-none focus:border-blue-500 bg-white"
                         />
                         <button
                           type="button"
                           onClick={handleApplyPromo}
-                          className="px-4 h-10 bg-slate-900 text-white font-black text-[10px] tracking-widest uppercase rounded-xl hover:bg-slate-800 transition-colors"
+                          className="px-4 h-11 bg-slate-900 text-white font-black text-[10px] tracking-widest uppercase rounded-xl hover:bg-slate-800 transition-colors"
                         >
                           Terapkan
                         </button>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between w-full md:max-w-xs bg-emerald-50 border border-emerald-100 p-3 rounded-xl text-emerald-700 text-[10px] md:text-xs">
+                      <div className="flex items-center justify-between w-full bg-emerald-50 border border-emerald-100 p-3 rounded-xl text-emerald-700 text-[10px] md:text-xs">
                         <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider">
                           🎟️ Kupon: <strong>{appliedPromo.code}</strong> (-{formatRupiah(promoDiscount)})
                         </span>
@@ -509,11 +715,40 @@ export default function QuotationClient({
                     )}
                   </div>
 
-                  <div className="bg-blue-50 p-6 rounded-2xl flex justify-between items-center shadow-inner border border-blue-100">
-                    <div className="text-[10px] md:text-xs font-black text-blue-900 uppercase tracking-widest">
-                      Total Penawaran Estimasi
+                  <div className="space-y-3 rounded-2xl border border-blue-100 bg-blue-50 p-6 shadow-inner">
+                    <div className="flex items-center justify-between text-sm font-bold text-blue-900">
+                      <span>Subtotal Barang</span>
+                      <span>{formatRupiah(subtotal)}</span>
                     </div>
-                    <div className="text-xl md:text-3xl font-black text-blue-600 drop-shadow-sm">{formatRupiah(grandTotal)}</div>
+                    {totalLineDiscount > 0 && (
+                      <div className="flex items-center justify-between text-sm font-bold text-rose-500">
+                        <span>Diskon per Item</span>
+                        <span>-{formatRupiah(totalLineDiscount)}</span>
+                      </div>
+                    )}
+                    {manualDiscount > 0 && (
+                      <div className="flex items-center justify-between text-sm font-bold text-amber-600">
+                        <span>Diskon Tambahan</span>
+                        <span>-{formatRupiah(manualDiscount)}</span>
+                      </div>
+                    )}
+                    {promoDiscount > 0 && (
+                      <div className="flex items-center justify-between text-sm font-bold text-emerald-600">
+                        <span>Diskon Voucher</span>
+                        <span>-{formatRupiah(promoDiscount)}</span>
+                      </div>
+                    )}
+                    {isHeaderDiscountClamped && (
+                      <p className="text-[11px] font-bold text-blue-700">
+                        Diskon otomatis dibatasi supaya total penawaran tidak minus.
+                      </p>
+                    )}
+                    <div className="border-t border-blue-200 pt-3 flex justify-between items-center">
+                      <div className="text-[10px] md:text-xs font-black text-blue-900 uppercase tracking-widest">
+                        Total Penawaran Estimasi
+                      </div>
+                      <div className="text-xl md:text-3xl font-black text-blue-600 drop-shadow-sm">{formatRupiah(grandTotal)}</div>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -769,6 +1004,97 @@ export default function QuotationClient({
                   </>
                 )
               })()}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showCustomerModal && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !savingCustomer && closeCustomerModal()}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl"
+            >
+              <h3 className="text-xl font-bold mb-6">Tambah Customer Baru</h3>
+
+              {customerError && (
+                <div className="mb-6 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-600">
+                  {customerError}
+                </div>
+              )}
+
+              <form onSubmit={handleCreateCustomer} className="space-y-4">
+                <input
+                  required
+                  value={customerForm.name}
+                  onChange={(e) => setCustomerForm((current) => ({ ...current, name: e.target.value }))}
+                  placeholder="Nama customer / perusahaan"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                />
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <input
+                    type="email"
+                    value={customerForm.email}
+                    onChange={(e) => setCustomerForm((current) => ({ ...current, email: e.target.value }))}
+                    placeholder="Email"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                  />
+                  <input
+                    value={customerForm.phone}
+                    onChange={(e) => setCustomerForm((current) => ({ ...current, phone: e.target.value }))}
+                    placeholder="No. telepon"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <input
+                    value={customerForm.phone_wa}
+                    onChange={(e) => setCustomerForm((current) => ({ ...current, phone_wa: e.target.value }))}
+                    placeholder="WhatsApp"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                  />
+                  <input
+                    value={customerForm.instagram}
+                    onChange={(e) => setCustomerForm((current) => ({ ...current, instagram: e.target.value }))}
+                    placeholder="Instagram"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <textarea
+                  value={customerForm.address}
+                  onChange={(e) => setCustomerForm((current) => ({ ...current, address: e.target.value }))}
+                  rows={4}
+                  placeholder="Alamat"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                />
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeCustomerModal}
+                    disabled={savingCustomer}
+                    className="px-6 py-3 font-bold text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Batal
+                  </button>
+                  <SafeButton variant="primary" isLoading={savingCustomer} type="submit" className="!px-8">
+                    Simpan Customer
+                  </SafeButton>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

@@ -19,6 +19,18 @@ interface JournalClientProps {
   activeBranchName: string | null
 }
 
+type PurchaseTransparencySummary = {
+  subtotal?: number
+  lineDiscount?: number
+  headerDiscount?: number
+  subtotalAfterDiscount?: number
+  landedCost?: number
+  inventoryValue?: number
+  tax?: number
+  grandTotal?: number
+  note?: string | null
+}
+
 export default function JournalClient({
   orgId,
   initialEntries,
@@ -28,12 +40,29 @@ export default function JournalClient({
   activeBranchId,
   activeBranchName,
 }: JournalClientProps) {
+  const toAmount = (value: unknown) => {
+    const parsed = Number(value ?? 0)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+
   const [entries] = useState<any[]>(initialEntries)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [filterStatus, setFilterStatus] = useState<'POSTED' | 'VOIDED' | 'DRAFT'>('POSTED')
   
   const isOwner = userRole === 'owner'
+
+  const getPurchaseTransparency = (entry: any): PurchaseTransparencySummary | null => {
+    if (!entry || typeof entry !== 'object') return null
+    const summary = entry.purchase_transparency
+    return summary && typeof summary === 'object' ? (summary as PurchaseTransparencySummary) : null
+  }
+
+  const getLedgerDisclosureNote = (entry: any) => {
+    const notes = typeof entry?.notes === 'string' ? entry.notes.trim() : ''
+    if (notes) return notes
+    return String(getPurchaseTransparency(entry)?.note || '').trim()
+  }
   
   // Form State
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0])
@@ -65,10 +94,13 @@ export default function JournalClient({
   const stats = {
     postedCount: entries.filter((e: any) => e.status === 'POSTED').length,
     draftCount: entries.filter((e: any) => e.status === 'DRAFT').length,
-    totalVolume: entries.filter((e: any) => e.status === 'POSTED').reduce((sum: number, e: any) => {
-        const debitSum = (e.journal_lines || []).reduce((acc: number, l: any) => acc + (l.debit || 0), 0)
-        return sum + debitSum
-    }, 0),
+    totalVolume: entries
+      .filter((e: any) => e.status === 'POSTED')
+      .reduce((sum: number, e: any) => {
+        const journalLines = Array.isArray(e?.journal_lines) ? e.journal_lines : []
+        const debitSum = journalLines.reduce((acc: number, l: any) => acc + toAmount(l?.debit), 0)
+        return toAmount(sum) + toAmount(debitSum)
+      }, 0),
     voidedToday: entries.filter((e: any) => e.status === 'VOIDED' && e.entry_date === new Date().toISOString().split('T')[0]).length
   }
 
@@ -173,30 +205,25 @@ export default function JournalClient({
     else window.location.reload()
   }
 
-  const handleExportCSV = () => {
+  const handleExportXLSX = () => {
     const activeEntries = entries.filter((e: any) => e.status === filterStatus)
     if (activeEntries.length === 0) return alert("Tidak ada data untuk diunduh.")
 
-    const headers = ["Tanggal", "No. Jurnal", "Deskripsi", "Tipe Ref", "Akun", "Debit", "Kredit", "Memo"]
-    const rows = activeEntries.flatMap(entry => 
-      (entry.journal_lines || []).map((line: any) => [
-        entry.entry_date,
-        `"${entry.entry_number}"`,
-        `"${(entry.description || '').replace(/"/g, '""')}"`,
-        entry.reference_type,
-        `"${line.accounts?.code} - ${(line.accounts?.name || '').replace(/"/g, '""')}"`,
-        line.debit,
-        line.credit,
-        `"${(line.memo || '').replace(/"/g, '""')}"`
-      ])
-    )
+    if (filterStatus !== 'POSTED') {
+      return alert('Export Buku Besar format XLSX hanya untuk jurnal POSTED. Pilih filter POSTED terlebih dahulu.')
+    }
 
-    const csvContent = [headers.join(","), ...rows.map((r: any) => r.join(","))].join("\n")
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
+    const params = new URLSearchParams({
+      type: 'gl',
+      orgId,
+    })
+
+    if (activeBranchId) {
+      params.set('branchId', activeBranchId)
+    }
+
     const link = document.createElement("a")
-    link.href = url
-    link.download = `Ledger_${filterStatus}_${new Date().toISOString().split('T')[0]}.csv`
+    link.href = `/api/export?${params.toString()}`
     link.click()
   }
 
@@ -223,9 +250,9 @@ export default function JournalClient({
             <SafeButton 
               variant="white"
               icon={<Download size={16} />}
-              onClick={handleExportCSV}
+              onClick={handleExportXLSX}
             >
-              Export CSV
+              Export XLSX
             </SafeButton>
             <SafeButton 
               variant="primary"
@@ -324,6 +351,8 @@ export default function JournalClient({
                       const lockMessage = lockedPeriod
                         ? `Periode fiskal ${lockedPeriod.name} sudah ditutup.`
                         : null
+                      const purchaseTransparency = getPurchaseTransparency(entry)
+                      const disclosureNote = getLedgerDisclosureNote(entry)
 
                       return (
 	                  <tr key={entry.id} className="group hover:bg-slate-50 transition-colors">
@@ -335,29 +364,73 @@ export default function JournalClient({
                        <div className="text-sm font-black text-slate-800 leading-tight">{entry.description}</div>
                        <div className="flex items-center gap-2 mt-2">
                          <span className="text-[9px] font-black text-slate-400 border border-slate-200 bg-white px-2 py-0.5 rounded uppercase tracking-widest">{entry.reference_type}</span>
-                         {entry.notes && <span className="text-[10px] font-medium text-slate-400 italic truncate max-w-[150px]">{entry.notes}</span>}
+                         {disclosureNote && <span className="text-[10px] font-medium text-slate-400 italic truncate max-w-[220px]">{disclosureNote}</span>}
                        </div>
                     </td>
                     <td className="px-6 py-6 align-top">
                        <div className="flex flex-col gap-1.5 w-full min-w-[340px] max-w-lg">
+                        {purchaseTransparency && (
+                          <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 mb-2">
+                            <div className="text-[8px] font-black text-amber-700 uppercase tracking-[0.22em] mb-2">
+                              Transparansi Diskon Pembelian
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">Bruto Barang</span>
+                                <span className="font-mono font-black text-slate-800">{formatRupiah(Number(purchaseTransparency.subtotal || 0))}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">Diskon Item</span>
+                                <span className="font-mono font-black text-rose-600">{formatRupiah(Number(purchaseTransparency.lineDiscount || 0))}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">Diskon Header</span>
+                                <span className="font-mono font-black text-rose-600">{formatRupiah(Number(purchaseTransparency.headerDiscount || 0))}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">Neto Barang</span>
+                                <span className="font-mono font-black text-slate-800">{formatRupiah(Number(purchaseTransparency.subtotalAfterDiscount || 0))}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">Landed Cost</span>
+                                <span className="font-mono font-black text-slate-800">{formatRupiah(Number(purchaseTransparency.landedCost || 0))}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">Persediaan Tercatat</span>
+                                <span className="font-mono font-black text-emerald-700">{formatRupiah(Number(purchaseTransparency.inventoryValue || 0))}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">PPN Masukan</span>
+                                <span className="font-mono font-black text-slate-800">{formatRupiah(Number(purchaseTransparency.tax || 0))}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-slate-600">
+                                <span className="font-semibold">Total Tagihan</span>
+                                <span className="font-mono font-black text-blue-700">{formatRupiah(Number(purchaseTransparency.grandTotal || 0))}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         <div className="grid grid-cols-12 gap-2 text-[8px] font-black text-slate-300 uppercase tracking-widest mb-1 pb-2 border-b border-slate-100">
                           <div className="col-span-6">Akun (CoA)</div>
                           <div className="col-span-3 text-right text-emerald-600/50">Debit</div>
                           <div className="col-span-3 text-right text-rose-600/50">Kredit</div>
                         </div>
-                        {entry.journal_lines?.map((line: any) => (
+                        {entry.journal_lines?.map((line: any) => {
+                           const debitAmount = toAmount(line.debit)
+                           const creditAmount = toAmount(line.credit)
+                           return (
                            <div key={line.id} className="grid grid-cols-12 gap-2 text-[10px] items-center border-b border-slate-50 pb-2 pt-0.5 last:border-0 last:pb-0">
                              <div className="col-span-6 font-bold text-slate-600 truncate" title={line.accounts?.name}>
                                {line.accounts?.code} - {line.accounts?.name}
                              </div>
-                             <div className={`col-span-3 text-right font-mono font-black tracking-tight ${line.debit > 0 ? 'text-emerald-600' : 'text-slate-200'}`}>
-                                {line.debit > 0 ? formatRupiah(line.debit) : '-'}
+                             <div className={`col-span-3 text-right font-mono font-black tracking-tight ${debitAmount > 0 ? 'text-emerald-600' : 'text-slate-200'}`}>
+                                {debitAmount > 0 ? formatRupiah(debitAmount) : '-'}
                              </div>
-                             <div className={`col-span-3 text-right font-mono font-black tracking-tight ${line.credit > 0 ? 'text-rose-600' : 'text-slate-200'}`}>
-                                {line.credit > 0 ? formatRupiah(line.credit) : '-'}
+                             <div className={`col-span-3 text-right font-mono font-black tracking-tight ${creditAmount > 0 ? 'text-rose-600' : 'text-slate-200'}`}>
+                                {creditAmount > 0 ? formatRupiah(creditAmount) : '-'}
                              </div>
                            </div>
-                        ))}
+                        )})}
                        </div>
                     </td>
 	                    <td className="px-6 py-6 align-top">

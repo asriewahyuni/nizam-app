@@ -4,9 +4,14 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   createAdminClient: vi.fn(),
   revalidatePath: vi.fn(),
+  noStore: vi.fn(),
   getActiveBranch: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
   getBranchAccessScope: vi.fn(),
+  queryPostgres: vi.fn(),
+  createJournalEntry: vi.fn(),
+  postJournalEntry: vi.fn(),
+  nudgeEduModeValidation: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -16,6 +21,7 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('next/cache', () => ({
   revalidatePath: mocks.revalidatePath,
+  unstable_noStore: mocks.noStore,
 }))
 
 vi.mock('@/modules/organization/actions/org.actions', () => ({
@@ -25,6 +31,19 @@ vi.mock('@/modules/organization/actions/org.actions', () => ({
 vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
   getBranchAccessScope: mocks.getBranchAccessScope,
+}))
+
+vi.mock('@/lib/db/postgres', () => ({
+  queryPostgres: mocks.queryPostgres,
+}))
+
+vi.mock('@/modules/accounting/actions/journal.actions', () => ({
+  createJournalEntry: mocks.createJournalEntry,
+  postJournalEntry: mocks.postJournalEntry,
+}))
+
+vi.mock('@/modules/edu/lib/progress-hooks.server', () => ({
+  nudgeEduModeValidation: mocks.nudgeEduModeValidation,
 }))
 
 import { createPurchaseRequests } from '@/modules/factory/actions/factory.actions'
@@ -40,9 +59,32 @@ function createNoopMutationBuilder() {
   return builder
 }
 
+function createJournalEntriesQuery(result: { data: unknown; error: unknown }) {
+  const query = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    neq: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockResolvedValue(result),
+  }
+
+  return query
+}
+
+function mockPurchaseRead(purchaseRow: Record<string, unknown>, itemRows: Array<Record<string, unknown>> = []) {
+  mocks.queryPostgres
+    .mockResolvedValueOnce({ rows: [purchaseRow] })
+    .mockResolvedValueOnce({ rows: itemRows })
+}
+
 describe('Purchasing Branch Context', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.noStore.mockImplementation(() => undefined)
+    mocks.createJournalEntry.mockResolvedValue({ success: true })
+    mocks.postJournalEntry.mockResolvedValue({ success: true })
+    mocks.nudgeEduModeValidation.mockResolvedValue(undefined)
   })
 
   it('rejects purchase creation when branch does not belong to active org', async () => {
@@ -231,6 +273,117 @@ describe('Purchasing Branch Context', () => {
     expect(rpcMock).not.toHaveBeenCalled()
   })
 
+  it('keeps ISTISHNA purchase on chosen payment term so DP can be recorded bertahap', async () => {
+    const productsQuery = createNoopMutationBuilder()
+    const rpcMock = vi.fn().mockResolvedValue({
+      data: { success: true, purchase_id: 'po-istishna-1' },
+      error: null,
+    })
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'products') return productsQuery
+        throw new Error(`Unexpected table ${table}`)
+      }),
+      rpc: rpcMock,
+    })
+
+    const result = await createPurchaseEntry('org-1', {
+      vendor_id: 'vendor-1',
+      branch_id: 'branch-1',
+      purchase_date: '2026-04-06',
+      due_date: '2026-04-20',
+      payment_term: 'TEMPO',
+      shariah_mode: 'ISTISHNA',
+      lines: [
+        {
+          product_id: 'prod-1',
+          product_name: 'Barang ISTISHNA',
+          quantity: 2,
+          unit_price: 1000,
+        },
+      ],
+    })
+
+    expect(result).toEqual({ success: true, purchaseId: 'po-istishna-1' })
+    expect(rpcMock).toHaveBeenCalledWith(
+      'process_purchase_atomic',
+      expect.objectContaining({
+        p_shariah_mode: 'ISTISHNA',
+        p_due_date: '2026-04-20',
+        p_notes: expect.stringContaining('[TERMIN: TEMPO]'),
+      })
+    )
+  })
+
+  it('syncs published PO header discount and insurance after RPC success', async () => {
+    const productsQuery = createNoopMutationBuilder()
+    const purchasesTable = createNoopMutationBuilder()
+    const rpcMock = vi.fn().mockResolvedValue({
+      data: { success: true, purchase_id: 'po-headers-1' },
+      error: null,
+    })
+
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranches: [], accessibleBranchIds: ['branch-1'], canAccessAllBranches: false, membershipId: 'member-1', role: 'staff' },
+      branchId: 'branch-1',
+    })
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'products') return productsQuery
+        if (table === 'purchases') return purchasesTable
+        throw new Error(`Unexpected table ${table}`)
+      }),
+      rpc: rpcMock,
+    })
+
+    const result = await createPurchaseEntry('org-1', {
+      vendor_id: 'vendor-1',
+      branch_id: 'branch-1',
+      purchase_date: '2026-04-02',
+      payment_term: 'TEMPO',
+      discount_amount: 150,
+      insurance_amount: 50,
+      shipping_amount: 25,
+      lines: [
+        {
+          product_id: 'prod-1',
+          product_name: 'Baut',
+          quantity: 2,
+          unit_price: 1000,
+        },
+      ],
+    })
+
+    expect(result).toEqual({ success: true, purchaseId: 'po-headers-1' })
+    expect(purchasesTable.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vendor_id: 'vendor-1',
+        branch_id: 'branch-1',
+        purchase_date: '2026-04-02',
+        total_amount: 2000,
+        discount_amount: 150,
+        shipping_amount: 25,
+        insurance_amount: 50,
+        grand_total: 1925,
+      })
+    )
+  })
+
   it('filters purchase requests by branch when a unit is active', async () => {
     const orderMock = vi.fn().mockResolvedValue({
       data: [],
@@ -344,6 +497,23 @@ describe('Purchasing Branch Context', () => {
       }),
     }
 
+    mockPurchaseRead({
+      id: 'po-1',
+      org_id: 'org-1',
+      status: 'DRAFT',
+      branch_id: 'branch-1',
+      warehouse_id: null,
+      total_amount: 1000,
+      shipping_amount: 0,
+      insurance_amount: 0,
+      tax_amount: 0,
+      discount_amount: 0,
+      grand_total: 1000,
+      notes: '',
+      shariah_mode: 'CASH',
+      payment_status: 'UNPAID',
+    })
+
     mocks.createClient.mockResolvedValue({
       from: vi.fn((table: string) => {
         if (table === 'purchases') return purchasesTable
@@ -396,6 +566,23 @@ describe('Purchasing Branch Context', () => {
         eq: vi.fn().mockReturnThis(),
       })),
     }
+
+    mockPurchaseRead({
+      id: 'po-salam-1',
+      org_id: 'org-1',
+      status: 'ORDERED',
+      branch_id: 'branch-1',
+      warehouse_id: null,
+      total_amount: 1000,
+      shipping_amount: 0,
+      insurance_amount: 0,
+      tax_amount: 0,
+      discount_amount: 0,
+      grand_total: 1000,
+      notes: '',
+      shariah_mode: 'SALAM',
+      payment_status: 'UNPAID',
+    })
 
     mocks.createClient.mockResolvedValue({
       from: vi.fn((table: string) => {
@@ -478,15 +665,18 @@ describe('Purchasing Branch Context', () => {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       in: vi.fn().mockResolvedValue({
-        data: [],
+        data: [
+          { id: 'acc-inventory', code: '1301', type: 'ASSET' },
+          { id: 'acc-payable', code: '2101', type: 'LIABILITY' },
+        ],
         error: null,
       }),
     }
+    const journalEntriesQuery = createJournalEntriesQuery({
+      data: null,
+      error: null,
+    })
     const rpcMock = vi.fn(async (fn: string) => {
-      if (fn === 'update_product_average_cost') {
-        return { data: null, error: null }
-      }
-
       if (fn === 'adjust_inventory_stock') {
         return {
           data: null,
@@ -517,12 +707,43 @@ describe('Purchasing Branch Context', () => {
       })),
     }
 
+    mockPurchaseRead(
+      {
+        id: 'po-1',
+        org_id: 'org-1',
+        status: 'APPROVED',
+        branch_id: 'branch-1',
+        warehouse_id: 'wh-1',
+        purchase_number: 'PO-001',
+        total_amount: 2000,
+        shipping_amount: 0,
+        insurance_amount: 0,
+        tax_amount: 0,
+        discount_amount: 0,
+        grand_total: 2000,
+        notes: '',
+        shariah_mode: 'CASH',
+        payment_status: 'UNPAID',
+      },
+      [
+        {
+          product_id: 'prod-1',
+          quantity: 2,
+          unit_price: 1000,
+          discount_amount: 0,
+          product_asset_account_id: null,
+          product_category: 'Bahan',
+        },
+      ]
+    )
+
     mocks.createClient.mockResolvedValue({
       from: vi.fn((table: string) => {
         if (table === 'purchases') return purchasesTable
         if (table === 'warehouses') return explicitWarehouseQuery
         if (table === 'stock_movements') return stockMovementsTable
         if (table === 'accounts') return accountsQuery
+        if (table === 'journal_entries') return journalEntriesQuery
         throw new Error(`Unexpected table ${table}`)
       }),
       rpc: rpcMock,
@@ -624,15 +845,18 @@ describe('Purchasing Branch Context', () => {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       in: vi.fn().mockResolvedValue({
-        data: [],
+        data: [
+          { id: 'acc-inventory', code: '1301', type: 'ASSET' },
+          { id: 'acc-payable', code: '2101', type: 'LIABILITY' },
+        ],
         error: null,
       }),
     }
+    const journalEntriesQuery = createJournalEntriesQuery({
+      data: null,
+      error: null,
+    })
     const rpcMock = vi.fn(async (fn: string) => {
-      if (fn === 'update_product_average_cost') {
-        return { data: null, error: null }
-      }
-
       if (fn === 'adjust_inventory_stock') {
         return {
           data: null,
@@ -663,12 +887,43 @@ describe('Purchasing Branch Context', () => {
       })),
     }
 
+    mockPurchaseRead(
+      {
+        id: 'po-1',
+        org_id: 'org-1',
+        status: 'APPROVED',
+        branch_id: 'branch-1',
+        warehouse_id: 'wh-1',
+        purchase_number: 'PO-001',
+        total_amount: 2000,
+        shipping_amount: 0,
+        insurance_amount: 0,
+        tax_amount: 0,
+        discount_amount: 0,
+        grand_total: 2000,
+        notes: '',
+        shariah_mode: 'CASH',
+        payment_status: 'UNPAID',
+      },
+      [
+        {
+          product_id: 'prod-1',
+          quantity: 2,
+          unit_price: 1000,
+          discount_amount: 0,
+          product_asset_account_id: null,
+          product_category: 'Bahan',
+        },
+      ]
+    )
+
     mocks.createClient.mockResolvedValue({
       from: vi.fn((table: string) => {
         if (table === 'purchases') return purchasesTable
         if (table === 'warehouses') return explicitWarehouseQuery
         if (table === 'stock_movements') return stockMovementsTable
         if (table === 'accounts') return accountsQuery
+        if (table === 'journal_entries') return journalEntriesQuery
         throw new Error(`Unexpected table ${table}`)
       }),
       rpc: rpcMock,
@@ -770,15 +1025,18 @@ describe('Purchasing Branch Context', () => {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       in: vi.fn().mockResolvedValue({
-        data: [],
+        data: [
+          { id: 'acc-inventory', code: '1301', type: 'ASSET' },
+          { id: 'acc-payable', code: '2101', type: 'LIABILITY' },
+        ],
         error: null,
       }),
     }
+    const journalEntriesQuery = createJournalEntriesQuery({
+      data: null,
+      error: null,
+    })
     const rpcMock = vi.fn(async (fn: string) => {
-      if (fn === 'update_product_average_cost') {
-        return { data: null, error: null }
-      }
-
       if (fn === 'adjust_inventory_stock') {
         return {
           data: null,
@@ -809,12 +1067,43 @@ describe('Purchasing Branch Context', () => {
       })),
     }
 
+    mockPurchaseRead(
+      {
+        id: 'po-1',
+        org_id: 'org-1',
+        status: 'APPROVED',
+        branch_id: 'branch-1',
+        warehouse_id: 'wh-1',
+        purchase_number: 'PO-001',
+        total_amount: 2000,
+        shipping_amount: 0,
+        insurance_amount: 0,
+        tax_amount: 0,
+        discount_amount: 0,
+        grand_total: 2000,
+        notes: '',
+        shariah_mode: 'CASH',
+        payment_status: 'UNPAID',
+      },
+      [
+        {
+          product_id: 'prod-1',
+          quantity: 2,
+          unit_price: 1000,
+          discount_amount: 0,
+          product_asset_account_id: null,
+          product_category: 'Bahan',
+        },
+      ]
+    )
+
     mocks.createClient.mockResolvedValue({
       from: vi.fn((table: string) => {
         if (table === 'purchases') return purchasesTable
         if (table === 'warehouses') return explicitWarehouseQuery
         if (table === 'stock_movements') return stockMovementsTable
         if (table === 'accounts') return accountsQuery
+        if (table === 'journal_entries') return journalEntriesQuery
         throw new Error(`Unexpected table ${table}`)
       }),
       rpc: rpcMock,
@@ -912,6 +1201,27 @@ describe('Purchasing Branch Context', () => {
         error: null,
       }),
     }
+    const journalEntriesQuery = createJournalEntriesQuery({
+      data: { id: 'je-po-2', status: 'POSTED' },
+      error: null,
+    })
+
+    mockPurchaseRead({
+      id: 'po-2',
+      org_id: 'org-1',
+      status: 'APPROVED',
+      branch_id: 'branch-1',
+      warehouse_id: 'wh-1',
+      total_amount: 1000,
+      shipping_amount: 0,
+      insurance_amount: 0,
+      tax_amount: 0,
+      discount_amount: 0,
+      grand_total: 1000,
+      notes: '',
+      shariah_mode: 'CASH',
+      payment_status: 'UNPAID',
+    })
 
     mocks.createClient.mockResolvedValue({
       from: vi.fn((table: string) => {
@@ -919,6 +1229,7 @@ describe('Purchasing Branch Context', () => {
         if (table === 'warehouses') return explicitWarehouseQuery
         if (table === 'stock_movements') return stockMovementsTable
         if (table === 'accounts') return accountsQuery
+        if (table === 'journal_entries') return journalEntriesQuery
         throw new Error(`Unexpected table ${table}`)
       }),
       rpc: vi.fn(),
@@ -1002,12 +1313,34 @@ describe('Purchasing Branch Context', () => {
       })),
       insert: vi.fn().mockResolvedValue({ error: null }),
     }
+    const journalEntriesQuery = createJournalEntriesQuery({
+      data: { id: 'je-po-3', status: 'POSTED' },
+      error: null,
+    })
+
+    mockPurchaseRead({
+      id: 'po-3',
+      org_id: 'org-1',
+      status: 'APPROVED',
+      branch_id: 'branch-1',
+      warehouse_id: 'wh-1',
+      total_amount: 1000,
+      shipping_amount: 0,
+      insurance_amount: 0,
+      tax_amount: 0,
+      discount_amount: 0,
+      grand_total: 1000,
+      notes: '',
+      shariah_mode: 'CASH',
+      payment_status: 'UNPAID',
+    })
 
     mocks.createClient.mockResolvedValue({
       from: vi.fn((table: string) => {
         if (table === 'purchases') return purchasesTable
         if (table === 'warehouses') return explicitWarehouseQuery
         if (table === 'stock_movements') return stockMovementsTable
+        if (table === 'journal_entries') return journalEntriesQuery
         throw new Error(`Unexpected table ${table}`)
       }),
       rpc: vi.fn(),

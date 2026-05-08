@@ -5,6 +5,7 @@ import { CashClient } from './CashClient'
 import { checkCanManageCoA } from '@/modules/accounting/actions/coa.actions'
 import { getRecentBankTransactions } from '@/modules/cash/actions/bank.actions'
 import { canSelectAllBranches, getActiveBranch, getActiveOrg, getBranches, getChildOrgs } from '@/modules/organization/actions/org.actions'
+import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { getPendingCoaRequestCount } from '@/modules/accounting/actions/coa-request.actions'
 import type {
   CashAccountOption,
@@ -74,6 +75,12 @@ function isMissingRpc(error: { code?: string | null; message?: string | null } |
       (message.includes('schema cache') || message.includes('does not exist') || message.includes('undefined function'))
     )
   )
+}
+
+function isMissingColumnError(error: { message?: string | null } | null | undefined) {
+  if (!error) return false
+  const message = String(error.message || '').toLowerCase()
+  return message.includes('column') && message.includes('does not exist')
 }
 
 function mapAccountsWithBalance<T extends { account_id: string }>(
@@ -169,6 +176,61 @@ async function getChildOrgPlacementData(childOrgs: ChildOrgSummary[]) {
   }
 
   return { branchesByOrgId, accountsByOrgId }
+}
+
+async function getPlacementChildOrgs(parentOrgId: string): Promise<ChildOrgSummary[]> {
+  const trimmedParentOrgId = String(parentOrgId || '').trim()
+  if (!trimmedParentOrgId) return []
+
+  let reader: any
+  try {
+    reader = (await createAdminClient()) as any
+  } catch {
+    reader = (await createClient()) as any
+  }
+
+  const { data, error } = await reader
+    .from('organizations')
+    .select('id, name')
+    .eq('parent_org_id', trimmedParentOrgId)
+    .order('created_at', { ascending: false })
+
+  if (error || !Array.isArray(data)) return []
+
+  return data
+    .map((row: { id?: string | null; name?: string | null }) => ({
+      id: String(row?.id || '').trim(),
+      name: String(row?.name || '').trim(),
+    }))
+    .filter((row: ChildOrgSummary) => Boolean(row.id && row.name))
+}
+
+async function getAllPlacementBranches(orgId: string): Promise<{ id: string; name: string }[]> {
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) return []
+
+  let reader: any
+  try {
+    reader = (await createAdminClient()) as any
+  } catch {
+    reader = (await createClient()) as any
+  }
+
+  const { data, error } = await reader
+    .from('branches')
+    .select('id, name')
+    .eq('org_id', trimmedOrgId)
+    .eq('is_active', true)
+    .order('name', { ascending: true })
+
+  if (error || !Array.isArray(data)) return []
+
+  return data
+    .map((row: { id?: string | null; name?: string | null }) => ({
+      id: String(row?.id || '').trim(),
+      name: String(row?.name || '').trim(),
+    }))
+    .filter((row: { id: string; name: string }) => Boolean(row.id && row.name))
 }
 
 async function getPostedEntryIds(orgId: string, branchId?: string | null) {
@@ -391,31 +453,66 @@ async function getManagedRecentTransactionsForParent(
   const supabase = await createClient()
   const orgIds = await getConsolidatedOrgIds(parentOrgId)
 
-  const { data, error } = await supabase
-    .from('bank_transactions')
-    .select(`
-      id,
-      org_id,
-      branch_id,
-      bank_account_id,
-      transaction_date,
-      description,
-      amount,
-      type,
-      status,
-      bank_account:bank_accounts(bank_name, account_number),
-      category:accounts(name, code),
-      organization:organizations(name),
-      branch:branches(name)
-    `)
-    .in('org_id', orgIds)
-    .order('transaction_date', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(limit)
+  const detailedSelect = `
+    id,
+    org_id,
+    branch_id,
+    bank_account_id,
+    transaction_date,
+    created_at,
+    updated_at,
+    reference_number,
+    journal_entry_id,
+    description,
+    amount,
+    type,
+    status,
+    bank_account:bank_accounts(bank_name, account_number),
+    category:accounts(name, code),
+    organization:organizations(name),
+    branch:branches(name)
+  `
 
-  if (error || !Array.isArray(data)) return []
+  const legacySelect = `
+    id,
+    org_id,
+    branch_id,
+    bank_account_id,
+    transaction_date,
+    description,
+    amount,
+    type,
+    status,
+    bank_account:bank_accounts(bank_name, account_number),
+    category:accounts(name, code),
+    organization:organizations(name),
+    branch:branches(name)
+  `
 
-  return (data as RecentTransactionRecord[]).map((row) => ({
+  const runQuery = async (selectClause: string) => {
+    return supabase
+      .from('bank_transactions')
+      .select(selectClause)
+      .in('org_id', orgIds)
+      .order('transaction_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(limit)
+  }
+
+  const detailedResult = await runQuery(detailedSelect)
+  let rows: RecentTransactionRecord[] = []
+
+  if (!detailedResult.error && Array.isArray(detailedResult.data)) {
+    rows = detailedResult.data as RecentTransactionRecord[]
+  } else if (isMissingColumnError(detailedResult.error)) {
+    const fallbackResult = await runQuery(legacySelect)
+    if (fallbackResult.error || !Array.isArray(fallbackResult.data)) return []
+    rows = fallbackResult.data as RecentTransactionRecord[]
+  } else {
+    return []
+  }
+
+  return rows.map((row) => ({
     ...row,
     org_name: readRelationName(row.organization),
     branch_name: readRelationName(row.branch),
@@ -436,12 +533,14 @@ export default async function CashPage({
   const orgName = orgData.org.name || 'Nizam'
   const orgEntity = orgData.org as typeof orgData.org & { parent_org_id?: string | null }
   const isParentOrgFromTree = !orgEntity.parent_org_id
-  const [activeBranch, canAccessAllBranches, allAccounts, coaAccess, branches] = await Promise.all([
+  const canViewFullPlacementScope = hasRolePermission(orgData.role, orgData.permissions, 'bank')
+  const [activeBranch, canAccessAllBranches, allAccounts, coaAccess, branches, placementBranches] = await Promise.all([
     getActiveBranch(orgId),
     canSelectAllBranches(orgId),
     getCashAccountOptions(orgId),
     checkCanManageCoA(orgId),
     getBranches(orgId),
+    isParentOrgFromTree && canViewFullPlacementScope ? getAllPlacementBranches(orgId) : Promise.resolve([]),
   ])
   const { canManageDirect } = coaAccess
   const canUseHoldingView = canManageDirect && isParentOrgFromTree
@@ -468,6 +567,9 @@ export default async function CashPage({
         getManagedRecentTransactionsForParent(orgId, 20),
       ])
     : [0, [] as ChildOrgSummary[], bankAccounts, parentRecentTransactions]
+  const placementChildOrgs = isParentOrgFromTree && canViewFullPlacementScope
+    ? await getPlacementChildOrgs(orgId)
+    : [] as ChildOrgSummary[]
 
   const recentTransactions: RecentTransactionOption[] = cashViewMode === 'holding'
     ? holdingRecentTransactions
@@ -494,12 +596,12 @@ export default async function CashPage({
     orgName: string
     accounts: TransferCategoryOption[]
   }[] = []
-  if (canManageDirect) {
+  if (isParentOrgFromTree && canViewFullPlacementScope) {
     // 1. Add Parent
     placementNodes.push({
       orgId: orgId,
       orgName: orgName + ' (Pusat)',
-      branches: branches,
+      branches: placementBranches,
       accounts: parentBankGlAccounts,
     })
     transferCategoryNodes.push({
@@ -513,8 +615,8 @@ export default async function CashPage({
         cash_flow_category: a.cash_flow_category ?? null,
       })),
     })
-    const { branchesByOrgId, accountsByOrgId } = await getChildOrgPlacementData(childOrgs)
-    const childOrgNodes = childOrgs.map((child) => {
+    const { branchesByOrgId, accountsByOrgId } = await getChildOrgPlacementData(placementChildOrgs)
+    const childOrgNodes = placementChildOrgs.map((child) => {
       const childBranches = branchesByOrgId.get(child.id) || []
       const childAccounts = accountsByOrgId.get(child.id) || []
 

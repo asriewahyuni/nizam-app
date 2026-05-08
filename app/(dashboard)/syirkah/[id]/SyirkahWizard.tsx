@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import {
   ChevronRight, ChevronLeft, Check, Building2, Landmark, Users, ListTodo,
   PieChart, Shield, FileText, QrCode, AlertCircle, Link2, Plus, Trash2, Info, Scale
@@ -30,6 +30,39 @@ const DURATION_OPTIONS = [3, 6, 12, 18, 24, 36, 48, 60]
 
 type Member = SyirkahMemberPayload & { id?: string; sign_token?: string; signed_at?: string }
 
+function createDraftRowId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  const randomSegment = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, '0')
+  return `${randomSegment()}${randomSegment()}-${randomSegment()}-4${randomSegment().slice(1)}-a${randomSegment().slice(1)}-${randomSegment()}${randomSegment()}${randomSegment()}`
+}
+
+function formatDateForInput(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function toDateInputValue(value: unknown) {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null
+    return formatDateForInput(value)
+  }
+
+  const raw = String(value || '').trim()
+  if (!raw) return null
+
+  const datePrefix = raw.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s]|$)/)
+  if (datePrefix) return datePrefix[1]
+
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) return null
+  return formatDateForInput(parsed)
+}
+
 const STEPS = [
   { id: 1, label: 'Informasi Usaha', icon: Building2 },
   { id: 2, label: 'Jenis & Durasi', icon: Landmark },
@@ -43,6 +76,7 @@ const STEPS = [
 ]
 
 const emptyMember = (): Member => ({
+  id: createDraftRowId(),
   member_name: '', role: 'PENGELOLA', nik: '', address: '', phone: '', email: '',
   responsibility: '', profit_share_percentage: 0, capital_contribution: 0
 })
@@ -50,8 +84,18 @@ const emptyMember = (): Member => ({
 type Witness = SyirkahWitnessPayload & { id?: string; sign_token?: string; signed_at?: string }
 
 const emptyWitness = (): Witness => ({
+  id: createDraftRowId(),
   witness_name: '', gender: 'LAKI-LAKI', nik: '', address: '', phone: ''
 })
+
+function normalizeLocalContractStatus(value: unknown) {
+  const normalized = String(value || '').trim().toUpperCase()
+  if (['DRAFT', 'SIGNING', 'ACTIVE', 'COMPLETED'].includes(normalized)) {
+    return normalized as 'DRAFT' | 'SIGNING' | 'ACTIVE' | 'COMPLETED'
+  }
+
+  return 'DRAFT' as const
+}
 
 export default function SyirkahWizard({ orgId, contract, members: initialMembers, witnesses: initialWitnesses }: {
   orgId: string
@@ -76,6 +120,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
   }
 
   const [step, setStep] = useState<number>(contract.wizard_step || 1)
+  const [contractStatus, setContractStatus] = useState(normalizeLocalContractStatus(contract.status))
   const [saving, setSaving] = useState(false)
   const [contractId] = useState<string>(contract.id)
 
@@ -88,11 +133,9 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
   const [contractType, setContractType] = useState(contract.contract_type || 'Syirkah Mudharabah')
   const [durationMonths, setDurationMonths] = useState(contract.duration_months || 12)
   const [startDate, setStartDate] = useState(
-    contract.start_date
-      ? (typeof contract.start_date === 'string' ? contract.start_date : new Date(contract.start_date).toISOString()).split('T')[0]
-      : new Date().toISOString().split('T')[0]
+    toDateInputValue(contract.start_date) || formatDateForInput(new Date())
   )
-  const [currency, setCurrency] = useState<string>(contract.currency || 'IDR')
+  const [currency] = useState<string>(contract.currency || 'IDR')
 
 
   // Step 3 & 4: Members
@@ -112,6 +155,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
 
   // Step 6: Nisbah
   const totalNisbah = members.reduce((sum, m) => sum + Number(m.profit_share_percentage || 0), 0)
+  const [profitSharingAllocation, setProfitSharingAllocation] = useState(contract.profit_sharing_allocation || 0)
 
   // Step 7: Debt
   const [debtAllocation, setDebtAllocation] = useState(contract.debt_allocation || 0)
@@ -123,7 +167,10 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
   )
 
   // Step 9: Signing
-  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const [origin, setOrigin] = useState('')
+  useEffect(() => {
+    setOrigin(window.location.origin)
+  }, [])
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -153,10 +200,23 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
 
   // ─── Save & Navigate ───────────────────────────────────────────────────────
 
+  const resolveDraftStatus = (targetStep: number) => {
+    if (contractStatus === 'ACTIVE' || contractStatus === 'COMPLETED') {
+      return contractStatus
+    }
+
+    if (targetStep >= 9 || contractStatus === 'SIGNING') {
+      return 'SIGNING'
+    }
+
+    return 'DRAFT'
+  }
+
   const saveProgress = async (targetStep: number) => {
     setSaving(true)
     try {
-      await upsertSyirkahContract(orgId, {
+      const nextStatus = resolveDraftStatus(targetStep)
+      const savedContract = await upsertSyirkahContract(orgId, {
         id: contractId,
         title: businessName || contract.title,
         business_name: businessName,
@@ -166,32 +226,48 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
         duration_months: durationMonths,
         start_date: startDate,
         debt_allocation: debtAllocation,
+        profit_sharing_allocation: profitSharingAllocation,
         currency,
 
         current_debt: currentDebt,
         clauses: clauses.length > 0 ? clauses : undefined,
         wizard_step: targetStep,
-        status: targetStep === 9 ? 'ACTIVE' : contract.status || 'DRAFT',
+        status: nextStatus,
       })
 
-      // Save all members
+      // Save all members and keep returned ids/tokens in local state so
+      // repeated saves update the same rows instead of inserting duplicates.
+      const nextMembers: Member[] = []
       for (const member of members) {
+        const normalizedRole = isMudharabah(contractType) ? member.role : autoRole(contractType)
         if (member.member_name) {
-          await upsertSyirkahMember(contractId, {
+          const savedMember = await upsertSyirkahMember(contractId, {
             ...member,
-            // Untuk Mudharabah, user bisa set role sendiri. Tipe lain di-lock lewat autoRole
-            role: isMudharabah(contractType) ? member.role : autoRole(contractType),
+            role: normalizedRole,
           })
+          nextMembers.push({ ...member, ...savedMember, role: normalizedRole })
+          continue
         }
-      }
 
-      // Save all witnesses
+        nextMembers.push({ ...member, role: normalizedRole })
+      }
+      setMembers(nextMembers)
+
+      // Witnesses follow the same flow as members: once a row is saved, keep
+      // the database id so the next wizard step performs an update.
+      const nextWitnesses: Witness[] = []
       for (const witness of witnesses) {
         if (witness.witness_name) {
-          await upsertSyirkahWitness(contractId, witness)
+          const savedWitness = await upsertSyirkahWitness(contractId, witness)
+          nextWitnesses.push({ ...witness, ...savedWitness })
+          continue
         }
-      }
 
+        nextWitnesses.push(witness)
+      }
+      setWitnesses(nextWitnesses)
+
+      setContractStatus(normalizeLocalContractStatus(savedContract?.status || nextStatus))
       setStep(targetStep)
     } catch (e: any) {
       alert('Gagal menyimpan: ' + e.message)
@@ -575,6 +651,16 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
         {/* ── STEP 6: Nisbah Bagi Hasil (was 5) ── */}
         {step === 6 && (
           <StepCard title="Nisbah Bagi Hasil" desc="Tentukan persentase bagi hasil untuk setiap pihak. Total harus sama dengan 100%." icon={PieChart}>
+            <Field
+              label="Nominal Alokasi Bagi Hasil (Rp)"
+              hint="Isi nominal laba yang benar-benar akan dibagikan. Jika kosong atau 0, sistem memakai basis default saat tersedia."
+            >
+              <MoneyInput
+                value={profitSharingAllocation}
+                onChange={setProfitSharingAllocation}
+              />
+            </Field>
+
             <div className="space-y-4">
               {members.filter(m => m.member_name).map((member, index) => (
                 <div key={index} className="bg-white border border-slate-200 rounded-2xl p-5">
@@ -621,6 +707,35 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
               <p className="text-xs text-center text-rose-600 font-medium -mt-2">
                 {totalNisbah > 100 ? `Kelebihan ${totalNisbah - 100}% — kurangi nisbah salah satu pihak` : `Kekurangan ${100 - totalNisbah}% — tambahkan ke salah satu pihak`}
               </p>
+            )}
+
+            {profitSharingAllocation > 0 && members.filter(m => m.member_name).length > 0 && (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-black text-blue-900">Preview Alokasi Nominal</h4>
+                    <p className="text-sm text-blue-700">
+                      Dengan alokasi {formatRupiah(profitSharingAllocation)}, estimasi nominal per syarik menjadi:
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-700">
+                    Basis {formatRupiah(profitSharingAllocation)}
+                  </span>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {members.filter(m => m.member_name).map((member, index) => (
+                    <div key={`${member.id || member.member_name}-${index}`} className="flex items-center justify-between rounded-xl bg-white px-4 py-3 text-sm">
+                      <div>
+                        <p className="font-bold text-slate-800">{member.member_name}</p>
+                        <p className="text-xs font-medium text-slate-500">{member.profit_share_percentage}% nisbah</p>
+                      </div>
+                      <span className="font-black text-blue-700">
+                        {formatRupiah((profitSharingAllocation * Number(member.profit_share_percentage || 0)) / 100)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </StepCard>
         )}
@@ -766,8 +881,8 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
               <ol className="list-decimal list-inside space-y-1 text-xs">
                 <li>Bagikan QR Code kepada masing-masing pihak</li>
                 <li>Setiap pihak scan QR Code-nya masing-masing</li>
-                <li>Buka link → baca akad → klik "Saya Setuju & Tandatangani"</li>
-                <li>Setelah semua TTD, status akad otomatis berubah menjadi AKTIF</li>
+                <li>Buka link → baca akad → klik &quot;Saya Setuju & Tandatangani&quot;</li>
+                <li>Setelah semua pihak TTD, status akad berubah menjadi ACTIVE dan modal baru siap dicatat ke Core</li>
               </ol>
             </div>
 

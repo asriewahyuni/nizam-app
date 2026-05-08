@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
@@ -11,7 +11,13 @@ import {
   Download,
   Printer,
 } from 'lucide-react'
+import {
+  getSaasCapabilityDisplayLabel,
+  getSaasCapabilityKind,
+  getSaasPackageArchitecture,
+} from '@/lib/saas/module-catalog'
 import type { OperatorDocumentSnapshot } from '@/modules/saas/actions/operator-sales.actions'
+import { MiniErpWordmark } from '@/components/shared/MiniErpWordmark'
 
 function formatIdr(value: number) {
   return new Intl.NumberFormat('id-ID', {
@@ -83,12 +89,15 @@ function parsePercentValue(raw: string) {
 
 type QuoteAddon = {
   name: string
+  kind: 'module' | 'addon' | 'capacity_addon'
   isSingleBill: boolean
   promoPrice: number
   anchorPrice: number | null
 }
 
 type QuoteBreakdown = {
+  coreFamilyName: string | null
+  coreFamilyLayer: string | null
   baseAmount: number | null
   durationMonths: number
   monthlySubtotal: number | null
@@ -114,6 +123,8 @@ type QuoteBreakdown = {
 
 function createEmptyBreakdown(): QuoteBreakdown {
   return {
+    coreFamilyName: null,
+    coreFamilyLayer: null,
     baseAmount: null,
     durationMonths: 1,
     monthlySubtotal: null,
@@ -138,6 +149,40 @@ function createEmptyBreakdown(): QuoteBreakdown {
   }
 }
 
+function getMarketplaceKind(
+  name: string,
+  fallbackLabel?: string | null
+): 'module' | 'addon' | 'capacity_addon' {
+  const capabilityKind = getSaasCapabilityKind(name)
+  if (capabilityKind === 'vertical_module') return 'module'
+  if (capabilityKind === 'capacity_addon') return 'capacity_addon'
+
+  const fallback = String(fallbackLabel || '').trim().toLowerCase()
+  if (fallback === 'module') return 'module'
+  if (fallback === 'capacity add-on') return 'capacity_addon'
+  return 'addon'
+}
+
+function getMarketplaceLabel(kind: QuoteAddon['kind']) {
+  if (kind === 'module') return 'Module'
+  if (kind === 'capacity_addon') return 'Capacity Add-on'
+  return 'Add-on'
+}
+
+function getUniqueLabels(values: readonly string[]) {
+  const output: string[] = []
+  const seen = new Set<string>()
+
+  values.forEach((value) => {
+    const label = getSaasCapabilityDisplayLabel(String(value || '').trim())
+    if (!label || seen.has(label)) return
+    seen.add(label)
+    output.push(label)
+  })
+
+  return output
+}
+
 function parseQuoteBreakdown(rawDescription: string | null | undefined): QuoteBreakdown {
   const breakdown = createEmptyBreakdown()
   const normalizedDescription = String(rawDescription || '').replace(/\\n/g, '\n')
@@ -147,6 +192,21 @@ function parseQuoteBreakdown(rawDescription: string | null | undefined): QuoteBr
     .filter(Boolean)
 
   lines.forEach((line) => {
+    if (line.startsWith('Core Family:')) {
+      breakdown.coreFamilyName = line.slice('Core Family:'.length).trim() || null
+      return
+    }
+
+    if (line.startsWith('Core Family Layer:')) {
+      breakdown.coreFamilyLayer = line.slice('Core Family Layer:'.length).trim() || null
+      return
+    }
+
+    if (line.startsWith('Harga Core Family:')) {
+      breakdown.baseAmount = parseCurrencyValue(line.slice('Harga Core Family:'.length))
+      return
+    }
+
     if (line.startsWith('Paket dasar:')) {
       breakdown.baseAmount = parseCurrencyValue(line.slice('Paket dasar:'.length))
       return
@@ -158,46 +218,28 @@ function parseQuoteBreakdown(rawDescription: string | null | undefined): QuoteBr
       return
     }
 
-    const singleBillAddonWithAnchor = line.match(/^Add-on Single Bill\s+(.+):\s+(.+)\s+->\s+(.+)$/i)
-    if (singleBillAddonWithAnchor) {
+    const marketplaceWithAnchor = line.match(/^(Module|Add-on|Capacity Add-on)(?:\s+Single Bill)?\s+(.+):\s+(.+)\s+->\s+(.+)$/i)
+    if (marketplaceWithAnchor) {
+      const name = marketplaceWithAnchor[2].trim()
       breakdown.addons.push({
-        name: singleBillAddonWithAnchor[1].trim(),
-        isSingleBill: true,
-        anchorPrice: parseCurrencyValue(singleBillAddonWithAnchor[2]),
-        promoPrice: parseCurrencyValue(singleBillAddonWithAnchor[3]),
+        name,
+        kind: getMarketplaceKind(name, marketplaceWithAnchor[1]),
+        isSingleBill: /\bSingle Bill\b/i.test(line),
+        anchorPrice: parseCurrencyValue(marketplaceWithAnchor[3]),
+        promoPrice: parseCurrencyValue(marketplaceWithAnchor[4]),
       })
       return
     }
 
-    const singleBillAddonSimple = line.match(/^Add-on Single Bill\s+(.+):\s+(.+)$/i)
-    if (singleBillAddonSimple) {
+    const marketplaceSimple = line.match(/^(Module|Add-on|Capacity Add-on)(?:\s+Single Bill)?\s+(.+):\s+(.+)$/i)
+    if (marketplaceSimple) {
+      const name = marketplaceSimple[2].trim()
       breakdown.addons.push({
-        name: singleBillAddonSimple[1].trim(),
-        isSingleBill: true,
+        name,
+        kind: getMarketplaceKind(name, marketplaceSimple[1]),
+        isSingleBill: /\bSingle Bill\b/i.test(line),
         anchorPrice: null,
-        promoPrice: parseCurrencyValue(singleBillAddonSimple[2]),
-      })
-      return
-    }
-
-    const addonWithAnchor = line.match(/^Add-on\s+(.+):\s+(.+)\s+->\s+(.+)$/i)
-    if (addonWithAnchor) {
-      breakdown.addons.push({
-        name: addonWithAnchor[1].trim(),
-        isSingleBill: false,
-        anchorPrice: parseCurrencyValue(addonWithAnchor[2]),
-        promoPrice: parseCurrencyValue(addonWithAnchor[3]),
-      })
-      return
-    }
-
-    const addonSimple = line.match(/^Add-on\s+(.+):\s+(.+)$/i)
-    if (addonSimple) {
-      breakdown.addons.push({
-        name: addonSimple[1].trim(),
-        isSingleBill: false,
-        anchorPrice: null,
-        promoPrice: parseCurrencyValue(addonSimple[2]),
+        promoPrice: parseCurrencyValue(marketplaceSimple[3]),
       })
       return
     }
@@ -268,6 +310,15 @@ function parseQuoteBreakdown(rawDescription: string | null | undefined): QuoteBr
       return
     }
 
+    if (line.startsWith('Core Family Scope:')) {
+      breakdown.modules = line
+        .slice('Core Family Scope:'.length)
+        .split(',')
+        .map((moduleName) => moduleName.trim())
+        .filter(Boolean)
+      return
+    }
+
     if (line.startsWith('Modul dipilih:')) {
       breakdown.modules = line
         .slice('Modul dipilih:'.length)
@@ -288,6 +339,18 @@ function extractAdditionalNote(rawDescription: string | null | undefined) {
   const blockMatch = normalizedDescription.match(/(?:^|\n)(Catatan(?:\s+tambahan|\s+penawaran|\s+invoice)?|Note)\s*[:\-]?\s*([\s\S]*)$/i)
   if (blockMatch?.[2]) return blockMatch[2].trim()
   return null
+}
+
+function subscribeToHydration() {
+  return () => {}
+}
+
+function getClientHydrationState() {
+  return true
+}
+
+function getServerHydrationState() {
+  return false
 }
 
 type PricingRow = {
@@ -337,92 +400,131 @@ export default function SaasDocumentView({
 }: {
   snapshot: OperatorDocumentSnapshot
 }) {
-  const [isHydrated, setIsHydrated] = useState(false)
   const router = useRouter()
-  const { invoice, saasConfig, packageModules } = snapshot
-
-  useEffect(() => {
-    setIsHydrated(true)
-  }, [])
+  const { invoice, saasConfig, packageModules, packageAddons } = snapshot
+  const isHydrated = useSyncExternalStore(
+    subscribeToHydration,
+    getClientHydrationState,
+    getServerHydrationState
+  )
 
   const isQuotation = isQuotationNumber(invoice.invoice_number)
   const documentLabel = isQuotation ? 'Surat Penawaran' : 'Invoice'
   const documentFilePrefix = isQuotation ? 'penawaran' : 'invoice'
-  const itemName = invoice.item_name || `${isQuotation ? 'Penawaran SaaS' : 'Invoice SaaS'}${invoice.package?.name ? `: ${invoice.package.name}` : ''}`
+  const itemName = invoice.item_name || `${isQuotation ? 'Penawaran SaaS' : 'Invoice SaaS'}${invoice.package?.name ? `: Core Family ${invoice.package.name}` : ''}`
 
   const bankInfo = useMemo(() => normalizeBankInfo(saasConfig.bank_info), [saasConfig.bank_info])
   const breakdown = useMemo(() => parseQuoteBreakdown(invoice.item_description), [invoice.item_description])
+  const packageArchitecture = useMemo(
+    () => getSaasPackageArchitecture(packageModules, packageAddons),
+    [packageAddons, packageModules]
+  )
   const additionalNote = useMemo(
     () => breakdown.note || extractAdditionalNote(invoice.item_description),
     [breakdown.note, invoice.item_description]
   )
 
-  const includedModules = breakdown.modules.length > 0 ? breakdown.modules : packageModules
-  const selectedAddonNames = breakdown.addons.map((addon) => addon.name)
-
-  const pricingRows = useMemo<PricingRow[]>(() => {
-    const rows: PricingRow[] = []
-
-    if (breakdown.baseAmount && breakdown.baseAmount > 0) {
-      rows.push({
-        label: itemName,
-        qty: 1,
-        total: breakdown.baseAmount,
-        note: invoice.package?.billing ? `Skema billing: ${invoice.package.billing} • per bulan` : 'Per bulan',
-      })
-    }
-
-    breakdown.addons.forEach((addon) => {
-      rows.push({
-        label: `Add-on ${addon.name}`,
-        qty: 1,
-        total: addon.promoPrice,
-        note: addon.anchorPrice && addon.anchorPrice > addon.promoPrice
-          ? `Harga normal ${formatIdr(addon.anchorPrice)}${addon.isSingleBill ? ' • single bill' : ' • per bulan'}`
-          : addon.anchorPrice
-            ? `Harga add-on ${formatIdr(addon.anchorPrice)}${addon.isSingleBill ? ' • single bill' : ' • per bulan'}`
-            : addon.isSingleBill ? 'Single bill' : 'Per bulan',
-      })
+  const coreCoverage = useMemo(() => {
+    const quotedCoreItems = breakdown.modules.filter((item) => {
+      const kind = getSaasCapabilityKind(item)
+      return kind !== 'vertical_module' && kind !== 'addon' && kind !== 'capacity_addon'
     })
 
-    if (breakdown.aiTokenTotal > 0) {
-      rows.push({
-        label: breakdown.aiTokenLabel || 'Paket Token AI',
-        qty: 1,
-        total: breakdown.aiTokenTotal,
-        note: 'Top-up token AI • one-time',
-      })
+    if (quotedCoreItems.length > 0) {
+      return getUniqueLabels([
+        ...packageArchitecture.platformCore,
+        ...quotedCoreItems,
+      ])
     }
 
-    if (breakdown.extraEntityQty > 0 && breakdown.extraEntityTotal > 0) {
-      rows.push({
-        label: 'Entitas tambahan',
-        qty: breakdown.extraEntityQty,
-        total: breakdown.extraEntityTotal,
-        note: `${formatIdr(breakdown.extraEntityUnitPrice)} per entitas • per bulan`,
-      })
-    }
+    return getUniqueLabels([
+      ...packageArchitecture.platformCore,
+      ...packageArchitecture.liteCore,
+      ...packageArchitecture.starterCore,
+      ...packageArchitecture.fullCoreExtensions,
+    ])
+  }, [breakdown.modules, packageArchitecture])
 
-    if (breakdown.extraBranchQty > 0 && breakdown.extraBranchTotal > 0) {
-      rows.push({
-        label: 'Cabang tambahan',
-        qty: breakdown.extraBranchQty,
-        total: breakdown.extraBranchTotal,
-        note: `${formatIdr(breakdown.extraBranchUnitPrice)} per cabang • per bulan`,
-      })
-    }
+  const includedModuleNames = useMemo(() => getUniqueLabels([
+    ...packageArchitecture.verticalModules,
+    ...breakdown.addons
+      .filter((addon) => addon.kind === 'module')
+      .map((addon) => addon.name),
+  ]), [breakdown.addons, packageArchitecture.verticalModules])
 
-    if (rows.length === 0) {
-      rows.push({
-        label: itemName,
-        qty: 1,
-        total: Number(invoice.amount || 0),
-        note: invoice.package?.billing ? `Skema billing: ${invoice.package.billing}` : null,
-      })
-    }
+  const includedAddonNames = useMemo(() => getUniqueLabels([
+    ...packageArchitecture.addons,
+    ...breakdown.addons
+      .filter((addon) => addon.kind !== 'module')
+      .map((addon) => addon.name),
+  ]), [breakdown.addons, packageArchitecture.addons])
 
-    return rows
-  }, [breakdown, invoice.amount, invoice.package?.billing, itemName])
+  const pricingRows: PricingRow[] = []
+  const baseLabel = breakdown.coreFamilyName
+    ? `Core Family ${breakdown.coreFamilyName}`
+    : invoice.package?.name
+      ? `Core Family ${invoice.package.name}`
+      : itemName
+  const baseLayer = breakdown.coreFamilyLayer || packageArchitecture.bundleLabel
+
+  if (breakdown.baseAmount && breakdown.baseAmount > 0) {
+    pricingRows.push({
+      label: baseLabel,
+      qty: 1,
+      total: breakdown.baseAmount,
+      note: `${baseLayer}${invoice.package?.billing ? ` • Skema billing: ${invoice.package.billing}` : ' • Per bulan'}`,
+    })
+  }
+
+  breakdown.addons.forEach((addon) => {
+    const cadenceNote = addon.isSingleBill ? ' • single bill' : ' • per bulan'
+    pricingRows.push({
+      label: `${getMarketplaceLabel(addon.kind)} ${addon.name}`,
+      qty: 1,
+      total: addon.promoPrice,
+      note: addon.anchorPrice && addon.anchorPrice > addon.promoPrice
+        ? `Harga referensi ${formatIdr(addon.anchorPrice)}${cadenceNote}`
+        : addon.anchorPrice
+          ? `Harga ${formatIdr(addon.anchorPrice)}${cadenceNote}`
+          : addon.isSingleBill ? 'Single bill' : 'Per bulan',
+    })
+  })
+
+  if (breakdown.aiTokenTotal > 0) {
+    pricingRows.push({
+      label: breakdown.aiTokenLabel || 'Paket Token AI',
+      qty: 1,
+      total: breakdown.aiTokenTotal,
+      note: 'Top-up token AI • one-time',
+    })
+  }
+
+  if (breakdown.extraEntityQty > 0 && breakdown.extraEntityTotal > 0) {
+    pricingRows.push({
+      label: 'Entitas tambahan',
+      qty: breakdown.extraEntityQty,
+      total: breakdown.extraEntityTotal,
+      note: `${formatIdr(breakdown.extraEntityUnitPrice)} per entitas • per bulan`,
+    })
+  }
+
+  if (breakdown.extraBranchQty > 0 && breakdown.extraBranchTotal > 0) {
+    pricingRows.push({
+      label: 'Cabang tambahan',
+      qty: breakdown.extraBranchQty,
+      total: breakdown.extraBranchTotal,
+      note: `${formatIdr(breakdown.extraBranchUnitPrice)} per cabang • per bulan`,
+    })
+  }
+
+  if (pricingRows.length === 0) {
+    pricingRows.push({
+      label: baseLabel,
+      qty: 1,
+      total: Number(invoice.amount || 0),
+      note: `${baseLayer}${invoice.package?.billing ? ` • Skema billing: ${invoice.package.billing}` : ''}`,
+    })
+  }
 
   const subtotalAmount = breakdown.subtotal
     ?? pricingRows.reduce((sum, row) => sum + row.total, 0)
@@ -538,7 +640,7 @@ export default function SaasDocumentView({
                   </span>
                   <span className="flex flex-col leading-none">
                     <span className="text-lg font-black uppercase tracking-tight text-white">NIZAM</span>
-                    <span className="mt-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-300">Cloud ERP</span>
+                    <MiniErpWordmark className="mt-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-300" erpClassName="text-amber-300" />
                   </span>
                 </div>
                 <div>
@@ -590,8 +692,12 @@ export default function SaasDocumentView({
                   <Badge>{statusLabel}</Badge>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <span>Paket</span>
+                  <span>Core Family</span>
                   <span className="text-right font-black text-slate-900">{invoice.package?.name || '-'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span>Layer</span>
+                  <span className="text-right font-black text-slate-900">{breakdown.coreFamilyLayer || packageArchitecture.bundleLabel}</span>
                 </div>
                 {invoice.package?.billing && (
                   <div className="flex items-center justify-between gap-4">
@@ -642,12 +748,12 @@ export default function SaasDocumentView({
             </div>
           </section>
 
-          {(includedModules.length > 0 || selectedAddonNames.length > 0 || additionalNote) && (
-            <section className="grid grid-cols-1 gap-4 border-t border-slate-100 bg-slate-50 px-6 py-6 md:grid-cols-3 md:px-10 print:grid-cols-3">
+          {(coreCoverage.length > 0 || includedModuleNames.length > 0 || includedAddonNames.length > 0 || additionalNote) && (
+            <section className="grid grid-cols-1 gap-4 border-t border-slate-100 bg-slate-50 px-6 py-6 md:grid-cols-2 md:px-10 xl:grid-cols-4 print:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Cakupan Modul</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Cakupan Core Family</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {includedModules.length > 0 ? includedModules.map((moduleName) => (
+                  {coreCoverage.length > 0 ? coreCoverage.map((moduleName) => (
                     <span
                       key={moduleName}
                       className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700"
@@ -655,7 +761,23 @@ export default function SaasDocumentView({
                       {moduleName}
                     </span>
                   )) : (
-                    <span className="text-xs font-semibold text-slate-400">Tidak ada data modul.</span>
+                    <span className="text-xs font-semibold text-slate-400">Tidak ada data core family.</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Module Tercakup</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {includedModuleNames.length > 0 ? includedModuleNames.map((moduleName) => (
+                    <span
+                      key={moduleName}
+                      className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-sky-700"
+                    >
+                      {moduleName}
+                    </span>
+                  )) : (
+                    <span className="text-xs font-semibold text-slate-400">Tidak ada module tambahan.</span>
                   )}
                 </div>
               </div>
@@ -663,7 +785,7 @@ export default function SaasDocumentView({
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Add-on Tercakup</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {selectedAddonNames.length > 0 ? selectedAddonNames.map((addonName) => (
+                  {includedAddonNames.length > 0 ? includedAddonNames.map((addonName) => (
                     <span
                       key={addonName}
                       className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-indigo-700"

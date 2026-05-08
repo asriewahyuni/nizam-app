@@ -4,10 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { Product } from '@/types/database.types'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
+import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 
 type ProductInventoryFields = Pick<
   Product,
-  'id' | 'name' | 'sku' | 'type' | 'unit' | 'purchase_price' | 'selling_price' | 'category' | 'is_active'
+  'id' | 'name' | 'sku' | 'type' | 'unit' | 'purchase_price' | 'selling_price' | 'category' | 'is_active' | 'created_at' | 'updated_at'
 > & {
   barcode?: string | null
   average_cost?: number | null
@@ -92,6 +93,41 @@ function isStockMovementsBranchSchemaMissing(error: { code?: string | null; mess
   return isSchemaColumnMissing(error, 'stock_movements', 'branch_id')
 }
 
+function normalizeOptionalText(value: unknown) {
+  const trimmed = String(value ?? '').trim()
+  return trimmed || null
+}
+
+function sanitizeProductMutationPayload(productData: Partial<Product>) {
+  const nextPayload = { ...productData }
+
+  if ('sku' in nextPayload) {
+    nextPayload.sku = normalizeOptionalText(nextPayload.sku)
+  }
+
+  if ('barcode' in nextPayload) {
+    nextPayload.barcode = normalizeOptionalText(nextPayload.barcode)
+  }
+
+  if ('name' in nextPayload && typeof nextPayload.name === 'string') {
+    nextPayload.name = nextPayload.name.trim()
+  }
+
+  if ('unit' in nextPayload && typeof nextPayload.unit === 'string') {
+    nextPayload.unit = nextPayload.unit.trim() || 'Pcs'
+  }
+
+  if ('category' in nextPayload && typeof nextPayload.category === 'string') {
+    nextPayload.category = nextPayload.category.trim()
+  }
+
+  if ('description' in nextPayload) {
+    nextPayload.description = normalizeOptionalText(nextPayload.description)
+  }
+
+  return nextPayload
+}
+
 type ActiveBranchResult =
   | { branchId: string }
   | { error: string }
@@ -162,7 +198,7 @@ export async function getProducts(orgId: string, branchId?: string | null): Prom
 
   const { data: productsData } = await supabase
     .from('products')
-    .select('id, name, sku, barcode, type, unit, purchase_price, selling_price, category, average_cost, is_active')
+    .select('id, name, sku, barcode, type, unit, purchase_price, selling_price, category, average_cost, is_active, created_at, updated_at')
     .eq('org_id', orgId)
     .order('name', { ascending: true })
 
@@ -229,10 +265,11 @@ export async function getProducts(orgId: string, branchId?: string | null): Prom
 
 export async function createProduct(productData: Partial<Product>) {
   const supabase = await createClient()
+  const normalizedProductData = sanitizeProductMutationPayload(productData)
 
   const { data, error } = await (supabase as any)
     .from('products')
-    .insert([productData])
+    .insert([normalizedProductData])
     .select()
     .single()
 
@@ -242,15 +279,17 @@ export async function createProduct(productData: Partial<Product>) {
   }
 
   revalidatePath('/inventory')
+  await nudgeEduModeValidation('inventory.create.product')
   return { data: data as Product }
 }
 
 export async function updateProduct(id: string, orgId: string, productData: Partial<Product>) {
   const supabase = await createClient()
+  const normalizedProductData = sanitizeProductMutationPayload(productData)
 
   const { data, error } = await (supabase as any)
     .from('products')
-    .update(productData)
+    .update(normalizedProductData)
     .eq('id', id)
     .eq('org_id', orgId)
     .select()

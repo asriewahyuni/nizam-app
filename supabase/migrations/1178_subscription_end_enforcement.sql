@@ -1,3 +1,4 @@
+-- Migration target: Railway Postgres (applied via DATABASE_URL)
 -- Migration: Add subscription_end to organizations and enforce it on new sign-ups
 -- This column holds the exact timestamp when the org's current plan expires.
 -- NULL means unlimited / not yet set (legacy orgs retain access).

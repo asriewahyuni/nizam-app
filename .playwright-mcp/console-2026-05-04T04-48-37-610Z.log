@@ -1,0 +1,35 @@
+[    3773ms] [LOG] [Client Instrumentation Hook] Slow execution detected: 34ms (Note: Code download overhead is not included in this measurement) @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:702
+[    3812ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[    3943ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[    4121ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[    5165ms] [LOG] [Fast Refresh] done in 1172ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[    5536ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[    5895ms] [LOG] [Fast Refresh] done in 461ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   17732ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   19435ms] [LOG] [Fast Refresh] done in 1808ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   29459ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   30317ms] [LOG] [Fast Refresh] done in 965ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   36372ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   37378ms] [LOG] [Fast Refresh] done in 1111ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   46846ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   47029ms] [LOG] [Fast Refresh] done in 290ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   61796ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   73520ms] [LOG] [Fast Refresh] done in 11822ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   79986ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   81216ms] [LOG] [Fast Refresh] done in 1331ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   90625ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   90752ms] [LOG] [Fast Refresh] done in 238ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 1995729ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5034984ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5139322ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5139498ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5140974ms] [LOG] [Fast Refresh] done in 1577ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5482802ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5558223ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5558457ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5558575ms] [LOG] [Fast Refresh] done in 219ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5580597ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5768039ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 6243307ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 6252446ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 6256704ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073

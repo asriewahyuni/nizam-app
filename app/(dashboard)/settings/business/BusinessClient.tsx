@@ -1,11 +1,17 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Settings, Save, Fingerprint, Building, Receipt, FileText, Upload, Check, AlertCircle, Plus, Trash2, Link as LinkIcon, Copy, X, Key, ShieldCheck, Clock, Zap, RotateCcw } from 'lucide-react'
+import { Settings, Save, Fingerprint, Building, FileText, Check, X, Key, Clock, Zap, RotateCcw, MessageCircle, Eye, EyeOff, Sparkles } from 'lucide-react'
 import { updateOrgSettings, uploadLogo, checkSlugAvailability } from '@/modules/organization/actions/org.actions'
 import { resetOrganizationData, type ResetOrganizationMode } from '@/modules/settings/actions/audit.actions'
 import { motion, AnimatePresence } from 'framer-motion'
+import {
+  STARTUP_WIZARD_HIDE_STORAGE_KEY,
+  STARTUP_WIZARD_VISIBILITY_EVENT,
+  isStartupWizardHiddenInBrowser,
+  setStartupWizardHiddenInBrowser,
+} from '@/lib/startup-wizard/preferences'
 
 type BusinessSettingsMap = Record<string, string | number | boolean | null | undefined>
 type BusinessProfile = {
@@ -13,6 +19,10 @@ type BusinessProfile = {
   slug?: string
   logo_url?: string | null
   settings?: BusinessSettingsMap
+}
+
+function normalizeLogoUrl(value: unknown) {
+  return String(value || '').trim()
 }
 
 export default function BusinessClient({ 
@@ -28,12 +38,40 @@ export default function BusinessClient({
 }) {
   const [settings, setSettings] = useState<BusinessSettingsMap>(initialSettings?.settings || {})
   const [currentSlug, setCurrentSlug] = useState(initialSettings?.slug || '')
+  const [savedLogoUrl, setSavedLogoUrl] = useState(normalizeLogoUrl(initialSettings?.logo_url))
+  const [logoInputValue, setLogoInputValue] = useState(normalizeLogoUrl(initialSettings?.logo_url))
   const [loading, setLoading] = useState(false)
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [logoControlsReady, setLogoControlsReady] = useState(false)
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
+  const [startupWizardHiddenInBrowserState, setStartupWizardHiddenInBrowserState] = useState(false)
   const [isResetModalOpen, setIsResetModalOpen] = useState(false)
   const [resetMode, setResetMode] = useState<ResetOrganizationMode>('transactions')
   const [resetConfirmation, setResetConfirmation] = useState('')
 
+  useEffect(() => {
+    setLogoControlsReady(true)
+
+    const syncStartupWizardState = () => {
+      setStartupWizardHiddenInBrowserState(isStartupWizardHiddenInBrowser())
+    }
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key && event.key !== STARTUP_WIZARD_HIDE_STORAGE_KEY) return
+      syncStartupWizardState()
+    }
+
+    syncStartupWizardState()
+    window.addEventListener(STARTUP_WIZARD_VISIBILITY_EVENT, syncStartupWizardState as EventListener)
+    window.addEventListener('storage', handleStorage)
+
+    return () => {
+      window.removeEventListener(STARTUP_WIZARD_VISIBILITY_EVENT, syncStartupWizardState as EventListener)
+      window.removeEventListener('storage', handleStorage)
+    }
+  }, [])
+
+  const startupWizardEnabled = settings.startup_wizard_enabled !== false
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -53,9 +91,15 @@ export default function BusinessClient({
       po_format: (formData.get('po_format') as string) || 'PO-{YYYY}{MM}-{0000}',
       so_format: (formData.get('so_format') as string) || 'SO/{YY}/{MM}/{000}',
       inv_format: (formData.get('inv_format') as string) || 'INV/NIZ/{YYYY}/{0000}',
+      startup_wizard_enabled: formData.get('startup_wizard_enabled') === 'on',
+      pos_wa_custom_message: (formData.get('pos_wa_custom_message') as string) || '',
+      pos_require_open_shift: formData.get('pos_require_open_shift') === 'on',
+      pos_enable_shift_settlement: formData.get('pos_enable_shift_settlement') === 'on',
+      pos_default_register_code: (formData.get('pos_default_register_code') as string) || 'REG-1',
+      pos_variance_approval_threshold: Number(formData.get('pos_variance_approval_threshold') || 0) || 0,
     }
     
-    const logoUrl = formData.get('logo_url') as string
+    const logoUrl = normalizeLogoUrl(formData.get('logo_url'))
 
     const res = await updateOrgSettings(orgId, { 
        settings: newSettings,
@@ -67,6 +111,8 @@ export default function BusinessClient({
     else {
       setSettings(newSettings)
       if (newSlug) setCurrentSlug(newSlug)
+      setSavedLogoUrl(logoUrl)
+      setLogoInputValue(logoUrl)
       setSlugStatus('idle')
       alert('Pengaturan Bisnis berhasil disimpan!')
     }
@@ -134,14 +180,6 @@ export default function BusinessClient({
               <FileText size={16} />
               Buka Pusat Migrasi
             </Link>
-            <a
-              href="/templates/migrasi/NIZAM_Migration_Template.xlsx"
-              download
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
-            >
-              <Upload size={16} />
-              Download Template
-            </a>
           </div>
         </div>
       </div>
@@ -157,7 +195,7 @@ export default function BusinessClient({
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/settings/api"
+              href="/developers/api"
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-white transition hover:bg-violet-700"
             >
               <Key size={16} />
@@ -179,8 +217,9 @@ export default function BusinessClient({
            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 p-10 bg-slate-50/50 rounded-[32px] border border-slate-100/50 shadow-inner">
               <div className="md:col-span-3 bg-white p-8 rounded-3xl border border-slate-200 flex flex-col md:flex-row gap-8 items-center shadow-sm">
                  <div className="w-32 h-32 bg-slate-50 rounded-[28px] border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-inner group relative">
-                    {initialSettings.logo_url ? (
-                       <img src={initialSettings.logo_url} alt="Logo" className="w-full h-full object-contain" />
+                    {savedLogoUrl ? (
+                       // eslint-disable-next-line @next/next/no-img-element
+                       <img src={savedLogoUrl} alt="Logo" className="w-full h-full object-contain" />
                     ) : (
                        <Building size={32} className="text-slate-300" />
                     )}
@@ -192,29 +231,60 @@ export default function BusinessClient({
                         <p className="text-[10px] text-slate-400 italic">Recommended format: Square (1:1) PNG or SVG with transparency.</p>
                      </div>
                      
-                     <div className="flex flex-col sm:flex-row gap-4 items-center">
-                        <input type="file" id="logo-upload" className="hidden" accept="image/*" onChange={(e) => {
-                           const file = e.target.files?.[0];
-                           if (file) {
-                              const fd = new FormData();
-                              fd.append('file', file);
-                              uploadLogo(orgId, fd).then(res => {
-                                 if (res.error) alert(res.error);
-                                 else window.location.reload();
-                              });
-                           }
-                        }} disabled={loading} />
-                        
-                        <div className="flex-1 w-full space-y-1 group">
-                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Logo URL Connection</label>
-                           <input 
-                              name="logo_url" 
-                              defaultValue={initialSettings.logo_url || ""}
-                              placeholder="https://cloud.com/brand/logo.png" 
-                              className="w-full px-5 py-3 text-[11px] border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold bg-slate-50 transition-all"
-                           />
-                        </div>
-                     </div>
+                     {logoControlsReady ? (
+                       <>
+                         <div className="flex flex-col sm:flex-row gap-4 items-center">
+                            <input type="file" id="logo-upload" className="hidden" accept="image/*" onChange={async (e) => {
+                               const input = e.currentTarget
+                               const file = input.files?.[0]
+                               if (!file) return
+
+                               setLogoUploading(true)
+
+                               try {
+                                  const fd = new FormData()
+                                  fd.append('file', file)
+                                  const res = await uploadLogo(orgId, fd)
+
+                                  if (res.error) {
+                                     alert(res.error)
+                                     return
+                                  }
+
+                                  const nextLogoUrl = normalizeLogoUrl(res.url)
+                                  setSavedLogoUrl(nextLogoUrl)
+                                  setLogoInputValue(nextLogoUrl)
+                                  alert('Logo perusahaan berhasil diperbarui!')
+                               } catch {
+                                  alert('Terjadi kesalahan saat mengunggah logo.')
+                               } finally {
+                                  setLogoUploading(false)
+                                  input.value = ''
+                               }
+                            }} disabled={loading || logoUploading} />
+                            
+                            <div className="flex-1 w-full space-y-1 group">
+                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Logo URL Connection</label>
+                               <input 
+                                  name="logo_url" 
+                                  value={logoInputValue}
+                                  onChange={(e) => setLogoInputValue(e.target.value)}
+                                  placeholder="https://cloud.com/brand/logo.png" 
+                                  className="w-full px-5 py-3 text-[11px] border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold bg-slate-50 transition-all"
+                                  disabled={loading || logoUploading}
+                               />
+                            </div>
+                         </div>
+                         <p className="text-[10px] text-slate-400">
+                            {logoUploading ? 'Sedang memproses logo...' : 'Anda bisa upload file langsung atau tempel URL gambar publik.'}
+                         </p>
+                       </>
+                     ) : (
+                       <div className="space-y-3">
+                          <div className="h-[58px] w-full rounded-2xl border border-slate-200 bg-slate-100/80" />
+                          <p className="text-[10px] text-slate-400">Menyiapkan kontrol logo...</p>
+                       </div>
+                     )}
                   </div>
               </div>
 
@@ -294,6 +364,156 @@ export default function BusinessClient({
               <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Alamat Headquarter</label>
               <textarea name="company_address" defaultValue={String(settings.company_address ?? '')} placeholder="Jl..." className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold min-h-[100px]" />
            </div>
+        </div>
+
+        <div className="space-y-8">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
+              <Sparkles size={20} className="text-slate-400" /> Startup Wizard
+            </h3>
+          </div>
+
+          <div className="rounded-[32px] border border-amber-100 bg-amber-50/40 p-8 shadow-inner space-y-6">
+            <label className="flex items-start gap-4 rounded-3xl border border-slate-200 bg-white px-5 py-4 cursor-pointer">
+              <input
+                type="checkbox"
+                name="startup_wizard_enabled"
+                defaultChecked={startupWizardEnabled}
+                className="mt-1 h-5 w-5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-black text-slate-900">Tampilkan Startup Wizard di Dashboard</span>
+                <span className="block text-[11px] font-medium text-slate-500 leading-6">
+                  Jika aktif, banner panduan langkah awal akan tampil di dashboard organisasi. Cocok untuk onboarding tim baru atau tenant yang masih setup awal.
+                </span>
+              </span>
+            </label>
+
+            <div className="rounded-3xl border border-slate-200 bg-white px-5 py-5 space-y-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Status Browser Saat Ini</div>
+                  <p className="mt-1 text-sm font-bold text-slate-900">
+                    {startupWizardHiddenInBrowserState ? 'Wizard sedang disembunyikan di browser ini.' : 'Wizard sedang diizinkan tampil di browser ini.'}
+                  </p>
+                  <p className="mt-1 text-[11px] font-medium text-slate-500 leading-6">
+                    Pengaturan ini hanya berlaku untuk browser yang sedang Anda pakai sekarang, bukan untuk semua perangkat.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextHiddenState = !startupWizardHiddenInBrowserState
+                    setStartupWizardHiddenInBrowser(nextHiddenState)
+                  }}
+                  disabled={!startupWizardEnabled}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-900 px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {startupWizardHiddenInBrowserState ? <Eye size={14} /> : <EyeOff size={14} />}
+                  {startupWizardHiddenInBrowserState ? 'Show Lagi di Browser Ini' : 'Hide di Browser Ini'}
+                </button>
+              </div>
+
+              {!startupWizardEnabled && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-bold text-amber-700 leading-6">
+                  Startup Wizard sedang dimatikan dari setting bisnis. Simpan perubahan dulu bila ingin menampilkannya lagi di dashboard.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
+              <MessageCircle size={20} className="text-slate-400" /> Template WhatsApp POS
+            </h3>
+          </div>
+
+          <div className="rounded-[32px] border border-emerald-100 bg-emerald-50/40 p-8 shadow-inner space-y-4">
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Pesan Tambahan Default</label>
+              <textarea
+                name="pos_wa_custom_message"
+                defaultValue={String(settings.pos_wa_custom_message ?? '')}
+                placeholder="Contoh: Terima kasih Kak {customer_name}. Simpan nomor ini untuk info promo berikutnya."
+                className="w-full min-h-[140px] px-5 py-4 text-sm border border-slate-200 rounded-[28px] outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 font-medium bg-white"
+              />
+            </div>
+            <p className="text-[11px] font-medium text-slate-500 leading-6">
+              Template ini otomatis muncul di POS saat kasir mengirim struk WhatsApp. Placeholder yang didukung:
+              {' '}<code>{'{customer_name}'}</code>, <code>{'{sale_id}'}</code>, <code>{'{item_count}'}</code>, <code>{'{subtotal}'}</code>, <code>{'{discount}'}</code>, <code>{'{tax}'}</code>, dan <code>{'{total}'}</code>.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
+              <Clock size={20} className="text-slate-400" /> Operasional Shift POS
+            </h3>
+          </div>
+
+          <div className="rounded-[32px] border border-blue-100 bg-blue-50/40 p-8 shadow-inner space-y-6">
+            <label className="flex items-start gap-4 rounded-3xl border border-slate-200 bg-white px-5 py-4 cursor-pointer">
+              <input
+                type="checkbox"
+                name="pos_require_open_shift"
+                defaultChecked={Boolean(settings.pos_require_open_shift)}
+                className="mt-1 h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-black text-slate-900">Wajib Buka Shift Sebelum Checkout POS</span>
+                <span className="block text-[11px] font-medium text-slate-500 leading-6">
+                  Jika aktif, checkout POS akan terkunci sampai kasir membuka shift terlebih dahulu. Aman untuk rollout bertahap karena default-nya tetap nonaktif.
+                </span>
+              </span>
+            </label>
+
+            <label className="flex items-start gap-4 rounded-3xl border border-slate-200 bg-white px-5 py-4 cursor-pointer">
+              <input
+                type="checkbox"
+                name="pos_enable_shift_settlement"
+                defaultChecked={Boolean(settings.pos_enable_shift_settlement)}
+                className="mt-1 h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-black text-slate-900">Aktifkan Settlement Shift ke Jurnal</span>
+                <span className="block text-[11px] font-medium text-slate-500 leading-6">
+                  Menampilkan modal settlement di POS untuk memindahkan saldo kas/clearing shift ke akun tujuan secara terposting.
+                </span>
+              </span>
+            </label>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Kode Register Default</label>
+                <input
+                  name="pos_default_register_code"
+                  defaultValue={String(settings.pos_default_register_code ?? 'REG-1')}
+                  placeholder="REG-1"
+                  className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold bg-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Ambang Selisih Kas</label>
+                <input
+                  name="pos_variance_approval_threshold"
+                  type="number"
+                  min="0"
+                  defaultValue={String(settings.pos_variance_approval_threshold ?? 0)}
+                  placeholder="0"
+                  className="w-full px-5 py-3 text-sm border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+              <p className="text-[11px] font-bold text-indigo-700 leading-relaxed">
+                Pola rollout aman: aktifkan dulu <code>Wajib Buka Shift</code> pada satu cabang pilot, lalu nyalakan <code>Settlement</code> setelah akun kas/clearing cabang tersebut sudah siap.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-8">

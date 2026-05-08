@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { signUp } from '@/modules/auth/actions/auth.actions'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { User, Mail, Lock, ArrowRight, AlertCircle, CheckCircle2, Building, ShieldCheck } from 'lucide-react'
+import { User, Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2, Building, ShieldCheck } from 'lucide-react'
 
 type SignUpResult = Awaited<ReturnType<typeof signUp>>
 
@@ -38,6 +38,7 @@ function RegisterPageContent() {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
   const searchParams = useSearchParams()
   const [formData, setFormData] = useState({ fullName: '', email: '', password: '' })
   const source = (searchParams.get('source') || '').trim().toLowerCase()
@@ -153,16 +154,24 @@ function RegisterPageContent() {
         <div className="space-y-2">
            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Create Password</label>
            <div className="relative">
+              <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 minLength={8}
                 placeholder="Minimal 8 Karakter"
                 value={formData.password}
                 onChange={e => setFormData({...formData, password: e.target.value})}
-                className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all pr-12"
+                className="w-full py-4 pl-12 pr-12 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all"
               />
-              <Lock className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+              <button
+                type="button"
+                onClick={() => setShowPassword((previous) => !previous)}
+                aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
            </div>
         </div>
 

@@ -13,6 +13,7 @@ import { revalidatePath } from 'next/cache'
 import type { Account, AccountType, NormalBalance, AccountBalance } from '@/types/database.types'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { isInternalAuthProvider } from '@/lib/auth/provider'
+import { setShariahAccountsActive as syncShariahAccountsActive } from './shariah.actions'
 
 type MirrorableAccount = Pick<
   Account,
@@ -731,6 +732,27 @@ export async function deleteAccount(accountId: string, orgId: string) {
     return { error: 'Akun ini sudah memiliki transaksi. Nonaktifkan saja, jangan hapus.' }
   }
 
+  // Check for payroll component mappings
+  const { count: payrollComponentCount } = await (supabase as any)
+    .from('payroll_components')
+    .select('*', { count: 'exact', head: true })
+    .eq('org_id', orgId)
+    .eq('account_id', accountId)
+
+  if ((payrollComponentCount ?? 0) > 0) {
+    return { error: 'Akun ini masih dipakai pada komponen payroll. Ganti mapping payroll atau nonaktifkan akun ini.' }
+  }
+
+  // Check for persisted payslip lines
+  const { count: payslipLineCount } = await (supabase as any)
+    .from('payslip_lines')
+    .select('*', { count: 'exact', head: true })
+    .eq('account_id', accountId)
+
+  if ((payslipLineCount ?? 0) > 0) {
+    return { error: 'Akun ini sudah dipakai pada slip gaji/payroll. Nonaktifkan saja, jangan hapus.' }
+  }
+
   const { error } = await (supabase as any)
     .from('accounts')
     .delete()
@@ -743,6 +765,18 @@ export async function deleteAccount(accountId: string, orgId: string) {
     const errorCode = String((error as any)?.code || '')
 
     if (errorCode === '23503') {
+      if (normalizedMessage.includes('payslip_lines_account_id_fkey')) {
+        return {
+          error: 'Akun ini sudah dipakai pada slip gaji/payroll. Nonaktifkan saja, jangan hapus.',
+        }
+      }
+
+      if (normalizedMessage.includes('payroll_components_account_id_fkey')) {
+        return {
+          error: 'Akun ini masih dipakai pada komponen payroll. Ganti mapping payroll atau nonaktifkan akun ini.',
+        }
+      }
+
       return {
         error:
           'Akun masih dipakai pada data lain (mis. bank account, produk, payroll, aset, budget, atau transaksi terkait). Lepaskan relasinya terlebih dahulu.',
@@ -876,25 +910,5 @@ export async function seedInitialCoA(orgId: string, options?: SeedInitialCoAOpti
 // setShariahAccountsActive — Toggle Syariah Accounts
 // ─────────────────────────────────────────────────────────────
 export async function setShariahAccountsActive(orgId: string, active: boolean) {
-  const supabase = await createClient()
-
-  // Hanya 3100 yang tidak lagi dipakai pada CoAS.
-  // 3110 & 3120 tetap dipertahankan sebagai akun Syirkah.
-  const activationCodes = ['1404', '2600', '2601', '2602', '3110', '3120', '6100', '6110', '6120', '6200', '6210', '6220', '6230']
-  const deactivationCodes = [...activationCodes, '3100']
-  const syariahCodes = active ? activationCodes : deactivationCodes
-
-  const { error } = await (supabase as any)
-    .from('accounts')
-    .update({ is_active: active })
-    .eq('org_id', orgId)
-    .filter('code', 'in', `(${syariahCodes.join(',')})`)
-
-  if (error) {
-    (console as any).error('Toggle Syariah Error:', error)
-    return { error: 'Gagal mengubah status akun Syariah.' }
-  }
-
-  revalidatePath('/settings/accounts')
-  return { success: true }
+  return syncShariahAccountsActive(orgId, active)
 }

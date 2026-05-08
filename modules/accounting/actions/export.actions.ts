@@ -6,66 +6,46 @@
  * Board Sprint 1 — Executed.
  */
 
-import { createClient } from '@/lib/supabase/server'
 import { getProfitLoss, getBalanceSheet, getGeneralLedger } from './reports.actions'
 import { getZakatSummary } from './zakat.actions'
 import ExcelJS from 'exceljs'
 
 // ─────────────────────────────────────────────────────────────
-// Styling helpers — Enterprise look, not toy
+// Styling helpers — versi polos tanpa warna dan tanpa garis
 // ─────────────────────────────────────────────────────────────
-const NIZAM_BLUE = 'FF003366'
-const HEADER_BG = 'FF1E3A5F'
-const ALT_ROW = 'FFF0F4FF'
-const BORDER_STYLE: ExcelJS.BorderStyle = 'thin'
+function applyPlainSheetLook(sheet: ExcelJS.Worksheet) {
+  sheet.views = [{ showGridLines: false }]
+}
 
-function styleHeaderRow(row: ExcelJS.Row, bgColor: string = HEADER_BG) {
+function styleHeaderRow(row: ExcelJS.Row, bgColor = '') {
+  void bgColor
   row.eachCell((cell) => {
-    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 }
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } }
+    cell.font = { bold: true, size: 10 }
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
-    cell.border = {
-      top: { style: BORDER_STYLE }, bottom: { style: BORDER_STYLE },
-      left: { style: BORDER_STYLE }, right: { style: BORDER_STYLE }
-    }
   })
-  row.height = 30
+  row.height = 20
 }
 
 function styleSectionHeader(row: ExcelJS.Row) {
   row.eachCell((cell) => {
-    cell.font = { bold: true, color: { argb: NIZAM_BLUE }, size: 10 }
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EDF5' } }
-    cell.border = {
-      bottom: { style: BORDER_STYLE, color: { argb: NIZAM_BLUE } }
-    }
+    cell.font = { bold: true, size: 10 }
   })
 }
 
 function styleDataRow(row: ExcelJS.Row, isAlt: boolean) {
+  void isAlt
   row.eachCell((cell) => {
-    cell.fill = isAlt 
-      ? { type: 'pattern', pattern: 'solid', fgColor: { argb: ALT_ROW } }
-      : { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }
     cell.font = { size: 9 }
-    cell.border = {
-      bottom: { style: 'hair' as ExcelJS.BorderStyle },
-      left: { style: BORDER_STYLE }, right: { style: BORDER_STYLE }
-    }
   })
 }
 
 function styleTotalRow(row: ExcelJS.Row) {
   row.eachCell((cell) => {
-    cell.font = { bold: true, size: 10, color: { argb: NIZAM_BLUE } }
-    cell.border = {
-      top: { style: 'medium' as ExcelJS.BorderStyle, color: { argb: NIZAM_BLUE } },
-      bottom: { style: 'double' as ExcelJS.BorderStyle, color: { argb: NIZAM_BLUE } }
-    }
+    cell.font = { bold: true, size: 10 }
   })
 }
 
-function addWorkbookMetadata(wb: ExcelJS.Workbook, orgName: string) {
+function addWorkbookMetadata(wb: ExcelJS.Workbook) {
   wb.creator = 'NIZAM ERP'
   wb.lastModifiedBy = 'NIZAM ERP Export Engine'
   wb.created = new Date()
@@ -82,34 +62,25 @@ function addNizamHeader(sheet: ExcelJS.Worksheet, title: string, subtitle: strin
   sheet.mergeCells('A1:F1')
   const r1 = sheet.getRow(1)
   r1.getCell(1).value = orgName.toUpperCase()
-  r1.getCell(1).font = { bold: true, size: 14, color: { argb: NIZAM_BLUE } }
+  r1.getCell(1).font = { bold: true, size: 12 }
   r1.getCell(1).alignment = { horizontal: 'center' }
-  r1.height = 22
+  r1.height = 18
 
   // Row 2: Report title
   sheet.mergeCells('A2:F2')
   const r2 = sheet.getRow(2)
   r2.getCell(1).value = title
-  r2.getCell(1).font = { bold: true, size: 12 }
+  r2.getCell(1).font = { bold: true, size: 11 }
   r2.getCell(1).alignment = { horizontal: 'center' }
-  r2.height = 18
+  r2.height = 16
 
   // Row 3: Subtitle/period
   sheet.mergeCells('A3:F3')
   const r3 = sheet.getRow(3)
   r3.getCell(1).value = subtitle
-  r3.getCell(1).font = { italic: true, size: 9, color: { argb: 'FF666666' } }
+  r3.getCell(1).font = { italic: true, size: 9 }
   r3.getCell(1).alignment = { horizontal: 'center' }
-
-  // Row 4: Generated timestamp
-  sheet.mergeCells('A4:F4')
-  const r4 = sheet.getRow(4)
-  r4.getCell(1).value = `Digenerate oleh NIZAM ERP pada ${new Date().toLocaleString('id-ID')}`
-  r4.getCell(1).font = { size: 8, color: { argb: 'FF999999' } }
-  r4.getCell(1).alignment = { horizontal: 'center' }
-
-  // Row 5: Spacer
-  sheet.getRow(5).height = 10
+  r3.height = 14
 }
 
 
@@ -127,8 +98,9 @@ export async function exportProfitLossXLSX(
   const data = await getProfitLoss(orgId, startDate, endDate, branchId, consolidated)
   
   const wb = new ExcelJS.Workbook()
-  addWorkbookMetadata(wb, orgName)
+  addWorkbookMetadata(wb)
   const sheet = wb.addWorksheet('Laba Rugi', { pageSetup: { paperSize: 9, orientation: 'portrait' } })
+  applyPlainSheetLook(sheet)
 
   sheet.columns = [
     { key: 'code', width: 12 },
@@ -136,7 +108,7 @@ export async function exportProfitLossXLSX(
     { key: 'amount', width: 22 },
   ]
 
-  addNizamHeader(sheet, 'LAPORAN LABA RUGI', `Periode: ${startDate} s/d ${endDate}`, orgName)
+  addNizamHeader(sheet, 'LABA RUGI', `${startDate} - ${endDate}`, orgName)
 
   // Revenue Header
   const revHeader = sheet.addRow(['Kode', 'Nama Akun', 'Nominal'])
@@ -176,12 +148,7 @@ export async function exportProfitLossXLSX(
   // Net Profit Row
   const netRow = sheet.addRow(['', 'LABA (RUGI) BERSIH', formatRupiahExcel(data.netProfit)])
   netRow.eachCell((cell) => {
-    cell.font = { bold: true, size: 12, color: { argb: data.netProfit >= 0 ? 'FF16A34A' : 'FFDC2626' } }
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: data.netProfit >= 0 ? 'FFF0FDF4' : 'FFFEF2F2' } }
-    cell.border = {
-      top: { style: 'double' as ExcelJS.BorderStyle, color: { argb: NIZAM_BLUE } },
-      bottom: { style: 'double' as ExcelJS.BorderStyle, color: { argb: NIZAM_BLUE } }
-    }
+    cell.font = { bold: true, size: 12 }
   })
   netRow.getCell(3).alignment = { horizontal: 'right' }
   netRow.height = 25
@@ -203,8 +170,9 @@ export async function exportBalanceSheetXLSX(
   const data = await getBalanceSheet(orgId, asOfDate, branchId, consolidated)
 
   const wb = new ExcelJS.Workbook()
-  addWorkbookMetadata(wb, orgName)
+  addWorkbookMetadata(wb)
   const sheet = wb.addWorksheet('Neraca', { pageSetup: { paperSize: 9, orientation: 'landscape' } })
+  applyPlainSheetLook(sheet)
 
   sheet.columns = [
     { key: 'code', width: 10 },
@@ -215,7 +183,7 @@ export async function exportBalanceSheetXLSX(
     { key: 'lia_amount', width: 22 },
   ]
 
-  addNizamHeader(sheet, 'NERACA (BALANCE SHEET)', `Per Tanggal: ${asOfDate}`, orgName)
+  addNizamHeader(sheet, 'NERACA', `Per ${asOfDate}`, orgName)
 
   // Column headers
   const hRow = sheet.addRow(['Kode', 'AKTIVA', 'Nominal', '', 'KEWAJIBAN & EKUITAS', 'Nominal'])
@@ -268,14 +236,16 @@ export async function exportGeneralLedgerXLSX(
   const entries = await getGeneralLedger(orgId, branchId, consolidated)
 
   const wb = new ExcelJS.Workbook()
-  addWorkbookMetadata(wb, orgName)
+  addWorkbookMetadata(wb)
   const sheet = wb.addWorksheet('Buku Besar', { pageSetup: { paperSize: 9, orientation: 'landscape' } })
+  applyPlainSheetLook(sheet)
 
   sheet.columns = [
     { key: 'no', width: 8 },
     { key: 'date', width: 14 },
     { key: 'entry_number', width: 14 },
-    { key: 'description', width: 40 },
+    { key: 'description', width: 28 },
+    { key: 'breakdown', width: 28 },
     { key: 'account_code', width: 10 },
     { key: 'account_name', width: 30 },
     { key: 'ref_type', width: 16 },
@@ -283,21 +253,23 @@ export async function exportGeneralLedgerXLSX(
     { key: 'credit', width: 20 },
   ]
 
-  addNizamHeader(sheet, 'BUKU BESAR UMUM (GENERAL LEDGER)', `Semua transaksi POSTED per ${new Date().toLocaleDateString('id-ID')}`, orgName)
+  addNizamHeader(sheet, 'BUKU BESAR', `POSTED ${new Date().toLocaleDateString('id-ID')}`, orgName)
 
-  const headerRow = sheet.addRow(['No', 'Tanggal', 'No. Jurnal', 'Keterangan', 'Kode Akun', 'Nama Akun', 'Tipe Referensi', 'DEBIT (Rp)', 'KREDIT (Rp)'])
+  const headerRow = sheet.addRow(['No', 'Tanggal', 'No. Jurnal', 'Keterangan', 'Catatan', 'Kode Akun', 'Nama Akun', 'Ref', 'Debit', 'Kredit'])
   styleHeaderRow(headerRow)
 
   let lineNo = 1
   entries.forEach((entry: any, idx: number) => {
     if (entry.journal_lines && entry.journal_lines.length > 0) {
       let isFirstLine = true
+      const breakdownNote = String(entry?.purchase_transparency?.note || entry?.notes || '').trim()
       entry.journal_lines.forEach((line: any) => {
         const row = sheet.addRow([
           isFirstLine ? lineNo : '',
           isFirstLine ? entry.entry_date : '',
           isFirstLine ? (entry.entry_number || '') : '',
           isFirstLine ? entry.description : '',
+          isFirstLine ? breakdownNote : '',
           line.accounts?.code || '',
           line.accounts?.name || '',
           isFirstLine ? (entry.reference_type || 'MANUAL') : '',
@@ -305,8 +277,8 @@ export async function exportGeneralLedgerXLSX(
           line.credit > 0 ? formatRupiahExcel(line.credit) : '',
         ])
         styleDataRow(row, idx % 2 === 0)
-        row.getCell(8).alignment = { horizontal: 'right' }
         row.getCell(9).alignment = { horizontal: 'right' }
+        row.getCell(10).alignment = { horizontal: 'right' }
         isFirstLine = false
       })
       lineNo++
@@ -322,14 +294,14 @@ export async function exportGeneralLedgerXLSX(
     return s + (e.journal_lines || []).reduce((ls: number, l: any) => ls + Number(l.credit || 0), 0)
   }, 0)
 
-  const totalRow = sheet.addRow(['', '', '', '', '', '', 'TOTAL', formatRupiahExcel(totalDebit), formatRupiahExcel(totalCredit)])
+  const totalRow = sheet.addRow(['', '', '', '', '', '', '', 'TOTAL', formatRupiahExcel(totalDebit), formatRupiahExcel(totalCredit)])
   styleTotalRow(totalRow)
-  totalRow.getCell(8).alignment = { horizontal: 'right' }
   totalRow.getCell(9).alignment = { horizontal: 'right' }
+  totalRow.getCell(10).alignment = { horizontal: 'right' }
 
   // Balance check
-  const balRow = sheet.addRow(['', '', '', '', '', '', 'SELISIH (harus 0)', formatRupiahExcel(Math.abs(totalDebit - totalCredit)), ''])
-  balRow.getCell(7).font = { italic: true, size: 8, color: { argb: Math.abs(totalDebit - totalCredit) < 0.01 ? 'FF16A34A' : 'FFDC2626' } }
+  const balRow = sheet.addRow(['', '', '', '', '', '', '', 'SELISIH (harus 0)', formatRupiahExcel(Math.abs(totalDebit - totalCredit)), ''])
+  balRow.getCell(8).font = { italic: true, size: 8 }
 
   return Buffer.from(await wb.xlsx.writeBuffer())
 }
@@ -348,8 +320,9 @@ export async function exportZakatReportXLSX(
   const data = await getZakatSummary(orgId, { goldPerGram, silverPerGram })
 
   const wb = new ExcelJS.Workbook()
-  addWorkbookMetadata(wb, orgName)
+  addWorkbookMetadata(wb)
   const sheet = wb.addWorksheet('Zakat Tijarah', { pageSetup: { paperSize: 9, orientation: 'portrait' } })
+  applyPlainSheetLook(sheet)
 
   sheet.columns = [
     { key: 'item', width: 40 },
@@ -357,9 +330,9 @@ export async function exportZakatReportXLSX(
     { key: 'notes', width: 40 },
   ]
 
-  addNizamHeader(sheet, 'LAPORAN ZAKAT TIJARAH', `Digenerate: ${new Date().toLocaleDateString('id-ID')}`, orgName)
+  addNizamHeader(sheet, 'ZAKAT TIJARAH', new Date().toLocaleDateString('id-ID'), orgName)
 
-  const scopeRow = sheet.addRow(['CAKUPAN LAPORAN', data.scopeLabel || 'Level Organisasi', 'Zakat Tijarah dihitung untuk seluruh organisasi, bukan per unit.'])
+  const scopeRow = sheet.addRow(['CAKUPAN', data.scopeLabel || 'Level Organisasi', 'Organisasi'])
   styleSectionHeader(scopeRow)
   sheet.mergeCells(`C${scopeRow.number}:C${scopeRow.number}`)
 
@@ -422,9 +395,9 @@ export async function exportZakatReportXLSX(
 
   // Disclaimer
   sheet.addRow([])
-  const disRow = sheet.addRow(['DISCLAIMER', '', ''])
-  disRow.getCell(1).value = '⚠ Laporan ini dihasilkan otomatis berdasarkan data akuntansi di NIZAM ERP. Untuk keputusan zakat final, konsultasikan dengan Lembaga Amil Zakat (LAZ) yang berwenang.'
-  disRow.getCell(1).font = { italic: true, size: 8, color: { argb: 'FF999999' } }
+  const disRow = sheet.addRow(['CATATAN', '', ''])
+  disRow.getCell(1).value = 'Periksa kembali sebelum dipakai final.'
+  disRow.getCell(1).font = { italic: true, size: 8 }
   sheet.mergeCells(`A${disRow.number}:C${disRow.number}`)
 
   return Buffer.from(await wb.xlsx.writeBuffer())

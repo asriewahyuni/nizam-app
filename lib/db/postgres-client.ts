@@ -19,7 +19,8 @@
  *   - RPC menjalankan SELECT fn(params) dan mengembalikan hasil pertama.
  */
 
-import { getPostgresPool, queryPostgres } from './postgres'
+import { getInternalAuthSession } from '@/lib/auth/internal-auth.server'
+import { connectPostgresClient, queryPostgres } from './postgres'
 
 // ─── FK constraint cache (fetched once from information_schema) ──────────────
 // Maps: "sourceTable.sourceCol" → "targetTable"
@@ -497,6 +498,59 @@ class PostgresQueryBuilder {
     return { data: rows, error: null }
   }
 
+  private _normalizeSelectedColumn(column: string): string {
+    return column.trim().replace(/^"+|"+$/g, '')
+  }
+
+  private _mergeSelectColumns(selectExpr: string, requiredColumns: string[]): string {
+    if (selectExpr === '*') return '*'
+
+    const columns = new Set(
+      splitTopLevel(selectExpr)
+        .map((column) => this._normalizeSelectedColumn(column))
+        .filter(Boolean)
+    )
+
+    for (const column of requiredColumns) {
+      const normalized = this._normalizeSelectedColumn(column)
+      if (normalized) columns.add(normalized)
+    }
+
+    return Array.from(columns).join(', ')
+  }
+
+  private async _collectSupportColumnsForSubRelations(
+    baseTable: string,
+    subRelations: string[]
+  ): Promise<string[]> {
+    if (subRelations.length === 0) return []
+
+    await loadFkCache()
+
+    const requiredColumns = new Set<string>()
+
+    for (const subRel of subRelations) {
+      const aliasMatch = subRel.match(/^(\w+):([\w!]+)\(([\s\S]*)\)$/)
+      const simpleMatch = subRel.match(/^([\w!]+)\(([\s\S]*)\)$/)
+      if (!aliasMatch && !simpleMatch) continue
+
+      const aliasRaw = aliasMatch ? aliasMatch[1] : simpleMatch![1]
+      const relTableRaw = aliasMatch ? aliasMatch[2] : simpleMatch![1]
+      const alias = aliasRaw.split('!')[0]
+      const relTable = relTableRaw.split('!')[0]
+
+      // Alias-based fallback tetap dipakai karena banyak query mengikuti pola branch -> branch_id, product -> product_id.
+      requiredColumns.add(`${alias}_id`)
+
+      for (const [key, value] of _fkCache.entries()) {
+        if (!key.startsWith(baseTable + '.') || value !== relTable) continue
+        requiredColumns.add(key.split('.')[1])
+      }
+    }
+
+    return Array.from(requiredColumns)
+  }
+
   /**
    * Resolusi nested relations menggunakan FK constraint dari PostgreSQL information_schema.
    *
@@ -539,6 +593,7 @@ class PostgresQueryBuilder {
       
       const relColExpr = flatRelCols
       const relTableQ = `public."${relTable.replace(/"/g, '""')}"`
+      const subRelationSupportCols = await this._collectSupportColumnsForSubRelations(relTable, subRelations)
 
       // --- Custom Strategy for specific FK column mapping (fallback when FK cache misses) ---
       // For instance, purchases -> contacts uses contact_id, but the alias might be 'vendor'
@@ -573,9 +628,7 @@ class PostgresQueryBuilder {
             // Always include 'id' in SELECT so relById map keys are populated
             const idSelectExpr = relColExpr === '*'
               ? '*'
-              : relColExpr.split(', ').map((c) => c.trim()).includes('id')
-                ? relColExpr
-                : `id, ${relColExpr}`
+              : this._mergeSelectColumns(relColExpr, ['id', ...subRelationSupportCols])
             let relResultRows = (await queryPostgres<Record<string, unknown>>(
               'SELECT ' + idSelectExpr + ' FROM ' + relTableQ + ' WHERE id = ANY($1::uuid[])',
               [foreignIds]
@@ -606,9 +659,7 @@ class PostgresQueryBuilder {
               // Always include 'id' in SELECT so relById map keys are populated
               const idSelectExpr2 = relColExpr === '*'
                 ? '*'
-                : relColExpr.split(', ').map((c) => c.trim()).includes('id')
-                  ? relColExpr
-                  : `id, ${relColExpr}`
+                : this._mergeSelectColumns(relColExpr, ['id', ...subRelationSupportCols])
               let relResultRows = (await queryPostgres<Record<string, unknown>>(
                 'SELECT ' + idSelectExpr2 + ' FROM ' + relTableQ + ' WHERE id = ANY($1::uuid[])',
                 [foreignIds]
@@ -649,9 +700,7 @@ class PostgresQueryBuilder {
             const backRefColQ = `"${backRefColFromCache.replace(/"/g, '""')}"`
             const backRefSelectExpr = relColExpr === '*'
               ? '*'
-              : relColExpr.split(', ').map((c) => c.trim()).includes(backRefColFromCache)
-                ? relColExpr
-                : `${relColExpr}, ${backRefColQ}`
+              : this._mergeSelectColumns(relColExpr, [backRefColFromCache, ...subRelationSupportCols])
 
             let relResultRows = (await queryPostgres<Record<string, unknown>>(
               'SELECT ' + backRefSelectExpr + ' FROM ' + relTableQ + ' WHERE ' + backRefColQ + ' = ANY($1::uuid[])',
@@ -814,26 +863,69 @@ async function callRpc(
   params?: Record<string, unknown>
 ): Promise<QueryResult> {
   try {
+    let authClaimValues: string[] = []
+
+    try {
+      const internalSession = await getInternalAuthSession()
+      const userId = String(internalSession?.user?.id || '').trim()
+      const email = String(internalSession?.user?.email || '').trim()
+
+      if (userId) {
+        const claimPayload = JSON.stringify({
+          sub: userId,
+          role: 'authenticated',
+          ...(email ? { email } : {}),
+        })
+
+        authClaimValues = [
+          userId,
+          'authenticated',
+          claimPayload,
+        ]
+      }
+    } catch {
+      // No request-scoped internal auth session is available (e.g. scripts/cron).
+      // In that case we call the RPC without auth claims injection.
+    }
+
     const args = params ? Object.entries(params) : []
-    const paramValues = args.map(([, v]) => {
-      if (v instanceof Date) {
-        return v.toISOString()
-      }
+    const paramValues = args.map(([, v]) => serializeRpcParam(v))
 
-      if (Array.isArray(v)) {
-        return JSON.stringify(v)
-      }
-
-      if (v && typeof v === 'object') {
-        return JSON.stringify(v)
-      }
-
-      return v
-    })
     // Build: SELECT * FROM fn(p1 => $1, p2 => $2)
     const argStr = args.map(([k], i) => `${k} => $${i + 1}`).join(', ')
     const sql = `SELECT * FROM public."${fnName.replace(/"/g, '""')}"(${argStr})`
-    const result = await queryPostgres<Record<string, unknown>>(sql, paramValues)
+    let result
+
+    if (authClaimValues.length > 0) {
+      const client = await connectPostgresClient()
+
+      try {
+        await client.query('BEGIN')
+        await client.query(
+          `
+            SELECT
+              set_config('request.jwt.claim.sub', $1::text, true),
+              set_config('request.jwt.claim.role', $2::text, true),
+              set_config('request.jwt.claims', $3::text, true)
+          `,
+          authClaimValues
+        )
+        result = await client.query<Record<string, unknown>>(sql, paramValues)
+        await client.query('COMMIT')
+      } catch (error) {
+        try {
+          await client.query('ROLLBACK')
+        } catch {
+          // Ignore rollback failures so the original RPC error is preserved.
+        }
+        throw error
+      } finally {
+        client.release()
+      }
+    } else {
+      result = await queryPostgres<Record<string, unknown>>(sql, paramValues)
+    }
+
     if (result.rows.length === 1) {
       const row = result.rows[0]
       const rowKeys = Object.keys(row)
@@ -854,6 +946,31 @@ async function callRpc(
     const code = (err as any)?.code
     return { data: null, error: { message, code } }
   }
+}
+
+function serializeRpcParam(value: unknown): unknown {
+  if (value instanceof Date) {
+    return value.toISOString()
+  }
+
+  if (Array.isArray(value)) {
+    const normalizedArray = value.map((item) => item instanceof Date ? item.toISOString() : item)
+
+    // Keep primitive arrays as native JS arrays so pg can bind them as
+    // PostgreSQL arrays (uuid[], text[], numeric[], etc.). Structured arrays
+    // still need JSON encoding for json/jsonb function parameters.
+    const hasStructuredItem = normalizedArray.some(
+      (item) => Array.isArray(item) || (item !== null && typeof item === 'object')
+    )
+
+    return hasStructuredItem ? JSON.stringify(normalizedArray) : normalizedArray
+  }
+
+  if (value && typeof value === 'object') {
+    return JSON.stringify(value)
+  }
+
+  return value
 }
 
 // ─── Main client factory ──────────────────────────────────────────────────────

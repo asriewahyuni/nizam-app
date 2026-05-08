@@ -1,14 +1,17 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Check, X, Bell, FileText, View, QrCode, ShieldCheck, AlertTriangle, Clock, Shield } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { decideApproval, getApprovalDetail, getApprovalHistory } from '@/modules/organization/actions/approval.actions'
+import { decideApproval, getApprovalDetail, getApprovalHistory, getPendingApprovals } from '@/modules/organization/actions/approval.actions'
+import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/browser/approval-notifier'
+import { getDocumentHeaderDiscountAmount, getDocumentLineDiscountsForDisplay, getDocumentLineDiscountTotal } from '@/lib/commerce/discounts'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { QRCodeSVG } from 'qrcode.react'
 
 interface ApprovalClientProps {
   orgId: string
+  activeBranchId?: string | null
   initialApprovals: any[]
 }
 
@@ -24,6 +27,13 @@ function getSourceTypeTone(sourceType: string) {
     return {
       icon: 'bg-indigo-50 text-indigo-600',
       badge: 'bg-indigo-50 text-indigo-700',
+    }
+  }
+
+  if (sourceType === 'CONSTRUCTION_CHANGE_ORDER') {
+    return {
+      icon: 'bg-amber-50 text-amber-600',
+      badge: 'bg-amber-50 text-amber-700',
     }
   }
 
@@ -74,7 +84,15 @@ function getLogActorDisplayText(log: any) {
   return getApproverDisplayText(log)
 }
 
-export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps) {
+function getPurchaseLineGrossTotal(item: any) {
+  return Number(item?.quantity || 0) * Number(item?.unit_price || 0)
+}
+
+function getPurchaseLineNetTotal(item: any, displayDiscountAmount: number) {
+  return getPurchaseLineGrossTotal(item) - displayDiscountAmount + Number(item?.tax_amount || 0)
+}
+
+export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals }: ApprovalClientProps) {
   const [approvals, setApprovals] = useState(initialApprovals)
   const [history, setHistory] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'PENDING' | 'HISTORY'>('PENDING')
@@ -86,6 +104,9 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
   const [detailData, setDetailData] = useState<any>(null)
   const [detailLogs, setDetailLogs] = useState<any[]>([])
   const [loadingDetail, setLoadingDetail] = useState(false)
+  const purchaseLineDiscountTotal = getDocumentLineDiscountTotal(detailData?.purchase_items || [])
+  const purchaseHeaderDiscountAmount = getDocumentHeaderDiscountAmount(detailData, purchaseLineDiscountTotal)
+  const purchaseLineDisplayDiscounts = getDocumentLineDiscountsForDisplay(detailData)
 
   // Confirmation + Notes Modal State
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -96,6 +117,19 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
   // QR Signature Modal State
   const [signOpen, setSignOpen] = useState(false)
   const [signatureData, setSignatureData] = useState<string>('')
+
+  const replaceApprovals = useCallback((nextApprovals: any[] | ((current: any[]) => any[])) => {
+    setApprovals((current) => (
+      typeof nextApprovals === 'function'
+        ? nextApprovals(current)
+        : nextApprovals
+    ))
+  }, [])
+
+  const refreshPendingApprovals = useCallback(async () => {
+    const latestApprovals = await getPendingApprovals(orgId, activeBranchId)
+    replaceApprovals(latestApprovals || [])
+  }, [activeBranchId, orgId, replaceApprovals])
 
   const openConfirm = (id: string, action: 'APPROVED' | 'REJECTED') => {
     setConfirmReqId(id)
@@ -109,12 +143,12 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
     if (!confirmAction) return
     setSubmitting(confirmReqId)
     setConfirmOpen(false)
-    const res = await decideApproval(confirmReqId, orgId, confirmAction, confirmNotes)
+    const res = await decideApproval(confirmReqId, orgId, confirmAction, confirmNotes, activeBranchId)
     if (res.error) {
       alert(res.error)
       setSubmitting(null)
     } else {
-      setApprovals(approvals.filter(a => a.id !== confirmReqId))
+      replaceApprovals((current) => current.filter((approval) => approval.id !== confirmReqId))
       setSubmitting(null)
       if (confirmAction === 'APPROVED') {
         const ts = new Date().toISOString()
@@ -124,23 +158,41 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
     }
   }
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     setLoadingDetail(true)
-    const res = await getApprovalHistory(orgId)
+    const res = await getApprovalHistory(orgId, activeBranchId)
     setHistory(res || [])
     setLoadingDetail(false)
-  }
+  }, [activeBranchId, orgId])
 
-  React.useEffect(() => {
+  useEffect(() => {
+    replaceApprovals(initialApprovals)
+  }, [initialApprovals, replaceApprovals])
+
+  useEffect(() => {
+    return subscribeApprovalSignal((signal) => {
+      if (!approvalSignalMatchesScope(signal, orgId, activeBranchId)) {
+        return
+      }
+
+      void refreshPendingApprovals()
+
+      if (activeTab === 'HISTORY') {
+        void loadHistory()
+      }
+    })
+  }, [activeBranchId, activeTab, loadHistory, orgId, refreshPendingApprovals])
+
+  useEffect(() => {
     if (activeTab === 'HISTORY') loadHistory()
-  }, [activeTab])
+  }, [activeTab, loadHistory])
 
   const handleDetail = async (req: any) => {
     setSelectedReq(req)
     setDetailData(null)
     setDetailOpen(true)
     setLoadingDetail(true)
-    const res = await getApprovalDetail(orgId, req.source_id, req.source_type)
+    const res = await getApprovalDetail(orgId, req.source_id, req.source_type, activeBranchId)
     setDetailData(res.data)
     setDetailLogs(res.logs || [])
     setLoadingDetail(false)
@@ -300,7 +352,9 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                         <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-tighter">Verified Items</span>
                       </h3>
                       <div className="space-y-3">
-                        {detailData.purchase_items?.map((item: any) => (
+                        {detailData.purchase_items?.map((item: any, index: number) => {
+                          const displayDiscountAmount = Number(purchaseLineDisplayDiscounts[index] || 0)
+                          return (
                           <div key={item.id} className="flex justify-between items-center p-4 border border-slate-100 rounded-xl">
                             <div>
                                <p className="font-bold text-slate-900">{item.products?.name || item.description}</p>
@@ -309,11 +363,21 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                                    {item.quantity} {item.unit || item.products?.unit || 'Unit/Pcs'}
                                  </span>
                                  <span className="text-xs text-slate-400 font-bold">@ {formatRupiah(item.unit_price)}</span>
+                                 {displayDiscountAmount > 0 && (
+                                   <span className="inline-flex h-6 px-3 items-center justify-center bg-rose-50 text-rose-600 text-[10px] font-black rounded-lg border border-rose-100 uppercase tracking-tighter">
+                                     Diskon {formatRupiah(displayDiscountAmount)}
+                                   </span>
+                                 )}
                                </div>
                             </div>
-                            <div className="font-bold text-[#003366]">{formatRupiah(item.quantity * item.unit_price)}</div>
+                            <div className="text-right">
+                              {displayDiscountAmount > 0 && (
+                                <p className="text-[11px] font-bold text-slate-400 line-through">{formatRupiah(getPurchaseLineGrossTotal(item))}</p>
+                              )}
+                              <p className="font-bold text-[#003366]">{formatRupiah(getPurchaseLineNetTotal(item, displayDiscountAmount))}</p>
+                            </div>
                           </div>
-                        ))}
+                        )})}
                       </div>
 
                       {/* Financial Summary Breakdown */}
@@ -327,10 +391,16 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                              <span className="text-slate-500 font-medium">Subtotal Barang</span>
                              <span className="font-black text-slate-700">{formatRupiah(detailData.total_amount)}</span>
                            </div>
-                           {detailData.discount_amount > 0 && (
+                           {purchaseLineDiscountTotal > 0 && (
                               <div className="flex justify-between text-sm">
-                                <span className="text-rose-500 font-medium italic">Diskon Global</span>
-                                <span className="font-black text-rose-600">-{formatRupiah(detailData.discount_amount)}</span>
+                                <span className="text-rose-500 font-medium italic">Diskon Item</span>
+                                <span className="font-black text-rose-600">-{formatRupiah(purchaseLineDiscountTotal)}</span>
+                              </div>
+                           )}
+                           {purchaseHeaderDiscountAmount > 0 && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-rose-500 font-medium italic">Diskon Header / Faktur</span>
+                                <span className="font-black text-rose-600">-{formatRupiah(purchaseHeaderDiscountAmount)}</span>
                               </div>
                            )}
                            {detailData.tax_amount > 0 && (
@@ -524,6 +594,75 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                       )}
                     </>
                   )}
+                  {selectedReq.source_type === 'CONSTRUCTION_CHANGE_ORDER' && (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-amber-50 p-4 rounded-2xl">
+                          <p className="text-xs text-amber-600 uppercase font-black mb-1">Project</p>
+                          <p className="text-base font-black text-slate-900">{detailData.project_name}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{detailData.project_code || 'Tanpa kode proyek'}</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Tahap</p>
+                          <p className="text-base font-black text-slate-900">{detailData.stage_name || 'Semua Tahap'}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{detailData.branch_name || 'Tanpa unit'}</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Jenis Perubahan</p>
+                          <p className="text-base font-black text-slate-900">{detailData.change_type}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{detailData.reference_no || 'Tanpa referensi'}</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-xs text-slate-400 uppercase font-black mb-1">Status Dokumen</p>
+                          <p className="text-base font-black text-slate-900">{detailData.status}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {detailData.requested_date ? formatDate(detailData.requested_date) : 'Tanggal request belum diisi'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <div className="bg-emerald-50 p-4 rounded-2xl">
+                          <p className="text-[10px] text-emerald-600 uppercase font-black mb-1">Delta Kontrak</p>
+                          <p className="text-lg font-black text-slate-900">{formatRupiah(detailData.contract_value_delta || 0)}</p>
+                        </div>
+                        <div className="bg-rose-50 p-4 rounded-2xl">
+                          <p className="text-[10px] text-rose-600 uppercase font-black mb-1">Delta Cost</p>
+                          <p className="text-lg font-black text-slate-900">{formatRupiah(detailData.estimated_cost_delta || 0)}</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-[10px] text-slate-400 uppercase font-black mb-1">Delta Waktu</p>
+                          <p className="text-lg font-black text-slate-900">{detailData.schedule_delta_days || 0} hari</p>
+                        </div>
+                      </div>
+
+                      {detailData.reason && (
+                        <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                          <p className="text-[10px] text-amber-600 uppercase font-black mb-1">Alasan Perubahan</p>
+                          <p className="text-sm text-slate-700">{detailData.reason}</p>
+                        </div>
+                      )}
+
+                      {detailData.notes && (
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <p className="text-[10px] text-slate-400 uppercase font-black mb-1">Catatan Tambahan</p>
+                          <p className="text-sm text-slate-700">{detailData.notes}</p>
+                        </div>
+                      )}
+
+                      {(detailData.site_address || detailData.project_status) && (
+                        <div className="p-4 bg-[#003366]/5 rounded-2xl border border-[#003366]/10">
+                          <p className="text-[10px] text-[#003366] uppercase font-black mb-1">Konteks Project</p>
+                          <p className="text-sm text-slate-700">
+                            Status project: <span className="font-bold text-slate-900">{detailData.project_status || 'N/A'}</span>
+                          </p>
+                          {detailData.site_address && (
+                            <p className="text-sm text-slate-600 mt-1">{detailData.site_address}</p>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
 
                   {/* APPROVAL LOGS / HISTORY */}
                   <div className="pt-6 border-t border-slate-100">
@@ -568,7 +707,7 @@ export function ApprovalClient({ orgId, initialApprovals }: ApprovalClientProps)
                               </p>
                               {log.notes && (
                                 <div className="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 italic">
-                                  "{log.notes}"
+                                  &ldquo;{log.notes}&rdquo;
                                 </div>
                               )}
                             </div>

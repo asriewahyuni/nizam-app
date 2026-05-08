@@ -1,0 +1,22 @@
+[   18551ms] [LOG] [Client Instrumentation Hook] Slow execution detected: 32ms (Note: Code download overhead is not included in this measurement) @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:702
+[   18576ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   18722ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   18904ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   20071ms] [LOG] [Fast Refresh] done in 1294ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   29475ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[   29602ms] [LOG] [Fast Refresh] done in 237ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 1934474ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 1934677ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 1934761ms] [LOG] [Fast Refresh] done in 184ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 4973395ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/webpack-hmr?id=FDNuKoLlL9BStFcVJd46I' failed: Error during WebSocket handshake: net::ERR_NETWORK_IO_SUSPENDED @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_client_0olzjiv._.js:14498
+[ 4974409ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5078283ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5421672ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5497215ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5519416ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 5706903ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 6182101ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 6191192ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 6191392ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 6191636ms] [LOG] [Fast Refresh] done in 346ms @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073
+[ 6195536ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/09it_next_dist_0u_9mcp._.js:1073

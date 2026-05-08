@@ -1,21 +1,24 @@
 'use client'
 
 import React, { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { 
   CheckCircle2, 
-  Circle, 
   ChevronRight, 
-  ChevronLeft,
   X,
   CreditCard,
   Building,
-  ShoppingCart,
   TrendingUp,
   Sparkles,
   ArrowRight
 } from 'lucide-react'
 import Link from 'next/link'
+import {
+  STARTUP_WIZARD_HIDE_STORAGE_KEY,
+  STARTUP_WIZARD_VISIBILITY_EVENT,
+  isStartupWizardHiddenInBrowser,
+  setStartupWizardHiddenInBrowser,
+} from '@/lib/startup-wizard/preferences'
 
 const WIZARD_STEPS = [
   {
@@ -60,27 +63,57 @@ const WIZARD_STEPS = [
   }
 ]
 
-export function StartupWizard({ isDemo = false }: { isDemo?: boolean }) {
+export function StartupWizard({
+  isDemo = false,
+  enabled = true,
+}: {
+  isDemo?: boolean
+  enabled?: boolean
+}) {
   const [isVisible, setIsVisible] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
 
   React.useEffect(() => {
-    // Initial check
-    const hidden = localStorage.getItem('nizam_hide_tour')
-    if (!hidden) setIsVisible(true)
+    const syncVisibility = () => {
+      setIsVisible(!isStartupWizardHiddenInBrowser())
+    }
 
-    // Listen for toggle event
-    const handleToggle = () => setIsVisible(prev => !prev)
-    window.addEventListener('nizam_toggle_tour', handleToggle)
-    return () => window.removeEventListener('nizam_toggle_tour', handleToggle)
+    const handleVisibilityChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ hidden?: boolean }>
+      if (typeof customEvent.detail?.hidden === 'boolean') {
+        setIsVisible(!customEvent.detail.hidden)
+        return
+      }
+
+      syncVisibility()
+    }
+
+    const handleStorage = (event: StorageEvent) => {
+      if (
+        event.key &&
+        event.key !== STARTUP_WIZARD_HIDE_STORAGE_KEY
+      ) {
+        return
+      }
+
+      syncVisibility()
+    }
+
+    syncVisibility()
+    window.addEventListener(STARTUP_WIZARD_VISIBILITY_EVENT, handleVisibilityChange as EventListener)
+    window.addEventListener('storage', handleStorage)
+
+    return () => {
+      window.removeEventListener(STARTUP_WIZARD_VISIBILITY_EVENT, handleVisibilityChange as EventListener)
+      window.removeEventListener('storage', handleStorage)
+    }
   }, [])
 
   const handleClose = () => {
-    setIsVisible(false)
-    localStorage.setItem('nizam_hide_tour', 'true')
+    setStartupWizardHiddenInBrowser(true)
   }
 
-  if (!isVisible || isDemo) return null
+  if (!enabled || !isVisible || isDemo) return null
 
   return (
     <motion.div 
@@ -93,7 +126,6 @@ export function StartupWizard({ isDemo = false }: { isDemo?: boolean }) {
         <div className="flex items-center justify-between gap-8">
            <div className="flex items-center gap-6 flex-1 overflow-x-auto no-scrollbar py-2">
              {WIZARD_STEPS.map((step, idx) => {
-               const Icon = step.icon
                const isActive = idx === currentStep
                const isDone = idx < currentStep
 

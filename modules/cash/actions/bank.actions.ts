@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { checkCanManageCoA } from '@/modules/accounting/actions/coa.actions'
+import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
+import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 import type { Account, BankAccount } from '@/types/database.types'
 import type { CashBankAccount, RecentTransactionOption } from '@/modules/cash/types'
 
@@ -74,6 +76,63 @@ function isMissingRpc(error: { code?: string | null; message?: string | null } |
       (message.includes('schema cache') || message.includes('does not exist') || message.includes('undefined function'))
     )
   )
+}
+
+function isMissingColumnError(error: { message?: string | null } | null | undefined) {
+  if (!error) return false
+  const message = String(error.message || '').toLowerCase()
+  return message.includes('column') && message.includes('does not exist')
+}
+
+async function getCurrentCashPlacementAccess(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string
+) {
+  const { data: authData } = await supabase.auth.getUser()
+  const userId = String(authData?.user?.id || '').trim()
+
+  if (!userId) {
+    return { role: null, permissions: [] as string[] }
+  }
+
+  const { data: membership } = await supabase
+    .from('org_members')
+    .select('role, role_id')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  let resolvedRoleId = String(membership?.role_id || '').trim()
+
+  if (!resolvedRoleId) {
+    const { data: employee } = await supabase
+      .from('employees')
+      .select('role_id')
+      .eq('org_id', orgId)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    resolvedRoleId = String(employee?.role_id || '').trim()
+  }
+
+  let permissions: string[] = []
+  if (resolvedRoleId) {
+    const { data: roleData } = await supabase
+      .from('roles')
+      .select('permissions')
+      .eq('id', resolvedRoleId)
+      .maybeSingle()
+
+    permissions = Array.isArray(roleData?.permissions)
+      ? roleData.permissions.filter((permission: unknown): permission is string => typeof permission === 'string')
+      : []
+  }
+
+  return {
+    role: typeof membership?.role === 'string' ? membership.role : null,
+    permissions,
+  }
 }
 
 function decorateCashAccountsWithBalance<T extends CashBankAccountRecord & {
@@ -244,7 +303,7 @@ export async function getBankAccounts(orgId: string, branchId?: string | null) {
 
 // ─────────────────────────────────────────────────────────────
 // createBankAccount — Add a new bank account
-// HANYA untuk Parent/Holding. Child/Branch gunakan:
+// HANYA untuk organisasi induk/holding. Entitas anak gunakan:
 // → /accounting/coa-requests untuk mengajukan rekening baru
 // ─────────────────────────────────────────────────────────────
 export async function createBankAccount(orgId: string, formData: FormData) {
@@ -257,24 +316,30 @@ export async function createBankAccount(orgId: string, formData: FormData) {
   )
   if ('error' in activeBranchResult) return { error: activeBranchResult.error }
 
-  // ── Guard 2: Hanya Parent/Holding yang boleh membuat rekening bank langsung ──
+  // ── Guard 2: Hanya organisasi induk/holding yang boleh membuat rekening bank langsung ──
   let canManageDirect = true;
   try {
     const result = await checkCanManageCoA(orgId);
     canManageDirect = result.canManageDirect;
-  } catch (e) {
+  } catch {
     // If the check fails (e.g., missing tables in test environment), assume permission granted.
     canManageDirect = true;
   }
   if (!canManageDirect) {
     return {
       error:
-        'Hanya Organisasi Utama (Parent/Holding) yang dapat menambahkan rekening bank secara langsung. ' +
+        'Hanya Organisasi Utama (Induk/Holding) yang dapat menambahkan rekening bank secara langsung. ' +
         'Silakan ajukan melalui menu "Pengajuan Rekening CoA".',
       requiresRequest: true,
     }
   }
 
+  const activeOrgData = await getCurrentCashPlacementAccess(supabase, orgId)
+  const canUseFullPlacementScope = hasRolePermission(
+    activeOrgData?.role,
+    activeOrgData?.permissions,
+    'bank'
+  )
 
   const accountId = formData.get('account_id') as string // The GL Account ID
   const bankName = String(formData.get('bank_name') || '').trim()
@@ -295,6 +360,13 @@ export async function createBankAccount(orgId: string, formData: FormData) {
     }
     // parts[1] might be empty if "Kantor Utama" is selected and it has no default branch ID? Actually branches are mandatory. But if it's empty, use NULL (kantor utama fallback)
     finalBranchId = parts.length >= 2 && parts[1].trim() ? parts[1].trim() : null;
+  }
+
+  if (finalOrgId !== orgId && !canUseFullPlacementScope) {
+    return {
+      error:
+        'Role ini belum punya akses Kas & Bank, jadi tidak bisa memilih penempatan rekening lintas organisasi & unit.',
+    }
   }
 
   if (!accountId || !bankName) {
@@ -320,6 +392,7 @@ export async function createBankAccount(orgId: string, formData: FormData) {
   }
 
   revalidatePath('/cash')
+  await nudgeEduModeValidation('cash.create.bank-account')
   return { success: true }
 }
 
@@ -422,14 +495,15 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
   revalidatePath('/accounting/journal')
   revalidatePath('/reports')
   revalidatePath('/dashboard')
+  await nudgeEduModeValidation('cash.create.bank-transaction')
   return { success: true }
 }
 
 // ─────────────────────────────────────────────────────────────
-// createInterOrgCapitalTransfer — Parent transfer modal ke Child/Cabang
+// createInterOrgCapitalTransfer — organisasi induk transfer modal ke entitas tujuan
 // Mencatat 2 transaksi atomik:
-// 1) OUT di org sumber (parent)
-// 2) IN  di org tujuan (child/cabang)
+// 1) OUT di org sumber (induk)
+// 2) IN  di org tujuan (entitas penerima)
 // ─────────────────────────────────────────────────────────────
 export async function createInterOrgCapitalTransfer(orgId: string, formData: FormData) {
   const supabase = await createClient()
@@ -464,13 +538,13 @@ export async function createInterOrgCapitalTransfer(orgId: string, formData: For
     .maybeSingle()
 
   if (sourceCounterError || !sourceCounterAccount?.id) {
-    return { error: 'Akun investasi parent (sumber) tidak ditemukan.' }
+    return { error: 'Akun investasi organisasi sumber tidak ditemukan.' }
   }
 
   if (!isInvestingTransferAccount(sourceCounterAccount)) {
     return {
       error:
-        'Akun lawan parent harus akun investasi (kelompok 16xx), misalnya 1601 Investasi pada Entitas Anak / Unit.',
+        'Akun lawan organisasi sumber harus akun investasi (kelompok 16xx), misalnya 1601 Investasi pada Entitas Anak / Unit.',
     }
   }
 
@@ -511,6 +585,7 @@ export async function createInterOrgCapitalTransfer(orgId: string, formData: For
   revalidatePath('/accounting/journal')
   revalidatePath('/reports')
   revalidatePath('/dashboard')
+  await nudgeEduModeValidation('cash.create.interorg-capital-transfer')
   return { success: true, data }
 }
 
@@ -524,36 +599,69 @@ export async function getRecentBankTransactions(
 ): Promise<RecentTransactionOption[]> {
   const supabase = await createClient()
 
-  let query = (supabase as any)
-    .from('bank_transactions')
-    .select(`
-      id,
-      org_id,
-      branch_id,
-      bank_account_id,
-      transaction_date,
-      description,
-      amount,
-      type,
-      status,
-      bank_account:bank_accounts(bank_name, account_number),
-      category:accounts(name, code)
-    `)
-    .eq('org_id', orgId)
+  const detailedSelect = `
+    id,
+    org_id,
+    branch_id,
+    bank_account_id,
+    transaction_date,
+    created_at,
+    updated_at,
+    reference_number,
+    journal_entry_id,
+    description,
+    amount,
+    type,
+    status,
+    bank_account:bank_accounts(bank_name, account_number),
+    category:accounts(name, code)
+  `
 
+  const legacySelect = `
+    id,
+    org_id,
+    branch_id,
+    bank_account_id,
+    transaction_date,
+    description,
+    amount,
+    type,
+    status,
+    bank_account:bank_accounts(bank_name, account_number),
+    category:accounts(name, code)
+  `
+
+  let resolvedBranchId: string | null = null
   if (branchId) {
     const branchSelection = await resolveAccessibleBranchSelection(orgId, branchId)
     if ('error' in branchSelection || !branchSelection.branchId) return []
-    query = query.eq('branch_id', branchSelection.branchId)
+    resolvedBranchId = branchSelection.branchId
   }
 
-  const { data, error } = await query
-    .order('transaction_date', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(limit)
+  const runQuery = async (selectClause: string) => {
+    let query = (supabase as any)
+      .from('bank_transactions')
+      .select(selectClause)
+      .eq('org_id', orgId)
 
-  if (error) return []
-  return data as RecentTransactionOption[]
+    if (resolvedBranchId) query = query.eq('branch_id', resolvedBranchId)
+
+    return query
+      .order('transaction_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(limit)
+  }
+
+  const detailedResult = await runQuery(detailedSelect)
+  if (!detailedResult.error && Array.isArray(detailedResult.data)) {
+    return detailedResult.data as RecentTransactionOption[]
+  }
+
+  if (!isMissingColumnError(detailedResult.error)) return []
+
+  const fallbackResult = await runQuery(legacySelect)
+  if (fallbackResult.error || !Array.isArray(fallbackResult.data)) return []
+  return fallbackResult.data as RecentTransactionOption[]
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -17,6 +17,8 @@ const DEMO_EMAIL = 'demo@nizam.app'
 const DEMO_PASSWORD = 'demo-nizam-2026!'
 const DEMO_ACCOUNT_WAIT_RETRIES = 5
 const DEMO_ACCOUNT_WAIT_MS = 1000
+const DEMO_SESSION_MAX_AGE = 60 * 60 * 12
+const DEMO_BUSINESS_TYPES: DemoBusinessType[] = ['COMPUTER', 'CATERING', 'RESTAURANT', 'SUPPLIER_MBG', 'BLANK']
 const BLANK_DEMO_BUDGET_TEMPLATES = [
   { code: '4001', budgetAmount: 250000000 },
   { code: '5001', budgetAmount: 95000000 },
@@ -31,6 +33,12 @@ type DemoSeedAccount = {
   code: string
 }
 
+type DemoSessionUser = {
+  id: string
+  email?: string | null
+  user_metadata?: Record<string, unknown> | null
+}
+
 /**
  * Start a demo session:
  * 1. Sign in with demo credentials
@@ -40,8 +48,71 @@ type DemoSeedAccount = {
  */
 export type DemoBusinessType = 'COMPUTER' | 'CATERING' | 'RESTAURANT' | 'SUPPLIER_MBG' | 'BLANK'
 
-export async function startDemoSession(businessName?: string, demoType: DemoBusinessType = 'COMPUTER') {
+function normalizeDemoBusinessType(value: unknown): DemoBusinessType {
+  const normalized = String(value || '').trim().toUpperCase()
+  if (DEMO_BUSINESS_TYPES.includes(normalized as DemoBusinessType)) {
+    return normalized as DemoBusinessType
+  }
+  return 'COMPUTER'
+}
+
+export async function startDemoSessionFromForm(formData: FormData) {
+  const businessName = String(formData.get('businessName') || '').trim() || undefined
+  const demoType = normalizeDemoBusinessType(formData.get('demoType'))
+  return startDemoSession(businessName, demoType)
+}
+
+function isDemoOrganizationRecord(orgRow: { is_demo?: boolean | null; settings?: Record<string, unknown> | null } | null | undefined) {
+  if (!orgRow) return false
+  const settings = orgRow.settings ?? null
+  const planName =
+    settings && typeof settings.plan === 'string'
+      ? settings.plan.trim().toLowerCase()
+      : ''
+
+  return Boolean(orgRow.is_demo) || settings?.is_demo === true || planName === 'demo'
+}
+
+async function getValidatedDemoSession() {
+  const cookieStore = await cookies()
+  const demoOrgId = String(cookieStore.get('nizam_demo_org_id')?.value || '').trim()
+  if (!demoOrgId) return null
+
   const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user?.id) return null
+
+  const db = (await createAdminClient()) as any
+  const { data: membership } = await db
+    .from('org_members')
+    .select('org_id')
+    .eq('org_id', demoOrgId)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!membership?.org_id) return null
+
+  const { data: orgRow } = await db
+    .from('organizations')
+    .select('id, is_demo, settings')
+    .eq('id', demoOrgId)
+    .maybeSingle()
+
+  if (!isDemoOrganizationRecord(orgRow as { is_demo?: boolean | null; settings?: Record<string, unknown> | null } | null)) {
+    return null
+  }
+
+  return {
+    user: user as DemoSessionUser,
+    demoOrgId,
+  }
+}
+
+export async function startDemoSession(businessName?: string, demoType: DemoBusinessType = 'COMPUTER') {
   const adminClient = await createAdminClient()
 
   // 1. Sign up or sign in the demo user
@@ -140,17 +211,24 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
 
   // 6. Set Demo Org ID in Cookie for session-specific tracking
   const cookieStore = await cookies()
-  cookieStore.delete('nizam_active_org_id') // Reset shared org cache for fresh demo
+  // Set nizam_active_org_id ke demo org baru agar getActiveOrg() tidak null
+  // dan DashboardLayout tidak redirect ke /onboarding.
+  cookieStore.set('nizam_active_org_id', orgId, {
+    maxAge: DEMO_SESSION_MAX_AGE,
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+  })
   cookieStore.delete('nizam_active_branch_id')
   cookieStore.set('nizam_demo_org_id', orgId, { 
-    maxAge: 60 * 60 * 12, // 12 hours — demo session lifetime
+    maxAge: DEMO_SESSION_MAX_AGE, // 12 hours — demo session lifetime
     path: '/',
     httpOnly: true,
     sameSite: 'lax'
   })
   if (demoBranchId) {
     cookieStore.set('nizam_active_branch_id', demoBranchId, {
-      maxAge: 60 * 60 * 12,
+      maxAge: DEMO_SESSION_MAX_AGE,
       path: '/',
       httpOnly: true,
       sameSite: 'lax',
@@ -165,33 +243,44 @@ export async function startDemoSession(businessName?: string, demoType: DemoBusi
  * End demo session — delete everything and logout
  */
 export async function signOutDemo() {
-  const supabase = await createClient()
   const cookieStore = await cookies()
-  const demoOrgId = cookieStore.get('nizam_demo_org_id')?.value
+  const supabase = await createClient()
+  const demoSession = await getValidatedDemoSession()
 
-  const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user
-
-  if (user && (user.email === DEMO_EMAIL || (user.user_metadata as any)?.is_demo)) {
+  if (demoSession?.demoOrgId) {
     // Karena Railway dipakai, kita bisa langsung nge-delete lewat adminClient
     const authedClient = (await createAdminClient()) as any
 
-    if (demoOrgId) {
-      // Delete specifically THE session org (cascade delete removes all related data)
-      const { error: delErr } = await authedClient.from('organizations').delete().eq('id', demoOrgId)
-      if (delErr) (console as any).error('SignOutDemo: Failed to delete org:', delErr)
-    }
+    // Delete specifically THE session org (cascade delete removes all related data)
+    const { error: delErr } = await authedClient.from('organizations').delete().eq('id', demoSession.demoOrgId)
+    if (delErr) (console as any).error('SignOutDemo: Failed to delete org:', delErr)
 
-    // Also clean up ANY remaining demo orgs for this user (belt + suspenders)
-    const { data: remainingMemberships } = await authedClient
-      .from('org_members')
-      .select('org_id')
-      .eq('user_id', user.id)
+    const isCanonicalDemoUser =
+      demoSession.user.email === DEMO_EMAIL || Boolean(demoSession.user.user_metadata?.is_demo)
 
-    if (remainingMemberships) {
-      for (const m of remainingMemberships as any[]) {
-        const { error: delErr } = await authedClient.from('organizations').delete().eq('id', m.org_id)
-        if (delErr) (console as any).error('SignOutDemo: Cleanup delete failed for org', m.org_id, delErr)
+    // For the shared demo account, also clean up any leftover demo orgs.
+    if (isCanonicalDemoUser) {
+      const { data: remainingMemberships } = await authedClient
+        .from('org_members')
+        .select('org_id')
+        .eq('user_id', demoSession.user.id)
+
+      if (remainingMemberships) {
+        for (const m of remainingMemberships as any[]) {
+          if (!m?.org_id || m.org_id === demoSession.demoOrgId) continue
+          const { data: orgRow } = await authedClient
+            .from('organizations')
+            .select('id, is_demo, settings')
+            .eq('id', m.org_id)
+            .maybeSingle()
+
+          if (!isDemoOrganizationRecord(orgRow as { is_demo?: boolean | null; settings?: Record<string, unknown> | null } | null)) {
+            continue
+          }
+
+          const { error: cleanupErr } = await authedClient.from('organizations').delete().eq('id', m.org_id)
+          if (cleanupErr) (console as any).error('SignOutDemo: Cleanup delete failed for org', m.org_id, cleanupErr)
+        }
       }
     }
   }
@@ -215,16 +304,9 @@ export async function signOutDemo() {
  * DashboardLayout will redirect the user out of the dashboard.
  */
 export async function isDemoSession(): Promise<boolean> {
-  const cookieStore = await cookies()
-  const demoOrgId = cookieStore.get('nizam_demo_org_id')?.value
-
-  // If the demo cookie has expired, the session is over — treat as non-demo.
-  if (!demoOrgId) return false
-
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return false
-  return user.email === DEMO_EMAIL || !!user.user_metadata?.is_demo
+  // If the demo cookie has expired or no longer points to a live demo org
+  // owned by the current user, the session is over.
+  return Boolean(await getValidatedDemoSession())
 }
 
 // ═══════════════════════════════════════════════════════════

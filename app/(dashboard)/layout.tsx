@@ -10,11 +10,18 @@ import { AppSidebar } from '@/components/shared/AppSidebar'
 import { AppHeader } from '@/components/shared/AppHeader'
 import { AdminImpersonationBanner } from '@/components/shared/AdminImpersonationBanner'
 import { DemoBanner } from '@/components/shared/DemoBanner'
+import { SentryUserContext } from '@/components/shared/SentryUserContext'
 import { StartupWizard } from '@/components/shared/StartupWizard'
 import { FloatingPlanBadge } from '@/components/shared/FloatingPlanBadge'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import { MobilePullToRefresh } from '@/components/shared/MobilePullToRefresh'
 import { RouteProgressBar } from '@/components/shared/RouteProgressBar'
+import { UserActivityTracker } from '@/components/shared/UserActivityTracker'
+import { GlobalApprovalNotifier } from '@/components/shared/GlobalApprovalNotifier'
+import { EduModeShell } from '@/components/edu/EduModeShell'
+import { hasEnabledModuleAccess, hasPosOnlyAccess } from '@/modules/organization/lib/navigation-access'
+import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
+import { resolveRuntimeDatabaseTarget } from '@/lib/db/runtime-target'
 
 type RouteModuleEntry = {
   path: string
@@ -27,6 +34,10 @@ function moduleNameMatches(enabledModuleRaw: string, candidateRaw: string) {
   return saasModuleMatches(enabledModuleRaw, candidateRaw)
 }
 
+function isPosCashierRoute(pathname: string) {
+  return pathname === '/pos' || pathname.startsWith('/pos/')
+}
+
 export default async function DashboardLayout({
   children,
 }: {
@@ -36,6 +47,12 @@ export default async function DashboardLayout({
   const requestPathname = (await headers()).get('x-pathname') || ''
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
+  const runtimeDb = resolveRuntimeDatabaseTarget()
+  const orgSettings =
+    orgData.org.settings && typeof orgData.org.settings === 'object' && !Array.isArray(orgData.org.settings)
+      ? orgData.org.settings as Record<string, unknown>
+      : {}
+  const startupWizardEnabled = orgSettings.startup_wizard_enabled !== false
   const [adminImpersonation, activeBranch, allowAllBranchSelection, isDemo] = await Promise.all([
     getAdminImpersonationState(),
     getActiveBranch(orgData.org.id),
@@ -43,6 +60,10 @@ export default async function DashboardLayout({
     isDemoSession(),
   ])
   const effectivePlanName = isDemo ? 'Demo' : (orgData.org.settings?.plan || 'Trial')
+  const saasAssessorContext = await getSaasAssessorContext({
+    email: orgData.user?.email,
+    impersonationEmail: adminImpersonation?.email || null,
+  })
 
   // ── DEMO SESSION EXPIRY ENFORCEMENT ──────────────────────────────────────
   // isDemoSession() returns false when the 12-hour cookie has expired.
@@ -64,6 +85,18 @@ export default async function DashboardLayout({
   // ─────────────────────────────────────────────────────────────
   const isOwnerOrAdmin = orgData.role === 'owner' || orgData.role === 'admin'
   const canManageSubOrganizations = isOwnerOrAdmin
+  const isPosOnlyUser = hasPosOnlyAccess(orgData.role, orgData.permissions)
+  const isSaasAssessorRouteAccess =
+    requestPathname.startsWith('/learning') &&
+    saasAssessorContext.hasAccess
+
+  if (
+    isPosOnlyUser &&
+    hasEnabledModuleAccess(orgData.enabledModules, 'POS') &&
+    !isPosCashierRoute(requestPathname)
+  ) {
+    return redirect('/pos')
+  }
 
   // Map paths to their required module names (matching saas_packages.modules)
   // Each entry can have multiple aliases to support both English & Indonesian module names
@@ -75,7 +108,8 @@ export default async function DashboardLayout({
     { path: '/settings/ticketing', requiredModule: 'Config', aliases: ['Config', 'Ticketing', 'Support Ticket', 'Doc Update Ticketing', 'Dokumen Update Support Ticket'], permissionKeys: ['business', 'support', 'ticketing'] },
     { path: '/settings/roles', requiredModule: 'HRIS', aliases: ['HRIS', 'Akses & Jabatan'], permissionKeys: ['business'] },
     { path: '/settings/branches', requiredModule: 'Config', aliases: ['Config', 'Cabang & Divisi'], permissionKeys: ['branch'] },
-    { path: '/settings/api', requiredModule: 'Config', aliases: ['Config', 'API & Integrasi'], permissionKeys: ['business'] },
+    { path: '/developers/api', requiredModule: 'Integrasi API', aliases: ['Integrasi API', 'API & Integrasi', 'Developers', 'Open API'], permissionKeys: ['business'] },
+    { path: '/settings/api', requiredModule: 'Integrasi API', aliases: ['Integrasi API', 'API & Integrasi', 'Developers', 'Open API'], permissionKeys: ['business'] },
     { path: '/settings/business', requiredModule: 'Config', aliases: ['Config', 'Pengaturan Bisnis'], permissionKeys: ['business'] },
     { path: '/settings/accounts', requiredModule: 'Finance', aliases: ['Finance', 'Akun (CoA)'], permissionKeys: ['coa'] },
     {
@@ -86,16 +120,19 @@ export default async function DashboardLayout({
     },
     { path: '/cash', requiredModule: 'Finance', aliases: ['Finance', 'Kas & Bank'], permissionKeys: ['finance', 'bank', 'cash', 'journal'] },
     { path: '/contacts', requiredModule: 'CRM', aliases: ['CRM', 'Pelanggan (CRM)', 'Marketing'], permissionKeys: ['sales', 'crm', 'contacts', 'customer'] },
+    { path: '/ecommerce', requiredModule: 'Sales', aliases: ['Sales', 'E-Commerce', 'Penjualan'], permissionKeys: ['sales', 'crm', 'inventory'] },
     { path: '/inventory', requiredModule: 'Inventory', aliases: ['Inventory', 'Inventori'], permissionKeys: ['inventory', 'warehouse'] },
     { path: '/factory', requiredModule: 'Manufacturing', aliases: ['Manufacturing', 'Factory'], permissionKeys: ['factory', 'manufacturing'] },
     { path: '/purchasing', requiredModule: 'Purchasing', aliases: ['Purchasing', 'Pembelian'], permissionKeys: ['purchasing', 'purchase'] },
     { path: '/sales', requiredModule: 'Sales', aliases: ['Sales', 'Penjualan'], permissionKeys: ['sales', 'quotation'] },
-    { path: '/pos', requiredModule: 'POS', aliases: ['POS', 'POS (Kasir)'], permissionKeys: ['pos', 'sales'] },
+    { path: '/pos', requiredModule: 'POS', aliases: ['POS', 'POS (Kasir)'], permissionKeys: ['pos'] },
     { path: '/fleet', requiredModule: 'Fleet & Rental', aliases: ['Fleet & Rental', 'Fleet Management', 'Smart Fleet Management'], permissionKeys: ['fleet'] },
     { path: '/hris', requiredModule: 'HRIS', aliases: ['HRIS', 'Karyawan (HRIS)', 'Attendance', 'Payroll'], permissionKeys: ['hris', 'employee', 'employees', 'attendance', 'payroll'] },
+    { path: '/learning', requiredModule: 'HRIS', aliases: ['HRIS', 'Learning', 'Peningkatan Kompetensi'], permissionKeys: ['learning', 'hris', 'employee', 'employees'] },
     { path: '/reports', requiredModule: 'Reports', aliases: ['Reports', 'Laporan', 'Insight'], permissionKeys: ['reports', 'strategy', 'forecast'] },
     { path: '/services', requiredModule: 'Job Order (Jasa)', aliases: ['Job Order (Jasa)', 'Industrial Job Order', 'Services'], permissionKeys: ['services', 'service', 'job_order'] },
-    { path: '/syirkah', requiredModule: 'Syirkah', aliases: ['Syirkah', 'Partnership'] },
+    { path: '/construction', requiredModule: 'Project & Construction', aliases: ['Project & Construction', 'Construction', 'Project Construction', 'Project Konstruksi', 'Job Order (Jasa)'], permissionKeys: ['construction', 'project', 'services', 'job_order'] },
+    { path: '/syirkah', requiredModule: 'Syirkah', aliases: ['Syirkah', 'Partnership'], permissionKeys: ['syirkah'] },
   ]
 
   // Identify which module is being accessed
@@ -108,16 +145,15 @@ export default async function DashboardLayout({
     // 1. SAAS MODULE GUARD (Check for EVERYONE, including owner)
     const isModulePaid = !orgData.enabledModules || orgData.enabledModules.length === 0
       ? true  // If no modules are configured, allow access (e.g. during setup)
-      : requiredModule === 'Syirkah' ? true // Bypass SaaS guard for custom Syirkah module
       : orgData.enabledModules.some((m: string) => allNames.some((candidate) => moduleNameMatches(m, candidate)))
 
-    if (!isModulePaid) {
+    if (!isModulePaid && !isSaasAssessorRouteAccess) {
       console.log(`[ACL] Redirecting - Module not paid: ${requiredModule} (checked aliases: ${allNames.join(', ')}) for path: ${requestPathname}`)
       return redirect('/dashboard')
     }
 
     // 2. RBAC PERMISSION GUARD (Only check if NOT owner/admin)
-    if (!isOwnerOrAdmin && permissionKeys.length > 0) {
+    if (!isOwnerOrAdmin && !isSaasAssessorRouteAccess && permissionKeys.length > 0) {
       const normalizedPermissions = Array.isArray(orgData.permissions)
         ? orgData.permissions
             .filter((permission): permission is string => typeof permission === 'string')
@@ -135,7 +171,25 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 print:block print:h-auto print:overflow-visible print:bg-white">
+      <SentryUserContext
+        userId={orgData.user?.id || null}
+        email={orgData.user?.email || null}
+        fullName={String(orgData.user?.user_metadata?.full_name || orgData.user?.email || '')}
+        orgId={orgData.org.id}
+        orgName={orgData.org.name}
+        branchId={activeBranch?.id || null}
+        branchName={activeBranch?.name || null}
+        role={orgData.role}
+        route={requestPathname}
+        feature="dashboard"
+      />
       <RouteProgressBar />
+      <UserActivityTracker />
+      <GlobalApprovalNotifier
+        orgId={orgData.org.id}
+        activeBranchId={activeBranch?.id || null}
+      />
+      <EduModeShell />
       {/* Sidebar */}
       <AppSidebar 
         key={`sidebar:${orgData.org.id}:${activeBranch?.id || 'all'}`}
@@ -152,6 +206,7 @@ export default async function DashboardLayout({
         isDemo={isDemo}
         planName={effectivePlanName}
         canManageSubOrganizations={canManageSubOrganizations}
+        isSaasAssessor={saasAssessorContext.hasAccess}
       />
 
       {/* Main content */}
@@ -178,8 +233,10 @@ export default async function DashboardLayout({
           activeOrgParentId={(orgData.org as { parent_org_id?: string | null }).parent_org_id ?? null}
           allowAllBranchSelection={allowAllBranchSelection}
           canManageBranches={isOwnerOrAdmin}
+          runtimeDatabaseMode={runtimeDb.mode}
+          runtimeDatabaseSource={runtimeDb.sourceKey}
         />
-        <StartupWizard isDemo={isDemo} />
+        <StartupWizard isDemo={isDemo} enabled={startupWizardEnabled} />
         <MobilePullToRefresh scrollContainerId="dashboard-scroll-root" />
         <main id="dashboard-scroll-root" className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6 print:overflow-visible print:p-0 print:pb-0">
           <div className="max-w-7xl mx-auto print:max-w-none">
@@ -201,7 +258,11 @@ export default async function DashboardLayout({
             {children}
           </div>
         </main>
-        <MobileBottomNav />
+        <MobileBottomNav
+          userRole={orgData.role}
+          permissions={orgData.permissions}
+          enabledModules={orgData.enabledModules}
+        />
         <FloatingPlanBadge planName={effectivePlanName} />
       </div>
     </div>

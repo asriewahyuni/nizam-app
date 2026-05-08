@@ -62,6 +62,31 @@ describe('Supabase Middleware', () => {
     expect(response.headers.get('location')).toBe('http://localhost:3000/login?redirectTo=%2Ffleet')
   })
 
+  it('returns a server-action redirect for unauthenticated server actions on protected routes', async () => {
+    mocks.createServerClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: null },
+        }),
+      },
+    })
+
+    const request = new NextRequest('http://localhost:3000/fleet', {
+      method: 'POST',
+      headers: {
+        'next-action': 'test-action-id',
+      },
+    })
+
+    const response = await updateSession(request)
+
+    expect(response.status).toBe(303)
+    expect(response.headers.get('content-type')).toContain('text/plain')
+    expect(response.headers.get('x-action-redirect')).toBe(
+      'http://localhost:3000/login?redirectTo=%2Ffleet;replace'
+    )
+  })
+
   it('keeps query params in redirectTo for protected routes', async () => {
     mocks.createServerClient.mockReturnValue({
       auth: {
@@ -172,5 +197,25 @@ describe('Supabase Middleware', () => {
     expect(mocks.createServerClient).not.toHaveBeenCalled()
     expect(response.status).toBe(200)
     expect(response.headers.get('location')).toBeNull()
+  })
+
+  it('returns a server-action redirect for internal server actions without session', async () => {
+    process.env.AUTH_PROVIDER = 'internal'
+
+    const request = new NextRequest('http://localhost:3000/fleet', {
+      method: 'POST',
+      headers: {
+        'next-action': 'test-action-id',
+      },
+    })
+
+    const response = await updateSession(request)
+
+    expect(mocks.createServerClient).not.toHaveBeenCalled()
+    expect(response.status).toBe(303)
+    expect(response.headers.get('content-type')).toContain('text/plain')
+    expect(response.headers.get('x-action-redirect')).toBe(
+      'http://localhost:3000/login?redirectTo=%2Ffleet;replace'
+    )
   })
 })

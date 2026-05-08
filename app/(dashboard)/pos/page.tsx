@@ -5,6 +5,8 @@ import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/or
 import { getProducts } from '@/modules/inventory/actions/inventory.actions'
 import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 import type { ProductWithStock } from '@/modules/inventory/actions/inventory.actions'
+import { getPosShiftHistory, getPosShiftSnapshot } from '@/modules/sales/actions/pos-shift.actions'
+import { getPosShiftConfig, isPosShiftFeatureEnabled } from '@/modules/sales/lib/pos-shift'
 
 export default async function POSPage() {
   const orgData = await getActiveOrg()
@@ -13,17 +15,24 @@ export default async function POSPage() {
   const supabase = await createClient()
   const orgId = orgData.org.id
   const activeBranch = await getActiveBranch(orgId)
-  const [products, warehouses, { data: customers }, { data: accounts }, { data: employeeProfile }] = await Promise.all([
+  const posShiftConfig = getPosShiftConfig(orgData.org.settings || {})
+  const [products, warehouses, { data: customers }, { data: accounts }, { data: employeeProfile }, posShiftSnapshot, posShiftHistory] = await Promise.all([
     activeBranch ? getProducts(orgId, activeBranch.id) : Promise.resolve([]),
     activeBranch ? getWarehouses(orgId, activeBranch.id) : Promise.resolve([]),
     supabase.from('contacts').select('id, name, phone').eq('org_id', orgId).eq('type', 'CUSTOMER'),
-    supabase.from('accounts').select('id, name, code').eq('org_id', orgId).eq('is_active', true),
+    supabase.from('accounts').select('id, name, code, type').eq('org_id', orgId).eq('is_active', true),
     supabase
       .from('employees')
       .select('first_name, last_name')
       .eq('org_id', orgId)
       .eq('user_id', orgData.user.id)
       .maybeSingle(),
+    isPosShiftFeatureEnabled(posShiftConfig)
+      ? getPosShiftSnapshot(orgId)
+      : Promise.resolve(null),
+    isPosShiftFeatureEnabled(posShiftConfig)
+      ? getPosShiftHistory(orgId)
+      : Promise.resolve(null),
   ])
 
   const isReadyToSellInventory = (product: ProductWithStock) => {
@@ -70,8 +79,12 @@ export default async function POSPage() {
       warehouses={warehouses || []}
       currentUser={orgData.user}
       currentUserDisplayName={currentUserDisplayName}
+      currentOrgRole={orgData.role || null}
       activeBranchId={activeBranch?.id || null}
       activeBranchName={activeBranch?.name || null}
+      posShiftConfig={posShiftConfig}
+      posShiftSnapshot={posShiftSnapshot}
+      initialShiftHistory={posShiftHistory}
     />
   )
 }

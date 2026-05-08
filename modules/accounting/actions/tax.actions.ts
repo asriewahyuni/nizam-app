@@ -1,5 +1,34 @@
 import { createClient } from '@/lib/supabase/server'
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+function normalizeDateOnlyValue(value: unknown): string | null {
+  if (!value) return null
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    if (DATE_ONLY_PATTERN.test(trimmed)) return trimmed
+
+    const parsed = new Date(trimmed)
+    if (Number.isNaN(parsed.getTime())) return null
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+  }
+
+  const normalized = String(value).trim()
+  if (!normalized) return null
+  if (DATE_ONLY_PATTERN.test(normalized)) return normalized
+
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) return null
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
+}
+
 export async function getTaxSummary(orgId: string, startDate?: string, endDate?: string, branchId?: string | null) {
   const supabase = await createClient()
   const db = supabase as any
@@ -99,7 +128,7 @@ export async function getTaxSummary(orgId: string, startDate?: string, endDate?:
   lines.forEach((l: any) => {
     const code = l.accounts.code
     const item = {
-      date: l.journal_entries.entry_date,
+      date: normalizeDateOnlyValue(l.journal_entries.entry_date),
       ref: l.journal_entries.entry_number,
       description: l.journal_entries.description,
       memo: l.memo

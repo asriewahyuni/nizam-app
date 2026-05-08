@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { PageHeader, SafeButton, SectionCard, SectionHeader, StatCard } from '@/components/ui/NizamUI'
 import {
+  importCoaMigration,
   importEmployeesMigration,
   importFixedAssetsMigration,
   importManufacturingMigration,
@@ -25,6 +26,7 @@ import {
   importOpeningApMigration,
   importOpeningArMigration,
   importOpeningStockMigration,
+  type CoaImportResult,
   type EmployeesImportResult,
   type FixedAssetsImportResult,
   type OpeningCashBankImportResult,
@@ -110,6 +112,19 @@ type FlowStage = {
 }
 
 const SHEET_SCHEMAS: SheetSchema[] = [
+  {
+    name: 'coa',
+    columns: ['kode_akun', 'nama_akun', 'kategori_utama', 'sub_kategori', 'parent_kode', 'level', 'tipe_akun', 'saldo_normal', 'arus_kas', 'aktif', 'deskripsi'],
+    requiredFields: ['kode_akun', 'nama_akun', 'kategori_utama', 'level', 'tipe_akun', 'saldo_normal', 'aktif'],
+    booleanFields: ['aktif'],
+    numericFields: ['level'],
+    enumFields: {
+      kategori_utama: ['Aset', 'Liabilitas', 'Ekuitas', 'Pendapatan', 'HPP', 'Beban Operasional', 'Beban Lainnya'],
+      tipe_akun: ['HEADER', 'DETAIL'],
+      saldo_normal: ['DEBIT', 'CREDIT'],
+      arus_kas: ['OPERATING', 'INVESTING', 'FINANCING'],
+    },
+  },
   {
     name: 'coa_mapping',
     columns: ['legacy_account_code', 'legacy_account_name', 'nizam_account_code', 'nizam_account_name', 'notes'],
@@ -202,9 +217,16 @@ const SHEET_SCHEMAS: SheetSchema[] = [
 
 const MIGRATION_SECTIONS: MigrationSection[] = [
   {
+    id: 'coa',
+    title: 'Chart of Accounts',
+    description: 'Struktur rekening utama yang akan dipakai modul akuntansi, cash, stok, piutang, hutang, dan laporan keuangan.',
+    sheets: ['coa'],
+    nextStep: 'Pastikan hierarki parent-child, saldo normal, dan kategori akun sudah final sebelum bagian lain diproses.',
+  },
+  {
     id: 'master-data',
     title: 'Master Data',
-    description: 'Customer, supplier, produk, gudang, dan mapping akun. Ini fondasi utama sebelum opening balance diproses.',
+    description: 'Customer, supplier, produk, gudang, dan lampiran mapping legacy. Ini fondasi utama sebelum opening balance diproses.',
     sheets: ['coa_mapping', 'customers', 'suppliers', 'products', 'warehouses'],
     nextStep: 'Pastikan master data sudah bersih sebelum lanjut ke opening stock dan opening balances.',
   },
@@ -269,8 +291,8 @@ const migrationSteps = [
     description: 'Periode aktif harus sudah ada sebelum input saldo awal, tetapi jangan dikunci sebelum rekonsiliasi final selesai.',
   },
   {
-    title: 'Rapikan master data',
-    description: 'Bersihkan SKU, satuan, kategori produk, cabang, gudang, dan mapping akun sebelum import.',
+    title: 'Rapikan CoA & master data',
+    description: 'Finalkan struktur akun, lalu bersihkan SKU, satuan, kategori produk, cabang, gudang, dan mapping legacy sebelum import.',
   },
   {
     title: 'Validasi per bagian',
@@ -290,12 +312,12 @@ const requiredFiles = [
   'Hutang outstanding',
   'Stok per produk per gudang',
   'Master customer, supplier, dan produk',
-  'CoA lama, jika migrasi dari aplikasi lain',
+  'CoA final + mapping legacy, jika migrasi dari aplikasi lain',
 ]
 
 const supportItems = [
   'Menentukan strategi cut-off yang aman',
-  'Mapping CoA lama ke CoA NIZAM',
+  'Mapping CoA lama ke CoA NIZAM dan impor sheet coa',
   'Pembersihan master data dan kategori produk',
   'Penyusunan template migrasi client',
   'Validasi neraca pembuka dan nilai persediaan',
@@ -524,6 +546,39 @@ async function parseWorkbook(file: File): Promise<WorkbookReport> {
         }
         seenKeys.add(normalizedSku)
       }
+
+      if (schema.name === 'coa' && !isBlank(rowValues.kode_akun)) {
+        const normalizedCode = rowValues.kode_akun.toUpperCase()
+        if (seenKeys.has(normalizedCode)) {
+          issues.push({
+            severity: 'blocked',
+            message: `Baris ${rowIndex}: kode_akun ${rowValues.kode_akun} duplikat di sheet coa.`,
+          })
+        }
+        seenKeys.add(normalizedCode)
+
+        const level = Number(String(rowValues.level || '').trim())
+        if (Number.isFinite(level) && level === 1 && !isBlank(rowValues.parent_kode || '')) {
+          issues.push({
+            severity: 'blocked',
+            message: `Baris ${rowIndex}: akun level 1 tidak boleh memiliki parent_kode.`,
+          })
+        }
+
+        if (Number.isFinite(level) && level > 1 && isBlank(rowValues.parent_kode || '')) {
+          issues.push({
+            severity: 'blocked',
+            message: `Baris ${rowIndex}: akun level ${level} wajib memiliki parent_kode.`,
+          })
+        }
+
+        if (!isBlank(rowValues.parent_kode || '') && rowValues.parent_kode.toUpperCase() === normalizedCode) {
+          issues.push({
+            severity: 'blocked',
+            message: `Baris ${rowIndex}: parent_kode tidak boleh sama dengan kode_akun.`,
+          })
+        }
+      }
     }
 
     const status = resolveWorstStatus(issues.map((issue) => issue.severity))
@@ -657,6 +712,7 @@ export default function MigrationClient() {
   const [report, setReport] = useState<WorkbookReport | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [isParsing, setIsParsing] = useState(false)
+  const [isMigratingCoa, setIsMigratingCoa] = useState(false)
   const [isMigratingMasterData, setIsMigratingMasterData] = useState(false)
   const [isMigratingOpeningStock, setIsMigratingOpeningStock] = useState(false)
   const [isMigratingOpeningAr, setIsMigratingOpeningAr] = useState(false)
@@ -665,6 +721,8 @@ export default function MigrationClient() {
   const [isMigratingFixedAssets, setIsMigratingFixedAssets] = useState(false)
   const [isMigratingManufacturing, setIsMigratingManufacturing] = useState(false)
   const [isMigratingEmployees, setIsMigratingEmployees] = useState(false)
+  const [coaImportResult, setCoaImportResult] = useState<CoaImportResult | null>(null)
+  const [coaImportError, setCoaImportError] = useState('')
   const [masterDataImportResult, setMasterDataImportResult] = useState<MasterDataImportResult | null>(null)
   const [masterDataImportError, setMasterDataImportError] = useState('')
   const [openingStockImportResult, setOpeningStockImportResult] = useState<OpeningStockImportResult | null>(null)
@@ -735,6 +793,17 @@ export default function MigrationClient() {
     ]
   }, [masterDataImportResult])
 
+  const coaSummaryCards = useMemo(() => {
+    if (!coaImportResult?.success) return []
+
+    return [
+      { label: 'Created', value: coaImportResult.summary.created },
+      { label: 'Updated', value: coaImportResult.summary.updated },
+      { label: 'Header', value: coaImportResult.summary.headerRows },
+      { label: 'Detail', value: coaImportResult.summary.detailRows },
+    ]
+  }, [coaImportResult])
+
   const readySectionCount = useMemo(
     () => sectionReports.filter((section) => section.status === 'ok' && section.rowCount > 0).length,
     [sectionReports]
@@ -742,6 +811,7 @@ export default function MigrationClient() {
 
   const migratedSectionCount = useMemo(
     () => [
+      coaImportResult?.success,
       masterDataImportResult?.success,
       openingStockImportResult?.success,
       openingArImportResult?.success,
@@ -752,6 +822,7 @@ export default function MigrationClient() {
       employeesImportResult?.success,
     ].filter(Boolean).length,
     [
+      coaImportResult,
       employeesImportResult,
       fixedAssetsImportResult,
       manufacturingImportResult,
@@ -764,6 +835,7 @@ export default function MigrationClient() {
   )
 
   const hasAnyMigrationRunning =
+    isMigratingCoa ||
     isMigratingMasterData ||
     isMigratingOpeningStock ||
     isMigratingOpeningAr ||
@@ -774,6 +846,7 @@ export default function MigrationClient() {
     isMigratingEmployees
 
   const hasAnySuccessfulMigration = Boolean(
+    coaImportResult?.success ||
     masterDataImportResult?.success ||
     openingStockImportResult?.success ||
     openingArImportResult?.success ||
@@ -988,6 +1061,8 @@ export default function MigrationClient() {
 
     setIsParsing(true)
     setErrorMessage('')
+    setCoaImportResult(null)
+    setCoaImportError('')
     setMasterDataImportResult(null)
     setMasterDataImportError('')
     setOpeningStockImportResult(null)
@@ -1014,6 +1089,32 @@ export default function MigrationClient() {
     } finally {
       setIsParsing(false)
       event.target.value = ''
+    }
+  }
+
+  const handleMigrateCoa = async () => {
+    if (!report) return
+
+    setIsMigratingCoa(true)
+    setCoaImportError('')
+    setCoaImportResult(null)
+
+    try {
+      const result = await importCoaMigration({
+        coaRows: getSheetRows('coa'),
+      })
+
+      if (!result.success) {
+        setCoaImportError(result.error)
+        return
+      }
+
+      setCoaImportResult(result)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Gagal menjalankan migrasi Chart of Accounts.'
+      setCoaImportError(message)
+    } finally {
+      setIsMigratingCoa(false)
     }
   }
 
@@ -1234,7 +1335,7 @@ export default function MigrationClient() {
       <PageHeader
         tag="Business Settings"
         title="Pusat Migrasi Data"
-        subtitle="Upload workbook migrasi, lalu validasi hasilnya per bagian sebelum import ke database."
+        subtitle="Download workbook migrasi resmi, lalu validasi dan import tiap bagian mulai dari Chart of Accounts sampai opening balances."
         icon={<Building2 />}
         actions={(
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -1251,7 +1352,7 @@ export default function MigrationClient() {
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-white transition hover:bg-black"
             >
               <Download size={16} />
-              Download Template
+              Download Template Migrasi
             </a>
           </div>
         )}
@@ -1280,7 +1381,7 @@ export default function MigrationClient() {
         <SectionCard className="rounded-[36px] border border-slate-200 bg-gradient-to-br from-white via-blue-50 to-slate-50">
           <SectionHeader
             title="Upload Workbook Migrasi"
-            subtitle="Workbook tetap satu file, tetapi proses review dan tindak lanjutnya dipisahkan per bagian."
+            subtitle="Workbook tetap satu file, tetapi sekarang sudah termasuk sheet CoA resmi, sample implementasi, dan referensi pengisian."
             icon={Upload}
           />
 
@@ -1289,7 +1390,7 @@ export default function MigrationClient() {
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-700">Workbook Excel</div>
               <h3 className="text-xl font-black tracking-tight text-slate-900">Pilih file `.xlsx` hasil pengisian client</h3>
               <p className="text-sm font-medium leading-6 text-slate-600">
-                Setelah file di-upload, sistem akan langsung membawa user ke alur: verifikasi, warning, ready, lalu migrate.
+                Template ini sudah berisi sheet `coa`, `coa_sample`, dan `coa_referensi` agar tim finance bisa langsung mengisi struktur akun sebelum bagian lain dimigrasikan.
               </p>
             </div>
 
@@ -1310,7 +1411,7 @@ export default function MigrationClient() {
                 className="inline-flex items-center justify-center gap-2 rounded-[22px] border border-slate-200 bg-white px-7 py-3.5 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
               >
                 <FileSpreadsheet size={16} />
-                Ambil Template Excel
+                Ambil Template Resmi
               </a>
             </div>
 
@@ -1451,7 +1552,7 @@ export default function MigrationClient() {
 
         {!report ? (
           <div className="mt-6 rounded-[28px] border border-slate-200 bg-slate-50 p-8 text-sm font-semibold text-slate-500">
-            Upload workbook dulu untuk melihat status tiap bagian, dari master data sampai opening balances.
+            Upload workbook dulu untuk melihat status tiap bagian, mulai dari Chart of Accounts, master data, sampai opening balances.
           </div>
         ) : (
           <div className="mt-6 space-y-6">
@@ -1461,6 +1562,7 @@ export default function MigrationClient() {
 
             {sectionReports.map((section, index) => {
               const toneClasses = getToneClasses(section.status)
+              const isCoaSection = section.id === 'coa'
               const isMasterDataSection = section.id === 'master-data'
               const isOpeningStockSection = section.id === 'opening-stock'
               const isOpeningArSection = section.id === 'opening-ar'
@@ -1470,6 +1572,7 @@ export default function MigrationClient() {
               const isManufacturingSection = section.id === 'manufacturing'
               const isEmployeesSection = section.id === 'employees'
               const sectionHasRows = section.rowCount > 0
+              const canMigrateCoa = isCoaSection && section.status === 'ok' && sectionHasRows && !isParsing
               const canMigrateMasterData = isMasterDataSection && section.status === 'ok' && sectionHasRows && !isParsing
               const canMigrateOpeningStock = isOpeningStockSection && section.status === 'ok' && sectionHasRows && !isParsing
               const canMigrateOpeningAr = isOpeningArSection && section.status === 'ok' && sectionHasRows && !isParsing
@@ -1480,6 +1583,7 @@ export default function MigrationClient() {
               const canMigrateEmployees = isEmployeesSection && section.status === 'ok' && sectionHasRows && !isParsing
               const isMigratableSection = true
               const hasMigratedSection =
+                (isCoaSection && Boolean(coaImportResult?.success)) ||
                 (isMasterDataSection && Boolean(masterDataImportResult?.success)) ||
                 (isOpeningStockSection && Boolean(openingStockImportResult?.success)) ||
                 (isOpeningArSection && Boolean(openingArImportResult?.success)) ||
@@ -1538,7 +1642,19 @@ export default function MigrationClient() {
                           <Download size={14} />
                           Template
                         </a>
-                        {isMasterDataSection ? (
+                        {isCoaSection ? (
+                          <SafeButton
+                            variant="emerald"
+                            size="sm"
+                            icon={<CheckCircle2 size={14} />}
+                            isLoading={isMigratingCoa}
+                            loadingText="Migrating..."
+                            onClick={handleMigrateCoa}
+                            disabled={!canMigrateCoa}
+                          >
+                            Migrate Now
+                          </SafeButton>
+                        ) : isMasterDataSection ? (
                           <SafeButton
                             variant="emerald"
                             size="sm"
@@ -1675,6 +1791,12 @@ export default function MigrationClient() {
                     </div>
                   ) : null}
 
+                  {isCoaSection && coaImportError ? (
+                    <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
+                      {coaImportError}
+                    </div>
+                  ) : null}
+
                   {isMasterDataSection && masterDataImportError ? (
                     <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
                       {masterDataImportError}
@@ -1723,6 +1845,48 @@ export default function MigrationClient() {
                     </div>
                   ) : null}
 
+                  {isCoaSection && coaImportResult?.success ? (
+                    <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${
+                      coaImportResult.hasErrors
+                        ? 'border-amber-200 bg-amber-50 text-amber-800'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    }`}>
+                      <div className="font-black">{coaImportResult.message}</div>
+                      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        {coaSummaryCards.map(({ label, value }) => (
+                          <div key={label} className="rounded-2xl bg-white/80 px-4 py-3">
+                            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</div>
+                            <div className="mt-2 text-xs font-semibold text-slate-700">{value}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-3 rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                        Sinkron akun berhasil diproses: {coaImportResult.metadata.syncedAccounts} akun.
+                      </div>
+
+                      {coaImportResult.warnings.length > 0 ? (
+                        <div className="mt-3 space-y-2">
+                          {coaImportResult.warnings.map((warning) => (
+                            <div key={warning} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                              {warning}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {coaImportResult.summary.errors.length > 0 ? (
+                        <div className="mt-3 space-y-2">
+                          {coaImportResult.summary.errors.slice(0, 6).map((error) => (
+                            <div key={error} className="rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
+                              {error}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
                   {isMasterDataSection && masterDataImportResult?.success ? (
                     <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${
                       masterDataImportResult.hasErrors
@@ -1743,7 +1907,7 @@ export default function MigrationClient() {
 
                       {masterDataImportResult.ignored.coaMappingRows > 0 ? (
                         <div className="mt-3 rounded-2xl bg-white/80 px-4 py-3 font-semibold text-slate-700">
-                          `coa_mapping` terbaca {masterDataImportResult.ignored.coaMappingRows} baris, tetapi masih status review only.
+                          `coa_mapping` terbaca {masterDataImportResult.ignored.coaMappingRows} baris dan tetap disimpan sebagai lampiran mapping legacy. Import akun utama dijalankan dari sheet `coa`.
                         </div>
                       ) : null}
 

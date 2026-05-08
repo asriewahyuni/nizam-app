@@ -211,6 +211,49 @@ export type ProductionWorkOrderCost = {
   id: string; wo_id: string; description: string; amount: number
   cost_type: string; created_at: string
 }
+export type TrainingCourseAssessment = {
+  id: string
+  org_id: string
+  course_slug: string
+  assessment_version: string
+  participant_name: string
+  participant_reference: string | null
+  participant_role: string | null
+  assessor_user_id: string | null
+  assessor_name: string
+  decision: 'COMPETENT' | 'NOT_YET_COMPETENT'
+  theory_status: 'UNDERSTOOD' | 'PARTIAL' | 'NOT_YET'
+  practice_status: 'SUCCESS' | 'NEEDS_SUPPORT' | 'FAILED'
+  checklist_results: Json
+  evidence_summary: string | null
+  strengths: string | null
+  repeated_errors: string | null
+  follow_up: string | null
+  metadata: Json
+  created_at: string
+  updated_at: string
+}
+export type TrainingCourseAnswerSubmission = {
+  id: string
+  org_id: string
+  course_slug: string
+  assessment_version: string
+  participant_user_id: string | null
+  participant_name: string
+  participant_reference: string | null
+  participant_role: string | null
+  theory_answers: Json
+  practical_answers: Json
+  general_notes: string | null
+  status: 'SUBMITTED' | 'REVIEWED'
+  reviewer_user_id: string | null
+  reviewer_name: string | null
+  reviewer_note: string | null
+  reviewed_at: string | null
+  metadata: Json
+  created_at: string
+  updated_at: string
+}
 
 export interface Database {
   public: {
@@ -327,6 +370,26 @@ export interface Database {
         Row: Organization
         Insert: Omit<Organization, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
         Update: Partial<Organization>
+        Relationships: []
+      }
+      training_course_assessments: {
+        Row: TrainingCourseAssessment
+        Insert: Omit<TrainingCourseAssessment, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<TrainingCourseAssessment>
+        Relationships: []
+      }
+      training_course_answer_submissions: {
+        Row: TrainingCourseAnswerSubmission
+        Insert: Omit<TrainingCourseAnswerSubmission, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<TrainingCourseAnswerSubmission>
         Relationships: []
       }
       warehouses: {

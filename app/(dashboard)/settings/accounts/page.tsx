@@ -2,7 +2,9 @@ import type { Metadata } from 'next'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 import { getChartOfAccounts, seedInitialCoA, checkCanManageCoA, syncParentCoAToChildOrg } from '@/modules/accounting/actions/coa.actions'
+import { getShariahSetupSummary } from '@/modules/accounting/actions/shariah.actions'
 import AccountRowActions from './components/AccountRowActions'
+import ShariahSettingsCard from './components/ShariahSettingsCard'
 
 import { redirect } from 'next/navigation'
 import type { Account, AccountType } from '@/types/database.types'
@@ -35,9 +37,10 @@ export default async function ChartOfAccountsPage() {
     }
   }
 
-  const [accounts, { canManageDirect, isParentOrg }] = await Promise.all([
+  const [accounts, { canManageDirect, isParentOrg }, shariahSetupSummary] = await Promise.all([
     getChartOfAccounts(orgData.org.id),
     checkCanManageCoA(orgData.org.id),
+    getShariahSetupSummary(orgData.org.id),
   ])
   const canCreateDirectAccount = isParentOrg && canManageDirect
   const isCoAEmpty = accounts.length === 0
@@ -62,7 +65,7 @@ export default async function ChartOfAccountsPage() {
         <div>
           <h1 className="text-xl font-bold text-gray-900">Chart of Accounts</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {accounts.length} akun • Standar PSAK • {needsCoAActivation ? 'Aktivasi awal via tombol CoA' : (isChildOrganization ? 'Mengikuti parent (holding)' : 'Siap digunakan')}
+            {accounts.length} akun • Standar PSAK • {needsCoAActivation ? 'Aktivasi awal via tombol CoA' : (isChildOrganization ? 'Mengikuti organisasi induk (holding)' : 'Siap digunakan')}
           </p>
         </div>
         {needsCoAActivation ? (
@@ -75,7 +78,7 @@ export default async function ChartOfAccountsPage() {
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-all"
               style={{ background: isChildOrganization ? 'linear-gradient(135deg, #0f766e, #14b8a6)' : 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
             >
-              {isChildOrganization ? 'Sinkronkan CoA Parent' : 'Aktifkan CoA PSAK'}
+              {isChildOrganization ? 'Sinkronkan CoA Induk' : 'Aktifkan CoA PSAK'}
             </button>
           </form>
         ) : isParentOrg ? (
@@ -93,7 +96,7 @@ export default async function ChartOfAccountsPage() {
               disabled
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white opacity-60 cursor-not-allowed"
               style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
-              title="Pindah ke konteks Unit Utama parent untuk membuat rekening."
+              title="Pindah ke konteks Unit Utama organisasi induk untuk membuat rekening."
             >
               + Tambah Akun
             </button>
@@ -114,6 +117,8 @@ export default async function ChartOfAccountsPage() {
         )}
       </div>
 
+      <ShariahSettingsCard orgId={orgData.org.id} summary={shariahSetupSummary} />
+
       {needsCoAActivation && (
         <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">
           <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -123,12 +128,12 @@ export default async function ChartOfAccountsPage() {
           </div>
           <h3 className="text-lg font-bold text-gray-900 mb-2">
             {isChildOrganization
-              ? 'CoA child/cabang belum tersinkron'
+              ? 'CoA entitas anak belum tersinkron'
               : (isCoAEmpty ? 'CoA belum diaktivasi' : 'CoA belum lengkap')}
           </h3>
           <p className="text-gray-500 max-w-sm mx-auto mb-8 text-sm">
             {isChildOrganization
-              ? 'Untuk entitas anak/cabang, struktur rekening harus mengikuti parent. Jalankan sinkronisasi agar CoA mengikuti holding.'
+              ? 'Untuk entitas anak, struktur rekening mengikuti organisasi induk. Jalankan sinkronisasi agar CoA tetap konsisten dengan holding.'
               : (isCoAEmpty
                 ? 'Aktifkan Chart of Accounts (CoA) standar PSAK agar modul akuntansi siap dipakai.'
                 : 'Ditemukan akun parsial. Jalankan aktivasi CoA agar sistem melengkapi seluruh struktur PSAK.')}
@@ -143,7 +148,7 @@ export default async function ChartOfAccountsPage() {
               className="px-6 py-2.5 text-white rounded-lg font-semibold transition-colors"
               style={{ backgroundColor: isChildOrganization ? '#0f766e' : '#2563eb' }}
             >
-              {isChildOrganization ? 'Sinkronkan CoA Dari Parent' : 'Aktifkan CoA Standar PSAK'}
+              {isChildOrganization ? 'Sinkronkan CoA Dari Induk' : 'Aktifkan CoA Standar PSAK'}
             </button>
           </form>
 
@@ -154,7 +159,7 @@ export default async function ChartOfAccountsPage() {
           )}
           {isParentOrg && !canManageDirect && (
             <p className="text-xs text-amber-600 mt-4">
-              Parent terdeteksi, namun pembuatan rekening dikunci karena konteks unit aktif bukan Unit Utama.
+              Organisasi induk terdeteksi, namun pembuatan rekening dikunci karena konteks unit aktif bukan Unit Utama.
             </p>
           )}
         </div>

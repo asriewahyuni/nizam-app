@@ -4,6 +4,15 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { getServerAuthContext } from '@/lib/supabase/auth.server'
 import { isInternalAuthProvider } from '@/lib/auth/provider'
 import { normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
+import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
+import {
+  buildLogoStorageKey,
+  buildPublicStorageObjectPath,
+  deleteObjectFromStorage,
+  extractManagedStorageKey,
+  isObjectStorageFeatureEnabled,
+  uploadObjectToStorage,
+} from '@/lib/storage/object-storage.server'
 import { generateSlug } from '@/lib/utils'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -29,11 +38,16 @@ import {
 } from '@/modules/organization/lib/branch-access.server'
 import { applyVoucher } from './billing.actions'
 import { syncParentCoAToChildOrg } from '@/modules/accounting/actions/coa.actions'
+import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
 
 const ACTIVE_CONTEXT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 const DEFAULT_BRANCH_NAME = 'Unit Utama'
 const DEFAULT_BRANCH_CODE = 'MAIN'
 const DEMO_ACCOUNT_EMAIL = 'demo@nizam.app'
+const DEMO_SESSION_COOKIE_MAX_AGE = 60 * 60 * 12
+const TRIAL_PLAN_NAME = 'Trial'
+const DEFAULT_TRIAL_DURATION_DAYS = 3
+const TRIAL_REUSE_BLOCK_MESSAGE = 'Akun ini sudah pernah menggunakan paket Trial. Trial hanya bisa dipakai sekali per akun. Silakan lanjut dengan paket berbayar atau voucher.'
 
 async function getAuthenticatedUserFromSupabaseOrInternal(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
@@ -319,6 +333,12 @@ function isDemoPlanName(value: unknown): boolean {
   return typeof value === 'string' && value.trim().toLowerCase() === 'demo'
 }
 
+function normalizeEmail(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toLowerCase()
+  return normalized || null
+}
+
 function readPlanNameFromSettings(settings: unknown): string | null {
   if (!isPlainObject(settings)) return null
 
@@ -334,11 +354,45 @@ function readDemoFlagFromSettings(settings: unknown): boolean {
   return Boolean(settings.is_demo) || isDemoPlanName(settings.plan)
 }
 
+function parseOptionalDate(value: unknown): Date | null {
+  if (!value) return null
+
+  const parsed = value instanceof Date ? value : new Date(String(value))
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function resolveOrganizationSubscriptionEnd(org: unknown): Date | null {
+  if (!isPlainObject(org)) return null
+
+  const settings = isPlainObject(org.settings) ? org.settings : null
+  const candidates = [
+    parseOptionalDate(org.subscription_end),
+    parseOptionalDate(settings?.expires_at),
+  ].filter((candidate): candidate is Date => candidate instanceof Date)
+
+  if (candidates.length === 0) return null
+
+  return candidates.reduce((latest, current) =>
+    current.getTime() > latest.getTime() ? current : latest
+  )
+}
+
 function isDemoAccountUser(user: { email?: string | null; user_metadata?: Record<string, unknown> | null } | null | undefined): boolean {
   if (!user) return false
   const normalizedEmail = String(user.email || '').trim().toLowerCase()
   if (normalizedEmail === DEMO_ACCOUNT_EMAIL) return true
   return Boolean(user.user_metadata && (user.user_metadata as Record<string, unknown>).is_demo)
+}
+
+function hasUnlimitedSubscriptionAccess(input: {
+  userEmail?: string | null
+  org?: unknown
+}) {
+  if (isPlatformAdminEmail(input.userEmail)) return true
+  if (!isPlainObject(input.org)) return false
+  return isPlatformAdminEmail(
+    typeof input.org.owner_email === 'string' ? input.org.owner_email : null
+  )
 }
 
 async function getOrganizationPackageState(
@@ -364,6 +418,82 @@ async function getOrganizationPackageState(
   const isDemo = Boolean(orgRow.is_demo) || readDemoFlagFromSettings(orgRow.settings) || isDemoPlanName(plan)
 
   return { plan, isDemo }
+}
+
+async function hasConsumedTrial(
+  db: any,
+  user: { id?: string | null; email?: string | null }
+): Promise<boolean> {
+  const authUserId = String(user.id || '').trim()
+  const email = normalizeEmail(user.email)
+
+  if (!authUserId && !email) return false
+
+  if (authUserId) {
+    const { data: byUser, error: byUserError } = await db
+      .from('saas_trial_claims')
+      .select('id')
+      .eq('auth_user_id', authUserId)
+      .maybeSingle()
+
+    if (byUserError) {
+      throw new Error(byUserError.message || 'Gagal memeriksa riwayat Trial berdasarkan akun.')
+    }
+    if (byUser?.id) return true
+  }
+
+  if (email) {
+    const { data: byEmail, error: byEmailError } = await db
+      .from('saas_trial_claims')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (byEmailError) {
+      throw new Error(byEmailError.message || 'Gagal memeriksa riwayat Trial berdasarkan email.')
+    }
+    if (byEmail?.id) return true
+  }
+
+  return false
+}
+
+async function recordTrialClaim(
+  db: any,
+  input: {
+    authUserId?: string | null
+    email?: string | null
+    orgId: string
+    claimedAt?: string | null
+  }
+) {
+  const authUserId = String(input.authUserId || '').trim() || null
+  const email = normalizeEmail(input.email)
+
+  if (!authUserId && !email) {
+    return { error: 'Akun Trial tidak valid karena identitas user/email kosong.' as const }
+  }
+
+  const payload = {
+    auth_user_id: authUserId,
+    email,
+    first_org_id: input.orgId,
+    claimed_at: input.claimedAt || new Date().toISOString(),
+  }
+
+  const { error } = await db
+    .from('saas_trial_claims')
+    .insert(payload)
+
+  if (!error) return { success: true as const }
+
+  if (String(error.code || '').trim() === '23505') {
+    return { error: TRIAL_REUSE_BLOCK_MESSAGE }
+  }
+
+  return {
+    error: error.message || 'Gagal mencatat penggunaan Trial untuk akun ini.',
+  }
 }
 
 function mergeOrganizationSettingsWithPlanState(
@@ -615,6 +745,7 @@ async function createOrganizationRecord(
 
     // POPULATE OWNER EMAIL FROM SESSION
     const ownerEmail = user.email
+    const hasUnlimitedAccess = hasUnlimitedSubscriptionAccess({ userEmail: ownerEmail })
     const planParam = String(formData.get('plan') || '').trim().toLowerCase()
     const businessType = (formData.get('type') || 'BLANK') as DemoBusinessType
     const requestedDemoPlan = planParam === 'demo'
@@ -652,12 +783,25 @@ async function createOrganizationRecord(
     if (parentPackageState?.plan) {
       selectedPlan = parentPackageState.plan
     }
+    const shouldClaimTrial =
+      !hasUnlimitedAccess &&
+      !isDemo &&
+      !parentOrgId &&
+      planParam !== 'abs' &&
+      selectedPlan === TRIAL_PLAN_NAME
+
+    if (shouldClaimTrial) {
+      const alreadyUsedTrial = await hasConsumedTrial(privilegedDb, user)
+      if (alreadyUsedTrial) {
+        return { error: TRIAL_REUSE_BLOCK_MESSAGE }
+      }
+    }
 
     // ── AUTO-SET subscription_end FOR TIME-LIMITED PLANS ──────────────────────
     // Lookup duration from saas_packages and stamp an expiry on the org row.
     // Only applies to non-Demo, non-inherited-plan root orgs (i.e. fresh Trials).
     let subscriptionEndToSet: string | null = null
-    if (!isDemo && !parentOrgId) {
+    if (!isDemo && !parentOrgId && !hasUnlimitedAccess) {
       try {
         const { data: pkgMeta } = await organizationWriteDb
           .from('saas_packages')
@@ -669,9 +813,17 @@ async function createOrganizationRecord(
           const expiry = new Date()
           expiry.setDate(expiry.getDate() + pkgMeta.duration_days)
           subscriptionEndToSet = expiry.toISOString()
+        } else if (selectedPlan === TRIAL_PLAN_NAME) {
+          const expiry = new Date()
+          expiry.setDate(expiry.getDate() + DEFAULT_TRIAL_DURATION_DAYS)
+          subscriptionEndToSet = expiry.toISOString()
         }
       } catch (_) {
-        // Non-fatal: if we can't fetch duration, we just leave subscription_end null
+        if (selectedPlan === TRIAL_PLAN_NAME) {
+          const expiry = new Date()
+          expiry.setDate(expiry.getDate() + DEFAULT_TRIAL_DURATION_DAYS)
+          subscriptionEndToSet = expiry.toISOString()
+        }
       }
     }
 
@@ -818,9 +970,47 @@ async function createOrganizationRecord(
       }
     }
 
+    if (shouldClaimTrial) {
+      const trialClaimResult = await recordTrialClaim(privilegedDb, {
+        authUserId: user.id,
+        email: ownerEmail || user.email || null,
+        orgId,
+        claimedAt: createdAt,
+      })
+
+      if ('error' in trialClaimResult) {
+        ;(console as any).error('CreateOrganization: trial claim failed', trialClaimResult.error)
+        await privilegedDb.from('organizations').delete().eq('id', orgId)
+        return { error: trialClaimResult.error }
+      }
+    }
+
     if (!preserveParentContext) {
+      if (isDemo) {
+        cookieStore.set('nizam_demo_org_id', orgId, {
+          maxAge: DEMO_SESSION_COOKIE_MAX_AGE,
+          path: '/',
+          httpOnly: true,
+          sameSite: 'lax',
+        })
+      } else {
+        cookieStore.delete('nizam_demo_org_id')
+      }
+
       cookieStore.set(ACTIVE_ORG_COOKIE, orgId, getActiveContextCookieOptions())
-      cookieStore.set(ACTIVE_BRANCH_COOKIE, defaultBranchId, getActiveContextCookieOptions())
+      cookieStore.set(
+        ACTIVE_BRANCH_COOKIE,
+        defaultBranchId,
+        isDemo
+          ? {
+              maxAge: DEMO_SESSION_COOKIE_MAX_AGE,
+              path: '/',
+              httpOnly: true,
+              sameSite: 'lax',
+              secure: process.env.NODE_ENV === 'production',
+            }
+          : getActiveContextCookieOptions()
+      )
     }
 
     return {
@@ -1290,6 +1480,7 @@ export async function createOrganizationQuick(formData: FormData) {
     revalidatePath('/', 'layout')
     revalidatePath('/dashboard')
   }
+  await nudgeEduModeValidation('organization.create.quick')
   return result
 }
 
@@ -1326,10 +1517,20 @@ const getActiveOrgCached = cache(async () => {
     return null
   }
   const planName = org?.settings?.plan
-  // Note: enabled_modules column may not exist in DB; rely on saas_packages + active_addons
   let enabledModules: string[] = []
   let isSubscriptionExpired = false
   let subscriptionEnd: Date | null = null
+  const hasUnlimitedAccess = hasUnlimitedSubscriptionAccess({
+    userEmail: user.email,
+    org,
+  })
+
+  const useCustomModules = org?.settings?.use_custom_modules === true
+  const customEnabledModules = Array.isArray(org?.enabled_modules)
+    ? org.enabled_modules
+        .map((moduleName: unknown) => normalizeSaasEntitlementName(String(moduleName || '').trim()))
+        .filter(Boolean)
+    : []
 
   // DYNAMIC MODULE RESOLUTION + SUBSCRIPTION EXPIRY CHECK FROM SaaS PACKAGE
   if (planName) {
@@ -1340,7 +1541,7 @@ const getActiveOrgCached = cache(async () => {
       .eq('is_active', true)
       .maybeSingle()
     
-    if (pkgData?.modules) {
+    if (!useCustomModules && pkgData?.modules) {
       try {
         const pkgModules = Array.isArray(pkgData.modules) ? pkgData.modules : JSON.parse(pkgData.modules || '[]')
         enabledModules = [...enabledModules, ...pkgModules]
@@ -1357,15 +1558,19 @@ const getActiveOrgCached = cache(async () => {
     // (no enforcement) to avoid locking out existing paying customers.
     const isTimeLimited = typeof pkgData?.duration_days === 'number' && pkgData.duration_days > 0
     const isDemoPlan = planName === 'Demo'
-    if (isTimeLimited && !isDemoPlan) {
-      // Prefer the explicit subscription_end stored on the org row.
-      const rawEnd = (org as any).subscription_end
-      if (rawEnd) {
-        subscriptionEnd = new Date(rawEnd)
+    if (isTimeLimited && !isDemoPlan && !hasUnlimitedAccess) {
+      // Keep supporting the legacy settings.expires_at field so old admin edits
+      // or manual extensions do not keep a tenant locked out after renewal.
+      subscriptionEnd = resolveOrganizationSubscriptionEnd(org)
+      if (subscriptionEnd) {
         isSubscriptionExpired = subscriptionEnd < new Date()
       }
-      // If subscription_end is null (legacy org), we do NOT force-expire.
+      // If both expiry fields are missing (legacy org), we do NOT force-expire.
     }
+  }
+
+  if (useCustomModules) {
+    enabledModules = [...enabledModules, ...customEnabledModules]
   }
 
   // ADD INDUSTRIAL ADD-ONS
@@ -1521,13 +1726,16 @@ export async function setActiveOrg(orgId: string) {
 
   if (!user) return { error: 'Tidak terautentikasi.' }
 
-  let { data: membership, error } = await db
+  const membershipLookup = await db
     .from('org_members')
     .select('id, org_id, role')
     .eq('user_id', user.id)
     .eq('org_id', trimmedOrgId)
     .eq('is_active', true)
     .maybeSingle()
+
+  let membership = membershipLookup.data
+  const error = membershipLookup.error
 
   if (error || !membership) {
     const { data: childOrg } = await admin
@@ -1609,11 +1817,64 @@ export async function setActiveOrg(orgId: string) {
   return { success: true, orgId: trimmedOrgId, branchId: persistedBranchId }
 }
 
+function normalizeOrganizationLogoUrl(value: unknown): string | null {
+  const normalized = String(value || '').trim()
+  return normalized || null
+}
+
+/**
+ * Membersihkan file logo lama jika organisasi berpindah ke file logo bucket yang baru.
+ */
+async function cleanupReplacedManagedLogo(previousLogoUrl: string | null, nextLogoUrl: string | null) {
+  const previousKey = extractManagedStorageKey(previousLogoUrl)
+  const nextKey = extractManagedStorageKey(nextLogoUrl)
+
+  if (!previousKey || previousKey === nextKey || !previousKey.startsWith('logos/')) {
+    return
+  }
+
+  try {
+    await deleteObjectFromStorage(previousKey)
+  } catch (error) {
+    console.error('[Organization] Gagal menghapus logo lama dari bucket:', error)
+  }
+}
+
 export async function updateOrgSettings(orgId: string, updates: any) {
   const supabase = await createClient()
   const db = supabase as any
-  const { error } = await db.from('organizations').update(updates).eq('id', orgId)
+  const normalizedUpdates =
+    updates && typeof updates === 'object'
+      ? {
+          ...updates,
+          ...(Object.prototype.hasOwnProperty.call(updates, 'logo_url')
+            ? { logo_url: normalizeOrganizationLogoUrl(updates.logo_url) }
+            : {}),
+        }
+      : updates
+  const nextLogoUrl = Object.prototype.hasOwnProperty.call(normalizedUpdates || {}, 'logo_url')
+    ? normalizeOrganizationLogoUrl(normalizedUpdates.logo_url)
+    : null
+  let previousLogoUrl: string | null = null
+
+  if (Object.prototype.hasOwnProperty.call(normalizedUpdates || {}, 'logo_url')) {
+    const { data: previousOrg } = await db
+      .from('organizations')
+      .select('logo_url')
+      .eq('id', orgId)
+      .maybeSingle()
+
+    previousLogoUrl = normalizeOrganizationLogoUrl(previousOrg?.logo_url)
+  }
+
+  const { error } = await db.from('organizations').update(normalizedUpdates).eq('id', orgId)
   if (error) return { error: 'Gagal menyimpan.' }
+
+  if (Object.prototype.hasOwnProperty.call(normalizedUpdates || {}, 'logo_url')) {
+    await cleanupReplacedManagedLogo(previousLogoUrl, nextLogoUrl)
+  }
+
+  revalidatePath('/', 'layout')
   revalidatePath('/settings/business')
   return { success: true }
 }
@@ -1632,14 +1893,78 @@ export async function uploadLogo(orgId: string, formData: FormData) {
   if (!user) return { success: false, error: 'Auth failed' }
 
   const file = formData.get('file') as File
-  const filePath = `${orgId}/logo-${Date.now()}`
+  if (!file || typeof file.arrayBuffer !== 'function' || file.size === 0) {
+    return { success: false, error: 'File logo tidak valid.' }
+  }
+  if (!String(file.type || '').startsWith('image/')) {
+    return { success: false, error: 'Logo harus berupa file gambar PNG, JPG, WEBP, atau SVG.' }
+  }
+  if (file.size > 1024 * 1024) {
+    return { success: false, error: 'Ukuran logo maksimal 1 MB agar performa tetap ringan.' }
+  }
 
-  await supabase.storage.from('brand_assets').upload(filePath, file, { upsert: true })
-  const { data: { publicUrl } } = supabase.storage.from('brand_assets').getPublicUrl(filePath)
-  await db.from('organizations').update({ logo_url: publicUrl }).eq('id', orgId)
+  const { data: organization } = await db
+    .from('organizations')
+    .select('logo_url')
+    .eq('id', orgId)
+    .maybeSingle()
 
+  const previousLogoUrl = normalizeOrganizationLogoUrl(organization?.logo_url)
+
+  if (isObjectStorageFeatureEnabled('logos')) {
+    const fileBuffer = Buffer.from(await file.arrayBuffer())
+    const storageKey = buildLogoStorageKey(orgId, file.name)
+    const proxiedLogoUrl = buildPublicStorageObjectPath(storageKey)
+    const normalizedLogoUrl = normalizeOrganizationLogoUrl(proxiedLogoUrl)
+
+    try {
+      await uploadObjectToStorage({
+        key: storageKey,
+        body: fileBuffer,
+        contentType: file.type || 'application/octet-stream',
+        cacheControl: 'public, max-age=31536000, immutable',
+      })
+    } catch (error) {
+      console.error('[Organization] Gagal upload logo ke bucket:', error)
+      return { success: false, error: 'Gagal upload logo ke bucket Railway. Cek kredensial bucket lalu coba lagi.' }
+    }
+
+    const { error } = await db
+      .from('organizations')
+      .update({ logo_url: normalizedLogoUrl })
+      .eq('id', orgId)
+
+    if (error) {
+      try {
+        await deleteObjectFromStorage(storageKey)
+      } catch (cleanupError) {
+        console.error('[Organization] Gagal membersihkan logo baru setelah update database gagal:', cleanupError)
+      }
+
+      return { success: false, error: 'Gagal menyimpan logo perusahaan.' }
+    }
+
+    await cleanupReplacedManagedLogo(previousLogoUrl, normalizedLogoUrl)
+
+    revalidatePath('/', 'layout')
+    revalidatePath('/settings/business')
+    return { success: true, url: normalizedLogoUrl }
+  }
+
+  const base64Payload = Buffer.from(await file.arrayBuffer()).toString('base64')
+  const publicUrl = `data:${file.type};base64,${base64Payload}`
+  const normalizedLogoUrl = normalizeOrganizationLogoUrl(publicUrl)
+  const { error } = await db
+    .from('organizations')
+    .update({ logo_url: normalizedLogoUrl })
+    .eq('id', orgId)
+  if (error) {
+    return { success: false, error: 'Gagal menyimpan logo perusahaan.' }
+  }
+
+  revalidatePath('/', 'layout')
   revalidatePath('/settings/business')
-  return { success: true, url: publicUrl }
+  return { success: true, url: normalizedLogoUrl }
 }
 
 export async function getOrgMembers(orgId: string) {
@@ -2012,7 +2337,7 @@ export async function createBranch(orgId: string, formData: FormData) {
   const limits = await getOrgLimits(trimmedOrgId)
   if (limits.maxBranches !== null && limits.currentBranches >= limits.maxBranches) {
     return {
-      error: `Batas cabang tercapai (${limits.currentBranches}/${limits.maxBranches}). Upgrade paket SaaS Anda untuk menambah lebih banyak cabang.`,
+      error: `Batas unit tercapai (${limits.currentBranches}/${limits.maxBranches}). Upgrade paket SaaS Anda untuk menambah lebih banyak unit.`,
     }
   }
 
@@ -2063,6 +2388,7 @@ export async function createBranch(orgId: string, formData: FormData) {
   revalidatePath('/', 'layout')
   revalidatePath('/settings/branches')
   revalidatePath('/settings/users')
+  await nudgeEduModeValidation('organization.create.branch')
   return {
     success: true,
     branch: insertedBranch,
@@ -2084,9 +2410,9 @@ export async function updateBranch(orgId: string, branchId: string, formData: Fo
   const address = addressRaw || null
 
   if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
-  if (!trimmedBranchId) return { error: 'Cabang tidak valid.' }
-  if (!name) return { error: 'Nama cabang wajib diisi.' }
-  if (!code) return { error: 'Kode cabang wajib diisi.' }
+  if (!trimmedBranchId) return { error: 'Unit tidak valid.' }
+  if (!name) return { error: 'Nama unit wajib diisi.' }
+  if (!code) return { error: 'Kode unit wajib diisi.' }
 
   // Check actor permissions
   const { data: actorMembership } = await db
@@ -2098,7 +2424,7 @@ export async function updateBranch(orgId: string, branchId: string, formData: Fo
     .maybeSingle()
 
   if (!actorMembership || !['owner', 'admin'].includes(String(actorMembership.role || ''))) {
-    return { error: 'Hanya owner atau admin yang dapat mengubah cabang.' }
+    return { error: 'Hanya owner atau admin yang dapat mengubah unit.' }
   }
 
   // Duplicate check (ignore self)
@@ -2109,7 +2435,7 @@ export async function updateBranch(orgId: string, branchId: string, formData: Fo
     .eq('name', name)
     .neq('id', trimmedBranchId)
     .maybeSingle()
-  if (dupName?.id) return { error: 'Nama cabang sudah digunakan.' }
+  if (dupName?.id) return { error: 'Nama unit sudah digunakan.' }
 
   const { data: dupCode } = await db
     .from('branches')
@@ -2118,7 +2444,7 @@ export async function updateBranch(orgId: string, branchId: string, formData: Fo
     .eq('code', code)
     .neq('id', trimmedBranchId)
     .maybeSingle()
-  if (dupCode?.id) return { error: 'Kode cabang sudah digunakan.' }
+  if (dupCode?.id) return { error: 'Kode unit sudah digunakan.' }
 
   const { error: updateError } = await db
     .from('branches')
@@ -2126,7 +2452,7 @@ export async function updateBranch(orgId: string, branchId: string, formData: Fo
     .eq('id', trimmedBranchId)
     .eq('org_id', trimmedOrgId)
 
-  if (updateError) return { error: updateError.message || 'Gagal memperbarui cabang.' }
+  if (updateError) return { error: updateError.message || 'Gagal memperbarui unit.' }
 
   revalidatePath('/settings/branches')
   revalidatePath('/', 'layout')
@@ -2142,7 +2468,7 @@ export async function deleteBranch(orgId: string, branchId: string) {
   const trimmedOrgId = String(orgId || '').trim()
   const trimmedBranchId = String(branchId || '').trim()
   if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
-  if (!trimmedBranchId) return { error: 'Cabang tidak valid.' }
+  if (!trimmedBranchId) return { error: 'Unit tidak valid.' }
 
   const { data: actorMembership } = await db
     .from('org_members')
@@ -2153,7 +2479,7 @@ export async function deleteBranch(orgId: string, branchId: string) {
     .maybeSingle()
 
   if (!actorMembership || String(actorMembership.role || '') !== 'owner') {
-    return { error: 'Hanya owner yang dapat menghapus cabang.' }
+    return { error: 'Hanya owner yang dapat menghapus unit.' }
   }
 
   // Prevent deleting the only branch
@@ -2164,7 +2490,7 @@ export async function deleteBranch(orgId: string, branchId: string) {
     .eq('is_active', true)
 
   if ((branchCount ?? 0) <= 1) {
-    return { error: 'Tidak dapat menghapus satu-satunya cabang yang aktif.' }
+    return { error: 'Tidak dapat menghapus satu-satunya unit aktif.' }
   }
 
   // ── Pre-flight: cek semua tabel yang punya FK NOT NULL ke branches ──
@@ -2175,6 +2501,7 @@ export async function deleteBranch(orgId: string, branchId: string) {
     { table: 'bank_transactions',      label: 'Transaksi Bank'     },
     { table: 'bank_mutations',         label: 'Mutasi Bank'        },
     { table: 'service_orders',         label: 'Order Jasa'         },
+    { table: 'construction_projects',  label: 'Project Konstruksi' },
     { table: 'fleet_assets',           label: 'Armada'             },
     { table: 'fleet_bookings',         label: 'Booking Armada'     },
     { table: 'fleet_routes',           label: 'Rute Armada'        },
@@ -2201,7 +2528,7 @@ export async function deleteBranch(orgId: string, branchId: string) {
 
   if (blockers.length > 0) {
     return {
-      error: `Cabang ini tidak dapat dihapus karena masih memiliki data terkait:\n• ${blockers.join('\n• ')}\n\nPindahkan atau hapus data tersebut terlebih dahulu sebelum menghapus cabang.`,
+      error: `Unit ini tidak dapat dihapus karena masih memiliki data terkait:\n• ${blockers.join('\n• ')}\n\nPindahkan atau hapus data tersebut terlebih dahulu sebelum menghapus unit.`,
     }
   }
 
@@ -2214,9 +2541,9 @@ export async function deleteBranch(orgId: string, branchId: string) {
   if (deleteError) {
     // Tangkap FK violation yang mungkin masih lolos dari pre-flight check
     if (deleteError.code === '23503') {
-      return { error: 'Cabang masih memiliki data terkait dan tidak dapat dihapus. Hapus semua data yang menggunakan cabang ini terlebih dahulu.' }
+      return { error: 'Unit masih memiliki data terkait dan tidak dapat dihapus. Hapus semua data yang menggunakan unit ini terlebih dahulu.' }
     }
-    return { error: deleteError.message || 'Gagal menghapus cabang.' }
+    return { error: deleteError.message || 'Gagal menghapus unit.' }
   }
 
   revalidatePath('/settings/branches')
@@ -2236,7 +2563,7 @@ export async function assignBranchPIC(orgId: string, branchId: string, employeeI
   const normalizedEmployeeId = String(employeeId || '').trim() || null
 
   if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
-  if (!trimmedBranchId) return { error: 'Cabang tidak valid.' }
+  if (!trimmedBranchId) return { error: 'Unit tidak valid.' }
 
   const { data: actorMembership } = await db
     .from('org_members')
@@ -2247,7 +2574,7 @@ export async function assignBranchPIC(orgId: string, branchId: string, employeeI
     .maybeSingle()
 
   if (!actorMembership || !['owner', 'admin'].includes(String(actorMembership.role || ''))) {
-    return { error: 'Hanya owner atau admin yang dapat mengubah PIC cabang.' }
+    return { error: 'Hanya owner atau admin yang dapat mengubah PIC unit.' }
   }
 
   if (normalizedEmployeeId) {
@@ -2266,7 +2593,7 @@ export async function assignBranchPIC(orgId: string, branchId: string, employeeI
     .eq('id', trimmedBranchId)
     .eq('org_id', trimmedOrgId)
 
-  if (updateError) return { error: updateError.message || 'Gagal menyimpan PIC cabang.' }
+  if (updateError) return { error: updateError.message || 'Gagal menyimpan PIC unit.' }
 
   revalidatePath('/settings/branches')
   return { success: true }

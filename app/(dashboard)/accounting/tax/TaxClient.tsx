@@ -20,11 +20,41 @@ import {
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatRupiah, formatDate } from '@/lib/utils'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip as ReTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts'
+import { SafeResponsiveContainer } from '@/components/ui/SafeResponsiveContainer'
 
 interface TaxClientProps {
   summary: any
   orgId: string
+}
+
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+function normalizeTaxDate(value: unknown): string {
+  if (!value) return ''
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return ''
+    if (DATE_ONLY_PATTERN.test(trimmed)) return trimmed
+
+    const parsed = new Date(trimmed)
+    if (Number.isNaN(parsed.getTime())) return ''
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return ''
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+  }
+
+  const parsed = new Date(String(value))
+  if (Number.isNaN(parsed.getTime())) return ''
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
+}
+
+function compareTaxDateDesc(a: { date?: unknown }, b: { date?: unknown }) {
+  return normalizeTaxDate(b?.date).localeCompare(normalizeTaxDate(a?.date))
 }
 
 const container = {
@@ -186,7 +216,7 @@ export default function TaxClient({ summary, orgId }: TaxClientProps) {
                </div>
                
                <div className="h-64 relative">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <SafeResponsiveContainer>
                     <PieChart>
                       <Pie
                         data={vatData}
@@ -206,7 +236,7 @@ export default function TaxClient({ summary, orgId }: TaxClientProps) {
                         formatter={(value: any) => formatRupiah(Number(value || 0))}
                       />
                     </PieChart>
-                  </ResponsiveContainer>
+                  </SafeResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                      <span className="text-[10px] font-black text-slate-400 uppercase">Efek Kas</span>
                      <span className={`text-xs font-black ${summary.netVat >= 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
@@ -278,7 +308,7 @@ export default function TaxClient({ summary, orgId }: TaxClientProps) {
                               </tr>
                            </thead>
                            <tbody className="divide-y divide-slate-50">
-                              {[...summary.vatIn.items, ...summary.vatOut.items].sort((a,b) => b.date.localeCompare(a.date)).map((it, idx) => (
+                              {[...summary.vatIn.items, ...summary.vatOut.items].sort(compareTaxDateDesc).map((it, idx) => (
                                 <tr key={idx} className="hover:bg-slate-50 transition-colors group">
                                    <td className="px-8 py-5 text-xs font-bold text-slate-600">{formatDate(it.date)}</td>
                                    <td className="px-6 py-5 font-mono text-[11px] font-black text-slate-400">{it.ref}</td>
@@ -349,7 +379,7 @@ export default function TaxClient({ summary, orgId }: TaxClientProps) {
                               </tr>
                            </thead>
                            <tbody className="divide-y divide-slate-50">
-                              {[...summary.pph21.items.map((i:any) => ({...i, type: 'PPh 21'})), ...summary.pph23.items.map((i:any) => ({...i, type: 'PPh 23'}))].sort((a,b) => b.date.localeCompare(a.date)).map((it, idx) => (
+                              {[...summary.pph21.items.map((i:any) => ({...i, type: 'PPh 21'})), ...summary.pph23.items.map((i:any) => ({...i, type: 'PPh 23'}))].sort(compareTaxDateDesc).map((it, idx) => (
                                 <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                    <td className="px-8 py-5 text-xs font-bold text-slate-600">{formatDate(it.date)}</td>
                                    <td className="px-6 py-5">

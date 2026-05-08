@@ -2,6 +2,7 @@
 
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getDocumentHeaderDiscountAmount, getDocumentLineDiscountTotal, roundMoney } from '@/lib/commerce/discounts'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { ensureSellableBranchStockAvailability, shouldGuardOrderedSaleStock } from '@/modules/sales/lib/stock-guard.server'
 
@@ -53,6 +54,20 @@ function deriveNameFromEmail(email: string | null): string | null {
   const withSpaces = localPart.replace(/[._-]+/g, ' ').trim()
   if (!withSpaces) return null
   return toTitleWords(withSpaces)
+}
+
+function hydratePurchaseApprovalDiscount<T extends Record<string, unknown>>(purchase: T, items: Array<Record<string, unknown>> = []) {
+  const storedDiscount = Math.max(0, roundMoney(purchase?.discount_amount))
+  const lineDiscountTotal = getDocumentLineDiscountTotal(items)
+  const headerDiscountAmount = getDocumentHeaderDiscountAmount({
+    ...purchase,
+    purchase_items: items,
+  }, lineDiscountTotal)
+
+  return {
+    ...purchase,
+    discount_amount: roundMoney(Math.max(storedDiscount, lineDiscountTotal + headerDiscountAmount)),
+  }
 }
 
 async function getOrgMemberIdentityByUserIds(supabase: any, orgId: string, userIds: string[]) {
@@ -421,13 +436,15 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
       if (poResult.rows.length === 0) { dataRes = { data: null, error: { message: 'Purchase order tidak ditemukan.' } } }
       else {
         const row = poResult.rows[0]
+        const purchaseItems = itemsResult.rows.map((item) => ({
+          ...item, products: item.product_name ? { name: item.product_name, unit: item.product_unit } : null,
+        }))
+        const hydratedRow = hydratePurchaseApprovalDiscount(row, purchaseItems)
         dataRes = { data: {
-          ...row,
-          contacts: row.vendor_name ? { name: row.vendor_name } : null,
-          branches: row.branch_name ? { name: row.branch_name, code: row.branch_code } : null,
-          purchase_items: itemsResult.rows.map((item) => ({
-            ...item, products: item.product_name ? { name: item.product_name, unit: item.product_unit } : null,
-          })),
+          ...hydratedRow,
+          contacts: hydratedRow.vendor_name ? { name: hydratedRow.vendor_name } : null,
+          branches: hydratedRow.branch_name ? { name: hydratedRow.branch_name, code: hydratedRow.branch_code } : null,
+          purchase_items: purchaseItems,
         }, error: null }
       }
     } catch (err: any) { dataRes = { data: null, error: { message: err?.message || 'Query error' } } }
@@ -490,6 +507,41 @@ export async function getApprovalDetail(orgId: string, sourceId: string, sourceT
         }, error: null }
       }
     } catch (err: any) { dataRes = { data: null, error: { message: err?.message || 'Query error' } } }
+  } else if (sourceType === 'CONSTRUCTION_CHANGE_ORDER') {
+    try {
+      const coParams: unknown[] = [sourceId, orgId]
+      let coWhere = `co.id = $1 AND co.org_id = $2`
+      if (effectiveBranchId) {
+        coParams.push(effectiveBranchId)
+        coWhere += ` AND p.branch_id = $${coParams.length}`
+      }
+
+      const changeOrderResult = await queryPostgres<Record<string, unknown>>(`
+        SELECT
+          co.*,
+          p.project_code,
+          p.project_name,
+          p.project_status,
+          p.site_address,
+          p.contract_value AS project_contract_value,
+          p.estimated_cost AS project_estimated_cost,
+          b.name AS branch_name,
+          b.code AS branch_code,
+          s.stage_name
+        FROM public.construction_change_orders co
+        INNER JOIN public.construction_projects p ON p.id = co.project_id
+        LEFT JOIN public.branches b ON b.id = p.branch_id
+        LEFT JOIN public.construction_project_stages s ON s.id = co.stage_id
+        WHERE ${coWhere}
+        LIMIT 1
+      `, coParams)
+
+      if (changeOrderResult.rows.length === 0) {
+        dataRes = { data: null, error: { message: 'Change order tidak ditemukan.' } }
+      } else {
+        dataRes = { data: changeOrderResult.rows[0], error: null }
+      }
+    } catch (err: any) { dataRes = { data: null, error: { message: err?.message || 'Query error' } } }
   } else if (sourceType === 'LEAVE_REQUEST') {
     let query = (supabase as any)
       .from('leave_requests')
@@ -549,6 +601,62 @@ export async function getPendingApprovalsCount(orgId: string, branchId?: string 
   }
   
   return count || 0
+}
+
+export type PendingApprovalNotificationMarker = {
+  pendingCount: number
+  latestPendingId: string | null
+  latestRequestedAt: string | null
+}
+
+export async function getPendingApprovalNotificationMarker(
+  orgId: string,
+  branchId?: string | null
+): Promise<PendingApprovalNotificationMarker> {
+  const supabase = await createClient()
+  const branchSelection = await resolveApprovalBranchId(orgId, branchId)
+  if ('error' in branchSelection) {
+    return {
+      pendingCount: 0,
+      latestPendingId: null,
+      latestRequestedAt: null,
+    }
+  }
+
+  const effectiveBranchId = branchSelection.branchId
+
+  let query = (supabase as any)
+    .from('approval_requests')
+    .select('id, requested_at', { count: 'exact' })
+    .eq('org_id', orgId)
+    .eq('status', 'PENDING')
+
+  if (effectiveBranchId) {
+    query = query.eq('branch_id', effectiveBranchId)
+  }
+
+  const { data, count, error } = await query
+    .order('requested_at', { ascending: false })
+    .limit(1)
+
+  if (error) {
+    ;(console as any).error('Error fetching approval notification marker:', error)
+    return {
+      pendingCount: 0,
+      latestPendingId: null,
+      latestRequestedAt: null,
+    }
+  }
+
+  const latestRow = Array.isArray(data) && data.length > 0
+    ? data[0] as { id?: string | null; requested_at?: string | null }
+    : null
+
+  return {
+    pendingCount: count || 0,
+    latestPendingId: toTrimmedString(latestRow?.id) || null,
+    latestRequestedAt: toTrimmedString(latestRow?.requested_at) || null,
+  }
 }
 
 export async function decideApproval(id: string, orgId: string, status: 'APPROVED' | 'REJECTED', notes?: string, branchId?: string | null) {
@@ -668,6 +776,32 @@ export async function decideApproval(id: string, orgId: string, status: 'APPROVE
         query = query.eq('branch_id', reqData.branch_id)
       }
       await query
+  }
+
+  if (reqData.source_type === 'CONSTRUCTION_CHANGE_ORDER') {
+      const nextStatus = status === 'APPROVED' ? 'APPROVED' : 'REJECTED'
+      const approvalTimestamp = new Date().toISOString()
+
+      const { data: changeOrder } = await (supabase as any)
+        .from('construction_change_orders')
+        .select('project_id')
+        .eq('id', reqData.source_id)
+        .eq('org_id', orgId)
+        .maybeSingle()
+
+      await (supabase as any)
+        .from('construction_change_orders')
+        .update({
+          status: nextStatus,
+          approved_date: status === 'APPROVED' ? approvalTimestamp : null,
+        })
+        .eq('id', reqData.source_id)
+        .eq('org_id', orgId)
+
+      if (changeOrder?.project_id) {
+        revalidatePath(`/construction/${changeOrder.project_id}`)
+      }
+      revalidatePath('/construction')
   }
 
   if (reqData.source_type === 'LEAVE_REQUEST') {

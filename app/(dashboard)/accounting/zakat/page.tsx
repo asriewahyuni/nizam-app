@@ -3,6 +3,16 @@ import { getZakatSummary, evaluateZakatDaily } from '@/modules/accounting/action
 import { redirect } from 'next/navigation'
 import ZakatClient from './ZakatClient'
 
+function toClientSafeValue<T>(value: T): T {
+  return JSON.parse(
+    JSON.stringify(value, (_key, currentValue) => {
+      if (currentValue instanceof Date) return currentValue.toISOString()
+      if (typeof currentValue === 'bigint') return Number(currentValue)
+      return currentValue
+    })
+  ) as T
+}
+
 export default async function ZakatPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const activeOrg = await getActiveOrg()
   if (!activeOrg) redirect('/onboarding')
@@ -19,11 +29,12 @@ export default async function ZakatPage({ searchParams }: { searchParams: Promis
   await evaluateZakatDaily(orgId, { gold: goldPrice, silver: silverPrice })
 
   const summary = await getZakatSummary(orgId, { goldPerGram: goldPrice, silverPerGram: silverPrice })
+  const safeSummary = toClientSafeValue(summary)
 
   return (
     <main className="p-8">
       <ZakatClient
-        summary={summary}
+        summary={safeSummary}
         orgId={orgId}
         activeBranchName={activeBranch?.name ?? null}
       />

@@ -1,0 +1,82 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - generic [ref=e7]: RR
+          - generic [ref=e8]:
+            - generic [ref=e9]: Rantang Raya
+            - generic [ref=e10]: Rantang Raya Catering
+        - navigation [ref=e11]:
+          - link "Beranda" [ref=e12] [cursor=pointer]:
+            - /url: /toko/testtt/st1
+          - link "Koleksi" [ref=e13] [cursor=pointer]:
+            - /url: /toko/testtt/st1/koleksi
+          - link "Keranjang" [ref=e14] [cursor=pointer]:
+            - /url: /toko/testtt/st1/keranjang
+        - link "Keranjang 0" [ref=e15] [cursor=pointer]:
+          - /url: /toko/testtt/st1/keranjang
+          - img [ref=e16]
+          - generic [ref=e20]: Keranjang
+          - text: "0"
+    - main [ref=e21]:
+      - generic [ref=e22]:
+        - generic [ref=e24]:
+          - generic [ref=e25]: Keranjang
+          - heading "Periksa pesanan Anda lalu lanjutkan ke checkout." [level=2] [ref=e26]
+          - paragraph [ref=e27]: Atur jumlah paket, cek total, lalu isi detail pengiriman dan acara Anda di halaman ini.
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - generic [ref=e30]:
+              - generic [ref=e31]:
+                - generic [ref=e32]:
+                  - generic [ref=e33]: Keranjang
+                  - generic [ref=e34]: 0 item aktif
+                - img [ref=e36]
+              - generic [ref=e41]:
+                - generic [ref=e42]: Keranjang Anda masih kosong. Pilih dulu paket yang ingin dipesan, lalu kembali ke halaman ini untuk lanjut checkout.
+                - link "Buka daftar menu" [ref=e43] [cursor=pointer]:
+                  - /url: /toko/testtt/st1/koleksi
+                  - text: Buka daftar menu
+                  - img [ref=e44]
+            - generic [ref=e46]:
+              - generic [ref=e47]: Ringkasan Nilai
+              - generic [ref=e48]:
+                - generic [ref=e49]:
+                  - generic [ref=e50]: Subtotal
+                  - generic [ref=e51]: Rp 0
+                - generic [ref=e52]:
+                  - generic [ref=e53]: Ongkir
+                  - generic [ref=e54]: Rp 0
+                - generic [ref=e56]:
+                  - generic [ref=e57]: Total akhir
+                  - generic [ref=e58]: Rp 0
+          - generic [ref=e60]:
+            - generic [ref=e61]:
+              - generic [ref=e62]: Bisa pesan tanpa akun
+              - generic [ref=e63]: Transfer manual
+              - generic [ref=e64]: Upload bukti bayar setelah order
+            - generic [ref=e65]: Konfirmasi acara Anda dalam satu order
+            - paragraph [ref=e66]: Isi data pemesan, alamat kirim, dan catatan acara Anda. Setelah order dibuat, Anda bisa langsung cek status dan upload bukti bayar dari halaman order.
+            - generic [ref=e67]: Untuk order besar, sebaiknya masuk paling lambat H-1 sebelum jam 15.00 agar slot dapur dan pengiriman lebih aman.
+            - generic [ref=e68]:
+              - textbox "Nama pelanggan" [ref=e69]
+              - generic [ref=e70]:
+                - textbox "Email" [ref=e71]
+                - textbox "No. WhatsApp" [ref=e72]
+              - textbox "Alamat lengkap" [ref=e73]
+              - generic [ref=e74]:
+                - textbox "Kecamatan" [ref=e75]
+                - textbox "Kota" [ref=e76]
+              - generic [ref=e77]:
+                - textbox "Provinsi" [ref=e78]
+                - textbox "Kode pos" [ref=e79]
+              - combobox [ref=e80]:
+                - option "Zona Utama • Standard • Rp 0" [selected]
+              - generic [ref=e81]: "Ongkir aktif mengikuti alamat: Zona Utama • Standard • Rp 0"
+              - textbox "Catatan order" [ref=e82]
+              - button "Buat Order" [ref=e83]:
+                - text: Buat Order
+                - img [ref=e84]
+  - button "Open Next.js Dev Tools" [ref=e91] [cursor=pointer]:
+    - img [ref=e92]

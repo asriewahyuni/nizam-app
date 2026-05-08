@@ -61,3 +61,8 @@ trace_*.js
 find_*.js
 verify_*.ts
 fix_*.js
+.claude/settings.local.json
+
+# Sentry Config File
+.env.sentry-build-plugin
+scratch/db-backups/

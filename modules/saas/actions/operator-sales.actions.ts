@@ -3,17 +3,36 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
-import { normalizeSaasEntitlementList } from '@/lib/saas/module-catalog'
+import {
+  getSaasCapabilityDisplayLabel,
+  getSaasPackageArchitecture,
+  normalizeSaasEntitlementList,
+} from '@/lib/saas/module-catalog'
 import {
   EXTRA_BRANCH_UNIT_PRICE,
   EXTRA_ENTITY_UNIT_PRICE,
+  OPERATOR_ADDON_OPTIONS,
   getOperatorAddonById,
+  getOperatorMarketplaceCompatibility,
+  getOperatorMarketplaceLabel,
 } from '@/lib/saas/operator-pricing'
+import { getModuleByKey } from '@/modules/marketplace/lib/module-registry'
+
+type OperatorResellerOption = {
+  id: string
+  name: string
+  reseller_type: string
+  company_name: string | null
+  commission_type: string | null
+  commission_value: number | null
+  is_active: boolean
+}
 
 type OperatorSnapshot = {
   orgs: Array<{ id: string; name: string }>
-  packages: Array<{ id: string; name: string; price: number; billing?: string; modules: string[]; addons: string[] }>
+  packages: Array<{ id: string; name: string; price: number; billing?: string; modules: string[]; addons: string[]; corePrices: Record<string, number>; operationalPrices: Record<string, number> }>
   aiTokenPackages: OperatorAiTokenPackageOption[]
+  resellers: OperatorResellerOption[]
   quotations: InvoiceRecord[]
   sales: InvoiceRecord[]
   summary: {
@@ -28,6 +47,7 @@ type InvoiceRecord = {
   id: string
   org_id: string
   package_id: string | null
+  reseller_id: string | null
   invoice_number: string
   item_name: string | null
   item_description: string | null
@@ -43,6 +63,7 @@ type InvoiceRecord = {
   updated_at: string
   organization?: { name: string } | null
   package?: { name: string } | null
+  reseller?: { id: string; name: string; commission_type: string | null; commission_value: number | null } | null
 }
 
 type PackageLookup = {
@@ -54,6 +75,7 @@ type QuotationDraft = {
   orgId: string
   packageId: string
   packageName: string
+  bundleLabel: string
   finalAmount: number
   discountPercent: number
   discountAmount: number
@@ -105,9 +127,9 @@ export type OperatorDocumentSnapshot = {
   aiTokenPackages: OperatorAiTokenPackageOption[]
 }
 
-const SAAS_INVOICE_SELECT_WITH_ITEM_COLUMNS = 'id, org_id, package_id, invoice_number, item_name, item_description, amount, status, payment_method, due_date, created_at, updated_at, organization:organizations(name), package:saas_packages(name)'
-const SAAS_INVOICE_SELECT_WITH_PRICING_COLUMNS = 'id, org_id, package_id, invoice_number, item_name, item_description, discount_percent, discount_amount, tax_percent, tax_amount, amount, status, payment_method, due_date, created_at, updated_at, organization:organizations(name), package:saas_packages(name)'
-const SAAS_INVOICE_SELECT_BASE = 'id, org_id, package_id, invoice_number, amount, status, payment_method, due_date, created_at, updated_at, organization:organizations(name), package:saas_packages(name)'
+const SAAS_INVOICE_SELECT_WITH_ITEM_COLUMNS = 'id, org_id, package_id, reseller_id, invoice_number, item_name, item_description, amount, status, payment_method, due_date, created_at, updated_at, organization:organizations(name), package:saas_packages(name), reseller:sales_resellers(id, name, commission_type, commission_value)'
+const SAAS_INVOICE_SELECT_WITH_PRICING_COLUMNS = 'id, org_id, package_id, reseller_id, invoice_number, item_name, item_description, discount_percent, discount_amount, tax_percent, tax_amount, amount, status, payment_method, due_date, created_at, updated_at, organization:organizations(name), package:saas_packages(name), reseller:sales_resellers(id, name, commission_type, commission_value)'
+const SAAS_INVOICE_SELECT_BASE = 'id, org_id, package_id, reseller_id, invoice_number, amount, status, payment_method, due_date, created_at, updated_at, organization:organizations(name), package:saas_packages(name), reseller:sales_resellers(id, name, commission_type, commission_value)'
 
 function isMissingColumnError(message: string | null | undefined, column: string) {
   if (!message) return false
@@ -174,7 +196,7 @@ function extractAddonNamesFromDescription(rawDescription: string | null | undefi
     .filter(Boolean)
 
   const addonNames = lines.flatMap((line) => {
-    const match = line.match(/^Add-on(?:\s+Single\s+Bill)?\s+(.+?):\s+/i)
+    const match = line.match(/^(?:Module|Add-on|Capacity Add-on)(?:\s+Single\s+Bill)?\s+(.+?):\s+/i)
     return match?.[1] ? [match[1].trim()] : []
   })
 
@@ -275,7 +297,11 @@ function toEntryDate(dateLike: string | null | undefined) {
 }
 
 function findAccountByCodes(accounts: AccountingAccount[], codes: string[]) {
-  return accounts.find((account) => codes.includes(String(account.code || '').trim())) || null
+  for (const code of codes) {
+    const found = accounts.find((account) => String(account.code || '').trim() === code)
+    if (found) return found
+  }
+  return null
 }
 
 function findAccountByName(accounts: AccountingAccount[], keywords: string[]) {
@@ -427,6 +453,12 @@ async function createAutoPostedJournal(
   return { entryId: entry.id, existed: false }
 }
 
+/**
+ * Membuat jurnal piutang & pendapatan untuk invoice SaaS.
+ * Jurnal dicatat ke org operator (operatorOrgId) jika tersedia,
+ * sehingga masuk ke GL/laporan keuangan operator — bukan GL tenant.
+ * Jika operatorOrgId tidak tersedia, fallback ke org tenant (legacy).
+ */
 async function ensureOperatorSaleJournal(
   admin: any,
   actorUserId: string,
@@ -437,38 +469,41 @@ async function ensureOperatorSaleJournal(
     amount: number | string
     tax_amount?: number | string | null
     created_at?: string | null
-  }
+  },
+  operatorOrgId?: string | null
 ): Promise<AutoJournalResult> {
   const totalAmount = Number(invoice.amount || 0)
   if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
     return { error: 'Nominal penjualan tidak valid untuk dicatat ke buku besar.' }
   }
 
-  const accounts = await getActiveAccountsForOrg(admin, invoice.org_id)
+  // Cari akun di org operator; jika tidak ada fallback ke org tenant (backward compat)
+  const journalOrgId = operatorOrgId || invoice.org_id
+  const accounts = await getActiveAccountsForOrg(admin, journalOrgId)
   const receivableAccount = resolveReceivableAccount(accounts)
   const revenueAccount = resolveRevenueAccount(accounts)
   const taxAmount = Math.max(0, Number(invoice.tax_amount || 0))
   const outputTaxAccount = taxAmount > 0 ? resolveOutputTaxAccount(accounts) : null
 
   if (!receivableAccount) {
-    return { error: 'Akun Piutang Usaha (1201) tidak ditemukan untuk organisasi ini.' }
+    return { error: `Akun Piutang Usaha (1201) tidak ditemukan${operatorOrgId ? ' di organisasi operator' : ' untuk organisasi ini'}.` }
   }
   if (!revenueAccount) {
-    return { error: 'Akun Pendapatan Usaha (4001) tidak ditemukan untuk organisasi ini.' }
+    return { error: `Akun Pendapatan Usaha (4001) tidak ditemukan${operatorOrgId ? ' di organisasi operator' : ' untuk organisasi ini'}.` }
   }
   if (taxAmount > 0 && !outputTaxAccount) {
-    return { error: 'Akun PPN Keluaran (2201) tidak ditemukan untuk organisasi ini.' }
+    return { error: `Akun PPN Keluaran (2201) tidak ditemukan${operatorOrgId ? ' di organisasi operator' : ' untuk organisasi ini'}.` }
   }
 
   const revenueAmount = Math.max(0, totalAmount - taxAmount)
   return createAutoPostedJournal(admin, {
-    orgId: invoice.org_id,
+    orgId: journalOrgId,
     actorUserId,
     entryDate: toEntryDate(invoice.created_at),
     description: `Penjualan SaaS ${invoice.invoice_number}`,
-    referenceType: 'SALE',
+    referenceType: 'SAAS_SALE',
     referenceId: invoice.id,
-    notes: 'Jurnal otomatis dari konversi penawaran SaaS operator.',
+    notes: `Jurnal otomatis penjualan SaaS operator. Tenant: ${invoice.org_id}`,
     lines: [
       {
         account_id: receivableAccount.id,
@@ -480,7 +515,7 @@ async function ensureOperatorSaleJournal(
         account_id: revenueAccount.id,
         debit: 0,
         credit: revenueAmount,
-        memo: `Pendapatan ${invoice.invoice_number}`,
+        memo: `Pendapatan SaaS ${invoice.invoice_number}`,
       },
       ...(taxAmount > 0 && outputTaxAccount
         ? [{
@@ -494,6 +529,10 @@ async function ensureOperatorSaleJournal(
   })
 }
 
+/**
+ * Membuat jurnal penerimaan kas saat invoice SaaS dilunasi.
+ * Jurnal dicatat ke org operator (operatorOrgId) jika tersedia.
+ */
 async function ensureOperatorReceiptJournal(
   admin: any,
   actorUserId: string,
@@ -505,32 +544,34 @@ async function ensureOperatorReceiptJournal(
     payment_method?: string | null
     updated_at?: string | null
   },
-  paymentMethod: string
+  paymentMethod: string,
+  operatorOrgId?: string | null
 ): Promise<AutoJournalResult> {
   const totalAmount = Number(invoice.amount || 0)
   if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
     return { error: 'Nominal penerimaan tidak valid untuk dicatat ke buku besar.' }
   }
 
-  const accounts = await getActiveAccountsForOrg(admin, invoice.org_id)
+  const journalOrgId = operatorOrgId || invoice.org_id
+  const accounts = await getActiveAccountsForOrg(admin, journalOrgId)
   const receivableAccount = resolveReceivableAccount(accounts)
   const settlementAccount = resolveCashSettlementAccount(accounts, paymentMethod)
 
   if (!receivableAccount) {
-    return { error: 'Akun Piutang Usaha (1201) tidak ditemukan untuk organisasi ini.' }
+    return { error: `Akun Piutang Usaha (1201) tidak ditemukan${operatorOrgId ? ' di organisasi operator' : ' untuk organisasi ini'}.` }
   }
   if (!settlementAccount) {
-    return { error: 'Akun Kas/Bank default untuk penerimaan belum tersedia di organisasi ini.' }
+    return { error: `Akun Kas/Bank default untuk penerimaan belum tersedia${operatorOrgId ? ' di organisasi operator' : ' di organisasi ini'}.` }
   }
 
   return createAutoPostedJournal(admin, {
-    orgId: invoice.org_id,
+    orgId: journalOrgId,
     actorUserId,
     entryDate: toEntryDate(invoice.updated_at),
-    description: `Pelunasan Invoice SaaS ${invoice.invoice_number}`,
-    referenceType: 'CASH_IN',
+    description: `Penerimaan SaaS ${invoice.invoice_number}`,
+    referenceType: 'SAAS_CASH_IN',
     referenceId: invoice.id,
-    notes: `Penerimaan otomatis dari pelunasan invoice SaaS. Metode: ${paymentMethod || invoice.payment_method || 'MANUAL_TRANSFER'}`,
+    notes: `Penerimaan kas otomatis dari pelunasan SaaS. Metode: ${paymentMethod || invoice.payment_method || 'MANUAL_TRANSFER'}. Tenant: ${invoice.org_id}`,
     lines: [
       {
         account_id: settlementAccount.id,
@@ -568,6 +609,77 @@ function parseNumericRecordJson(raw: string): Record<string, number> {
   }
 }
 
+/**
+ * Membuat jurnal pengeluaran kas untuk komisi reseller saat invoice SaaS dilunasi.
+ * Menggunakan akun Biaya Pemasaran & Iklan (6005) untuk mencatat beban.
+ */
+async function ensureOperatorCommissionJournal(
+  admin: any,
+  actorUserId: string,
+  invoice: {
+    id: string
+    invoice_number: string
+    amount: number | string
+    updated_at?: string | null
+  },
+  reseller: {
+    name: string
+    commission_type: string
+    commission_value: number
+  },
+  paymentMethod: string,
+  operatorOrgId: string
+): Promise<AutoJournalResult> {
+  const totalAmount = Number(invoice.amount || 0)
+  if (totalAmount <= 0) return {}
+
+  let commAmount = 0
+  if (String(reseller.commission_type).toUpperCase() === 'PERCENT') {
+    commAmount = (totalAmount * Number(reseller.commission_value || 0)) / 100
+  } else {
+    commAmount = Number(reseller.commission_value || 0)
+  }
+
+  if (commAmount <= 0) return {}
+
+  const accounts = await getActiveAccountsForOrg(admin, operatorOrgId)
+  
+  // Asumsikan komisi reseller masuk ke beban pemasaran (6005)
+  const expenseAccount = accounts.find((a: any) => String(a.code) === '6005')
+  const settlementAccount = resolveCashSettlementAccount(accounts, paymentMethod)
+
+  if (!expenseAccount) {
+    return { error: 'Akun Biaya Pemasaran & Iklan (6005) tidak ditemukan di organisasi operator untuk mencatat komisi.' }
+  }
+  if (!settlementAccount) {
+    return { error: 'Akun Kas/Bank default untuk pembayaran komisi belum tersedia.' }
+  }
+
+  return createAutoPostedJournal(admin, {
+    orgId: operatorOrgId,
+    actorUserId,
+    entryDate: toEntryDate(invoice.updated_at),
+    description: `Pembayaran Komisi SaaS ${invoice.invoice_number}`,
+    referenceType: 'SAAS_COMMISSION',
+    referenceId: invoice.id,
+    notes: `Pembayaran komisi reseller otomatis untuk mitra ${reseller.name}. Invoice: ${invoice.invoice_number}`,
+    lines: [
+      {
+        account_id: expenseAccount.id,
+        debit: commAmount,
+        credit: 0,
+        memo: `Beban Komisi ${reseller.name}`,
+      },
+      {
+        account_id: settlementAccount.id,
+        debit: 0,
+        credit: commAmount,
+        memo: `Pembayaran Komisi ${reseller.name}`,
+      },
+    ],
+  })
+}
+
 async function assertPlatformAdmin() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -575,6 +687,24 @@ async function assertPlatformAdmin() {
     throw new Error('Akses ditolak. Modul ini khusus pengelola SaaS.')
   }
   return user
+}
+
+/**
+ * Mencari org_id milik operator SaaS (platform admin).
+ * Jurnal keuangan SaaS harus dicatat ke GL org operator sendiri,
+ * bukan ke GL org tenant — agar masuk ke laporan keuangan operator.
+ */
+async function getOperatorOrgId(
+  admin: any,
+  actorEmail: string | null | undefined
+): Promise<string | null> {
+  if (!actorEmail) return null
+  const { data } = await (admin.from('organizations') as any)
+    .select('id')
+    .eq('owner_email', actorEmail.toLowerCase().trim())
+    .limit(1)
+    .maybeSingle()
+  return (data as { id?: string } | null)?.id ?? null
 }
 
 function buildQuoteNumber() {
@@ -602,20 +732,32 @@ export async function getOperatorSaasSnapshot(): Promise<OperatorSnapshot> {
   const scoped = (await createClient()) as any
   const admin = await createAdminClient()
 
-  const [orgRes, pkgRes, invoiceRes] = await Promise.all([
+  // Ambil org operator untuk query resellers
+  const operatorOrgId = await getOperatorOrgId(admin, (await (await createClient()).auth.getUser()).data.user?.email)
+
+  const [orgRes, pkgRes, invoiceRes, resellerRes] = await Promise.all([
     scoped.from('organizations').select('id, name').order('name', { ascending: true }),
-    scoped.from('saas_packages').select('id, name, price, billing, modules, addons').order('price', { ascending: true }),
+    scoped.from('saas_packages').select('id, name, price, billing, modules, addons, core_prices, operational_prices').order('price', { ascending: true }),
     admin
       .from('saas_invoices')
       .select(SAAS_INVOICE_SELECT_WITH_PRICING_COLUMNS)
       .order('created_at', { ascending: false })
       .limit(500),
+    operatorOrgId
+      ? admin
+          .from('sales_resellers')
+          .select('id, name, reseller_type, company_name, commission_type, commission_value, is_active')
+          .eq('org_id', operatorOrgId)
+          .eq('is_active', true)
+          .order('name', { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
   ])
 
   let rawInvoiceRows = (invoiceRes.data || []) as Array<{
     id: string
     org_id: string
     package_id: string | null
+    reseller_id?: string | null
     invoice_number: string
     item_name?: string | null
     item_description?: string | null
@@ -631,6 +773,7 @@ export async function getOperatorSaasSnapshot(): Promise<OperatorSnapshot> {
     updated_at: string
     organization?: { name: string } | null
     package?: { name: string } | null
+    reseller?: { id: string; name: string; commission_type: string | null; commission_value: number | null } | null
   }>
 
   // Backward compatibility: some environments still don't have item_name/item_description.
@@ -662,7 +805,19 @@ export async function getOperatorSaasSnapshot(): Promise<OperatorSnapshot> {
     billing?: string | null
     modules?: unknown
     addons?: unknown
+    core_prices?: unknown
+    operational_prices?: unknown
   }>
+  const resellerRows = (resellerRes.data || []) as Array<{
+    id: string
+    name: string
+    reseller_type?: string | null
+    company_name?: string | null
+    commission_type?: string | null
+    commission_value?: number | string | null
+    is_active?: boolean
+  }>
+
   const { data: aiPkgRows, error: aiPkgError } = await admin
     .from('ai_token_topup_packages')
     .select('id, name, description, tokens, price_idr, is_active, sort_order')
@@ -678,6 +833,17 @@ export async function getOperatorSaasSnapshot(): Promise<OperatorSnapshot> {
     billing: pkg.billing || undefined,
     modules: normalizeSaasEntitlementList(toStringArray(pkg.modules)),
     addons: normalizeSaasEntitlementList(toStringArray(pkg.addons)),
+    corePrices: (pkg.core_prices as Record<string, number>) ?? {},
+    operationalPrices: (pkg.operational_prices as Record<string, number>) ?? {},
+  }))
+  const resellers: OperatorResellerOption[] = resellerRows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    reseller_type: r.reseller_type || 'PERSONAL',
+    company_name: r.company_name || null,
+    commission_type: r.commission_type || null,
+    commission_value: r.commission_value != null ? Number(r.commission_value) : null,
+    is_active: r.is_active ?? true,
   }))
   const aiTokenPackages: OperatorAiTokenPackageOption[] = aiPkgError
     ? []
@@ -699,6 +865,7 @@ export async function getOperatorSaasSnapshot(): Promise<OperatorSnapshot> {
     id: inv.id,
     org_id: inv.org_id,
     package_id: inv.package_id,
+    reseller_id: inv.reseller_id ?? null,
     invoice_number: inv.invoice_number,
     item_name: inv.item_name ?? null,
     item_description: inv.item_description ?? null,
@@ -714,6 +881,7 @@ export async function getOperatorSaasSnapshot(): Promise<OperatorSnapshot> {
     updated_at: inv.updated_at,
     organization: inv.organization,
     package: inv.package,
+    reseller: inv.reseller ?? null,
   }))
 
   const quotations = invoices.filter((inv) => isQuotationNumber(inv.invoice_number))
@@ -721,12 +889,12 @@ export async function getOperatorSaasSnapshot(): Promise<OperatorSnapshot> {
 
   const summary = {
     totalQuotes: quotations.length,
-    totalOpenSales: sales.filter((inv) => inv.status !== 'PAID').length,
+    totalOpenSales: sales.filter((inv) => inv.status !== 'PAID' && inv.status !== 'VOIDED').length,
     totalPaidSales: sales.filter((inv) => inv.status === 'PAID').length,
-    totalSalesValue: sales.reduce((acc, inv) => acc + Number(inv.amount || 0), 0),
+    totalSalesValue: sales.filter((inv) => inv.status === 'PAID').reduce((acc, inv) => acc + Number(inv.amount || 0), 0),
   }
 
-  return { orgs, packages, aiTokenPackages, quotations, sales, summary }
+  return { orgs, packages, aiTokenPackages, resellers, quotations, sales, summary }
 }
 
 async function buildQuotationDraftFromFormData(admin: any, formData: FormData): Promise<{ error: string } | { data: QuotationDraft }> {
@@ -755,10 +923,10 @@ async function buildQuotationDraftFromFormData(admin: any, formData: FormData): 
 
   const { data: pkgData } = await admin
     .from('saas_packages')
-    .select('name, price, modules')
+    .select('name, price, modules, core_prices, operational_prices')
     .eq('id', packageId)
     .maybeSingle()
-  const pkg = pkgData as (PackageLookup & { modules?: unknown }) | null
+  const pkg = pkgData as (PackageLookup & { modules?: unknown; core_prices?: unknown; operational_prices?: unknown }) | null
   if (!pkg) {
     return { error: 'Paket SaaS tidak ditemukan.' }
   }
@@ -794,10 +962,12 @@ async function buildQuotationDraftFromFormData(admin: any, formData: FormData): 
     const anchorPrice = Math.max(promoPrice, parseNumber(String(addonAnchorOverrides[addonId] ?? addon?.anchorPrice ?? promoPrice), promoPrice))
     const billing = String(addon?.billing || 'Bulan').trim()
     const isSingleBill = billing.toLowerCase().includes('single')
+    const marketplaceLabel = getOperatorMarketplaceLabel({ name: addon?.name || addonId })
 
     return {
       id: addonId,
       name: addon?.name || addonId,
+      marketplaceLabel,
       promoPrice,
       anchorPrice,
       billing,
@@ -829,9 +999,22 @@ async function buildQuotationDraftFromFormData(admin: any, formData: FormData): 
     }
   }
 
+  let modulesMonthlyTotal = 0
+  if (selectedModules.length > 0) {
+    const corePrices = (pkg.core_prices as Record<string, number>) || {}
+    const operationalPrices = (pkg.operational_prices as Record<string, number>) || {}
+    
+    modulesMonthlyTotal = selectedModules.reduce((acc, modKey) => {
+      const corePrice = corePrices[modKey] || 0
+      const operationalPrice = operationalPrices[modKey] || 0
+      const isAddon = OPERATOR_ADDON_OPTIONS.some((a: any) => a.name === modKey || a.name.toLowerCase().includes(modKey.toLowerCase().split(' ')[0]))
+      return acc + corePrice + (isAddon ? 0 : operationalPrice)
+    }, 0)
+  }
+
   const extraEntityTotal = extraEntityQty * extraEntityUnitPrice
   const extraBranchTotal = extraBranchQty * extraBranchUnitPrice
-  const monthlySubtotalAmount = baseAmount + monthlyAddonTotal + extraEntityTotal + extraBranchTotal
+  const monthlySubtotalAmount = baseAmount + modulesMonthlyTotal + monthlyAddonTotal + extraEntityTotal + extraBranchTotal
   const oneTimeSubtotalAmount = singleBillAddonTotal + aiTokenTotal
   const durationSubtotalAmount = monthlySubtotalAmount * durationMonths
   const subtotalAmount = durationSubtotalAmount + oneTimeSubtotalAmount
@@ -845,19 +1028,64 @@ async function buildQuotationDraftFromFormData(admin: any, formData: FormData): 
   }
 
   const packageModules = normalizeSaasEntitlementList(toStringArray(pkg.modules))
-  const modulesForQuote = selectedModules.length > 0 ? selectedModules : packageModules
+  const modulesForQuote = normalizeSaasEntitlementList(selectedModules.length > 0 ? selectedModules : packageModules)
+  const packageArchitecture = getSaasPackageArchitecture(modulesForQuote)
+  const quoteCapabilities = normalizeSaasEntitlementList([
+    ...modulesForQuote,
+    ...selectedAddonBreakdown.map((addon) => addon.name),
+  ])
+  const incompatibleAddons = selectedAddonBreakdown
+    .map((addon) => {
+      const addonOption = getOperatorAddonById(addon.id)
+      const compatibility = getOperatorMarketplaceCompatibility(addonOption || addon, {
+        coreFamilyLevel: packageArchitecture.coreFamilyLevel,
+        enabledCapabilities: quoteCapabilities,
+      })
+
+      return compatibility.isCompatible
+        ? null
+        : `${addon.name}: ${compatibility.reason || 'belum kompatibel dengan Core Family yang dipilih.'}`
+    })
+    .filter(Boolean)
+
+  if (incompatibleAddons.length > 0) {
+    return { error: `Module/Add-on belum kompatibel. ${incompatibleAddons.join(' ')}` }
+  }
+
+  const incompatibleModules: string[] = []
+  modulesForQuote.forEach(modName => {
+    const modDef = getModuleByKey(modName)
+    if (modDef?.requires && modDef.requires.length > 0) {
+      const missing = modDef.requires.filter(req => !quoteCapabilities.some(cap => cap.toLowerCase() === req.toLowerCase()))
+      if (missing.length > 0) {
+        incompatibleModules.push(`${modName} (Butuh: ${missing.join(', ')})`)
+      }
+    }
+  })
+
+  if (incompatibleModules.length > 0) {
+    return { error: `Syarat modul belum terpenuhi: ${incompatibleModules.join(' | ')}. Tambahkan modul yang dibutuhkan ke dalam paket.` }
+  }
+
+  const coreScopeLabels = Array.from(new Set(
+    modulesForQuote
+      .map((moduleName) => getSaasCapabilityDisplayLabel(moduleName))
+      .filter(Boolean)
+  ))
 
   const detailLines = [
-    `Paket dasar: ${formatCurrencyId(baseAmount)}`,
+    `Core Family: ${pkg.name}`,
+    `Core Family Layer: ${packageArchitecture.bundleLabel}`,
+    `Harga Core Family: ${formatCurrencyId(baseAmount)}`,
     `Durasi: ${durationMonths} bulan`,
     ...selectedAddonBreakdown.map((addon) => (
       addon.anchorPrice > addon.promoPrice
-        ? `${addon.isSingleBill ? 'Add-on Single Bill' : 'Add-on'} ${addon.name}: ${formatCurrencyId(addon.anchorPrice)} -> ${formatCurrencyId(addon.promoPrice)}`
-        : `${addon.isSingleBill ? 'Add-on Single Bill' : 'Add-on'} ${addon.name}: ${formatCurrencyId(addon.promoPrice)}`
+        ? `${addon.marketplaceLabel}${addon.isSingleBill ? ' Single Bill' : ''} ${addon.name}: ${formatCurrencyId(addon.anchorPrice)} -> ${formatCurrencyId(addon.promoPrice)}`
+        : `${addon.marketplaceLabel}${addon.isSingleBill ? ' Single Bill' : ''} ${addon.name}: ${formatCurrencyId(addon.promoPrice)}`
     )),
     ...(aiTokenPackageId && aiTokenLabel ? [`Token AI: ${aiTokenLabel} (${formatCurrencyId(aiTokenTotal)})`] : []),
     ...(extraEntityQty > 0 ? [`Entitas tambahan: ${extraEntityQty} x ${formatCurrencyId(extraEntityUnitPrice)} = ${formatCurrencyId(extraEntityTotal)}`] : []),
-    ...(extraBranchQty > 0 ? [`Cabang tambahan: ${extraBranchQty} x ${formatCurrencyId(extraBranchUnitPrice)} = ${formatCurrencyId(extraBranchTotal)}`] : []),
+    ...(extraBranchQty > 0 ? [`Unit tambahan: ${extraBranchQty} x ${formatCurrencyId(extraBranchUnitPrice)} = ${formatCurrencyId(extraBranchTotal)}`] : []),
     `Subtotal / bulan: ${formatCurrencyId(monthlySubtotalAmount)}`,
     `Subtotal durasi (${durationMonths} bulan): ${formatCurrencyId(durationSubtotalAmount)}`,
     ...(oneTimeSubtotalAmount > 0 ? [`Subtotal one-time: ${formatCurrencyId(oneTimeSubtotalAmount)}`] : []),
@@ -865,7 +1093,7 @@ async function buildQuotationDraftFromFormData(admin: any, formData: FormData): 
     ...(discountAmount > 0 || discountPercent > 0 ? [`Diskon setelah durasi: ${discountPercent}% (${formatCurrencyId(discountAmount)})`] : []),
     ...(taxAmount > 0 || taxPercent > 0 ? [`Pajak: ${taxPercent}% (${formatCurrencyId(taxAmount)})`] : []),
     `Grand total: ${formatCurrencyId(finalAmount)}`,
-    ...(modulesForQuote.length > 0 ? [`Modul dipilih: ${modulesForQuote.join(', ')}`] : []),
+    ...(coreScopeLabels.length > 0 ? [`Core Family Scope: ${coreScopeLabels.join(', ')}`] : []),
     ...(note ? [`Catatan: ${note}`] : []),
   ]
 
@@ -874,6 +1102,7 @@ async function buildQuotationDraftFromFormData(admin: any, formData: FormData): 
       orgId,
       packageId,
       packageName: pkg.name,
+      bundleLabel: packageArchitecture.bundleLabel,
       finalAmount,
       discountPercent,
       discountAmount,
@@ -894,6 +1123,8 @@ export async function createOperatorQuotation(formData: FormData) {
   }
   const draft = draftResult.data
   const invoiceNumber = buildQuoteNumber()
+  const resellerId = String(formData.get('reseller_id') || '').trim() || null
+
   const baseInvoicePayload = {
     org_id: draft.orgId,
     package_id: draft.packageId,
@@ -901,11 +1132,12 @@ export async function createOperatorQuotation(formData: FormData) {
     amount: draft.finalAmount,
     status: 'UNPAID',
     due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    reseller_id: resellerId,
   }
 
   const payloadWithItemsAndPricing = {
     ...baseInvoicePayload,
-    item_name: `Penawaran SaaS: ${draft.packageName}`,
+    item_name: `Penawaran SaaS: ${draft.bundleLabel} - ${draft.packageName}`,
     item_description: draft.itemDescription,
     discount_percent: draft.discountPercent,
     discount_amount: draft.discountAmount,
@@ -914,7 +1146,7 @@ export async function createOperatorQuotation(formData: FormData) {
   }
   const payloadWithItemsOnly = {
     ...baseInvoicePayload,
-    item_name: `Penawaran SaaS: ${draft.packageName}`,
+    item_name: `Penawaran SaaS: ${draft.bundleLabel} - ${draft.packageName}`,
     item_description: draft.itemDescription,
   }
 
@@ -971,16 +1203,19 @@ export async function updateOperatorQuotation(formData: FormData) {
   }
   const draft = draftResult.data
 
+  const resellerId = String(formData.get('reseller_id') || '').trim() || null
+
   const baseUpdatePayload = {
     org_id: currentQuote.org_id,
     package_id: draft.packageId,
     amount: draft.finalAmount,
     due_date: currentQuote.due_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    reseller_id: resellerId,
     updated_at: new Date().toISOString(),
   }
   const payloadWithItemsAndPricing = {
     ...baseUpdatePayload,
-    item_name: `Penawaran SaaS: ${draft.packageName}`,
+    item_name: `Penawaran SaaS: ${draft.bundleLabel} - ${draft.packageName}`,
     item_description: draft.itemDescription,
     discount_percent: draft.discountPercent,
     discount_amount: draft.discountAmount,
@@ -989,7 +1224,7 @@ export async function updateOperatorQuotation(formData: FormData) {
   }
   const payloadWithItemsOnly = {
     ...baseUpdatePayload,
-    item_name: `Penawaran SaaS: ${draft.packageName}`,
+    item_name: `Penawaran SaaS: ${draft.bundleLabel} - ${draft.packageName}`,
     item_description: draft.itemDescription,
   }
 
@@ -1070,7 +1305,7 @@ export async function updateOperatorSaleInvoice(formData: FormData) {
   }
   const payloadWithItemsAndPricing = {
     ...baseUpdatePayload,
-    item_name: `Invoice SaaS: ${draft.packageName}`,
+    item_name: `Invoice SaaS: ${draft.bundleLabel} - ${draft.packageName}`,
     item_description: draft.itemDescription,
     discount_percent: draft.discountPercent,
     discount_amount: draft.discountAmount,
@@ -1079,7 +1314,7 @@ export async function updateOperatorSaleInvoice(formData: FormData) {
   }
   const payloadWithItemsOnly = {
     ...baseUpdatePayload,
-    item_name: `Invoice SaaS: ${draft.packageName}`,
+    item_name: `Invoice SaaS: ${draft.bundleLabel} - ${draft.packageName}`,
     item_description: draft.itemDescription,
   }
 
@@ -1178,12 +1413,23 @@ export async function convertQuotationToSale(invoiceId: string) {
 
   if (!invoiceId) return { error: 'Invoice penawaran tidak valid.' }
 
-  const { data: invoiceData } = await admin
+  let invoiceRes = await admin
     .from('saas_invoices')
-    .select('id, org_id, invoice_number, amount, tax_amount, created_at')
+    .select('id, org_id, invoice_number, item_name, amount, tax_amount, created_at')
     .eq('id', invoiceId)
     .maybeSingle()
-  const invoice = invoiceData as Pick<InvoiceRecord, 'id' | 'org_id' | 'invoice_number' | 'amount' | 'tax_amount' | 'created_at'> | null
+
+  if (invoiceRes.error && hasMissingInvoiceItemColumn(invoiceRes.error.message)) {
+    invoiceRes = await admin
+      .from('saas_invoices')
+      .select('id, org_id, invoice_number, amount, tax_amount, created_at')
+      .eq('id', invoiceId)
+      .maybeSingle()
+  }
+
+  const invoice = invoiceRes.data as (Pick<InvoiceRecord, 'id' | 'org_id' | 'invoice_number' | 'amount' | 'tax_amount' | 'created_at'> & {
+    item_name?: string | null
+  }) | null
 
   if (!invoice) return { error: 'Data penawaran tidak ditemukan.' }
   if (!isQuotationNumber(invoice.invoice_number)) {
@@ -1191,6 +1437,12 @@ export async function convertQuotationToSale(invoiceId: string) {
   }
 
   const nextInvoiceNumber = buildSalesNumber()
+
+  // Cari org operator untuk mencatat jurnal ke GL operator (bukan tenant)
+  const operatorOrgId = await getOperatorOrgId(admin, actor.email)
+
+  // Pencatatan jurnal bersifat best-effort: jika akun COA belum tersedia,
+  // konversi tetap dilanjutkan. Jurnal bisa dicatat manual kemudian.
   const journalResult = await ensureOperatorSaleJournal(admin, actor.id, {
     id: invoice.id,
     org_id: invoice.org_id,
@@ -1198,21 +1450,41 @@ export async function convertQuotationToSale(invoiceId: string) {
     amount: invoice.amount,
     tax_amount: invoice.tax_amount,
     created_at: new Date().toISOString(),
-  })
+  }, operatorOrgId)
+  const journalWarning = journalResult.error
+    ? `(Jurnal otomatis dilewati: ${journalResult.error})`
+    : null
 
-  if (journalResult.error) {
-    return { error: `Gagal membuat jurnal penjualan: ${journalResult.error}` }
+  const baseUpdatePayload = {
+    invoice_number: nextInvoiceNumber,
+    updated_at: new Date().toISOString(),
+  }
+  const payloadWithItemName = {
+    ...baseUpdatePayload,
+    item_name: String(invoice.item_name || '').replace(/^Penawaran SaaS:/i, 'Invoice SaaS:') || invoice.item_name || null,
   }
 
-  const { error } = await (admin.from('saas_invoices') as any)
-    .update({
-      invoice_number: nextInvoiceNumber,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', invoiceId)
+  let error: { message: string } | null = null
+  const updateAttempts = [payloadWithItemName, baseUpdatePayload]
+
+  for (const payload of updateAttempts) {
+    const updateRes = await (admin.from('saas_invoices') as any)
+      .update(payload)
+      .eq('id', invoiceId)
+    if (!updateRes.error) {
+      error = null
+      break
+    }
+
+    error = { message: updateRes.error.message }
+    if (!updateRes.error.message.includes('Could not find the')) {
+      break
+    }
+  }
 
   if (error) {
-    if (journalResult.entryId && !journalResult.existed) {
+    // Jika update gagal, rollback jurnal yang sudah terbuat (jika ada)
+    if (journalResult.entryId && !journalResult.existed && !journalWarning) {
       await deleteJournalById(admin, journalResult.entryId)
     }
     return { error: `Gagal konversi penawaran: ${error.message}` }
@@ -1221,7 +1493,7 @@ export async function convertQuotationToSale(invoiceId: string) {
   revalidatePath('/saas/penawaran')
   revalidatePath('/saas/penjualan')
   revalidatePath('/accounting/journal')
-  return { success: true }
+  return { success: true, warning: journalWarning ?? undefined }
 }
 
 export async function markOperatorSalePaid(invoiceId: string, paymentMethod: string = 'MANUAL_TRANSFER') {
@@ -1232,10 +1504,10 @@ export async function markOperatorSalePaid(invoiceId: string, paymentMethod: str
 
   const { data: invoiceData } = await admin
     .from('saas_invoices')
-    .select('id, org_id, package_id, invoice_number, item_description, amount, tax_amount, status, payment_method, created_at, updated_at')
+    .select('id, org_id, package_id, reseller_id, invoice_number, item_description, amount, tax_amount, status, payment_method, created_at, updated_at')
     .eq('id', invoiceId)
     .maybeSingle()
-  const invoice = invoiceData as Pick<InvoiceRecord, 'id' | 'org_id' | 'package_id' | 'invoice_number' | 'item_description' | 'amount' | 'tax_amount' | 'status' | 'payment_method' | 'created_at' | 'updated_at'> | null
+  const invoice = invoiceData as Pick<InvoiceRecord, 'id' | 'org_id' | 'package_id' | 'reseller_id' | 'invoice_number' | 'item_description' | 'amount' | 'tax_amount' | 'status' | 'payment_method' | 'created_at' | 'updated_at'> | null
 
   if (!invoice) return { error: 'Data penjualan tidak ditemukan.' }
   if (invoice.status === 'PAID') {
@@ -1246,6 +1518,9 @@ export async function markOperatorSalePaid(invoiceId: string, paymentMethod: str
     return { success: true }
   }
 
+  // Cari org operator untuk mencatat jurnal ke GL operator (bukan tenant)
+  const operatorOrgId = await getOperatorOrgId(admin, actor.email)
+
   const saleJournalResult = await ensureOperatorSaleJournal(admin, actor.id, {
     id: invoice.id,
     org_id: invoice.org_id,
@@ -1253,7 +1528,7 @@ export async function markOperatorSalePaid(invoiceId: string, paymentMethod: str
     amount: invoice.amount,
     tax_amount: invoice.tax_amount,
     created_at: invoice.created_at,
-  })
+  }, operatorOrgId)
 
   if (saleJournalResult.error) {
     return { error: `Gagal sinkronisasi jurnal penjualan: ${saleJournalResult.error}` }
@@ -1266,10 +1541,32 @@ export async function markOperatorSalePaid(invoiceId: string, paymentMethod: str
     amount: invoice.amount,
     payment_method: invoice.payment_method,
     updated_at: new Date().toISOString(),
-  }, paymentMethod)
+  }, paymentMethod, operatorOrgId)
 
   if (receiptJournalResult.error) {
     return { error: `Gagal membuat jurnal pelunasan: ${receiptJournalResult.error}` }
+  }
+
+  // Jurnal Komisi Reseller jika ada
+  let commJournalResult: AutoJournalResult = {}
+  if (invoice.reseller_id) {
+    const { data: resellerData } = await (admin.from('sales_resellers') as any)
+      .select('name, commission_type, commission_value')
+      .eq('id', invoice.reseller_id)
+      .maybeSingle()
+    
+    if (resellerData) {
+      commJournalResult = await ensureOperatorCommissionJournal(admin, actor.id, {
+        id: invoice.id,
+        invoice_number: invoice.invoice_number,
+        amount: invoice.amount,
+        updated_at: new Date().toISOString(),
+      }, resellerData, paymentMethod, operatorOrgId || '')
+      
+      if (commJournalResult.error) {
+        return { error: `Gagal membuat jurnal komisi reseller: ${commJournalResult.error}` }
+      }
+    }
   }
 
   const { error: invoiceUpdateError } = await (admin.from('saas_invoices') as any)
@@ -1290,18 +1587,30 @@ export async function markOperatorSalePaid(invoiceId: string, paymentMethod: str
   if (invoice.package_id) {
     const [{ data: pkgData }, { data: orgData }] = await Promise.all([
       admin.from('saas_packages').select('name').eq('id', invoice.package_id).maybeSingle(),
-      admin.from('organizations').select('settings').eq('id', invoice.org_id).maybeSingle(),
+      admin.from('organizations').select('settings, enabled_modules').eq('id', invoice.org_id).maybeSingle(),
     ])
     const pkg = pkgData as { name: string } | null
-    const org = orgData as { settings?: Record<string, unknown> | null } | null
+    const org = orgData as { settings?: Record<string, unknown> | null, enabled_modules?: string[] | null } | null
 
     if (pkg?.name) {
+      let customModules: string[] = []
+      if (invoice.item_description) {
+        const coreScopeLine = invoice.item_description.split('\n').find(l => l.startsWith('Core Family Scope:'))
+        if (coreScopeLine) {
+          customModules = coreScopeLine.replace('Core Family Scope:', '').split(',').map(s => s.trim()).filter(Boolean)
+        }
+      }
+
       const currentSettings = (org?.settings && typeof org.settings === 'object') ? org.settings : {}
+      const isCustom = customModules.length > 0
+
       await (admin.from('organizations') as any)
         .update({
+          enabled_modules: isCustom ? customModules : org?.enabled_modules,
           settings: {
             ...currentSettings,
             plan: pkg.name,
+            use_custom_modules: isCustom ? true : currentSettings.use_custom_modules,
             updated_at: new Date().toISOString(),
           },
         })
@@ -1461,4 +1770,180 @@ export async function getOperatorInvoiceDocument(invoiceId: string): Promise<Ope
     packageAddons,
     aiTokenPackages,
   }
+}
+
+/**
+ * Void invoice penjualan SaaS yang belum PAID.
+ * - Update status invoice menjadi VOIDED
+ * - Void semua jurnal GL yang terkait (referenceId = invoice.id)
+ * - Invoice yang sudah PAID tidak bisa di-void (harus melalui retur/refund manual)
+ */
+export async function voidOperatorSale(invoiceId: string, reason?: string) {
+  const actor = await assertPlatformAdmin()
+  const admin = await createAdminClient()
+
+  if (!invoiceId) return { error: 'ID invoice penjualan tidak valid.' }
+
+  const { data: invoiceData } = await admin
+    .from('saas_invoices')
+    .select('id, org_id, invoice_number, status, amount')
+    .eq('id', invoiceId)
+    .maybeSingle()
+  const invoice = invoiceData as Pick<InvoiceRecord, 'id' | 'org_id' | 'invoice_number' | 'status' | 'amount'> | null
+
+  if (!invoice) return { error: 'Data penjualan tidak ditemukan.' }
+  if (isQuotationNumber(invoice.invoice_number)) {
+    return { error: 'Data ini adalah penawaran, bukan penjualan. Gunakan tombol Hapus di tabel penawaran.' }
+  }
+  if (invoice.status === 'VOIDED') {
+    return { success: true, message: 'Invoice sudah berstatus VOIDED.' }
+  }
+  if (invoice.status === 'PAID') {
+    return { error: 'Invoice yang sudah PAID tidak dapat di-void. Proses retur/refund secara manual.' }
+  }
+
+  const voidedAt = new Date().toISOString()
+  const voidReason = reason || 'Void oleh operator SaaS'
+
+  // Void semua jurnal GL yang mengacu ke invoice ini (termasuk SAAS_COMMISSION)
+  const journalReferenceTypes = ['SAAS_SALE', 'SAAS_CASH_IN', 'SAAS_COMMISSION', 'SALE', 'CASH_IN']
+  for (const refType of journalReferenceTypes) {
+    await (admin.from('journal_entries') as any)
+      .update({
+        status: 'VOIDED',
+        void_reason: voidReason,
+        voided_by: actor.id,
+        voided_at: voidedAt,
+        updated_at: voidedAt,
+      })
+      .eq('reference_type', refType)
+      .eq('reference_id', invoiceId)
+      .neq('status', 'VOIDED')
+  }
+
+  // Update status invoice
+  const { error: updateError } = await (admin.from('saas_invoices') as any)
+    .update({
+      status: 'VOIDED',
+      updated_at: voidedAt,
+    })
+    .eq('id', invoiceId)
+
+  if (updateError) {
+    return { error: `Gagal void invoice: ${updateError.message}` }
+  }
+
+  revalidatePath('/saas/penjualan')
+  revalidatePath('/saas/penawaran')
+  revalidatePath('/accounting/journal')
+  revalidatePath('/accounting/ledgers')
+  return { success: true }
+}
+
+/**
+ * Perbarui reseller pada invoice SaaS (penawaran atau penjualan) yang sudah ada.
+ * Berguna untuk koreksi retroaktif ketika reseller belum diisi saat transaksi terjadi.
+ */
+export async function updateOperatorInvoiceReseller(invoiceId: string, resellerId: string | null) {
+  await assertPlatformAdmin()
+  const admin = await createAdminClient()
+
+  if (!invoiceId) return { error: 'ID invoice tidak valid.' }
+
+  const { data: invoiceData } = await admin
+    .from('saas_invoices')
+    .select('id, invoice_number, status')
+    .eq('id', invoiceId)
+    .maybeSingle()
+  const invoice = invoiceData as Pick<InvoiceRecord, 'id' | 'invoice_number' | 'status'> | null
+
+  if (!invoice) return { error: 'Invoice tidak ditemukan.' }
+  if (invoice.status === 'VOIDED') return { error: 'Invoice yang sudah VOIDED tidak dapat diubah.' }
+
+  // Validasi reseller_id jika diisi
+  if (resellerId) {
+    const { data: resellerData } = await (admin.from('sales_resellers') as any)
+      .select('id, name, is_active')
+      .eq('id', resellerId)
+      .maybeSingle()
+    if (!resellerData) return { error: 'Reseller tidak ditemukan.' }
+    if (!resellerData.is_active) return { error: 'Reseller tidak aktif.' }
+  }
+
+  const { error: updateError } = await (admin.from('saas_invoices') as any)
+    .update({
+      reseller_id: resellerId || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', invoiceId)
+
+  if (updateError) {
+    return { error: `Gagal memperbarui reseller: ${updateError.message}` }
+  }
+
+  revalidatePath('/saas/penawaran')
+  revalidatePath('/saas/penjualan')
+  return { success: true }
+}
+
+/**
+ * Fetch SaaS sales data and map to CommissionSaleRecord format for reseller dashboard.
+ * This is used to display NIZAM APP SaaS sales in the commission module.
+ */
+export async function getSaasSalesForCommission(operatorOrgId: string) {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  let invoices: any[] = []
+  try {
+    const result = await queryPostgres(`
+      SELECT
+        si.id,
+        si.org_id AS tenant_org_id,
+        si.invoice_number,
+        si.created_at,
+        si.amount,
+        si.status,
+        si.reseller_id,
+        o.name AS organization_name,
+        sr.id AS r_id,
+        sr.name AS r_name,
+        sr.reseller_type AS r_type,
+        sr.company_name AS r_company,
+        sr.contact_person AS r_contact,
+        sr.commission_type AS r_comm_type,
+        sr.commission_value AS r_comm_val
+      FROM saas_invoices si
+      JOIN sales_resellers sr ON sr.id = si.reseller_id
+      LEFT JOIN organizations o ON o.id = si.org_id
+      WHERE sr.org_id = $1
+        AND si.invoice_number NOT ILIKE 'QUOTE-%'
+    `, [operatorOrgId])
+    invoices = result.rows
+  } catch (err) {
+    return []
+  }
+
+  // Map to CommissionSaleRecord shape
+  return invoices.map((inv: any) => ({
+    id: inv.id,
+    org_id: operatorOrgId,
+    sale_number: inv.invoice_number,
+    sale_date: inv.created_at ? new Date(inv.created_at).toISOString().slice(0, 10) : null,
+    grand_total: Number(inv.amount || 0),
+    status: inv.status === 'PAID' ? 'FINISHED' : inv.status === 'VOIDED' ? 'VOIDED' : 'ORDERED',
+    reseller_id: inv.reseller_id,
+    commission_type: inv.r_comm_type || null,
+    commission_value: Number(inv.r_comm_val || 0),
+    contacts: inv.organization_name ? { name: inv.organization_name } : null,
+    sales_resellers: {
+      id: inv.r_id,
+      name: inv.r_name,
+      reseller_type: inv.r_type,
+      company_name: inv.r_company,
+      contact_person: inv.r_contact,
+      commission_type: inv.r_comm_type,
+      commission_value: Number(inv.r_comm_val || 0)
+    },
+    sales_returns: []
+  }))
 }

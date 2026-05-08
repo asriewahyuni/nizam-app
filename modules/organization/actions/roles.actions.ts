@@ -4,6 +4,11 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { isInternalAuthProvider } from '@/lib/auth/provider'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import {
+  normalizeDepartmentIds,
+  normalizePermissions,
+  normalizeRoleRecord,
+} from '@/modules/organization/lib/role-normalization'
 
 type RoleMutationInput = {
   id?: string | null
@@ -12,28 +17,20 @@ type RoleMutationInput = {
   parentId?: string | null
 }
 
+type OrganizationRoleRecord = Record<string, unknown> & {
+  department_ids?: unknown
+  department_id?: unknown
+  permissions?: unknown
+}
+
 function normalizeRoleName(value: string) {
   return String(value || '').trim()
 }
 
-function normalizeDepartmentIds(values: string[] | null | undefined) {
-  return Array.from(
-    new Set(
-      (Array.isArray(values) ? values : [])
-        .map((value) => String(value || '').trim())
-        .filter(Boolean)
-    )
-  )
-}
-
-function normalizePermissions(values: string[] | null | undefined) {
-  return Array.from(
-    new Set(
-      (Array.isArray(values) ? values : [])
-        .map((value) => String(value || '').trim())
-        .filter(Boolean)
-    )
-  )
+function isRoleNameConflictError(error: { code?: string | null; message?: string | null } | null | undefined) {
+  const code = String(error?.code || '').trim()
+  const message = String(error?.message || '')
+  return code === '23505' || message.includes('roles_org_id_name_key')
 }
 
 function canManageRoles(activeOrg: Awaited<ReturnType<typeof getActiveOrg>>) {
@@ -90,7 +87,11 @@ export async function getRolesForOrganization(orgId: string) {
     return { error: `Gagal memuat daftar jabatan: ${error.message}`, data: [] as any[] }
   }
 
-  return { data: Array.isArray(data) ? data : [] }
+  return {
+    data: Array.isArray(data)
+      ? data.map((role) => normalizeRoleRecord((role || {}) as OrganizationRoleRecord))
+      : [],
+  }
 }
 
 export async function saveOrganizationRole(orgId: string, input: RoleMutationInput) {
@@ -115,7 +116,7 @@ export async function saveOrganizationRole(orgId: string, input: RoleMutationInp
       .eq('org_id', context.orgId)
 
     if (error) {
-      return { error: error.message.includes('roles_org_id_name_key') ? 'Nama jabatan ini sudah ada di organisasi Anda.' : error.message }
+      return { error: isRoleNameConflictError(error) ? 'Nama jabatan ini sudah ada di organisasi Anda.' : error.message }
     }
 
     revalidateRolePages()
@@ -137,7 +138,7 @@ export async function saveOrganizationRole(orgId: string, input: RoleMutationInp
     })
 
   if (error) {
-    return { error: error.message.includes('roles_org_id_name_key') ? 'Nama jabatan ini sudah ada di organisasi Anda.' : error.message }
+    return { error: isRoleNameConflictError(error) ? 'Nama jabatan ini sudah ada di organisasi Anda.' : error.message }
   }
 
   revalidateRolePages()

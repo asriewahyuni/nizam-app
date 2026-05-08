@@ -2,7 +2,11 @@
 
 import React, { startTransition, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { requestPasswordReset, resetEmployeePassword } from '@/modules/auth/actions/auth.actions'
+import {
+  requestPasswordReset,
+  resetEmployeePassword,
+  signInAsTenantHrisUser,
+} from '@/modules/auth/actions/auth.actions'
 import { uploadEmployeeAvatar } from '@/modules/hris/actions/employee.actions'
 import {
   Plus,
@@ -59,8 +63,25 @@ import {
   EmptyState
 } from '@/components/ui/NizamUI'
 
+type AdminImpersonationInfo = {
+  email?: string | null
+  activeOrgId?: string | null
+}
+
+type HrisImpersonationTarget = {
+  rawUserId?: string | null
+  targetUserId?: string | null
+  displayName?: string | null
+  email?: string | null
+  nik?: string | null
+  roleLabel?: string | null
+  branchName?: string | null
+  isCurrentUser?: boolean
+}
+
 export default function HrisClient({
   orgId,
+  currentUserId = '',
   activeBranchId = null,
   activeBranchName = null,
   allowAllBranchSelection = true,
@@ -78,9 +99,12 @@ export default function HrisClient({
   transferDisabledReason = null,
   initialTransferHistory = [],
   initialInvitations = [],
+  adminImpersonation = null,
+  hrisImpersonationTargets = [],
   defaultTab
 }: {
   orgId: string,
+  currentUserId?: string,
   activeBranchId?: string | null,
   activeBranchName?: string | null,
   allowAllBranchSelection?: boolean,
@@ -98,6 +122,8 @@ export default function HrisClient({
   transferDisabledReason?: string | null,
   initialTransferHistory?: any[],
   initialInvitations?: any[],
+  adminImpersonation?: AdminImpersonationInfo | null,
+  hrisImpersonationTargets?: HrisImpersonationTarget[],
   defaultTab?: string
 }) {
   const router = useRouter()
@@ -114,7 +140,9 @@ export default function HrisClient({
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false)
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
   const [isPositionModalOpen, setIsPositionModalOpen] = useState(false)
+  const [isHrisImpersonationModalOpen, setIsHrisImpersonationModalOpen] = useState(false)
   const [editingPosition, setEditingPosition] = useState<any>(null)
+  const [impersonatingTargetUserId, setImpersonatingTargetUserId] = useState<string | null>(null)
   const [baseUrl, setBaseUrl] = useState('https://nizam.app')
 
   useEffect(() => {
@@ -432,6 +460,38 @@ export default function HrisClient({
     setLoading(false)
   }
 
+  const handleImpersonateHrisUser = (candidate: HrisImpersonationTarget) => {
+    const targetUserId = String(candidate?.targetUserId || '').trim()
+    const displayName = String(candidate?.displayName || 'akun target').trim()
+    const rawUserId = String(candidate?.rawUserId || '').trim()
+    const isCurrentTarget = Boolean(candidate?.isCurrentUser) || rawUserId === currentUserId || targetUserId === currentUserId
+
+    if (!targetUserId) {
+      showToast('Target akun HRIS tidak valid.', 'error')
+      return
+    }
+
+    if (isCurrentTarget) {
+      showToast('Anda sudah berada di akun HRIS ini.', 'info')
+      return
+    }
+
+    if (!window.confirm(`Sesi tenant saat ini akan diganti menjadi ${displayName}. Lanjutkan impersonation HRIS?`)) {
+      return
+    }
+
+    setImpersonatingTargetUserId(targetUserId)
+    startTransition(async () => {
+      const result = await signInAsTenantHrisUser(orgId, targetUserId)
+      if (result?.error) {
+        showToast(result.error, 'error')
+        setImpersonatingTargetUserId(null)
+        return
+      }
+      showToast('Mengalihkan sesi ke akun HRIS...', 'info')
+    })
+  }
+
   const handleDeleteEmployee = async (emp: any) => {
     if (!confirm(`Yakin ingin menghapus karyawan ${emp.first_name} ${emp.last_name || ''}?`)) return
     setLoading(true)
@@ -502,7 +562,7 @@ export default function HrisClient({
     const YYYY = now.getFullYear().toString()
     const DD = now.getDate().toString().padStart(2, '0')
 
-    let formatStr = rawFormat
+    const formatStr = rawFormat
       .replace('{MM}', MM)
       .replace('{YY}', YY)
       .replace('{YYYY}', YYYY)
@@ -585,7 +645,7 @@ export default function HrisClient({
     e.preventDefault()
     if (!transferingEmp) return
     if (!transferTargetOrgId || !transferTargetBranchId) {
-      showToast('Pilih entitas dan cabang tujuan terlebih dahulu.', 'error')
+      showToast('Pilih entitas dan unit tujuan terlebih dahulu.', 'error')
       return
     }
 
@@ -696,6 +756,7 @@ export default function HrisClient({
   const defaultDateTimeInput = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
   const selectedTransferOrg = transferTargets.find((org: any) => org.orgId === transferTargetOrgId)
   const selectedTransferBranches = selectedTransferOrg?.branches || []
+  const showHrisImpersonationTools = Boolean(adminImpersonation)
 
   return (
     <div className="space-y-10 pb-20">
@@ -716,43 +777,55 @@ export default function HrisClient({
           <Users />
         }
         actions={
-          <div className="flex bg-slate-100 p-1.5 rounded-3xl border border-slate-200 shadow-inner overflow-x-auto scrollbar-hide max-w-[90vw] md:max-w-none">
-            {['EMPLOYEES', 'POSITIONS', 'ACTIVATION'].includes(activeTab) && (
-              <>
-                <button
-                  onClick={() => setActiveTab('POSITIONS')}
-                  className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'POSITIONS' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                  Positions & Roles
+          <div className="flex flex-col items-stretch gap-3 md:items-end">
+            <div className="flex bg-slate-100 p-1.5 rounded-3xl border border-slate-200 shadow-inner overflow-x-auto scrollbar-hide max-w-[90vw] md:max-w-none">
+              {['EMPLOYEES', 'POSITIONS', 'ACTIVATION'].includes(activeTab) && (
+                <>
+                  <button
+                    onClick={() => setActiveTab('POSITIONS')}
+                    className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'POSITIONS' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    Positions & Roles
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('EMPLOYEES')}
+                    className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'EMPLOYEES' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    Employees
+                  </button>
+                  <button
+                     onClick={() => setActiveTab('ACTIVATION')}
+                     className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'ACTIVATION' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                     Activation Center
+                  </button>
+                </>
+              )}
+              {activeTab === 'ATTENDANCE' && (
+                <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
+                  Mesin Absensi Terpusat
                 </button>
-                <button
-                  onClick={() => setActiveTab('EMPLOYEES')}
-                  className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'EMPLOYEES' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                  Employees
+              )}
+              {activeTab === 'PAYROLL' && (
+                <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
+                  Master Komponen Gaji
                 </button>
-                <button
-                   onClick={() => setActiveTab('ACTIVATION')}
-                   className={`px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${activeTab === 'ACTIVATION' ? 'bg-white text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                   Activation Center
+              )}
+              {activeTab === 'RUNS' && (
+                <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
+                  Siklus Penggajian
                 </button>
-              </>
-            )}
-            {activeTab === 'ATTENDANCE' && (
-              <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
-                Mesin Absensi Terpusat
-              </button>
-            )}
-            {activeTab === 'PAYROLL' && (
-              <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
-                Master Komponen Gaji
-              </button>
-            )}
-            {activeTab === 'RUNS' && (
-              <button className="px-6 md:px-8 py-3 rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all shrink-0 bg-white text-blue-600 shadow-xl cursor-default">
-                Siklus Penggajian
-              </button>
+              )}
+            </div>
+            {showHrisImpersonationTools && (
+              <SafeButton
+                onClick={() => setIsHrisImpersonationModalOpen(true)}
+                variant="white"
+                size="sm"
+                icon={<ShieldCheck size={16} />}
+              >
+                HRIS IMPERSONATION
+              </SafeButton>
             )}
           </div>
         }
@@ -851,7 +924,7 @@ export default function HrisClient({
                   )}
                   {transferTargets.length === 0 && transferDisabledReason && (
                     <div className="text-[11px] font-bold text-indigo-600">
-                      Mutasi parent/child nonaktif: {transferDisabledReason}
+                      Mutasi antar entitas nonaktif: {transferDisabledReason}
                     </div>
                   )}
                 </div>
@@ -907,7 +980,7 @@ export default function HrisClient({
                             onClick={(e: any) => { e.stopPropagation(); handleOpenTransfer(emp); }}
                             disabled={transferTargets.length === 0}
                             className="p-3 bg-white text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition shadow-sm border border-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={transferTargets.length === 0 ? (transferDisabledReason || 'Belum ada entitas tujuan tersedia') : 'Mutasi ke parent/child lain'}
+                            title={transferTargets.length === 0 ? (transferDisabledReason || 'Belum ada entitas tujuan tersedia') : 'Mutasi ke entitas lain dalam holding'}
                           >
                             <ArrowRightLeft size={16} />
                           </button>
@@ -990,7 +1063,7 @@ export default function HrisClient({
                         <ArrowRightLeft size={16} />
                       </div>
                       <div>
-                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-[0.16em]">Riwayat Mutasi Parent/Child</h4>
+                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-[0.16em]">Riwayat Mutasi Antar Entitas</h4>
                         <p className="text-[11px] font-bold text-slate-500">20 aktivitas terbaru perpindahan karyawan antar entitas holding.</p>
                       </div>
                     </div>
@@ -1584,6 +1657,106 @@ export default function HrisClient({
          )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {isHrisImpersonationModalOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsHrisImpersonationModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/70 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative w-full max-w-4xl bg-white rounded-[40px] shadow-2xl overflow-hidden border border-white"
+            >
+              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-emerald-50/70">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-xl shadow-emerald-100">
+                    <ShieldCheck size={22} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900 tracking-tight uppercase italic">HRIS Impersonation</h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
+                      Aktif karena admin platform sedang impersonate tenant {adminImpersonation?.email ? `• ${adminImpersonation.email}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsHrisImpersonationModalOpen(false)}
+                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:bg-rose-50 hover:text-rose-500 transition-all border border-slate-100"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-8 space-y-6 max-h-[75vh] overflow-y-auto">
+                <div className="rounded-[28px] border border-emerald-100 bg-emerald-50/50 px-6 py-5">
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Kapan panel ini muncul?</div>
+                  <p className="text-sm font-bold text-slate-700 leading-relaxed">
+                    Panel ini hanya tampil saat platform admin sedang berada dalam mode impersonation tenant. Dari sini Anda bisa turun ke akun yang punya akses HR/HRIS untuk cek scope menu, branch, dan batas akses aslinya.
+                  </p>
+                </div>
+
+                {hrisImpersonationTargets.length === 0 ? (
+                  <div className="rounded-[28px] border border-slate-100 bg-slate-50 px-6 py-8 text-center">
+                    <p className="text-sm font-black text-slate-700">Belum ada akun HR/HRIS yang siap dipakai.</p>
+                    <p className="text-xs font-semibold text-slate-500 mt-2">
+                      Pastikan tenant punya user aktif dengan role HR, admin, owner, atau custom role yang memiliki permission HRIS.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {hrisImpersonationTargets.map((candidate: HrisImpersonationTarget) => {
+                      const targetUserId = String(candidate?.targetUserId || '').trim()
+                      const rawUserId = String(candidate?.rawUserId || '').trim()
+                      const isCurrentTarget = Boolean(candidate?.isCurrentUser) || rawUserId === currentUserId || targetUserId === currentUserId
+                      return (
+                        <div
+                          key={targetUserId || candidate?.rawUserId}
+                          className={`rounded-[32px] border p-6 transition-all ${isCurrentTarget ? 'border-emerald-300 bg-emerald-50/70 shadow-lg shadow-emerald-100/60' : 'border-slate-100 bg-slate-50/70 hover:border-emerald-200 hover:bg-white'}`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="space-y-2 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="text-base font-black text-slate-900 truncate">{candidate.displayName || 'User Tenant'}</h4>
+                                <StatusBadge
+                                  label={isCurrentTarget ? 'SEDANG AKTIF' : String(candidate.roleLabel || 'HRIS').toUpperCase()}
+                                  variant={isCurrentTarget ? 'success' : 'warning'}
+                                />
+                              </div>
+                              <div className="space-y-1 text-xs font-semibold text-slate-500">
+                                <p>Email login: {candidate.email || '-'}</p>
+                                <p>NIK: {candidate.nik || '-'}</p>
+                                <p>Unit default: {candidate.branchName || 'Tidak terikat unit tertentu'}</p>
+                              </div>
+                            </div>
+                            <SafeButton
+                              onClick={() => handleImpersonateHrisUser(candidate)}
+                              variant={isCurrentTarget ? 'ghost' : 'emerald'}
+                              size="sm"
+                              icon={<ArrowUpRight size={14} />}
+                              isLoading={impersonatingTargetUserId === targetUserId}
+                              disabled={isCurrentTarget}
+                            >
+                              {isCurrentTarget ? 'AKUN AKTIF' : 'MASUK SEBAGAI'}
+                            </SafeButton>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* ACTIVATION MODAL */}
         <AnimatePresence>
           {isInviteModalOpen && (
@@ -1738,13 +1911,25 @@ export default function HrisClient({
                   </div>
 
                   <div className="p-6 rounded-[32px] border border-blue-100 bg-blue-50/30 space-y-6">
-                    <div className="flex items-center gap-4">
-                      <div className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="is_percentage" name="is_percentage" checked={isPercentage} onChange={(e: any) => setIsPercentage(e.target.checked)} className="sr-only peer" />
-                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        <label htmlFor="is_percentage" className="ml-3 text-[11px] font-black text-slate-700 uppercase tracking-tight cursor-pointer">Calculate by Percentage (%)</label>
-                      </div>
-                    </div>
+                    <label
+                      htmlFor="is_percentage"
+                      className="flex items-center gap-4 cursor-pointer select-none w-fit"
+                    >
+                      <span className="relative inline-flex items-center">
+                        <input
+                          type="checkbox"
+                          id="is_percentage"
+                          name="is_percentage"
+                          checked={isPercentage}
+                          onChange={(e: any) => setIsPercentage(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <span className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></span>
+                      </span>
+                      <span className="text-[11px] font-black text-slate-700 uppercase tracking-tight">
+                        Calculate by Percentage (%)
+                      </span>
+                    </label>
                     {!isPercentage ? (
                       <CurrencyInput
                         label="Default Nominal (Rp)"
@@ -2338,13 +2523,13 @@ export default function HrisClient({
                   </div>
 
                   <div className="space-y-6">
-                    <div className="flex items-center gap-3">
-                      <div className="h-4 w-1 bg-emerald-600 rounded-full" />
-                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Penugasan PIC Cabang (Opsional)</h4>
+                      <div className="flex items-center gap-3">
+                        <div className="h-4 w-1 bg-emerald-600 rounded-full" />
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Penugasan PIC Unit (Opsional)</h4>
                     </div>
                     <div className="space-y-2">
                        <p className="text-xs font-semibold text-slate-500 mb-3">
-                          Pilih cabang/unit yang akan dikelola oleh karyawan ini sebagai Manager (PIC).
+                          Pilih unit operasional yang akan dikelola oleh karyawan ini sebagai Manager (PIC).
                        </p>
                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2 border border-slate-100 rounded-2xl p-3 bg-slate-50/50">
                           {branchOptions?.map((b: any) => (
@@ -2360,7 +2545,7 @@ export default function HrisClient({
                              </label>
                           ))}
                           {(!branchOptions || branchOptions.length === 0) && (
-                             <p className="text-xs text-slate-400 italic">Belum ada data cabang.</p>
+                             <p className="text-xs text-slate-400 italic">Belum ada data unit.</p>
                           )}
                        </div>
                     </div>
@@ -2433,7 +2618,7 @@ export default function HrisClient({
                     <ArrowRightLeft size={22} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-black text-slate-900 tracking-tight uppercase italic">Mutasi Parent/Child</h3>
+                    <h3 className="text-lg font-black text-slate-900 tracking-tight uppercase italic">Mutasi Antar Entitas</h3>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{transferingEmp.first_name} {transferingEmp.last_name || ''}</p>
                   </div>
                 </div>
@@ -2467,20 +2652,20 @@ export default function HrisClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cabang Tujuan</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Unit Tujuan</label>
                   <select
                     required
                     value={transferTargetBranchId}
                     onChange={(e) => setTransferTargetBranchId(e.target.value)}
                     className="w-full px-5 py-4 rounded-2xl border border-slate-200 bg-white text-sm font-black text-slate-700 outline-none focus:border-indigo-500"
                   >
-                    <option value="">-- Pilih Cabang --</option>
+                    <option value="">-- Pilih Unit --</option>
                     {selectedTransferBranches.map((branch: any) => (
                       <option key={branch.id} value={branch.id}>{branch.name} ({branch.code || '-'})</option>
                     ))}
                   </select>
                   {transferTargetOrgId && selectedTransferBranches.length === 0 && (
-                    <p className="text-[11px] font-semibold text-amber-600">Entitas ini belum memiliki cabang aktif yang bisa dipilih.</p>
+                    <p className="text-[11px] font-semibold text-amber-600">Entitas ini belum memiliki unit aktif yang bisa dipilih.</p>
                   )}
                 </div>
 
@@ -2493,7 +2678,7 @@ export default function HrisClient({
                     className="mt-1 h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
                   />
                   <label htmlFor="transfer-pic-target" className="text-xs font-bold text-emerald-700">
-                    Setelah mutasi, tetapkan karyawan ini sebagai PIC pada cabang tujuan.
+                    Setelah mutasi, tetapkan karyawan ini sebagai PIC pada unit tujuan.
                   </label>
                 </div>
 
@@ -2509,7 +2694,7 @@ export default function HrisClient({
                 </div>
 
                 <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-[11px] font-semibold text-indigo-700">
-                  Mutasi akan: memindahkan profil ke entitas tujuan, menghapus profil asal (atau fallback RESIGNED jika terikat histori transaksi), melepas PIC cabang lama, dan menulis riwayat mutasi.
+                  Mutasi akan: memindahkan profil ke entitas tujuan, menghapus profil asal (atau fallback RESIGNED jika terikat histori transaksi), melepas PIC unit lama, dan menulis riwayat mutasi.
                 </div>
 
                 <div className="flex justify-end gap-3 pt-2">

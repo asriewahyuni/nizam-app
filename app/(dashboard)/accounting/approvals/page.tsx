@@ -19,7 +19,11 @@ export default async function ApprovalsPage() {
 
   return (
     <div className="p-8">
-      <ApprovalClient orgId={orgData.org.id} initialApprovals={approvals} />
+      <ApprovalClient
+        orgId={orgData.org.id}
+        activeBranchId={activeBranch?.id ?? null}
+        initialApprovals={approvals}
+      />
     </div>
   )
 }

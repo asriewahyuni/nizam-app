@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createAdminClient: vi.fn(),
   revalidatePath: vi.fn(),
   resolveAccessibleBranchSelection: vi.fn(),
+  queryPostgres: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -22,7 +23,17 @@ vi.mock('@/modules/organization/lib/branch-access.server', () => ({
   resolveAccessibleBranchSelection: mocks.resolveAccessibleBranchSelection,
 }))
 
-import { createEmployee, deleteEmployee, getEmployees, updateEmployee } from '@/modules/hris/actions/employee.actions'
+vi.mock('@/lib/db/postgres', () => ({
+  queryPostgres: mocks.queryPostgres,
+}))
+
+import {
+  createEmployee,
+  deleteEmployee,
+  getEmployees,
+  transferEmployeeToChildOrg,
+  updateEmployee,
+} from '@/modules/hris/actions/employee.actions'
 
 function buildEmployeeForm(overrides: Record<string, string> = {}) {
   const formData = new FormData()
@@ -44,20 +55,26 @@ function buildEmployeeForm(overrides: Record<string, string> = {}) {
 describe('Employee Actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.queryPostgres.mockResolvedValue({ rows: [] })
   })
 
   it('filters employees by resolved branch selection', async () => {
-    const supabase = createSupabaseMock({
-      tables: {
-        employees: [
+    mocks.queryPostgres
+      .mockResolvedValueOnce({
+        rows: [
           {
-            result: success([]),
+            id: 'emp-1',
+            org_id: 'org-1',
+            branch_id: 'branch-1',
+            first_name: 'Salsa',
+            branch_id_val: 'branch-1',
+            branch_name: 'Main Branch',
+            branch_code: 'MB',
           },
         ],
-      },
-    })
+      })
+      .mockResolvedValueOnce({ rows: [] })
 
-    mocks.createClient.mockResolvedValue(supabase.client)
     mocks.resolveAccessibleBranchSelection.mockResolvedValue({
       scope: { accessibleBranchIds: ['branch-1'] },
       branchId: 'branch-1',
@@ -65,10 +82,10 @@ describe('Employee Actions', () => {
 
     await getEmployees('org-1')
 
-    const branchFilter = supabase.calls[0]?.operations.find(
-      (operation) => operation.method === 'eq' && operation.args[0] === 'branch_id'
+    expect(mocks.queryPostgres).toHaveBeenCalledWith(
+      expect.stringContaining('AND e.branch_id = $2'),
+      ['org-1', 'branch-1']
     )
-    expect(branchFilter?.args[1]).toBe('branch-1')
   })
 
   it('stamps branch_id when creating an employee', async () => {
@@ -94,6 +111,32 @@ describe('Employee Actions', () => {
     expect(result).toEqual({ success: true })
     expect(insertPayload.branch_id).toBe('branch-1')
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/hris')
+  })
+
+  it('normalizes browser-style date strings when creating an employee', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        employees: [
+          {
+            singleResult: success({ id: 'emp-1' }),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
+
+    const result = await createEmployee('org-1', buildEmployeeForm({
+      join_date: 'Tue Apr 16 2026 00:00:00 GMT+0700 (Western Indonesia Time)',
+    }))
+    const insertPayload = supabase.calls[0]?.operations.find((operation) => operation.method === 'insert')?.args[0] as Record<string, string>
+
+    expect(result).toEqual({ success: true })
+    expect(insertPayload.join_date).toBe('2026-04-16')
   })
 
   it('persists selected role_id when creating an employee', async () => {
@@ -151,6 +194,38 @@ describe('Employee Actions', () => {
 
     expect(result).toEqual({ success: true })
     expect(branchFilter?.args[1]).toBe('branch-1')
+  })
+
+  it('normalizes browser-style date strings when updating an employee', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        employees: [
+          {
+            maybeSingleResult: success({
+              id: 'emp-1',
+              branch_id: 'branch-1',
+            }),
+          },
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+    mocks.resolveAccessibleBranchSelection.mockResolvedValue({
+      scope: { accessibleBranchIds: ['branch-1'] },
+      branchId: 'branch-1',
+    })
+
+    const result = await updateEmployee('emp-1', 'org-1', buildEmployeeForm({
+      join_date: 'Tue Apr 16 2026 00:00:00 GMT+0700 (Western Indonesia Time)',
+    }))
+    const updatePayload = supabase.calls[1]?.operations.find((operation) => operation.method === 'update')?.args[0] as Record<string, string>
+
+    expect(result).toEqual({ success: true })
+    expect(updatePayload.join_date).toBe('2026-04-16')
   })
 
   it('syncs linked org member role_id when employee role is updated', async () => {
@@ -392,5 +467,180 @@ describe('Employee Actions', () => {
         expect.objectContaining({ method: 'in', args: ['id', ['child-1', 'child-2']] }),
       ])
     )
+  })
+
+  it('transfers employee from holding to child org and assigns PIC to target branch', async () => {
+    const adminSupabase = createSupabaseMock({
+      tables: {
+        org_members: [
+          {
+            maybeSingleResult: success({ role: 'admin' }),
+          },
+          {
+            maybeSingleResult: success({ role: 'owner' }),
+          },
+        ],
+        organizations: [
+          {
+            maybeSingleResult: success({
+              id: 'org-holding',
+              name: 'PT Nizam Pangan Nusantara',
+              parent_org_id: null,
+            }),
+          },
+          {
+            maybeSingleResult: success({
+              id: 'org-retail',
+              name: 'CV Nizam Retail Bandung',
+              parent_org_id: 'org-holding',
+              is_active: true,
+            }),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        employees: [
+          {
+            maybeSingleResult: success({
+              id: 'emp-holding-1',
+              org_id: 'org-holding',
+              branch_id: 'branch-holding',
+              nik: 'EMP-0007',
+              first_name: 'Alya',
+              last_name: 'Pratama',
+              employment_status: 'FULL_TIME',
+              join_date: '2026-04-01',
+              user_id: null,
+              job_title: 'Supervisor Toko',
+            }),
+          },
+          {
+            maybeSingleResult: success(null),
+          },
+          {
+            singleResult: success({
+              id: 'emp-retail-1',
+              first_name: 'Alya',
+              last_name: 'Pratama',
+              nik: 'EMP-0007',
+              user_id: null,
+              job_title: 'Supervisor Toko',
+            }),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        branches: [
+          {
+            maybeSingleResult: success({
+              id: 'branch-retail',
+              name: 'Retail Bandung',
+              code: 'RT-BDG',
+              org_id: 'org-retail',
+              is_active: true,
+            }),
+          },
+          {
+            maybeSingleResult: success({
+              id: 'branch-holding',
+              name: 'Kantor Pusat',
+              code: 'HQ',
+            }),
+          },
+          {
+            result: success([]),
+          },
+          {
+            result: success([]),
+          },
+        ],
+        audit_logs: [
+          {
+            result: success([]),
+          },
+          {
+            result: success([]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: {
+            user: {
+              id: 'user-owner-1',
+              email: 'owner@nizam.test',
+            },
+          },
+        }),
+      },
+    })
+    mocks.createAdminClient.mockResolvedValue(adminSupabase.client)
+
+    const result = await transferEmployeeToChildOrg('org-holding', {
+      employeeId: 'emp-holding-1',
+      targetOrgId: 'org-retail',
+      targetBranchId: 'branch-retail',
+      assignPicToTargetBranch: true,
+      note: 'Mutasi trainer simulation',
+    })
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        transferredEmployeeId: 'emp-retail-1',
+      })
+    )
+
+    const employeeInsertCall = adminSupabase.calls.find(
+      (call) => call.table === 'employees' && call.operations.some((operation) => operation.method === 'insert')
+    )
+    const employeeInsertPayload = employeeInsertCall?.operations.find((operation) => operation.method === 'insert')
+      ?.args[0] as Record<string, unknown>
+
+    expect(employeeInsertPayload).toEqual(
+      expect.objectContaining({
+        org_id: 'org-retail',
+        branch_id: 'branch-retail',
+        nik: 'EMP-0007',
+        first_name: 'Alya',
+        last_name: 'Pratama',
+        employment_status: 'FULL_TIME',
+      })
+    )
+
+    const sourceDeleteCall = adminSupabase.calls.find(
+      (call) => call.table === 'employees' && call.operations.some((operation) => operation.method === 'delete')
+    )
+    expect(sourceDeleteCall?.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ method: 'eq', args: ['id', 'emp-holding-1'] }),
+        expect.objectContaining({ method: 'eq', args: ['org_id', 'org-holding'] }),
+      ])
+    )
+
+    const branchUpdateCalls = adminSupabase.calls
+      .filter((call) => call.table === 'branches' && call.operations.some((operation) => operation.method === 'update'))
+    const targetPicCall = branchUpdateCalls[branchUpdateCalls.length - 1]
+
+    expect(targetPicCall?.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: 'update',
+          args: [expect.objectContaining({ pic_employee_id: 'emp-retail-1' })],
+        }),
+        expect.objectContaining({ method: 'eq', args: ['id', 'branch-retail'] }),
+        expect.objectContaining({ method: 'eq', args: ['org_id', 'org-retail'] }),
+      ])
+    )
+
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/hris')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/settings/sub-orgs')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/settings/users')
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/', 'layout')
   })
 })

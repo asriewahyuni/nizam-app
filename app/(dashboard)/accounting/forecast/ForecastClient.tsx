@@ -25,13 +25,13 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer,
   BarChart,
   Bar,
   Legend,
   ReferenceLine
 } from 'recharts'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { SafeResponsiveContainer } from '@/components/ui/SafeResponsiveContainer'
 
 interface ForecastClientProps {
   forecast: any
@@ -154,7 +154,7 @@ export default function ForecastClient({ forecast, orgId, activeBranchName = nul
             </div>
 
             <div className="h-[400px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <SafeResponsiveContainer>
                     <AreaChart data={chartData}>
                         <defs>
                             <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
@@ -195,7 +195,7 @@ export default function ForecastClient({ forecast, orgId, activeBranchName = nul
                             animationDuration={2000}
                         />
                     </AreaChart>
-                </ResponsiveContainer>
+                </SafeResponsiveContainer>
             </div>
          </div>
       </div>

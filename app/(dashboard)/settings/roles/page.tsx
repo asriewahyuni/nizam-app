@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence, Reorder } from 'framer-motion'
-import { ShieldAlert, Check, X, Shield, Users, Plus, Trash2, Edit2, ChevronRight, Settings2, Lock, GripVertical, CornerDownRight, AlertCircle, Sparkles } from 'lucide-react'
-import { PageHeader, SectionCard, SafeButton, ConfirmDialog } from '@/components/ui/NizamUI'
+import { ShieldAlert, Check, X, Shield, Users, Plus, Trash2, Edit2, GripVertical, CornerDownRight, AlertCircle, Sparkles } from 'lucide-react'
+import { SafeButton, ConfirmDialog } from '@/components/ui/NizamUI'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
 import {
   deleteOrganizationRole,
@@ -12,6 +12,11 @@ import {
   saveOrganizationRole,
   updateOrganizationRolePermissions,
 } from '@/modules/organization/actions/roles.actions'
+import {
+  normalizeDepartmentIds,
+  normalizePermissions,
+  normalizeRoleRecord,
+} from '@/modules/organization/lib/role-normalization'
 
 const MODULE_CATEGORIES = [
   {
@@ -34,7 +39,7 @@ const MODULE_CATEGORIES = [
   },
   {
     category: 'IT (Config)',
-    val: 'IT',
+    val: 'CONFIG',
     modules: [
       { id: 'audit_trail', name: 'Audit Trail (Log)', perms: ['audit_trail:read'] },
       { id: 'branch', name: 'Cabang & Divisi', perms: ['branch:read', 'branch:write'] },
@@ -65,6 +70,7 @@ const MODULE_CATEGORIES = [
       { id: 'inventory', name: 'Gudang & Stok', perms: ['inventory:read', 'inventory:write'] },
       { id: 'factory', name: 'Manufaktur & BoM', perms: ['factory:read', 'factory:write'] },
       { id: 'fleet', name: 'Fleet & Rental', perms: ['fleet:read', 'fleet:write'] },
+      { id: 'syirkah', name: 'Akad Syirkah', perms: ['syirkah:read', 'syirkah:write'] },
     ]
   },
   {
@@ -84,6 +90,7 @@ const MODULE_CATEGORIES = [
       { id: 'employees', name: 'Karyawan Dasar', perms: ['employees:read', 'employees:write'] },
       { id: 'payroll', name: 'Payroll & Slip Gaji', perms: ['payroll:read', 'payroll:write'] },
       { id: 'attendance', name: 'Absensi & Cuti', perms: ['attendance:read', 'attendance:write'] },
+      { id: 'learning', name: 'Peningkatan Kompetensi', perms: ['learning:read', 'learning:write'] },
     ]
   }
 ]
@@ -122,9 +129,10 @@ export default function RolesManagementPage() {
       if (rolesError) {
         setErrorMsg(rolesError)
       } else if (rolesData) {
-        setRoles(rolesData)
+        const normalizedRoles = rolesData.map((role: any) => normalizeRoleRecord(role))
+        setRoles(normalizedRoles)
         if (shouldSelectFirst || !activeRoleId) {
-          setActiveRoleId(rolesData[0]?.id || null)
+          setActiveRoleId(normalizedRoles[0]?.id || null)
         }
       }
     } catch (e: any) {
@@ -154,17 +162,19 @@ export default function RolesManagementPage() {
   }, [roles])
 
   const activeRole = roles.find(r => r.id === activeRoleId)
+  const activeRoleDepartmentIds = useMemo(() => normalizeDepartmentIds(activeRole?.department_ids), [activeRole])
+  const activeRolePermissions = useMemo(() => normalizePermissions(activeRole?.permissions), [activeRole])
 
   // FILTERED MODULES
   const activeCategories = useMemo(() => {
     if (!activeRole) return []
-    if (!activeRole.department_ids || activeRole.department_ids.length === 0) return []
-    return MODULE_CATEGORIES.filter(cat => activeRole.department_ids.includes(cat.val))
-  }, [activeRole])
+    if (activeRoleDepartmentIds.length === 0) return []
+    return MODULE_CATEGORIES.filter(cat => activeRoleDepartmentIds.includes(cat.val))
+  }, [activeRole, activeRoleDepartmentIds])
 
   const togglePermission = async (perm: string) => {
-    if (!activeRole) return
-    const pSet = new Set(activeRole.permissions || [])
+    if (!activeRole || !activeRoleId || !org?.org_id) return
+    const pSet = new Set(activeRolePermissions)
     if (pSet.has(perm)) pSet.delete(perm)
     else pSet.add(perm)
 
@@ -198,7 +208,7 @@ export default function RolesManagementPage() {
   const handleOpenEdit = (role: any) => {
     setEditingInfo(role)
     setNewRoleName(role.name)
-    setNewRoleDepts(role.department_ids || [])
+    setNewRoleDepts(normalizeDepartmentIds(role.department_ids))
     setNewRoleParent(role.parent_id || null)
     setNewRoleModal(true)
   }
@@ -310,7 +320,7 @@ export default function RolesManagementPage() {
                   <div>
                     <h1 className="text-2xl font-black text-slate-900 tracking-tight mb-2">{activeRole.name}</h1>
                     <div className="flex items-center gap-2">
-                       {activeRole.department_ids?.map((d: string) => (
+                       {activeRoleDepartmentIds.map((d: string) => (
                          <span key={d} className="px-2 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-100 text-[8px] font-black rounded uppercase tracking-widest">{d}</span>
                        ))}
                     </div>
@@ -347,8 +357,8 @@ export default function RolesManagementPage() {
                           </div>
                           <div className="grid grid-cols-1 gap-3">
                             {cat.modules.map(mod => {
-                              const hasRead = (activeRole.permissions || []).includes(mod.perms[0])
-                              const hasWrite = mod.perms.length > 1 ? (activeRole.permissions || []).includes(mod.perms[1]) : hasRead
+                              const hasRead = activeRolePermissions.includes(mod.perms[0])
+                              const hasWrite = mod.perms.length > 1 ? activeRolePermissions.includes(mod.perms[1]) : hasRead
                               return (
                                 <div key={mod.id} className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-3xl group hover:border-indigo-100 hover:bg-indigo-50/20 transition-all shadow-sm">
                                     <div>

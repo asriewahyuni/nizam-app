@@ -1,23 +1,23 @@
 # NIZAM ERP — Comprehensive Codebase Documentation
 
-> **Last updated:** 12 April 2026 — updated with Railway PostgreSQL full decoupling, native SQL JOIN resolution, and Internal Auth completion (`1176`).
+> **Last updated:** 19 April 2026 — refreshed to match current repository structure, PostgreSQL-native runtime, POS shift opening journal fix, EDU realtime session schema, Railway migration-history normalization, and migrations through `1226`.
 
 ---
 
 ## 1. Executive Summary
 
-NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **Supabase (PostgreSQL)**. It consolidates accounting, cash & bank, inventory/WMS, purchasing, sales, POS, CRM, HRIS & payroll, fixed assets, budgeting, tax, zakat (Islamic finance), approval workflows, audit trails, manufacturing, fleet management, service orders, SaaS billing, AI token economy, and a sales page builder — all within a single monorepo.
+NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** with a **PostgreSQL-native runtime** and a compatibility layer that still preserves parts of the historical Supabase-oriented API surface. It consolidates accounting, cash & bank, inventory/WMS, purchasing, sales, POS, CRM, HRIS & payroll, fixed assets, budgeting, tax, zakat (Islamic finance), approval workflows, audit trails, manufacturing, fleet management, service orders, SaaS billing, AI token economy, education flows, and public sales pages — all within a single monorepo.
 
 ### Codebase Snapshot
 
 | Metric | Value |
 |---|---|
-| Page routes (`page.tsx`) | **65** |
-| Client components (`*Client.tsx`) | **46** |
-| Server action files | **47** |
-| Migration SQL files | **193** (latest: `1152`) |
-| Test files | **33** |
-| API route handlers | **2** (`/api/export`, `/api/sales-pages/lead`) |
+| Page routes (`page.tsx`) | **78** |
+| Client components (`*Client.tsx`) | **52** |
+| Server action files | **59** |
+| Migration SQL files | **245** (latest: `1226`) |
+| Test files | **49** |
+| API route handlers | **14** |
 | Proxy (middleware) | `proxy.ts` |
 
 ---
@@ -30,9 +30,9 @@ NIZAM ERP is a **multi-tenant cloud ERP** built on **Next.js App Router** and **
 | UI Runtime | React **19.2.4** |
 | Rendering | Server Components + Client Components + Server Actions |
 | Request Interception | `proxy.ts` (Next.js 16 Proxy convention) |
-| Database | Supabase / PostgreSQL with RLS |
-| Auth | Supabase Auth (email/password, NIK/password for staff) |
-| Security | RLS + org isolation + role/module gating + branch-level ACL |
+| Database | PostgreSQL native via `pg`, Railway-oriented runtime, legacy Supabase compatibility layer |
+| Auth | Internal auth runtime + compatibility handling for transitional flows |
+| Security | Org isolation, role/module gating, branch-level ACL, and a mix of DB/app-layer enforcement during transition |
 | Styling | Tailwind CSS **4.2.2** + custom design tokens + Framer Motion |
 | UI Components | Custom `NizamUI` component library + Radix UI primitives |
 | Charts | Recharts |
@@ -64,12 +64,16 @@ nizam-app/
 │   └── sp/              # Public sales pages
 ├── components/
 │   ├── shared/          # Layout components (sidebar, header, wizard, etc.)
+│   ├── edu/             # Education shell/components
 │   └── ui/              # Reusable UI primitives (NizamUI, CurrencyInput, etc.)
+├── docs/                # Developer-facing documentation hub
 ├── lib/
+│   ├── auth/            # Auth provider + internal auth helpers
+│   ├── db/              # PostgreSQL connection + native adapter layer
 │   ├── email/           # Email sender (Resend)
 │   ├── hooks/           # Client hooks (useActiveOrgId)
 │   ├── saas/            # SaaS module catalog, pricing, platform admin
-│   ├── supabase/        # Supabase clients (server, client, middleware, config)
+│   ├── supabase/        # Compatibility clients, middleware, config, legacy naming
 │   └── utils.ts         # cn(), formatRupiah(), formatDate(), generateSlug(), etc.
 ├── modules/             # Domain business logic (server actions + lib)
 │   ├── accounting/      # 17 action files
@@ -78,6 +82,7 @@ nizam-app/
 │   ├── cash/            # Bank + reconciliation
 │   ├── contacts/        # CRM contacts
 │   ├── demo/            # Demo seeding
+│   ├── edu/             # Training, competency, edu mode
 │   ├── factory/         # Manufacturing
 │   ├── fleet/           # Fleet management
 │   ├── hris/            # HR + payroll + attendance + leave + expense + self-service
@@ -90,9 +95,9 @@ nizam-app/
 │   └── settings/        # Settings audit
 ├── types/
 │   └── database.types.ts # Auto-generated Supabase types
-├── __tests__/           # Vitest test suites (33 files)
+├── __tests__/           # Vitest test suites (49 files)
 ├── supabase/
-│   └── migrations/      # 193 SQL migration files
+│   └── migrations/      # 245 SQL migration files
 ├── scripts/             # Data migration scripts
 └── public/              # PWA manifest, logo, static assets
 ```
@@ -106,9 +111,10 @@ nizam-app/
 | `app/(dashboard)/layout.tsx` | **Main app guard** — session, org, module, RBAC validation |
 | `proxy.ts` | Next.js 16 Proxy — session refresh, route protection |
 | `lib/supabase/middleware.ts` | Session update, auth/protected page redirect logic |
-| `lib/supabase/config.ts` | Centralized Supabase connection config (remote/local switch) |
-| `lib/supabase/server.ts` | Server-side Supabase client (`createClient`, `createAdminClient`) |
+| `lib/supabase/config.ts` | Compatibility config for remote/local Supabase-oriented flows |
+| `lib/supabase/server.ts` | Compatibility adapter exposing `createClient` / `createAdminClient` over PostgreSQL native runtime |
 | `lib/supabase/client.ts` | Browser-side Supabase client |
+| `lib/db/postgres.ts` | Native PostgreSQL pool and query entry point |
 | `next.config.mjs` | Build config: `standalone` output, TypeScript errors ignored |
 
 ---
@@ -122,7 +128,7 @@ NIZAM uses the **App Router** with route groups:
 - **`(auth)`** — login, register, join invitation, forgot/update password
 - **`(dashboard)`** — all authenticated business modules (20 subdirectories)
 - **Public routes** — `/`, `/demo`, `/abs`, `/onboarding`, `/sp/[orgSlug]/[pageSlug]`
-- **API routes** — `/api/export`, `/api/sales-pages/lead`
+- **API routes** — auth session/signout, edu session, export, DB/health endpoints, OpenAPI, public sales lead, and `/api/v1/*` module endpoints
 
 ### 4.2 Root Flow
 
@@ -199,16 +205,23 @@ app/(dashboard)/sales/SalesClient.tsx   ← Client Component ('use client', all 
 
 Client components import server actions and call them via `startTransition` or form actions.
 
-### 4.7 Supabase Client Usage
+### 4.7 Data Access & Compatibility Layer
 
 | Context | Import | Function |
 |---|---|---|
-| Server Components, Server Actions | `lib/supabase/server.ts` | `createClient()` |
-| Admin operations (password reset, etc.) | `lib/supabase/server.ts` | `createAdminClient()` |
+| Native PostgreSQL access | `lib/db/postgres.ts` | Pool + direct SQL queries |
+| Server Components, Server Actions | `lib/supabase/server.ts` | `createClient()` compatibility adapter |
+| Admin operations | `lib/supabase/server.ts` | `createAdminClient()` compatibility adapter |
 | Client Components | `lib/supabase/client.ts` | `createClient()` |
 | Middleware | `lib/supabase/middleware.ts` | `createServerClient()` inline |
 
-**Config switching:** `lib/supabase/config.ts` reads `NEXT_PUBLIC_SUPABASE_TARGET`:
+Important notes:
+
+- `lib/supabase/server.ts` no longer represents a purely Supabase-backed server client; it adapts many existing action files to PostgreSQL-native internals.
+- `lib/supabase/config.ts` remains for compatibility and environment switching where older flows still expect Supabase configuration.
+- File naming in this area is historical. Always inspect implementation, not just the filename.
+
+**Compatibility config switching:** `lib/supabase/config.ts` reads `NEXT_PUBLIC_SUPABASE_TARGET`:
 - `'local'` → use `NEXT_PUBLIC_SUPABASE_LOCAL_URL` + local keys
 - anything else → use `NEXT_PUBLIC_SUPABASE_URL` + remote keys
 
@@ -231,8 +244,14 @@ Client components import server actions and call them via `startTransition` or f
 | Staff login | `signInWithNik(formData)` | NIK/password |
 | Staff invitation | `verifyEmployeeNikByToken(token, nik)` | Join link → `/join/[token]` |
 | Staff registration | `registerEmployeeAccount(formData)` | After invitation verification |
-| Password reset (owner) | `sendPasswordResetEmail(formData)` | Via Supabase email |
+| Password reset (owner) | `sendPasswordResetEmail(formData)` | Transitional / provider-dependent |
 | Password reset (staff) | `requestPasswordReset(nik)` → `resetEmployeePassword(...)` | HR-initiated |
+
+Current runtime note:
+
+- Middleware still supports `AUTH_PROVIDER=supabase` and `AUTH_PROVIDER=internal`.
+- The server adapter in `lib/supabase/server.ts` is already wired around internal auth session semantics for the PostgreSQL-native runtime.
+- This means some auth flows are transitional and should be verified against the active environment before operational use.
 
 ### 5.3 Active Organization Resolution
 
@@ -576,7 +595,13 @@ Guards both `/admin` and `/saas/*` routes.
 **Email capabilities:**
 - Invoice email sending
 - Promo broadcast
-- Requires `RESEND_API_KEY` (no fallback)
+- Internal password reset email
+- Weekly admin system usage report (analytics + heatmap)
+- Requires `MAILKETING_API_TOKEN` and `MAILKETING_FROM_EMAIL` (no fallback)
+- CLI trigger: `npm run report:weekly-system-usage`
+- Laravel-like scheduler: `npm run schedule:list` dan `npm run schedule:run`
+- Scheduler endpoint: `GET/POST /api/internal/weekly-system-usage-report` + secret header
+- Scheduler runner endpoint: `GET/POST /api/internal/schedule-run` + secret header
 
 ### 7.14 SaaS Operator
 
@@ -648,9 +673,12 @@ Core reusable components:
 
 ### 9.1 Overview
 
-- **193 migration files** in `supabase/migrations/`
+- **251 migration files** in `supabase/migrations/`
 - `master_init.sql` — legacy bootstrap SQL (foundation reference)
-- Latest migration: `1152_bsc_configuration_and_scoring.sql`
+- Latest migration: `1232_open_api_ip_allowlist.sql`
+- Recent normalization:
+  - Duplicate migration versions have been normalized into unique files such as `1199_syirkah_tables.sql`, `1231_fix_inventory_webhook_reversal_legacy_stock_movements.sql`, and `1232_open_api_ip_allowlist.sql`
+  - Placeholder continuity files yang masih dipakai saat ini adalah `1227_remote_history_placeholder.sql` dan `1228_remote_history_placeholder.sql`
 
 ### 9.2 Core Entities
 
@@ -670,6 +698,10 @@ Core reusable components:
 | Fleet | `fleet_assets`, `fleet_bookings`, `fleet_routes`, `fleet_schedules`, `fleet_tickets`, `fleet_maintenance_labs`, `fleet_terminals` |
 | Services | `service_orders` |
 | SaaS | `saas_packages`, `saas_invoices`, `saas_vouchers`, `saas_config` |
+| Syirkah | `syirkah_contracts`, `syirkah_members` |
+| POS Shift | `pos_shift_sessions`, `pos_shift_settlements` |
+| Open API | `api_keys`, `api_rate_limit_log`, `api_configurations`, `api_call_logs`, `api_idempotency_keys` |
+| Education / Training | `training_events`, `training_teams`, `training_sessions`, `training_session_steps`, `training_progress_events` |
 | Zakat | `zakat_haul`, `zakat_haul_events`, `zakat_asset_timeline` |
 | BSC / Strategy | `bsc_cycles`, `bsc_perspective_weights`, `bsc_kpis`, `bsc_kpi_measurements`, `v_bsc_latest_kpi_measurements` |
 | AI Tokens | `ai_token_wallets`, `ai_token_usage_logs`, `ai_token_topup_packages`, `ai_token_topup_orders` |
@@ -694,7 +726,6 @@ Core reusable components:
 | `ensure_salam_liability_account` | Ensure CoA syariah account `2602` (Hutang Salam) exists and return its account id |
 | `ensure_salam_vendor_receivable_account` | Ensure CoA syariah account `1404` (Piutang Salam Vendor) exists and return its account id |
 | `ensure_istishna_vendor_asset_account` | Ensure CoA account `1205` (Aset / Piutang Barang Istishna Pembelian) exists and return its account id |
-| `update_product_average_cost` | Average cost recalculation |
 | `resolve_inventory_asset_account` | Resolve inventory account per product / segment (`1301`–`1304`) |
 | `ensure_inventory_segment_accounts` | Ensure default segment accounts (WIP, raw material, finished goods) per org |
 | `generate_payslips_for_run` | Payslip generation |
@@ -784,6 +815,18 @@ Core reusable components:
 | `1151` | **Shariah CoA cleanup** — `inject_shariah_coa` tidak lagi membuat/mengaktifkan akun legacy `3100 Ekuitas Syariah`; menjaga akun Syirkah `3110`/`3120` tetap aktif di bawah parent `3000`; backfill menghapus/menonaktifkan `3100` lama secara aman. |
 | `1152` | **BSC configuration + KPI scoring engine** — tabel siklus/weight/KPI/measurement, helper function scoring (achievement %, score 100, score 4), trigger auto-fill score, view latest measurement per KPI, serta RLS berbasis permission `strategy:*`/`reports:read`. |
 | `1153`–`1176` | **Railway PostgreSQL Decoupling** — Migrasi data dan logika dari ekosistem Supabase Cloud ke *database* Railway secara penuh. Penggantian Supabase Auth dengan skema otentikasi internal mandiri (`internal_auth_users`), refaktor ekstensif pada *nested query builder* menjadi Native Postgres SQL JOIN dari modul kasir, pembelian hingga pembukuan agar visibilitas saldo & jurnal akurat. Pemutusan SDK _auth_ pada Demo Mode. Sistem ERP kini 100% otonom tanpa dependensi RLS Supabase eksternal. |
+| `1177` | Internal auth password resets — tabel `internal_auth_password_resets` untuk token reset sandi native. |
+| `1178` | Subscription end enforcement — tambah `organizations.subscription_end` dan normalisasi durasi Trial legacy. |
+| `1179` | POS shift foundation — sesi shift POS, settlement audit trail, dan relasi transaksi POS ke shift. |
+| `1199`–`1202` | Syirkah + Open API foundations — normalisasi file `syirkah_tables` ke versi unik `1199`, Open API keys/configuration/logging, serta `syirkah_contracts.current_debt`. |
+| `1206`–`1213` | Education scoreboard, org expiry sync, sales discount contra journal/backfill, audit FK repair, schema repair `roles.department_ids`, holding role sync, dan refresh injeksi CoA Syariah SALAM/ISTISHNA. |
+| `1214`–`1219` | Purchase insurance column, normalisasi `roles.department_ids` ke `text[]`, sinkronisasi arsitektur bundle SaaS, repricing paket, serta aturan Trial 3 hari + one-time claim tracking. |
+| `1220` | Harden sales delivery journal idempotency — cegah duplicate journal mentah, auto-heal status `FINISHED`, dan beri error bisnis yang lebih jelas untuk delivery legacy yang setengah sinkron. |
+| `1221` | POS shift opening funding metadata — simpan `opening_source_account_id` dan `opening_journal_entry_id` pada `pos_shift_sessions`. |
+| `1222` | Open API idempotency keys — tabel `api_idempotency_keys` untuk POST retry yang aman tanpa duplikasi transaksi. |
+| `1223`–`1224` | Railway migration history placeholders — file no-op untuk menjaga kontinuitas `supabase_migrations.schema_migrations` ketika histori remote sudah lebih dulu mencatat versi yang file sumbernya tidak lagi tersedia. |
+| `1225` | POS shift opening journal enum fix — tambah `POS_SHIFT_OPENING` ke enum `journal_reference_type` agar jurnal modal awal shift bisa diposting. |
+| `1226` | EDU realtime session mode — tambah `training_sessions`, `training_session_steps`, dan `training_progress_events` untuk mode latihan realtime. |
 
 ### 9.5 Storage Buckets
 
@@ -800,19 +843,37 @@ Core reusable components:
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase anon key |
-| `NEXT_PUBLIC_SUPABASE_TARGET` | Optional | `local` = use local Supabase CLI |
-| `SUPABASE_SERVICE_ROLE_KEY` | For admin ops | Employee provisioning, reset password |
+| `DATABASE_URL` | Recommended | Primary PostgreSQL runtime connection |
+| `RAILWAY_DATABASE_URL` | Recommended fallback | Railway PostgreSQL connection |
+| `DATABASE_PUBLIC_URL` | Optional fallback | Alternate DB connection source |
+| `AUTH_PROVIDER` | Recommended | `internal` or `supabase` depending on environment |
+| `INTERNAL_AUTH_SESSION_SECRET` | Required when internal auth | Internal auth cookie/session signing |
+| `INTERNAL_AUTH_BOOTSTRAP_PASSWORD` | Optional | Bootstrap helper for internal auth scripts |
+| `NEXT_PUBLIC_SUPABASE_URL` | Compatibility / legacy | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Compatibility / legacy | Supabase anon key |
+| `NEXT_PUBLIC_SUPABASE_TARGET` | Optional | `local` = use local Supabase CLI compatibility mode |
+| `SUPABASE_SERVICE_ROLE_KEY` | Transitional admin ops | Employee provisioning, reset password, legacy scripts |
 | `NEXT_PUBLIC_SUPABASE_LOCAL_URL` | When local | Local Supabase URL |
 | `NEXT_PUBLIC_SUPABASE_LOCAL_ANON_KEY` | When local | Local anon key |
 | `SUPABASE_LOCAL_SERVICE_ROLE_KEY` | When local | Local service role |
 | `GOOGLE_AI_STUDIO_KEY` | For AI features | OCR, AI content generation |
-| `RESEND_API_KEY` | For email | Invoice, promo email |
+| `MAILKETING_API_TOKEN` | For email | Invoice, promo, reset password email via Mailketing |
+| `MAILKETING_FROM_EMAIL` | For email | Default alamat pengirim email |
+| `WEEKLY_SYSTEM_USAGE_REPORT_RECIPIENTS` | For weekly admin report | Daftar email admin dipisah koma |
+| `WEEKLY_SYSTEM_USAGE_REPORT_SECRET` | For scheduler endpoint | Secret untuk trigger laporan mingguan |
+| `WEEKLY_SYSTEM_USAGE_REPORT_DAY` | Optional weekly schedule | Hari kirim mingguan (`0` Minggu s/d `6` Sabtu) |
+| `WEEKLY_SYSTEM_USAGE_REPORT_TIME` | Optional weekly schedule | Jam kirim format `HH:MM` |
+| `WEEKLY_SYSTEM_USAGE_REPORT_TIMEZONE` | Optional weekly schedule | Default `Asia/Jakarta` |
+| `SCHEDULER_SECRET` | For scheduler runner endpoint | Secret untuk trigger `/api/internal/schedule-run` |
+| `NEXT_PUBLIC_APP_URL` | Optional | Public base URL fallback |
 | `NEXT_PUBLIC_SITE_URL` | Optional | Password reset redirect URL |
 | `VERCEL_URL` | Auto (Vercel) | Vercel deployment origin |
 
-Connection switching is handled by `lib/supabase/config.ts`. **Changing `NEXT_PUBLIC_SUPABASE_TARGET` requires a restart** — it doesn't hot-reload.
+Notes:
+
+- Runtime DB access now expects one of `DATABASE_URL`, `RAILWAY_DATABASE_URL`, or `DATABASE_PUBLIC_URL`.
+- [`.env.local.example`](/Users/manbook/nizam-app/.env.local.example:1) is still a useful baseline, but it does not fully explain every PostgreSQL-native runtime variable.
+- Compatibility switching for older Supabase-oriented flows is still handled by `lib/supabase/config.ts`. Changing `NEXT_PUBLIC_SUPABASE_TARGET` requires a restart.
 
 ---
 
@@ -821,7 +882,8 @@ Connection switching is handled by `lib/supabase/config.ts`. **Changing `NEXT_PU
 ### 11.1 Prerequisites
 
 - Node.js ≥ 20.0.0
-- Supabase project (or local Supabase CLI + Docker)
+- PostgreSQL database access for the active environment
+- Optional: Supabase project or local Supabase CLI + Docker for compatibility/testing flows
 - Environment variables configured
 
 ### 11.2 Available Scripts
@@ -829,8 +891,10 @@ Connection switching is handled by `lib/supabase/config.ts`. **Changing `NEXT_PU
 ```bash
 # Development
 npm run dev               # Start Next.js dev server
+npm run dev:webpack       # Start dev server without Turbopack
 npm run build             # Production build
 npm run start             # Start production server
+npm run perf:local        # Build + start standalone locally
 npm run lint              # ESLint
 
 # Testing
@@ -846,14 +910,35 @@ npm run supabase:stop            # Stop local Supabase
 npm run supabase:status          # Show local Supabase status
 npm run supabase:db:reset        # Reset local database
 npm run supabase:migrate-local-data  # Clone online data to local
+
+# Railway / PostgreSQL cutover helpers
+npm run db:railway:sync          # Dry-run schema sync
+npm run db:railway:sync:apply    # Apply schema sync
+npm run db:railway:sync:all      # Apply schema sync including earlier remote-missing migrations
+npm run db:railway:data:sync     # Dry-run data sync
+npm run db:railway:data:sync:apply # Apply data sync
+npm run db:railway:data:sync:rest # Dry-run REST/admin data sync
+npm run db:railway:data:sync:rest:apply # Apply REST/admin data sync
+npm run db:railway:parity        # Compare Supabase vs Railway schema/data parity
+npm run db:railway:readiness     # Cutover readiness checks
+npm run db:railway:cutover       # Orchestrated dry-run cutover
+npm run db:railway:cutover:apply # Apply cutover flow
+npm run db:railway:auth:backfill # Dry-run internal auth/user backfill
+npm run db:railway:auth:backfill:apply # Apply auth/user backfill
+npm run db:railway:internal-auth:bootstrap # Dry-run bootstrap internal auth users
+npm run db:railway:internal-auth:bootstrap:apply # Apply bootstrap internal auth users
+
+# Utilities
+npm run templates:migrasi # Generate migration template workbook
 ```
 
-### 11.3 Supabase Connection Modes
+### 11.3 Runtime and Compatibility Modes
 
 | Mode | Setup |
 |---|---|
-| **App → Remote Supabase** | Fill remote env vars, leave `NEXT_PUBLIC_SUPABASE_TARGET` empty |
-| **App → Local Supabase** | Run `supabase:start`, fill local env vars, set `TARGET=local` |
+| **App → PostgreSQL native runtime** | Fill `DATABASE_URL` or `RAILWAY_DATABASE_URL`, configure auth provider |
+| **App → Remote Supabase compatibility flow** | Fill remote Supabase env vars, leave `NEXT_PUBLIC_SUPABASE_TARGET` empty |
+| **App → Local Supabase compatibility flow** | Run `supabase:start`, fill local env vars, set `NEXT_PUBLIC_SUPABASE_TARGET=local` |
 | **Clone Remote → Local** | Keep both env sets, run `supabase:migrate-local-data` |
 
 > ⚠️ After cloning, user passwords are reset to `LocalTest123!`
@@ -878,7 +963,7 @@ This means production builds will succeed even with type errors. This flag exist
 - Coverage: `v8` provider, `text` + `html` reporters
 - Path alias: `@/` → project root
 
-### 12.2 Test Suites (33 files)
+### 12.2 Test Suites (49 files)
 
 | File | Coverage Area |
 |---|---|
@@ -974,10 +1059,12 @@ The project uses **Tailwind CSS 4.2.2** with `@tailwindcss/postcss`. Custom colo
 
 5. **Check branch access.** For branch-aware operations, use `modules/organization/lib/branch-access.server.ts` to filter by user's allowed branches.
 
-6. **Use the correct Supabase client:**
+6. **Use the correct data access layer:**
+   - Native SQL / infra debugging: inspect `lib/db/postgres.ts`
    - Server actions/components: `import { createClient } from '@/lib/supabase/server'`
    - Client components: `import { createClient } from '@/lib/supabase/client'`
    - Admin operations: `import { createAdminClient } from '@/lib/supabase/server'`
+   - Remember that `lib/supabase/server.ts` is now a compatibility adapter over PostgreSQL-native internals
 
 7. **Follow the thin page + fat client pattern.** Server `page.tsx` files should be minimal. Put interactive UI in `*Client.tsx` with `'use client'`.
 
@@ -1055,7 +1142,7 @@ When adding new modules to the SaaS system, update:
 ### 14.8 Known Technical Debt
 
 - `next.config.mjs` ignores TypeScript build errors
-- Some admin/settings areas use client-side Supabase writes instead of server actions
+- Some admin/settings areas still use client-side Supabase-oriented writes instead of server actions
 - ESLint has a backlog of warnings across modules
 - Some `<img>` tags should be `next/image`
 
@@ -1235,6 +1322,37 @@ When adding new modules to the SaaS system, update:
 ---
 
 ## 16. Changelog (Recent Updates)
+
+### POS Shift Opening, EDU Realtime Sessions, and Railway Migration History Normalization (April 2026)
+
+- **Migration history normalization for Railway / Supabase CLI compatibility:**
+  - Duplicate migration versions dinormalisasi menjadi file unik:
+    - `1199_syirkah_tables.sql`
+    - `1226_edu_mode_sessions.sql`
+    - `1231_fix_inventory_webhook_reversal_legacy_stock_movements.sql`
+    - `1232_open_api_ip_allowlist.sql`
+  - Placeholder yang tetap dipakai untuk menjaga kontinuitas histori remote:
+    - `1227_remote_history_placeholder.sql`
+    - `1228_remote_history_placeholder.sql`
+  - Tujuan utamanya adalah menjaga kontinuitas `supabase_migrations.schema_migrations` ketika histori remote lebih dulu menyimpan versi yang file sumbernya sudah tidak ada di repo aktif.
+  - Setelah normalisasi ini, histori lokal kembali satu arah dan tidak lagi bentrok pada versi `1223` sampai `1226`.
+
+- **POS shift opening journal hardening:**
+  - `1221_pos_shift_opening_funding.sql` menambahkan metadata `opening_source_account_id` dan `opening_journal_entry_id` pada `pos_shift_sessions`.
+  - `1225_add_pos_shift_opening_reference_type.sql` menambahkan enum `POS_SHIFT_OPENING` ke `journal_reference_type`.
+  - Ini memperbaiki kegagalan jurnal modal awal shift dengan error `invalid input value for enum journal_reference_type: "POS_SHIFT_OPENING"`.
+
+- **Sales delivery journal idempotency hardening (`1220_harden_sales_delivery_journal_idempotency.sql`):**
+  - Mencegah duplicate key mentah pada jurnal delivery `SALE`.
+  - Auto-heal `sales.status = 'FINISHED'` ketika jurnal dan mutasi stok legacy memang sudah ada.
+  - Menghasilkan error bisnis yang lebih jelas saat data lama belum sinkron penuh.
+
+- **Open API hardening:**
+  - `1222_open_api_idempotency.sql` menambahkan `api_idempotency_keys` agar retry POST dari integrasi eksternal tidak menggandakan transaksi.
+
+- **EDU realtime session mode (`1226_edu_mode_sessions.sql`):**
+  - Menambahkan `training_sessions`, `training_session_steps`, dan `training_progress_events`.
+  - Struktur ini dipakai untuk mode latihan realtime, step validation per soal, heartbeat, pause/resume, dan event log pelatihan.
 
 ### BSC Configuration + Shariah CoA Cleanup (April 2026)
 

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
-import { createSaleEntry, deliverSale, voidSale, processSalesReturn, processSalesPayment } from '@/modules/sales/actions/sales.actions'
+import { createSaleEntry, createSaleFulfillmentDrafts, deliverSale, voidSale, processSalesReturn, processSalesPayment } from '@/modules/sales/actions/sales.actions'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
 import { createContact } from '@/modules/contacts/actions/contact.actions'
 import type { ProductWithStock } from '@/modules/inventory/actions/inventory.actions'
@@ -13,12 +13,293 @@ import { QRCodeSVG } from 'qrcode.react'
 
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
-import { formatRupiah } from '@/lib/utils'
+import { getEditableLineDiscountAmount, getStoredLineDiscountAmount, inferStoredLineDiscountMode } from '@/lib/commerce/discounts'
+import { formatDate, formatRupiah } from '@/lib/utils'
 import { getCommissionSchemeLabel, getResellerDisplayName, getResellerSubtitle } from '@/modules/sales/lib/commission'
 
 function pickRelation<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
+}
+
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+function normalizeDateInputValue(value: unknown): string {
+  if (!value) return ''
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return ''
+    if (DATE_ONLY_PATTERN.test(trimmed)) return trimmed
+
+    const parsed = new Date(trimmed)
+    if (Number.isNaN(parsed.getTime())) return ''
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return ''
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+  }
+
+  const normalized = String(value).trim()
+  if (!normalized) return ''
+  if (DATE_ONLY_PATTERN.test(normalized)) return normalized
+
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
+}
+
+type HeaderDiscountMode = 'FIXED' | 'PERCENT'
+type SalesAdjustmentMode = 'FIXED' | 'PERCENT'
+type SalesTaxType = 'PPN' | 'PPH_21' | 'PPH_23' | 'PAJAK_DAERAH'
+type SalesTaxConfig = Record<SalesTaxType, { mode: SalesAdjustmentMode; value: number }>
+type SalesTaxBreakdown = Record<SalesTaxType, { mode: SalesAdjustmentMode; value: number; amount: number }>
+type SalesOtherChargeInput = { id: number; label: string; mode: SalesAdjustmentMode; value: number }
+type SalesOtherChargeLine = SalesOtherChargeInput & { amount: number }
+
+const SALES_TAX_OPTIONS: Array<{ value: SalesTaxType; label: string; helper: string }> = [
+  { value: 'PPN', label: 'PPN', helper: 'Pajak umum yang biasanya menambah total tagihan customer.' },
+  { value: 'PPH_21', label: 'PPh 21', helper: 'Pajak penghasilan yang bisa dipilih untuk kebutuhan administrasi penjualan.' },
+  { value: 'PPH_23', label: 'PPh 23', helper: 'Pajak penghasilan jasa yang sering muncul pada transaksi B2B.' },
+  { value: 'PAJAK_DAERAH', label: 'Pajak Daerah', helper: 'Pajak lokal seperti PB1 atau pungutan daerah lain.' },
+]
+const DEFAULT_ADJUSTMENT_MODE: SalesAdjustmentMode = 'PERCENT'
+
+function roundMoneyValue(value: unknown): number {
+  const normalized = Number(value || 0)
+  if (!Number.isFinite(normalized)) return 0
+  return Number(Math.max(0, normalized).toFixed(2))
+}
+
+function normalizeSalesPercentValue(value: unknown): number {
+  const normalized = Number(value || 0)
+  if (!Number.isFinite(normalized) || normalized <= 0) return 0
+  return Number(Math.min(100, Math.max(0, normalized)).toFixed(2))
+}
+
+function normalizeAdjustmentMode(value: unknown): SalesAdjustmentMode {
+  return String(value || '').trim().toUpperCase() === 'FIXED' ? 'FIXED' : 'PERCENT'
+}
+
+function normalizeAdjustmentValue(mode: SalesAdjustmentMode, value: unknown): number {
+  return mode === 'PERCENT' ? normalizeSalesPercentValue(value) : roundMoneyValue(value)
+}
+
+function calculateAdjustmentAmount(baseAmount: number, mode: SalesAdjustmentMode, value: unknown): number {
+  const normalizedValue = normalizeAdjustmentValue(mode, value)
+  if (normalizedValue <= 0) return 0
+  if (mode === 'PERCENT') {
+    return roundMoneyValue((Math.max(0, baseAmount) * normalizedValue) / 100)
+  }
+  return roundMoneyValue(normalizedValue)
+}
+
+function createEmptySalesTaxConfig(): SalesTaxConfig {
+  return {
+    PPN: { mode: DEFAULT_ADJUSTMENT_MODE, value: 0 },
+    PPH_21: { mode: DEFAULT_ADJUSTMENT_MODE, value: 0 },
+    PPH_23: { mode: DEFAULT_ADJUSTMENT_MODE, value: 0 },
+    PAJAK_DAERAH: { mode: DEFAULT_ADJUSTMENT_MODE, value: 0 },
+  }
+}
+
+function createEmptySalesTaxBreakdown(): SalesTaxBreakdown {
+  return {
+    PPN: { mode: DEFAULT_ADJUSTMENT_MODE, value: 0, amount: 0 },
+    PPH_21: { mode: DEFAULT_ADJUSTMENT_MODE, value: 0, amount: 0 },
+    PPH_23: { mode: DEFAULT_ADJUSTMENT_MODE, value: 0, amount: 0 },
+    PAJAK_DAERAH: { mode: DEFAULT_ADJUSTMENT_MODE, value: 0, amount: 0 },
+  }
+}
+
+function createEmptyOtherChargeInput(partial: Partial<SalesOtherChargeInput> = {}): SalesOtherChargeInput {
+  return {
+    id: partial.id ?? Date.now() + Math.floor(Math.random() * 10000),
+    label: partial.label ?? '',
+    mode: partial.mode ?? 'FIXED',
+    value: partial.value ?? 0,
+  }
+}
+
+function calculateSalesTaxBreakdown(baseAmount: number, taxConfig: SalesTaxConfig): SalesTaxBreakdown {
+  const breakdown = createEmptySalesTaxBreakdown()
+
+  for (const option of SALES_TAX_OPTIONS) {
+    const mode = normalizeAdjustmentMode(taxConfig[option.value]?.mode)
+    const value = normalizeAdjustmentValue(mode, taxConfig[option.value]?.value)
+    breakdown[option.value] = {
+      mode,
+      value,
+      amount: calculateAdjustmentAmount(baseAmount, mode, value),
+    }
+  }
+
+  return breakdown
+}
+
+function getSalesTaxTotal(breakdown: SalesTaxBreakdown): number {
+  return roundMoneyValue(
+    SALES_TAX_OPTIONS.reduce((sum, option) => sum + Number(breakdown[option.value]?.amount || 0), 0)
+  )
+}
+
+function getSalesTaxConfigFromBreakdown(breakdown: SalesTaxBreakdown): SalesTaxConfig {
+  return {
+    PPN: { mode: normalizeAdjustmentMode(breakdown.PPN.mode), value: normalizeAdjustmentValue(normalizeAdjustmentMode(breakdown.PPN.mode), breakdown.PPN.value) },
+    PPH_21: { mode: normalizeAdjustmentMode(breakdown.PPH_21.mode), value: normalizeAdjustmentValue(normalizeAdjustmentMode(breakdown.PPH_21.mode), breakdown.PPH_21.value) },
+    PPH_23: { mode: normalizeAdjustmentMode(breakdown.PPH_23.mode), value: normalizeAdjustmentValue(normalizeAdjustmentMode(breakdown.PPH_23.mode), breakdown.PPH_23.value) },
+    PAJAK_DAERAH: { mode: normalizeAdjustmentMode(breakdown.PAJAK_DAERAH.mode), value: normalizeAdjustmentValue(normalizeAdjustmentMode(breakdown.PAJAK_DAERAH.mode), breakdown.PAJAK_DAERAH.value) },
+  }
+}
+
+function normalizeStoredSalesTaxBreakdown(
+  value: unknown,
+  totalAmount: unknown,
+  discountAmount: unknown,
+  taxAmount: unknown
+): SalesTaxBreakdown {
+  const safeTotalAmount = roundMoneyValue(totalAmount)
+  const safeDiscountAmount = roundMoneyValue(discountAmount)
+  const safeTaxAmount = roundMoneyValue(taxAmount)
+  const taxableBase = Math.max(0, safeTotalAmount - safeDiscountAmount)
+  const fallbackBreakdown = createEmptySalesTaxBreakdown()
+
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const source = value as Record<string, unknown>
+    const normalizedBreakdown = createEmptySalesTaxBreakdown()
+    let hasActiveTax = false
+
+    for (const option of SALES_TAX_OPTIONS) {
+      const rawEntry = source[option.value]
+      if (!rawEntry || typeof rawEntry !== 'object' || Array.isArray(rawEntry)) continue
+
+      const entry = rawEntry as Record<string, unknown>
+      const inferredMode = normalizeAdjustmentMode(
+        entry.mode ?? (Number(entry.percent || 0) > 0 ? 'PERCENT' : 'FIXED')
+      )
+      const valueSource = entry.value ?? (inferredMode === 'PERCENT' ? entry.percent : entry.amount)
+      const normalizedValue = normalizeAdjustmentValue(inferredMode, valueSource)
+      const normalizedAmount = roundMoneyValue(
+        entry.amount ?? calculateAdjustmentAmount(taxableBase, inferredMode, normalizedValue)
+      )
+
+      normalizedBreakdown[option.value] = {
+        mode: inferredMode,
+        value: normalizedValue,
+        amount: normalizedAmount,
+      }
+      if (normalizedValue > 0 || normalizedAmount > 0) {
+        hasActiveTax = true
+      }
+    }
+
+    if (hasActiveTax) {
+      return normalizedBreakdown
+    }
+  }
+
+  if (safeTaxAmount > 0) {
+    fallbackBreakdown.PPN = {
+      mode: taxableBase > 0 ? 'PERCENT' : 'FIXED',
+      value: taxableBase > 0 ? roundMoneyValue((safeTaxAmount / taxableBase) * 100) : safeTaxAmount,
+      amount: safeTaxAmount,
+    }
+  }
+
+  return fallbackBreakdown
+}
+
+function normalizeStoredOtherChargeInputs(
+  value: unknown,
+  fallbackOtherChargeAmount: unknown
+): SalesOtherChargeInput[] {
+  if (Array.isArray(value)) {
+    const mappedLines = value.flatMap((entry, index) => {
+      if (!entry || typeof entry !== 'object') return []
+
+      const rawEntry = entry as Record<string, unknown>
+      const mode = normalizeAdjustmentMode(rawEntry.mode)
+      const rawId = Number(rawEntry.id)
+      const normalizedValue = normalizeAdjustmentValue(
+        mode,
+        rawEntry.value ?? (mode === 'PERCENT' ? rawEntry.percent : rawEntry.amount)
+      )
+
+      return [createEmptyOtherChargeInput({
+        id: Number.isFinite(rawId) ? rawId : Date.now() + index,
+        label: String(rawEntry.label || ''),
+        mode,
+        value: normalizedValue,
+      })]
+    })
+
+    if (mappedLines.length > 0) {
+      return mappedLines
+    }
+  }
+
+  const safeFallbackOtherChargeAmount = roundMoneyValue(fallbackOtherChargeAmount)
+  if (safeFallbackOtherChargeAmount > 0) {
+    return [createEmptyOtherChargeInput({
+      label: 'Biaya Lain',
+      mode: 'FIXED',
+      value: safeFallbackOtherChargeAmount,
+    })]
+  }
+
+  return []
+}
+
+function calculateOtherChargeLines(baseAmount: number, inputs: SalesOtherChargeInput[]): SalesOtherChargeLine[] {
+  return inputs.map((input) => {
+    const mode = normalizeAdjustmentMode(input.mode)
+    const value = normalizeAdjustmentValue(mode, input.value)
+
+    return {
+      ...input,
+      label: String(input.label || ''),
+      mode,
+      value,
+      amount: calculateAdjustmentAmount(baseAmount, mode, value),
+    }
+  })
+}
+
+function getOtherChargeTotal(lines: SalesOtherChargeLine[]): number {
+  return roundMoneyValue(lines.reduce((sum, line) => sum + Number(line.amount || 0), 0))
+}
+
+function getActiveSalesTaxRows(breakdown: SalesTaxBreakdown) {
+  return SALES_TAX_OPTIONS
+    .map((option) => ({
+      code: option.value,
+      label: option.label,
+      helper: option.helper,
+      mode: breakdown[option.value].mode,
+      inputValue: breakdown[option.value].value,
+      amount: breakdown[option.value].amount,
+    }))
+    .filter((row) => row.inputValue > 0 || row.amount > 0)
+}
+
+function calculateHeaderDiscountValue(baseAmount: number, mode: HeaderDiscountMode, value: number | null): number | null {
+  if (value === null) return null
+
+  const normalizedBase = Math.max(0, Number(baseAmount || 0))
+  const normalizedValue = Math.max(0, Number(value || 0))
+  if (!Number.isFinite(normalizedBase) || !Number.isFinite(normalizedValue)) return 0
+  if (normalizedBase <= 0 || normalizedValue <= 0) return 0
+
+  if (mode === 'PERCENT') {
+    return Math.min(
+      normalizedBase,
+      Math.round(normalizedBase * (Math.min(100, normalizedValue) / 100))
+    )
+  }
+
+  return Math.min(normalizedBase, Math.round(normalizedValue))
 }
 
 export default function SalesClient({
@@ -108,7 +389,9 @@ export default function SalesClient({
   const [paymentTerm, setPaymentTerm] = useState<'TEMPO' | 'LUNAS'>('TEMPO')
   const [paymentAccountId, setPaymentAccountId] = useState('')
   const [customGlobalDiscount, setCustomGlobalDiscount] = useState<number | null>(null)
-  const [headerTaxPercent, setHeaderTaxPercent] = useState(0)
+  const [customGlobalDiscountMode, setCustomGlobalDiscountMode] = useState<HeaderDiscountMode>('FIXED')
+  const [headerTaxConfig, setHeaderTaxConfig] = useState<SalesTaxConfig>(createEmptySalesTaxConfig())
+  const [headerOtherChargeInputs, setHeaderOtherChargeInputs] = useState<SalesOtherChargeInput[]>([])
   const [shariahMode, setShariahMode] = useState<'CASH' | 'SALAM' | 'ISTISHNA'>('CASH')
 
   useEffect(() => {
@@ -152,13 +435,22 @@ export default function SalesClient({
   const paymentAccounts = coa?.filter((a: any) => a.type === 'ASSET' && (a.code.startsWith('11') || a.code.startsWith('12'))) || []
 
   const grossSubTotal = lines.reduce((sum: number, line: typeof lines[0]) => sum + (line.quantity * line.unit_price), 0)
-  const autoLineDiscounts = lines.reduce((sum: number, line: typeof lines[0]) => sum + ((line.discount_amount || 0) * line.quantity), 0)
-  
-  const appliedDiscount = customGlobalDiscount !== null ? customGlobalDiscount : autoLineDiscounts
+  const autoLineDiscounts = lines.reduce(
+    (sum: number, line: typeof lines[0]) => sum + getStoredLineDiscountAmount(line.discount_amount || 0, line.quantity),
+    0
+  )
+
+  const manualGlobalDiscount = calculateHeaderDiscountValue(grossSubTotal, customGlobalDiscountMode, customGlobalDiscount)
+  const isUsingManualDiscount = manualGlobalDiscount !== null
+  const appliedDiscount = manualGlobalDiscount !== null ? manualGlobalDiscount : autoLineDiscounts
   const taxableAmount = Math.max(0, grossSubTotal - appliedDiscount)
-  const calculatedTax = (grossSubTotal * headerTaxPercent) / 100
-  const grandTotal = taxableAmount + calculatedTax
-  const STOCK_EPSILON = 0.000001
+  const calculatedTaxBreakdown = calculateSalesTaxBreakdown(taxableAmount, headerTaxConfig)
+  const calculatedTax = getSalesTaxTotal(calculatedTaxBreakdown)
+  const calculatedOtherChargeLines = calculateOtherChargeLines(taxableAmount, headerOtherChargeInputs)
+  const activeOtherChargeRows = calculatedOtherChargeLines.filter((line) => line.value > 0 || line.amount > 0)
+  const calculatedOtherChargeAmount = getOtherChargeTotal(calculatedOtherChargeLines)
+  const grandTotal = taxableAmount + calculatedTax + calculatedOtherChargeAmount
+  const activeCalculatedTaxRows = getActiveSalesTaxRows(calculatedTaxBreakdown)
 
   const resetSaleForm = () => {
     setEditingDraftSaleId(null)
@@ -171,7 +463,9 @@ export default function SalesClient({
     setPaymentTerm('TEMPO')
     setPaymentAccountId('')
     setCustomGlobalDiscount(null)
-    setHeaderTaxPercent(0)
+    setCustomGlobalDiscountMode('FIXED')
+    setHeaderTaxConfig(createEmptySalesTaxConfig())
+    setHeaderOtherChargeInputs([])
     setShariahMode('CASH')
     setHasDp(false)
     setDpMode('NOMINAL')
@@ -188,6 +482,11 @@ export default function SalesClient({
     const nextPaymentTerm: 'TEMPO' | 'LUNAS' =
       String(sale?.payment_term || 'TEMPO').toUpperCase() === 'LUNAS' ? 'LUNAS' : 'TEMPO'
 
+    const storedDiscountMode = inferStoredLineDiscountMode(
+      sale?.sales_items || [],
+      Number(sale?.discount_amount || 0)
+    )
+
     const mappedLines = (sale?.sales_items || []).map((item: any) => {
       const linkedProduct = products.find((p: ProductWithStock) => p.id === item?.product_id)
       const productType = (linkedProduct?.type || item?.products?.type || 'INVENTORY') as 'INVENTORY' | 'NON_INVENTORY' | 'SERVICE'
@@ -197,30 +496,42 @@ export default function SalesClient({
         product_id: String(item?.product_id || ''),
         quantity: Number(item?.quantity || 1),
         unit_price: Number(item?.unit_price || 0),
-        discount_amount: Number(item?.discount_amount || 0),
+        discount_amount: getEditableLineDiscountAmount(
+          Number(item?.discount_amount || 0),
+          Number(item?.quantity || 1),
+          storedDiscountMode
+        ),
         stock_available: Number(linkedProduct?.stock_available || 0),
         type: productType,
         unit: String(linkedProduct?.unit || item?.products?.unit || 'Pcs'),
       }
     })
 
-    const total = Number(sale?.total_amount || 0)
+    const lineSubtotal = mappedLines.reduce((sum: number, line: typeof mappedLines[number]) => sum + (line.quantity * line.unit_price), 0)
     const discount = Number(sale?.discount_amount || 0)
-    const taxableBase = Math.max(0, total - discount)
-    const taxPercent = taxableBase > 0
-      ? (Number(sale?.tax_amount || 0) / taxableBase) * 100
-      : 0
+    const storedTaxBreakdown = normalizeStoredSalesTaxBreakdown(
+      sale?.tax_breakdown,
+      lineSubtotal,
+      discount,
+      sale?.tax_amount
+    )
+    const storedOtherChargeInputs = normalizeStoredOtherChargeInputs(
+      sale?.other_charge_breakdown,
+      sale?.other_charge_amount
+    )
 
     setEditingDraftSaleId(String(sale.id))
     setCustomerId(String(sale.customer_id || ''))
     setResellerId(String(sale.reseller_id || ''))
-    setSaleDate(String(sale.sale_date || new Date().toISOString().split('T')[0]))
-    setDueDate(sale?.due_date ? String(sale.due_date) : '')
+    setSaleDate(normalizeDateInputValue(sale.sale_date) || new Date().toISOString().split('T')[0])
+    setDueDate(normalizeDateInputValue(sale?.due_date))
     setNotes(String(sale?.notes || ''))
     setPaymentTerm(nextPaymentTerm)
     setPaymentAccountId(String(sale?.payment_account_id || ''))
     setCustomGlobalDiscount(discount)
-    setHeaderTaxPercent(Number.isFinite(taxPercent) ? Number(taxPercent.toFixed(2)) : 0)
+    setCustomGlobalDiscountMode('FIXED')
+    setHeaderTaxConfig(getSalesTaxConfigFromBreakdown(storedTaxBreakdown))
+    setHeaderOtherChargeInputs(storedOtherChargeInputs)
     setShariahMode(nextShariahMode)
     setHasDp(false)
     setDpMode('NOMINAL')
@@ -235,6 +546,55 @@ export default function SalesClient({
 
   const handleAddLine = () => {
     setLines([...lines, createEmptySaleLine()])
+  }
+
+  const handleHeaderTaxChange = (taxType: SalesTaxType, field: 'mode' | 'value', nextValue: string | number) => {
+    setHeaderTaxConfig((currentConfig) => {
+      const currentEntry = currentConfig[taxType]
+      const nextMode = field === 'mode'
+        ? normalizeAdjustmentMode(nextValue)
+        : currentEntry.mode
+
+      return {
+        ...currentConfig,
+        [taxType]: {
+          mode: nextMode,
+          value: field === 'value'
+            ? normalizeAdjustmentValue(nextMode, nextValue)
+            : normalizeAdjustmentValue(nextMode, currentEntry.value),
+        },
+      }
+    })
+  }
+
+  const handleAddOtherCharge = () => {
+    setHeaderOtherChargeInputs((currentLines) => [
+      ...currentLines,
+      createEmptyOtherChargeInput({ label: 'Biaya Lain', mode: 'FIXED', value: 0 }),
+    ])
+  }
+
+  const handleOtherChargeChange = (id: number, field: 'label' | 'mode' | 'value', nextValue: string | number) => {
+    setHeaderOtherChargeInputs((currentLines) => currentLines.map((line) => {
+      if (line.id !== id) return line
+
+      const nextMode = field === 'mode'
+        ? normalizeAdjustmentMode(nextValue)
+        : line.mode
+
+      return {
+        ...line,
+        label: field === 'label' ? String(nextValue || '') : line.label,
+        mode: nextMode,
+        value: field === 'value'
+          ? normalizeAdjustmentValue(nextMode, nextValue)
+          : normalizeAdjustmentValue(nextMode, line.value),
+      }
+    }))
+  }
+
+  const handleRemoveOtherCharge = (id: number) => {
+    setHeaderOtherChargeInputs((currentLines) => currentLines.filter((line) => line.id !== id))
   }
 
   const handleRemoveLine = (id: number) => {
@@ -266,37 +626,6 @@ export default function SalesClient({
     }))
   }
 
-  const getFirstNonSalamStockShortage = () => {
-    const requirementByProduct = new Map<string, { productName: string; requiredQty: number; availableQty: number; unit: string }>()
-
-    for (const line of lines) {
-      if (line.type !== 'INVENTORY' || !line.product_id) continue
-      const qty = Number(line.quantity || 0)
-      if (!Number.isFinite(qty) || qty <= 0) continue
-
-      const current = requirementByProduct.get(line.product_id)
-      if (current) {
-        current.requiredQty += qty
-        continue
-      }
-
-      requirementByProduct.set(line.product_id, {
-        productName: line.product_name || line.product_id,
-        requiredQty: qty,
-        availableQty: Number(line.stock_available || 0),
-        unit: line.unit || 'Pcs',
-      })
-    }
-
-    for (const requirement of requirementByProduct.values()) {
-      if ((requirement.requiredQty - requirement.availableQty) > STOCK_EPSILON) {
-        return requirement
-      }
-    }
-
-    return null
-  }
-
   const handleCreateSale = async (e: React.FormEvent) => {
     e.preventDefault()
     const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
@@ -309,7 +638,9 @@ export default function SalesClient({
     if (usableLines.length === 0) return setError('Tambahkan minimal 1 item sebelum menyimpan dokumen.')
     if (!isDraftSave && paymentTerm === 'LUNAS' && !paymentAccountId) return setError('Pilih akun penerimaan untuk transaksi Lunas!')
     if (!isDraftSave && shariahMode === 'SALAM' && paymentTerm !== 'LUNAS') return setError('Akad SALAM wajib dibayar lunas (tunai) di awal.')
-    if (!isDraftSave && (paymentTerm === 'TEMPO' || shariahMode === 'SALAM') && !dueDate) return setError('Tanggal jatuh tempo pengiriman wajib diisi.')
+    if (!isDraftSave && (paymentTerm === 'TEMPO' || shariahMode === 'SALAM' || shariahMode === 'ISTISHNA') && !dueDate) {
+      return setError('Tanggal jatuh tempo pengiriman wajib diisi.')
+    }
 
     if (!isDraftSave && usableLines.some(l => !l.product_name || l.quantity <= 0 || l.unit_price < 0)) {
       return setError('Lengkapi detail barang, kuantitas, dan Harga Jual pada setiap baris.')
@@ -317,34 +648,11 @@ export default function SalesClient({
 
     const dpFinalAmount = dpMode === 'PERCENT' ? ((parseFloat(dpPercent) || 0) / 100) * grandTotal : (parseFloat(dpAmount) || 0)
 
-    let resolvedShariahMode: 'CASH' | 'SALAM' | 'ISTISHNA' = shariahMode
-    let resolvedPaymentTerm: 'TEMPO' | 'LUNAS' = shariahMode === 'SALAM' ? 'LUNAS' : paymentTerm
+    const resolvedShariahMode: 'CASH' | 'SALAM' | 'ISTISHNA' = shariahMode
+    const resolvedPaymentTerm: 'TEMPO' | 'LUNAS' = shariahMode === 'SALAM' ? 'LUNAS' : paymentTerm
 
     if (!isDraftSave && resolvedPaymentTerm === 'TEMPO' && hasDp && dpFinalAmount > grandTotal) {
       return setError('Nilai Uang Muka (DP) tidak boleh melebihi Total Penjualan.')
-    }
-
-    if (!isDraftSave && resolvedShariahMode !== 'SALAM' && resolvedShariahMode !== 'ISTISHNA') {
-      const stockShortage = getFirstNonSalamStockShortage()
-      if (stockShortage) {
-        const stockMessage = `Stok produk "${stockShortage.productName}" tidak mencukupi. Dibutuhkan ${formatStockQuantity(
-          stockShortage.requiredQty
-        )}, tersedia ${formatStockQuantity(Math.max(0, stockShortage.availableQty))} ${stockShortage.unit}.`
-
-        const wantsSalam = confirm(
-          `${stockMessage}\n\nOtomatis ubah ke akad SALAM agar bisa diproses tanpa stok?\n\n(Pilih Cancel jika Anda ingin membatalkan dan mengubah manual menjadi akad ISTISHNA untuk dimanufaktur)`
-        )
-        if (wantsSalam) {
-          resolvedShariahMode = 'SALAM'
-          resolvedPaymentTerm = 'LUNAS'
-          setShariahMode('SALAM')
-          setPaymentTerm('LUNAS')
-          setHasDp(false)
-          setError(null)
-        } else {
-          return setError(`${stockMessage} Invoice biasa dibatalkan. Silakan ubah Dropdown mode akad ke ISTISHNA (jika diproduksi) atau SALAM.`)
-        }
-      }
     }
 
     setLoading(true)
@@ -353,12 +661,20 @@ export default function SalesClient({
       customer_id: customerId,
       reseller_id: resellerId || null,
       sale_date: saleDate,
-      due_date: (resolvedPaymentTerm === 'TEMPO' || resolvedShariahMode === 'SALAM') ? dueDate : null,
+      due_date: (resolvedPaymentTerm === 'TEMPO' || resolvedShariahMode === 'SALAM' || resolvedShariahMode === 'ISTISHNA') ? dueDate : null,
       notes,
       payment_term: resolvedShariahMode === 'SALAM' ? 'LUNAS' : resolvedPaymentTerm,
       payment_account_id: paymentAccountId,
       discount_amount: appliedDiscount,
+      tax_breakdown: calculatedTaxBreakdown,
       tax_amount: calculatedTax,
+      other_charge_breakdown: activeOtherChargeRows.map((line) => ({
+        label: String(line.label || '').trim() || 'Biaya Lain',
+        mode: line.mode,
+        value: line.value,
+        amount: line.amount,
+      })),
+      other_charge_amount: calculatedOtherChargeAmount,
       shariah_mode: resolvedShariahMode,
       mode: isDraftSave ? 'DRAFT' : 'PUBLISH',
       draft_id: editingDraftSaleId || undefined,
@@ -367,7 +683,7 @@ export default function SalesClient({
         product_name: l.product_name,
         quantity: l.quantity,
         unit_price: l.unit_price,
-        discount_amount: l.discount_amount
+        discount_amount: getStoredLineDiscountAmount(l.discount_amount, l.quantity)
       }))
     }
 
@@ -431,12 +747,47 @@ export default function SalesClient({
   const executeDelivery = async (saleId: string, warehouseId?: string | null) => {
     setLoading(true)
     const res = await deliverSale(orgId, saleId, warehouseId || null)
-    if (res?.error) setError(res.error)
-    else {
+    if (res?.code === 'DELIVERY_STOCK_SHORTAGE') {
+      setError(res.error)
+
+      const wantsDrafts = confirm(`${res.error}\n\n${buildDeliveryShortagePrompt(res.shortages || [])}`)
+      if (!wantsDrafts) {
+        setLoading(false)
+        return
+      }
+
+      const followUpRes = await createSaleFulfillmentDrafts(orgId, saleId, warehouseId || null)
+      if (followUpRes?.error) {
+        setError(followUpRes.error)
+      } else {
+        const cleanMessage = String(followUpRes.message || 'Tindak lanjut stok berhasil dibuat').replace(/\.+$/, '')
+        const routeHint =
+          Array.isArray(followUpRes?.routes) && followUpRes.routes.length > 0
+            ? ` Cek menu ${followUpRes.routes.includes('/factory') && followUpRes.routes.includes('/purchasing')
+              ? 'Factory dan Purchasing'
+              : followUpRes.routes.includes('/factory')
+                ? 'Factory'
+                : 'Purchasing'
+            }.`
+            : ''
+
+        setError(null)
+        setSuccess(`${cleanMessage}.${routeHint}`.trim())
+        setShowDeliveryModal(false)
+        setSelectedSaleForDelivery(null)
+        setDeliveryWarehouseId('')
+        router.refresh()
+        setTimeout(() => setSuccess(null), 4500)
+      }
+    } else if (res?.error) {
+      setError(res.error)
+    } else {
+      setError(null)
       setSuccess('Penjualan berhasil diselesaikan (FINISHED)! Jurnal COGS telah dibukukan otomatis.')
       setShowDeliveryModal(false)
       setSelectedSaleForDelivery(null)
       setDeliveryWarehouseId('')
+      router.refresh()
       setTimeout(() => setSuccess(null), 4000)
     }
     setLoading(false)
@@ -502,6 +853,23 @@ export default function SalesClient({
     return Number.isInteger(rounded)
       ? String(rounded)
       : rounded.toFixed(6).replace(/\.?0+$/, '')
+  }
+
+  const buildDeliveryShortagePrompt = (shortages: any[] = []) => {
+    const productionCount = shortages.filter((item) => item?.resolution === 'PRODUCTION').length
+    const purchasingCount = shortages.filter((item) => item?.resolution === 'PURCHASING').length
+    const actionParts: string[] = []
+
+    if (productionCount > 0) actionParts.push(`${productionCount} draft SPK`)
+    if (purchasingCount > 0) actionParts.push(`${purchasingCount} purchase request`)
+
+    const shortageLines = shortages.slice(0, 3).map((item) => {
+      const unitSuffix = item?.unit ? ` ${item.unit}` : ''
+      const actionLabel = item?.resolution === 'PRODUCTION' ? 'Buat SPK' : 'Ajukan purchasing'
+      return `- ${item?.productName || 'Produk'}: kurang ${formatStockQuantity(Number(item?.shortageQty || 0))}${unitSuffix} -> ${actionLabel}`
+    })
+
+    return `${shortageLines.length > 0 ? `${shortageLines.join('\n')}\n\n` : ''}Buat ${actionParts.join(' dan ') || 'tindak lanjut stok'} otomatis sekarang?`
   }
 
   const handleOpenPayment = (sale: any) => {
@@ -593,7 +961,7 @@ export default function SalesClient({
   }
 
   const stats = {
-    omzetMonth: sales.filter((s: any) => s.status !== 'VOIDED' && s.sale_date.startsWith(new Date().toISOString().slice(0, 7))).reduce((sum: number, s: any) => sum + s.grand_total, 0),
+    omzetMonth: sales.filter((s: any) => s.status !== 'VOIDED' && normalizeDateInputValue(s.sale_date).startsWith(new Date().toISOString().slice(0, 7))).reduce((sum: number, s: any) => sum + s.grand_total, 0),
     receivables: sales.filter((s: any) => s.status === 'FINISHED' && s.payment_status !== 'PAID').reduce((sum: number, s: any) => {
       const activeReturns = s.sales_returns?.filter((r: any) => r.status !== 'VOIDED') || []
       const ret = activeReturns.reduce((acc: number, r: any) => acc + Number(r.grand_total), 0) || 0
@@ -603,6 +971,43 @@ export default function SalesClient({
     newInvoices: sales.filter((s: any) => s.status === 'DRAFT' || s.status === 'ORDERED').length,
     customerCount: customers.length
   }
+  const selectedReturnLineSubtotal = selectedSaleForReturn
+    ? selectedSaleForReturn.sales_items.reduce((acc: number, it: any) => acc + (Number(it.quantity || 0) * Number(it.unit_price || 0)), 0)
+    : 0
+  const selectedReturnStoredTaxBreakdown = normalizeStoredSalesTaxBreakdown(
+    selectedSaleForReturn?.tax_breakdown,
+    selectedReturnLineSubtotal,
+    selectedSaleForReturn?.discount_amount,
+    selectedSaleForReturn?.tax_amount
+  )
+  const selectedReturnBaseAmount = selectedSaleForReturn
+    ? selectedSaleForReturn.sales_items.reduce((acc: number, it: any) => acc + ((returnQuantities[it.id] || 0) * it.unit_price), 0)
+    : 0
+  const selectedReturnTaxBreakdown = calculateSalesTaxBreakdown(
+    selectedReturnBaseAmount,
+    getSalesTaxConfigFromBreakdown(selectedReturnStoredTaxBreakdown)
+  )
+  const selectedReturnTaxRows = getActiveSalesTaxRows(selectedReturnTaxBreakdown)
+  const selectedReturnTaxAmount = getSalesTaxTotal(selectedReturnTaxBreakdown)
+  const selectedReturnGrandTotal = selectedReturnBaseAmount + selectedReturnTaxAmount
+  const viewSaleLineSubtotal = viewSale
+    ? viewSale.sales_items?.reduce((acc: number, item: any) => acc + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0) || 0
+    : 0
+  const viewSaleOtherChargeInputs = normalizeStoredOtherChargeInputs(
+    viewSale?.other_charge_breakdown,
+    viewSale?.other_charge_amount
+  )
+  const viewSaleTaxBreakdown = normalizeStoredSalesTaxBreakdown(
+    viewSale?.tax_breakdown,
+    viewSaleLineSubtotal,
+    viewSale?.discount_amount,
+    viewSale?.tax_amount
+  )
+  const viewSaleTaxRows = getActiveSalesTaxRows(viewSaleTaxBreakdown)
+  const viewSaleOtherChargeRows = calculateOtherChargeLines(
+    Math.max(0, viewSaleLineSubtotal - roundMoneyValue(viewSale?.discount_amount)),
+    viewSaleOtherChargeInputs
+  ).filter((line) => line.value > 0 || line.amount > 0)
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto pb-24">
@@ -700,7 +1105,10 @@ export default function SalesClient({
                        <button onClick={() => setViewSale(s)} className="text-xs font-black text-blue-600 tracking-tighter hover:underline">
                          {s.sale_number}
                        </button>
-                       <div className="text-[10px] font-bold text-slate-400 mt-1">{s.sale_date}</div>
+                       <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(s.sale_date, 'short')}</div>
+                       <div className="text-[10px] font-bold text-slate-500 mt-1">
+                         Diproses: <span className="text-slate-700">{s.processor_name || '-'}</span>
+                       </div>
                     </td>
                     <td className="px-8 py-6">
                        <div className="text-sm font-bold text-slate-900">{s.contacts?.name || 'Unknown Client'}</div>
@@ -846,10 +1254,11 @@ export default function SalesClient({
                     <div className="flex-1 space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Mode Transaksi</label>
                       <select value={shariahMode} onChange={(e) => setShariahMode(e.target.value as any)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-black text-blue-600 shadow-sm focus:border-blue-500 transition-all">
-                         <option value="CASH">PENJUALAN LANGSUNG (CASH)</option>
-                         <option value="SALAM">PENJUALAN SALAM (BAYAR DEPAN)</option>
-                         <option value="ISTISHNA">PENJUALAN ISTISHNA (PESANAN/DP)</option>
+                         <option value="CASH">PENJUALAN LANGSUNG / STOK SIAP</option>
+                         {shariahMode === 'SALAM' && <option value="SALAM">PENJUALAN SALAM (OTOMATIS)</option>}
+                         <option value="ISTISHNA">PENJUALAN ISTISHNA (PESANAN PRODUKSI)</option>
                       </select>
+                      {shariahMode === 'CASH' && <p className="text-[9px] font-bold text-slate-500 italic mt-1 leading-tight px-1">* Jika stok kurang, sistem akan otomatis menetapkan SALAM atau ISTISHNA berdasarkan ada/tidaknya BoM aktif.</p>}
                       {shariahMode === 'SALAM' && <p className="text-[9px] font-bold text-indigo-500 italic mt-1 leading-tight px-1">* Uang diterima lunas di awal, barang baru dikirim pada waktu yang ditentukan.</p>}
                       {shariahMode === 'ISTISHNA' && <p className="text-[9px] font-bold text-indigo-500 italic mt-1 leading-tight px-1">* Pesanan manufaktur/konstruksi, pembayaran boleh dicicil di awal.</p>}
                     </div>
@@ -894,9 +1303,9 @@ export default function SalesClient({
                       <input type="date" required value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-blue-500 transition-all" />
                     </div>
 
-                    {(paymentTerm === 'TEMPO' || shariahMode === 'SALAM') && (
+                    {(paymentTerm === 'TEMPO' || shariahMode === 'SALAM' || shariahMode === 'ISTISHNA') && (
                        <div className="w-full md:w-40 space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                         <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block px-1">{shariahMode === 'SALAM' ? 'Jatuh Tempo Kirim' : 'Jatuh Tempo'}</label>
+                         <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block px-1">{shariahMode === 'SALAM' || shariahMode === 'ISTISHNA' ? 'Target Kirim' : 'Jatuh Tempo'}</label>
                          <input type="date" required value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-amber-50/50 font-bold text-slate-900 shadow-sm focus:border-amber-500 transition-all" />
                        </div>
                     )}
@@ -1035,7 +1444,7 @@ export default function SalesClient({
 
                     {lines.map((line) => {
                       const isStockShortage = line.type === 'INVENTORY' && line.quantity > line.stock_available
-                      const isValidStock = !isStockShortage || shariahMode === 'SALAM'
+                      const isValidStock = !isStockShortage || shariahMode === 'SALAM' || shariahMode === 'ISTISHNA'
                       
                       return (
                       <div key={line.id} className={`grid grid-cols-1 sm:grid-cols-12 gap-2 items-start bg-white p-3 sm:p-0 border sm:border-0 ${isStockShortage ? 'border-amber-400 bg-amber-50 rounded-xl' : 'border-slate-100 rounded-xl sm:rounded-none'}`}>
@@ -1055,11 +1464,14 @@ export default function SalesClient({
                           ) : line.product_name ? (
                             <span className="text-[9px] font-bold text-purple-600 block mt-1">+ Jasa Kustom Non-Inventori</span>
                           ) : null}
-                          {isStockShortage && shariahMode !== 'SALAM' && (
-                            <span className="text-[10px] font-bold text-amber-600 block mt-1 flex items-center gap-1"><AlertCircle size={10}/> Peringatan: Melebihi Stok. Ubah ke akad SALAM untuk lanjut.</span>
+                          {isStockShortage && shariahMode !== 'SALAM' && shariahMode !== 'ISTISHNA' && (
+                            <span className="text-[10px] font-bold text-amber-600 block mt-1 flex items-center gap-1"><AlertCircle size={10}/> Stok kurang. Saat disimpan, sistem akan otomatis menetapkan ISTISHNA bila ada BoM aktif, atau SALAM bila tidak ada BoM.</span>
                           )}
                           {isStockShortage && shariahMode === 'SALAM' && (
-                            <span className="text-[10px] font-bold text-emerald-700 block mt-1 flex items-center gap-1"><CheckCircle2 size={10}/> Akad SALAM aktif: pesanan boleh dicatat, stok fisik dikurangi saat pengiriman.</span>
+                            <span className="text-[10px] font-bold text-emerald-700 block mt-1 flex items-center gap-1"><CheckCircle2 size={10}/> Akad SALAM aktif: pesanan boleh dicatat untuk barang tanpa BoM, stok fisik dikurangi saat pengiriman.</span>
+                          )}
+                          {isStockShortage && shariahMode === 'ISTISHNA' && (
+                            <span className="text-[10px] font-bold text-blue-700 block mt-1 flex items-center gap-1"><CheckCircle2 size={10}/> Akad ISTISHNA aktif: pesanan produksi boleh dicatat walau stok barang jadi belum cukup.</span>
                           )}
                         </div>
 
@@ -1115,25 +1527,201 @@ export default function SalesClient({
                      </div>
                      <div className="flex justify-between items-center text-sm font-semibold text-blue-900">
                        <div className="flex flex-col">
-                         <span>Diskon Global Faktur (Rp)</span>
-                         <span className="text-[10px] font-normal opacity-70">Otomatis dari diskon per barang, bisa ditimpa.</span>
+                         <span>Diskon Global Faktur</span>
+                         <span className="text-[10px] font-normal opacity-70">Default ikut total diskon item. Bisa diganti ke flat atau prosentase.</span>
                        </div>
-                       <CurrencyInput
-                         label=""
-                         value={customGlobalDiscount !== null ? customGlobalDiscount : autoLineDiscounts}
-                         onChange={(val) => setCustomGlobalDiscount(val)}
-                         className="!w-48 !py-2 !rounded-lg !text-right !font-bold !text-slate-900 bg-white"
-                         placeholder="0"
-                       />
+                       <div className="flex flex-col items-end gap-2">
+                         <div className="flex items-center gap-2">
+                           <div className="flex rounded-lg border border-slate-200 bg-white p-1">
+                             <button
+                               type="button"
+                               onClick={() => setCustomGlobalDiscountMode('FIXED')}
+                               className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${customGlobalDiscountMode === 'FIXED' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                             >
+                               Flat (Rp)
+                             </button>
+                             <button
+                               type="button"
+                               onClick={() => setCustomGlobalDiscountMode('PERCENT')}
+                               className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${customGlobalDiscountMode === 'PERCENT' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                             >
+                               Prosentase (%)
+                             </button>
+                           </div>
+                           {isUsingManualDiscount && (
+                             <button
+                               type="button"
+                               onClick={() => setCustomGlobalDiscount(null)}
+                               className="px-3 py-1 text-[10px] font-bold rounded-md border border-slate-200 bg-white text-slate-500 hover:text-slate-700"
+                             >
+                               Pakai Otomatis
+                             </button>
+                           )}
+                         </div>
+
+                         {customGlobalDiscountMode === 'FIXED' ? (
+                           <CurrencyInput
+                             label=""
+                             value={customGlobalDiscount ?? 0}
+                             onChange={(val) => setCustomGlobalDiscount(val)}
+                             className="!w-48 !py-2 !rounded-lg !text-right !font-bold !text-slate-900 bg-white"
+                             placeholder="0"
+                           />
+                         ) : (
+                           <input
+                             type="number"
+                             min="0"
+                             max="100"
+                             step="0.01"
+                             value={customGlobalDiscount ?? ''}
+                             onChange={(e) => setCustomGlobalDiscount(e.target.value === '' ? null : parseFloat(e.target.value) || 0)}
+                             className="w-48 px-3 py-2 border border-slate-200 rounded-lg outline-none text-right font-bold text-slate-900 bg-white"
+                             placeholder="0"
+                           />
+                         )}
+                       </div>
                      </div>
-                     <div className="flex justify-between items-center text-sm font-semibold text-blue-900">
-                       <div className="flex flex-col">
-                         <span>Pajak (PPN % Keluaran)</span>
-                         <span className="text-[10px] font-normal opacity-70">Ditagihkan ke Customer (Berpengaruh ke Piutang)</span>
+                     <div className="flex justify-between items-center text-xs font-semibold text-blue-800">
+                       <span>{isUsingManualDiscount ? 'Diskon manual yang dipakai:' : 'Diskon otomatis dari item yang dipakai:'}</span>
+                       <span>-{formatCurrency(appliedDiscount)}</span>
+                     </div>
+                     <div className="flex flex-col gap-3 text-sm font-semibold text-blue-900">
+                       <div className="flex items-start justify-between gap-4">
+                         <div className="flex flex-col">
+                           <span>Pajak Penjualan</span>
+                           <span className="text-[10px] font-normal opacity-70">Setiap pajak bisa pakai persen atau nominal tetap.</span>
+                         </div>
+                         {(calculatedTax > 0 || calculatedOtherChargeAmount > 0) && (
+                           <span className="text-xs text-blue-600 font-bold bg-white px-2 py-1 rounded-md">
+                             +{formatCurrency(calculatedTax + calculatedOtherChargeAmount)}
+                           </span>
+                         )}
                        </div>
-                       <div className="flex items-center gap-2">
-                         {calculatedTax > 0 && <span className="text-xs text-blue-600 font-bold bg-white px-2 py-1 rounded-md">+{formatCurrency(calculatedTax)}</span>}
-                         <input type="number" min="0" max="100" value={headerTaxPercent || ''} onChange={(e) => setHeaderTaxPercent(parseFloat(e.target.value) || 0)} className="w-20 px-3 py-1.5 border border-slate-200 rounded-lg outline-none text-right font-medium text-slate-700 bg-white" placeholder="0" />
+                       <div className="space-y-2">
+                         {SALES_TAX_OPTIONS.map((option) => {
+                           const taxConfig = headerTaxConfig[option.value]
+                           const taxAmount = calculatedTaxBreakdown[option.value].amount
+
+                           return (
+                             <div key={option.value} className="flex items-center justify-between gap-3 rounded-xl bg-white/80 px-3 py-2 border border-blue-100">
+                               <div className="flex min-w-0 flex-col">
+                                 <span className="text-xs font-bold text-slate-800">{option.label}</span>
+                                 <span className="text-[10px] font-normal text-slate-500 truncate">{option.helper}</span>
+                               </div>
+                               <div className="flex items-center gap-2 shrink-0">
+                                 <span className={`text-[11px] font-bold px-2 py-1 rounded-md ${taxAmount > 0 ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-400'}`}>
+                                   {taxAmount > 0 ? `+${formatCurrency(taxAmount)}` : 'Tidak aktif'}
+                                 </span>
+                                 <select
+                                   value={taxConfig.mode}
+                                   onChange={(e) => handleHeaderTaxChange(option.value, 'mode', e.target.value)}
+                                   className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none"
+                                 >
+                                   <option value="PERCENT">%</option>
+                                   <option value="FIXED">Nominal</option>
+                                 </select>
+                                 <div className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 rounded-lg">
+                                   <input
+                                     type="number"
+                                     min="0"
+                                     step="0.01"
+                                     max={taxConfig.mode === 'PERCENT' ? '100' : undefined}
+                                     value={taxConfig.value || ''}
+                                     onChange={(e) => handleHeaderTaxChange(option.value, 'value', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
+                                     className="w-20 outline-none text-right font-medium text-slate-700 bg-transparent"
+                                     placeholder="0"
+                                   />
+                                   <span className="text-xs font-bold text-slate-400">{taxConfig.mode === 'PERCENT' ? '%' : 'Rp'}</span>
+                                 </div>
+                               </div>
+                             </div>
+                           )
+                         })}
+                       </div>
+                       {activeCalculatedTaxRows.length > 0 && (
+                         <div className="space-y-1 text-xs text-blue-800">
+                           {activeCalculatedTaxRows.map((row) => (
+                             <div key={row.code} className="flex justify-between items-center">
+                               <span>{row.label} {row.mode === 'PERCENT' ? `(${row.inputValue}%)` : `(Nominal)`}</span>
+                               <span>+{formatCurrency(row.amount)}</span>
+                             </div>
+                           ))}
+                         </div>
+                       )}
+                       <div className="border-t border-blue-100 pt-3">
+                         <div className="flex items-center justify-between mb-2">
+                           <div className="flex flex-col">
+                             <span className="text-sm font-semibold text-blue-900">Biaya Lain</span>
+                             <span className="text-[10px] font-normal text-slate-500">Bisa untuk ongkir, admin, packing, atau biaya tambahan lain.</span>
+                           </div>
+                           <button
+                             type="button"
+                             onClick={handleAddOtherCharge}
+                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-bold"
+                           >
+                             <Plus size={14} />
+                             Tambah
+                           </button>
+                         </div>
+                         <div className="space-y-2">
+                           {headerOtherChargeInputs.length === 0 && (
+                             <div className="px-3 py-2 rounded-xl border border-dashed border-slate-200 text-[11px] text-slate-400 bg-white">
+                               Belum ada biaya tambahan.
+                             </div>
+                           )}
+                           {calculatedOtherChargeLines.map((line) => (
+                             <div key={line.id} className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 border border-blue-100">
+                               <input
+                                 value={line.label}
+                                 onChange={(e) => handleOtherChargeChange(line.id, 'label', e.target.value)}
+                                 placeholder="Nama biaya"
+                                 className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-slate-200 outline-none text-xs font-medium text-slate-700"
+                               />
+                               <select
+                                 value={line.mode}
+                                 onChange={(e) => handleOtherChargeChange(line.id, 'mode', e.target.value)}
+                                 className="px-2 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none"
+                               >
+                                 <option value="FIXED">Nominal</option>
+                                 <option value="PERCENT">%</option>
+                               </select>
+                               <div className="flex items-center gap-1 px-2 py-2 bg-white border border-slate-200 rounded-lg">
+                                 <input
+                                   type="number"
+                                   min="0"
+                                   max={line.mode === 'PERCENT' ? '100' : undefined}
+                                   step="0.01"
+                                   value={line.value || ''}
+                                   onChange={(e) => handleOtherChargeChange(line.id, 'value', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
+                                   className="w-20 outline-none text-right text-xs font-medium text-slate-700 bg-transparent"
+                                   placeholder="0"
+                                 />
+                                 <span className="text-xs font-bold text-slate-400">{line.mode === 'PERCENT' ? '%' : 'Rp'}</span>
+                               </div>
+                               <span className={`text-[11px] font-bold px-2 py-2 rounded-md ${line.amount > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-400'}`}>
+                                 {line.amount > 0 ? `+${formatCurrency(line.amount)}` : 'Tidak aktif'}
+                               </span>
+                               <button
+                                 type="button"
+                                 onClick={() => handleRemoveOtherCharge(line.id)}
+                                 className="p-2 rounded-lg text-rose-500 hover:bg-rose-50"
+                                 title="Hapus biaya"
+                               >
+                                 <Trash2 size={14} />
+                               </button>
+                             </div>
+                           ))}
+                         </div>
+                         {activeOtherChargeRows.length > 0 && (
+                           <div className="space-y-1 text-xs text-indigo-800 mt-2">
+                             {activeOtherChargeRows.map((line) => (
+                               <div key={line.id} className="flex justify-between items-center">
+                                 <span>{String(line.label || '').trim() || 'Biaya Lain'} {line.mode === 'PERCENT' ? `(${line.value}%)` : '(Nominal)'}</span>
+                                 <span>+{formatCurrency(line.amount)}</span>
+                               </div>
+                             ))}
+                           </div>
+                         )}
                        </div>
                      </div>
                      <div className="border-t border-blue-200 my-2"></div>
@@ -1319,21 +1907,23 @@ export default function SalesClient({
                     <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 flex flex-col gap-2 mx-6 mb-6">
                        <div className="flex justify-between items-center text-xs font-bold text-slate-500">
                          <span>Estimasi Nilai Barang (Net):</span>
-                         <span>{formatCurrency(selectedSaleForReturn.sales_items.reduce((acc: number, it: any) => acc + ((returnQuantities[it.id] || 0) * it.unit_price), 0))}</span>
+                         <span>{formatCurrency(selectedReturnBaseAmount)}</span>
                        </div>
-                       <div className="flex justify-between items-center text-xs font-bold text-amber-600">
-                         <span>Koreksi PPN (11%):</span>
-                         <span>{formatCurrency(selectedSaleForReturn.sales_items.reduce((acc: number, it: any) => acc + ((returnQuantities[it.id] || 0) * it.unit_price), 0) * 0.11)}</span>
-                       </div>
+                       {selectedReturnTaxRows.map((row) => (
+                         <div key={row.code} className="flex justify-between items-center text-xs font-bold text-amber-600">
+                           <span>Koreksi {row.label} {row.mode === 'PERCENT' ? `(${row.inputValue}%)` : '(Nominal)'}:</span>
+                           <span>{formatCurrency(row.amount)}</span>
+                         </div>
+                       ))}
                        <div className="border-t border-amber-200 my-1"></div>
                        <div className="flex justify-between items-center text-sm font-black text-slate-900 uppercase">
                          <span>{refundMode === 'AR' ? 'Total Pengurangan Piutang:' : 'Total Refund Tunai/Bank:'}</span>
-                         <span>{formatCurrency(selectedSaleForReturn.sales_items.reduce((acc: number, it: any) => acc + ((returnQuantities[it.id] || 0) * it.unit_price), 0) * 1.11)}</span>
+                         <span>{formatCurrency(selectedReturnGrandTotal)}</span>
                        </div>
                     </div>
                 </div>
                 <div className="p-6 bg-slate-50 flex items-center justify-between">
-                   <div className="text-[10px] text-slate-400 font-bold max-w-[200px]">💡 Sistem akan otomatis membalik jurnal Pendapatan, PPN, dan HPP sesuai proporsi unit.</div>
+                   <div className="text-[10px] text-slate-400 font-bold max-w-[200px]">💡 Sistem akan otomatis membalik jurnal Pendapatan, Pajak, dan HPP sesuai proporsi unit.</div>
                    <div className="flex gap-3">
                       <button onClick={() => setShowReturnModal(false)} className="px-6 py-3 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors">Batal</button>
                       <button 
@@ -1402,11 +1992,26 @@ export default function SalesClient({
                    </button>
                 </div>
                 
-                <div className="p-6 overflow-y-auto w-full print:overflow-visible print:px-0 print:py-0">
+                   <div className="p-6 overflow-y-auto w-full print:overflow-visible print:px-0 print:py-0">
                    <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
                       <div>
                          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">Customer / Klien</p>
                          <p className="font-bold text-slate-900">{viewSale.contacts?.name || 'Unknown'}</p>
+                         {printMode === 'DELIVERY_ORDER' && (
+                           <div className="mt-2 space-y-2 text-[11px] leading-relaxed">
+                             <div>
+                               <p className="font-bold text-slate-500">Alamat Customer</p>
+                               <p className="text-slate-800 whitespace-pre-line">{viewSale.contacts?.address || '-'}</p>
+                             </div>
+                             <div>
+                               <p className="font-bold text-slate-500">Telp / WA</p>
+                               <p className="text-slate-800">{viewSale.contacts?.phone || '-'}</p>
+                             </div>
+                           </div>
+                         )}
+                         <p className="mt-2 text-[11px] font-bold text-slate-500">
+                           Diproses oleh: <span className="text-slate-800">{viewSale.processor_name || '-'}</span>
+                         </p>
                          {pickRelation(viewSale.sales_resellers) && (
                            <p className="mt-2 text-[11px] font-bold text-indigo-600">
                              Reseller: {getResellerDisplayName(pickRelation(viewSale.sales_resellers))}
@@ -1414,8 +2019,17 @@ export default function SalesClient({
                          )}
                       </div>
                       <div className="text-right">
-                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">Tanggal & Status</p>
-                         <p className="font-bold text-slate-900 mb-1">{viewSale.sale_date} {viewSale.due_date ? `| Tempo: ${viewSale.due_date}` : ''}</p>
+                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1 print:text-slate-600">{printMode === 'DELIVERY_ORDER' ? 'Tanggal Dokumen' : 'Tanggal & Status'}</p>
+                         {printMode === 'DELIVERY_ORDER' ? (
+                           <>
+                             <p className="font-bold text-slate-900 mb-1">Tgl Order: {formatDate(viewSale.sale_date, 'long')}</p>
+                             <p className="mb-2 text-[11px] font-bold text-slate-500">
+                               Tgl Kirim: <span className="text-slate-800">{viewSale.delivered_at ? formatDate(viewSale.delivered_at, 'long') : 'Belum dicatat'}</span>
+                             </p>
+                           </>
+                         ) : (
+                           <p className="font-bold text-slate-900 mb-1">{formatDate(viewSale.sale_date, 'long')} {viewSale.due_date ? `| Tempo: ${formatDate(viewSale.due_date, 'long')}` : ''}</p>
+                         )}
                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border border-blue-200 bg-blue-50 text-blue-600`}>{viewSale.status === 'FINISHED' ? 'DELIVERED' : viewSale.status}</span>
                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border border-emerald-200 bg-emerald-50 text-emerald-600 ml-1 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>{viewSale.payment_status}</span>
                       </div>
@@ -1447,7 +2061,7 @@ export default function SalesClient({
                    <div className={`w-full bg-slate-50 rounded-2xl p-4 flex flex-col gap-2 shadow-inner print:shadow-none print:border print:border-slate-200 ${printMode === 'DELIVERY_ORDER' ? 'print:hidden' : ''}`}>
                       <div className="flex justify-between text-xs font-semibold text-slate-500">
                          <span>Subtotal Barang:</span>
-                         <span>{formatCurrency(viewSale.total_amount)}</span>
+                         <span>{formatCurrency(viewSaleLineSubtotal)}</span>
                       </div>
                       {viewSale.discount_amount > 0 && (
                         <div className="flex justify-between text-xs font-semibold text-rose-500">
@@ -1455,12 +2069,18 @@ export default function SalesClient({
                            <span>-{formatCurrency(viewSale.discount_amount)}</span>
                         </div>
                       )}
-                      {viewSale.tax_amount > 0 && (
-                        <div className="flex justify-between text-xs font-semibold text-slate-500">
-                           <span>PPN / Pajak:</span>
-                           <span>+{formatCurrency(viewSale.tax_amount)}</span>
+                      {viewSaleTaxRows.map((row) => (
+                        <div key={row.code} className="flex justify-between text-xs font-semibold text-slate-500">
+                           <span>{row.label}{row.mode === 'PERCENT' ? ` (${row.inputValue}%)` : ' (Nominal)'}:</span>
+                           <span>+{formatCurrency(row.amount)}</span>
                         </div>
-                      )}
+                      ))}
+                      {viewSaleOtherChargeRows.map((line) => (
+                        <div key={line.id} className="flex justify-between text-xs font-semibold text-indigo-600">
+                           <span>{String(line.label || '').trim() || 'Biaya Lain'}{line.mode === 'PERCENT' ? ` (${line.value}%)` : ' (Nominal)'}:</span>
+                           <span>+{formatCurrency(line.amount)}</span>
+                        </div>
+                      ))}
                       <div className="border-t border-slate-200 mt-2 pt-2 flex justify-between items-center">
                          <span className="font-bold text-slate-900 text-sm">TOTAL TAGIHAN (AR):</span>
                          <span className="font-black text-blue-600 text-lg">{formatCurrency(viewSale.grand_total)}</span>
@@ -1666,12 +2286,12 @@ export default function SalesClient({
       <div className="fixed bottom-8 right-8 z-[100] flex flex-col gap-2">
         <AnimatePresence>
           {error && (
-            <motion.div initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-red-50 border border-red-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-red-600 text-sm font-bold">
+            <motion.div key="sales-error-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-red-50 border border-red-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-red-600 text-sm font-bold">
               <AlertCircle size={18} /> {error}
             </motion.div>
           )}
           {success && (
-            <motion.div initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-emerald-50 border border-emerald-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
+            <motion.div key="sales-success-toast" initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }} className="bg-emerald-50 border border-emerald-100 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
               <CheckCircle2 size={18} /> {success}
             </motion.div>
           )}

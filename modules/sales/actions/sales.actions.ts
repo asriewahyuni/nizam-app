@@ -4,7 +4,15 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/branch-access.server'
 import { getResellerCommissionSnapshot } from '@/modules/sales/actions/commission.actions'
-import { ensureSellableBranchStockAvailability, shouldGuardOrderedSaleStock } from '@/modules/sales/lib/stock-guard.server'
+import {
+  calculateSalesPromoDiscount,
+  getUsableSalesPromoByCodeWithDb,
+  incrementSalesPromoUsage,
+} from '@/modules/sales/actions/promo.actions'
+import {
+  getSellableBranchStockShortages,
+} from '@/modules/sales/lib/stock-guard.server'
+import { listActiveSalesWarehouses } from '@/modules/sales/lib/warehouse-branch-compat.server'
 
 type ActiveBranchResult =
   | { branchId: string }
@@ -18,9 +26,58 @@ type InventoryRequirement = {
   productId: string
   productName: string
   requiredQty: number
+  unit: string | null
 }
 
+type DeliveryShortageResolution = 'PRODUCTION' | 'PURCHASING'
+
+type DeliveryShortage = {
+  productId: string
+  productName: string
+  requiredQty: number
+  availableQty: number
+  shortageQty: number
+  unit: string | null
+  bomId: string | null
+  resolution: DeliveryShortageResolution
+}
+
+type DeliveryStockCheckResult =
+  | { success: true }
+  | { error: string; shortages: DeliveryShortage[] }
+
+type AutoSaleShariahResolutionResult =
+  | { mode: 'SALAM' | 'ISTISHNA' | null }
+  | { error: string }
+
 const STOCK_EPSILON = 0.000001
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Normalize low-level delivery RPC failures into user-facing sales messages.
+ * This prevents duplicate delivery journals from surfacing as raw SQL errors.
+ */
+function getSalesDeliveryRpcErrorMessage(error: { message?: string | null; code?: string | null } | null | undefined) {
+  const code = String(error?.code || '').trim()
+  const rawMessage = String(error?.message || '').trim()
+  const normalizedMessage = rawMessage.toLowerCase()
+
+  if (
+    code === '23505'
+    && (
+      normalizedMessage.includes('uq_journal_ref_per_org')
+      || (normalizedMessage.includes('duplicate key') && normalizedMessage.includes('journal'))
+    )
+  ) {
+    return 'Sales ini sudah memiliki jurnal delivery. Sistem menolak membuat jurnal SALE ganda. Muat ulang data; jika status sales masih belum selesai, rekonsiliasi jurnal delivery lama terlebih dahulu.'
+  }
+
+  if (!rawMessage) {
+    return 'Gagal memproses delivery sales.'
+  }
+
+  return `Gagal memproses delivery sales: ${rawMessage}`
+}
 
 function formatQuantity(value: number): string {
   if (!Number.isFinite(value)) return '0'
@@ -31,12 +88,283 @@ function formatQuantity(value: number): string {
     : rounded.toFixed(6).replace(/\.?0+$/, '')
 }
 
+function buildSaleShortageMarker(saleId: string, productId: string) {
+  return `[AUTO_SO_SHORTAGE:${saleId}:${productId}]`
+}
+
+async function reserveUniqueWorkOrderNumber(
+  supabase: any,
+  orgId: string,
+  baseNumber: string
+) {
+  for (let attempt = 0; attempt < 25; attempt += 1) {
+    const candidate = attempt === 0 ? baseNumber : `${baseNumber}-${attempt + 1}`
+    const { data, error } = await (supabase as any)
+      .from('production_work_orders')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('wo_number', candidate)
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      return { error: 'Gagal menyiapkan nomor SPK otomatis: ' + error.message }
+    }
+
+    if (!data?.id) {
+      return { woNumber: candidate }
+    }
+  }
+
+  return { woNumber: `${baseNumber}-${Date.now().toString().slice(-4)}` }
+}
+
+/**
+ * Convert DB date values into stable YYYY-MM-DD strings for client components.
+ * Raw postgres results may surface `date` columns as `Date` objects.
+ */
+function normalizeDateOnlyValue(value: unknown): string | null {
+  if (!value) return null
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    if (DATE_ONLY_PATTERN.test(trimmed)) return trimmed
+
+    const parsed = new Date(trimmed)
+    if (Number.isNaN(parsed.getTime())) return null
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+  }
+
+  const normalized = String(value).trim()
+  if (!normalized) return null
+  if (DATE_ONLY_PATTERN.test(normalized)) return normalized
+
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) return null
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * Convert timestamp-like values into ISO strings that are safe to pass to client components.
+ */
+function normalizeDateTimeValue(value: unknown): string | null {
+  if (!value) return null
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+
+    const parsed = new Date(trimmed)
+    if (Number.isNaN(parsed.getTime())) return null
+    return parsed.toISOString()
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null
+    return value.toISOString()
+  }
+
+  const normalized = String(value).trim()
+  if (!normalized) return null
+
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString()
+}
+
 function normalizeShariahMode(value?: string | null): string {
   const normalized = String(value || '')
     .trim()
     .toUpperCase()
   if (normalized === 'SALAM' || normalized === 'ISTISHNA') return normalized
   return 'CASH'
+}
+
+type SalesAdjustmentMode = 'FIXED' | 'PERCENT'
+type NormalizedSalesTaxBreakdown = Record<'PPN' | 'PPH_21' | 'PPH_23' | 'PAJAK_DAERAH', {
+  mode: SalesAdjustmentMode
+  value: number
+  amount: number
+}>
+type NormalizedSalesOtherChargeLine = {
+  label: string
+  mode: SalesAdjustmentMode
+  value: number
+  amount: number
+}
+const DEFAULT_SALES_ADJUSTMENT_MODE: SalesAdjustmentMode = 'PERCENT'
+
+function roundSalesTaxValue(value: unknown): number {
+  const normalized = Number(value || 0)
+  if (!Number.isFinite(normalized)) return 0
+  return Number(Math.max(0, normalized).toFixed(2))
+}
+
+function normalizeSalesAdjustmentMode(value: unknown): SalesAdjustmentMode {
+  return String(value || '').trim().toUpperCase() === 'FIXED' ? 'FIXED' : 'PERCENT'
+}
+
+function normalizeSalesTaxPercent(value: unknown): number {
+  const normalized = Number(value || 0)
+  if (!Number.isFinite(normalized) || normalized <= 0) return 0
+  return Number(Math.min(100, Math.max(0, normalized)).toFixed(2))
+}
+
+function normalizeSalesAdjustmentValue(mode: SalesAdjustmentMode, value: unknown): number {
+  return mode === 'PERCENT' ? normalizeSalesTaxPercent(value) : roundSalesTaxValue(value)
+}
+
+function calculateSalesAdjustmentAmount(baseAmount: number, mode: SalesAdjustmentMode, value: unknown): number {
+  const normalizedValue = normalizeSalesAdjustmentValue(mode, value)
+  if (normalizedValue <= 0) return 0
+  if (mode === 'PERCENT') {
+    return roundSalesTaxValue((Math.max(0, baseAmount) * normalizedValue) / 100)
+  }
+  return roundSalesTaxValue(normalizedValue)
+}
+
+function createEmptySalesTaxBreakdown(): NormalizedSalesTaxBreakdown {
+  return {
+    PPN: { mode: DEFAULT_SALES_ADJUSTMENT_MODE, value: 0, amount: 0 },
+    PPH_21: { mode: DEFAULT_SALES_ADJUSTMENT_MODE, value: 0, amount: 0 },
+    PPH_23: { mode: DEFAULT_SALES_ADJUSTMENT_MODE, value: 0, amount: 0 },
+    PAJAK_DAERAH: { mode: DEFAULT_SALES_ADJUSTMENT_MODE, value: 0, amount: 0 },
+  }
+}
+
+function getSalesTaxBreakdownTotal(taxBreakdown: NormalizedSalesTaxBreakdown): number {
+  return roundSalesTaxValue(
+    taxBreakdown.PPN.amount +
+    taxBreakdown.PPH_21.amount +
+    taxBreakdown.PPH_23.amount +
+    taxBreakdown.PAJAK_DAERAH.amount
+  )
+}
+
+function normalizeSalesTaxBreakdown(
+  value: unknown,
+  taxableAmount: number,
+  fallbackTaxAmount?: unknown
+): NormalizedSalesTaxBreakdown {
+  const safeTaxableAmount = roundSalesTaxValue(taxableAmount)
+  const normalizedBreakdown = createEmptySalesTaxBreakdown()
+
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const source = value as Record<string, unknown>
+    let hasActiveTax = false
+
+    for (const taxType of ['PPN', 'PPH_21', 'PPH_23', 'PAJAK_DAERAH'] as const) {
+      const rawEntry = source[taxType]
+      if (!rawEntry || typeof rawEntry !== 'object' || Array.isArray(rawEntry)) continue
+
+      const entry = rawEntry as Record<string, unknown>
+      const mode = normalizeSalesAdjustmentMode(
+        entry.mode ?? (Number(entry.percent || 0) > 0 ? 'PERCENT' : 'FIXED')
+      )
+      const normalizedValue = normalizeSalesAdjustmentValue(
+        mode,
+        entry.value ?? (mode === 'PERCENT' ? entry.percent : entry.amount)
+      )
+      const amount = roundSalesTaxValue(
+        entry.amount ?? calculateSalesAdjustmentAmount(safeTaxableAmount, mode, normalizedValue)
+      )
+
+      normalizedBreakdown[taxType] = { mode, value: normalizedValue, amount }
+      if (normalizedValue > 0 || amount > 0) {
+        hasActiveTax = true
+      }
+    }
+
+    if (hasActiveTax) {
+      return normalizedBreakdown
+    }
+  }
+
+  const safeFallbackTaxAmount = roundSalesTaxValue(fallbackTaxAmount)
+  if (safeFallbackTaxAmount > 0) {
+    normalizedBreakdown.PPN = {
+      mode: safeTaxableAmount > 0 ? 'PERCENT' : 'FIXED',
+      value: safeTaxableAmount > 0 ? roundSalesTaxValue((safeFallbackTaxAmount / safeTaxableAmount) * 100) : safeFallbackTaxAmount,
+      amount: safeFallbackTaxAmount,
+    }
+  }
+
+  return normalizedBreakdown
+}
+
+function getSalesOtherChargeTotal(lines: NormalizedSalesOtherChargeLine[]): number {
+  return roundSalesTaxValue(lines.reduce((sum, line) => sum + Number(line.amount || 0), 0))
+}
+
+function normalizeSalesOtherChargeBreakdown(
+  value: unknown,
+  baseAmount: number,
+  fallbackOtherChargeAmount?: unknown
+): NormalizedSalesOtherChargeLine[] {
+  if (Array.isArray(value)) {
+    const normalizedLines = value.flatMap((entry) => {
+      if (!entry || typeof entry !== 'object') return []
+
+      const rawEntry = entry as Record<string, unknown>
+      const mode = normalizeSalesAdjustmentMode(rawEntry.mode)
+      const normalizedValue = normalizeSalesAdjustmentValue(
+        mode,
+        rawEntry.value ?? (mode === 'PERCENT' ? rawEntry.percent : rawEntry.amount)
+      )
+      const amount = roundSalesTaxValue(
+        rawEntry.amount ?? calculateSalesAdjustmentAmount(baseAmount, mode, normalizedValue)
+      )
+
+      if (normalizedValue <= 0 && amount <= 0) return []
+
+      return [{
+        label: String(rawEntry.label || '').trim() || 'Biaya Lain',
+        mode,
+        value: normalizedValue,
+        amount,
+      }]
+    })
+
+    if (normalizedLines.length > 0) {
+      return normalizedLines
+    }
+  }
+
+  const safeFallbackOtherChargeAmount = roundSalesTaxValue(fallbackOtherChargeAmount)
+  if (safeFallbackOtherChargeAmount > 0) {
+    return [{
+      label: 'Biaya Lain',
+      mode: 'FIXED',
+      value: safeFallbackOtherChargeAmount,
+      amount: safeFallbackOtherChargeAmount,
+    }]
+  }
+
+  return []
+}
+
+function calculateConfiguredHeaderDiscount(baseAmount: number, mode: unknown, value: unknown): number {
+  const normalizedBase = Math.max(0, Number(baseAmount || 0))
+  const normalizedValue = Math.max(0, Number(value || 0))
+  if (!Number.isFinite(normalizedBase) || !Number.isFinite(normalizedValue) || normalizedBase <= 0 || normalizedValue <= 0) {
+    return 0
+  }
+
+  const normalizedMode = String(mode || '').trim().toUpperCase() === 'PERCENT' ? 'PERCENT' : 'FIXED'
+  if (normalizedMode === 'PERCENT') {
+    return Math.min(
+      normalizedBase,
+      Math.round(normalizedBase * (Math.min(100, normalizedValue) / 100))
+    )
+  }
+
+  return Math.min(normalizedBase, Math.round(normalizedValue))
 }
 
 function isSalamMode(value?: string | null): boolean {
@@ -48,8 +376,16 @@ async function ensureCreateSaleStockAvailability(
   orgId: string,
   branchId: string,
   lines: Array<{ product_id?: string | null; product_name?: string | null; quantity?: number }>
-): Promise<{ success: true } | { error: string }> {
-  return ensureSellableBranchStockAvailability(supabase, {
+): Promise<{ shortages: Array<{
+  productId: string
+  productName: string
+  requiredQty: number
+  onHandQty: number
+  reservedQty: number
+  sellableQty: number
+  shortageQty: number
+}> } | { error: string }> {
+  return getSellableBranchStockShortages(supabase, {
     orgId,
     branchId,
     lines,
@@ -59,6 +395,157 @@ async function ensureCreateSaleStockAvailability(
 function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return (value[0] as T | undefined) ?? null
   return (value as T | null) ?? null
+}
+
+async function getPreferredProductionBomByProduct(
+  supabase: any,
+  orgId: string,
+  branchId: string,
+  productIds: string[]
+): Promise<{ bomByProduct: Map<string, { id: string; branchId: string | null }> } | { error: string }> {
+  const normalizedProductIds = [...new Set(productIds.map((productId) => String(productId || '').trim()).filter(Boolean))]
+  if (!normalizedProductIds.length) {
+    return { bomByProduct: new Map() }
+  }
+
+  const { data: bomRows, error: bomError } = await (supabase as any)
+    .from('production_boms')
+    .select('id, product_id, branch_id')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .in('product_id', normalizedProductIds)
+    .or(`branch_id.is.null,branch_id.eq.${branchId}`)
+
+  if (bomError) {
+    return { error: 'Gagal membaca BoM aktif: ' + bomError.message }
+  }
+
+  const preferredBomByProduct = new Map<string, { id: string; branchId: string | null }>()
+  for (const row of (bomRows as any[]) || []) {
+    const productId = String((row as any).product_id || '').trim()
+    if (!productId) continue
+
+    const branchSpecificBom = String((row as any).branch_id || '').trim() || null
+    const existing = preferredBomByProduct.get(productId)
+    if (!existing || (!existing.branchId && branchSpecificBom === branchId)) {
+      preferredBomByProduct.set(productId, {
+        id: String((row as any).id || ''),
+        branchId: branchSpecificBom,
+      })
+    }
+  }
+
+  return { bomByProduct: preferredBomByProduct }
+}
+
+async function ensureIstishnaLinesHaveActiveBom(
+  supabase: any,
+  orgId: string,
+  branchId: string,
+  lines: Array<{ product_id?: string | null; product_name?: string | null; quantity?: number }>
+): Promise<{ success: true } | { error: string }> {
+  const normalizedProductIds = [...new Set(
+    (lines || [])
+      .map((line) => String(line?.product_id || '').trim())
+      .filter(Boolean)
+  )]
+
+  if (!normalizedProductIds.length) {
+    return { error: 'Akad ISTISHNA hanya bisa dipakai untuk produk master yang punya BoM aktif.' }
+  }
+
+  const { data: productRows, error: productError } = await (supabase as any)
+    .from('products')
+    .select('id, name, type')
+    .eq('org_id', orgId)
+    .in('id', normalizedProductIds)
+
+  if (productError) {
+    return { error: 'Gagal memvalidasi produk ISTISHNA: ' + productError.message }
+  }
+
+  const inventoryProducts = ((productRows as any[]) || []).filter(
+    (product) => String((product as any).type || 'INVENTORY').toUpperCase() === 'INVENTORY'
+  )
+
+  if (!inventoryProducts.length) {
+    return { error: 'Akad ISTISHNA hanya berlaku untuk produk inventori yang diproduksi melalui BoM.' }
+  }
+
+  const bomLookup = await getPreferredProductionBomByProduct(
+    supabase,
+    orgId,
+    branchId,
+    inventoryProducts.map((product) => String((product as any).id || ''))
+  )
+  if ('error' in bomLookup) return bomLookup
+
+  const missingBomProducts = inventoryProducts.filter(
+    (product) => !bomLookup.bomByProduct.has(String((product as any).id || ''))
+  )
+
+  if (!missingBomProducts.length) {
+    return { success: true }
+  }
+
+  const firstMissing = String((missingBomProducts[0] as any).name || 'produk').trim() || 'produk'
+  const extraCount = missingBomProducts.length - 1
+  const extraInfo = extraCount > 0 ? ` Ada ${extraCount} produk lain yang juga belum punya BoM aktif.` : ''
+
+  return {
+    error: `Akad ISTISHNA hanya bisa dipakai untuk produk dengan BoM aktif. Lengkapi BoM untuk "${firstMissing}" terlebih dahulu.${extraInfo}`,
+  }
+}
+
+async function resolveAutomaticSaleShariahModeForShortage(
+  supabase: any,
+  orgId: string,
+  branchId: string,
+  lines: Array<{ product_id?: string | null; product_name?: string | null; quantity?: number }>
+): Promise<AutoSaleShariahResolutionResult> {
+  const stockCheck = await ensureCreateSaleStockAvailability(supabase, orgId, branchId, lines)
+  if ('error' in stockCheck) return stockCheck
+
+  if (!stockCheck.shortages.length) {
+    return { mode: null }
+  }
+
+  const reservedShortage = stockCheck.shortages.find((shortage) => shortage.reservedQty > STOCK_EPSILON)
+  if (reservedShortage) {
+    return {
+      error: `Stok produk "${reservedShortage.productName}" tidak cukup. Stok fisik ${formatQuantity(
+        reservedShortage.onHandQty
+      )}, sudah dialokasikan ke SO lain ${formatQuantity(
+        reservedShortage.reservedQty
+      )}, tersedia dijual ${formatQuantity(Math.max(
+        0,
+        reservedShortage.sellableQty
+      ))}, permintaan ${formatQuantity(reservedShortage.requiredQty)}.`,
+    }
+  }
+
+  const bomLookup = await getPreferredProductionBomByProduct(
+    supabase,
+    orgId,
+    branchId,
+    stockCheck.shortages.map((shortage) => shortage.productId)
+  )
+  if ('error' in bomLookup) return bomLookup
+
+  const shortagesWithBom = stockCheck.shortages.filter((shortage) => bomLookup.bomByProduct.has(shortage.productId))
+  const shortagesWithoutBom = stockCheck.shortages.filter((shortage) => !bomLookup.bomByProduct.has(shortage.productId))
+
+  if (shortagesWithBom.length && shortagesWithoutBom.length) {
+    const productionProduct = shortagesWithBom[0]
+    const salamProduct = shortagesWithoutBom[0]
+    return {
+      error: `SO ini mencampur produk yang harus diproduksi dan yang harus dipesan tanpa produksi. Produk "${productionProduct.productName}" harus memakai akad ISTISHNA karena punya BoM aktif, sedangkan "${salamProduct.productName}" harus memakai akad SALAM karena tidak punya BoM. Pisahkan ke SO terpisah.`,
+    }
+  }
+
+  return {
+    mode: shortagesWithBom.length ? 'ISTISHNA' : 'SALAM',
+  }
 }
 
 function isRpcFunctionNotFound(
@@ -119,6 +606,79 @@ function omitSalesCommissionColumns<T extends Record<string, unknown>>(
   return rest
 }
 
+function isSalesTaxBreakdownColumnSchemaCacheMiss(
+  error: { code?: string | null; message?: string | null } | null | undefined
+): boolean {
+  if (!error) return false
+
+  const code = String(error.code || '')
+  const message = String(error.message || '').toLowerCase()
+  const touchesTaxBreakdownColumn = message.includes(`'tax_breakdown'`) || message.includes('tax_breakdown')
+
+  if (code === 'PGRST204' || code === '42703') {
+    return touchesTaxBreakdownColumn || message.includes('schema cache')
+  }
+
+  return (
+    touchesTaxBreakdownColumn &&
+    (
+      message.includes('schema cache')
+      || message.includes('column')
+      || message.includes('undefined column')
+    )
+  )
+}
+
+function isSalesOtherChargeColumnSchemaCacheMiss(
+  error: { code?: string | null; message?: string | null } | null | undefined
+): boolean {
+  if (!error) return false
+
+  const code = String(error.code || '')
+  const message = String(error.message || '').toLowerCase()
+  const touchesOtherChargeColumn =
+    message.includes(`'other_charge_breakdown'`)
+    || message.includes('other_charge_breakdown')
+    || message.includes(`'other_charge_amount'`)
+    || message.includes('other_charge_amount')
+
+  if (code === 'PGRST204' || code === '42703') {
+    return touchesOtherChargeColumn || message.includes('schema cache')
+  }
+
+  return (
+    touchesOtherChargeColumn &&
+    (
+      message.includes('schema cache')
+      || message.includes('column')
+      || message.includes('undefined column')
+    )
+  )
+}
+
+function omitSalesTaxBreakdownColumn<T extends Record<string, unknown>>(
+  payload: T
+): Omit<T, 'tax_breakdown'> {
+  const {
+    tax_breakdown: _taxBreakdown,
+    ...rest
+  } = payload
+
+  return rest
+}
+
+function omitSalesOtherChargeColumns<T extends Record<string, unknown>>(
+  payload: T
+): Omit<T, 'other_charge_breakdown' | 'other_charge_amount'> {
+  const {
+    other_charge_breakdown: _otherChargeBreakdown,
+    other_charge_amount: _otherChargeAmount,
+    ...rest
+  } = payload
+
+  return rest
+}
+
 function getLegacySalesCommissionMigrationMessage() {
   return 'Database penjualan belum sinkron untuk fitur komisi reseller. Jalankan migration 1157_reseller_commission_off_invoice.sql lalu reload schema Supabase.'
 }
@@ -147,28 +707,25 @@ async function resolveDeliveryWarehouseId(
   branchId: string,
   explicitWarehouseId?: string | null
 ): Promise<DeliveryWarehouseResult> {
-  const query = (supabase as any)
-    .from('warehouses')
-    .select('id, name, branch_id')
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .eq('branch_id', branchId)
+  const warehousesResult = await listActiveSalesWarehouses(supabase, orgId, branchId, {
+    warehouseId: explicitWarehouseId,
+    limit: explicitWarehouseId ? undefined : 2,
+  })
 
-  if (explicitWarehouseId) {
-    const { data, error } = await query.eq('id', explicitWarehouseId).maybeSingle()
-    if (error || !data) {
-      return { error: 'Gudang pengiriman tidak tersedia pada unit aktif.' }
-    }
-
-    return { warehouseId: data.id }
-  }
-
-  const { data, error } = await query.order('name', { ascending: true }).limit(2)
-  if (error) {
+  if ('error' in warehousesResult) {
     return { error: 'Gagal memuat gudang pengiriman.' }
   }
 
-  const warehouses = (data as Array<{ id: string }>) || []
+  const warehouses = warehousesResult.warehouses
+
+  if (explicitWarehouseId) {
+    if (!warehouses[0]?.id) {
+      return { error: 'Gudang pengiriman tidak tersedia pada unit aktif.' }
+    }
+
+    return { warehouseId: warehouses[0].id }
+  }
+
   if (warehouses.length === 0) {
     return { error: 'Belum ada gudang aktif di unit ini. Tambahkan gudang terlebih dahulu.' }
   }
@@ -187,7 +744,7 @@ async function getSaleInventoryRequirements(
 ): Promise<{ requirements: InventoryRequirement[] } | { error: string }> {
   const { data: rows, error } = await (supabase as any)
     .from('sales_items')
-    .select('product_id, quantity, products(name, type)')
+    .select('product_id, quantity, products(name, type, unit)')
     .eq('org_id', orgId)
     .eq('sale_id', saleId)
 
@@ -197,7 +754,7 @@ async function getSaleInventoryRequirements(
 
   const requirementMap = new Map<string, InventoryRequirement>()
   for (const row of (rows as any[]) || []) {
-    const product = normalizeRelation<{ name?: string | null; type?: string | null }>((row as any).products)
+    const product = normalizeRelation<{ name?: string | null; type?: string | null; unit?: string | null }>((row as any).products)
     const productType = String(product?.type || 'INVENTORY').toUpperCase()
     if (productType !== 'INVENTORY') continue
 
@@ -217,6 +774,7 @@ async function getSaleInventoryRequirements(
       productId,
       productName: String(product?.name || productId),
       requiredQty: qty,
+      unit: String(product?.unit || '').trim() || null,
     })
   }
 
@@ -226,9 +784,10 @@ async function getSaleInventoryRequirements(
 async function ensureDeliveryStockAvailability(
   supabase: any,
   orgId: string,
+  branchId: string,
   warehouseId: string,
   requirements: InventoryRequirement[]
-): Promise<{ success: true } | { error: string }> {
+): Promise<DeliveryStockCheckResult> {
   if (!requirements.length) return { success: true }
 
   const productIds = requirements.map((item) => item.productId)
@@ -240,7 +799,7 @@ async function ensureDeliveryStockAvailability(
     .in('product_id', productIds)
 
   if (error) {
-    return { error: 'Gagal memvalidasi stok gudang: ' + error.message }
+    return { error: 'Gagal memvalidasi stok gudang: ' + error.message, shortages: [] }
   }
 
   const availableByProduct: Record<string, number> = {}
@@ -250,27 +809,77 @@ async function ensureDeliveryStockAvailability(
     availableByProduct[productId] = (availableByProduct[productId] || 0) + Number((row as any).quantity || 0)
   }
 
-  const shortages = requirements
+  const shortageCandidates = requirements
     .map((item) => {
       const availableQty = Number(availableByProduct[item.productId] || 0)
       return {
         ...item,
         availableQty,
-        shortage: item.requiredQty - availableQty,
+        shortageQty: item.requiredQty - availableQty,
       }
     })
-    .filter((item) => item.shortage > STOCK_EPSILON)
+    .filter((item) => item.shortageQty > STOCK_EPSILON)
 
-  if (!shortages.length) return { success: true }
+  if (!shortageCandidates.length) return { success: true }
+
+  const { data: bomRows, error: bomError } = await (supabase as any)
+    .from('production_boms')
+    .select('id, product_id, branch_id')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .in('product_id', shortageCandidates.map((item) => item.productId))
+    .or(`branch_id.is.null,branch_id.eq.${branchId}`)
+
+  if (bomError) {
+    return { error: 'Gagal menentukan tindak lanjut stok kurang: ' + bomError.message, shortages: [] }
+  }
+
+  const preferredBomByProduct = new Map<string, { id: string; branchId: string | null }>()
+  for (const row of (bomRows as any[]) || []) {
+    const productId = String((row as any).product_id || '')
+    if (!productId) continue
+
+    const branchSpecificBom = String((row as any).branch_id || '') || null
+    const existing = preferredBomByProduct.get(productId)
+    if (!existing || (!existing.branchId && branchSpecificBom === branchId)) {
+      preferredBomByProduct.set(productId, {
+        id: String((row as any).id || ''),
+        branchId: branchSpecificBom,
+      })
+    }
+  }
+
+  const shortages: DeliveryShortage[] = shortageCandidates.map((item) => {
+    const preferredBom = preferredBomByProduct.get(item.productId)
+    return {
+      productId: item.productId,
+      productName: item.productName,
+      requiredQty: item.requiredQty,
+      availableQty: item.availableQty,
+      shortageQty: item.shortageQty,
+      unit: item.unit,
+      bomId: preferredBom?.id || null,
+      resolution: preferredBom?.id ? 'PRODUCTION' : 'PURCHASING',
+    }
+  })
 
   const first = shortages[0]
+  const quantitySuffix = first.unit ? ` ${first.unit}` : ''
+  const guidance =
+    first.resolution === 'PRODUCTION'
+      ? ' Produk ini punya BoM aktif. Buat SPK produksi terlebih dahulu sebelum pengiriman.'
+      : ' Produk ini tidak punya BoM aktif. Ajukan purchase request terlebih dahulu sebelum pengiriman.'
+  const additionalShortageInfo =
+    shortages.length > 1 ? ` Ada ${shortages.length - 1} produk lain yang juga kurang stok.` : ''
+
   return {
     error: `Stok tidak cukup untuk produk "${first.productName}". Dibutuhkan ${formatQuantity(
       first.requiredQty
     )}, tersedia ${formatQuantity(Math.max(
       0,
       first.availableQty
-    ))}. Penjualan tidak boleh melebihi stok (kecuali akad SALAM).`,
+    ))}, kurang ${formatQuantity(first.shortageQty)}${quantitySuffix}.${guidance}${additionalShortageInfo}`,
+    shortages,
   }
 }
 
@@ -304,6 +913,52 @@ async function adjustInventoryStockCompat(
   return { success: true as const }
 }
 
+function isStockMovementsWarehouseColumnMissing(
+  error: { code?: string | null; message?: string | null } | null | undefined
+) {
+  if (!error) return false
+
+  const message = String(error.message || '')
+  const normalized = message.toLowerCase()
+
+  return (
+    error.code === '42703' ||
+    error.code === 'PGRST204' ||
+    (
+      normalized.includes('stock_movements') &&
+      normalized.includes('warehouse_id') &&
+      (
+        normalized.includes('does not exist') ||
+        normalized.includes('could not find')
+      )
+    )
+  )
+}
+
+async function insertStockMovementsCompat(supabase: any, movements: any[]) {
+  if (!Array.isArray(movements) || movements.length === 0) {
+    return { success: true as const }
+  }
+
+  const { error: insertError } = await (supabase as any).from('stock_movements').insert(movements)
+  if (!insertError) {
+    return { success: true as const }
+  }
+
+  if (!isStockMovementsWarehouseColumnMissing(insertError)) {
+    return { error: insertError.message }
+  }
+
+  const legacyCompatibleMovements = movements.map(({ warehouse_id: _warehouseId, ...movement }) => movement)
+  const { error: fallbackError } = await (supabase as any).from('stock_movements').insert(legacyCompatibleMovements)
+
+  if (fallbackError) {
+    return { error: fallbackError.message }
+  }
+
+  return { success: true as const }
+}
+
 async function fallbackVoidSaleWithoutRpc(
   supabase: any,
   args: {
@@ -316,7 +971,7 @@ async function fallbackVoidSaleWithoutRpc(
 ) {
   const { data: stockMovements, error: movementError } = await (supabase as any)
     .from('stock_movements')
-    .select('product_id, quantity')
+    .select('branch_id, warehouse_id, product_id, quantity, unit_price, notes')
     .eq('org_id', args.orgId)
     .eq('reference_type', 'SALE')
     .eq('reference_id', args.saleId)
@@ -358,6 +1013,25 @@ async function fallbackVoidSaleWithoutRpc(
       if ('error' in reverseResult) {
         return { error: 'Gagal sinkronisasi stok saat membatalkan sales order: ' + reverseResult.error }
       }
+    }
+
+    const reversalMovements = ((stockMovements as any[]) || []).map((row) => ({
+      org_id: args.orgId,
+      branch_id: String((row as any).branch_id || '').trim() || args.branchId,
+      warehouse_id: String((row as any).warehouse_id || '').trim() || resolvedWarehouseId,
+      product_id: String((row as any).product_id || ''),
+      quantity: -Number((row as any).quantity || 0),
+      unit_price: Number((row as any).unit_price || 0),
+      reference_type: 'SALE_VOID',
+      reference_id: args.saleId,
+      notes: String((row as any).notes || '').trim()
+        ? `Reversal SALE ${args.saleId} | ${String((row as any).notes).trim()}`
+        : `Reversal SALE ${args.saleId}`,
+    })).filter((row) => row.product_id && Number.isFinite(row.quantity) && row.quantity !== 0)
+
+    const reversalInsert = await insertStockMovementsCompat(supabase as any, reversalMovements)
+    if ('error' in reversalInsert) {
+      return { error: 'Gagal mencatat kartu stok reversal sales: ' + reversalInsert.error }
     }
   }
 
@@ -426,8 +1100,19 @@ export async function getSales(orgId: string, branchId?: string | null) {
       SELECT
         s.*,
         c.name           AS customer_name,
+        c.address        AS customer_address,
+        COALESCE(
+          NULLIF(trim(c.phone_wa), ''),
+          NULLIF(trim(c.phone), ''),
+          NULL
+        )                AS customer_phone,
         b.name           AS branch_name,
         b.code           AS branch_code,
+        COALESCE(
+          NULLIF(trim(concat_ws(' ', emp.first_name, emp.last_name)), ''),
+          NULLIF(trim(proc_auth.display_name), ''),
+          NULL
+        )                AS processor_name,
         sr.id            AS reseller_id_val,
         sr.name          AS reseller_name,
         sr.reseller_type AS reseller_type,
@@ -436,6 +1121,14 @@ export async function getSales(orgId: string, branchId?: string | null) {
       FROM   public.sales s
       LEFT JOIN public.contacts       c  ON c.id  = s.customer_id
       LEFT JOIN public.branches       b  ON b.id  = s.branch_id
+      LEFT JOIN public.employees      emp ON emp.org_id = s.org_id AND emp.user_id = s.created_by
+      LEFT JOIN LATERAL (
+        SELECT u.display_name
+        FROM   public.internal_auth_users u
+        WHERE  u.legacy_user_id = s.created_by OR u.id = s.created_by
+        ORDER  BY CASE WHEN u.legacy_user_id = s.created_by THEN 0 ELSE 1 END, u.updated_at DESC
+        LIMIT 1
+      ) proc_auth ON TRUE
       LEFT JOIN public.sales_resellers sr ON sr.id = s.reseller_id
       WHERE  s.org_id = $1${branchFilter}
       ORDER  BY s.created_at DESC
@@ -503,11 +1196,19 @@ export async function getSales(orgId: string, branchId?: string | null) {
     const sid = String(row.id ?? '')
     return {
       ...row,
+      sale_date: normalizeDateOnlyValue(row.sale_date),
+      due_date: normalizeDateOnlyValue(row.due_date),
+      delivered_at: normalizeDateTimeValue(row.delivered_at),
       // UI expects sale.contacts?.name for the customer
-      contacts: row.customer_name ? { name: row.customer_name } : null,
+      contacts: row.customer_name ? {
+        name: row.customer_name,
+        address: String(row.customer_address || '').trim() || null,
+        phone: String(row.customer_phone || '').trim() || null,
+      } : null,
       branches: (row.branch_name || row.branch_code)
         ? { name: row.branch_name, code: row.branch_code }
         : null,
+      processor_name: String(row.processor_name || '').trim() || null,
       sales_resellers: row.reseller_name ? {
         id: row.reseller_id_val,
         name: row.reseller_name,
@@ -544,12 +1245,38 @@ export async function createSaleEntry(orgId: string, payload: any) {
     return { error: 'Customer dan minimal satu baris item wajib diisi.' }
   }
 
-  const shariahMode = normalizeShariahMode(payload.shariah_mode)
-  const salamMode = isSalamMode(shariahMode)
-  const paymentTerm = salamMode ? 'LUNAS' : (String(payload.payment_term || 'TEMPO').toUpperCase() === 'LUNAS' ? 'LUNAS' : 'TEMPO')
-  const dueDate = (paymentTerm === 'TEMPO' || salamMode) ? (payload.due_date || null) : null
+  let shariahMode = normalizeShariahMode(payload.shariah_mode)
 
-  if (createMode === 'PUBLISH' && (paymentTerm === 'TEMPO' || salamMode) && !dueDate) {
+  if (createMode === 'PUBLISH' && shariahMode === 'CASH') {
+    const autoShariahMode = await resolveAutomaticSaleShariahModeForShortage(
+      supabase as any,
+      orgId,
+      activeBranchId,
+      normalizedLines
+    )
+    if ('error' in autoShariahMode) return autoShariahMode
+
+    if (autoShariahMode.mode) {
+      shariahMode = autoShariahMode.mode
+    }
+  }
+
+  if (createMode === 'PUBLISH' && shariahMode === 'ISTISHNA') {
+    const istishnaValidation = await ensureIstishnaLinesHaveActiveBom(
+      supabase as any,
+      orgId,
+      activeBranchId,
+      normalizedLines
+    )
+    if ('error' in istishnaValidation) return istishnaValidation
+  }
+
+  const salamMode = isSalamMode(shariahMode)
+  const istishnaMode = normalizeShariahMode(shariahMode) === 'ISTISHNA'
+  const paymentTerm = salamMode ? 'LUNAS' : (String(payload.payment_term || 'TEMPO').toUpperCase() === 'LUNAS' ? 'LUNAS' : 'TEMPO')
+  const dueDate = (paymentTerm === 'TEMPO' || salamMode || istishnaMode) ? (payload.due_date || null) : null
+
+  if (createMode === 'PUBLISH' && (paymentTerm === 'TEMPO' || salamMode || istishnaMode) && !dueDate) {
     return { error: 'Tanggal jatuh tempo pengiriman wajib diisi.' }
   }
 
@@ -557,18 +1284,22 @@ export async function createSaleEntry(orgId: string, payload: any) {
     return { error: 'Akad SALAM wajib dibayar lunas (tunai) di awal.' }
   }
 
-  if (createMode === 'PUBLISH' && shouldGuardOrderedSaleStock(shariahMode)) {
-    const createStockCheck = await ensureCreateSaleStockAvailability(
-      supabase as any,
-      orgId,
-      activeBranchId,
-      normalizedLines
-    )
-    if ('error' in createStockCheck) return { error: createStockCheck.error }
-  }
-
   const totalAmount = normalizedLines.reduce((acc: number, l: any) => acc + (l.quantity * l.unit_price), 0)
-  const computedTotal = totalAmount - (payload.discount_amount || 0) + (payload.tax_amount || 0)
+  const normalizedDiscountAmount = roundSalesTaxValue(payload.discount_amount)
+  const taxableAmount = Math.max(0, totalAmount - normalizedDiscountAmount)
+  const normalizedTaxBreakdown = normalizeSalesTaxBreakdown(
+    payload.tax_breakdown,
+    taxableAmount,
+    payload.tax_amount
+  )
+  const normalizedTaxAmount = getSalesTaxBreakdownTotal(normalizedTaxBreakdown)
+  const normalizedOtherChargeBreakdown = normalizeSalesOtherChargeBreakdown(
+    payload.other_charge_breakdown,
+    taxableAmount,
+    payload.other_charge_amount
+  )
+  const normalizedOtherChargeAmount = getSalesOtherChargeTotal(normalizedOtherChargeBreakdown)
+  const computedTotal = totalAmount - normalizedDiscountAmount + normalizedTaxAmount + normalizedOtherChargeAmount
   const resellerSnapshot = await getResellerCommissionSnapshot(orgId, payload.reseller_id)
 
   if (resellerSnapshot?.error) {
@@ -583,9 +1314,12 @@ export async function createSaleEntry(orgId: string, payload: any) {
     sale_date: payload.sale_date,
     due_date: dueDate,
     payment_term: paymentTerm,
-    total_amount: totalAmount,
-    tax_amount: payload.tax_amount || 0,
-    discount_amount: payload.discount_amount || 0,
+    total_amount: totalAmount + normalizedOtherChargeAmount,
+    tax_breakdown: normalizedTaxBreakdown,
+    tax_amount: normalizedTaxAmount,
+    other_charge_breakdown: normalizedOtherChargeBreakdown,
+    other_charge_amount: normalizedOtherChargeAmount,
+    discount_amount: normalizedDiscountAmount,
     grand_total: computedTotal,
     shariah_mode: shariahMode,
     notes: payload.notes,
@@ -622,14 +1356,29 @@ export async function createSaleEntry(orgId: string, payload: any) {
       .eq('org_id', orgId)
       .eq('branch_id', activeBranchId)
 
-    if (updateSaleError && isSalesCommissionColumnSchemaCacheMiss(updateSaleError)) {
-      if (resellerSnapshot.resellerId) {
+    if (updateSaleError && (
+      isSalesCommissionColumnSchemaCacheMiss(updateSaleError)
+      || isSalesTaxBreakdownColumnSchemaCacheMiss(updateSaleError)
+      || isSalesOtherChargeColumnSchemaCacheMiss(updateSaleError)
+    )) {
+      if (resellerSnapshot.resellerId && isSalesCommissionColumnSchemaCacheMiss(updateSaleError)) {
         return { error: getLegacySalesCommissionMigrationMessage() }
+      }
+
+      let fallbackDraftPayload: Record<string, unknown> = draftPayload
+      if (isSalesCommissionColumnSchemaCacheMiss(updateSaleError)) {
+        fallbackDraftPayload = omitSalesCommissionColumns(fallbackDraftPayload)
+      }
+      if (isSalesTaxBreakdownColumnSchemaCacheMiss(updateSaleError)) {
+        fallbackDraftPayload = omitSalesTaxBreakdownColumn(fallbackDraftPayload)
+      }
+      if (isSalesOtherChargeColumnSchemaCacheMiss(updateSaleError)) {
+        fallbackDraftPayload = omitSalesOtherChargeColumns(fallbackDraftPayload)
       }
 
       const { error: fallbackUpdateError } = await (supabase as any)
         .from('sales')
-        .update(omitSalesCommissionColumns(draftPayload))
+        .update(fallbackDraftPayload)
         .eq('id', payload.draft_id)
         .eq('org_id', orgId)
         .eq('branch_id', activeBranchId)
@@ -662,14 +1411,29 @@ export async function createSaleEntry(orgId: string, payload: any) {
       .select('id')
       .single()
 
-    if (saleErr && isSalesCommissionColumnSchemaCacheMiss(saleErr)) {
-      if (resellerSnapshot.resellerId) {
+    if (saleErr && (
+      isSalesCommissionColumnSchemaCacheMiss(saleErr)
+      || isSalesTaxBreakdownColumnSchemaCacheMiss(saleErr)
+      || isSalesOtherChargeColumnSchemaCacheMiss(saleErr)
+    )) {
+      if (resellerSnapshot.resellerId && isSalesCommissionColumnSchemaCacheMiss(saleErr)) {
         return { error: getLegacySalesCommissionMigrationMessage() }
+      }
+
+      let fallbackInsertPayload: Record<string, unknown> = draftInsertPayload
+      if (isSalesCommissionColumnSchemaCacheMiss(saleErr)) {
+        fallbackInsertPayload = omitSalesCommissionColumns(fallbackInsertPayload)
+      }
+      if (isSalesTaxBreakdownColumnSchemaCacheMiss(saleErr)) {
+        fallbackInsertPayload = omitSalesTaxBreakdownColumn(fallbackInsertPayload)
+      }
+      if (isSalesOtherChargeColumnSchemaCacheMiss(saleErr)) {
+        fallbackInsertPayload = omitSalesOtherChargeColumns(fallbackInsertPayload)
       }
 
       const fallbackInsertResult = await (supabase as any)
         .from('sales')
-        .insert(omitSalesCommissionColumns(draftInsertPayload))
+        .insert(fallbackInsertPayload)
         .select('id')
         .single()
 
@@ -748,6 +1512,215 @@ export async function createSaleEntry(orgId: string, payload: any) {
   return { success: true, saleId }
 }
 
+export async function createSaleFulfillmentDrafts(
+  orgId: string,
+  saleId: string,
+  warehouseId?: string | null
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Tidak terautentikasi.' }
+
+  const activeBranchResult = await requireActiveBranchId(
+    orgId,
+    'Pilih unit aktif terlebih dahulu untuk menyiapkan tindak lanjut kekurangan stok.'
+  )
+  if ('error' in activeBranchResult) return { error: activeBranchResult.error }
+
+  const { data: sale, error: saleError } = await (supabase as any)
+    .from('sales')
+    .select('id, sale_number, due_date, warehouse_id, status')
+    .eq('id', saleId)
+    .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
+    .single()
+
+  if (saleError || !sale) {
+    return { error: 'Sales order tidak ditemukan pada unit aktif.' }
+  }
+
+  if ((sale as any).status === 'FINISHED') {
+    return { error: 'Sales order ini sudah selesai dikirim.' }
+  }
+
+  if ((sale as any).status === 'VOIDED') {
+    return { error: 'Sales order yang sudah dibatalkan tidak bisa dibuatkan tindak lanjut stok.' }
+  }
+
+  const inventoryRequirementResult = await getSaleInventoryRequirements(supabase as any, orgId, saleId)
+  if ('error' in inventoryRequirementResult) return { error: inventoryRequirementResult.error }
+  if (!inventoryRequirementResult.requirements.length) {
+    return { error: 'SO ini tidak memiliki item persediaan yang perlu ditindaklanjuti.' }
+  }
+
+  let resolvedWarehouseId: string | null = warehouseId || (sale as any).warehouse_id || null
+  const resolvedWarehouse = await resolveDeliveryWarehouseId(
+    supabase as any,
+    orgId,
+    activeBranchResult.branchId,
+    resolvedWarehouseId
+  )
+
+  if ('error' in resolvedWarehouse) {
+    return { error: resolvedWarehouse.error }
+  }
+
+  resolvedWarehouseId = resolvedWarehouse.warehouseId
+
+  const stockCheck = await ensureDeliveryStockAvailability(
+    supabase as any,
+    orgId,
+    activeBranchResult.branchId,
+    resolvedWarehouseId,
+    inventoryRequirementResult.requirements
+  )
+
+  if (!('error' in stockCheck)) {
+    return { error: 'Stok saat ini sudah cukup. Coba kirim ulang barang.' }
+  }
+
+  if (!stockCheck.shortages.length) {
+    return { error: stockCheck.error }
+  }
+
+  const saleNumber = String((sale as any).sale_number || saleId)
+  const dueDate = normalizeDateOnlyValue((sale as any).due_date)
+  let workOrdersCreated = 0
+  let workOrdersSkipped = 0
+  let purchaseRequestsCreated = 0
+  let purchaseRequestsSkipped = 0
+
+  for (const shortage of stockCheck.shortages) {
+    const marker = buildSaleShortageMarker(saleId, shortage.productId)
+    const baseNote = `${marker} Otomatis dari kekurangan stok SO ${saleNumber} untuk produk ${shortage.productName}.`
+
+    if (shortage.resolution === 'PRODUCTION' && shortage.bomId) {
+      const { data: existingWorkOrder, error: existingWorkOrderError } = await (supabase as any)
+        .from('production_work_orders')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('branch_id', activeBranchResult.branchId)
+        .eq('bom_id', shortage.bomId)
+        .in('status', ['DRAFT', 'RELEASED'])
+        .ilike('notes', `%${marker}%`)
+        .limit(1)
+        .maybeSingle()
+
+      if (existingWorkOrderError) {
+        return { error: 'Gagal memeriksa draft SPK otomatis: ' + existingWorkOrderError.message }
+      }
+
+      if (existingWorkOrder?.id) {
+        workOrdersSkipped += 1
+        continue
+      }
+
+      const workOrderBaseNumber = [
+        'SPK',
+        saleNumber.replace(/[^A-Za-z0-9-]/g, '').slice(0, 30) || 'SO',
+        shortage.productId.replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase() || 'AUTO',
+      ].join('-')
+      const reservedNumber = await reserveUniqueWorkOrderNumber(
+        supabase as any,
+        orgId,
+        workOrderBaseNumber
+      )
+      if ('error' in reservedNumber) {
+        return { error: reservedNumber.error }
+      }
+
+      const { error: workOrderInsertError } = await (supabase as any)
+        .from('production_work_orders')
+        .insert({
+          org_id: orgId,
+          branch_id: activeBranchResult.branchId,
+          bom_id: shortage.bomId,
+          wo_number: reservedNumber.woNumber,
+          quantity_planned: shortage.shortageQty,
+          status: 'DRAFT',
+          notes: baseNote,
+          deadline_date: dueDate,
+        })
+
+      if (workOrderInsertError) {
+        return { error: 'Gagal membuat draft SPK otomatis: ' + workOrderInsertError.message }
+      }
+
+      workOrdersCreated += 1
+      continue
+    }
+
+    const { data: existingPurchaseRequest, error: existingPurchaseRequestError } = await (supabase as any)
+      .from('purchase_requests')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('branch_id', activeBranchResult.branchId)
+      .eq('source_type', 'SALES_DELIVERY_SHORTAGE')
+      .eq('source_id', saleId)
+      .eq('product_id', shortage.productId)
+      .in('status', ['PENDING', 'ORDERED', 'RECEIVED'])
+      .limit(1)
+      .maybeSingle()
+
+    if (existingPurchaseRequestError) {
+      return { error: 'Gagal memeriksa purchase request otomatis: ' + existingPurchaseRequestError.message }
+    }
+
+    if (existingPurchaseRequest?.id) {
+      purchaseRequestsSkipped += 1
+      continue
+    }
+
+    const { error: purchaseRequestInsertError } = await (supabase as any)
+      .from('purchase_requests')
+      .insert({
+        org_id: orgId,
+        branch_id: activeBranchResult.branchId,
+        requester_id: user.id,
+        product_id: shortage.productId,
+        product_name: shortage.productName,
+        quantity: shortage.shortageQty,
+        unit: shortage.unit,
+        status: 'PENDING',
+        priority: 'URGENT',
+        notes: baseNote,
+        source_type: 'SALES_DELIVERY_SHORTAGE',
+        source_id: saleId,
+      })
+
+    if (purchaseRequestInsertError) {
+      return { error: 'Gagal membuat purchase request otomatis: ' + purchaseRequestInsertError.message }
+    }
+
+    purchaseRequestsCreated += 1
+  }
+
+  revalidatePath('/sales')
+  revalidatePath('/factory')
+  revalidatePath('/purchasing')
+
+  const messageParts: string[] = []
+  if (workOrdersCreated > 0) messageParts.push(`${workOrdersCreated} draft SPK dibuat`)
+  if (workOrdersSkipped > 0) messageParts.push(`${workOrdersSkipped} draft SPK sudah ada`)
+  if (purchaseRequestsCreated > 0) messageParts.push(`${purchaseRequestsCreated} purchase request dibuat`)
+  if (purchaseRequestsSkipped > 0) messageParts.push(`${purchaseRequestsSkipped} purchase request sudah ada`)
+
+  return {
+    success: true,
+    message:
+      messageParts.join('. ') ||
+      'Tindak lanjut kekurangan stok sudah tersedia. Cek modul Factory atau Purchasing.',
+    workOrdersCreated,
+    workOrdersSkipped,
+    purchaseRequestsCreated,
+    purchaseRequestsSkipped,
+    routes: [
+      ...(workOrdersCreated + workOrdersSkipped > 0 ? ['/factory'] : []),
+      ...(purchaseRequestsCreated + purchaseRequestsSkipped > 0 ? ['/purchasing'] : []),
+    ],
+  }
+}
+
 export async function deliverSale(orgId: string, saleId: string, warehouseId?: string | null) {
   const supabase = await createClient()
   const activeBranchResult = await requireActiveBranchId(
@@ -790,7 +1763,7 @@ export async function deliverSale(orgId: string, saleId: string, warehouseId?: s
   if ('error' in inventoryRequirementResult) return { error: inventoryRequirementResult.error }
 
   const hasInventoryItems = inventoryRequirementResult.requirements.length > 0
-  if (hasInventoryItems && !isSalam && !resolvedWarehouseId) {
+  if (hasInventoryItems && !resolvedWarehouseId) {
     const resolvedWarehouse = await resolveDeliveryWarehouseId(
       supabase as any,
       orgId,
@@ -805,17 +1778,28 @@ export async function deliverSale(orgId: string, saleId: string, warehouseId?: s
     resolvedWarehouseId = resolvedWarehouse.warehouseId
   }
 
-  if (hasInventoryItems && !isSalam) {
+  if (hasInventoryItems) {
     if (!resolvedWarehouseId) {
       return { error: 'Gudang pengiriman wajib dipilih untuk memvalidasi stok.' }
     }
     const stockCheck = await ensureDeliveryStockAvailability(
       supabase as any,
       orgId,
+      activeBranchResult.branchId,
       resolvedWarehouseId,
       inventoryRequirementResult.requirements
     )
-    if ('error' in stockCheck) return { error: stockCheck.error }
+    if ('error' in stockCheck) {
+      if (!stockCheck.shortages.length) {
+        return { error: stockCheck.error }
+      }
+
+      return {
+        error: stockCheck.error,
+        code: 'DELIVERY_STOCK_SHORTAGE',
+        shortages: stockCheck.shortages,
+      }
+    }
   }
 
   const { error } = await (supabase as any).rpc('process_sales_delivery_atomic', {
@@ -826,7 +1810,26 @@ export async function deliverSale(orgId: string, saleId: string, warehouseId?: s
 
   if (error) {
     (console as any).error('Failed to deliver sale via atomic engine:', error)
-    return { error: `[RPC ERROR]: ${error.message} (Code: ${error.code})` }
+    return { error: getSalesDeliveryRpcErrorMessage(error) }
+  }
+
+  const { error: markDeliveredError } = await (supabase as any)
+    .from('sales')
+    .update({
+      delivered_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', saleId)
+    .eq('org_id', orgId)
+    .eq('branch_id', activeBranchResult.branchId)
+
+  if (markDeliveredError) {
+    const markDeliveredMessage = String(markDeliveredError.message || '')
+    if (!markDeliveredMessage.toLowerCase().includes('delivered_at')) {
+      return { error: 'Pengiriman berhasil, tetapi tanggal kirim gagal disimpan: ' + markDeliveredMessage }
+    }
+
+    ;(console as any).warn('[deliverSale] delivered_at belum tersedia, tanggal kirim dilewati:', markDeliveredMessage)
   }
 
   revalidatePath('/sales')
@@ -1040,7 +2043,7 @@ export async function getQuotations(orgId: string, branchId?: string | null) {
   if (quoteRows.length === 0) return []
   const saleIds = quoteRows.map((r) => r.id)
 
-  let itemsBySaleId: Record<string, any[]> = {}
+  const itemsBySaleId: Record<string, any[]> = {}
   try {
     const itemsResult = await queryPostgres<Record<string, unknown>>(`
       SELECT si.*, p.name AS product_name, p.sku, p.unit, p.type AS product_type
@@ -1096,9 +2099,29 @@ export async function createQuotation(orgId: string, payload: any) {
     (acc: number, l: any) => acc + (Number(l.quantity || 0) * Number(l.discount_amount || 0)),
     0
   )
-  const headerDiscount = Number(payload.discount_amount || 0)
+  const legacyHeaderDiscount = Math.max(0, Number(payload.discount_amount || 0))
+  const manualHeaderDiscount = typeof payload.manual_discount_value === 'undefined'
+    ? legacyHeaderDiscount
+    : calculateConfiguredHeaderDiscount(total, payload.manual_discount_mode, payload.manual_discount_value)
   const taxAmount = Number(payload.tax_amount || 0)
-  const grandTotal = total - lineDiscountTotal - headerDiscount + taxAmount
+  let appliedPromoId: string | null = null
+  let promoDiscount = 0
+
+  const promoCode = String(payload.promo_code || '').trim()
+  if (promoCode) {
+    const promoResult = await getUsableSalesPromoByCodeWithDb(supabase as any, orgId, promoCode)
+    if ('error' in promoResult) {
+      return { error: promoResult.error }
+    }
+
+    appliedPromoId = promoResult.promo.id
+    promoDiscount = calculateSalesPromoDiscount(promoResult.promo, total)
+  }
+
+  const maxHeaderDiscount = Math.max(0, total - lineDiscountTotal)
+  const headerDiscount = Math.min(maxHeaderDiscount, manualHeaderDiscount + promoDiscount)
+  const netSubtotal = Math.max(0, total - lineDiscountTotal - headerDiscount)
+  const grandTotal = netSubtotal + taxAmount
   const resellerSnapshot = await getResellerCommissionSnapshot(orgId, payload.reseller_id)
 
   if (resellerSnapshot?.error) {
@@ -1119,7 +2142,7 @@ export async function createQuotation(orgId: string, payload: any) {
     tax_amount: taxAmount,
     discount_amount: headerDiscount,
     grand_total: grandTotal,
-    shariah_mode: payload.shariah_mode || 'CASH',
+    shariah_mode: normalizeShariahMode(payload.shariah_mode),
     notes: payload.notes,
     created_by: user.id,
     status: 'QUOTATION',
@@ -1161,6 +2184,13 @@ export async function createQuotation(orgId: string, payload: any) {
     })))
 
   if (linesErr) return { error: linesErr.message }
+
+  if (appliedPromoId) {
+    const usageResult = await incrementSalesPromoUsage(supabase as any, orgId, appliedPromoId)
+    if ('error' in usageResult) {
+      ;(console as any).warn('[createQuotation] failed to increment promo usage:', usageResult.error)
+    }
+  }
 
   revalidatePath('/sales/quotations')
   return { success: true, quotationId: quote.id }

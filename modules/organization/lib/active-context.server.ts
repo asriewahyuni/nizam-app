@@ -149,8 +149,9 @@ export async function getStoredActiveOrgIdForUser(
 
 /**
  * Resolves the active org membership with this priority:
- * 1. demo org cookie, 2. parent org for platform admin,
- * 3. active org cookie, 4. persisted DB preference, 5. oldest active membership.
+ * 1. demo org cookie, 2. explicit active org cookie,
+ * 3. parent org default for platform admin,
+ * 4. persisted DB preference, 5. oldest active membership.
  */
 export async function resolveActiveMembership(
   db: any,
@@ -169,15 +170,15 @@ export async function resolveActiveMembership(
     memberData = await findMembershipByOrg(db, user.id, demoOrgId, select)
   }
 
+  if (!memberData && activeOrgIdCookie) {
+    memberData = await findMembershipByOrg(db, user.id, activeOrgIdCookie, select)
+  }
+
   if (!memberData && isPlatformAdmin) {
     const parentOrgId = await resolvePlatformAdminParentOrgId(db, user.id, activeOrgIdCookie)
     if (parentOrgId) {
       memberData = await findMembershipByOrg(db, user.id, parentOrgId, select)
     }
-  }
-
-  if (!memberData && activeOrgIdCookie) {
-    memberData = await findMembershipByOrg(db, user.id, activeOrgIdCookie, select)
   }
 
   if (!memberData) {

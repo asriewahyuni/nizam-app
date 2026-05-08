@@ -462,6 +462,7 @@ CREATE TYPE journal_reference_type AS ENUM (
   'PAYMENT_IN',      -- Customer payment
   'PAYMENT_OUT',     -- Supplier payment
   'BANK_TRANSFER',   -- Inter-bank transfer
+  'POS_SHIFT_OPENING', -- POS shift opening float
   'PAYROLL',         -- Staff salary
   'ADJUSTMENT',      -- Stock or value adjustment
   'TAX',             -- Tax payment / filing
@@ -705,4 +706,3 @@ CREATE POLICY "authenticated_users_can_insert_orgs"
 ALTER FUNCTION seed_default_roles() SECURITY DEFINER;
 ALTER FUNCTION seed_default_coa(p_org_id UUID) SECURITY DEFINER;
 ALTER FUNCTION trigger_seed_coa() SECURITY DEFINER;
-

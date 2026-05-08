@@ -62,4 +62,49 @@ describe('Tax Branch Context', () => {
       ])
     )
   })
+
+  it('normalizes tax item dates into stable date strings for the client', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        accounts: [
+          {
+            result: success([{ id: 'acc-vat-out', code: '2201' }]),
+          },
+        ],
+        journal_entries: [
+          {
+            result: success([{ id: 'je-2' }]),
+          },
+        ],
+        journal_lines: [
+          {
+            result: success([
+              {
+                debit: 0,
+                credit: 33000,
+                memo: 'PPN Keluaran',
+                entry_id: 'je-2',
+                account_id: 'acc-vat-out',
+                accounts: { id: 'acc-vat-out', code: '2201', name: 'PPN Keluaran', type: 'LIABILITY', normal_balance: 'CREDIT' },
+                journal_entries: { entry_number: 'JE-2', entry_date: new Date('2026-04-07T10:30:00.000Z'), description: 'Penjualan' },
+              },
+            ]),
+          },
+        ],
+      },
+    })
+
+    mocks.createClient.mockResolvedValue(supabase.client)
+
+    const result = await getTaxSummary('org-1', '2026-04-01', '2026-04-30', 'branch-1')
+
+    expect(result.vatOut.items).toEqual([
+      expect.objectContaining({
+        date: '2026-04-07',
+        ref: 'JE-2',
+        description: 'Penjualan',
+        amount: 33000,
+      }),
+    ])
+  })
 })

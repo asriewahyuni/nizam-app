@@ -7,6 +7,10 @@ import { getLeaveRequests } from '@/modules/hris/actions/leave.actions'
 import { getAccountBalances } from '@/modules/accounting/actions/coa.actions'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { isInternalAuthProvider } from '@/lib/auth/provider'
+import {
+  getAdminImpersonationState,
+  getTenantHrisImpersonationCandidates,
+} from '@/modules/auth/actions/auth.actions'
 import HrisClient from './HrisClient'
 
 type SiblingOrgRow = {
@@ -34,6 +38,52 @@ type ChildOrgPicOption = {
   manager_employee_id?: string | null
 }
 
+const HRIS_DATE_ONLY_KEYS = new Set([
+  'date_of_birth',
+  'join_date',
+  'end_date',
+  'license_expiry',
+  'record_date',
+  'start_date',
+  'period_start',
+  'period_end',
+  'payment_date',
+  'effective_date',
+])
+
+/**
+ * Convert Date instances from server queries into client-safe strings.
+ * Some HRIS data comes from raw Postgres helpers that may hydrate DATE columns as JS Date objects.
+ */
+function serializeHrisClientValue(value: unknown, key?: string): unknown {
+  if (value instanceof Date) {
+    if (key && HRIS_DATE_ONLY_KEYS.has(key)) {
+      return [
+        value.getUTCFullYear(),
+        String(value.getUTCMonth() + 1).padStart(2, '0'),
+        String(value.getUTCDate()).padStart(2, '0'),
+      ].join('-')
+    }
+
+    return value.toISOString()
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => serializeHrisClientValue(item))
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([entryKey, entryValue]) => [
+        entryKey,
+        serializeHrisClientValue(entryValue, entryKey),
+      ])
+    )
+  }
+
+  return value
+}
+
 export default async function HrisPage(props: { searchParams: Promise<{ tab?: string }> }) {
   const searchParams = await props.searchParams
   const defaultTab = (searchParams.tab || 'EMPLOYEES').toUpperCase()
@@ -41,12 +91,16 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
   const activeBranch = await getActiveBranch(orgData.org.id)
+  const adminImpersonation = await getAdminImpersonationState()
 
   const supabase = await createClient()
   const admin = await createAdminClient()
   const readClient = (isInternalAuthProvider() ? admin : supabase) as any
   const { data: roles } = await readClient.from('roles').select('*').eq('org_id', orgData.org.id).order('name')
   const { data: branches } = await readClient.from('branches').select('id, name, code, pic_employee_id').eq('org_id', orgData.org.id).eq('is_active', true).order('name')
+  const hrisImpersonationTargetsResult = adminImpersonation
+    ? await getTenantHrisImpersonationCandidates(orgData.org.id)
+    : { data: [] as unknown[] }
 
   let transferTargets: TransferTarget[] = []
   let transferDisabledReason: string | null = null
@@ -196,25 +250,42 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
     getEmployeeTransferHistory(orgData.org.id),
   ])
 
+  const clientSafeEmployees = serializeHrisClientValue(employees) as typeof employees
+  const clientSafePayrollComponents = serializeHrisClientValue(payrollComponents) as typeof payrollComponents
+  const clientSafeAccounts = serializeHrisClientValue(accounts) as typeof accounts
+  const clientSafePayrollRuns = serializeHrisClientValue(payrollRuns) as typeof payrollRuns
+  const clientSafeAttendanceRecords = serializeHrisClientValue(attendanceRecords) as typeof attendanceRecords
+  const clientSafeLeaveRequests = serializeHrisClientValue(leaveRequests) as typeof leaveRequests
+  const clientSafeInvitations = serializeHrisClientValue(invitations) as typeof invitations
+  const clientSafeRoles = serializeHrisClientValue(roles || []) as typeof roles
+  const clientSafeBranches = serializeHrisClientValue(branches || []) as typeof branches
+  const clientSafeChildOrgOptions = serializeHrisClientValue(childOrgOptions || []) as typeof childOrgOptions
+  const clientSafeTransferTargets = serializeHrisClientValue(transferTargets || []) as typeof transferTargets
+  const clientSafeTransferHistory = serializeHrisClientValue(initialTransferHistory || []) as typeof initialTransferHistory
+  const clientSafeSettings = serializeHrisClientValue(orgData.org.settings)
+
   return <HrisClient 
     orgId={orgData.org.id} 
     activeBranchId={activeBranch?.id ?? null}
     activeBranchName={activeBranch?.name ?? null}
     allowAllBranchSelection={allowAllBranchSelection}
-    initialEmployees={employees} 
-    initialPayrollComponents={payrollComponents}
-    initialPayrollRuns={payrollRuns}
-    initialAttendanceRecords={attendanceRecords}
-    initialLeaveRequests={leaveRequests}
-    accounts={accounts}
-    settings={orgData.org.settings}
-    roles={roles || []}
-    branches={branches || []}
-    childOrgOptions={childOrgOptions || []}
-    transferTargets={transferTargets || []}
+    initialEmployees={clientSafeEmployees} 
+    initialPayrollComponents={clientSafePayrollComponents}
+    initialPayrollRuns={clientSafePayrollRuns}
+    initialAttendanceRecords={clientSafeAttendanceRecords}
+    initialLeaveRequests={clientSafeLeaveRequests}
+    accounts={clientSafeAccounts}
+    settings={clientSafeSettings}
+    currentUserId={String(orgData.user?.id || '')}
+    roles={clientSafeRoles}
+    branches={clientSafeBranches}
+    childOrgOptions={clientSafeChildOrgOptions}
+    transferTargets={clientSafeTransferTargets}
     transferDisabledReason={transferDisabledReason}
-    initialTransferHistory={initialTransferHistory || []}
-    initialInvitations={invitations || []}
+    initialTransferHistory={clientSafeTransferHistory}
+    initialInvitations={clientSafeInvitations}
+    adminImpersonation={serializeHrisClientValue(adminImpersonation)}
+    hrisImpersonationTargets={serializeHrisClientValue(hrisImpersonationTargetsResult.data || [])}
     defaultTab={defaultTab}
   />
 }

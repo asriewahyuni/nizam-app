@@ -11,6 +11,155 @@ export type SyirkahClause = {
   editable?: boolean
 }
 
+export type SyirkahDistributionMode =
+  | 'WAITING_ACTIVE_CONTRACT'
+  | 'SINGLE_ACTIVE_CONTRACT'
+  | 'MULTIPLE_ACTIVE_CONTRACTS'
+
+export type SyirkahDistributionContext = {
+  mode: SyirkahDistributionMode
+  netProfit: number
+  activeContractIds: string[]
+  message: string
+}
+
+export type SyirkahContractDistributionStatus =
+  | 'ESTIMATED'
+  | 'WAITING_ACTIVE'
+  | 'MULTIPLE_ACTIVE_UNALLOCATED'
+
+export type SyirkahContractDistributionSource =
+  | 'MANUAL_ALLOCATION'
+  | 'ORG_NET_PROFIT'
+  | 'NONE'
+
+export type SyirkahContractDistributionResolution = {
+  status: SyirkahContractDistributionStatus
+  source: SyirkahContractDistributionSource
+  baseAmount: number | null
+  message: string
+}
+
+type SyirkahDistributionContractLike = {
+  id?: string | null
+  status?: unknown
+  profit_sharing_allocation?: unknown
+}
+
+function normalizeSyirkahMoney(value: unknown) {
+  const parsed = Number(value ?? 0)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.round(parsed * 100) / 100
+}
+
+function isActiveSyirkahContractStatus(status: unknown) {
+  const normalized = String(status || '').trim().toUpperCase()
+  return normalized === 'ACTIVE' || normalized === 'COMPLETED'
+}
+
+export function buildSyirkahDistributionContext(
+  contracts: SyirkahDistributionContractLike[],
+  netProfit: number
+): SyirkahDistributionContext {
+  const activeContractIds = contracts
+    .filter((contract) => isActiveSyirkahContractStatus(contract.status))
+    .map((contract) => String(contract.id || '').trim())
+    .filter(Boolean)
+
+  if (activeContractIds.length === 0) {
+    return {
+      mode: 'WAITING_ACTIVE_CONTRACT',
+      netProfit,
+      activeContractIds: [],
+      message: 'Estimasi bagi hasil tersedia setelah ada akad berstatus ACTIVE atau COMPLETED.',
+    }
+  }
+
+  if (activeContractIds.length === 1) {
+    return {
+      mode: 'SINGLE_ACTIVE_CONTRACT',
+      netProfit,
+      activeContractIds,
+      message: 'Estimasi bagi hasil saat ini memakai laba bersih organisasi untuk satu akad aktif yang berjalan.',
+    }
+  }
+
+  return {
+    mode: 'MULTIPLE_ACTIVE_CONTRACTS',
+    netProfit,
+    activeContractIds,
+    message: 'Ada lebih dari satu akad ACTIVE/COMPLETED. Sistem belum bisa membagi laba bersih organisasi otomatis per akad.',
+  }
+}
+
+export function getSyirkahContractEstimatedNetProfit(
+  context: SyirkahDistributionContext,
+  contractId: unknown
+) {
+  const normalizedContractId = String(contractId || '').trim()
+  if (!normalizedContractId) return null
+
+  if (context.mode !== 'SINGLE_ACTIVE_CONTRACT') return null
+  if (!context.activeContractIds.includes(normalizedContractId)) return null
+
+  return context.netProfit
+}
+
+export function resolveSyirkahContractDistributionStatus(
+  context: SyirkahDistributionContext,
+  contractId: unknown,
+  status: unknown
+): SyirkahContractDistributionStatus {
+  if (!isActiveSyirkahContractStatus(status)) {
+    return 'WAITING_ACTIVE'
+  }
+
+  return getSyirkahContractEstimatedNetProfit(context, contractId) == null
+    ? 'MULTIPLE_ACTIVE_UNALLOCATED'
+    : 'ESTIMATED'
+}
+
+export function resolveSyirkahContractDistribution(
+  context: SyirkahDistributionContext,
+  contract: SyirkahDistributionContractLike
+): SyirkahContractDistributionResolution {
+  if (!isActiveSyirkahContractStatus(contract.status)) {
+    return {
+      status: 'WAITING_ACTIVE',
+      source: 'NONE',
+      baseAmount: null,
+      message: 'Alokasi bagi hasil akan dipakai setelah akad berstatus ACTIVE atau COMPLETED.',
+    }
+  }
+
+  const manualAllocation = normalizeSyirkahMoney(contract.profit_sharing_allocation)
+  if (manualAllocation > 0) {
+    return {
+      status: 'ESTIMATED',
+      source: 'MANUAL_ALLOCATION',
+      baseAmount: manualAllocation,
+      message: 'Pembagian akad ini memakai nominal alokasi bagi hasil manual, bukan seluruh laba bersih organisasi.',
+    }
+  }
+
+  const fallbackNetProfit = getSyirkahContractEstimatedNetProfit(context, contract.id)
+  if (fallbackNetProfit != null) {
+    return {
+      status: 'ESTIMATED',
+      source: 'ORG_NET_PROFIT',
+      baseAmount: fallbackNetProfit,
+      message: 'Pembagian akad ini memakai laba bersih organisasi karena belum ada nominal alokasi bagi hasil manual.',
+    }
+  }
+
+  return {
+    status: 'MULTIPLE_ACTIVE_UNALLOCATED',
+    source: 'NONE',
+    baseAmount: null,
+    message: 'Akad ini butuh nominal alokasi bagi hasil manual atau laba bersih per akad agar pembagian nominal bisa dihitung.',
+  }
+}
+
 // ─── Witness Weight Helpers ──────────────────────────────────────────────────
 
 /** Bobot saksi: Laki-laki=1, Perempuan=0.5. Minimal total bobot = 2 */
