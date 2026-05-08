@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Post-commit hook: otomatis apply migrasi SQL baru ke Railway.
+# Hanya berjalan jika ada file .sql baru di supabase/migrations/ dalam commit ini.
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# Cek apakah ada file migrasi baru dalam commit terakhir
+NEW_MIGRATIONS=$(git diff-tree --no-commit-id -r --name-only HEAD \
+  | grep '^supabase/migrations/.*\.sql$' || true)
+
+if [ -z "$NEW_MIGRATIONS" ]; then
+  exit 0
+fi
+
+echo ""
+echo "🔄 Ditemukan migrasi baru dalam commit:"
+echo "$NEW_MIGRATIONS" | sed 's/^/   • /'
+echo ""
+echo "📡 Menjalankan migrasi ke Railway database..."
+echo ""
+
+cd "$REPO_ROOT"
+
+if node scripts/migrate-pending.mjs; then
+  echo "✅ Migrasi selesai."
+else
+  echo ""
+  echo "⚠️  Migrasi gagal. Commit tetap tersimpan secara lokal."
+  echo "   Jalankan manual: npm run db:migrate"
+  echo ""
+  # Tidak exit 1 agar commit tidak di-rollback
+fi
