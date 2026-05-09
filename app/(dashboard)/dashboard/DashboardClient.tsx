@@ -19,6 +19,7 @@ import {
    type LucideIcon,
 } from 'lucide-react'
 import Link from 'next/link'
+import { NIZAM_VERSION } from '@/lib/version'
 import { useRouter } from 'next/navigation'
 import { XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area } from 'recharts'
 import { formatRupiah } from '@/lib/utils'
@@ -262,6 +263,14 @@ export function DashboardClient({ data }: DashboardClientProps) {
             </div>
 
             <div className="flex items-center gap-3">
+               <Link
+                  href="/settings/version-info"
+                  className="hidden sm:inline-flex items-center gap-2 bg-white border border-blue-100 px-3 py-2.5 rounded-2xl text-blue-700 hover:border-blue-200 hover:bg-blue-50 transition-all shadow-sm"
+                  title={`NIZAM Full ${NIZAM_VERSION.full} — ${NIZAM_VERSION.codeName}`}
+               >
+                  <Package size={14} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">{NIZAM_VERSION.short}</span>
+               </Link>
                <button className="bg-white border border-slate-200 p-3 rounded-2xl text-slate-400 hover:text-slate-900 transition-all shadow-sm">
                   <Search size={20} />
                </button>

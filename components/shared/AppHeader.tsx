@@ -4,7 +4,7 @@ import { formatRupiah, getInitials } from '@/lib/utils'
 import type { RuntimeDatabaseMode, RuntimeDatabaseSourceKey } from '@/lib/db/runtime-target'
 import { scheduleIdleTask } from '@/lib/browser/idle'
 import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/browser/approval-notifier'
-import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2, Database, CircleDot } from 'lucide-react'
+import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2, Database, CircleDot, Package } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import Link from 'next/link'
@@ -19,6 +19,7 @@ import {
 } from '@/modules/organization/actions/dashboard-shell.actions'
 import { getOrganizationDeckData, type OrganizationDeckData } from '@/modules/organization/actions/org-deck.actions'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
+import { NIZAM_VERSION } from '@/lib/version'
 import type {
   AccessibleOrganization,
   BranchSummary,
@@ -1685,6 +1686,15 @@ export function AppHeader({
       </div>
 
       <div className="flex items-center gap-6">
+        <Link
+          href="/settings/version-info"
+          className="hidden md:inline-flex items-center gap-2 rounded-2xl border border-blue-100 bg-blue-50/80 px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700 transition-all hover:border-blue-200 hover:bg-blue-100"
+          title={`NIZAM Full ${NIZAM_VERSION.full} — ${NIZAM_VERSION.codeName}`}
+        >
+          <Package size={14} />
+          <span>{NIZAM_VERSION.short}</span>
+        </Link>
+
         <div
           title={runtimeDatabaseBadge.description}
           className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition-all ${runtimeDatabaseBadge.className}`}
