@@ -46,7 +46,7 @@ export interface VersionLogEntry {
 
 export const VERSION_LOG: VersionLogEntry[] = [
   // ╔════════════════════════════════════════════════════════════════════╗
-  // ║  CURRENT VERSION — v1.6.3.x                                       ║
+  // ║  CURRENT VERSION — N1.6.3.x                                       ║
   // ║  Core=1, Module=6, Addon=3                                       ║
   // ╚════════════════════════════════════════════════════════════════════╝
   // ── BUMP: addon ─────────────────────────────────────────────────────

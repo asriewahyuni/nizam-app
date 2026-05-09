@@ -1,11 +1,11 @@
 /**
  * NIZAM Full — Versi Resmi Produk
  *
- * Format: vC.M.A.P
+ * Format: NC.M.A.P
  *   C = Core generation
  *   M = Jumlah modul operasional yang tersedia (otomatis dari registry)
  *   A = Jumlah add-on yang sudah dirilis (otomatis dari registry)
- *   P = Patch count sejak add-on bump terakhir (otomatis dari version log)
+ *   P = Patch count (otomatis dari version log)
  *
  * Standar versioning: STANDAR_RESMI_VERSIONING_NIZAM_FULL.md
  */
@@ -25,14 +25,11 @@ export const NIZAM_VERSION = {
   patch: getPatchCount(),
 } as const
 
-/** Versi lengkap internal: v1.6.0.3 */
-export const NIZAM_VERSION_FULL = `v${NIZAM_VERSION.core}.${NIZAM_VERSION.module}.${NIZAM_VERSION.addon}.${NIZAM_VERSION.patch}`
+/** Versi lengkap internal: N1.6.3.1 */
+export const NIZAM_VERSION_FULL = `N${NIZAM_VERSION.core}.${NIZAM_VERSION.module}.${NIZAM_VERSION.addon}.${NIZAM_VERSION.patch}`
 
-/** Versi publik ringkas: v1.6.0 */
-export const NIZAM_VERSION_SHORT = `v${NIZAM_VERSION.core}.${NIZAM_VERSION.module}.${NIZAM_VERSION.addon}`
+/** Versi publik ringkas: N1.6.3 */
+export const NIZAM_VERSION_SHORT = `N${NIZAM_VERSION.core}.${NIZAM_VERSION.module}.${NIZAM_VERSION.addon}`
 
-/** Label siap pakai untuk UI — NIZAM v1.6.0 (P3) */
-export const NIZAM_VERSION_LABEL =
-  NIZAM_VERSION.patch > 0
-    ? `NIZAM ${NIZAM_VERSION_SHORT} (P${NIZAM_VERSION.patch})`
-    : `NIZAM ${NIZAM_VERSION_SHORT}`
+/** Label siap pakai untuk UI — NIZAM N1.6.3 */
+export const NIZAM_VERSION_LABEL = `NIZAM ${NIZAM_VERSION_SHORT}`
