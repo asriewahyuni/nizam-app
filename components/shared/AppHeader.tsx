@@ -6,6 +6,7 @@ import { scheduleIdleTask } from '@/lib/browser/idle'
 import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/browser/approval-notifier'
 import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2, Database, CircleDot, Tag } from 'lucide-react'
 import { NIZAM_VERSION_FULL } from '@/lib/version'
+import { VersionIntegrityButton } from '@/components/shared/VersionIntegrityButton'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import Link from 'next/link'
@@ -1779,10 +1780,9 @@ export function AppHeader({
           </Link>
         </div>
 
-        {/* NIZAM Version Badge */}
-        <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-slate-100 bg-gradient-to-b from-white to-slate-50/50 text-[10px] font-bold tracking-tight text-slate-400 shadow-sm mr-1 select-none">
-          <Tag size={10} className="text-slate-300" />
-          <span className="font-mono font-black tracking-tight">{NIZAM_VERSION_FULL}</span>
+        {/* Version Integrity Button */}
+        <div className="hidden sm:flex">
+          <VersionIntegrityButton />
         </div>
 
         <div className="flex items-center gap-3">
