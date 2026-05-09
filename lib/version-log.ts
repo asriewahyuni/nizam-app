@@ -62,6 +62,15 @@ export const VERSION_LOG: VersionLogEntry[] = [
   {
     date: '2026-05-09',
     type: 'patch',
+    label: 'Fix core module visibility + aktivasi',
+    description: 'MINIMUM_CORE_MODULES bypass di sidebar (Accounting, Finance, ' +
+      'Inventory, CRM, Reports selalu muncul). CoreModuleCard di marketplace ' +
+      'nampilin status Aktif/Aktifkan. ActivateCoreModuleButton client component.',
+    by: 'system',
+  },
+  {
+    date: '2026-05-09',
+    type: 'patch',
     label: 'Fix aktivasi modul langsung redirect ke halaman setup',
     description: 'ActivateModuleButton sekarang pake router.push() ke ' +
       '/marketplace/setup/{moduleKey} setelah aktivasi, bukan router.refresh(). ' +
