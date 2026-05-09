@@ -10,6 +10,7 @@ import { AppSidebar } from '@/components/shared/AppSidebar'
 import { AppHeader } from '@/components/shared/AppHeader'
 import { AdminImpersonationBanner } from '@/components/shared/AdminImpersonationBanner'
 import { DemoBanner } from '@/components/shared/DemoBanner'
+import { FloatingVersionBadge } from '@/components/shared/FloatingVersionBadge'
 import { SentryUserContext } from '@/components/shared/SentryUserContext'
 import { StartupWizard } from '@/components/shared/StartupWizard'
 import { FloatingPlanBadge } from '@/components/shared/FloatingPlanBadge'
@@ -268,6 +269,7 @@ export default async function DashboardLayout({
           permissions={orgData.permissions}
           enabledModules={orgData.enabledModules}
         />
+        <FloatingVersionBadge />
         <FloatingPlanBadge planName={effectivePlanName} />
       </div>
     </div>

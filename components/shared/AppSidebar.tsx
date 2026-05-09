@@ -155,6 +155,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Pengaturan Bisnis', href: '/settings/business', icon: Settings, permission_key: 'business', module_key: 'Config' },
       { label: 'API & Integrasi', href: '/developers/api', icon: Code2, permission_key: 'business', module_key: 'Integrasi API' },
       { label: 'Migrasi Data', href: '/settings/business/migration', icon: Upload, permission_key: 'business', module_key: 'Config' },
+      { label: 'Informasi Versi', href: '/settings/version-info', icon: Package, permission_key: 'business', module_key: 'Config' },
       { label: 'Support Ticket', href: '/settings/ticketing', icon: LifeBuoy, permission_key: 'business', module_key: 'Config' },
     ]
   }
