@@ -172,7 +172,7 @@ function CoreModuleCard({ mod, enabled }: { mod: ModuleDefinition; enabled: bool
           <CheckCircle2 className="h-2.5 w-2.5" /> Aktif
         </span>
       ) : (
-        <form action={async () => { 'use server'; await activateModule(mod.key) }}>
+        <form action={activateModule.bind(null, mod.key)}>
           <button className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-xl transition-all whitespace-nowrap">
             <Zap className="h-3 w-3" /> Aktifkan
           </button>
@@ -284,7 +284,7 @@ function OperationalModuleCard({
                   Syarat: Aktifkan {unmetRequirements.join(', ')} terlebih dahulu.
                 </div>
               )}
-              <form action={async () => { 'use server'; await activateModule(mod.key) }}>
+              <form action={activateModule.bind(null, mod.key)}>
                 <button 
                   type="submit" 
                   disabled={unmetRequirements.length > 0}
