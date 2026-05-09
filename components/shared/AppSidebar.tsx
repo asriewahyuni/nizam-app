@@ -442,6 +442,13 @@ export function AppSidebar({
     // 0. DEMO BYPASS: Tampilkan SEMUA modul di mode Demo/Latihan agar klien bisa eksplorasi fitur penuh
     if (isDemo) return true
 
+    // 0b. MINIMUM CORE BYPASS: Modul inti dasar selalu muncul di sidebar
+    //     Accounting, Finance, Inventory, CRM, Reports — wajib ada agar sistem berfungsi.
+    const MINIMUM_CORE_KEYS = ['Accounting', 'Finance', 'Inventory', 'CRM', 'Reports']
+    if (item.module_key && MINIMUM_CORE_KEYS.some(k => k.toLowerCase() === item.module_key!.toLowerCase())) {
+      return true
+    }
+
     // 1. SaaS Module Check
     if (item.module_key && enabledModules.length > 0) {
       const matches = enabledModules.some((moduleName) => {

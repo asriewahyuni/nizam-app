@@ -2180,15 +2180,6 @@ const getActiveOrgCached = cache(async () => {
   // Clean and unique, preserving the granular names for precise sidebar permission checks
   enabledModules = Array.from(new Set(enabledModules.map((m: string) => String(m).trim()).filter(Boolean)))
 
-  // AUTO-INCLUDE MINIMUM CORE MODULES — modul inti wajib selalu aktif
-  // Without these, the system cannot operate at a bare minimum.
-  const MINIMUM_CORE = ['Accounting', 'Finance', 'Inventory', 'CRM', 'Reports']
-  MINIMUM_CORE.forEach((coreKey: string) => {
-    if (!enabledModules.some((m: string) => m.toLowerCase() === coreKey.toLowerCase())) {
-      enabledModules.push(coreKey)
-    }
-  })
-
   // Fetch Job Title from employees table
   const { data: empData } = await db
     .from('employees')
