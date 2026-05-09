@@ -2410,7 +2410,7 @@ export default function SaaSAdminPage() {
                                   <Package size={14} />
                                   <span>Kelola</span>
                                 </button>
-                                <SafeButton variant="white" onClick={() => openEntitlementModal(org, 'modules')} icon={<Package size={16} />}>
+                                <SafeButton variant="white" onClick={() => openEntitlementModal(org, 'all')} icon={<Package size={16} />}>
                                   Atur Modul
                                 </SafeButton>
                               </div>
@@ -2527,7 +2527,7 @@ export default function SaaSAdminPage() {
                                   <Package size={14} />
                                   <span>Kelola</span>
                                 </button>
-                                <SafeButton variant="white" onClick={() => openEntitlementModal(org, 'addons')} icon={<Package size={16} />}>
+                                <SafeButton variant="white" onClick={() => openEntitlementModal(org, 'all')} icon={<Package size={16} />}>
                                   Atur Add-on
                                 </SafeButton>
                               </div>
