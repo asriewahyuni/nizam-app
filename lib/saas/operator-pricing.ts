@@ -24,6 +24,7 @@ export type OperatorAddonOption = {
 
 const FLEET_MODULE_NAME = 'Fleet & Rental'
 const JOB_ORDER_MODULE_NAME = 'Job Order (Jasa)'
+const WORKSHOP_MODULE_NAME = 'Workshop'
 const CONSTRUCTION_MODULE_NAME = 'Project & Construction'
 const SYIRKAH_MODULE_NAME = 'Syirkah'
 const WAREHOUSE_ADDON_NAME = 'Warehouse'
@@ -54,6 +55,15 @@ export const OPERATOR_ADDON_OPTIONS: OperatorAddonOption[] = [
     anchorPrice: 299000,
     billing: 'Bulan',
     description: 'Sistem perintah kerja jasa/workshop untuk tracking progress.',
+    minCoreFamily: 'lite',
+  },
+  {
+    id: 'addon_workshop',
+    name: WORKSHOP_MODULE_NAME,
+    price: 199000,
+    anchorPrice: 279000,
+    billing: 'Bulan',
+    description: 'SPK bengkel motor, manajemen kendaraan pelanggan, mekanik, spare part, dan jurnal pendapatan otomatis.',
     minCoreFamily: 'lite',
   },
   {

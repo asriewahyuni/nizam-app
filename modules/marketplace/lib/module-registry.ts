@@ -240,6 +240,23 @@ export const OPERATIONAL_MODULES: ModuleDefinition[] = [
     requires: ['Finance', 'Sales'],
   },
   {
+    key: 'Workshop',
+    name: 'Bengkel Motor',
+    tagline: 'Operasional bengkel motor: SPK, kendaraan, dan mekanik',
+    description: 'Untuk bisnis bengkel motor: Surat Perintah Kerja (SPK), manajemen kendaraan pelanggan, daftar jasa dan spare part, alur status dari antri hingga diserahkan, serta jurnal pendapatan otomatis ke buku besar.',
+    icon: '🔩',
+    color: 'bg-blue-700',
+    href: '/workshop',
+    isCore: false,
+    coaInjectionFn: 'inject_workshop_coa',
+    onboardingSteps: [
+      { id: 'coa', title: 'Install CoA Bengkel', description: 'Pasang akun Pendapatan Jasa Servis, Pendapatan Spare Part, dan Piutang Usaha Bengkel.' },
+      { id: 'settings', title: 'Pengaturan Bengkel', description: 'Tentukan mekanik default dan preferensi nomor SPK.' },
+    ],
+    tags: ['bengkel', 'motor', 'servis', 'spk', 'otomotif'],
+    requires: ['Finance', 'Inventory'],
+  },
+  {
     key: 'Job Order (Jasa)',
     name: 'Job Order (Jasa)',
     tagline: 'Bisnis jasa berbasis pekerjaan dan order',

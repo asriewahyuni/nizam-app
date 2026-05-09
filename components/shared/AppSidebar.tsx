@@ -45,6 +45,7 @@ import {
   Upload,
   Building2,
   Code2,
+  Wrench,
   GraduationCap,
   type LucideIcon
 } from 'lucide-react'
@@ -100,6 +101,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Manufaktur (BoM)', href: '/factory', icon: Factory, permission_key: 'factory', module_key: 'Manufacturing' },
       { label: 'Fleet & Rental', href: '/fleet', icon: Truck, permission_key: 'fleet', module_key: 'Fleet & Rental' },
       { label: 'Job Order (Jasa)', href: '/services', icon: Briefcase, permission_key: 'services', module_key: 'Job Order (Jasa)' },
+      { label: 'Bengkel Motor', href: '/workshop', icon: Wrench, permission_key: 'workshop', module_key: 'Workshop' },
       { label: 'Project Konstruksi', href: '/construction', icon: Building2, permission_key: 'construction,project,services', module_key: 'Project & Construction' },
       { label: 'LMS (Pelatihan Komersial)', href: '/lms', icon: GraduationCap, permission_key: 'learning', module_key: 'LMS' },
       { label: 'Panel Penilai', href: '/lms/assessment-center', icon: ShieldCheck, permission_key: 'learning:write', saas_assessor_only: true },

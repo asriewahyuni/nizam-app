@@ -338,6 +338,63 @@ export type HrisCompetencyTrainingEvaluation = {
   updated_at: string
 }
 
+// ─── Workshop / Bengkel Motor ─────────────────────────────────────────────────
+
+export type WorkshopVehicleRow = {
+  id: string
+  org_id: string
+  branch_id: string | null
+  contact_id: string | null
+  plate_number: string
+  brand: string
+  model: string
+  year: number | null
+  color: string | null
+  engine_number: string | null
+  chassis_number: string | null
+  fuel_type: string
+  transmission: string
+  last_odometer: number
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type WorkshopWorkOrderRow = {
+  id: string
+  org_id: string
+  branch_id: string | null
+  spk_number: string
+  vehicle_id: string | null
+  contact_id: string | null
+  mechanic_name: string | null
+  status: 'ANTRI' | 'DIKERJAKAN' | 'MENUNGGU_PART' | 'SELESAI' | 'DISERAHKAN' | 'CANCEL'
+  customer_complaint: string | null
+  diagnosis: string | null
+  odometer_in: number | null
+  odometer_out: number | null
+  estimated_finish: string | null
+  actual_finish: string | null
+  subtotal: number
+  discount: number
+  total: number
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type WorkshopWorkOrderItemRow = {
+  id: string
+  work_order_id: string
+  item_type: 'JASA' | 'PART'
+  name: string
+  quantity: number
+  unit_price: number
+  subtotal: number
+  notes: string | null
+  created_at: string
+}
+
 export interface Database {
   public: {
     Tables: {

@@ -467,6 +467,10 @@ const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
     aliases: ['job order (jasa)', 'job order', 'industrial job order', 'services', 'service jasa'],
   },
   {
+    canonical: 'Workshop',
+    aliases: ['workshop', 'bengkel', 'bengkel motor', 'servis motor', 'spk bengkel', 'auto workshop'],
+  },
+  {
     canonical: 'Project & Construction',
     aliases: [
       'project & construction',
