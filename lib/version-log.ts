@@ -62,6 +62,15 @@ export const VERSION_LOG: VersionLogEntry[] = [
   {
     date: '2026-05-09',
     type: 'patch',
+    label: 'Fix aktivasi modul langsung redirect ke halaman setup',
+    description: 'ActivateModuleButton sekarang pake router.push() ke ' +
+      '/marketplace/setup/{moduleKey} setelah aktivasi, bukan router.refresh(). ' +
+      'User langsung masuk wizard setup tanpa perlu klik "Selesaikan Setup" manual.',
+    by: 'system',
+  },
+  {
+    date: '2026-05-09',
+    type: 'patch',
     label: 'Fix pop-up modal: X button ga kelihatan',
     description: 'X button diubah jadi sticky top-4 float-right dengan ' +
       'background putih solid + border + shadow. Backdrop bg-black/60 tanpa blur.',
