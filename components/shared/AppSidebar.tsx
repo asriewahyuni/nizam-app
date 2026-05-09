@@ -73,7 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
     group: 'Utama',
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission_key: 'dashboard' },
-      { label: 'Modul Marketplace', href: '/marketplace', icon: Store, permission_key: 'config', admin_only: true },
+      { label: 'Marketplace Modul', href: '/marketplace', icon: Store, permission_key: 'config', admin_only: true },
       { label: 'Audit Integritas', href: '/accounting/audit', icon: ShieldCheck, permission_key: 'audit', module_key: 'Audit' },
     ]
   },
