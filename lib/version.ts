@@ -31,5 +31,5 @@ export const NIZAM_VERSION_FULL = `N${NIZAM_VERSION.core}.${NIZAM_VERSION.module
 /** Versi publik ringkas: N1.6.3 */
 export const NIZAM_VERSION_SHORT = `N${NIZAM_VERSION.core}.${NIZAM_VERSION.module}.${NIZAM_VERSION.addon}`
 
-/** Label siap pakai untuk UI — NIZAM N1.6.3 */
-export const NIZAM_VERSION_LABEL = `NIZAM ${NIZAM_VERSION_SHORT}`
+/** Label siap pakai untuk UI — NIZAM N1.6.3.1 */
+export const NIZAM_VERSION_LABEL = `NIZAM ${NIZAM_VERSION_FULL}`
