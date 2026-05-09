@@ -21,9 +21,8 @@ export function ActivateModuleButton({ moduleKey, disabled }: Props) {
     startTransition(async () => {
       try {
         await activateModule(moduleKey)
-        setSuccess(true)
-        // Refresh page agar state modul ter-update (available → active_pending)
-        router.refresh()
+        // Redirect langsung ke halaman setup
+        router.push(`/marketplace/setup/${moduleKey}`)
       } catch (err: any) {
         setError(err.message || 'Terjadi kesalahan saat mengaktifkan modul')
       }
@@ -33,7 +32,7 @@ export function ActivateModuleButton({ moduleKey, disabled }: Props) {
   if (success) {
     return (
       <div className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-amber-100">
-        <CheckCircle2 className="h-4 w-4" /> Dialihkan ke Setup...
+        <CheckCircle2 className="h-4 w-4" /> Mengalihkan ke Setup...
       </div>
     )
   }
