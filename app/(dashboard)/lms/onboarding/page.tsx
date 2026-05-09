@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-import { getModuleInstanceStatus, installModuleCoa, saveModuleSettings, completeModuleOnboarding } from '@/modules/marketplace/actions/marketplace.actions'
+import { getModuleInstanceStatus, completeModuleOnboarding } from '@/modules/marketplace/actions/marketplace.actions'
 import { getModuleByKey } from '@/modules/marketplace/lib/module-registry'
 import { CheckCircle2, BookOpen, Settings, Zap, ArrowRight, GraduationCap } from 'lucide-react'
+import { InstallCoaButton, SettingsForm } from './OnboardingClient'
 
 const MODULE_KEY = 'LMS'
 
@@ -74,14 +75,7 @@ export default async function LmsOnboardingPage() {
             done={stepsDone.coa}
           >
             {!stepsDone.coa && (
-              <form action={async () => { 'use server'; await installModuleCoa(MODULE_KEY); redirect('/lms/onboarding') }}>
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all"
-                >
-                  Install CoA LMS <ArrowRight className="h-4 w-4" />
-                </button>
-              </form>
+              <InstallCoaButton moduleKey={MODULE_KEY} />
             )}
           </StepRow>
 
@@ -94,60 +88,11 @@ export default async function LmsOnboardingPage() {
             done={stepsDone.settings}
           >
             {!stepsDone.settings && (
-              <form
-                action={async (fd: FormData) => {
-                  'use server'
-                  await saveModuleSettings(MODULE_KEY, {
-                    institutionName: fd.get('institutionName') as string,
-                    allowPublicRegistration: fd.get('allowPublicRegistration') === 'on',
-                    defaultCurrency: fd.get('defaultCurrency') as string,
-                  })
-                  redirect('/lms/onboarding')
-                }}
-                className="mt-4 grid gap-4"
-              >
-                <label className="block text-sm">
-                  <div className="font-bold text-slate-900 mb-1.5">Nama Lembaga Pelatihan</div>
-                  <input
-                    name="institutionName"
-                    defaultValue={currentSettings?.institutionName ?? orgData.org.name}
-                    required
-                    placeholder="Contoh: Balai Pelatihan Nizam"
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400 bg-slate-50"
-                  />
-                </label>
-                <div className="grid grid-cols-2 gap-4">
-                  <label className="block text-sm">
-                    <div className="font-bold text-slate-900 mb-1.5">Mata Uang Default</div>
-                    <select
-                      name="defaultCurrency"
-                      defaultValue={currentSettings?.defaultCurrency ?? 'IDR'}
-                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400 bg-slate-50"
-                    >
-                      <option value="IDR">IDR (Rupiah)</option>
-                      <option value="USD">USD (Dollar)</option>
-                    </select>
-                  </label>
-                  <label className="flex items-center gap-3 pt-6 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="allowPublicRegistration"
-                      defaultChecked={currentSettings?.allowPublicRegistration !== false}
-                      className="w-5 h-5 rounded text-blue-600 border-slate-300"
-                    />
-                    <div>
-                      <div className="font-bold text-slate-900">Registrasi Publik</div>
-                      <div className="text-xs text-slate-500">Izinkan pendaftaran dari luar</div>
-                    </div>
-                  </label>
-                </div>
-                <button
-                  type="submit"
-                  className="w-full rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-blue-600 transition-all shadow-xl shadow-slate-100"
-                >
-                  Simpan Pengaturan
-                </button>
-              </form>
+              <SettingsForm
+                moduleKey={MODULE_KEY}
+                currentSettings={currentSettings}
+                defaultInstitutionName={orgData.org.name}
+              />
             )}
           </StepRow>
         </div>

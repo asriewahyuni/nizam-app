@@ -123,17 +123,12 @@ export async function installModuleCoa(moduleKey: string) {
 
   const supabase = await createClient()
 
-  // Coba dengan parameter p_org_id
-  const { error } = await supabase.rpc(moduleDef.coaInjectionFn, {
-    p_org_id: orgData.org.id,
-  })
-
-  if (error) {
-    // Fallback: beberapa function lama pakai parameter 'org_id'
-    const { error: error2 } = await supabase.rpc(moduleDef.coaInjectionFn, {
-      org_id: orgData.org.id,
-    })
-    if (error2) throw new Error(error2.message)
+  // Gunakan queryPostgres langsung untuk menghindari masalah resolusi tipe argumen named parameters di PostgreSQL
+  try {
+    const { queryPostgres } = await import('@/lib/db/postgres')
+    await queryPostgres(`SELECT public."${moduleDef.coaInjectionFn}"($1::uuid)`, [orgData.org.id])
+  } catch (err: any) {
+    throw new Error(err.message || 'Gagal menginstal Chart of Accounts untuk modul ini')
   }
 
   await markCoaInstalled(orgData.org.id, moduleKey)

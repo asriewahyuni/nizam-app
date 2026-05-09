@@ -13,6 +13,7 @@ import {
 } from '@/modules/marketplace/lib/module-registry'
 import { CheckCircle2, Lock, ArrowRight, Sparkles, ShieldCheck, Zap, Circle } from 'lucide-react'
 import { DeactivateModuleButton } from './DeactivateModuleButton'
+import { ActivateModuleButton } from './ActivateModuleButton'
 
 function moduleNameMatches(enabled: string, key: string): boolean {
   const n = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]/g, '')
@@ -23,7 +24,7 @@ function formatRp(n: number) {
   return 'Rp ' + n.toLocaleString('id-ID')
 }
 
-type ModuleState = 'active_ready' | 'active_pending' | 'inactive' | 'locked'
+type ModuleState = 'active_ready' | 'active_pending' | 'inactive' | 'locked' | 'available'
 
 export default async function MarketplacePage() {
   noStore()
@@ -44,7 +45,7 @@ export default async function MarketplacePage() {
     const instance = instanceMap.get(mod.key) as any
     if (instance?.status === 'DISABLED') return 'inactive'
     const isEnabled = enabledModules.some(m => moduleNameMatches(m, mod.key))
-    if (!isEnabled) return 'locked'
+    if (!isEnabled) return 'available'
     if (!instance || instance.status !== 'READY') return 'active_pending'
     return 'active_ready'
   }
@@ -285,15 +286,10 @@ function OperationalModuleCard({
                   Syarat: Aktifkan {unmetRequirements.join(', ')} terlebih dahulu.
                 </div>
               )}
-              <form action={async () => { 'use server'; await activateModule(mod.key) }}>
-                <button 
-                  type="submit" 
-                  disabled={unmetRequirements.length > 0}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-slate-200 hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ArrowRight className="h-4 w-4" /> Aktifkan Modul
-                </button>
-              </form>
+              <ActivateModuleButton 
+                moduleKey={mod.key} 
+                disabled={unmetRequirements.length > 0} 
+              />
             </div>
           )}
           {isPending && (

@@ -104,7 +104,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Bengkel Motor', href: '/workshop', icon: Wrench, permission_key: 'workshop', module_key: 'Workshop' },
       { label: 'Project Konstruksi', href: '/construction', icon: Building2, permission_key: 'construction,project,services', module_key: 'Project & Construction' },
       { label: 'LMS (Pelatihan Komersial)', href: '/lms', icon: GraduationCap, permission_key: 'learning', module_key: 'LMS' },
-      { label: 'Panel Penilai', href: '/lms/assessment-center', icon: ShieldCheck, permission_key: 'learning:write', saas_assessor_only: true },
+      { label: 'Panel Penilai', href: '/lms/assessment-center', icon: ShieldCheck, permission_key: 'learning:write', module_key: 'LMS', saas_assessor_only: true },
     ]
   },
   {
@@ -425,7 +425,8 @@ export function AppSidebar({
     }
 
     if (item.saas_assessor_only) {
-      return isSaasAssessor || hasRolePermission(userRole, permissions, item.permission_key)
+      const hasAccess = isSaasAssessor || hasRolePermission(userRole, permissions, item.permission_key)
+      if (!hasAccess) return false
     }
 
     // Cabang adalah fitur core — selalu tampilkan untuk owner/admin
