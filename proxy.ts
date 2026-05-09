@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 const NEXT_ACTION_HEADER = 'next-action'
+const INTERNAL_SESSION_COOKIE = 'nizam_internal_session'
 
 function isServerActionRequest(request: NextRequest) {
   return request.headers.has(NEXT_ACTION_HEADER)
@@ -16,6 +17,33 @@ function createServerActionRedirectResponse(target: string) {
       location: target,
     },
   })
+}
+
+/**
+ * Preview mode auto-login — only active when PREVIEW_MODE=true.
+ * Redirects unauthenticated users to /api/preview/auto-login
+ * which creates a session for bob@executive.id automatically.
+ */
+function handlePreviewAutoLogin(request: NextRequest): NextResponse | null {
+  if (process.env.PREVIEW_MODE !== 'true') return null
+
+  const { pathname } = request.nextUrl
+
+  // Skip API routes, login/register pages, static assets
+  if (
+    pathname.startsWith('/api') ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register') ||
+    pathname.startsWith('/_next')
+  ) return null
+
+  // Already has session
+  if (request.cookies.has(INTERNAL_SESSION_COOKIE)) return null
+
+  // Redirect to auto-login
+  const loginUrl = new URL('/api/preview/auto-login', request.url)
+  loginUrl.searchParams.set('redirect', pathname)
+  return NextResponse.redirect(loginUrl)
 }
 
 /**
@@ -72,6 +100,10 @@ export async function proxy(request: NextRequest) {
       // Jika resolver gagal, biarkan request lanjut ke flow normal.
     }
   }
+
+  // Preview mode auto-login (only when PREVIEW_MODE=true)
+  const previewRedirect = handlePreviewAutoLogin(request)
+  if (previewRedirect) return previewRedirect
 
   return updateSession(request)
 }

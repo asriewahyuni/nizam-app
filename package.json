@@ -94,7 +94,7 @@
     "eslint-config-next": "^16.2.0",
     "tailwindcss": "^4.2.2",
     "tsx": "^4.21.0",
-    "typescript": "^5.5.4",
+    "typescript": "5.9.3",
     "vite": "^8.0.2",
     "vitest": "^4.1.1"
   }
