@@ -24,6 +24,10 @@ VALUES (
   'Sekali',
   TRUE,
   '[
+    "Accounting",
+    "Finance",
+    "Inventory",
+    "Purchasing",
     "Sales",
     "POS",
     "CRM",
@@ -31,10 +35,6 @@ VALUES (
     "Config"
   ]'::jsonb,
   '[
-    "Accounting",
-    "Finance",
-    "Inventory",
-    "Purchasing",
     "HRIS",
     "Manufacturing",
     "Audit",

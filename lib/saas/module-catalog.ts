@@ -67,6 +67,7 @@ export const SAAS_VERTICAL_MODULE_ITEMS = [
   { label: 'Fleet & Rental', value: 'Fleet & Rental' },
   { label: 'Job Order (Jasa)', value: 'Job Order (Jasa)' },
   { label: 'Project & Construction', value: 'Project & Construction' },
+  { label: 'LMS', value: 'LMS' },
   { label: 'Syirkah', value: 'Syirkah' },
 ] as const
 

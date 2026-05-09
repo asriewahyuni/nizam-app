@@ -68,7 +68,7 @@ import {
   saasCoreFamilySatisfies,
   saasModuleMatches,
 } from '@/lib/saas/module-catalog'
-import { CORE_MODULES, MINIMUM_CORE_MODULES, OPERATIONAL_MODULES } from '@/modules/marketplace/lib/module-registry'
+import { CORE_MODULES, MINIMUM_CORE_MODULES, OPERATIONAL_MODULES, getModuleByKey } from '@/modules/marketplace/lib/module-registry'
 import { OPERATOR_GROWTH_ADDON_OPTIONS } from '@/lib/saas/operator-pricing'
 import {
   calculateAiHppPerGeneration,
@@ -2256,7 +2256,7 @@ export default function SaaSAdminPage() {
                           <td className="px-6 py-5 text-right">
                             <div className="flex justify-end gap-2">
                               <button
-                                onClick={() => openEntitlementModal(org, 'all')}
+                                onClick={() => openEntitlementModal(org, 'modules')}
                                 title="Kelola paket dan entitlement tenant"
                                 className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50"
                               >
@@ -2403,14 +2403,7 @@ export default function SaaSAdminPage() {
                             </td>
                             <td className="py-4 px-6 text-right">
                               <div className="flex justify-end gap-2">
-                                <button
-                                  onClick={() => openEntitlementModal(org, 'all')}
-                                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 transition-all hover:bg-slate-50"
-                                >
-                                  <Package size={14} />
-                                  <span>Kelola</span>
-                                </button>
-                                <SafeButton variant="white" onClick={() => openEntitlementModal(org, 'all')} icon={<Package size={16} />}>
+                                <SafeButton variant="white" onClick={() => openEntitlementModal(org, 'modules')} icon={<Package size={16} />}>
                                   Atur Modul
                                 </SafeButton>
                               </div>
@@ -3209,7 +3202,7 @@ export default function SaaSAdminPage() {
                           {SAAS_PACKAGE_EDITOR_SECTIONS
                             .filter((section) => section.kind !== 'addon')
                             .map((section) => (
-                              <div key={`module-settings-${section.key}`} className="space-y-3 rounded-[28px] border border-slate-200 bg-white p-4">
+                              <div key={`module-settings-${section.key}`} className="space-y-4 rounded-[28px] border border-slate-200 bg-white p-5">
                                 <div className="flex items-center justify-between gap-4">
                                   <div>
                                     <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">{section.title}</h4>
@@ -3220,43 +3213,54 @@ export default function SaaSAdminPage() {
                                   </span>
                                 </div>
 
-                                <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                                   {section.items.map((item) => {
                                     const isSelected = entitlementManagedModules.some((capability) => saasModuleMatches(capability, item.value))
                                     const isPlanDefault = entitlementPackageModules.some((capability) => saasModuleMatches(capability, item.value))
+                                    const moduleDef = getModuleByKey(item.value)
 
                                     return (
                                       <label
                                         key={`tenant-module-${section.key}-${item.value}`}
-                                        className={`flex items-start gap-3 rounded-2xl border px-3 py-3 transition-all ${
+                                        className={`relative flex flex-col rounded-3xl border p-5 transition-all cursor-pointer ${
                                           isSelected
-                                            ? 'border-indigo-200 bg-indigo-50/70'
-                                            : 'border-slate-200 bg-white hover:border-indigo-200'
+                                            ? 'border-indigo-300 bg-indigo-50/40 shadow-md ring-1 ring-indigo-100 hover:shadow-lg'
+                                            : 'border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-indigo-200'
                                         }`}
                                       >
-                                        <input
-                                          type="checkbox"
-                                          checked={isSelected}
-                                          onChange={(e) => toggleEntitlementModule(item.value, e.target.checked)}
-                                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                        />
-                                        <div className="min-w-0 flex-1">
-                                          <div className="text-[11px] font-black uppercase tracking-[0.1em] text-slate-700">
-                                            {item.label}
+                                        <div className="absolute top-4 right-4 flex items-center gap-2">
+                                          {isPlanDefault && (
+                                            <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest border px-2 py-1 rounded-full bg-slate-100 text-slate-500 border-slate-200">
+                                              Plan Default
+                                            </span>
+                                          )}
+                                          <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={(e) => toggleEntitlementModule(item.value, e.target.checked)}
+                                            className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                          />
+                                        </div>
+
+                                        <div className="flex items-start gap-4">
+                                          <div className={`w-12 h-12 rounded-2xl ${moduleDef?.color || 'bg-slate-100'} flex items-center justify-center text-xl shadow-sm flex-shrink-0`}>
+                                            {moduleDef?.icon || '📦'}
                                           </div>
-                                          <div className="mt-1 flex flex-wrap gap-1.5">
-                                            {isSelected && (
-                                              <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
-                                                Active
-                                              </span>
-                                            )}
-                                            {isPlanDefault && (
-                                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
-                                                Plan Default
-                                              </span>
+                                          <div className="pr-16">
+                                            <div className="text-sm font-black text-slate-900 leading-tight">
+                                              {item.label}
+                                            </div>
+                                            {moduleDef?.tagline && (
+                                              <p className="text-[10px] font-semibold text-slate-500 mt-0.5">{moduleDef.tagline}</p>
                                             )}
                                           </div>
                                         </div>
+
+                                        {moduleDef?.description && (
+                                          <p className="mt-3 text-[11px] leading-relaxed flex-1 text-slate-600">
+                                            {moduleDef.description}
+                                          </p>
+                                        )}
                                       </label>
                                     )
                                   })}
@@ -3286,7 +3290,7 @@ export default function SaaSAdminPage() {
                           const sectionItems = section.items
 
                           return (
-                            <div key={section.key} className="space-y-3 rounded-[28px] border border-slate-200 bg-white p-4">
+                            <div key={section.key} className="space-y-4 rounded-[28px] border border-slate-200 bg-white p-5">
                               <div className="flex items-center justify-between gap-4">
                                 <div>
                                   <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">{section.title}</h4>
@@ -3297,51 +3301,63 @@ export default function SaaSAdminPage() {
                                 </span>
                               </div>
 
-                              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                                 {sectionItems.map((item) => {
                                   const includedByPlan = entitlementManagedModules.some((capability) => saasModuleMatches(capability, item.value))
                                   const isSelected = entitlementModal.selectedAddons.some((capability) => saasModuleMatches(capability, item.value))
                                   const isBlueprintOption = entitlementPackageBlueprintAddons.some((capability) => saasModuleMatches(capability, item.value))
+                                  const moduleDef = getModuleByKey(item.value)
 
                                   return (
                                     <label
                                       key={`tenant-addon-${section.key}-${item.value}`}
-                                      className={`flex items-start gap-3 rounded-2xl border px-3 py-3 transition-all ${
+                                      className={`relative flex flex-col rounded-3xl border p-5 transition-all cursor-pointer ${
                                         includedByPlan
-                                          ? 'border-indigo-200 bg-indigo-50/70'
+                                          ? 'border-indigo-300 bg-indigo-50/40 shadow-sm ring-1 ring-indigo-100'
                                           : isSelected
-                                            ? 'border-emerald-200 bg-emerald-50/70'
-                                            : 'border-slate-200 bg-white hover:border-emerald-200'
+                                            ? 'border-emerald-300 bg-emerald-50/40 shadow-md ring-1 ring-emerald-100 hover:shadow-lg'
+                                            : 'border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-emerald-200'
                                       }`}
                                     >
-                                      <input
-                                        type="checkbox"
-                                        checked={includedByPlan || isSelected}
-                                        disabled={includedByPlan}
-                                        onChange={(e) => toggleEntitlementAddon(item.value, e.target.checked)}
-                                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed"
-                                      />
-                                      <div className="min-w-0 flex-1">
-                                        <div className="text-[11px] font-black uppercase tracking-[0.1em] text-slate-700">
-                                          {item.label}
+                                      <div className="absolute top-4 right-4 flex items-center gap-2">
+                                        {!includedByPlan && isBlueprintOption && (
+                                          <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest border px-2 py-1 rounded-full bg-slate-100 text-slate-500 border-slate-200">
+                                            Blueprint
+                                          </span>
+                                        )}
+                                        {includedByPlan && (
+                                          <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest border px-2 py-1 rounded-full bg-indigo-100 text-indigo-600 border-indigo-200">
+                                            Included
+                                          </span>
+                                        )}
+                                        <input
+                                          type="checkbox"
+                                          checked={includedByPlan || isSelected}
+                                          disabled={includedByPlan}
+                                          onChange={(e) => toggleEntitlementAddon(item.value, e.target.checked)}
+                                          className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                        />
+                                      </div>
+
+                                      <div className="flex items-start gap-4">
+                                        <div className={`w-12 h-12 rounded-2xl ${moduleDef?.color || 'bg-slate-100'} flex items-center justify-center text-xl shadow-sm flex-shrink-0 ${includedByPlan ? 'opacity-70' : ''}`}>
+                                          {moduleDef?.icon || '🧩'}
                                         </div>
-                                        <div className="mt-1 flex flex-wrap gap-1.5">
-                                          {includedByPlan ? (
-                                            <span className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
-                                              Included in Plan
-                                            </span>
-                                          ) : isSelected ? (
-                                            <span className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700">
-                                              Active Manual
-                                            </span>
-                                          ) : null}
-                                          {!includedByPlan && isBlueprintOption && (
-                                            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
-                                              Blueprint
-                                            </span>
+                                        <div className="pr-20">
+                                          <div className="text-sm font-black text-slate-900 leading-tight">
+                                            {item.label}
+                                          </div>
+                                          {moduleDef?.tagline && (
+                                            <p className="text-[10px] font-semibold text-slate-500 mt-0.5">{moduleDef.tagline}</p>
                                           )}
                                         </div>
                                       </div>
+
+                                      {moduleDef?.description && (
+                                        <p className="mt-3 text-[11px] leading-relaxed flex-1 text-slate-600">
+                                          {moduleDef.description}
+                                        </p>
+                                      )}
                                     </label>
                                   )
                                 })}
