@@ -4,6 +4,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { getServerAuthContext } from '@/lib/supabase/auth.server'
 import { isInternalAuthProvider } from '@/lib/auth/provider'
 import { normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
+import { MINIMUM_CORE_MODULES } from '@/modules/marketplace/lib/module-registry'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import {
   buildLogoStorageKey,
@@ -2179,6 +2180,15 @@ const getActiveOrgCached = cache(async () => {
 
   // Clean and unique, preserving the granular names for precise sidebar permission checks
   enabledModules = Array.from(new Set(enabledModules.map((m: string) => String(m).trim()).filter(Boolean)))
+
+  // AUTO-INCLUDE MINIMUM CORE MODULES — modul inti wajib selalu aktif
+  // Tanpa modul-modul ini, sistem tidak bisa beroperasi secara minimal.
+  // Operator tidak boleh membuat paket tanpa modul-modul ini.
+  MINIMUM_CORE_MODULES.forEach((coreKey: string) => {
+    if (!enabledModules.some((m: string) => m.toLowerCase() === coreKey.toLowerCase())) {
+      enabledModules.push(coreKey)
+    }
+  })
 
   // Fetch Job Title from employees table
   const { data: empData } = await db

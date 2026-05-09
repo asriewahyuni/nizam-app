@@ -103,9 +103,10 @@ export default async function MarketplacePage() {
           <span className="text-xs text-slate-400 font-medium">Selalu aktif — sudah termasuk dalam paket</span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {CORE_MODULES.map(mod => (
-            <CoreModuleCard key={mod.key} mod={mod} />
-          ))}
+          {CORE_MODULES.map(mod => {
+            const isEnabled = enabledModules.some(m => moduleNameMatches(m, mod.key))
+            return <CoreModuleCard key={mod.key} mod={mod} enabled={isEnabled} />
+          })}
         </div>
       </section>
 
@@ -149,19 +150,34 @@ export default async function MarketplacePage() {
 }
 
 // ── Core Module Card ─────────────────────────────────────────────────────────
-function CoreModuleCard({ mod }: { mod: ModuleDefinition }) {
+function CoreModuleCard({ mod, enabled }: { mod: ModuleDefinition; enabled: boolean }) {
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 px-5 py-4">
-      <div className={`w-10 h-10 rounded-xl ${mod.color} flex items-center justify-center text-lg flex-shrink-0 shadow-sm`}>
+    <div className={`flex items-center gap-4 rounded-2xl border px-5 py-4 transition-all ${
+      enabled
+        ? 'border-emerald-100 bg-emerald-50/40'
+        : 'border-slate-200 bg-white hover:shadow-md hover:border-blue-200'
+    }`}>
+      <div className={`w-10 h-10 rounded-xl ${mod.color} flex items-center justify-center text-lg flex-shrink-0 shadow-sm ${
+        enabled ? '' : 'opacity-50 grayscale'
+      }`}>
         {mod.icon}
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-bold text-slate-900 truncate">{mod.name}</div>
         <div className="text-xs text-slate-500 truncate">{mod.tagline}</div>
       </div>
-      <span className="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
-        <CheckCircle2 className="h-2.5 w-2.5" /> Inti
-      </span>
+
+      {enabled ? (
+        <span className="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
+          <CheckCircle2 className="h-2.5 w-2.5" /> Aktif
+        </span>
+      ) : (
+        <form action={async () => { 'use server'; await activateModule(mod.key) }}>
+          <button className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-xl transition-all whitespace-nowrap">
+            <Zap className="h-3 w-3" /> Aktifkan
+          </button>
+        </form>
+      )}
     </div>
   )
 }
