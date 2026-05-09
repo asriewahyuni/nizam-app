@@ -38,7 +38,8 @@ export const ADDON_REGISTRY: AddonDefinition[] = [
     name: 'POS',
     description: 'Point of Sale untuk retail dan F&B',
     icon: '💳',
-    released: false,
+    released: true,
+    releasedAt: '2026-05-09',
     relatesTo: ['Sales'],
   },
   {
@@ -54,7 +55,8 @@ export const ADDON_REGISTRY: AddonDefinition[] = [
     name: 'Sales Page',
     description: 'Landing page penjualan dan checkout link untuk bisnis online',
     icon: '🛍️',
-    released: false,
+    released: true,
+    releasedAt: '2026-05-09',
     relatesTo: ['Sales'],
   },
   {
@@ -76,7 +78,8 @@ export const ADDON_REGISTRY: AddonDefinition[] = [
     name: 'Quick Bill',
     description: 'Faktur instan untuk tagihan cepat tanpa workflow penuh',
     icon: '⚡',
-    released: false,
+    released: true,
+    releasedAt: '2026-05-09',
     relatesTo: ['Sales'],
   },
   {

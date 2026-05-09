@@ -1,19 +1,18 @@
 /**
  * Version Log — NIZAM Full
  *
- * Satu-satunya tempat mencatat perubahan versi.
- * Patch count = jumlah entry type 'patch' sejak bump terakhir.
+ * Mencatat setiap perubahan sistem dengan version tracking.
+ * Patch count = jumlah entry 'patch' dalam versi saat ini.
  *
  * Aturan:
- * - entry type 'core' → reset M, A, P = 0
- * - entry type 'module' → reset A, P = 0
- * - entry type 'addon' → reset P = 0
- * - entry type 'patch' → increment P
+ * - Setiap bump (core/module/addon) menaikkan versi → reset patch
+ * - Patch entries di bawah bump entry = milik versi itu
+ * - Wajib diupdate setiap kali ada perubahan
  *
  * Cara pakai:
- *   1. Setelah melakukan perubahan, tambah entry baru di bawah.
- *   2. Jangan ubah entry lama (immutable).
- *   3. Urutkan dari TERBARU ke TERLAMA.
+ *   1. Bump versi → tambah entry type 'core'/'module'/'addon' di PALING ATAS
+ *   2. Patch → tambah entry type 'patch' setelah bump entry
+ *   3. Urutkan dari TERBARU ke TERLAMA
  */
 
 export type VersionLogEntryType = 'core' | 'module' | 'addon' | 'patch'
@@ -31,47 +30,80 @@ export interface VersionLogEntry {
   by?: string
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// VERSION LOG — ENTRIES PALING ATAS = PALING BARU
-// ═════════════════════════════════════════════════════════════════════════════
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * VERSION LOG — ENTRIES PALING ATAS = PALING BARU
+ *
+ * STRUKTUR:
+ *   [BUMP entry — core|module|addon]  ← menandai versi baru
+ *   [patch entries...]                  ← patch dalam versi ini
+ *   ─────────────────────
+ *   [BUMP entry sebelumnya]
+ *   [patch entries...]
+ *   ...
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
 
 export const VERSION_LOG: VersionLogEntry[] = [
-  // ── v1.6.0.x — (patch auto-count) ─────────────────────────────────────
+  // ╔════════════════════════════════════════════════════════════════════╗
+  // ║  CURRENT VERSION — v1.6.3.x                                       ║
+  // ║  Core=1, Module=6, Addon=3                                       ║
+  // ╚════════════════════════════════════════════════════════════════════╝
+  // ── BUMP: addon ─────────────────────────────────────────────────────
+  {
+    date: '2026-05-09',
+    type: 'addon',
+    label: 'Rilis 3 add-on: POS, Sales Page, Quick Bill',
+    description: 'POS, Sales Page, dan Quick Bill di-set released: true. ' +
+      'Add-on count naik dari 0 ke 3. Versi: v1.6.0.x → v1.6.3.x.',
+    by: 'system',
+  },
+  // ── Patches dalam v1.6.3.x ──────────────────────────────────────────
+  {
+    date: '2026-05-09',
+    type: 'patch',
+    label: 'Fix pop-up modal: X button ga kelihatan',
+    description: 'X button diubah jadi sticky top-4 float-right dengan ' +
+      'background putih solid + border + shadow. Backdrop bg-black/60 tanpa blur.',
+    by: 'system',
+  },
+
+  // ╔════════════════════════════════════════════════════════════════════╗
+  // ║  v1.6.0.x — Core=1, Module=6, Addon=0                            ║
+  // ╚════════════════════════════════════════════════════════════════════╝
+  // ── BUMP: module ────────────────────────────────────────────────────
+  {
+    date: '2026-05-09',
+    type: 'module',
+    label: 'Version M auto-count dari operational module registry',
+    description: 'Segmen M (Module) sekarang otomatis menghitung jumlah modul operasional ' +
+      'dari OPERATIONAL_MODULES.length di module-registry.ts. ' +
+      'Hasil: M = 6 (Fleet, Workshop, Job Order, Project, LMS, Syirkah).',
+    by: 'system',
+  },
+  // ── Patches dalam v1.6.0.x ──────────────────────────────────────────
   {
     date: '2026-05-09',
     type: 'patch',
     label: 'Add-on registry + auto-count versioning',
     description: 'Buat lib/addon-registry.ts sebagai sumber kebenaran add-on. ' +
-      'Add-on count otomatis dari RELEASED_ADDON_COUNT (filter a.released). ' +
-      'Saat ini semua add-on masih planned (A=0).',
+      'Add-on count otomatis dari RELEASED_ADDON_COUNT (filter a.released).',
     by: 'system',
   },
   {
     date: '2026-05-09',
     type: 'patch',
-    label: 'Version changelog + patch auto-count',
+    label: 'Version changelog + patch auto-count infrastructure',
     description: 'Buat lib/version-log.ts dengan VERSION_LOG entries. ' +
-      'Patch count = jumlah entry type patch sejak non-patch terakhir. ' +
-      'Setiap perubahan dicatat di sini, patch naik otomatis.',
+      'Patch count otomatis dari log entries.',
     by: 'system',
   },
   {
     date: '2026-05-09',
     type: 'patch',
     label: 'Version Integrity Button di header',
-    description: 'Buat VersionIntegrityButton.tsx — tombol di header yang ' +
-      'buka modal berisi: ringkasan versi, daftar modul operasional, ' +
-      'daftar add-on (status rilis/planned), dan changelog lengkap. ' +
-      'User bisa lihat semua perubahan secara transparan.',
-    by: 'system',
-  },
-  {
-    date: '2026-05-09',
-    type: 'patch',
-    label: 'Version M auto-count dari operational module registry',
-    description: 'Segmen M (Module) sekarang otomatis menghitung jumlah modul operasional ' +
-      'dari OPERATIONAL_MODULES.length di module-registry.ts. ' +
-      'Hasil: M = 6 (Fleet, Workshop, Job Order, Project, LMS, Syirkah).',
+    description: 'Buat VersionIntegrityButton.tsx — tombol header yang ' +
+      'buka modal berisi ringkasan versi + changelog transparan.',
     by: 'system',
   },
   {
@@ -98,7 +130,11 @@ export const VERSION_LOG: VersionLogEntry[] = [
     description: 'NIZAM v1.x.x badge di pojok kanan atas header (antara notifikasi dan avatar).',
     by: 'system',
   },
-  // ── v1.0.0.0 ────────────────────────────────────────────────────────────
+
+  // ╔════════════════════════════════════════════════════════════════════╗
+  // ║  v1.0.0.0 — Initial Release                                      ║
+  // ╚════════════════════════════════════════════════════════════════════╝
+  // ── BUMP: core ──────────────────────────────────────────────────────
   {
     date: '2026-04-30',
     type: 'core',
@@ -109,16 +145,36 @@ export const VERSION_LOG: VersionLogEntry[] = [
   },
 ]
 
-/** Ambil patch count: jumlah entry 'patch' sejak tipe non-patch terakhir */
+/**
+ * Patch count = jumlah entry 'patch' di antara bump teratas (current version)
+ * dan bump di bawahnya (previous version).
+ *
+ * Cara baca log (newest-first):
+ *   1. Skip entry pertama jika dia bump (current version marker)
+ *   2. Hitung patch entries sampai ketemu bump berikutnya (previous version)
+ *   3. Berhenti di situ
+ */
 export function getPatchCount(): number {
   let count = 0
+  let currentVersionBumpSeen = false
+
   for (const entry of VERSION_LOG) {
+    if (!currentVersionBumpSeen) {
+      // Skip the first bump entry (current version marker)
+      if (entry.type === 'core' || entry.type === 'module' || entry.type === 'addon') {
+        currentVersionBumpSeen = true
+      }
+      continue
+    }
+
+    // Now we're past the current version marker
     if (entry.type === 'patch') {
       count++
-    } else {
-      // Reset: hitungan patch mulai dari entry non-patch ini
+    } else if (entry.type === 'core' || entry.type === 'module' || entry.type === 'addon') {
+      // Hit previous version bump — stop
       break
     }
   }
+
   return count
 }

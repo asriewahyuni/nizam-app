@@ -38,7 +38,7 @@ export function VersionIntegrityButton() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[999] flex items-start justify-center pt-[10vh] bg-black/60"
             onClick={() => setOpen(false)}
           >
             {/* Modal */}
@@ -49,17 +49,18 @@ export function VersionIntegrityButton() {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               onClick={e => e.stopPropagation()}
-              className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-[28px] bg-white shadow-2xl border border-slate-200"
+              className="relative w-full max-w-2xl max-h-[75vh] overflow-y-auto rounded-[28px] bg-white shadow-2xl border border-slate-200"
             >
-              {/* Header */}
-              <div className="sticky top-0 z-10 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 rounded-t-[28px] p-6 text-white">
-                <button
-                  onClick={() => setOpen(false)}
-                  className="absolute top-4 right-4 w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+              {/* X Button — absolute di pojok modal, selalu keliatan */}
+              <button
+                onClick={() => setOpen(false)}
+                className="sticky top-4 z-50 float-right mr-4 w-9 h-9 rounded-xl bg-white/90 border border-slate-200 shadow-lg flex items-center justify-center hover:bg-white transition-all text-slate-500 hover:text-slate-900"
+              >
+                <X className="h-4 w-4" />
+              </button>
 
+              {/* Header */}
+              <div className="relative -mt-2 mx-4 rounded-[24px] bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-6 text-white shadow-xl">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center">
                     <ShieldCheck className="h-5 w-5 text-emerald-300" />
