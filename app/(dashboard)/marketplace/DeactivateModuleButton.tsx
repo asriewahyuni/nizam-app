@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { PowerOff, Loader2, AlertTriangle, X } from 'lucide-react'
 import { deactivateModule } from '@/modules/marketplace/actions/marketplace.actions'
 
@@ -10,6 +11,7 @@ type Props = {
 }
 
 export function DeactivateModuleButton({ moduleKey, moduleName }: Props) {
+  const router = useRouter()
   const [showConfirm, setShowConfirm] = useState(false)
   const [isPending, startTransition] = useTransition()
 
@@ -17,6 +19,7 @@ export function DeactivateModuleButton({ moduleKey, moduleName }: Props) {
     startTransition(async () => {
       await deactivateModule(moduleKey)
       setShowConfirm(false)
+      router.refresh()
     })
   }
 
