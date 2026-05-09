@@ -14,6 +14,7 @@ import {
 import { CheckCircle2, Lock, ArrowRight, Sparkles, ShieldCheck, Zap, Circle } from 'lucide-react'
 import { DeactivateModuleButton } from './DeactivateModuleButton'
 import { ActivateModuleButton } from './ActivateModuleButton'
+import { ActivateCoreModuleButton } from './ActivateCoreModuleButton'
 
 function moduleNameMatches(enabled: string, key: string): boolean {
   const n = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]/g, '')
@@ -172,11 +173,7 @@ function CoreModuleCard({ mod, enabled }: { mod: ModuleDefinition; enabled: bool
           <CheckCircle2 className="h-2.5 w-2.5" /> Aktif
         </span>
       ) : (
-        <form action={activateModule.bind(null, mod.key)}>
-          <button className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-xl transition-all whitespace-nowrap">
-            <Zap className="h-3 w-3" /> Aktifkan
-          </button>
-        </form>
+        <ActivateCoreModuleButton moduleKey={mod.key} />
       )}
     </div>
   )
