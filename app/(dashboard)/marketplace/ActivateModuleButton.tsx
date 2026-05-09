@@ -22,7 +22,7 @@ export function ActivateModuleButton({ moduleKey, disabled }: Props) {
       try {
         await activateModule(moduleKey)
         // Redirect langsung ke halaman setup
-        router.push(`/marketplace/setup/${moduleKey}`)
+        router.push(`/marketplace/setup/${encodeURIComponent(moduleKey)}`)
       } catch (err: any) {
         setError(err.message || 'Terjadi kesalahan saat mengaktifkan modul')
       }

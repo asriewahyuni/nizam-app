@@ -35,14 +35,8 @@ export default async function ModuleSetupPage({ params }: Props) {
 
   return (
     <SetupClient
-      moduleKey={mod.key}
-      moduleName={mod.name}
-      moduleIcon={mod.icon}
-      moduleHref={mod.href}
-      tagline={mod.tagline}
-      hasCoa={!!mod.coaInjectionFn}
+      mod={mod}
       coaInstalled={coaInstalled}
-      onboardingSteps={mod.onboardingSteps}
       currentSettings={currentSettings}
     />
   )
