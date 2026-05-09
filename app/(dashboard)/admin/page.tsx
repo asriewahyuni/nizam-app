@@ -28,7 +28,9 @@ import {
   Zap,
   ExternalLink,
   Coins,
-  LogIn
+  LogIn,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react'
 import { PageHeader, SectionCard, SectionHeader, SafeButton, StatusBadge, ConfirmDialog } from '@/components/ui/NizamUI'
 import { createClient } from '@/lib/supabase/client'
@@ -74,6 +76,7 @@ import {
   calculateAiRecommendedSellPerGeneration,
   normalizeAiTokenPolicy,
 } from '@/modules/ai/lib/ai-token'
+import { cn } from '@/lib/utils'
 
 const supabase = createClient()
 
@@ -293,6 +296,14 @@ type Tab =
   | 'activity'
   | 'assessors'
 
+type OrganizationHierarchyRow = {
+  org: Organization
+  depth: number
+  parentOrg: Organization | null
+  ancestorOrgIds: string[]
+  visibleDescendantCount: number
+}
+
 export default function SaaSAdminPage() {
   const db = supabase as any
   const [invoices, setInvoices] = useState<any[]>([])
@@ -362,6 +373,7 @@ export default function SaaSAdminPage() {
   const [loadingPackages, setLoadingPackages] = useState(true)
 
   const [orgs, setOrgs] = useState<Organization[]>([])
+  const [collapsedParentOrgIds, setCollapsedParentOrgIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -1270,6 +1282,197 @@ export default function SaaSAdminPage() {
      return matchesSearch && matchesType && matchesPkg
   })
 
+  const allOrgById = new Map(orgs.map((org) => [org.id, org]))
+  const childrenByParentId = new Map<string, Organization[]>()
+  const collapsedParentOrgIdSet = new Set(collapsedParentOrgIds)
+
+  orgs.forEach((org) => {
+    const parentOrgId = String(org.parent_org_id || '').trim()
+    if (!parentOrgId || !allOrgById.has(parentOrgId)) return
+
+    const bucket = childrenByParentId.get(parentOrgId) || []
+    bucket.push(org)
+    childrenByParentId.set(parentOrgId, bucket)
+  })
+
+  const filteredOrgIds = new Set(filteredOrgs.map((org) => org.id))
+  const hierarchicalFilteredOrgs: OrganizationHierarchyRow[] = []
+  const visitedHierarchyOrgIds = new Set<string>()
+
+  // Flatten the full organization tree while only rendering rows that match the current filters.
+  const appendHierarchyRows = (
+    org: Organization,
+    depth: number,
+    ancestorOrgIds: string[] = []
+  ): number => {
+    if (visitedHierarchyOrgIds.has(org.id)) return 0
+    visitedHierarchyOrgIds.add(org.id)
+
+    const parentOrgId = String(org.parent_org_id || '').trim()
+    const parentOrg = parentOrgId ? allOrgById.get(parentOrgId) || null : null
+    const directChildren = childrenByParentId.get(org.id) || []
+    const isVisible = filteredOrgIds.has(org.id)
+    const rowIndex = isVisible ? hierarchicalFilteredOrgs.length : -1
+
+    if (isVisible) {
+      hierarchicalFilteredOrgs.push({
+        org,
+        depth,
+        parentOrg,
+        ancestorOrgIds,
+        visibleDescendantCount: 0,
+      })
+    }
+
+    const nextAncestorOrgIds = isVisible ? [...ancestorOrgIds, org.id] : ancestorOrgIds
+    let visibleDescendantCount = 0
+    directChildren.forEach((child) => {
+      visibleDescendantCount += appendHierarchyRows(child, depth + 1, nextAncestorOrgIds)
+    })
+
+    if (rowIndex >= 0) {
+      hierarchicalFilteredOrgs[rowIndex].visibleDescendantCount = visibleDescendantCount
+    }
+
+    return (isVisible ? 1 : 0) + visibleDescendantCount
+  }
+
+  orgs
+    .filter((org) => {
+      const parentOrgId = String(org.parent_org_id || '').trim()
+      return !parentOrgId || !allOrgById.has(parentOrgId)
+    })
+    .forEach((org) => appendHierarchyRows(org, 0))
+
+  orgs.forEach((org) => {
+    if (!visitedHierarchyOrgIds.has(org.id)) {
+      appendHierarchyRows(org, 0)
+    }
+  })
+
+  const visibleHierarchicalFilteredOrgs = hierarchicalFilteredOrgs.filter(
+    (row) => !row.ancestorOrgIds.some((ancestorOrgId) =>
+      filteredOrgIds.has(ancestorOrgId) && collapsedParentOrgIdSet.has(ancestorOrgId)
+    )
+  )
+  const filteredActiveTenantCount = filteredOrgs.filter((org) => org.is_active).length
+  const filteredDemoTenantCount = filteredOrgs.filter((org) => Boolean((org as any).is_demo)).length
+  const filteredParentTenantCount = hierarchicalFilteredOrgs.filter((row) => row.visibleDescendantCount > 0).length
+  const filteredAttentionTenantCount = filteredOrgs.filter((org) => {
+    if (!org.is_active) return true
+    const expiryDate = resolveOrganizationExpiryDate(org as OrganizationExpirySource)
+    if (!expiryDate) return false
+    const daysRemaining = Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    return daysRemaining <= 7
+  }).length
+  const hasVisibleTenantRows = visibleHierarchicalFilteredOrgs.length > 0
+
+  const toggleParentRowCollapse = (orgId: string) => {
+    setCollapsedParentOrgIds((current) =>
+      current.includes(orgId)
+        ? current.filter((id) => id !== orgId)
+        : [...current, orgId]
+    )
+  }
+
+  const buildCapabilityPreview = (
+    items: readonly string[],
+    emptyLabel: string,
+    limit = 2
+  ) => {
+    const labels = normalizeSaasEntitlementList([...items]).map((capability) =>
+      getSaasCapabilityDisplayLabel(capability)
+    )
+
+    if (labels.length === 0) return emptyLabel
+
+    const preview = labels.slice(0, limit)
+    const remaining = labels.length - preview.length
+
+    return remaining > 0 ? `${preview.join(', ')} +${remaining}` : preview.join(', ')
+  }
+
+  const renderTenantTypeBadge = (isDemo: boolean) => {
+    const Icon = isDemo ? Settings2 : CheckCircle2
+
+    return (
+      <span className={cn(
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold',
+        isDemo
+          ? 'border-orange-200 bg-orange-50 text-orange-700'
+          : 'border-blue-200 bg-blue-50 text-blue-700'
+      )}>
+        <Icon size={11} />
+        {isDemo ? 'Demo' : 'Official'}
+      </span>
+    )
+  }
+
+  const renderOrganizationCell = (
+    row: OrganizationHierarchyRow,
+    variant: 'full' | 'compact' = 'full'
+  ) => {
+    const ownerEmail = String((row.org as any).owner_email || '').trim()
+    const hasParent = Boolean(row.parentOrg)
+    const isCollapsible = row.visibleDescendantCount > 0
+    const isCollapsed = isCollapsible && collapsedParentOrgIdSet.has(row.org.id)
+    const depthPadding = Math.min(row.depth, 4) * (variant === 'compact' ? 16 : 20)
+    const hierarchySummary = row.parentOrg
+      ? isCollapsible
+        ? `Di bawah ${row.parentOrg.name} • ${row.visibleDescendantCount} child`
+        : `Di bawah ${row.parentOrg.name}`
+      : isCollapsible
+        ? `Parent • ${row.visibleDescendantCount} child`
+        : 'Tenant mandiri'
+
+    return (
+      <div className="min-w-0" style={depthPadding > 0 ? { paddingLeft: `${depthPadding}px` } : undefined}>
+        <div className="flex items-start gap-2.5 min-w-0">
+          <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
+            {isCollapsible ? (
+              <button
+                type="button"
+                onClick={() => toggleParentRowCollapse(row.org.id)}
+                aria-label={isCollapsed ? `Expand ${row.org.name}` : `Collapse ${row.org.name}`}
+                className="flex h-5 w-5 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              </button>
+            ) : hasParent ? (
+              <span className="block h-px w-3 bg-slate-300" />
+            ) : (
+              <span className="block h-1.5 w-1.5 rounded-full bg-slate-300" />
+            )}
+          </div>
+
+          <div className="min-w-0">
+            <p className={cn(
+              'truncate font-bold text-slate-900',
+              variant === 'compact' ? 'text-sm' : 'text-[15px]'
+            )}>
+              {row.org.name}
+            </p>
+
+            <p className={cn(
+              'mt-0.5 truncate text-slate-400',
+              variant === 'compact' ? 'text-[10px]' : 'text-[11px]'
+            )}>
+              {hierarchySummary}
+            </p>
+
+            <p className={cn(
+              'mt-1 flex min-w-0 items-center gap-1.5 text-slate-500',
+              variant === 'compact' ? 'text-[10px]' : 'text-[11px]'
+            )}>
+              <Mail size={12} className="shrink-0" />
+              <span className="truncate">{ownerEmail || 'No Email'}</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const entitlementSelectedPackage = packages.find((pkg) => pkg.name === entitlementModal.selectedPlan) || null
   const orgModalSelectedPackage = packages.find((pkg) => pkg.name === orgModalPlanName) || null
   const entitlementPackageModules = entitlementSelectedPackage ? toCapabilityArray(entitlementSelectedPackage.modules) : []
@@ -1795,79 +1998,216 @@ export default function SaaSAdminPage() {
 
           {activeTab === 'users' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
-                <div className="lg:col-span-2 relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input 
-                    value={searchTxt}
-                    onChange={(e) => setSearchTxt(e.target.value)}
-                    placeholder="Cari tenant / email pemilik..." 
-                    className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-bold text-slate-700"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-widest">Tipe Akun</label>
-                  <select 
-                    value={typeFilter}
-                    onChange={(e) => setTypeFilter(e.target.value as any)}
-                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
-                  >
-                    <option value="all">Semua Tipe</option>
-                    <option value="official">Resmi / Produksi</option>
-                    <option value="demo">Demo / Latihan</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-widest">Filter Paket</label>
-                  <select 
-                    value={packageFilter}
-                    onChange={(e) => setPackageFilter(e.target.value)}
-                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
-                  >
-                    <option value="all">Semua Paket</option>
-                    {packages.map(p => <option key={p.id||p.name} value={p.name}>{p.name}</option>)}
-                  </select>
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.95fr)]">
+                <SectionCard className="relative overflow-hidden border-slate-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_46%,#eef6ff_100%)]">
+                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-200 to-transparent" />
+                  <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-sky-100/70 blur-3xl" />
+                  <div className="absolute bottom-0 left-0 h-24 w-24 rounded-full bg-blue-50 blur-2xl" />
+                  <div className="relative p-7 md:p-8">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 shadow-sm">
+                      <ShieldCheck size={12} className="text-sky-500" />
+                      Tenant Workspace
+                    </div>
+                    <h2 className="mt-4 max-w-2xl text-3xl font-black tracking-tight text-slate-900">
+                      Kelola tenant dengan tampilan yang lebih bersih dan modern.
+                    </h2>
+                    <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-slate-500">
+                      Parent-child, status, paket, dan masa berlaku tenant ditata ulang agar lebih cepat dipindai saat jumlah tenant mulai bertambah.
+                    </p>
+                    <div className="mt-6 flex flex-wrap gap-3">
+                      <SafeButton variant="primary" onClick={() => openOrgModal(null)} icon={<Plus size={18} />}>
+                        Registrasi Tenant Baru
+                      </SafeButton>
+                      <SafeButton
+                        variant={tenantDeleteMode ? 'danger' : 'white'}
+                        onClick={() => setTenantDeleteMode(prev => !prev)}
+                        icon={tenantDeleteMode ? <X size={18} /> : <Trash2 size={18} />}
+                      >
+                        {tenantDeleteMode ? 'Keluar Mode Hapus' : 'Mode Hapus Tenant Nonaktif'}
+                      </SafeButton>
+                      <button
+                        onClick={fetchOrganizations}
+                        className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white/90 text-slate-500 shadow-sm transition-all hover:bg-white hover:text-slate-800"
+                        title="Refresh data tenant"
+                      >
+                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                      </button>
+                    </div>
+                  </div>
+                </SectionCard>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    {
+                      label: 'Tenant Terlihat',
+                      value: filteredOrgs.length,
+                      note: 'Hasil filter saat ini',
+                      icon: Users,
+                      tone: 'from-sky-50 to-white text-sky-600',
+                    },
+                    {
+                      label: 'Tenant Aktif',
+                      value: filteredActiveTenantCount,
+                      note: 'Berstatus running',
+                      icon: CheckCircle2,
+                      tone: 'from-emerald-50 to-white text-emerald-600',
+                    },
+                    {
+                      label: 'Parent Tenant',
+                      value: filteredParentTenantCount,
+                      note: 'Memiliki child tenant',
+                      icon: Building2,
+                      tone: 'from-indigo-50 to-white text-indigo-600',
+                    },
+                    {
+                      label: 'Perlu Perhatian',
+                      value: filteredAttentionTenantCount,
+                      note: 'Suspended atau hampir habis',
+                      icon: Zap,
+                      tone: 'from-amber-50 to-white text-amber-600',
+                    },
+                  ].map((item) => {
+                    const StatIcon = item.icon
+                    return (
+                      <SectionCard
+                        key={item.label}
+                        className={`border-slate-200/80 bg-gradient-to-br ${item.tone} shadow-[0_18px_40px_-24px_rgba(15,23,42,0.35)]`}
+                      >
+                        <div className="p-5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                {item.label}
+                              </p>
+                              <p className="mt-3 text-3xl font-black tracking-tight text-slate-900">
+                                {item.value}
+                              </p>
+                              <p className="mt-1 text-[11px] font-medium text-slate-500">
+                                {item.note}
+                              </p>
+                            </div>
+                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/80 bg-white/80 shadow-sm">
+                              <StatIcon size={18} className="shrink-0" />
+                            </div>
+                          </div>
+                        </div>
+                      </SectionCard>
+                    )
+                  })}
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-3">
-                 <SafeButton variant="primary" onClick={() => openOrgModal(null)} icon={<Plus size={18} />}>Registrasi Tenant Baru</SafeButton>
-                 <SafeButton
-                   variant={tenantDeleteMode ? 'danger' : 'white'}
-                   onClick={() => setTenantDeleteMode(prev => !prev)}
-                   icon={tenantDeleteMode ? <X size={18} /> : <Trash2 size={18} />}
-                 >
-                   {tenantDeleteMode ? 'Keluar Mode Hapus' : 'Mode Hapus Tenant Nonaktif'}
-                 </SafeButton>
-                 <button onClick={fetchOrganizations} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors shadow-sm"><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></button>
-              </div>
+              <SectionCard glass className="border-slate-200/80 bg-white/80 shadow-[0_20px_40px_-24px_rgba(15,23,42,0.18)]">
+                <div className="grid grid-cols-1 gap-4 p-5 lg:grid-cols-[minmax(0,1.4fr)_220px_220px]">
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                      value={searchTxt}
+                      onChange={(e) => setSearchTxt(e.target.value)}
+                      placeholder="Cari tenant atau email pemilik..."
+                      className="w-full rounded-2xl border border-slate-200 bg-white/90 py-3.5 pl-12 pr-4 font-bold text-slate-700 shadow-sm outline-none transition-all focus:border-blue-200 focus:ring-4 focus:ring-blue-100/70"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">Tipe Akun</label>
+                    <select
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value as any)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 font-bold text-slate-700 shadow-sm outline-none transition-all focus:border-blue-200 focus:ring-4 focus:ring-blue-100/70"
+                    >
+                      <option value="all">Semua Tipe</option>
+                      <option value="official">Resmi / Produksi</option>
+                      <option value="demo">Demo / Latihan</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">Filter Paket</label>
+                    <select
+                      value={packageFilter}
+                      onChange={(e) => setPackageFilter(e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 font-bold text-slate-700 shadow-sm outline-none transition-all focus:border-blue-200 focus:ring-4 focus:ring-blue-100/70"
+                    >
+                      <option value="all">Semua Paket</option>
+                      {packages.map((p) => <option key={p.id || p.name} value={p.name}>{p.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </SectionCard>
 
               {tenantDeleteMode && (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-700">
+                <div className="rounded-[26px] border border-rose-200 bg-[linear-gradient(135deg,#fff1f2_0%,#fff7f7_100%)] px-5 py-4 text-xs font-bold text-rose-700 shadow-[0_18px_35px_-28px_rgba(225,29,72,0.55)]">
                   Mode hapus aktif: hanya tenant berstatus <span className="font-black">Suspended</span> yang dapat dihapus.
                 </div>
               )}
 
-              <SectionCard>
+              <SectionCard className="border-slate-200/80 shadow-[0_24px_60px_-28px_rgba(15,23,42,0.16)]">
+                <div className="flex flex-col gap-3 border-b border-slate-100 bg-[linear-gradient(180deg,rgba(248,250,252,0.92)_0%,rgba(255,255,255,0.9)_100%)] px-6 py-5 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Tenant Overview</p>
+                    <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Daftar tenant yang sedang Anda pantau</h3>
+                    <p className="mt-1 text-sm font-medium text-slate-500">
+                      {filteredOrgs.length} tenant cocok dengan filter • {visibleHierarchicalFilteredOrgs.length} baris terlihat pada struktur saat ini
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-right shadow-sm">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Hierarchy</p>
+                    <p className="mt-1 text-sm font-bold text-slate-700">
+                      Chevron parent akan membuka dan menutup child tenant.
+                    </p>
+                  </div>
+                </div>
+
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
+                  <table className="w-full min-w-[1080px] border-separate border-spacing-0">
                     <thead>
-                      <tr className="border-b border-slate-100">
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Organisasi / Pemilik</th>
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Tipe</th>
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Paket / Entitlement</th>
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Masa Berlaku</th>
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Status</th>
-                        <th className="text-right py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Aksi</th>
+                      <tr>
+                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-black uppercase tracking-widest text-slate-400 backdrop-blur">Organisasi / Pemilik</th>
+                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-black uppercase tracking-widest text-slate-400 backdrop-blur">Tipe</th>
+                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-black uppercase tracking-widest text-slate-400 backdrop-blur">Paket / Entitlement</th>
+                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-black uppercase tracking-widest text-slate-400 backdrop-blur">Masa Berlaku</th>
+                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-black uppercase tracking-widest text-slate-400 backdrop-blur">Status</th>
+                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-right text-[11px] font-black uppercase tracking-widest text-slate-400 backdrop-blur">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {filteredOrgs.map((org) => {
+                      {!hasVisibleTenantRows && (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-16 text-center">
+                            <div className="mx-auto flex max-w-md flex-col items-center">
+                              <div className="flex h-14 w-14 items-center justify-center rounded-3xl border border-slate-200 bg-slate-50 text-slate-400 shadow-sm">
+                                <Search size={20} />
+                              </div>
+                              <h4 className="mt-4 text-lg font-black text-slate-900">Belum ada tenant yang cocok</h4>
+                              <p className="mt-2 text-sm font-medium leading-6 text-slate-500">
+                                Coba longgarkan kata kunci pencarian atau ubah filter tipe dan paket untuk melihat tenant lain.
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {visibleHierarchicalFilteredOrgs.map((row) => {
+                        const org = row.org
                         const expiryDate = resolveOrganizationExpiryDate(org as OrganizationExpirySource)
                         const expiryTime = expiryDate?.getTime() ?? null
                         const daysRemaining = expiryTime
                           ? Math.ceil((expiryTime - Date.now()) / (1000 * 60 * 60 * 24))
                           : null
+                        const expiryLabel =
+                          expiryDate && expiryTime !== null && daysRemaining !== null
+                            ? daysRemaining < 0
+                              ? `Expired ${Math.abs(daysRemaining)} hari`
+                              : daysRemaining === 0
+                                ? 'Berakhir hari ini'
+                                : `${daysRemaining} hari lagi`
+                            : 'Unlimited'
+                        const expiryToneClass =
+                          expiryDate && expiryTime !== null && daysRemaining !== null
+                            ? daysRemaining < 0
+                              ? 'text-rose-600'
+                              : daysRemaining <= 7
+                                ? 'text-orange-500'
+                                : 'text-slate-800'
+                            : 'text-slate-700'
                         const {
                           activePlanName,
                           rowManagedModules,
@@ -1878,102 +2218,75 @@ export default function SaaSAdminPage() {
                         } = getOrgEntitlementSnapshot(org)
 
                         return (
-                          <tr key={org.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="py-4 px-6">
-                            <div>
-                               <p className="font-bold text-slate-900">{org.name}</p>
-                               <p className="text-[10px] text-blue-600 font-black flex items-center gap-1.5 mt-0.5">
-                                  <Mail size={12} /> {(org as any).owner_email || 'No Email'}
-                               </p>
-                            </div>
+                          <tr key={org.id} className="align-top transition-colors hover:bg-sky-50/30">
+                          <td className="px-6 py-5">
+                            {renderOrganizationCell(row, 'full')}
                           </td>
-                          <td className="py-4 px-6">
-                            {(org as any).is_demo ? 
-                              <span className="px-2.5 py-1 bg-orange-50 text-orange-600 text-[10px] font-black uppercase rounded-lg border border-orange-100 flex items-center gap-1 w-fit"><Settings2 size={10} /> Demo</span> : 
-                              <span className="px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-black uppercase rounded-lg border border-blue-100 flex items-center gap-1 w-fit"><CheckCircle2 size={10} /> Official</span>
-                            }
+                          <td className="px-6 py-5">
+                            {renderTenantTypeBadge(Boolean((org as any).is_demo))}
                           </td>
-                          <td className="py-4 px-6">
-                            <div className="space-y-2">
-                              <span className="text-sm font-bold text-slate-700">{activePlanName || 'Belum Dipilih'}</span>
-                              <div className="flex flex-wrap gap-1.5">
-                                <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-indigo-700">
-                                  {rowArchitecture?.bundleLabel || 'Custom / Unknown'}
-                                </span>
-                                <span className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] border ${
-                                  useCustomModules
-                                    ? 'border-amber-200 bg-amber-50 text-amber-700'
-                                    : 'border-slate-200 bg-white text-slate-500'
-                                }`}>
-                                  {useCustomModules ? 'Custom Modules' : 'Follow Plan'}
-                                </span>
-                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-slate-600">
-                                  {rowManagedModules.length} Module
-                                </span>
-                                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700">
-                                  {rowManualAddons.length} Add-on
-                                </span>
-                              </div>
-                              <p className="text-[10px] font-bold text-slate-400">
-                                Total capability aktif: {rowFinalCapabilities.length}
+                          <td className="px-6 py-5">
+                            <div className="space-y-1">
+                              <p className="text-sm font-bold text-slate-800">
+                                {activePlanName || 'Belum dipilih'}
+                              </p>
+                              <p className="text-[11px] font-medium text-slate-500">
+                                {rowArchitecture?.bundleLabel || 'Custom / Unknown'} • {rowManagedModules.length} modul • {rowManualAddons.length} add-on
+                              </p>
+                              <p className="text-[10px] font-medium text-slate-400">
+                                {useCustomModules ? 'Custom modules aktif' : 'Ikuti konfigurasi plan'} • total {rowFinalCapabilities.length} capability
                               </p>
                             </div>
                           </td>
-                          <td className="py-4 px-6">
-                            {expiryDate && expiryTime !== null && daysRemaining !== null ? (
-                              <div className="flex flex-col gap-0.5">
-                                <p className={`text-xs font-black tabular-nums ${
-                                  expiryTime < Date.now()
-                                    ? 'text-rose-600' 
-                                    : (expiryTime - Date.now() < 7 * 24 * 60 * 60 * 1000 ? 'text-orange-500' : 'text-slate-900')
-                                }`}>
-                                  {daysRemaining} Hari
-                                </p>
-                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight italic">
-                                  s/d {expiryDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                </p>
-                              </div>
-                            ) : (
-                              <span className="text-xs font-bold text-slate-300 italic">Unlimited / No Data</span>
-                            )}
+                          <td className="px-6 py-5">
+                            <div className="space-y-0.5">
+                              <p className={cn('text-xs font-black tabular-nums', expiryToneClass)}>
+                                {expiryLabel}
+                              </p>
+                              <p className="text-[10px] font-medium text-slate-400">
+                                {expiryDate
+                                  ? expiryDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+                                  : 'Tanpa batas waktu'}
+                              </p>
+                            </div>
                           </td>
-                          <td className="py-4 px-6">
+                          <td className="px-6 py-5">
                             <StatusBadge variant={org.is_active ? 'success' : 'neutral'} label={org.is_active ? 'Running' : 'Suspended'} />
                           </td>
-                          <td className="py-4 px-6 text-right">
+                          <td className="px-6 py-5 text-right">
                             <div className="flex justify-end gap-2">
                               <button
                                 onClick={() => openEntitlementModal(org, 'all')}
-                                title="Buka provisioning builder"
-                                className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[11px] font-black uppercase tracking-wide text-indigo-700 transition-all hover:bg-indigo-100"
+                                title="Kelola paket dan entitlement tenant"
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50"
                               >
                                 <Package size={14} />
-                                <span>Builder</span>
+                                <span>Kelola</span>
                               </button>
                               <button
                                 onClick={() => handleLoginAsTenant(org)}
                                 disabled={loginAsPending}
                                 title="Login sebagai owner tenant ini"
-                                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-black uppercase tracking-wide text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60"
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
                               >
                                 {loginAsPending && loginAsOrgId === org.id ? (
                                   <Loader2 size={14} className="animate-spin" />
                                 ) : (
                                   <LogIn size={14} />
                                 )}
-                                <span>Login As</span>
+                                <span>Masuk</span>
                               </button>
-                              <button onClick={() => openOrgModal(org)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
-                                 <Edit3 size={18} />
+                              <button onClick={() => openOrgModal(org)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:text-slate-700">
+                                 <Edit3 size={16} />
                               </button>
                               {tenantDeleteMode && (
                                 <button
                                   onClick={() => handleDeleteOrg(org)}
                                   disabled={org.is_active || deletingOrgId === org.id}
                                   title={org.is_active ? 'Hanya tenant Suspended yang bisa dihapus.' : 'Hapus tenant nonaktif'}
-                                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-sm transition-all hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-400"
                                 >
-                                  {deletingOrgId === org.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                                  {deletingOrgId === org.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                                 </button>
                               )}
                             </div>
@@ -2051,7 +2364,8 @@ export default function SaaSAdminPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {filteredOrgs.map((org) => {
+                      {visibleHierarchicalFilteredOrgs.map((row) => {
+                        const org = row.org
                         const {
                           activePlanName,
                           rowManagedModules,
@@ -2063,60 +2377,40 @@ export default function SaaSAdminPage() {
                         return (
                           <tr key={`module-mgmt-${org.id}`} className="hover:bg-slate-50/50 transition-colors">
                             <td className="py-4 px-6">
-                              <div>
-                                <p className="font-bold text-slate-900">{org.name}</p>
-                                <p className="text-[10px] text-blue-600 font-black flex items-center gap-1.5 mt-0.5">
-                                  <Mail size={12} /> {(org as any).owner_email || 'No Email'}
-                                </p>
-                              </div>
+                              {renderOrganizationCell(row, 'compact')}
                             </td>
                             <td className="py-4 px-6">
                               <span className="text-sm font-bold text-slate-700">{activePlanName || 'Belum Dipilih'}</span>
                             </td>
                             <td className="py-4 px-6">
-                              <div className="flex flex-wrap gap-1.5">
-                                <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                              <div className="space-y-1">
+                                <p className="text-sm font-bold text-slate-800">
                                   {rowArchitecture?.bundleLabel || 'Custom / Unknown'}
-                                </span>
-                                <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] border ${
-                                  useCustomModules
-                                    ? 'border-amber-200 bg-amber-50 text-amber-700'
-                                    : 'border-slate-200 bg-white text-slate-500'
-                                }`}>
-                                  {useCustomModules ? 'Custom' : 'Plan Default'}
-                                </span>
+                                </p>
+                                <p className="text-[10px] font-medium text-slate-400">
+                                  {useCustomModules ? 'Custom modules aktif' : 'Ikuti plan default'}
+                                </p>
                               </div>
                             </td>
                             <td className="py-4 px-6">
-                              <div className="flex flex-wrap gap-1.5">
-                                {rowManagedModules.slice(0, 3).map((capability) => (
-                                  <span key={`module-chip-${org.id}-${capability}`} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-600">
-                                    {getSaasCapabilityDisplayLabel(capability)}
-                                  </span>
-                                ))}
-                                {rowManagedModules.length > 3 && (
-                                  <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                                    +{rowManagedModules.length - 3} lagi
-                                  </span>
-                                )}
-                                {rowManagedModules.length === 0 && (
-                                  <span className="text-xs font-bold text-slate-400">Belum ada module aktif.</span>
-                                )}
-                              </div>
+                              <p className="text-xs font-medium leading-5 text-slate-500">
+                                {buildCapabilityPreview(rowManagedModules, 'Belum ada modul aktif.')}
+                              </p>
                             </td>
-                            <td className="py-4 px-6 text-sm font-black text-slate-900">
-                              {rowFinalCapabilities.length}
+                            <td className="py-4 px-6">
+                              <span className="text-sm font-black text-slate-900">{rowFinalCapabilities.length}</span>
+                              <span className="ml-1 text-[10px] font-medium text-slate-400">capability</span>
                             </td>
                             <td className="py-4 px-6 text-right">
                               <div className="flex justify-end gap-2">
                                 <button
                                   onClick={() => openEntitlementModal(org, 'all')}
-                                  className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[11px] font-black uppercase tracking-wide text-indigo-700 transition-all hover:bg-indigo-100"
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 transition-all hover:bg-slate-50"
                                 >
                                   <Package size={14} />
-                                  <span>Builder</span>
+                                  <span>Kelola</span>
                                 </button>
-                                <SafeButton variant="white" onClick={() => openEntitlementModal(org, 'modules')} icon={<Package size={16} />}>
+                                <SafeButton variant="white" onClick={() => openEntitlementModal(org, 'all')} icon={<Package size={16} />}>
                                   Atur Modul
                                 </SafeButton>
                               </div>
@@ -2194,7 +2488,8 @@ export default function SaaSAdminPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {filteredOrgs.map((org) => {
+                      {visibleHierarchicalFilteredOrgs.map((row) => {
+                        const org = row.org
                         const {
                           activePlanName,
                           rowBlueprintAddons,
@@ -2205,49 +2500,34 @@ export default function SaaSAdminPage() {
                         return (
                           <tr key={`addon-mgmt-${org.id}`} className="hover:bg-slate-50/50 transition-colors">
                             <td className="py-4 px-6">
-                              <div>
-                                <p className="font-bold text-slate-900">{org.name}</p>
-                                <p className="text-[10px] text-blue-600 font-black flex items-center gap-1.5 mt-0.5">
-                                  <Mail size={12} /> {(org as any).owner_email || 'No Email'}
-                                </p>
-                              </div>
+                              {renderOrganizationCell(row, 'compact')}
                             </td>
                             <td className="py-4 px-6">
                               <span className="text-sm font-bold text-slate-700">{activePlanName || 'Belum Dipilih'}</span>
                             </td>
                             <td className="py-4 px-6">
-                              <div className="flex flex-wrap gap-1.5">
-                                {rowManualAddons.slice(0, 3).map((capability) => (
-                                  <span key={`addon-chip-${org.id}-${capability}`} className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700">
-                                    {getSaasCapabilityDisplayLabel(capability)}
-                                  </span>
-                                ))}
-                                {rowManualAddons.length > 3 && (
-                                  <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                                    +{rowManualAddons.length - 3} lagi
-                                  </span>
-                                )}
-                                {rowManualAddons.length === 0 && (
-                                  <span className="text-xs font-bold text-slate-400">Belum ada add-on manual.</span>
-                                )}
-                              </div>
+                              <p className="text-xs font-medium leading-5 text-slate-500">
+                                {buildCapabilityPreview(rowManualAddons, 'Belum ada add-on manual.')}
+                              </p>
                             </td>
-                            <td className="py-4 px-6 text-sm font-black text-slate-700">
-                              {rowBlueprintAddons.length}
+                            <td className="py-4 px-6">
+                              <span className="text-sm font-black text-slate-700">{rowBlueprintAddons.length}</span>
+                              <span className="ml-1 text-[10px] font-medium text-slate-400">blueprint</span>
                             </td>
-                            <td className="py-4 px-6 text-sm font-black text-slate-900">
-                              {rowFinalCapabilities.length}
+                            <td className="py-4 px-6">
+                              <span className="text-sm font-black text-slate-900">{rowFinalCapabilities.length}</span>
+                              <span className="ml-1 text-[10px] font-medium text-slate-400">capability</span>
                             </td>
                             <td className="py-4 px-6 text-right">
                               <div className="flex justify-end gap-2">
                                 <button
                                   onClick={() => openEntitlementModal(org, 'all')}
-                                  className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[11px] font-black uppercase tracking-wide text-indigo-700 transition-all hover:bg-indigo-100"
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 transition-all hover:bg-slate-50"
                                 >
                                   <Package size={14} />
-                                  <span>Builder</span>
+                                  <span>Kelola</span>
                                 </button>
-                                <SafeButton variant="white" onClick={() => openEntitlementModal(org, 'addons')} icon={<Package size={16} />}>
+                                <SafeButton variant="white" onClick={() => openEntitlementModal(org, 'all')} icon={<Package size={16} />}>
                                   Atur Add-on
                                 </SafeButton>
                               </div>

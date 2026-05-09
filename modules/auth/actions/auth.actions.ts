@@ -1621,6 +1621,54 @@ export async function deleteInactiveTenantByPlatformAdmin(orgId: string) {
     return { error: `Tenant "${org.name}" masih aktif. Nonaktifkan tenant terlebih dahulu sebelum menghapus.` }
   }
 
+  const { data: orgAccounts, error: orgAccountsError } = await (adminClient as any)
+    .from('accounts')
+    .select('id')
+    .eq('org_id', trimmedOrgId)
+
+  if (orgAccountsError) {
+    return { error: `Gagal membaca daftar akun tenant: ${orgAccountsError.message}` }
+  }
+
+  const orgAccountIds = (orgAccounts || [])
+    .map((row: { id?: string | null }) => String(row?.id || '').trim())
+    .filter(Boolean)
+
+  if (orgAccountIds.length > 0) {
+    const cleanupSteps = [
+      {
+        label: 'komponen payroll',
+        run: () => (adminClient as any)
+          .from('payroll_components')
+          .update({ account_id: null })
+          .eq('org_id', trimmedOrgId)
+          .in('account_id', orgAccountIds),
+      },
+      {
+        label: 'run payroll',
+        run: () => (adminClient as any)
+          .from('payroll_runs')
+          .update({ disbursement_account_id: null })
+          .eq('org_id', trimmedOrgId)
+          .in('disbursement_account_id', orgAccountIds),
+      },
+      {
+        label: 'baris slip gaji',
+        run: () => (adminClient as any)
+          .from('payslip_lines')
+          .update({ account_id: null })
+          .in('account_id', orgAccountIds),
+      },
+    ] as const
+
+    for (const step of cleanupSteps) {
+      const { error: cleanupError } = await step.run()
+      if (cleanupError) {
+        return { error: `Gagal membersihkan referensi akun di ${step.label}: ${cleanupError.message}` }
+      }
+    }
+  }
+
   const { error: deleteError } = await (adminClient as any)
     .from('organizations')
     .delete()
