@@ -642,7 +642,7 @@ export function AppSidebar({
                       return (
                         <li key={`${group.group}:${item.label}:${item.href}`}>
                           <Link
-                            href={item.href}
+                            href={item.module_key && pendingModules.includes(item.module_key) ? `/marketplace/setup/${item.module_key}` : item.href}
                             onMouseEnter={() => prefetchRoute(item.href)}
                             onFocus={() => prefetchRoute(item.href)}
                             onTouchStart={() => prefetchRoute(item.href)}
@@ -720,7 +720,7 @@ export function AppSidebar({
                     return (
                       <li key={`${group.group}:${item.label}:${item.href}`}>
                         <Link
-                          href={item.href}
+                          href={item.module_key && pendingModules.includes(item.module_key) ? `/marketplace/setup/${item.module_key}` : item.href}
                           onMouseEnter={() => prefetchRoute(item.href)}
                           onFocus={() => prefetchRoute(item.href)}
                           onTouchStart={() => prefetchRoute(item.href)}
