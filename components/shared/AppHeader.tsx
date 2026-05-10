@@ -4,7 +4,6 @@ import { formatRupiah, getInitials } from '@/lib/utils'
 import { scheduleIdleTask } from '@/lib/browser/idle'
 import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/browser/approval-notifier'
 import { Building2, Bell, Coins, Menu, MapPin, ChevronDown, Sparkles, Plus, CheckCircle2, AlertCircle, LoaderCircle, ShieldAlert, Layers, ArrowUpRight, GripVertical, Pencil, Trash2, Workflow, Command, Move, X, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2, Zap } from 'lucide-react'
-import { VersionIntegrityButton } from '@/components/shared/VersionIntegrityButton'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import Link from 'next/link'
@@ -1650,16 +1649,6 @@ export function AppHeader({
         <div className="hidden sm:block">
           <VersionIntegrityButton />
         </div>
-
-        {planName && (
-          <Link
-            href="/billing"
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-indigo-700 hover:bg-indigo-100 transition-colors"
-          >
-            <Zap size={11} className="text-indigo-500" />
-            {planName}
-          </Link>
-        )}
 
         {isPlatformAdmin && (
           <Link
