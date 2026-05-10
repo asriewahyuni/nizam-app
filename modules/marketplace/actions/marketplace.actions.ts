@@ -208,8 +208,9 @@ export async function completeModuleOnboarding(moduleKey: string) {
 
   if (error) throw new Error(error.message)
 
-  revalidatePath('/lms')
   revalidatePath('/marketplace')
+  revalidatePath('/dashboard')
+  revalidatePath(`/marketplace/setup/${encodeURIComponent(moduleKey)}`)
   return { success: true }
 }
 
@@ -242,7 +243,7 @@ export async function deactivateModule(moduleKey: string) {
 
   revalidatePath('/marketplace')
   revalidatePath('/dashboard')
-  redirect(`/marketplace/setup/${encodeURIComponent(moduleKey)}`)
+  redirect('/marketplace')
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────────────

@@ -3,7 +3,6 @@ import { unstable_noStore as noStore } from 'next/cache'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import {
   getOrgModuleInstances,
-  activateModule,
   getOperationalModulePricing,
 } from '@/modules/marketplace/actions/marketplace.actions'
 import {
@@ -122,15 +121,41 @@ export default async function MarketplacePage() {
           </div>
           <div className="flex-1 h-px bg-slate-200" />
         </div>
-        <p className="text-xs text-slate-500 mb-6">
+        <p className="text-xs text-slate-500 mb-4">
           Aktifkan sesuai model bisnis. Setiap modul membawa Chart of Accounts dan alur kerja spesifik.
           {hasPricing ? ' Harga ditambahkan ke tagihan langganan Anda.' : ' Hubungi tim kami untuk harga.'}
         </p>
+
+        {/* ── Alur Aktivasi ── */}
+        <div className="mb-6 flex items-center gap-1 flex-wrap">
+          {[
+            { step: 1, label: 'Aktifkan' },
+            { step: 2, label: 'Pembayaran' },
+            { step: 3, label: 'Onboarding' },
+            { step: 4, label: 'Setup' },
+            { step: 5, label: 'Aktif' },
+            { step: 6, label: 'Masuk Menu' },
+          ].map((item, idx, arr) => (
+            <div key={item.step} className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+                <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center text-[8px] font-black text-white flex-shrink-0">
+                  {item.step}
+                </div>
+                <span className="text-[10px] font-bold text-slate-500">{item.label}</span>
+              </div>
+              {idx < arr.length - 1 && (
+                <Zap className="h-3 w-3 text-slate-300 flex-shrink-0" />
+              )}
+            </div>
+          ))}
+        </div>
 
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {OPERATIONAL_MODULES.map(mod => {
             const state = getModuleState(mod)
             const price = pricing[mod.key]
+            const instance = instanceMap.get(mod.key) as any
+            const readyAt = instance?.ready_at ?? null
             const unmetRequirements = (mod.requires || []).filter(
               req => !enabledModules.some(m => moduleNameMatches(m, req))
             )
@@ -140,6 +165,7 @@ export default async function MarketplacePage() {
                 mod={mod}
                 state={state}
                 price={price}
+                readyAt={readyAt}
                 unmetRequirements={unmetRequirements}
               />
             )
@@ -184,11 +210,13 @@ function OperationalModuleCard({
   mod,
   state,
   price,
+  readyAt,
   unmetRequirements = [],
 }: {
   mod: ModuleDefinition
   state: ModuleState
   price?: number
+  readyAt?: string | null
   unmetRequirements?: string[]
 }) {
   const isLocked   = state === 'locked'
@@ -260,9 +288,26 @@ function OperationalModuleCard({
           <span className="text-xs text-slate-400 font-medium">/ bulan</span>
         </div>
       )}
-      {price !== undefined && isReady && (
-        <div className="mt-3 text-xs font-bold text-blue-600">
-          {formatRp(price)} / bulan · Aktif dalam paket Anda
+
+      {/* ── Banner Modul Aktif ── */}
+      {isReady && (
+        <div className="mt-4 pt-4 border-t border-blue-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              <span className="text-xs font-black text-emerald-700">Modul Aktif</span>
+            </div>
+            {readyAt && (
+              <span className="text-[10px] text-slate-400 font-medium">
+                Sejak {new Date(readyAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+            )}
+          </div>
+          {price !== undefined && (
+            <p className="text-[10px] text-blue-500 font-bold mt-1">
+              {formatRp(price)} / bulan · Aktif dalam paket Anda
+            </p>
+          )}
         </div>
       )}
 
@@ -281,15 +326,14 @@ function OperationalModuleCard({
                   Syarat: Aktifkan {unmetRequirements.join(', ')} terlebih dahulu.
                 </div>
               )}
-              <form action={activateModule.bind(null, mod.key)}>
-                <button 
-                  type="submit" 
-                  disabled={unmetRequirements.length > 0}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Aktifkan Kembali <ArrowRight className="h-4 w-4" />
-                </button>
-              </form>
+              <ActivateModuleButton
+                moduleKey={mod.key}
+                moduleName={mod.name}
+                moduleIcon={mod.icon}
+                moduleColor={mod.color}
+                price={price}
+                disabled={unmetRequirements.length > 0}
+              />
             </div>
           )}
           {isAvailable && (
@@ -300,7 +344,11 @@ function OperationalModuleCard({
                 </div>
               )}
               <ActivateModuleButton 
-                moduleKey={mod.key} 
+                moduleKey={mod.key}
+                moduleName={mod.name}
+                moduleIcon={mod.icon}
+                moduleColor={mod.color}
+                price={price}
                 disabled={unmetRequirements.length > 0} 
               />
             </div>
