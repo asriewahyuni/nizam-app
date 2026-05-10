@@ -136,10 +136,26 @@ export async function activateModule(moduleKey: string) {
     p_module_key: moduleKey,
   })
 
+  // ── Khusus child org: pastikan use_custom_modules = true ──────────────────
+  // Child org mewarisi plan dari parent, tapi enabled_modules-nya berbeda.
+  // use_custom_modules harus true agar kolom enabled_modules di org dibaca
+  // oleh getActiveOrg(), bukan diambil dari saas_packages plan.
+  const isChildOrg = Boolean(orgData.org.parent_org_id)
+  if (isChildOrg && !orgData.org.settings?.use_custom_modules) {
+    const currentSettings = (orgData.org.settings && typeof orgData.org.settings === 'object')
+      ? orgData.org.settings
+      : {}
+    await supabase
+      .from('organizations')
+      .update({ settings: { ...currentSettings, use_custom_modules: true } })
+      .eq('id', orgData.org.id)
+  }
+
   revalidatePath('/marketplace')
   revalidatePath('/dashboard')
   redirect(`/marketplace/setup/${encodeURIComponent(moduleKey)}`)
 }
+
 
 /**
  * Install CoA untuk sebuah modul dengan memanggil SQL injection function.
@@ -185,7 +201,7 @@ export async function saveModuleSettings(moduleKey: string, settings: Record<str
 
   if (error) throw new Error(error.message)
 
-  revalidatePath(`/${moduleKey.toLowerCase().replace(/[^a-z]/g, '-')}/onboarding`)
+  // Tidak perlu revalidatePath — client langsung pindah step via state lokal
   return { success: true }
 }
 
@@ -208,9 +224,10 @@ export async function completeModuleOnboarding(moduleKey: string) {
 
   if (error) throw new Error(error.message)
 
+  // Hanya invalidate marketplace agar modul tampil sebagai READY.
+  // Dashboard layout TIDAK perlu di-revalidate karena sidebar membaca
+  // enabledModules yang sudah ada — router.push dari client sudah cukup.
   revalidatePath('/marketplace')
-  revalidatePath('/dashboard')
-  revalidatePath(`/marketplace/setup/${encodeURIComponent(moduleKey)}`)
   return { success: true }
 }
 
