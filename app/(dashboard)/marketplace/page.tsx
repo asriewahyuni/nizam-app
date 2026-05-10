@@ -8,6 +8,7 @@ import {
 import {
   CORE_MODULES,
   OPERATIONAL_MODULES,
+  ADDON_MODULES,
   type ModuleDefinition,
 } from '@/modules/marketplace/lib/module-registry'
 import { CheckCircle2, Lock, ArrowRight, Sparkles, ShieldCheck, Zap, Circle } from 'lucide-react'
@@ -52,6 +53,7 @@ export default async function MarketplacePage() {
 
   const readyCount  = OPERATIONAL_MODULES.filter(m => getModuleState(m) === 'active_ready').length
   const pendingCount = OPERATIONAL_MODULES.filter(m => getModuleState(m) === 'active_pending').length
+  const addonReadyCount = ADDON_MODULES.filter(m => getModuleState(m) === 'active_ready').length
   const hasPricing  = Object.keys(pricing).length > 0
 
   return (
@@ -84,6 +86,12 @@ export default async function MarketplacePage() {
               <div className="flex items-center gap-2 bg-amber-500/20 border border-amber-400/30 rounded-xl px-4 py-2">
                 <Zap className="h-4 w-4 text-amber-300" />
                 <span>{pendingCount} Perlu Diselesaikan</span>
+              </div>
+            )}
+            {addonReadyCount > 0 && (
+              <div className="flex items-center gap-2 bg-purple-500/20 border border-purple-400/30 rounded-xl px-4 py-2">
+                <Sparkles className="h-4 w-4 text-purple-300" />
+                <span>{addonReadyCount} Add-on Aktif</span>
               </div>
             )}
           </div>
@@ -152,6 +160,43 @@ export default async function MarketplacePage() {
 
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {OPERATIONAL_MODULES.map(mod => {
+            const state = getModuleState(mod)
+            const price = pricing[mod.key]
+            const instance = instanceMap.get(mod.key) as any
+            const readyAt = instance?.ready_at ?? null
+            const unmetRequirements = (mod.requires || []).filter(
+              req => !enabledModules.some(m => moduleNameMatches(m, req))
+            )
+            return (
+              <OperationalModuleCard
+                key={mod.key}
+                mod={mod}
+                state={state}
+                price={price}
+                readyAt={readyAt}
+                unmetRequirements={unmetRequirements}
+              />
+            )
+          })}
+        </div>
+      </section>
+
+      {/* ── ADD-ON MODULES ── */}
+      <section>
+        <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center">
+              <Sparkles className="h-3 w-3 text-purple-600" />
+            </div>
+            <span className="text-sm font-black text-slate-900">Add-on</span>
+          </div>
+          <div className="flex-1 h-px bg-slate-200" />
+        </div>
+        <p className="text-xs text-slate-500 mb-4">
+          Tambahan fitur yang dapat dikombinasikan dengan modul operasional aktif Anda.
+        </p>
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {ADDON_MODULES.map(mod => {
             const state = getModuleState(mod)
             const price = pricing[mod.key]
             const instance = instanceMap.get(mod.key) as any
