@@ -17,6 +17,11 @@ export default async function ModuleSetupPage({ params }: Props) {
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
 
+  // Unit/branch cannot manage modules — they inherit from parent org
+  if (orgData.activeBranchId) {
+    return redirect('/dashboard')
+  }
+
   const mod = getModuleByKey(moduleKey)
   if (!mod) return notFound()
 
