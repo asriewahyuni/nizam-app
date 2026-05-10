@@ -631,7 +631,6 @@ export function AppHeader({
     setBranches(initialBranches)
     setHasLoadedNavigationContext(initialOrganizations.length > 0 || initialBranches.length > 0)
     setHeaderPendingApprovals(initialPendingApprovals)
-    setAiTokens(initialAiTokens)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeOrgId, activeBranchId])
 
