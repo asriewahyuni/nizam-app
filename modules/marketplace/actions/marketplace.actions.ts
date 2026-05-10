@@ -61,7 +61,7 @@ export async function getOperationalModulePricing(): Promise<Record<string, numb
  * - Pillar/core → selalu aktif (tidak perlu aktivasi manual)
  * - Tambahkan ke enabled_modules
  */
-export async function activateModule(moduleKey: string) {
+export async function activateModule(moduleKey: string, returnUrl?: string) {
   const orgData = await getActiveOrg()
   if (!orgData) throw new Error('Not authenticated')
 
@@ -153,7 +153,7 @@ export async function activateModule(moduleKey: string) {
 
   revalidatePath('/marketplace')
   revalidatePath('/dashboard')
-  redirect(`/marketplace/setup/${encodeURIComponent(moduleKey)}`)
+  redirect(returnUrl ?? `/marketplace/setup/${encodeURIComponent(moduleKey)}`)
 }
 
 

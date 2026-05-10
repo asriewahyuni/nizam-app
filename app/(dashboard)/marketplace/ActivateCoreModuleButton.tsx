@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { Zap, Loader2, CheckCircle2 } from 'lucide-react'
 import { activateModule } from '@/modules/marketplace/actions/marketplace.actions'
 
@@ -11,6 +11,7 @@ type Props = {
 
 export function ActivateCoreModuleButton({ moduleKey }: Props) {
   const router = useRouter()
+  const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
@@ -19,7 +20,7 @@ export function ActivateCoreModuleButton({ moduleKey }: Props) {
     setError(null)
     startTransition(async () => {
       try {
-        await activateModule(moduleKey)
+        await activateModule(moduleKey, pathname)
         setDone(true)
         router.refresh()
       } catch (err: any) {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { usePathname } from 'next/navigation'
 import { ArrowRight, Loader2, X, CreditCard, Tag, CheckCircle2, Sparkles, Shield } from 'lucide-react'
 import { activateModule } from '@/modules/marketplace/actions/marketplace.actions'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -19,6 +20,7 @@ function formatRp(n: number) {
 }
 
 export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, moduleColor, price, disabled }: Props) {
+  const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [showPayment, setShowPayment] = useState(false)
@@ -53,7 +55,7 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
     setError(null)
     startTransition(async () => {
       try {
-        await activateModule(moduleKey)
+        await activateModule(moduleKey, pathname)
       } catch (err: any) {
         if (err?.digest?.startsWith('NEXT_REDIRECT')) return
         setError(err.message || 'Terjadi kesalahan saat mengaktifkan modul')
