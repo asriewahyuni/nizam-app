@@ -227,9 +227,10 @@ export async function updateWorkOrderStatus(orgId: string, orderId: string, stat
   if (status === 'DISERAHKAN') {
     const journalResult = await postWorkshopJournal(orgId, orderId, db)
     if ('error' in journalResult) {
-      // Jurnal gagal tidak membatalkan perubahan status; cukup log
       console.error('postWorkshopJournal error:', journalResult.error)
     }
+    // Deduct stok spare part dari inventori
+    await deductWorkshopPartInventory(orgId, orderId)
   }
 
   revalidatePath('/workshop')
@@ -266,51 +267,38 @@ async function postWorkshopJournal(orgId: string, orderId: string, db: LooseDb) 
     .reduce((s, i) => s + Number(i.subtotal || 0), 0)
 
   // Lookup akun: Piutang Usaha (1201) & Pendapatan (4001)
+  let finalArId: string | undefined
+  let finalRevId: string | undefined
+
+  // Cari akun AR berdasarkan kode, fallback ke nama
   const { data: accAR } = await db
-    .from('accounts')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('code', '1201')
-    .maybeSingle()
+    .from('accounts').select('id').eq('org_id', orgId).eq('code', '1201').maybeSingle()
+  finalArId = (accAR as any)?.id as string | undefined
 
-  const arAccountId = (accAR as Record<string, unknown> | null)?.id as string | undefined
-  if (!arAccountId) {
-    // Fallback: cari berdasarkan nama
-    const { data: altAR } = await db
-      .from('accounts')
-      .select('id')
-      .eq('org_id', orgId)
-      .ilike('name', '%piutang usaha%')
-      .limit(1)
-      .maybeSingle()
-    if (!(altAR as Record<string, unknown> | null)?.id) {
-      return { error: 'Akun Piutang Usaha (1201) tidak ditemukan. Periksa COA.' }
-    }
+  if (!finalArId) {
+    const { queryPostgres } = await import('@/lib/db/postgres')
+    const res = await queryPostgres<{ id: string }>(
+      `SELECT id FROM public.accounts WHERE org_id=$1 AND LOWER(name) LIKE '%piutang usaha%' LIMIT 1`,
+      [orgId]
+    )
+    finalArId = res.rows[0]?.id
   }
+  if (!finalArId) return { error: 'Akun Piutang Usaha (1201) tidak ditemukan. Periksa COA.' }
 
+  // Cari akun Pendapatan berdasarkan kode, fallback ke nama
   const { data: accRevenue } = await db
-    .from('accounts')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('code', '4001')
-    .maybeSingle()
+    .from('accounts').select('id').eq('org_id', orgId).eq('code', '4001').maybeSingle()
+  finalRevId = (accRevenue as any)?.id as string | undefined
 
-  const revenueAccountId = (accRevenue as Record<string, unknown> | null)?.id as string | undefined
-  if (!revenueAccountId) {
-    const { data: altRev } = await db
-      .from('accounts')
-      .select('id')
-      .eq('org_id', orgId)
-      .ilike('name', '%pendapatan%')
-      .limit(1)
-      .maybeSingle()
-    if (!(altRev as Record<string, unknown> | null)?.id) {
-      return { error: 'Akun Pendapatan (4001) tidak ditemukan. Periksa COA.' }
-    }
+  if (!finalRevId) {
+    const { queryPostgres } = await import('@/lib/db/postgres')
+    const res = await queryPostgres<{ id: string }>(
+      `SELECT id FROM public.accounts WHERE org_id=$1 AND LOWER(name) LIKE '%pendapatan%' LIMIT 1`,
+      [orgId]
+    )
+    finalRevId = res.rows[0]?.id
   }
-
-  const finalArId = arAccountId as string
-  const finalRevId = revenueAccountId as string
+  if (!finalRevId) return { error: 'Akun Pendapatan (4001) tidak ditemukan. Periksa COA.' }
 
   // Susun baris jurnal
   const lines: { account_id: string; debit: number; credit: number; memo: string }[] = []
@@ -322,7 +310,7 @@ async function postWorkshopJournal(orgId: string, orderId: string, db: LooseDb) 
   if (totalJasa > 0) {
     lines.push({ account_id: finalRevId, debit: 0, credit: totalJasa, memo: `Pendapatan jasa servis ${spkNumber}` })
   }
-  // Credit: Pendapatan Part (gunakan akun yang sama jika tidak ada akun terpisah)
+  // Credit: Pendapatan Part
   if (totalPart > 0) {
     lines.push({ account_id: finalRevId, debit: 0, credit: totalPart, memo: `Pendapatan spare part ${spkNumber}` })
   }
@@ -342,6 +330,7 @@ async function postWorkshopJournal(orgId: string, orderId: string, db: LooseDb) 
   })
 }
 
+
 export async function addWorkOrderItem(
   orgId: string,
   workOrderId: string,
@@ -352,13 +341,17 @@ export async function addWorkOrderItem(
 
   const qty = Number(formData.get('quantity') || 1)
   const unitPrice = Number(formData.get('unit_price') || 0)
+  const productId = (formData.get('product_id') as string) || null
+  const itemType = (formData.get('item_type') as string) || 'JASA'
 
   const { error: itemError } = await db.from('workshop_work_order_items').insert({
+    org_id: orgId,
     work_order_id: workOrderId,
-    item_type: (formData.get('item_type') as string) || 'JASA',
+    item_type: itemType,
     name: formData.get('name') as string,
     quantity: qty,
     unit_price: unitPrice,
+    product_id: productId,
     notes: (formData.get('notes') as string) || null,
   })
 
@@ -438,4 +431,147 @@ export async function deleteWorkOrderItem(orgId: string, workOrderId: string, it
 
   revalidatePath('/workshop')
   return { success: true }
+}
+
+// ─── Inventory Deduction ──────────────────────────────────────────────────────
+
+/**
+ * Deduct stok spare part dari inventori saat SPK diserahkan.
+ * Dipanggil otomatis dari updateWorkOrderStatus saat status = DISERAHKAN.
+ */
+export async function deductWorkshopPartInventory(orgId: string, workOrderId: string) {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+
+  // Ambil semua item PART yang punya product_id
+  const items = await queryPostgres<{
+    product_id: string
+    quantity: number
+  }>(`
+    SELECT product_id, quantity
+    FROM public.workshop_work_order_items
+    WHERE work_order_id = $1
+      AND item_type = 'PART'
+      AND product_id IS NOT NULL
+  `, [workOrderId])
+
+  if (items.rows.length === 0) return { success: true }
+
+  // Ambil warehouse default org
+  const warehouseRes = await queryPostgres<{ id: string }>(
+    `SELECT id FROM public.warehouses WHERE org_id = $1 AND is_default = true LIMIT 1`,
+    [orgId]
+  )
+  const warehouseId = warehouseRes.rows[0]?.id
+  if (!warehouseId) return { success: true } // Tidak ada warehouse, skip
+
+  // Deduct stok setiap part
+  const errors: string[] = []
+  for (const item of items.rows) {
+    try {
+      await queryPostgres(`
+        UPDATE public.inventory_stocks
+        SET quantity = GREATEST(0, quantity - $1)
+        WHERE org_id = $2
+          AND product_id = $3
+          AND warehouse_id = $4
+      `, [item.quantity, orgId, item.product_id, warehouseId])
+    } catch (err: any) {
+      errors.push(`Part ${item.product_id}: ${err.message}`)
+    }
+  }
+
+  if (errors.length > 0) {
+    console.error('[deductWorkshopPartInventory] errors:', errors)
+  }
+
+  return { success: true }
+}
+
+// ─── Service Rates CRUD ───────────────────────────────────────────────────────
+
+export interface WorkshopServiceRate {
+  id: string
+  name: string
+  description: string | null
+  unitPrice: number
+  category: string
+  isActive: boolean
+}
+
+export async function getWorkshopServiceRates(orgId: string): Promise<WorkshopServiceRate[]> {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const res = await queryPostgres<Record<string, unknown>>(
+    `SELECT id, name, description, unit_price, category, is_active
+     FROM public.workshop_service_rates
+     WHERE org_id = $1 AND is_active = true
+     ORDER BY category, name`,
+    [orgId]
+  )
+  return res.rows.map(r => ({
+    id: String(r.id),
+    name: String(r.name),
+    description: r.description ? String(r.description) : null,
+    unitPrice: Number(r.unit_price),
+    category: String(r.category || 'UMUM'),
+    isActive: Boolean(r.is_active),
+  }))
+}
+
+export async function upsertWorkshopServiceRate(orgId: string, formData: FormData) {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const id = (formData.get('id') as string) || null
+  const name = (formData.get('name') as string)?.trim()
+  const description = (formData.get('description') as string) || null
+  const unitPrice = Number(formData.get('unit_price') || 0)
+  const category = (formData.get('category') as string) || 'UMUM'
+
+  if (!name) return { error: 'Nama tarif wajib diisi.' }
+  if (unitPrice < 0) return { error: 'Harga tidak boleh negatif.' }
+
+  if (id) {
+    await queryPostgres(
+      `UPDATE public.workshop_service_rates
+       SET name=$1, description=$2, unit_price=$3, category=$4, updated_at=NOW()
+       WHERE id=$5 AND org_id=$6`,
+      [name, description, unitPrice, category, id, orgId]
+    )
+  } else {
+    await queryPostgres(
+      `INSERT INTO public.workshop_service_rates (org_id, name, description, unit_price, category)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [orgId, name, description, unitPrice, category]
+    )
+  }
+
+  revalidatePath('/workshop')
+  revalidatePath('/workshop/settings')
+  return { success: true }
+}
+
+export async function deleteWorkshopServiceRate(orgId: string, rateId: string) {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  await queryPostgres(
+    `UPDATE public.workshop_service_rates SET is_active=false WHERE id=$1 AND org_id=$2`,
+    [rateId, orgId]
+  )
+  revalidatePath('/workshop')
+  revalidatePath('/workshop/settings')
+  return { success: true }
+}
+
+// Ambil produk inventori (spare part) untuk lookup di form item SPK
+export async function getWorkshopPartProducts(orgId: string) {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const res = await queryPostgres<{ id: string; name: string; sku: string; selling_price: number; quantity: number }>(
+    `SELECT p.id, p.name, p.sku, p.selling_price,
+            COALESCE(SUM(s.quantity), 0) AS quantity
+     FROM public.products p
+     LEFT JOIN public.inventory_stocks s ON s.product_id = p.id AND s.org_id = p.org_id
+     WHERE p.org_id = $1
+       AND p.type IN ('INVENTORY', 'PART', 'SPAREPART')
+     GROUP BY p.id, p.name, p.sku, p.selling_price
+     ORDER BY p.name`,
+    [orgId]
+  )
+  return res.rows
 }

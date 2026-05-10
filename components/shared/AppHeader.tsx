@@ -397,9 +397,13 @@ export function AppHeader({
   const orgDeckCashSummaries = orgDeckData.orgCashSummaries
   const orgDeckBranchCashSummaries = orgDeckData.branchCashSummaries
 
-  const loadNavigationContext = useCallback(async () => {
-    if (hasLoadedNavigationContext || isLoadingNavigationContext) return
+  const isLoadingNavRef = useRef(false)
+  const isLoadingTokenRef = useRef(false)
 
+  const loadNavigationContext = useCallback(async () => {
+    if (hasLoadedNavigationContext || isLoadingNavRef.current) return
+
+    isLoadingNavRef.current = true
     setIsLoadingNavigationContext(true)
     try {
       const navigationData = await getHeaderNavigationData(activeOrgId)
@@ -410,13 +414,15 @@ export function AppHeader({
       const message = error instanceof Error ? error.message : 'Gagal memuat organisasi dan unit.'
       setOrgFeedback({ type: 'error', message })
     } finally {
+      isLoadingNavRef.current = false
       setIsLoadingNavigationContext(false)
     }
-  }, [activeOrgId, hasLoadedNavigationContext, isLoadingNavigationContext])
+  }, [activeOrgId, hasLoadedNavigationContext])
 
   const loadTokenSummary = useCallback(async () => {
-    if (aiTokens || isLoadingTokenSummary) return
+    if (aiTokens || isLoadingTokenRef.current) return
 
+    isLoadingTokenRef.current = true
     setIsLoadingTokenSummary(true)
     try {
       const tokenSummary = await getHeaderTokenSummary(activeOrgId)
@@ -424,9 +430,10 @@ export function AppHeader({
     } catch (error) {
       console.error('[AppHeader] Failed to load AI token summary:', error)
     } finally {
+      isLoadingTokenRef.current = false
       setIsLoadingTokenSummary(false)
     }
-  }, [activeOrgId, aiTokens, isLoadingTokenSummary])
+  }, [activeOrgId, aiTokens])
 
   const prewarmNavigationContext = useCallback(() => {
     if (hasLoadedNavigationContext || isLoadingNavigationContext) return
@@ -709,13 +716,16 @@ export function AppHeader({
 
   const isLowBalance = tokenSummary.threshold > 0 && tokenSummary.balance <= tokenSummary.threshold
 
+  // Sync ulang saat org/branch aktif berubah.
+  // Pakai activeOrgId/activeBranchId (primitives) bukan object props agar tidak infinite re-render.
   useEffect(() => {
     setOrganizations(initialOrganizations)
     setBranches(initialBranches)
     setHasLoadedNavigationContext(initialOrganizations.length > 0 || initialBranches.length > 0)
     setHeaderPendingApprovals(initialPendingApprovals)
     setAiTokens(initialAiTokens)
-  }, [activeOrgId, activeBranchId, initialAiTokens, initialBranches, initialOrganizations, initialPendingApprovals])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeOrgId, activeBranchId])
 
   useEffect(() => {
     let isCancelled = false
@@ -994,6 +1004,7 @@ export function AppHeader({
     setOrgDeckPositions(initialOrgDeckPositions)
   }, [initialOrgDeckPositions])
 
+  // Sync orgDeckData dari props awal. Deps pakai primitives agar tidak re-run tiap render.
   useEffect(() => {
     setOrgDeckData({
       orgBscSummaries,
@@ -1002,13 +1013,8 @@ export function AppHeader({
       branchCashSummaries,
     })
     setHasLoadedOrgDeckData(hasInitialOrgDeckData)
-  }, [
-    branchCashSummaries,
-    hasInitialOrgDeckData,
-    orgBscSummaries,
-    orgBranchesByOrgId,
-    orgCashSummaries,
-  ])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeOrgId])
 
   useEffect(() => {
     if (!isOrgDeckOpen) return

@@ -18,6 +18,7 @@ import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getLearningAccessContext } from '@/modules/edu/lib/learning-access.server'
 import { formatRupiah } from '@/lib/utils'
 import { getModuleInstanceStatus } from '@/modules/marketplace/actions/marketplace.actions'
+import { TambahProgramButton } from './TambahProgramButton'
 
 function StatCard({
   label,
@@ -106,6 +107,7 @@ export default async function LMSDashboardPage(props: {
         </div>
 
         <div className="flex flex-wrap gap-3 w-full md:w-auto">
+          <TambahProgramButton />
           <Link
             href="/lms/admin"
             className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white text-sm font-bold rounded-2xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-200"
@@ -222,10 +224,16 @@ export default async function LMSDashboardPage(props: {
                   </div>
                 </div>
               ))}
-              
+
               {activeCourses.length === 0 && (
-                <div className="p-4 text-center text-sm font-medium text-slate-400 border border-dashed border-slate-700 rounded-2xl">
-                  Belum ada program aktif
+                <div className="p-6 text-center border border-dashed border-slate-700 rounded-2xl space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto">
+                    <GraduationCap size={22} className="text-slate-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-400">Belum ada program</p>
+                    <p className="text-xs text-slate-600 mt-1">Klik &ldquo;Tambah Program&rdquo; untuk mulai.</p>
+                  </div>
                 </div>
               )}
             </div>
