@@ -1198,22 +1198,19 @@ export function AppHeader({
               onFocus={prewarmNavigationContext}
               onTouchStart={prewarmNavigationContext}
               onPointerDown={prewarmNavigationContext}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl shadow-sm hover:bg-slate-100/70 transition-all disabled:cursor-wait disabled:opacity-70"
+              className="group flex items-center gap-2.5 pl-2 pr-3 py-1.5 bg-gradient-to-br from-[#003366]/5 to-slate-50 border border-[#003366]/12 rounded-2xl shadow-sm hover:shadow-md hover:from-[#003366]/8 hover:to-slate-50 hover:border-[#003366]/20 transition-all duration-200 disabled:cursor-wait disabled:opacity-70"
             >
-              <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[#003366] shrink-0 shadow-sm">
-                {pendingContextSwitch?.kind === 'org' ? <LoaderCircle size={14} className="animate-spin" /> : <Building2 size={14} />}
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#003366] to-[#0055aa] flex items-center justify-center text-white shrink-0 shadow-md">
+                {pendingContextSwitch?.kind === 'org' ? <LoaderCircle size={13} className="animate-spin" /> : <Building2 size={13} />}
               </div>
               <div className="flex flex-col overflow-hidden">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter leading-none mb-0.5">Organisasi Aktif</span>
-                <span className="text-xs font-black text-slate-900 leading-none truncate max-w-[140px]">{org.name}</span>
-                <span className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 mt-1 leading-none">
-                  {effectiveActiveOrgRole}
-                </span>
-                <span className="text-[9px] font-semibold text-slate-500 mt-1 leading-none truncate max-w-[170px]">
-                  {activeOrgIsParent ? 'PARENT' : 'CHILD'} • {activeOrgHierarchyLabel}
+                <span className="text-[8.5px] text-[#003366]/50 font-black uppercase tracking-[0.16em] leading-none mb-0.5">Organisasi</span>
+                <span className="text-[12.5px] font-black text-slate-900 leading-none truncate max-w-[130px]">{org.name}</span>
+                <span className="text-[8.5px] font-black uppercase tracking-[0.16em] text-[#003366]/60 mt-0.5 leading-none">
+                  {effectiveActiveOrgRole} · {activeOrgIsParent ? 'Parent' : 'Child'}
                 </span>
               </div>
-              <ChevronDown size={12} className={`text-slate-400 ml-1 transition-transform ${isOrgMenuOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={11} className={`text-[#003366]/40 shrink-0 transition-transform duration-200 ${isOrgMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isOrgMenuOpen && (
@@ -1495,21 +1492,23 @@ export function AppHeader({
               onFocus={prewarmNavigationContext}
               onTouchStart={prewarmNavigationContext}
               onPointerDown={prewarmNavigationContext}
-              className="flex items-center gap-2 px-3 py-1.5 bg-[#003366]/5/50 border border-[#003366]/10 rounded-xl hover:bg-[#003366]/5 transition-all shadow-sm disabled:cursor-wait disabled:opacity-70"
+              className="group flex items-center gap-2.5 pl-2 pr-3 py-1.5 bg-gradient-to-br from-emerald-50 to-teal-50/60 border border-emerald-200/70 rounded-2xl shadow-sm hover:shadow-md hover:from-emerald-50 hover:to-teal-50 hover:border-emerald-300/60 transition-all duration-200 disabled:cursor-wait disabled:opacity-70"
             >
-              {pendingContextSwitch?.kind === 'branch'
-                ? <LoaderCircle size={14} className="text-[#003366] shrink-0 animate-spin" />
-                : <MapPin size={14} className="text-[#003366] shrink-0" />}
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shrink-0 shadow-md">
+                {pendingContextSwitch?.kind === 'branch'
+                  ? <LoaderCircle size={13} className="animate-spin" />
+                  : <MapPin size={13} />}
+              </div>
               <div className="flex flex-col overflow-hidden">
-                <span className="text-[9px] text-[#003366]/60 font-bold uppercase tracking-tighter leading-none mb-0.5">Unit Terpilih</span>
-                <span className="text-xs font-black text-blue-900 leading-none truncate max-w-[150px]">
+                <span className="text-[8.5px] text-emerald-600/70 font-black uppercase tracking-[0.16em] leading-none mb-0.5">Unit Kerja</span>
+                <span className="text-[12.5px] font-black text-slate-900 leading-none truncate max-w-[140px]">
                   {branchHeadline}
                 </span>
-                <span className="text-[9px] font-black uppercase tracking-[0.18em] text-[#003366]/45 mt-1 leading-none">
+                <span className="text-[8.5px] font-black uppercase tracking-[0.16em] text-emerald-600/60 mt-0.5 leading-none">
                   {branchCaption}
                 </span>
               </div>
-              <ChevronDown size={12} className={`text-[#003366]/60 ml-1 transition-transform ${isBranchMenuOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={11} className={`text-emerald-500/60 shrink-0 transition-transform duration-200 ${isBranchMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isBranchMenuOpen && (
@@ -1648,6 +1647,10 @@ export function AppHeader({
       </div>
 
       <div className="flex items-center gap-6">
+        <div className="hidden sm:block">
+          <VersionIntegrityButton />
+        </div>
+
         {planName && (
           <Link
             href="/billing"
