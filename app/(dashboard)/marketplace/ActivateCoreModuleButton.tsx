@@ -19,9 +19,11 @@ export function ActivateCoreModuleButton({ moduleKey }: Props) {
     setError(null)
     startTransition(async () => {
       try {
-        await activateModule(moduleKey)
-        setDone(true)
-        router.refresh()
+        const result = await activateModule(moduleKey)
+        if (result?.success) {
+          setDone(true)
+          router.refresh()
+        }
       } catch (err: any) {
         setError(err.message || 'Gagal mengaktifkan modul inti')
       }
