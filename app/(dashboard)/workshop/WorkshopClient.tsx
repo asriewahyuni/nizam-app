@@ -28,22 +28,42 @@ import {
   addWorkOrderItem,
   deleteWorkOrderItem,
 } from '@/modules/workshop/actions/workshop.actions'
+import {
+  getVehicleForSpkPrefill,
+  createInvoiceFromWorkOrder,
+} from '@/modules/operational-bridge/actions/bridge.actions'
 import type {
   WorkshopWorkOrder,
   WorkshopVehicle,
   WorkshopStatus,
 } from '@/modules/workshop/lib/workshop-types'
 
+export interface ServiceRate { id: string; name: string; unitPrice: number; category: string }
+export interface PartProduct { id: string; name: string; sku: string; selling_price: number; quantity: number }
+
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface WorkshopInvoice {
+  id: string
+  saleNumber: string
+  saleDate: string
+  grandTotal: number
+  status: string
+  spkId: string | null
+  customerName: string
+}
 
 interface Props {
   orgId: string
   workOrders: WorkshopWorkOrder[]
   vehicles: WorkshopVehicle[]
   contacts: { id: string; name: string }[]
+  invoices: WorkshopInvoice[]
+  serviceRates: ServiceRate[]
+  partProducts: PartProduct[]
 }
 
-type Tab = 'spk' | 'vehicles'
+type Tab = 'spk' | 'vehicles' | 'invoices'
 
 // ─── Konstanta ────────────────────────────────────────────────────────────────
 
@@ -67,13 +87,21 @@ const STATUS_TRANSITIONS: Record<WorkshopStatus, WorkshopStatus[]> = {
 
 // ─── WorkshopClient ───────────────────────────────────────────────────────────
 
-export function WorkshopClient({ orgId, workOrders, vehicles, contacts }: Props) {
+export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices, serviceRates, partProducts }: Props) {
   const [tab, setTab] = useState<Tab>('spk')
   const [search, setSearch] = useState('')
   const [showSpkModal, setShowSpkModal] = useState(false)
   const [showVehicleModal, setShowVehicleModal] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<WorkshopWorkOrder | null>(null)
   const [loading, setLoading] = useState(false)
+  // Vehicle auto-fill state
+  const [vehiclePrefill, setVehiclePrefill] = useState<{
+    contactId: string | null
+    contactName: string | null
+    lastOdometer: number
+    info: string
+  } | null>(null)
+  const [vehicleLoading, setVehicleLoading] = useState(false)
 
   // Filter berdasarkan pencarian
   const filteredOrders = useMemo(() => {
@@ -106,12 +134,29 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts }: Props)
     total:      workOrders.length,
   }), [workOrders])
 
+  async function handleVehicleChange(vehicleId: string) {
+    if (!vehicleId) { setVehiclePrefill(null); return }
+    setVehicleLoading(true)
+    const data = await getVehicleForSpkPrefill(vehicleId)
+    if (data) {
+      setVehiclePrefill({
+        contactId: data.contactId,
+        contactName: data.contactName,
+        lastOdometer: data.lastOdometer,
+        info: `${data.brand} ${data.model}${data.year ? ` (${data.year})` : ''}${data.color ? ` · ${data.color}` : ''}`,
+      })
+    } else {
+      setVehiclePrefill(null)
+    }
+    setVehicleLoading(false)
+  }
+
   async function handleCreateSpk(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     const res = await createWorkshopWorkOrder(orgId, new FormData(e.currentTarget))
     if (res.error) alert(res.error)
-    else { setShowSpkModal(false); window.location.reload() }
+    else { setShowSpkModal(false); setVehiclePrefill(null); window.location.reload() }
     setLoading(false)
   }
 
@@ -178,7 +223,7 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts }: Props)
       {/* Tabs + Search */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <div className="flex bg-slate-100 rounded-2xl p-1 gap-1">
-          {(['spk', 'vehicles'] as Tab[]).map(t => (
+          {(['spk', 'invoices', 'vehicles'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => { setTab(t); setSearch('') }}
@@ -188,6 +233,8 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts }: Props)
             >
               {t === 'spk' ? (
                 <span className="flex items-center gap-2"><ClipboardList size={14} /> SPK</span>
+              ) : t === 'invoices' ? (
+                <span className="flex items-center gap-2">🧾 Invoice <span className="bg-[#003366] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">{invoices.length}</span></span>
               ) : (
                 <span className="flex items-center gap-2"><Car size={14} /> Kendaraan</span>
               )}
@@ -213,7 +260,11 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts }: Props)
           onSelect={setSelectedOrder}
           onStatusChange={handleStatusChange}
           orgId={orgId}
+          serviceRates={serviceRates}
+          partProducts={partProducts}
         />
+      ) : tab === 'invoices' ? (
+        <InvoiceList invoices={invoices} workOrders={workOrders} />
       ) : (
         <VehicleList vehicles={filteredVehicles} />
       )}
@@ -224,7 +275,11 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts }: Props)
           <Modal title="Buat Surat Perintah Kerja" onClose={() => setShowSpkModal(false)}>
             <form onSubmit={handleCreateSpk} className="space-y-4">
               <FormRow label="Kendaraan">
-                <select name="vehicle_id" className={inputCls}>
+                <select
+                  name="vehicle_id"
+                  className={inputCls}
+                  onChange={e => handleVehicleChange(e.target.value)}
+                >
                   <option value="">— Pilih kendaraan —</option>
                   {vehicles.map(v => (
                     <option key={v.id} value={v.id}>
@@ -232,14 +287,32 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts }: Props)
                     </option>
                   ))}
                 </select>
+                {vehicleLoading && (
+                  <p className="text-[10px] text-slate-400 mt-1">Mengambil data kendaraan...</p>
+                )}
+                {vehiclePrefill && (
+                  <div className="mt-2 p-2.5 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700 font-medium">
+                    🚗 {vehiclePrefill.info} · Odometer terakhir: {vehiclePrefill.lastOdometer.toLocaleString('id-ID')} km
+                  </div>
+                )}
               </FormRow>
               <FormRow label="Pelanggan">
-                <select name="contact_id" className={inputCls}>
+                <select
+                  name="contact_id"
+                  className={inputCls}
+                  value={vehiclePrefill?.contactId ?? ''}
+                  onChange={() => {}}
+                >
                   <option value="">— Pilih pelanggan —</option>
                   {contacts.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
+                {vehiclePrefill?.contactName && (
+                  <p className="text-[10px] text-emerald-600 font-bold mt-1">
+                    ✓ Otomatis diisi dari data kendaraan: {vehiclePrefill.contactName}
+                  </p>
+                )}
               </FormRow>
               <FormRow label="Nama Mekanik">
                 <input name="mechanic_name" placeholder="Contoh: Budi" className={inputCls} />
@@ -349,12 +422,16 @@ function SpkList({
   onSelect,
   onStatusChange,
   orgId,
+  serviceRates,
+  partProducts,
 }: {
   orders: WorkshopWorkOrder[]
   selectedOrder: WorkshopWorkOrder | null
   onSelect: (o: WorkshopWorkOrder | null) => void
   onStatusChange: (o: WorkshopWorkOrder, s: WorkshopStatus) => void
   orgId: string
+  serviceRates: ServiceRate[]
+  partProducts: PartProduct[]
 }) {
   if (orders.length === 0) {
     return (
@@ -374,6 +451,8 @@ function SpkList({
           onToggle={() => onSelect(selectedOrder?.id === order.id ? null : order)}
           onStatusChange={onStatusChange}
           orgId={orgId}
+          serviceRates={serviceRates}
+          partProducts={partProducts}
         />
       ))}
     </div>
@@ -386,23 +465,52 @@ function SpkCard({
   onToggle,
   onStatusChange,
   orgId,
+  serviceRates,
+  partProducts,
 }: {
   order: WorkshopWorkOrder
   isExpanded: boolean
   onToggle: () => void
   onStatusChange: (o: WorkshopWorkOrder, s: WorkshopStatus) => void
   orgId: string
+  serviceRates: ServiceRate[]
+  partProducts: PartProduct[]
 }) {
   const [showItemForm, setShowItemForm] = useState(false)
   const [itemLoading, setItemLoading] = useState(false)
+  const [itemType, setItemType] = useState<'JASA' | 'PART'>('JASA')
+  const [selectedName, setSelectedName] = useState('')
+  const [selectedPrice, setSelectedPrice] = useState(0)
+  const [selectedProductId, setSelectedProductId] = useState('')
   const cfg = STATUS_CONFIG[order.status]
+
+  function resetItemForm() {
+    setItemType('JASA')
+    setSelectedName('')
+    setSelectedPrice(0)
+    setSelectedProductId('')
+  }
+
+  function handleSelectRate(rateId: string) {
+    const rate = serviceRates.find(r => r.id === rateId)
+    if (rate) { setSelectedName(rate.name); setSelectedPrice(rate.unitPrice) }
+    else { setSelectedName(''); setSelectedPrice(0) }
+  }
+
+  function handleSelectPart(productId: string) {
+    const part = partProducts.find(p => p.id === productId)
+    if (part) { setSelectedName(part.name); setSelectedPrice(part.selling_price); setSelectedProductId(productId) }
+    else { setSelectedName(''); setSelectedPrice(0); setSelectedProductId('') }
+  }
 
   async function handleAddItem(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setItemLoading(true)
-    const res = await addWorkOrderItem(orgId, order.id, new FormData(e.currentTarget))
+    const fd = new FormData(e.currentTarget)
+    if (selectedProductId) fd.set('product_id', selectedProductId)
+    const res = await addWorkOrderItem(orgId, order.id, fd)
     if (res.error) alert(res.error)
-    else { setShowItemForm(false); window.location.reload() }
+    else { setShowItemForm(false); resetItemForm(); window.location.reload() }
     setItemLoading(false)
   }
 
@@ -552,27 +660,119 @@ function SpkCard({
                       onSubmit={handleAddItem}
                       className="mt-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3"
                     >
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div>
-                          <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Tipe</label>
-                          <select name="item_type" defaultValue="JASA" className={inputCls}>
-                            <option value="JASA">Jasa</option>
-                            <option value="PART">Spare Part</option>
-                          </select>
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Nama</label>
-                          <input name="name" required placeholder="Ganti oli, kampas rem, dll." className={inputCls} />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Qty</label>
-                          <input name="quantity" type="number" min="0.01" step="0.01" defaultValue="1" className={inputCls} />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Harga Satuan</label>
-                          <input name="unit_price" type="number" min="0" defaultValue="0" className={inputCls} />
-                        </div>
+                      {/* Tipe item */}
+                      <div className="flex gap-2">
+                        {(['JASA', 'PART'] as const).map(t => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => { setItemType(t); resetItemForm() }}
+                            className={`px-4 py-1.5 text-xs font-black rounded-xl border transition-all ${
+                              itemType === t
+                                ? t === 'JASA' ? 'bg-blue-600 text-white border-blue-600' : 'bg-orange-500 text-white border-orange-500'
+                                : 'bg-white text-slate-500 border-slate-200'
+                            }`}
+                          >
+                            {t === 'JASA' ? '🔧 Jasa' : '📦 Spare Part'}
+                          </button>
+                        ))}
                       </div>
+                      <input type="hidden" name="item_type" value={itemType} />
+
+                      {/* Pilih dari daftar atau manual */}
+                      {itemType === 'JASA' ? (
+                        <div className="space-y-2">
+                          {serviceRates.length > 0 && (
+                            <div>
+                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Pilih dari Tarif Jasa</label>
+                              <select
+                                className={inputCls}
+                                onChange={e => handleSelectRate(e.target.value)}
+                                defaultValue=""
+                              >
+                                <option value="">— Pilih tarif atau isi manual —</option>
+                                {serviceRates.map(r => (
+                                  <option key={r.id} value={r.id}>
+                                    {r.name} — {r.unitPrice.toLocaleString('id-ID')}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="col-span-2">
+                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Nama Jasa <span className="text-rose-400">*</span></label>
+                              <input
+                                name="name"
+                                required
+                                value={selectedName}
+                                onChange={e => setSelectedName(e.target.value)}
+                                placeholder="Ganti oli, tune-up, dll."
+                                className={inputCls}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Qty</label>
+                              <input name="quantity" type="number" min="0.01" step="0.01" defaultValue="1" className={inputCls} />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Harga Satuan</label>
+                              <input
+                                name="unit_price"
+                                type="number"
+                                min="0"
+                                value={selectedPrice}
+                                onChange={e => setSelectedPrice(Number(e.target.value))}
+                                className={inputCls}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">
+                              Pilih dari Inventori
+                              {partProducts.length === 0 && <span className="text-amber-500 ml-2 normal-case font-medium">— Belum ada produk tipe INVENTORY</span>}
+                            </label>
+                            <select
+                              className={inputCls}
+                              onChange={e => handleSelectPart(e.target.value)}
+                              defaultValue=""
+                            >
+                              <option value="">— Pilih produk —</option>
+                              {partProducts.map(p => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} {p.sku ? `(${p.sku})` : ''} — Stok: {Number(p.quantity).toLocaleString('id-ID')}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {selectedName && (
+                            <p className="text-[10px] text-emerald-600 font-bold">✓ {selectedName}</p>
+                          )}
+                          <input type="hidden" name="name" value={selectedName || 'Spare Part'} />
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Qty</label>
+                              <input name="quantity" type="number" min="0.01" step="0.01" defaultValue="1" className={inputCls} />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Harga Jual</label>
+                              <input
+                                name="unit_price"
+                                type="number"
+                                min="0"
+                                value={selectedPrice}
+                                onChange={e => setSelectedPrice(Number(e.target.value))}
+                                className={inputCls}
+                              />
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-slate-400">Stok akan dikurangi otomatis saat SPK diserahkan.</p>
+                        </div>
+                      )}
+
                       <div className="flex justify-end gap-2">
                         <button type="button" onClick={() => setShowItemForm(false)} className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700">Batal</button>
                         <button type="submit" disabled={itemLoading} className="px-5 py-2 bg-[#003366] text-white text-xs font-bold rounded-xl disabled:opacity-50">
@@ -584,24 +784,29 @@ function SpkCard({
                 </AnimatePresence>
               </div>
 
-              {/* Aksi status */}
-              {transitions.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50">
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest self-center mr-2">Ubah status:</p>
-                  {transitions.map(nextStatus => {
-                    const nextCfg = STATUS_CONFIG[nextStatus]
-                    return (
-                      <button
-                        key={nextStatus}
-                        onClick={() => onStatusChange(order, nextStatus)}
-                        className={`flex items-center gap-1.5 px-4 py-2 text-xs font-black rounded-xl border transition-all hover:opacity-80 ${nextCfg.color}`}
-                      >
-                        {nextCfg.icon} {nextCfg.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
+              {/* Aksi status + Invoice */}
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-50">
+                {transitions.length > 0 && (
+                  <>
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest self-center mr-2">Ubah status:</p>
+                    {transitions.map(nextStatus => {
+                      const nextCfg = STATUS_CONFIG[nextStatus]
+                      return (
+                        <button
+                          key={nextStatus}
+                          onClick={() => onStatusChange(order, nextStatus)}
+                          className={`flex items-center gap-1.5 px-4 py-2 text-xs font-black rounded-xl border transition-all hover:opacity-80 ${nextCfg.color}`}
+                        >
+                          {nextCfg.icon} {nextCfg.label}
+                        </button>
+                      )
+                    })}
+                  </>
+                )}
+                {(order.status === 'SELESAI' || order.status === 'DISERAHKAN') && order.total > 0 && (
+                  <CreateInvoiceButton orderId={order.id} orgId={orgId} />
+                )}
+              </div>
             </div>
           </motion.div>
         )}
@@ -676,7 +881,76 @@ function VehicleList({ vehicles }: { vehicles: WorkshopVehicle[] }) {
   )
 }
 
+// ─── Invoice List ─────────────────────────────────────────────────────────────
+
+function InvoiceList({ invoices, workOrders }: {
+  invoices: WorkshopInvoice[]
+  workOrders: WorkshopWorkOrder[]
+}) {
+  if (invoices.length === 0) {
+    return (
+      <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-bold italic">
+        Belum ada invoice. Buat invoice dari SPK yang sudah selesai.
+      </div>
+    )
+  }
+
+  const spkMap = Object.fromEntries(workOrders.map(o => [o.id, o.spkNumber]))
+
+  const STATUS_BADGE: Record<string, string> = {
+    DRAFT:    'bg-slate-100 text-slate-500',
+    ORDERED:  'bg-blue-50 text-blue-600',
+    FINISHED: 'bg-emerald-50 text-emerald-700',
+    VOIDED:   'bg-rose-50 text-rose-500',
+  }
+
+  return (
+    <div className="rounded-[24px] overflow-hidden border border-slate-100 shadow-sm">
+      <table className="w-full text-sm">
+        <thead className="bg-slate-50">
+          <tr>
+            <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">No. Invoice</th>
+            <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pelanggan</th>
+            <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ref. SPK</th>
+            <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tanggal</th>
+            <th className="text-right px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total</th>
+            <th className="text-center px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-50">
+          {invoices.map(inv => (
+            <tr key={inv.id} className="hover:bg-slate-50/50">
+              <td className="px-5 py-4 font-black text-[#003366]">{inv.saleNumber}</td>
+              <td className="px-5 py-4 font-medium text-slate-700">{inv.customerName || '—'}</td>
+              <td className="px-5 py-4 text-slate-500 text-xs font-mono">
+                {inv.spkId ? (spkMap[inv.spkId] || inv.spkId.slice(0, 8) + '...') : '—'}
+              </td>
+              <td className="px-5 py-4 text-slate-500">{inv.saleDate ? formatDate(inv.saleDate) : '—'}</td>
+              <td className="px-5 py-4 text-right font-black text-slate-900">{formatRupiah(inv.grandTotal)}</td>
+              <td className="px-5 py-4 text-center">
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${STATUS_BADGE[inv.status] || 'bg-slate-100 text-slate-500'}`}>
+                  {inv.status}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot className="bg-slate-50">
+          <tr>
+            <td colSpan={4} className="px-5 py-3 text-right text-xs font-black text-slate-400 uppercase tracking-widest">Total</td>
+            <td className="px-5 py-3 text-right font-black text-[#003366]">
+              {formatRupiah(invoices.reduce((s, i) => s + i.grandTotal, 0))}
+            </td>
+            <td />
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  )
+}
+
 // ─── Shared UI ────────────────────────────────────────────────────────────────
+
 
 const inputCls =
   'w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-[#003366]/20'
@@ -728,3 +1002,33 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
     </motion.div>
   )
 }
+
+// ─── Create Invoice Button ─────────────────────────────────────────────────────
+
+function CreateInvoiceButton({ orderId, orgId: _orgId }: { orderId: string; orgId: string }) {
+  const [loading, setLoading] = React.useState(false)
+
+  async function handleCreateInvoice() {
+    if (!confirm('Buat Sales Invoice dari SPK ini? Invoice akan otomatis dibuat berdasarkan item yang ada.')) return
+    setLoading(true)
+    const result = await createInvoiceFromWorkOrder(orderId)
+    if ('error' in result && result.error) {
+      alert('Gagal: ' + result.error)
+    } else {
+      alert('✅ Invoice berhasil dibuat! Lihat di tab Invoice.')
+      window.location.reload()
+    }
+    setLoading(false)
+  }
+
+  return (
+    <button
+      onClick={handleCreateInvoice}
+      disabled={loading}
+      className="flex items-center gap-1.5 px-4 py-2 text-xs font-black rounded-xl border bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 transition-all disabled:opacity-50 ml-auto"
+    >
+      {loading ? 'Memproses...' : '🧾 Buat Invoice'}
+    </button>
+  )
+}
+
