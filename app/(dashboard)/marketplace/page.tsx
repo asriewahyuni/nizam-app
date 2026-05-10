@@ -33,6 +33,11 @@ export default async function MarketplacePage() {
   if (!orgData) return redirect('/onboarding')
   if (!['owner', 'admin'].includes(orgData.role)) return redirect('/dashboard')
 
+  // Unit/branch cannot manage modules — they inherit from parent org
+  if (orgData.activeBranchId) {
+    return redirect('/dashboard')
+  }
+
   const [instances, pricing] = await Promise.all([
     getOrgModuleInstances(orgData.org.id),
     getOperationalModulePricing(),
