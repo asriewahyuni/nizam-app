@@ -435,11 +435,6 @@ export function AppSidebar({
       return isOwnerOrAdmin
     }
 
-    // Model Hub tidak ditampilkan di mode unit (branch) — manajemen modul hanya di org induk
-    if (item.href === '/marketplace' && activeBranchId) {
-      return false
-    }
-
     // Platform admin should always see SaaS operator shortcuts
     if (group.group === SAAS_OPERATOR_GROUP.group) {
       return showSaasOperatorGroup
@@ -475,7 +470,6 @@ export function AppSidebar({
     // 2. RBAC Permission Check
     return hasRolePermission(userRole, permissions, item.permission_key)
   }, [
-    activeBranchId,
     canManageSubOrganizations,
     enabledModules,
     isDemo,
