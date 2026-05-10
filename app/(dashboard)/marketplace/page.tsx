@@ -63,7 +63,7 @@ export default async function MarketplacePage() {
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500 rounded-full blur-3xl opacity-10 -ml-20 -mb-20" />
         <div className="relative">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest mb-4">
-            <Sparkles className="h-3 w-3" /> Model Hub
+            <Sparkles className="h-3 w-3" /> Modul Hub
           </div>
           <h1 className="text-3xl font-black tracking-tight">Pilih Operasional Bisnis Anda</h1>
           <p className="mt-2 text-slate-300 text-sm font-medium max-w-xl">
