@@ -226,10 +226,9 @@ export async function completeModuleOnboarding(moduleKey: string) {
 
   if (error) throw new Error(error.message)
 
-  // Hanya invalidate marketplace agar modul tampil sebagai READY.
-  // Dashboard layout TIDAK perlu di-revalidate karena sidebar membaca
-  // enabledModules yang sudah ada — router.push dari client sudah cukup.
+  // Revalidate paths to ensure fresh data
   revalidatePath('/marketplace')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 

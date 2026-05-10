@@ -93,7 +93,11 @@ export function SetupClient({
 
   useEffect(() => {
     if (navigationUrl && !isPending) {
-      router.push(navigationUrl)
+      // Small delay to ensure database updates propagate
+      const timer = setTimeout(() => {
+        router.push(navigationUrl)
+      }, 300)
+      return () => clearTimeout(timer)
     }
   }, [navigationUrl, isPending, router])
 
