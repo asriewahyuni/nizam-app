@@ -46,8 +46,8 @@ export interface VersionLogEntry {
 
 export const VERSION_LOG: VersionLogEntry[] = [
   // ╔════════════════════════════════════════════════════════════════════╗
-  // ║  CURRENT VERSION — N1.6.3.x                                       ║
-  // ║  Core=1, BusinessType=6, Addon=3                                  ║
+  // ║  CURRENT VERSION — N2.6.3.x                                       ║
+  // ║  Core=2 (Syirkah added as pillar), BusinessType=6, Addon=3        ║
   // ╚════════════════════════════════════════════════════════════════════╝
   // ── BUMP: addon ─────────────────────────────────────────────────────
   {
@@ -130,6 +130,17 @@ export const VERSION_LOG: VersionLogEntry[] = [
       'dengan PILLAR_MODULES dinamis dari registry. Semua pillar module ' +
       'auto-visible di sidebar. Sidebar module_keys diverifikasi: ' +
       'semua 24 module_keys sudah ada di entitlement catalog.',
+    by: 'system',
+  },
+  {
+    date: '2026-05-10',
+    type: 'core',
+    label: 'Syirkah jadi pillar ke-5 → Core naik N1→N2',
+    description: 'Syirkah dipindah dari SPECIAL_MODULES ke SYIRKAH_MODULES ' +
+      '(pillar baru, isCore:true). Category: syirkah. ' +
+      'PILLAR_MODULES sekarang: Finance + Marketing + HRIS + Syirkah. ' +
+      'Version: N2.6.3.x (Core=2, BusinessType=6, Addon=3). ' +
+      'ModuleCategory ditambah tipe syirkah.',
     by: 'system',
   },
   {

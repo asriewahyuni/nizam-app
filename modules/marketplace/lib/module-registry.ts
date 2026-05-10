@@ -2,11 +2,12 @@
  * Module Registry — Nizam App
  * Sumber kebenaran tunggal untuk semua modul yang tersedia di marketplace.
  *
- * ARSITEKTUR 4 PILAR (wajib, selalu aktif):
+ * ARSITEKTUR 5 PILAR (wajib, selalu aktif):
  *   1. Finance    → Accounting, Kas & Bank, Purchasing, Inventory, Warehouse, Reports, Audit
  *   2. Operasional → Container, isinya Business Type (swapable)
  *   3. Marketing   → Sales, CRM
  *   4. HRIS       → Karyawan & Payroll
+ *   5. Syirkah    → Kemitraan & Bagi Hasil
  *
  * BUSINESS TYPE (isi Operasional, swapable, hanya 1 aktif):
  *   Fleet & Rental, Manufacturing, Workshop, Job Order, Project, LMS
@@ -21,7 +22,7 @@ export type OnboardingStep = {
   description: string
 }
 
-export type ModuleCategory = 'finance' | 'operasional' | 'marketing' | 'hris' | 'business_type' | 'addon'
+export type ModuleCategory = 'finance' | 'operasional' | 'marketing' | 'hris' | 'syirkah' | 'business_type' | 'addon'
 
 export type ModuleDefinition = {
   key: string
@@ -273,21 +274,26 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
   },
 ]
 
-// ── SPECIAL / KHUSUS — belum dikategorikan ────────────────────────────────
-export const SPECIAL_MODULES: ModuleDefinition[] = [
+// ── SYIRKAH PILLAR ─────────────────────────────────────────────────────────
+export const SYIRKAH_MODULES: ModuleDefinition[] = [
   {
     key: 'Syirkah',
     name: 'Syirkah (Bagi Hasil)',
-    tagline: 'Bisnis dengan skema bagi hasil/patungan',
-    description: 'Untuk bisnis dengan skema syirkah/mudharabah: porsi modal, nisbah bagi hasil, distribusi keuntungan periodik.',
+    tagline: 'Kemitraan & bagi hasil/patungan',
+    description: 'Pencatatan porsi modal, nisbah bagi hasil, distribusi keuntungan periodik, dan laporan kinerja kemitraan.',
     icon: '🤝',
     color: 'bg-emerald-700',
     href: '/syirkah',
-    isCore: false,
-    category: 'special',
+    isCore: true,
+    category: 'syirkah',
     onboardingSteps: [],
     requires: ['Finance', 'Accounting'],
   },
+]
+
+// ── SPECIAL / KHUSUS — belum dikategorikan ────────────────────────────────
+export const SPECIAL_MODULES: ModuleDefinition[] = [
+  // Kosong — sementara belum ada modul khusus
 ]
 
 // ── ADD-ON (multi-aktif, tidak ngaruh operasional) ────────────────────────
@@ -327,6 +333,7 @@ export const PILLAR_MODULES: ModuleDefinition[] = [
   ...FINANCE_MODULES,
   ...MARKETING_MODULES,
   ...HRIS_MODULES,
+  ...SYIRKAH_MODULES,
 ]
 
 // ── BACKWARD COMPAT ALIASES ────────────────────────────────────────────────

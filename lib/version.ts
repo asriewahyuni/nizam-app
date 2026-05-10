@@ -20,8 +20,8 @@ import { RELEASED_ADDON_COUNT } from '@/lib/addon-registry'
 import { getPatchCount } from '@/lib/version-log'
 
 export const NIZAM_VERSION = {
-  /** Core generation — naik jika fondasi platform berubah */
-  core: 1,
+  /** Core generation — naik jika fondasi platform berubah (tambah pillar baru, dll) */
+  core: 2,
   /** Module = jumlah business type yang tersedia */
   module: BUSINESS_TYPE_MODULES.length,
   /** Add-on = jumlah add-on yang sudah dirilis */
