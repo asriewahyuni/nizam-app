@@ -55,8 +55,9 @@ export async function getOperationalModulePricing(): Promise<Record<string, numb
 
 /**
  * Aktifkan sebuah modul untuk org.
- * - Jika sebelumnya DISABLED → re-aktifkan ke PENDING
- * - Jika baru pertama kali → insert PENDING
+ * - Jika modul operasional (isCore: false) → swap dengan operasional existing
+ * - Jika core (isCore: true) → normal aktivasi tanpa swap
+ * - Inventory dikecualikan dari swap (sudah core, aman)
  * - Tambahkan ke enabled_modules
  */
 export async function activateModule(moduleKey: string) {
@@ -72,6 +73,35 @@ export async function activateModule(moduleKey: string) {
     const unmet = modDef.requires.filter(req => !enabledModules.some(m => m.toLowerCase().replace(/\s+/g, '') === req.toLowerCase().replace(/\s+/g, '')))
     if (unmet.length > 0) {
       throw new Error(`Syarat belum terpenuhi: Modul ${unmet.join(', ')} harus diaktifkan terlebih dahulu.`)
+    }
+  }
+
+  // ── SWAP LOGIC: Jika modul operasional (non-core) → swap dengan operasional existing ──
+  if (modDef && !modDef.isCore) {
+    // Cari modul operasional lain yang sedang aktif (PENDING, ONBOARDING, atau READY)
+    const { data: allInstances } = await supabase
+      .from('org_module_instances')
+      .select('id, module_key')
+      .eq('org_id', orgData.org.id)
+      .in('status', ['PENDING', 'ONBOARDING', 'READY'])
+
+    if (allInstances && allInstances.length > 0) {
+      for (const instance of allInstances) {
+        if (instance.module_key === moduleKey) continue // skip modul yg sama
+        const otherModDef = getModuleByKey(instance.module_key)
+        if (otherModDef && !otherModDef.isCore) {
+          // Swap out: deactivate operational module yang lama
+          await supabase
+            .from('org_module_instances')
+            .update({ status: 'DISABLED' })
+            .eq('id', instance.id)
+
+          await supabase.rpc('remove_enabled_module', {
+            p_org_id: orgData.org.id,
+            p_module_key: instance.module_key,
+          })
+        }
+      }
     }
   }
 
