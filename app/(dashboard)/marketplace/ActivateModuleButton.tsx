@@ -21,8 +21,11 @@ export function ActivateModuleButton({ moduleKey, disabled }: Props) {
     startTransition(async () => {
       try {
         await activateModule(moduleKey)
-        // Redirect langsung ke halaman setup
-        router.push(`/marketplace/setup/${encodeURIComponent(moduleKey)}`)
+        setSuccess(true)
+        // Redirect ke halaman setup — pake window.location biar gak konflik sama revalidatePath
+        setTimeout(() => {
+          window.location.href = `/marketplace/setup/${encodeURIComponent(moduleKey)}`
+        }, 500)
       } catch (err: any) {
         setError(err.message || 'Terjadi kesalahan saat mengaktifkan modul')
       }
