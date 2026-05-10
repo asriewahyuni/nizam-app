@@ -214,7 +214,9 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
     href: '/factory',
     isCore: false,
     category: 'business_type',
-    onboardingSteps: [],
+    onboardingSteps: [
+      { id: 'settings', title: 'Pengaturan Produksi', description: 'Tentukan satuan produksi, kategori BoM, dan default gudang produksi.' },
+    ],
     requires: ['Inventory'],
   },
   {
@@ -227,7 +229,9 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
     href: '/workshop',
     isCore: false,
     category: 'business_type',
-    onboardingSteps: [],
+    onboardingSteps: [
+      { id: 'settings', title: 'Pengaturan Bengkel', description: 'Tentukan layanan jasa bengkel, kategori spare part, dan tarif teknisi.' },
+    ],
     requires: ['Inventory', 'Sales'],
   },
   {
@@ -237,10 +241,12 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
     description: 'Untuk bisnis jasa: job order, penugasan tim, time tracking, dan billing berbasis pekerjaan.',
     icon: '📋',
     color: 'bg-teal-600',
-    href: '/job-order',
+    href: '/services',
     isCore: false,
     category: 'business_type',
-    onboardingSteps: [],
+    onboardingSteps: [
+      { id: 'settings', title: 'Pengaturan Jasa', description: 'Tentukan kategori jasa, metode billing, dan template job order.' },
+    ],
     requires: ['Finance', 'Sales'],
   },
   {
@@ -250,10 +256,12 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
     description: 'Untuk bisnis konstruksi/kontraktor: RAB, progress billing, subkon, dan laporan progres proyek.',
     icon: '🏗️',
     color: 'bg-orange-700',
-    href: '/project',
+    href: '/construction',
     isCore: false,
     category: 'business_type',
-    onboardingSteps: [],
+    onboardingSteps: [
+      { id: 'settings', title: 'Pengaturan Proyek', description: 'Tentukan kategori proyek, metode RAB, dan format progress billing.' },
+    ],
     requires: ['Finance', 'Purchasing'],
   },
   {
@@ -286,7 +294,11 @@ export const SYIRKAH_MODULES: ModuleDefinition[] = [
     href: '/syirkah',
     isCore: true,
     category: 'syirkah',
-    onboardingSteps: [],
+    coaInjectionFn: 'inject_shariah_coa',
+    onboardingSteps: [
+      { id: 'coa', title: 'Install CoA Syirkah', description: 'Pasang akun Modal Syirkah, Kewajiban Syariah, Piutang Salam, dan Beban Ijarah.' },
+      { id: 'settings', title: 'Pengaturan Kemitraan', description: 'Tentukan jenis akad, nisbah bagi hasil default, dan periode distribusi.' },
+    ],
     requires: ['Finance', 'Accounting'],
   },
 ]
@@ -307,7 +319,9 @@ export const ADDON_MODULES: ModuleDefinition[] = [
     isCore: false,
     isAddon: true,
     category: 'addon',
-    onboardingSteps: [],
+    onboardingSteps: [
+      { id: 'settings', title: 'Pengaturan Sales Page', description: 'Pilih template halaman, domain, dan metode pembayaran.' },
+    ],
     requires: ['Sales', 'Inventory'],
   },
   {
@@ -317,11 +331,13 @@ export const ADDON_MODULES: ModuleDefinition[] = [
     description: 'Buat halaman penjualan online untuk produk/jasa dengan link pembayaran. Cocok untuk campaign dan social selling.',
     icon: '🛍️',
     color: 'bg-rose-500',
-    href: '/sales-page',
+    href: '/sales/pages',
     isCore: false,
     isAddon: true,
     category: 'addon',
-    onboardingSteps: [],
+    onboardingSteps: [
+      { id: 'settings', title: 'Pengaturan Sales Page', description: 'Pilih template halaman, domain, dan metode pembayaran.' },
+    ],
     requires: ['Sales'],
   },
 ]

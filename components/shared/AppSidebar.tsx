@@ -459,12 +459,13 @@ export function AppSidebar({
         if (enabledLower === item.label.trim().toLowerCase()) return true
 
         // b. Canonical module match — backward compat with packages storing canonical names
-        //    Only applies when the enabledModule IS already a canonical name (normalizes to itself)
-        //    e.g. enabledModules has 'Purchasing' → matches item.module_key 'Purchasing'
-        //    Also supports family coverage, e.g. 'HRIS' should reveal Payroll/Attendance menus.
+        //    e.g. enabledModules has 'Job Order' → normalizes to 'Job Order (Jasa)'
+        //        matches item.module_key 'Job Order (Jasa)' via coverage check.
         const normalizedEnabled = normalizeSaasEntitlementName(moduleName)
-        if (normalizedEnabled.trim().toLowerCase() === enabledLower) {
-          if (saasModuleCoversCapability(moduleName, item.module_key!)) return true
+        if (normalizedEnabled.trim()) {
+          // Check both: (1) normalized canonical matches module_key, (2) original input matches module_key
+          if (saasModuleCoversCapability(normalizedEnabled, item.module_key!) ||
+              saasModuleCoversCapability(moduleName, item.module_key!)) return true
         }
 
         return false
