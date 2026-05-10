@@ -102,8 +102,9 @@ export default async function DashboardLayout({
 
   // Map paths to their required module names (matching saas_packages.modules)
   // Each entry can have multiple aliases to support both English & Indonesian module names
+  // Note: /marketplace is intentionally excluded — it's the module management page and must always
+  // be accessible regardless of which modules are active (including /marketplace/setup/*)
   const routeModuleMap: RouteModuleEntry[] = [
-    { path: '/marketplace', requiredModule: 'Config', aliases: ['Config'], permissionKeys: ['config', 'business'] },
     { path: '/sales/pages', requiredModule: 'Sales Page', aliases: ['Sales Page'], permissionKeys: ['sales'] },
     { path: '/inventory/warehouses', requiredModule: 'Warehouse', aliases: ['Warehouse', 'WMS'], permissionKeys: ['inventory', 'warehouse'] },
     { path: '/accounting/audit', requiredModule: 'Audit', aliases: ['Audit', 'Audit Trail'], permissionKeys: ['audit', 'approval'] },

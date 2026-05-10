@@ -152,7 +152,6 @@ export async function activateModule(moduleKey: string) {
   }
 
   revalidatePath('/marketplace')
-  revalidatePath('/dashboard')
   revalidatePath(`/marketplace/setup/${encodeURIComponent(moduleKey)}`)
 
   return { success: true, redirectUrl: `/marketplace/setup/${encodeURIComponent(moduleKey)}` }
@@ -226,9 +225,9 @@ export async function completeModuleOnboarding(moduleKey: string) {
 
   if (error) throw new Error(error.message)
 
-  // Revalidate paths to ensure fresh data
+  // Revalidate paths to ensure fresh data — revalidate layout so sidebar reflects READY status
   revalidatePath('/marketplace')
-  revalidatePath('/dashboard')
+  revalidatePath('/', 'layout')
   return { success: true }
 }
 
@@ -260,7 +259,6 @@ export async function deactivateModule(moduleKey: string) {
   })
 
   revalidatePath('/marketplace')
-  revalidatePath('/dashboard')
 
   return { success: true, redirectUrl: '/marketplace' }
 }

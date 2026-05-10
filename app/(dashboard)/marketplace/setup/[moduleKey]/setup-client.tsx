@@ -82,7 +82,6 @@ export function SetupClient({
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [isPending, startTransition] = useTransition()
   const [settingsSaved, setSettingsSaved] = useState(false)
-  const [navigationUrl, setNavigationUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (toast) {
@@ -90,16 +89,6 @@ export function SetupClient({
       return () => clearTimeout(t)
     }
   }, [toast])
-
-  useEffect(() => {
-    if (navigationUrl && !isPending) {
-      // Small delay to ensure database updates propagate
-      const timer = setTimeout(() => {
-        router.push(navigationUrl)
-      }, 300)
-      return () => clearTimeout(timer)
-    }
-  }, [navigationUrl, isPending, router])
 
   function goToStep(nextIdx: number, prevIdx: number, success = true) {
     setStepStatuses((prev) => {
@@ -150,7 +139,7 @@ export function SetupClient({
       try {
         await completeModuleOnboarding(mod.key)
         setStepStatuses((prev) => { const n = [...prev] as StepStatus[]; n[steps.length - 1] = 'done'; return n })
-        setNavigationUrl(mod.href)
+        router.push(mod.href)
       } catch (err: any) {
         setToast({ message: err.message || 'Gagal menyelesaikan setup', type: 'error' })
       }
