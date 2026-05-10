@@ -8,6 +8,7 @@ import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/brows
 import { scheduleIdleTask } from '@/lib/browser/idle'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import { saasModuleCoversCapability, normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
+import { PILLAR_MODULES } from '@/modules/marketplace/lib/module-registry'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import {
   LayoutDashboard,
@@ -442,10 +443,9 @@ export function AppSidebar({
     // 0. DEMO BYPASS: Tampilkan SEMUA modul di mode Demo/Latihan agar klien bisa eksplorasi fitur penuh
     if (isDemo) return true
 
-    // 0b. MINIMUM CORE BYPASS: Modul inti dasar selalu muncul di sidebar
-    //     Accounting, Finance, Inventory, CRM, Reports — wajib ada agar sistem berfungsi.
-    const MINIMUM_CORE_KEYS = ['Accounting', 'Finance', 'Inventory', 'CRM', 'Reports']
-    if (item.module_key && MINIMUM_CORE_KEYS.some(k => k.toLowerCase() === item.module_key!.toLowerCase())) {
+    // 0b. PILLAR BYPASS: Modul pillar (Finance, Marketing, HRIS) selalu muncul di sidebar
+    //     Sidebar items yang punya module_key milik pillar modules auto-visible.
+    if (item.module_key && PILLAR_MODULES.some(p => p.key.toLowerCase() === item.module_key!.toLowerCase())) {
       return true
     }
 

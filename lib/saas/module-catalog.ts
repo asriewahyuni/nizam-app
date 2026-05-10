@@ -396,6 +396,7 @@ const SAAS_CAPABILITY_COVERAGE: Record<string, readonly string[]> = {
   HRIS: ['Attendance', 'Payroll'],
   'Job Order (Jasa)': ['Project & Construction'],
   'Project & Construction': ['Job Order (Jasa)'],
+  LMS: ['Learning', 'Pelatihan', 'Training'],
 }
 
 const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
@@ -487,6 +488,19 @@ const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
       'rab',
       'boq',
       'site progress',
+    ],
+  },
+  {
+    canonical: 'LMS',
+    aliases: [
+      'lms',
+      'learning',
+      'lembaga pelatihan',
+      'pelatihan',
+      'training',
+      'education',
+      'kursus',
+      'modul pelatihan',
     ],
   },
   {
