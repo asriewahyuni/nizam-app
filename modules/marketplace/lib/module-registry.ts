@@ -2,17 +2,15 @@
  * Module Registry — Nizam App
  * Sumber kebenaran tunggal untuk semua modul yang tersedia di marketplace.
  *
- * ARSITEKTUR 4 PILAR (wajib, selalu aktif):
+ * ARSITEKTUR 5 PILAR (wajib, selalu aktif):
  *   1. Finance    → Accounting, Kas & Bank, Purchasing, Inventory, Warehouse, Reports, Audit
  *   2. Operasional → Container, isinya Business Type (swapable)
  *   3. Marketing   → Sales, CRM
  *   4. HRIS       → Karyawan & Payroll
+ *   5. Syirkah    → Kemitraan & Bagi Hasil
  *
  * BUSINESS TYPE (isi Operasional, swapable, hanya 1 aktif):
  *   Fleet & Rental, Manufacturing, Workshop, Job Order, Project, LMS
- *
- * SPECIAL — bukan business type, bukan pillar:
- *   Syirkah
  *
  * ADD-ON (multi-aktif, tidak ngaruh business type):
  *   POS, Sales Page, Ecommerce, Quick Bill, Service
@@ -24,7 +22,7 @@ export type OnboardingStep = {
   description: string
 }
 
-export type ModuleCategory = 'finance' | 'operasional' | 'marketing' | 'hris' | 'business_type' | 'addon' | 'special'
+export type ModuleCategory = 'finance' | 'operasional' | 'marketing' | 'hris' | 'syirkah' | 'business_type' | 'addon' | 'special'
 
 export type ModuleDefinition = {
   key: string
@@ -277,8 +275,7 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
 ]
 
 // ── SYIRKAH PILLAR ─────────────────────────────────────────────────────────
-// ── SPECIAL — bukan business type, bukan pillar ──────────────────────────
-export const SPECIAL_MODULES: ModuleDefinition[] = [
+export const SYIRKAH_MODULES: ModuleDefinition[] = [
   {
     key: 'Syirkah',
     name: 'Syirkah (Bagi Hasil)',
@@ -287,12 +284,15 @@ export const SPECIAL_MODULES: ModuleDefinition[] = [
     icon: '🤝',
     color: 'bg-emerald-700',
     href: '/syirkah',
-    isCore: false,
-    category: 'special',
+    isCore: true,
+    category: 'syirkah',
     onboardingSteps: [],
     requires: ['Finance', 'Accounting'],
   },
 ]
+
+// ── SPECIAL — cadangan (kosong) ───────────────────────────────────────────
+export const SPECIAL_MODULES: ModuleDefinition[] = []
 
 // ── ADD-ON (multi-aktif, tidak ngaruh operasional) ────────────────────────
 export const ADDON_MODULES: ModuleDefinition[] = [
@@ -331,6 +331,7 @@ export const PILLAR_MODULES: ModuleDefinition[] = [
   ...FINANCE_MODULES,
   ...MARKETING_MODULES,
   ...HRIS_MODULES,
+  ...SYIRKAH_MODULES,
 ]
 
 // ── BACKWARD COMPAT ALIASES ────────────────────────────────────────────────
