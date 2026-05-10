@@ -55,9 +55,9 @@ export async function getOperationalModulePricing(): Promise<Record<string, numb
 
 /**
  * Aktifkan sebuah modul untuk org.
- * - Jika modul operasional (isCore: false) → swap dengan operasional existing
- * - Jika core (isCore: true) → normal aktivasi tanpa swap
- * - Inventory dikecualikan dari swap (sudah core, aman)
+ * - Business type → swap dengan business type existing (hanya 1 aktif)
+ * - Add-on → multi-aktif, tidak kena swap
+ * - Pillar/core → selalu aktif (tidak perlu aktivasi manual)
  * - Tambahkan ke enabled_modules
  */
 export async function activateModule(moduleKey: string) {
@@ -76,9 +76,11 @@ export async function activateModule(moduleKey: string) {
     }
   }
 
-  // ── SWAP LOGIC: Jika modul operasional (non-core) → swap dengan operasional existing ──
-  if (modDef && !modDef.isCore) {
-    // Cari modul operasional lain yang sedang aktif (PENDING, ONBOARDING, atau READY)
+  // ── SWAP LOGIC: Hanya business_type yang di-swap ──
+  // Add-on (isAddon) bisa multi-aktif, tidak kena swap.
+  // Pillar/core modules juga bebas multi-aktif.
+  if (modDef && modDef.category === 'business_type') {
+    // Cari business type lain yang sedang aktif (PENDING, ONBOARDING, atau READY)
     const { data: allInstances } = await supabase
       .from('org_module_instances')
       .select('id, module_key')
@@ -87,10 +89,10 @@ export async function activateModule(moduleKey: string) {
 
     if (allInstances && allInstances.length > 0) {
       for (const instance of allInstances) {
-        if (instance.module_key === moduleKey) continue // skip modul yg sama
+        if (instance.module_key === moduleKey) continue
         const otherModDef = getModuleByKey(instance.module_key)
-        if (otherModDef && !otherModDef.isCore) {
-          // Swap out: deactivate operational module yang lama
+        if (otherModDef && otherModDef.category === 'business_type') {
+          // Swap out: deactivate business type yang lama
           await supabase
             .from('org_module_instances')
             .update({ status: 'DISABLED' })

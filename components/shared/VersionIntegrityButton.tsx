@@ -9,7 +9,7 @@ import {
 import { NIZAM_VERSION, NIZAM_VERSION_FULL, NIZAM_VERSION_LABEL } from '@/lib/version'
 import { VERSION_LOG, type VersionLogEntry } from '@/lib/version-log'
 import { ADDON_REGISTRY } from '@/lib/addon-registry'
-import { OPERATIONAL_MODULES } from '@/modules/marketplace/lib/module-registry'
+import { BUSINESS_TYPE_MODULES, PILLAR_MODULES } from '@/modules/marketplace/lib/module-registry'
 
 export function VersionIntegrityButton() {
   const [open, setOpen] = useState(false)
@@ -87,10 +87,22 @@ export function VersionIntegrityButton() {
               {/* Body */}
               <div className="p-6 space-y-6">
 
-                {/* Ringkasan Modul */}
-                <Section title="📦 Modul Operasional" icon={<Zap className="h-4 w-4" />}>
+                {/* 4 Pilar */}
+                <Section title="🏛️ 4 Pilar Inti" icon={<ShieldCheck className="h-4 w-4" />}>
                   <div className="grid grid-cols-2 gap-2">
-                    {OPERATIONAL_MODULES.map(m => (
+                    {PILLAR_MODULES.map(m => (
+                      <div key={m.key} className="flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-xs font-medium text-slate-700">
+                        <span>{m.icon}</span>
+                        <span className="truncate">{m.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+
+                {/* Business Type */}
+                <Section title="🔄 Business Type (swapable)" icon={<Zap className="h-4 w-4" />}>
+                  <div className="grid grid-cols-2 gap-2">
+                    {BUSINESS_TYPE_MODULES.map(m => (
                       <div key={m.key} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">
                         <span>{m.icon}</span>
                         <span className="truncate">{m.name}</span>
