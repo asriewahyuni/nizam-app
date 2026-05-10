@@ -34,8 +34,11 @@ export default async function MarketplacePage() {
   if (!orgData) return redirect('/onboarding')
   if (!['owner', 'admin'].includes(orgData.role)) return redirect('/dashboard')
 
-  // Unit/branch cannot manage modules — they inherit from parent org
-  if (orgData.activeBranchId) {
+  // Unit/child org cannot manage modules — mereka inherit dari parent org.
+  // Cek parent_org_id (bukan activeBranchId) karena activeBranchId hanya
+  // branch filter dan bisa aktif di parent org juga.
+  const isChildOrg = !!(orgData.org as any).parent_org_id
+  if (isChildOrg) {
     return redirect('/dashboard')
   }
 
