@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { PowerOff, Loader2, AlertTriangle, X } from 'lucide-react'
 import { deactivateModule } from '@/modules/marketplace/actions/marketplace.actions'
@@ -14,6 +14,14 @@ export function DeactivateModuleButton({ moduleKey, moduleName }: Props) {
   const router = useRouter()
   const [showConfirm, setShowConfirm] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
+
+  // Handle navigation after successful deactivation
+  useEffect(() => {
+    if (redirectUrl && !isPending) {
+      router.push(redirectUrl)
+    }
+  }, [redirectUrl, isPending, router])
 
   function handleConfirm() {
     startTransition(async () => {
@@ -21,7 +29,7 @@ export function DeactivateModuleButton({ moduleKey, moduleName }: Props) {
         const result = await deactivateModule(moduleKey)
         setShowConfirm(false)
         if (result?.success && result?.redirectUrl) {
-          router.push(result.redirectUrl)
+          setRedirectUrl(result.redirectUrl)
         } else {
           router.refresh()
         }

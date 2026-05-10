@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Loader2, X, CreditCard, Tag, CheckCircle2, Sparkles, Shield } from 'lucide-react'
 import { activateModule } from '@/modules/marketplace/actions/marketplace.actions'
@@ -24,10 +24,18 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [showPayment, setShowPayment] = useState(false)
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
   const [voucher, setVoucher] = useState('')
   const [voucherApplied, setVoucherApplied] = useState(false)
   const [voucherError, setVoucherError] = useState<string | null>(null)
   const [discountPct, setDiscountPct] = useState(0)
+
+  // Handle navigation after successful activation
+  useEffect(() => {
+    if (redirectUrl && !isPending) {
+      router.push(redirectUrl)
+    }
+  }, [redirectUrl, isPending, router])
 
   // Voucher mock validation
   function handleApplyVoucher() {
@@ -53,11 +61,13 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
 
   function handleActivate() {
     setError(null)
+    setRedirectUrl(null)
     startTransition(async () => {
       try {
         const result = await activateModule(moduleKey)
         if (result?.success && result?.redirectUrl) {
-          router.push(result.redirectUrl)
+          setRedirectUrl(result.redirectUrl)
+          setShowPayment(false)
         }
       } catch (err: any) {
         setError(err.message || 'Terjadi kesalahan saat mengaktifkan modul')
