@@ -9,7 +9,7 @@
  *   4. HRIS       → Karyawan & Payroll
  *
  * BUSINESS TYPE (isi Operasional, swapable, hanya 1 aktif):
- *   Fleet & Rental, Manufacturing, Workshop, Job Order, Project, LMS, Syirkah
+ *   Fleet & Rental, Manufacturing, Workshop, Job Order, Project, LMS
  *
  * ADD-ON (multi-aktif, tidak ngaruh business type):
  *   POS, Sales Page, Ecommerce, Quick Bill, Service
@@ -271,6 +271,10 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
     ],
     requires: ['Finance'],
   },
+]
+
+// ── SPECIAL / KHUSUS — belum dikategorikan ────────────────────────────────
+export const SPECIAL_MODULES: ModuleDefinition[] = [
   {
     key: 'Syirkah',
     name: 'Syirkah (Bagi Hasil)',
@@ -280,7 +284,7 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
     color: 'bg-emerald-700',
     href: '/syirkah',
     isCore: false,
-    category: 'business_type',
+    category: 'special',
     onboardingSteps: [],
     requires: ['Finance', 'Accounting'],
   },
@@ -351,6 +355,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
   ...PILLAR_MODULES,
   ...BUSINESS_TYPE_MODULES,
   ...ADDON_MODULES,
+  ...SPECIAL_MODULES,
 ]
 
 // ── HELPERS ─────────────────────────────────────────────────────────────────
