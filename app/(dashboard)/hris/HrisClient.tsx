@@ -343,7 +343,7 @@ export default function HrisClient({
       const res = await uploadEmployeeAvatar(avatarFile, tempId)
       if (res.url) formData.set('avatar_url', res.url)
     }
-    formData.append('basic_salary', basicSalary.toString())
+    formData.set('basic_salary', basicSalary.toString())
     formData.append('managed_branches', JSON.stringify(selectedManagedBranches))
     formData.append('managed_child_orgs', JSON.stringify(selectedManagedChildOrgs))
 
@@ -2491,6 +2491,7 @@ export default function HrisClient({
                       </select>
                       <CurrencyInput
                         label="Base Salary / Mo *"
+                        name="basic_salary"
                         value={basicSalary}
                         onChange={setBasicSalary}
                       />
