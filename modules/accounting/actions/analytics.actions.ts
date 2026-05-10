@@ -1,5 +1,3 @@
-import { isInternalAuthProvider } from '@/lib/auth/provider'
-import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { queryPostgres } from '@/lib/db/postgres'
 import { format, subMonths } from 'date-fns'
 
