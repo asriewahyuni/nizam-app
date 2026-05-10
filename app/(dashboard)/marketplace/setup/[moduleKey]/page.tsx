@@ -17,8 +17,9 @@ export default async function ModuleSetupPage({ params }: Props) {
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
 
-  // Unit/branch cannot manage modules — they inherit from parent org
-  if (orgData.activeBranchId) {
+  // Unit/child org cannot manage modules — cek parent_org_id bukan activeBranchId
+  const isChildOrg = !!(orgData.org as any).parent_org_id
+  if (isChildOrg) {
     return redirect('/dashboard')
   }
 
