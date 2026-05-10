@@ -238,8 +238,9 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
     }
   }
 
-  const [employees, payrollComponents, accounts, payrollRuns, attendanceRecords, leaveRequests, invitations, allowAllBranchSelection, initialTransferHistory] = await Promise.all([
+  const [employees, allEmployees, payrollComponents, accounts, payrollRuns, attendanceRecords, leaveRequests, invitations, allowAllBranchSelection, initialTransferHistory] = await Promise.all([
     getEmployees(orgData.org.id, activeBranch?.id),
+    getEmployees(orgData.org.id), // fetch all org employees for NIK generation (no branch filter)
     getPayrollComponents(orgData.org.id),
     getAccountBalances(orgData.org.id),
     getPayrollRuns(orgData.org.id, activeBranch?.id),
@@ -251,6 +252,7 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
   ])
 
   const clientSafeEmployees = serializeHrisClientValue(employees) as typeof employees
+  const clientSafeAllEmployees = serializeHrisClientValue(allEmployees) as typeof allEmployees
   const clientSafePayrollComponents = serializeHrisClientValue(payrollComponents) as typeof payrollComponents
   const clientSafeAccounts = serializeHrisClientValue(accounts) as typeof accounts
   const clientSafePayrollRuns = serializeHrisClientValue(payrollRuns) as typeof payrollRuns
@@ -266,6 +268,7 @@ export default async function HrisPage(props: { searchParams: Promise<{ tab?: st
 
   return <HrisClient 
     orgId={orgData.org.id} 
+    allEmployees={clientSafeAllEmployees}
     activeBranchId={activeBranch?.id ?? null}
     activeBranchName={activeBranch?.name ?? null}
     allowAllBranchSelection={allowAllBranchSelection}

@@ -87,6 +87,27 @@ export const VERSION_LOG: VersionLogEntry[] = [
     by: 'system',
   },
   {
+    date: '2026-05-10',
+    type: 'patch',
+    label: 'Fix payroll JE empty lines: RPC fallback for NULL account_id',
+    description: 'process_payroll_payment sekarang punya FALLBACK: kalo loop ' +
+      'payslip_lines gak menghasilkan baris (karena account_id NULL), ' +
+      'otomatis cari akun beban (6001) dan bikin 1 baris jurnal. ' +
+      'generate_payslips_for_run juga improved: fallback akun sampe ' +
+      'last-resort (any account in org) biar account_id gak pernah NULL.',
+    by: 'system',
+  },
+  {
+    date: '2026-05-10',
+    type: 'patch',
+    label: 'Fix NIK auto-counter: pake all org employees instead of per-branch',
+    description: 'getNextNik() sebelumnya cuma liat employees state yang ' +
+      'terfilter per branch. Pas ganti branch, counter reset. Sekarang ' +
+      'pake prop allEmployees yang isinya SEMUA karyawan se-org (tanpa ' +
+      'filter branch), jadi NIK auto-counter akurat secara global.',
+    by: 'system',
+  },
+  {
     date: '2026-05-09',
     type: 'patch',
     label: 'Fix core module visibility + aktivasi',

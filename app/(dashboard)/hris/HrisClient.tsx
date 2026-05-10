@@ -81,6 +81,7 @@ type HrisImpersonationTarget = {
 
 export default function HrisClient({
   orgId,
+  allEmployees = [],
   currentUserId = '',
   activeBranchId = null,
   activeBranchName = null,
@@ -104,6 +105,7 @@ export default function HrisClient({
   defaultTab
 }: {
   orgId: string,
+  allEmployees?: any[],
   currentUserId?: string,
   activeBranchId?: string | null,
   activeBranchName?: string | null,
@@ -580,7 +582,8 @@ export default function HrisClient({
     const literalPrefix = splitFormat[0]
 
     let maxNum = 0
-    employees.forEach((emp: any) => {
+    const nikSource = allEmployees.length > 0 ? allEmployees : employees
+    nikSource.forEach((emp: any) => {
       // Basic extraction matching the literalPrefix
       if (emp.nik && emp.nik.startsWith(literalPrefix)) {
         const potentialNum = emp.nik.substring(literalPrefix.length, literalPrefix.length + digitsCount)
