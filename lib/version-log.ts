@@ -108,6 +108,31 @@ export const VERSION_LOG: VersionLogEntry[] = [
     by: 'system',
   },
   {
+    date: '2026-05-10',
+    type: 'patch',
+    label: 'Restruktur arsitektur: 4 pilar + business type + add-on',
+    description: 'Modul diorganisir ulang sesuai arahan: ' +
+      '4 Pilar (Finance, Operasional container, Marketing, HRIS) selalu aktif. ' +
+      'Business Type (Fleet, Manufacturing, Workshop, Job Order, Project, ' +
+      'LMS, Syirkah) swapable, hanya 1 aktif. Add-on (POS, Sales Page) ' +
+      'multi-aktif. activateModule: swap logic by category. ' +
+      'module-registry: category field + BUSINESS_TYPE_MODULES + ADDON_MODULES. ' +
+      'Mark: Manufacturing pindah dari core ke business type. ' +
+      'POS dan Sales Page pindah dari core ke add-on.',
+    by: 'system',
+  },
+  {
+    date: '2026-05-10',
+    type: 'patch',
+    label: 'Fix LMS tidak muncul di sidebar + entitlement catalog',
+    description: 'LMS ditambahkan ke SAAS_ENTITLEMENT_CATALOG dan ' +
+      'SAAS_CAPABILITY_COVERAGE. MINIMUM_CORE_KEYS hardcoded diganti ' +
+      'dengan PILLAR_MODULES dinamis dari registry. Semua pillar module ' +
+      'auto-visible di sidebar. Sidebar module_keys diverifikasi: ' +
+      'semua 24 module_keys sudah ada di entitlement catalog.',
+    by: 'system',
+  },
+  {
     date: '2026-05-09',
     type: 'patch',
     label: 'Fix core module visibility + aktivasi',
