@@ -8,7 +8,6 @@ import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/brows
 import { scheduleIdleTask } from '@/lib/browser/idle'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import { saasModuleCoversCapability, normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
-import { PILLAR_MODULES } from '@/modules/marketplace/lib/module-registry'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import {
   LayoutDashboard,
@@ -50,6 +49,7 @@ import {
   GraduationCap,
   type LucideIcon
 } from 'lucide-react'
+import { VersionIntegrityButton } from '@/components/shared/VersionIntegrityButton'
 import { signOut } from '@/modules/auth/actions/auth.actions'
 import { signOutDemo } from '@/modules/demo/actions/demo.actions'
 import { getSidebarChromeMetrics } from '@/modules/organization/actions/dashboard-shell.actions'
@@ -448,12 +448,6 @@ export function AppSidebar({
     // 0. DEMO BYPASS: Tampilkan SEMUA modul di mode Demo/Latihan agar klien bisa eksplorasi fitur penuh
     if (isDemo) return true
 
-    // 0b. PILLAR BYPASS: Modul pillar (Finance, Marketing, HRIS) selalu muncul di sidebar
-    //     Sidebar items yang punya module_key milik pillar modules auto-visible.
-    if (item.module_key && PILLAR_MODULES.some(p => p.key.toLowerCase() === item.module_key!.toLowerCase())) {
-      return true
-    }
-
     // 1. SaaS Module Check
     if (item.module_key && enabledModules.length > 0) {
       const matches = enabledModules.some((moduleName) => {
@@ -601,6 +595,13 @@ export function AppSidebar({
           )}
         </>
       </div>
+
+      {/* Version Integrity — below logo, hidden when collapsed */}
+      {!effectiveIsCollapsed && (
+        <div className="px-4 pb-2">
+          <VersionIntegrityButton />
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 overflow-y-auto no-scrollbar scroll-smooth">
