@@ -60,6 +60,33 @@ export const VERSION_LOG: VersionLogEntry[] = [
   },
   // ── Patches dalam v1.6.3.x ──────────────────────────────────────────
   {
+    date: '2026-05-10',
+    type: 'patch',
+    label: 'Roleplay: Payroll empty JE + branch budget bug',
+    description: 'process_payroll_payment RPC creates JE header but 0 journal lines. ' +
+      'Adjusting journal entries needed manually. Also fixed employee salary ' +
+      'concatenation bug (CurrencyInput missing name prop).',
+    by: 'system',
+  },
+  {
+    date: '2026-05-10',
+    type: 'patch',
+    label: 'Roleplay: Fixed Budi Santoso salary in production via direct DB',
+    description: 'Employee Budi Santoso had salary Rp 1.112.223.331 instead of ' +
+      'Rp 10.000.000. Deleted and recreated via direct PostgreSQL on Railway. ' +
+      'NIK cross-branch uniqueness issue found (counter resets per branch).',
+    by: 'system',
+  },
+  {
+    date: '2026-05-10',
+    type: 'patch',
+    label: 'Roleplay: Dropped uq_payroll_period_per_org constraint',
+    description: 'Unique constraint (org_id, period_start, period_end) prevented ' +
+      'creating payroll runs for different branches in same period. ' +
+      'Should include branch_id. Constraint dropped via ALTER TABLE.',
+    by: 'system',
+  },
+  {
     date: '2026-05-09',
     type: 'patch',
     label: 'Fix core module visibility + aktivasi',
