@@ -153,7 +153,9 @@ export async function activateModule(moduleKey: string) {
 
   revalidatePath('/marketplace')
   revalidatePath('/dashboard')
-  redirect(`/marketplace/setup/${encodeURIComponent(moduleKey)}`)
+  revalidatePath(`/marketplace/setup/${encodeURIComponent(moduleKey)}`)
+
+  return { success: true, redirectUrl: `/marketplace/setup/${encodeURIComponent(moduleKey)}` }
 }
 
 
@@ -260,7 +262,8 @@ export async function deactivateModule(moduleKey: string) {
 
   revalidatePath('/marketplace')
   revalidatePath('/dashboard')
-  redirect('/marketplace')
+
+  return { success: true, redirectUrl: '/marketplace' }
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
