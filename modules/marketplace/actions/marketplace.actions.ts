@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getModuleByKey } from '@/modules/marketplace/lib/module-registry'
@@ -137,7 +138,7 @@ export async function activateModule(moduleKey: string) {
 
   revalidatePath('/marketplace')
   revalidatePath('/dashboard')
-  return { success: true }
+  redirect(`/marketplace/setup/${encodeURIComponent(moduleKey)}`)
 }
 
 /**
@@ -241,7 +242,7 @@ export async function deactivateModule(moduleKey: string) {
 
   revalidatePath('/marketplace')
   revalidatePath('/dashboard')
-  return { success: true }
+  redirect(`/marketplace/setup/${encodeURIComponent(moduleKey)}`)
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
