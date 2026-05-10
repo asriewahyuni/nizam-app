@@ -49,7 +49,6 @@ import {
   GraduationCap,
   type LucideIcon
 } from 'lucide-react'
-import { VersionIntegrityButton } from '@/components/shared/VersionIntegrityButton'
 import { signOut } from '@/modules/auth/actions/auth.actions'
 import { signOutDemo } from '@/modules/demo/actions/demo.actions'
 import { getSidebarChromeMetrics } from '@/modules/organization/actions/dashboard-shell.actions'
@@ -589,13 +588,6 @@ export function AppSidebar({
           )}
         </>
       </div>
-
-      {/* Version Integrity — below logo, hidden when collapsed */}
-      {!effectiveIsCollapsed && (
-        <div className="px-4 pb-2">
-          <VersionIntegrityButton />
-        </div>
-      )}
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 overflow-y-auto no-scrollbar scroll-smooth">
