@@ -1651,16 +1651,6 @@ export function AppHeader({
           <VersionIntegrityButton />
         </div>
 
-        {planName && (
-          <Link
-            href="/billing"
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-indigo-700 hover:bg-indigo-100 transition-colors"
-          >
-            <Zap size={11} className="text-indigo-500" />
-            {planName}
-          </Link>
-        )}
-
         {isPlatformAdmin && (
           <Link
             href="/admin"
