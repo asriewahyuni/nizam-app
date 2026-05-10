@@ -12,7 +12,6 @@ import { AdminImpersonationBanner } from '@/components/shared/AdminImpersonation
 import { DemoBanner } from '@/components/shared/DemoBanner'
 import { SentryUserContext } from '@/components/shared/SentryUserContext'
 import { StartupWizard } from '@/components/shared/StartupWizard'
-import { FloatingPlanBadge } from '@/components/shared/FloatingPlanBadge'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import { MobilePullToRefresh } from '@/components/shared/MobilePullToRefresh'
 import { RouteProgressBar } from '@/components/shared/RouteProgressBar'
@@ -21,7 +20,6 @@ import { GlobalApprovalNotifier } from '@/components/shared/GlobalApprovalNotifi
 import { EduModeShell } from '@/components/edu/EduModeShell'
 import { hasEnabledModuleAccess, hasPosOnlyAccess } from '@/modules/organization/lib/navigation-access'
 import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
-import { resolveRuntimeDatabaseTarget } from '@/lib/db/runtime-target'
 import { getOrgModuleInstances } from '@/modules/marketplace/actions/marketplace.actions'
 
 type RouteModuleEntry = {
@@ -48,7 +46,6 @@ export default async function DashboardLayout({
   const requestPathname = (await headers()).get('x-pathname') || ''
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
-  const runtimeDb = resolveRuntimeDatabaseTarget()
   const orgSettings =
     orgData.org.settings && typeof orgData.org.settings === 'object' && !Array.isArray(orgData.org.settings)
       ? orgData.org.settings as Record<string, unknown>
@@ -239,8 +236,7 @@ export default async function DashboardLayout({
           activeOrgParentId={(orgData.org as { parent_org_id?: string | null }).parent_org_id ?? null}
           allowAllBranchSelection={allowAllBranchSelection}
           canManageBranches={isOwnerOrAdmin}
-          runtimeDatabaseMode={runtimeDb.mode}
-          runtimeDatabaseSource={runtimeDb.sourceKey}
+          planName={effectivePlanName}
         />
         <StartupWizard isDemo={isDemo} enabled={startupWizardEnabled} />
         <MobilePullToRefresh scrollContainerId="dashboard-scroll-root" />
@@ -269,7 +265,6 @@ export default async function DashboardLayout({
           permissions={orgData.permissions}
           enabledModules={orgData.enabledModules}
         />
-        <FloatingPlanBadge planName={effectivePlanName} />
       </div>
     </div>
   )

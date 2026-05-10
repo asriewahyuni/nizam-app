@@ -105,7 +105,7 @@ export default async function MarketplacePage() {
             <span className="text-sm font-black text-slate-900">Modul Inti</span>
           </div>
           <div className="flex-1 h-px bg-slate-200" />
-          <span className="text-xs text-slate-400 font-medium">Selalu aktif — sudah termasuk dalam paket</span>
+          <span className="text-xs text-slate-400 font-medium">Termasuk dalam paket · Accounting &amp; Finance tidak dapat dinonaktifkan</span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {CORE_MODULES.map(mod => {
@@ -181,8 +181,12 @@ export default async function MarketplacePage() {
   )
 }
 
+// Modul inti yang tidak boleh dinonaktifkan — fondasi sistem ERP
+const MINIMUM_CORE_KEYS = new Set(['Accounting', 'Finance'])
+
 // ── Core Module Card ─────────────────────────────────────────────────────────
 function CoreModuleCard({ mod, enabled }: { mod: ModuleDefinition; enabled: boolean }) {
+  const isMinimum = MINIMUM_CORE_KEYS.has(mod.key)
   return (
     <div className={`flex items-center gap-4 rounded-2xl border px-5 py-4 transition-all ${
       enabled
@@ -200,9 +204,12 @@ function CoreModuleCard({ mod, enabled }: { mod: ModuleDefinition; enabled: bool
       </div>
 
       {enabled ? (
-        <span className="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
-          <CheckCircle2 className="h-2.5 w-2.5" /> Aktif
-        </span>
+        <div className="flex-shrink-0 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
+            <CheckCircle2 className="h-2.5 w-2.5" /> Aktif
+          </span>
+          {!isMinimum && <DeactivateModuleButton moduleKey={mod.key} moduleName={mod.name} />}
+        </div>
       ) : (
         <ActivateCoreModuleButton moduleKey={mod.key} />
       )}
