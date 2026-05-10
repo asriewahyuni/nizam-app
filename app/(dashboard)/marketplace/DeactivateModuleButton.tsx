@@ -17,9 +17,17 @@ export function DeactivateModuleButton({ moduleKey, moduleName }: Props) {
 
   function handleConfirm() {
     startTransition(async () => {
-      await deactivateModule(moduleKey)
-      setShowConfirm(false)
-      router.refresh()
+      try {
+        const result = await deactivateModule(moduleKey)
+        setShowConfirm(false)
+        if (result?.success && result?.redirectUrl) {
+          router.push(result.redirectUrl)
+        } else {
+          router.refresh()
+        }
+      } catch (err: any) {
+        setShowConfirm(false)
+      }
     })
   }
 

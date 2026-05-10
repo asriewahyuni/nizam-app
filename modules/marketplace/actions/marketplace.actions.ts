@@ -136,12 +136,12 @@ export async function activateModule(moduleKey: string) {
     p_module_key: moduleKey,
   })
 
-  // ── Khusus child org: pastikan use_custom_modules = true ──────────────────
-  // Child org mewarisi plan dari parent, tapi enabled_modules-nya berbeda.
-  // use_custom_modules harus true agar kolom enabled_modules di org dibaca
-  // oleh getActiveOrg(), bukan diambil dari saas_packages plan.
-  const isChildOrg = Boolean(orgData.org.parent_org_id)
-  if (isChildOrg && !orgData.org.settings?.use_custom_modules) {
+  // ── Ensure use_custom_modules = true ─────────────────────────────────────
+  // Operational modules are stored in org.enabled_modules array.
+  // use_custom_modules must be true for getActiveOrg() to read enabled_modules
+  // instead of relying only on saas_packages plan modules.
+  // This applies to both main and child orgs.
+  if (!orgData.org.settings?.use_custom_modules) {
     const currentSettings = (orgData.org.settings && typeof orgData.org.settings === 'object')
       ? orgData.org.settings
       : {}
@@ -152,8 +152,9 @@ export async function activateModule(moduleKey: string) {
   }
 
   revalidatePath('/marketplace')
-  revalidatePath('/dashboard')
-  redirect(`/marketplace/setup/${encodeURIComponent(moduleKey)}`)
+  revalidatePath(`/marketplace/setup/${encodeURIComponent(moduleKey)}`)
+
+  return { success: true, redirectUrl: `/marketplace/setup/${encodeURIComponent(moduleKey)}` }
 }
 
 
@@ -224,10 +225,9 @@ export async function completeModuleOnboarding(moduleKey: string) {
 
   if (error) throw new Error(error.message)
 
-  // Hanya invalidate marketplace agar modul tampil sebagai READY.
-  // Dashboard layout TIDAK perlu di-revalidate karena sidebar membaca
-  // enabledModules yang sudah ada — router.push dari client sudah cukup.
+  // Revalidate paths to ensure fresh data — revalidate layout so sidebar reflects READY status
   revalidatePath('/marketplace')
+  revalidatePath('/', 'layout')
   return { success: true }
 }
 
@@ -259,8 +259,8 @@ export async function deactivateModule(moduleKey: string) {
   })
 
   revalidatePath('/marketplace')
-  revalidatePath('/dashboard')
-  redirect('/marketplace')
+
+  return { success: true, redirectUrl: '/marketplace' }
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────────────

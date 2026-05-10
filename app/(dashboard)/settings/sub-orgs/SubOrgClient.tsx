@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Layers, Building, Calendar, Activity, Link as LinkIcon, UserCircle, Pencil, Trash2, CheckCircle2, Loader2, Plus, ArrowRight } from 'lucide-react'
+import { Layers, Building, Calendar, Activity, Link as LinkIcon, UserCircle, Pencil, Trash2, CheckCircle2, Loader2, Plus, ArrowRight, FileSpreadsheet, X } from 'lucide-react'
 import {
   linkSubOrganization,
   assignSubOrgManager,
@@ -13,6 +13,7 @@ import {
   getChildCoAConsolidationWorkspace,
   saveChildCoAConsolidationMappings,
 } from '@/modules/organization/actions/org.actions'
+import { CoAUploadForm } from '@/components/accounting/CoAUploadForm'
 import { formatDate } from '@/lib/utils'
 
 type CoAManagementMode = 'INHERITED' | 'LOCAL'
@@ -112,6 +113,8 @@ export default function SubOrgClient({
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false)
+  const [isCoAUploadModalOpen, setIsCoAUploadModalOpen] = useState(false)
+  const [uploadingCoAForChildId, setUploadingCoAForChildId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [createLoading, setCreateLoading] = useState(false)
   const [mappingLoading, setMappingLoading] = useState(false)
@@ -596,15 +599,28 @@ export default function SubOrgClient({
                     <p className="text-[11px] font-medium text-amber-700">
                       Untuk laporan grup yang rapi, akun lokal child tetap perlu disejajarkan ke akun holding pada mapping konsolidasi.
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenCoAConsolidationMapping(child.id, child.name)}
-                      disabled={!canManageConsolidationMappings}
-                      className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Layers size={12} />
-                      Atur Mapping Konsolidasi
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUploadingCoAForChildId(child.id)
+                          setIsCoAUploadModalOpen(true)
+                        }}
+                        className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-blue-700 transition hover:bg-blue-100"
+                      >
+                        <FileSpreadsheet size={12} />
+                        Upload CoA Excel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCoAConsolidationMapping(child.id, child.name)}
+                        disabled={!canManageConsolidationMappings}
+                        className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Layers size={12} />
+                        Atur Mapping Konsolidasi
+                      </button>
+                    </div>
                   </div>
                 )}
                 {currentCoAMode === 'LOCAL' && !canManageConsolidationMappings && (
@@ -1058,6 +1074,44 @@ export default function SubOrgClient({
                 </button>
               </div>
             </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* CoA Upload Modal */}
+      {isCoAUploadModalOpen && uploadingCoAForChildId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h3 className="text-2xl font-black text-slate-900">Upload Chart of Accounts</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  {childOrgList.find((c) => c.id === uploadingCoAForChildId)?.name}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsCoAUploadModalOpen(false)
+                  setUploadingCoAForChildId(null)
+                }}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <CoAUploadForm
+              orgId={uploadingCoAForChildId}
+              onSuccess={() => {
+                setIsCoAUploadModalOpen(false)
+                setUploadingCoAForChildId(null)
+              }}
+            />
           </motion.div>
         </div>
       )}
