@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Zap, Loader2, CheckCircle2 } from 'lucide-react'
 import { activateModule } from '@/modules/marketplace/actions/marketplace.actions'
@@ -15,13 +15,6 @@ export function ActivateCoreModuleButton({ moduleKey }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
 
-  // Refresh page after successful activation when not pending
-  useEffect(() => {
-    if (done && !isPending) {
-      router.refresh()
-    }
-  }, [done, isPending, router])
-
   function handleClick() {
     setError(null)
     startTransition(async () => {
@@ -29,6 +22,7 @@ export function ActivateCoreModuleButton({ moduleKey }: Props) {
         const result = await activateModule(moduleKey)
         if (result?.success) {
           setDone(true)
+          router.refresh()
         }
       } catch (err: any) {
         setError(err.message || 'Gagal mengaktifkan modul inti')
