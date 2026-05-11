@@ -9,13 +9,13 @@ Prioritas: **Stabilitas → UI/UX → Fitur Critical → Mobile**
 ## 🔥 PHASE 0: WAR ROOM (Sekarang — 1 hari)
 ### Goal: Stop the bleeding. Fix semua bug known.
 
-| # | Task | Area | Impact |
-|---|------|------|--------|
-| 0.1 | Fix activation redirect → user sampai ke setup page | Onboarding | ⭐⭐⭐ |
-| 0.2 | Fix inventory save regression | Inventory | ⭐⭐⭐ |
-| 0.3 | Fix build error di tax page (pg module in client) | Build | ⭐⭐⭐ |
-| 0.4 | Fix marketplace page Server Component error | Marketplace | ⭐⭐⭐ |
-| 0.5 | Add Sentry / error boundary ke semua halaman | Stability | ⭐⭐⭐ |
+| # | Task | Area | Impact | Status |
+|---|------|------|--------|--------|
+| 0.1 | Fix activation redirect → user sampai ke setup page | Onboarding | ⭐⭐⭐ | ❌ |
+| 0.2 | Fix inventory save regression | Inventory | ⭐⭐⭐ | ❌ |
+| 0.3 | Fix build error di tax page (pg module in client) | Build | ⭐⭐⭐ | ✅ |
+| 0.4 | Fix marketplace page Server Component error | Marketplace | ⭐⭐⭐ | ❌ |
+| 0.5 | Add error boundary ke halaman utama | Stability | ⭐⭐⭐ | ❌ |
 
 ---
 
