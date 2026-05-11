@@ -118,6 +118,13 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
   }
 
+  // ── Preview mode: bypass all auth checks ──
+  // PREVIEW_MODE=true makes ALL pages accessible without session.
+  // Hanya aktif di local dev + tunnel, tidak pernah di production.
+  if (process.env.PREVIEW_MODE === 'true') {
+    return supabaseResponse
+  }
+
   if (getAuthProvider() === 'internal') {
     const hasInternalSession = Boolean(
       request.cookies.get(INTERNAL_AUTH_SESSION_COOKIE)?.value?.trim()

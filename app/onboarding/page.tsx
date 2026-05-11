@@ -81,9 +81,8 @@ function OnboardingContent() {
 
       <div className="w-full max-w-md relative z-10">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          initial={false}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           className="bg-white/95 backdrop-blur-xl rounded-[40px] shadow-[0_24px_64px_-16px_rgba(0,0,0,0.3)] p-10 md:p-12 border border-white relative overflow-hidden"
         >
           {/* Top Branding Bar */}
