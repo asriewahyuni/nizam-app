@@ -26,10 +26,10 @@ export default function GlobalError({
       <body className="min-h-screen bg-[#F8F9FA] text-[#212529]">
         <div className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 py-12 text-center">
           <div className="w-full rounded-[32px] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50">
-            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-rose-500">
+            <div className="text-[10px] font-semibold tracking-tight text-rose-500">
               Sistem Mengalami Gangguan
             </div>
-            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900">
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
               Halaman gagal dimuat.
             </h1>
             <p className="mt-4 text-sm leading-6 text-slate-600">
@@ -46,13 +46,13 @@ export default function GlobalError({
               <button
                 type="button"
                 onClick={() => reset()}
-                className="inline-flex items-center justify-center rounded-2xl bg-[#003366] px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-white transition hover:bg-[#00264d]"
+                className="inline-flex items-center justify-center rounded-2xl bg-[#003366] px-5 py-3 text-xs font-semibold tracking-tight text-white transition hover:bg-[#00264d]"
               >
                 Coba Lagi
               </button>
               <a
                 href="/dashboard"
-                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-xs font-semibold tracking-tight text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
               >
                 Kembali ke Dashboard
               </a>

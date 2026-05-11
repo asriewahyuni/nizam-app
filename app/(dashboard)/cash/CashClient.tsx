@@ -591,7 +591,7 @@ export function CashClient({
                     <PiggyBank size={36} strokeWidth={1.5} />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="font-black text-slate-900 text-xl tracking-tight">Belum ada Rekening</h3>
+                    <h3 className="font-semibold text-slate-900 text-xl tracking-tight">Belum ada Rekening</h3>
                     <p className="text-sm text-slate-400 max-w-xs mx-auto font-medium">Tambahkan rekening bank atau kas kecil Anda untuk mulai mencatat transaksi.</p>
                   </div>
                 </div>
@@ -623,10 +623,10 @@ export function CashClient({
                           <Wallet size={28} strokeWidth={2} />
                         </div>
                         <div className="text-right">
-                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">{acc.bank_name}</span>
+                           <span className="text-[10px] font-semibold text-slate-400 tracking-tight block mb-1">{acc.bank_name}</span>
                            <span className="text-xs font-black text-slate-900 font-mono tracking-tighter bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">{acc.account_number || 'Cash Asset'}</span>
                            {showScopeBadge && (
-                             <span className="mt-2 inline-flex items-center rounded-lg bg-blue-50 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-blue-700 border border-blue-100">
+                             <span className="mt-2 inline-flex items-center rounded-lg bg-blue-50 px-2 py-1 text-[9px] font-medium tracking-tight text-blue-700 border border-blue-100">
                                {isCrossEntity
                                  ? `${acc.org_name || 'Entitas Anak'}${acc.branch_name ? ` • ${acc.branch_name}` : ''}`
                                  : (acc.branch_name || 'Semua Unit')}
@@ -743,10 +743,10 @@ export function CashClient({
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50/50 border-b border-slate-100">
-                           <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tanggal</th>
-                           <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Rincian Transaksi</th>
-                           <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Nominal (IDR)</th>
-                           <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Aksi</th>
+                           <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 tracking-tight">Tanggal</th>
+                           <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 tracking-tight">Rincian Transaksi</th>
+                           <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 tracking-tight text-right">Nominal (IDR)</th>
+                           <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 tracking-tight text-center">Aksi</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
@@ -797,14 +797,14 @@ export function CashClient({
                                       <div className="flex flex-col gap-1.5">
                                         <span className="text-sm font-black text-slate-900 leading-tight">{tx.description}</span>
                                         <div className="flex items-center gap-2">
-                                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded text-[9px] font-black text-slate-500 uppercase">
+                                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 rounded text-[9px] font-medium text-slate-500">
                                             <Building size={10} /> {accountLabel}
                                           </div>
-                                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 rounded text-[9px] font-black text-indigo-500 uppercase">
+                                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 rounded text-[9px] font-medium text-indigo-500">
                                             <Activity size={10} /> {tx.category?.name || 'Uncategorized'}
                                           </div>
                                           {isHoldingView && (tx.org_name || tx.org_id !== orgId) ? (
-                                            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded text-[9px] font-black text-emerald-600 uppercase">
+                                            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded text-[9px] font-medium text-emerald-600">
                                               <Building2 size={10} /> {tx.org_name || 'Entitas'}{tx.branch_name ? ` / ${tx.branch_name}` : ''}
                                             </div>
                                           ) : null}
@@ -844,7 +844,7 @@ export function CashClient({
                                       <td colSpan={4} className="px-8 pb-8">
                                         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                                           <div className="mb-4 flex items-center justify-between gap-3">
-                                            <h4 className="text-xs font-black uppercase tracking-[0.16em] text-slate-700">Detail Riwayat Mutasi</h4>
+                                            <h4 className="text-xs font-semibold tracking-tight text-slate-700">Detail Riwayat Mutasi</h4>
                                             <span className={`rounded-lg px-2 py-1 text-[10px] font-semibold tracking-tight ${tx.status === 'POSTED' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
                                               {tx.status}
                                             </span>
@@ -917,7 +917,7 @@ export function CashClient({
                         <TrendingUp size={32} className="text-emerald-400" />
                       </div>
                       <div className="space-y-3">
-                        <h3 className="font-black text-2xl tracking-tighter italic">Auto-Journaling Engine</h3>
+                        <h3 className="font-semibold text-2xl tracking-tight italic">Auto-Journaling Engine</h3>
                         <p className="text-xs text-slate-400 font-medium leading-relaxed">Setiap mutasi kas akan otomatis meluncurkan entri jurnal ganda di CoA organisasi Anda. Akuntabilitas instan tanpa input manual.</p>
                       </div>
                       <div className="pt-4">
@@ -970,7 +970,7 @@ export function CashClient({
                            <Building2 size={20} />
                         </div>
                         <div>
-                          <span className="text-xs font-black uppercase tracking-tight block">{acc.bank_name}</span>
+                          <span className="text-xs font-semibold tracking-tight block">{acc.bank_name}</span>
                           <span className="text-[10px] font-medium text-slate-400 font-mono tracking-tighter">{acc.account_number || 'Cash Asset Account'}</span>
                         </div>
                       </button>
@@ -991,7 +991,7 @@ export function CashClient({
                        <div className="w-full py-12 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center gap-4 group-hover:bg-slate-50 group-hover:border-blue-400 group-hover:text-blue-500 transition-all duration-300 shadow-inner">
                           <Upload size={32} strokeWidth={1.5} />
                           <div className="text-center">
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] block">Seret & Lepas File</span>
+                            <span className="text-[10px] font-semibold tracking-tight block">Seret & Lepas File</span>
                             <span className="text-[8px] font-bold text-slate-400 uppercase mt-1 tracking-widest">Atau klik untuk memilih (.csv)</span>
                           </div>
                        </div>
@@ -1015,10 +1015,10 @@ export function CashClient({
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50/50 border-b border-slate-100">
-                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tanggal</th>
-                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Keterangan Bank</th>
-                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Nominal (IDR)</th>
-                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
+                        <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 tracking-tight">Tanggal</th>
+                        <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 tracking-tight">Keterangan Bank</th>
+                        <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 tracking-tight text-right">Nominal (IDR)</th>
+                        <th className="px-8 py-5 text-[10px] font-semibold text-slate-400 tracking-tight text-center">Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1026,7 +1026,7 @@ export function CashClient({
                         <td colSpan={4} className="py-40 text-center">
                           <div className="flex flex-col items-center gap-6 text-slate-200">
                             <div className="w-24 h-24 rounded-2xl bg-slate-50/50 flex items-center justify-center border border-slate-100 shadow-inner"><Building2 size={48} strokeWidth={1} /></div>
-                            <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-300">Belum ada mutasi yang diunggah</span>
+                            <span className="text-xs font-semibold tracking-tight text-slate-300">Belum ada mutasi yang diunggah</span>
                           </div>
                         </td>
                       </tr>
@@ -1062,7 +1062,7 @@ export function CashClient({
                  <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-1">
                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1 flex items-center gap-1.5"><Hash size={12}/> Account Number</label>
-                      <input name="account_number" placeholder="8821..." className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-black font-mono focus:bg-white focus:border-emerald-500 transition-all shadow-inner" />
+                      <input name="account_number" placeholder="8821..." className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-sm font-semibold font-mono focus:bg-white focus:border-emerald-500 transition-all shadow-inner" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1 flex items-center gap-1.5"><User size={12}/> Holder Name</label>
@@ -1211,7 +1211,7 @@ export function CashClient({
                               Available Kas: {formatRupiah(availableCashBalance)}
                             </p>
                             {isAmountExceedingAvailable ? (
-                              <p className="text-[10px] font-black text-rose-600">
+                              <p className="text-[10px] font-semibold text-rose-600">
                                 Nominal melampaui available sebesar {formatRupiah(txAmount - availableCashBalance)}.
                               </p>
                             ) : null}
@@ -1221,7 +1221,7 @@ export function CashClient({
                     </div>
                     
                     <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] ml-1 flex items-center gap-1.5">
+                        <label className="text-[10px] font-semibold text-slate-400 tracking-tight ml-1 flex items-center gap-1.5">
                           <ExternalLink size={12}/> {txType === 'TRANSFER' ? 'Target Account' : 'Counterparty Account'}
                         </label>
                         {txType === 'TRANSFER' ? (
@@ -1278,7 +1278,7 @@ export function CashClient({
                  {txType === 'TRANSFER' && isInterOrgTransfer && (
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div className="space-y-1">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] ml-1">
+                       <label className="text-[10px] font-semibold text-slate-400 tracking-tight ml-1">
                          Akun Investasi Induk (OUT)
                        </label>
                        <select
@@ -1306,7 +1306,7 @@ export function CashClient({
                        )}
                      </div>
                      <div className="space-y-1">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] ml-1">
+                       <label className="text-[10px] font-semibold text-slate-400 tracking-tight ml-1">
                          Akun Modal/Pendanaan Entitas Tujuan (IN)
                        </label>
                        <select
