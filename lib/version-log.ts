@@ -49,6 +49,18 @@ export const VERSION_LOG: VersionLogEntry[] = [
   // ║  CURRENT VERSION — N2.6.3.x                                       ║
   // ║  Core=2 (Syirkah pillar baru), BusinessType=6, Addon=3            ║
   // ╚════════════════════════════════════════════════════════════════════╝
+  // ── PATCH: Multi-Currency Engine ──────────────────────────────────
+  {
+    date: '2026-05-11',
+    type: 'patch',
+    label: 'Feat: Multi Mata Uang — kurs, settings, forex tracking',
+    description: 'Sistem multi-currency lengkap: org_currencies (base IDR), ' +
+      'org_allowed_currencies (USD/SGD/MYR etc), exchange_rates (riwayat harian). ' +
+      'Kolom currency_code + exchange_rate di sales & purchases. ' +
+      'Halaman /accounting/currencies: setting base currency, kelola mata uang asing, ' +
+      'input kurs manual, tren kurs, riwayat per mata uang.',
+    by: 'Z',
+  },
   // ── PATCH: Financial Ratios Dashboard ──────────────────────────────
   {
     date: '2026-05-11',
