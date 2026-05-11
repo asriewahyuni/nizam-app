@@ -59,8 +59,10 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
       try {
         const result = await activateModule(moduleKey)
         if (result?.success && result?.redirectUrl) {
-          // Client-side redirect ke setup page
-          router.push(result.redirectUrl)
+          // Redirect di luar transition biar gak konflik sama React batching
+          setTimeout(() => {
+            window.location.href = result.redirectUrl
+          }, 50)
         } else {
           setRedirecting(false)
         }
