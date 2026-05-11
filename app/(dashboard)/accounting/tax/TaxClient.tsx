@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ShieldCheck, 
@@ -16,12 +16,32 @@ import {
   Info,
   Filter,
   CheckCircle2,
-  FileText
+  FileText,
+  X,
+  Settings,
+  FileSpreadsheet,
+  ExternalLink,
+  Loader2,
+  AlertCircle,
+  CheckCircle,
+  Building2,
+  Receipt,
+  Banknote,
+  SwitchCamera,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { PieChart, Pie, Cell, Tooltip as ReTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts'
 import { SafeResponsiveContainer } from '@/components/ui/SafeResponsiveContainer'
+import {
+  payTax,
+  downloadSptCsv,
+  getOrgTaxSettings,
+  upsertOrgTaxSettings,
+  generateTaxInvoice,
+  getTaxInvoices,
+  getSptPpn1111,
+} from '@/modules/accounting/actions/tax.actions'
 
 interface TaxClientProps {
   summary: any
@@ -75,6 +95,33 @@ export default function TaxClient({ summary, orgId }: TaxClientProps) {
   const startDate = searchParams.get('startDate') || summary.startDate
   const endDate = searchParams.get('endDate') || summary.endDate
 
+  // Modals
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showSptModal, setShowSptModal] = useState(false)
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Tax settings
+  const [taxSettings, setTaxSettings] = useState<any>(null)
+  const [npwp, setNpwp] = useState('')
+  const [ppnRate, setPpnRate] = useState(11)
+  const [isPkp, setIsPkp] = useState(false)
+  const [pkpSince, setPkpSince] = useState('')
+
+  // Payment form
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
+  const [paymentAccount, setPaymentAccount] = useState('')
+  const [paymentNotes, setPaymentNotes] = useState('')
+  const [bankAccounts, setBankAccounts] = useState<any[]>([])
+
+  // SPT data
+  const [sptData, setSptData] = useState<any>(null)
+
+  // Tax invoices
+  const [taxInvoices, setTaxInvoices] = useState<any[]>([])
+
   const updateDates = (s: string, e: string) => {
     const params = new URLSearchParams(searchParams)
     params.set('startDate', s)
@@ -123,17 +170,74 @@ export default function TaxClient({ summary, orgId }: TaxClientProps) {
            </div>
 
            <button 
-             onClick={() => alert("Segera Hadir: Sinkronisasi e-Billing & Modul Bank untuk pembuatan Jurnal Pembayaran Pajak otomatis.")}
+             onClick={async () => {
+               setLoading(true)
+               try {
+                 const { createClient } = await import('@/lib/supabase/client')
+                 const supabase = createClient()
+                 const { data: banks } = await (supabase as any)
+                   .from('bank_accounts')
+                   .select('id, bank_name, account_number, accounts!inner(id, code, name)')
+                   .eq('org_id', orgId)
+                   .eq('is_active', true)
+                 setBankAccounts(banks || [])
+                 setPaymentAccount('')
+                 setPaymentDate(new Date().toISOString().split('T')[0])
+                 setShowPaymentModal(true)
+               } catch (e) {
+                 setMessage({ type: 'error', text: 'Gagal memuat data rekening.' })
+               }
+               setLoading(false)
+             }}
              className="flex items-center gap-2 px-5 py-3 bg-emerald-600 text-white font-bold rounded-2xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all text-sm"
            >
              <Wallet size={16} /> Bayar Pajak
            </button>
            
            <button 
-             onClick={() => alert("Segera Hadir: Ekspor CSV/PDF Laporan SPT Masa format baku DJP Online.")}
+             onClick={async () => {
+               setLoading(true)
+               try {
+                 const period = (startDate || summary.startDate).slice(0, 7)
+                 const result = await downloadSptCsv(orgId, period)
+                 if (result?.csv) {
+                   const blob = new Blob([result.csv], { type: 'text/csv' })
+                   const url = URL.createObjectURL(blob)
+                   const a = document.createElement('a')
+                   a.href = url
+                   a.download = result.filename
+                   a.click()
+                   URL.revokeObjectURL(url)
+                   setMessage({ type: 'success', text: `SPT ${result.filename} berhasil di-download.` })
+                 } else {
+                   setMessage({ type: 'error', text: 'Tidak ada data SPT untuk periode ini.' })
+                 }
+               } catch (e) {
+                 setMessage({ type: 'error', text: 'Gagal download SPT.' })
+               }
+               setLoading(false)
+             }}
              className="flex items-center gap-2 px-5 py-3 bg-white text-slate-700 font-bold border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all text-sm"
            >
-             <Download size={16} /> Download SPT
+             {loading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Download SPT
+           </button>
+
+           <button 
+             onClick={async () => {
+               setLoading(true)
+               const settings = await getOrgTaxSettings(orgId)
+               setTaxSettings(settings)
+               setIsPkp(settings.is_pkp)
+               setNpwp(settings.npwp || '')
+               setPpnRate(settings.ppn_rate || 11)
+               setPkpSince(settings.pkp_since ? settings.pkp_since.slice(0, 10) : '')
+               setShowSettingsModal(true)
+               setLoading(false)
+             }}
+             className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-emerald-600 rounded-2xl shadow-sm transition-all hidden md:flex items-center justify-center"
+             title="Setting PKP"
+           >
+             <Settings size={18} />
            </button>
 
            <button onClick={() => window.print()} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-emerald-600 rounded-2xl shadow-sm transition-all hidden md:flex items-center justify-center">
@@ -404,6 +508,178 @@ export default function TaxClient({ summary, orgId }: TaxClientProps) {
             </AnimatePresence>
          </div>
       </div>
+
+      {/* ── Toast Message ── */}
+      {message && (
+        <div className="fixed bottom-8 right-8 z-[9999] animate-in slide-in-from-bottom-2 fade-in">
+          <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border ${
+            message.type === 'success' 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            {message.type === 'success' ? <CheckCircle size={20} className="text-emerald-500" /> : <AlertCircle size={20} className="text-red-500" />}
+            <span className="font-bold text-sm">{message.text}</span>
+            <button onClick={() => setMessage(null)} className="ml-2 opacity-50 hover:opacity-100">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── PAYMENT MODAL ── */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-[999] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowPaymentModal(false)}>
+          <div className="bg-white rounded-[32px] max-w-lg w-full shadow-2xl border border-slate-100 p-8 space-y-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">Bayar Pajak</h3>
+              <button onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+                <X size={20} className="text-slate-400" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-500 font-medium">
+              Buat jurnal pembayaran PPN Kurang Bayar. Dana akan didebet dari rekening yang dipilih.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Periode Pajak</label>
+                <div className="bg-slate-50 rounded-2xl px-5 py-4">
+                  <span className="font-bold text-slate-900">{summary.taxPeriod || (startDate || summary.startDate).slice(0, 7)}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Tanggal Bayar</label>
+                <input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)}
+                  className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-slate-900 border border-slate-100 outline-none focus:border-emerald-300 transition-all" />
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Dari Rekening</label>
+                <select value={paymentAccount} onChange={e => setPaymentAccount(e.target.value)}
+                  className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-slate-900 border border-slate-100 outline-none focus:border-emerald-300 transition-all">
+                  <option value="">Pilih Rekening...</option>
+                  {bankAccounts.map((b: any) => (
+                    <option key={b.id} value={b.accounts?.id}>{b.bank_name} - {b.account_number}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Keterangan (opsional)</label>
+                <textarea value={paymentNotes} onChange={e => setPaymentNotes(e.target.value)} rows={2}
+                  className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-medium text-slate-900 border border-slate-100 outline-none focus:border-emerald-300 transition-all resize-none"
+                  placeholder="Pembayaran PPN Masa..." />
+              </div>
+            </div>
+
+            <button
+              disabled={!paymentAccount || loading}
+              onClick={async () => {
+                setLoading(true)
+                setMessage(null)
+                const period = (startDate || summary.startDate).slice(0, 7)
+                const result = await payTax(orgId, period, paymentDate, paymentAccount, paymentNotes)
+                if (result.success) {
+                  setMessage({ type: 'success', text: `Jurnal pembayaran PPN berhasil! No. ${result.entry_number} - Rp ${formatRupiah(result.amount)}` })
+                  setShowPaymentModal(false)
+                } else {
+                  setMessage({ type: 'error', text: result.error || 'Gagal memproses pembayaran.' })
+                }
+                setLoading(false)
+              }}
+              className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white font-black rounded-2xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <Wallet size={18} />}
+              {loading ? 'Memproses...' : 'Konfirmasi Pembayaran Pajak'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── SETTINGS MODAL (PKP) ── */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 z-[999] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowSettingsModal(false)}>
+          <div className="bg-white rounded-[32px] max-w-lg w-full shadow-2xl border border-slate-100 p-8 space-y-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">Setting PKP</h3>
+              <button onClick={() => setShowSettingsModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-all">
+                <X size={20} className="text-slate-400" />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl">
+                <div className={`w-14 h-8 rounded-full relative transition-all cursor-pointer ${isPkp ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                  onClick={() => setIsPkp(!isPkp)}>
+                  <div className={`absolute w-6 h-6 bg-white rounded-full top-1 shadow transition-all ${isPkp ? 'left-7' : 'left-1'}`} />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-slate-900">Pengusaha Kena Pajak (PKP)</p>
+                  <p className="text-xs text-slate-500 font-medium">Aktifkan untuk menerbitkan Faktur Pajak</p>
+                </div>
+              </div>
+
+              {isPkp && (
+                <>
+                  <div>
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">NPWP</label>
+                    <input type="text" value={npwp} onChange={e => setNpwp(e.target.value)} placeholder="XX.XXX.XXX.X-XXX.XXX"
+                      className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-mono font-bold text-slate-900 border border-slate-100 outline-none focus:border-emerald-300 transition-all" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Tarif PPN (%)</label>
+                    <div className="flex gap-2">
+                      {[11, 12].map(rate => (
+                        <button key={rate} onClick={() => setPpnRate(rate)}
+                          className={`px-6 py-4 rounded-2xl font-black text-sm border-2 transition-all ${
+                            ppnRate === rate 
+                              ? 'bg-emerald-50 border-emerald-500 text-emerald-700' 
+                              : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300'
+                          }`}>
+                          {rate}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Tanggal PKP</label>
+                    <input type="date" value={pkpSince} onChange={e => setPkpSince(e.target.value)}
+                      className="w-full bg-slate-50 rounded-2xl px-5 py-4 font-bold text-slate-900 border border-slate-100 outline-none focus:border-emerald-300 transition-all" />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <button
+              disabled={loading}
+              onClick={async () => {
+                setLoading(true)
+                const settings = await getOrgTaxSettings(orgId)
+                const result = await upsertOrgTaxSettings(orgId, {
+                  is_pkp: isPkp,
+                  npwp: isPkp ? npwp : null,
+                  ppn_rate: ppnRate,
+                  pkp_since: isPkp && pkpSince ? pkpSince : null,
+                  ...(settings.ppn_masukan_account_id ? { ppn_masukan_account_id: settings.ppn_masukan_account_id } : {}),
+                  ...(settings.ppn_keluaran_account_id ? { ppn_keluaran_account_id: settings.ppn_keluaran_account_id } : {}),
+                })
+                if (result.success) {
+                  setMessage({ type: 'success', text: 'Setting PKP berhasil disimpan.' })
+                  setShowSettingsModal(false)
+                } else {
+                  setMessage({ type: 'error', text: result.error || 'Gagal menyimpan setting.' })
+                }
+                setLoading(false)
+              }}
+              className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-lg hover:bg-slate-800 transition-all disabled:opacity-40"
+            >
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle size={18} />}
+              {loading ? 'Menyimpan...' : 'Simpan Setting PKP'}
+            </button>
+          </div>
+        </div>
+      )}
     </motion.div>
   )
 }
