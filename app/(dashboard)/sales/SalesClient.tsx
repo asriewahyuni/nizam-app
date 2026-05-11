@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil } from 'lucide-react'
+import { Plus, Search, Users, CheckCircle2, AlertCircle, Trash2, CheckSquare, XCircle, DollarSign, RotateCcw, ShoppingCart, TrendingUp, Wallet, Clock, Printer, FileText, Factory, Pencil, Globe } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
 import { createSaleEntry, createSaleFulfillmentDrafts, deliverSale, voidSale, processSalesReturn, processSalesPayment } from '@/modules/sales/actions/sales.actions'
 import { getApprovalForSource } from '@/modules/organization/actions/approval.actions'
@@ -13,6 +13,7 @@ import { QRCodeSVG } from 'qrcode.react'
 
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
+import CurrencyPicker from '@/components/shared/CurrencyPicker'
 import { getEditableLineDiscountAmount, getStoredLineDiscountAmount, inferStoredLineDiscountMode } from '@/lib/commerce/discounts'
 import { formatDate, formatRupiah } from '@/lib/utils'
 import { getCommissionSchemeLabel, getResellerDisplayName, getResellerSubtitle } from '@/modules/sales/lib/commission'
@@ -384,6 +385,8 @@ export default function SalesClient({
   const [customerId, setCustomerId] = useState('')
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0])
   const [dueDate, setDueDate] = useState('')
+  const [currencyCode, setCurrencyCode] = useState('IDR')
+  const [exchangeRate, setExchangeRate] = useState<number | null>(null)
   const [notes, setNotes] = useState('')
   const [resellerId, setResellerId] = useState('')
   const [paymentTerm, setPaymentTerm] = useState<'TEMPO' | 'LUNAS'>('TEMPO')
@@ -676,6 +679,8 @@ export default function SalesClient({
       })),
       other_charge_amount: calculatedOtherChargeAmount,
       shariah_mode: resolvedShariahMode,
+      currency_code: currencyCode,
+      exchange_rate: exchangeRate,
       mode: isDraftSave ? 'DRAFT' : 'PUBLISH',
       draft_id: editingDraftSaleId || undefined,
       lines: usableLines.map(l => ({
@@ -1105,6 +1110,11 @@ export default function SalesClient({
                        <button onClick={() => setViewSale(s)} className="text-xs font-black text-blue-600 tracking-tighter hover:underline">
                          {s.sale_number}
                        </button>
+                       {s.currency_code && s.currency_code !== 'IDR' && (
+                         <span className="ml-2 inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                           <Globe size={8} />{s.currency_code}
+                         </span>
+                       )}
                        <div className="text-[10px] font-bold text-slate-400 mt-1">{formatDate(s.sale_date, 'short')}</div>
                        <div className="text-[10px] font-bold text-slate-500 mt-1">
                          Diproses: <span className="text-slate-700">{s.processor_name || '-'}</span>
@@ -1309,6 +1319,19 @@ export default function SalesClient({
                          <input type="date" required value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-amber-50/50 font-bold text-slate-900 shadow-sm focus:border-amber-500 transition-all" />
                        </div>
                     )}
+
+                    <div className="w-full md:w-32 space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Mata Uang</label>
+                      <CurrencyPicker
+                        orgId={orgId}
+                        value={currencyCode}
+                        onChange={(code, rate) => {
+                          setCurrencyCode(code)
+                          setExchangeRate(code === 'IDR' ? null : (rate || null))
+                        }}
+                        showRate
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 p-5 bg-indigo-50/60 rounded-[28px] border border-indigo-100">
