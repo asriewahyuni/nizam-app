@@ -49,6 +49,62 @@ export const VERSION_LOG: VersionLogEntry[] = [
   // ║  CURRENT VERSION — N2.6.3.x                                       ║
   // ║  Core=2 (Syirkah pillar baru), BusinessType=6, Addon=3            ║
   // ╚════════════════════════════════════════════════════════════════════╝
+  // ── PATCH: accounting core audit fixes ─────────────────────────────
+  {
+    date: '2026-05-11',
+    type: 'patch',
+    label: 'Fix: cash_flow_category 1.546 akun NULL',
+    description: 'Inject default cash_flow_category (OPERATING/INVESTING/FINANCING) ' +
+      'ke 1.546 akun berdasarkan code prefix. Fix cash flow report yang sebelumnya ' +
+      'cuma nampilin 54 akun dari 1.600.',
+    by: 'Z',
+  },
+  {
+    date: '2026-05-11',
+    type: 'patch',
+    label: 'Fix: P&L & Neraca pake hardcoded code prefix',
+    description: 'Hapus fallback startsWith(\'1\'/2/3/4/5/6/7/8/9) dari filtering ' +
+      'revenue/expense/assets/liabilities. Sekarang 100% pake account type. ' +
+      'Mencegah misklasifikasi akun kustom.',
+    by: 'Z',
+  },
+  {
+    date: '2026-05-11',
+    type: 'patch',
+    label: 'Fix: cash account detection via bank_accounts FK',
+    description: 'Hapus code.startsWith(\'11\') fallback dari getCashAccountCodes. ' +
+      'Sekarang cuma pake JOIN bank_accounts.account_id → accounts.code. ' +
+      'Akun non-kas yang kodenya mulai 11 gak bakal ke-detek sebagai kas.',
+    by: 'Z',
+  },
+  {
+    date: '2026-05-11',
+    type: 'patch',
+    label: 'Fix: fiscal period closing generates closing JE',
+    description: 'generate_period_closing_journal() otomatis bikin closing JE: ' +
+      'debit semua Revenue, credit semua Expense, transfer net ke Laba Ditahan (3002). ' +
+      'Trigger cegah unclose period kalo udah ada closing journal. ' +
+      'CLOSING reference_type ditambahkan ke enum.',
+    by: 'Z',
+  },
+  {
+    date: '2026-05-11',
+    type: 'patch',
+    label: 'Fix: getBalanceSheet gak manggil getProfitLoss 2×',
+    description: 'Optimasi query: retained earnings & current profit dihitung langsung ' +
+      'dari getPostedEntryIds + getAccountBalancesFromEntries, tanpa bikin ' +
+      'koneksi Supabase baru. Load laporan keuangan lebih cepat.',
+    by: 'Z',
+  },
+  {
+    date: '2026-05-11',
+    type: 'patch',
+    label: 'Feat: opening balance system',
+    description: 'Table opening_balances + fungsi apply_opening_balances() untuk ' +
+      'generate JE opening balance. Validasi balance (debit = credit) sebelum posting. ' +
+      'OPENING_BALANCE reference_type ditambahkan ke enum.',
+    by: 'Z',
+  },
   // ── BUMP: addon ─────────────────────────────────────────────────────
   {
     date: '2026-05-09',

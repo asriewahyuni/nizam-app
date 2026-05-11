@@ -315,16 +315,9 @@ async function getCashAccountCodes(
   consolidated: boolean = false,
   consolidationParentOrgId?: string | null
 ): Promise<string[]> {
-  const fallbackCashAccountCodes = ['1101', '1102', '1103', '1104', '1105']
+  const fallbackCashAccountCodes: string[] = []
 
   if (consolidated && consolidationParentOrgId) {
-    const effectiveAccounts = await getEffectiveReferenceAccounts(db, orgIdsToSearch, consolidationParentOrgId, true)
-    const cashLikeAccountCodes = effectiveAccounts.reduce<string[]>((codes, account) => {
-      const code = typeof account.code === 'string' ? account.code.trim() : ''
-      if (code.startsWith('11')) codes.push(code)
-      return codes
-    }, [])
-
     try {
       const { queryPostgres } = await import('@/lib/db/postgres')
       const { rows } = await queryPostgres<Record<string, unknown>>(
@@ -352,7 +345,7 @@ async function getCashAccountCodes(
         return codes
       }, [])
 
-      linkedCodes.push(...cashLikeAccountCodes, ...fallbackCashAccountCodes)
+      linkedCodes.push(...fallbackCashAccountCodes)
       return Array.from(new Set(linkedCodes))
     } catch (error) {
       if (!isMissingConsolidationMappingSchemaError(error)) {
@@ -373,21 +366,6 @@ async function getCashAccountCodes(
 
   const { data: linkedAccounts } = await linkedAccountsQuery
 
-  const { data: activeAccounts } = await (supabase as any)
-    .from('accounts')
-    .select('code')
-    .in('org_id', orgIdsToSearch)
-    .eq('is_active', true)
-
-  const cashLikeAccountCodes = (Array.isArray(activeAccounts) ? activeAccounts : []).reduce<string[]>(
-    (codes, account: { code?: unknown }) => {
-      const code = typeof account.code === 'string' ? account.code.trim() : ''
-      if (code.startsWith('11')) codes.push(code)
-      return codes
-    },
-    []
-  )
-
   const cashAccountCodes = (Array.isArray(linkedAccounts) ? linkedAccounts : []).reduce<string[]>(
     (codes, linkedAccount: { accounts?: { code?: unknown } | null }) => {
       const code = typeof linkedAccount.accounts?.code === 'string'
@@ -400,7 +378,6 @@ async function getCashAccountCodes(
     []
   )
 
-  cashAccountCodes.push(...cashLikeAccountCodes)
   cashAccountCodes.push(...fallbackCashAccountCodes)
 
   return Array.from(new Set(cashAccountCodes))
@@ -1279,17 +1256,17 @@ export async function getBalanceSheet(
   }
 
   const assets = accounts
-    .filter((a: any) => a.type === 'ASSET' || String(a.code || '').startsWith('1'))
+    .filter((a: any) => a.type === 'ASSET')
     .map((a: any) => mapBalance(a, 'DEBIT'))
     .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
   const liabilities = accounts
-    .filter((a: any) => a.type === 'LIABILITY' || String(a.code || '').startsWith('2'))
+    .filter((a: any) => a.type === 'LIABILITY')
     .map((a: any) => mapBalance(a, 'CREDIT'))
     .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
   const equity = accounts
-    .filter((a: any) => a.type === 'EQUITY' || String(a.code || '').startsWith('3'))
+    .filter((a: any) => a.type === 'EQUITY')
     .map((a: any) => mapBalance(a, 'CREDIT'))
     .sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 
@@ -1309,12 +1286,43 @@ export async function getBalanceSheet(
   const currentPeriodStart = nextOpenDate && nextOpenDate > fiscalYearStart ? nextOpenDate : fiscalYearStart
   const retainedEarningsEnd = addDaysToDateString(currentPeriodStart, -1)
 
-  const retainedProfit = retainedEarningsEnd >= '1970-01-01'
-    ? (await getProfitLoss(orgId, '1970-01-01', retainedEarningsEnd, branchId, consolidated)).netProfit
-    : 0
-  const currentProfit = currentPeriodStart <= finalAsOfDate
-    ? (await getProfitLoss(orgId, currentPeriodStart, finalAsOfDate, branchId, consolidated)).netProfit
-    : 0
+  // ── Optimasi: hitung laba tanpa manggil getProfitLoss() ──
+  // Sebelumnya getBalanceSheet manggil getProfitLoss 2× (masing2 bikin query sendiri).
+  // Sekarang pake getPostedEntryIds + getAccountBalancesFromEntries langsung,
+  // lebih ringan karena gak perlu auth check & setup client ulang.
+
+  let retainedProfit = 0
+  let currentProfit = 0
+
+  if (retainedEarningsEnd >= '1970-01-01') {
+    const retainedEntryIds = await getPostedEntryIds(db, orgId, {
+      branchId,
+      startDate: '1970-01-01',
+      endDate: retainedEarningsEnd,
+      consolidated,
+    })
+    if (retainedEntryIds.length > 0) {
+      const retainedBalances = await getAccountBalancesFromEntries(db, retainedEntryIds, undefined, consolidationParentOrgId)
+      const revBal = retainedBalances.filter((b: any) => b.type === 'REVENUE').reduce((s: number, b: any) => s + (b.total_credit - b.total_debit), 0)
+      const expBal = retainedBalances.filter((b: any) => b.type === 'EXPENSE').reduce((s: number, b: any) => s + (b.total_debit - b.total_credit), 0)
+      retainedProfit = revBal - expBal
+    }
+  }
+
+  if (currentPeriodStart <= finalAsOfDate) {
+    const currentEntryIds = await getPostedEntryIds(db, orgId, {
+      branchId,
+      startDate: currentPeriodStart,
+      endDate: finalAsOfDate,
+      consolidated,
+    })
+    if (currentEntryIds.length > 0) {
+      const currentBalances = await getAccountBalancesFromEntries(db, currentEntryIds, undefined, consolidationParentOrgId)
+      const revBal = currentBalances.filter((b: any) => b.type === 'REVENUE').reduce((s: number, b: any) => s + (b.total_credit - b.total_debit), 0)
+      const expBal = currentBalances.filter((b: any) => b.type === 'EXPENSE').reduce((s: number, b: any) => s + (b.total_debit - b.total_credit), 0)
+      currentProfit = revBal - expBal
+    }
+  }
 
   const referenceByCode = new Map<string, any>(accounts.map((account: any) => [String(account?.code || ''), account]))
   const equityParent = referenceByCode.get('3000')
@@ -1374,13 +1382,13 @@ export async function getProfitLoss(orgId: string, startDate?: string, endDate?:
 
   const results = balances.map((a: any) => ({
     ...a,
-    balance: ['REVENUE', 'LIABILITY', 'EQUITY'].includes(a.type) || ['4', '7', '8'].includes(a.code[0])
+    balance: ['REVENUE', 'LIABILITY', 'EQUITY'].includes(a.type)
       ? a.total_credit - a.total_debit
       : a.total_debit - a.total_credit
   }))
 
-  const revenue = results.filter((a: any) => a.type === 'REVENUE' || ['4', '7', '8'].includes(a.code[0])).sort((a: any, b: any) => a.code.localeCompare(b.code))
-  const expenses = results.filter((a: any) => a.type === 'EXPENSE' || ['5', '6', '9'].includes(a.code[0])).sort((a: any, b: any) => a.code.localeCompare(b.code))
+  const revenue = results.filter((a: any) => a.type === 'REVENUE').sort((a: any, b: any) => a.code.localeCompare(b.code))
+  const expenses = results.filter((a: any) => a.type === 'EXPENSE').sort((a: any, b: any) => a.code.localeCompare(b.code))
 
   const totalRevenue = revenue.reduce((sum: number, r: any) => sum + (r.balance || 0), 0)
   const totalExpenses = expenses.reduce((sum: number, e: any) => sum + (e.balance || 0), 0)
