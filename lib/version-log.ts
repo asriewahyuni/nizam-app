@@ -49,14 +49,26 @@ export const VERSION_LOG: VersionLogEntry[] = [
   // ║  CURRENT VERSION — N2.6.3.x                                       ║
   // ║  Core=2 (Syirkah pillar baru), BusinessType=6, Addon=3            ║
   // ╚════════════════════════════════════════════════════════════════════╝
-  // ── PATCH: Multi-Currency Integration ─────────────────────────────
+  // ── PATCH: UI Design System Phase 1 ───────────────────────────────
   {
     date: '2026-05-11',
     type: 'patch',
-    label: 'Integrasi Multi Mata Uang ke Sales — CurrencyPicker + badge',
-    description: 'CurrencyPicker component (dropdown dengan live rate lookup) ' +
-      'terintegrasi ke form Create Sale. Sales list nampilin currency badge ' +
-      'untuk transaksi valas. createSaleEntry terima currency_code & exchange_rate.',
+    label: 'UI Design System — CSS tokens + utility classes',
+    description: 'Design tokens di globals.css: status colors (success/warning/danger/info), ' +
+      'component-level CSS variables (buttons, inputs, tables, cards, modals, badges), ' +
+      'utility class .btn (sm/md/lg + 5 variants), .input + .input-error, .table-wrap, .card, ' +
+      '.badge (5 variants), .section-header/title/subtitle.',
+    by: 'Z',
+  },
+  // ── PATCH: NizamUI Extended ─────────────────────────────────────────
+  {
+    date: '2026-05-11',
+    type: 'patch',
+    label: 'NizamUI: Loading Skeleton, Form Components, ErrorBoundary, PageShell',
+    description: 'Komponen baru: Skeleton/TableSkeleton/CardSkeleton/FormSkeleton (loading state), ' +
+      'FormField/FormInput/FormSelect/FormTextarea (form konsisten + error state), ' +
+      'PageShell (universal page wrapper: title, subtitle, actions, loading skeleton), ' +
+      'ErrorBoundary (class component, fallback UI, refresh button).',
     by: 'Z',
   },
   // ── PATCH: Multi-Currency Engine ──────────────────────────────────
