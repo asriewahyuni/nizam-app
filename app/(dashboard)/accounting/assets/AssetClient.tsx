@@ -948,10 +948,39 @@ function LabelPrintModal({ asset, onClose }: { asset: any; onClose: () => void }
     styleEl.id = 'nz-label-print-css'
     styleEl.textContent = `
 @media print {
+  body { margin: 0 !important; padding: 0 !important; }
   body * { visibility: hidden !important; }
-  .nz-label-overlay { visibility: visible !important; background: transparent !important; backdrop-filter: none !important; }
-  .nz-label-overlay > div { visibility: visible !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; }
+  .nz-label-overlay {
+    visibility: visible !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    justify-content: flex-start !important;
+    align-items: flex-start !important;
+    padding: 0 !important;
+  }
+  .nz-label-overlay > div {
+    visibility: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    width: auto !important;
+  }
   #printable-label, #printable-label * { visibility: visible !important; }
+  #printable-label {
+    padding: 4mm !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    gap: 2mm !important;
+    width: fit-content !important;
+  }
+  #printable-label h4 { font-size: 10pt !important; margin: 0 !important; }
+  #printable-label div { padding: 1mm !important; gap: 1mm !important; }
+  #printable-label p { font-size: 8pt !important; }
   .nz-print-hide { display: none !important; }
   @page { margin: 0; }
 }
