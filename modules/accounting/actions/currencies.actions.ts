@@ -3,6 +3,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { POPULAR_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
+
+export { POPULAR_CURRENCIES, getCurrencySymbol }
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  CURRENCY — Org Settings
@@ -92,21 +95,6 @@ export async function removeAllowedCurrency(orgId: string, currencyCode: string)
 // ═══════════════════════════════════════════════════════════════════════════
 //  EXCHANGE RATES
 // ═══════════════════════════════════════════════════════════════════════════
-
-const POPULAR_CURRENCIES = [
-  { code: 'USD', name: 'US Dollar', symbol: '$' },
-  { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$' },
-  { code: 'MYR', name: 'Malaysian Ringgit', symbol: 'RM' },
-  { code: 'EUR', name: 'Euro', symbol: '€' },
-  { code: 'GBP', name: 'British Pound', symbol: '£' },
-  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
-  { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
-  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
-  { code: 'SAR', name: 'Saudi Riyal', symbol: '﷼' },
-  { code: 'THB', name: 'Thai Baht', symbol: '฿' },
-]
-
-export { POPULAR_CURRENCIES }
 
 export async function getExchangeRates(orgId: string) {
   const supabase = await createClient()
@@ -201,24 +189,6 @@ export async function deleteExchangeRate(rateId: string) {
 // ═══════════════════════════════════════════════════════════════════════════
 //  CURRENCY — Formatters & Converters
 // ═══════════════════════════════════════════════════════════════════════════
-
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  IDR: 'Rp',
-  USD: '$',
-  SGD: 'S$',
-  MYR: 'RM',
-  EUR: '€',
-  GBP: '£',
-  JPY: '¥',
-  CNY: '¥',
-  AUD: 'A$',
-  SAR: '﷼',
-  THB: '฿',
-}
-
-export function getCurrencySymbol(code: string): string {
-  return CURRENCY_SYMBOLS[code?.toUpperCase()] || code
-}
 
 export async function convertAmount(
   orgId: string,

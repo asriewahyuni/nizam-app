@@ -1,6 +1,7 @@
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { redirect } from 'next/navigation'
-import { getOrgCurrencies, getAllowedCurrencies, getExchangeRates, POPULAR_CURRENCIES } from '@/modules/accounting/actions/currencies.actions'
+import { getOrgCurrencies, getAllowedCurrencies, getExchangeRates } from '@/modules/accounting/actions/currencies.actions'
+import { POPULAR_CURRENCIES } from '@/lib/currency'
 import CurrencyClient from '@/app/(dashboard)/accounting/currencies/CurrencyClient'
 
 export const dynamic = 'force-dynamic'
