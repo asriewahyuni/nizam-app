@@ -940,70 +940,116 @@ export function AssetClient({
 
 // ── LABEL PRINT MODAL ─────────────────────────────────────────────────────────
 function LabelPrintModal({ asset, onClose }: { asset: any; onClose: () => void }) {
-  const printContentRef = useRef<HTMLDivElement>(null)
+  const barcodeRef = useRef<HTMLDivElement>(null)
+  const qrRef = useRef<HTMLDivElement>(null)
+
+  // inject CSS @media print — body-level container biar gak kena React root
+  useEffect(() => {
+    const style = document.createElement('style')
+    style.id = 'nz-print-label-style'
+    style.textContent = `
+#nz-print-asset-label { display: none; }
+@media print {
+  body > :not(#nz-print-asset-label) { display: none !important; }
+  #nz-print-asset-label {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    gap: 4mm;
+    position: absolute !important;
+    top: 0; left: 0;
+    padding: 4mm;
+    margin: 0;
+    background: white;
+    font-family: sans-serif;
+  }
+  @page { margin: 0; }
+}
+`
+    document.head.appendChild(style)
+    return () => { const el = document.getElementById('nz-print-label-style'); if (el) el.remove() }
+  }, [])
 
   function handlePrint() {
-    // Ambil HTML label yang sudah dirender (dengan barcode SVG + QR canvas)
-    const sourceDiv = printContentRef.current
-    if (!sourceDiv) return
+    const barcodeDiv = barcodeRef.current
+    const qrDiv = qrRef.current
+    if (!barcodeDiv || !qrDiv) return
 
-    // Clone node biar gak merusak yang asli
-    const clone = sourceDiv.cloneNode(true) as HTMLElement
+    // Ambil barcode (SVG) — outerHTML biar namespace kebawa
+    const barcodeSvg = barcodeDiv.querySelector('svg')
+    const barcodeHtml = barcodeSvg ? barcodeSvg.outerHTML : ''
 
-    // Convert QR canvas ke image data biar kebawa ke window baru
-    const canvases = sourceDiv.querySelectorAll('canvas')
-    const cloneCanvases = clone.querySelectorAll('canvas')
-    canvases.forEach((canvas, i) => {
-      if (cloneCanvases[i]) {
-        const img = document.createElement('img')
-        img.src = canvas.toDataURL('image/png')
-        img.style.width = canvas.style.width || '48px'
-        img.style.height = canvas.style.height || '48px'
-        cloneCanvases[i].replaceWith(img)
-      }
-    })
+    // Convert QR canvas → img data URL
+    const qrCanvas = qrDiv.querySelector('canvas')
+    let qrHtml = ''
+    if (qrCanvas) {
+      const img = new Image()
+      img.src = qrCanvas.toDataURL('image/png')
+      img.style.cssText = 'width:48px;height:48px'
+      qrHtml = img.outerHTML
+    }
 
-    const labelHtml = clone.innerHTML
+    // Build container di body level (LGSG di luar React root)
+    let container = document.getElementById('nz-print-asset-label')
+    if (!container) {
+      container = document.createElement('div')
+      container.id = 'nz-print-asset-label'
+      document.body.appendChild(container)
+    }
 
-    const printWin = window.open('', '_blank', 'width=400,height=300,scrollbars=no')
-    if (!printWin) { window.print(); return }
+    container.innerHTML = `
+      <div style="font-size:10pt;font-weight:900;text-align:center;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0f172a">${escHtml(asset.name)}</div>
+      <div style="display:flex;gap:3mm;flex-wrap:wrap;justify-content:center">
+        <div style="border:0.5mm solid #e2e8f0;border-radius:1mm;padding:2mm;display:flex;flex-direction:column;align-items:center;gap:1mm">
+          ${barcodeHtml}
+          <div style="font-size:7pt;font-family:monospace;font-weight:bold;color:#2563eb">${escHtml(asset.code)}</div>
+        </div>
+        <div style="border:0.5mm solid #e2e8f0;border-radius:1mm;padding:2mm;display:flex;flex-direction:column;align-items:center;gap:1mm">
+          ${qrHtml}
+          <div style="font-size:6pt;font-family:sans-serif;color:#64748b;text-align:center;line-height:1.3">Scan untuk<br/>detail aset</div>
+        </div>
+      </div>
+    `
 
-    printWin.document.write(`
-      <html><head><style>
-        @page { margin: 0; }
-        html,body { margin:0; padding:0; width:100%; height:auto; }
-        body { display:flex; padding:4mm; }
-        .label-wrap { display:flex; flex-direction:column; align-items:center; gap:2mm; }
-        .label-wrap h4 { font-size:10pt; margin:0; text-align:center; max-width:200px; overflow:hidden; }
-        .label-wrap p { font-size:8pt; margin:0; font-family:monospace; font-weight:bold; color:#2563eb; }
-      </style></head><body>
-        <div class="label-wrap">${labelHtml}</div>
-        <script>window.onload=function(){window.print();window.close()};<\/script>
-      </body></html>
-    `)
-    printWin.document.close()
+    window.print()
   }
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-300">
-       <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-8 animate-in zoom-in-95">
+       <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-6 animate-in zoom-in-95">
+          {/* Header */}
           <div className="flex items-center justify-between">
              <h2 className="text-xl font-black text-slate-900 flex items-center gap-2"> <Printer className="text-blue-600" /> Label Aset </h2>
              <button onClick={onClose} className="text-slate-400 hover:text-slate-900"> <X size={24} /> </button>
           </div>
-          <div ref={printContentRef} className="bg-white p-6 flex flex-col items-center gap-4 text-center border-2 border-slate-100 rounded-3xl">
+
+          {/* Preview Label */}
+          <div className="bg-white p-4 flex flex-col items-center gap-4 text-center">
              <h4 className="text-sm font-black text-slate-900 truncate w-full">{asset.name}</h4>
-             <div className="p-2 bg-slate-50 rounded-2xl flex flex-col items-center gap-3">
-                <Barcode value={asset.code} width={1.2} height={40} fontSize={10} background="transparent" />
-                <QRCodeCanvas value={`https://nizam.app/asset/${asset.id}`} size={48} level="H" />
+             <div className="flex gap-3 flex-wrap justify-center">
+                {/* Barcode + Kode Aset */}
+                <div ref={barcodeRef} className="border border-slate-200 rounded-xl p-3 flex flex-col items-center gap-2">
+                   <Barcode value={asset.code} width={1.2} height={40} fontSize={10} background="transparent" />
+                   <p className="text-[9px] font-mono font-bold text-blue-600">{asset.code}</p>
+                </div>
+                {/* QR + Scan Detail */}
+                <div ref={qrRef} className="border border-slate-200 rounded-xl p-3 flex flex-col items-center gap-2">
+                   <QRCodeCanvas value={`https://nizam.app/asset/${asset.id}`} size={56} level="H" />
+                   <p className="text-[7px] font-medium text-slate-400 leading-tight">Scan untuk<br/>detail aset</p>
+                </div>
              </div>
-             <p className="text-[10px] font-mono font-bold text-blue-600">{asset.code}</p>
           </div>
+
+          {/* Actions */}
           <div className="flex gap-4">
-             <button onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl" > Tutup </button>
-             <button onClick={handlePrint} className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-2" > <Printer size={18} /> Cetak </button>
+             <button onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl hover:bg-slate-200 transition-all" > Tutup </button>
+             <button onClick={handlePrint} className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-all active:scale-95" > <Printer size={18} /> Cetak </button>
           </div>
        </div>
     </div>
   )
+}
+
+function escHtml(s: string) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 }
