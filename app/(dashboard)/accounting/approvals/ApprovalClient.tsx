@@ -201,7 +201,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
   return (
     <div className="max-w-5xl mx-auto space-y-8 relative">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+        <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
           <Bell className="text-[#003366]" size={32} />
           Approval Center
         </h1>
@@ -213,14 +213,14 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
            <div className="flex gap-8">
               <button 
                 onClick={() => setActiveTab('PENDING')}
-                className={`pb-4 text-sm font-black uppercase tracking-widest transition-all relative ${activeTab === 'PENDING' ? 'text-[#003366]' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`pb-4 text-sm font-semibold tracking-tight transition-all relative ${activeTab === 'PENDING' ? 'text-[#003366]' : 'text-slate-400 hover:text-slate-600'}`}
               >
                 Menunggu ({approvals.length})
                 {activeTab === 'PENDING' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-[#003366] rounded-t-full" />}
               </button>
               <button 
                 onClick={() => setActiveTab('HISTORY')}
-                className={`pb-4 text-sm font-black uppercase tracking-widest transition-all relative ${activeTab === 'HISTORY' ? 'text-[#003366]' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`pb-4 text-sm font-semibold tracking-tight transition-all relative ${activeTab === 'HISTORY' ? 'text-[#003366]' : 'text-slate-400 hover:text-slate-600'}`}
               >
                 Riwayat Selesai
                 {activeTab === 'HISTORY' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-1 bg-[#003366] rounded-t-full" />}
@@ -253,7 +253,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                  </div>
                  <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                       <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg ${sourceTone.badge}`}>{req.source_type}</span>
+                       <span className={`text-[10px] font-semibold tracking-tight px-2 py-0.5 rounded-lg ${sourceTone.badge}`}>{req.source_type}</span>
                        <span className="text-slate-400 text-xs font-mono">• {formatDate(req.requested_at)}</span>
                     </div>
                     <h3 className="text-lg font-bold text-slate-900">{req.reason || 'Permintaan Persetujuan Operasional'}</h3>
@@ -298,7 +298,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                      </div>
                      <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                           <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg ${req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{req.status}</span>
+                           <span className={`text-[10px] font-semibold tracking-tight px-2 py-0.5 rounded-lg ${req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{req.status}</span>
                            <span className="text-slate-400 text-xs font-mono">• {formatDate(req.decided_at || req.updated_at)}</span>
                         </div>
                         <h3 className="text-lg font-bold text-slate-900">{req.reason || req.source_type}</h3>
@@ -340,11 +340,11 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                       <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl">
                         <div>
                           <p className="text-xs text-slate-500 uppercase font-bold">Total Pembelian</p>
-                          <p className="text-lg font-black text-slate-900">{formatRupiah(detailData.grand_total)}</p>
+                          <p className="text-lg font-semibold text-slate-900">{formatRupiah(detailData.grand_total)}</p>
                         </div>
                         <div>
                           <p className="text-xs text-slate-500 uppercase font-bold">Mode Syariah</p>
-                          <p className="text-lg font-black text-slate-900">{detailData.shariah_mode || 'CASH'}</p>
+                          <p className="text-lg font-semibold text-slate-900">{detailData.shariah_mode || 'CASH'}</p>
                         </div>
                       </div>
                       <h3 className="font-bold text-slate-800 flex items-center justify-between">
@@ -382,7 +382,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
 
                       {/* Financial Summary Breakdown */}
                       <div className="bg-slate-50 rounded-2xl p-6 space-y-4 border border-slate-100 shadow-inner">
-                        <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-widest">
+                        <div className="flex justify-between text-xs font-bold text-slate-400 tracking-tight">
                           <span>Keterangan</span>
                           <span>Total Jurnal</span>
                         </div>
@@ -417,11 +417,11 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                            )}
                            <div className="pt-4 border-t border-slate-200 mt-2 flex justify-between items-end">
                               <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Bayar (Konfirmasi)</p>
-                                <p className="text-2xl font-black text-[#003366] tracking-tighter leading-none">{formatRupiah(detailData.grand_total)}</p>
+                                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight leading-none mb-1">Total Bayar (Konfirmasi)</p>
+                                <p className="text-2xl font-semibold text-[#003366] tracking-tighter leading-none">{formatRupiah(detailData.grand_total)}</p>
                               </div>
                               <div className="text-right">
-                                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none mb-1">Status Dana</p>
+                                <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-tight leading-none mb-1">Status Dana</p>
                                 <p className="text-sm font-black text-slate-900 leading-none">{detailData.payment_status || 'UNPAID'}</p>
                               </div>
                            </div>
@@ -433,17 +433,17 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                     <>
                       <div className="bg-[#003366]/5 p-6 rounded-3xl border border-[#003366]/10 flex items-center justify-between">
                         <div>
-                          <p className="text-[10px] text-[#003366] uppercase font-black tracking-widest mb-1">Total Pengajuan</p>
-                          <p className="text-2xl font-black text-slate-900 font-mono tracking-tighter">{formatRupiah(detailData.total_amount)}</p>
+                          <p className="text-[10px] text-[#003366] uppercase font-semibold tracking-tight mb-1">Total Pengajuan</p>
+                          <p className="text-2xl font-semibold text-slate-900 font-mono tracking-tighter">{formatRupiah(detailData.total_amount)}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Nomor Klaim</p>
+                          <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-tight mb-1">Nomor Klaim</p>
                           <p className="text-base font-bold text-slate-800 font-mono">#{detailData.claim_number}</p>
                         </div>
                       </div>
 
                       <div className="space-y-4">
-                        <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest">Rincian Pengeluaran</h3>
+                        <h3 className="font-semibold text-slate-800 text-xs uppercase tracking-tight">Rincian Pengeluaran</h3>
                         <div className="space-y-3">
                           {detailData.items?.map((item: any) => (
                             <div key={item.id} className="group relative bg-white border border-slate-100 rounded-2xl p-4 hover:border-[#003366]/20 hover:shadow-sm transition-all">
@@ -451,7 +451,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                                 <div className="space-y-1">
                                   <p className="font-bold text-slate-900">{item.description}</p>
                                   <div className="flex items-center gap-2">
-                                    <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg uppercase tracking-wider">
+                                    <span className="text-[9px] font-semibold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg uppercase tracking-tight">
                                       {item.account?.name || 'Kategori Lain'}
                                     </span>
                                     <span className="text-[10px] text-slate-400 font-mono">• {item.expense_date}</span>
@@ -528,7 +528,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                         </div>
                         <div className="bg-slate-50 p-4 rounded-2xl">
                           <p className="text-xs text-slate-400 uppercase font-black mb-1">Total Tagihan</p>
-                          <p className="text-lg font-black text-slate-900">{formatRupiah(detailData.grand_total)}</p>
+                          <p className="text-lg font-semibold text-slate-900">{formatRupiah(detailData.grand_total)}</p>
                         </div>
                         <div className="bg-slate-50 p-4 rounded-2xl">
                           <p className="text-xs text-slate-400 uppercase font-black mb-1">Termin &amp; Jatuh Tempo</p>
@@ -557,7 +557,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
 
                       {/* Items */}
                       <div>
-                        <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest mb-3">Daftar Item Penjualan</h3>
+                        <h3 className="font-semibold text-slate-800 text-sm uppercase tracking-tight mb-3">Daftar Item Penjualan</h3>
                         <div className="border border-slate-100 rounded-2xl overflow-hidden">
                           <table className="w-full text-sm">
                             <thead className="bg-slate-50 border-b border-slate-100">
@@ -624,15 +624,15 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                         <div className="bg-emerald-50 p-4 rounded-2xl">
                           <p className="text-[10px] text-emerald-600 uppercase font-black mb-1">Delta Kontrak</p>
-                          <p className="text-lg font-black text-slate-900">{formatRupiah(detailData.contract_value_delta || 0)}</p>
+                          <p className="text-lg font-semibold text-slate-900">{formatRupiah(detailData.contract_value_delta || 0)}</p>
                         </div>
                         <div className="bg-rose-50 p-4 rounded-2xl">
                           <p className="text-[10px] text-rose-600 uppercase font-black mb-1">Delta Cost</p>
-                          <p className="text-lg font-black text-slate-900">{formatRupiah(detailData.estimated_cost_delta || 0)}</p>
+                          <p className="text-lg font-semibold text-slate-900">{formatRupiah(detailData.estimated_cost_delta || 0)}</p>
                         </div>
                         <div className="bg-slate-50 p-4 rounded-2xl">
                           <p className="text-[10px] text-slate-400 uppercase font-black mb-1">Delta Waktu</p>
-                          <p className="text-lg font-black text-slate-900">{detailData.schedule_delta_days || 0} hari</p>
+                          <p className="text-lg font-semibold text-slate-900">{detailData.schedule_delta_days || 0} hari</p>
                         </div>
                       </div>
 
@@ -666,7 +666,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
 
                   {/* APPROVAL LOGS / HISTORY */}
                   <div className="pt-6 border-t border-slate-100">
-                    <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <h3 className="font-semibold text-slate-800 text-xs uppercase tracking-tight mb-4 flex items-center gap-2">
                        <Clock size={14} className="text-slate-400" /> Riwayat Persetujuan (Internal Log)
                     </h3>
                     <div className="space-y-4">
@@ -686,7 +686,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                             
                             <div className="space-y-1">
                               <div className="flex items-center justify-between">
-                                <span className={`text-[10px] font-black uppercase tracking-wider ${
+                                <span className={`text-[10px] font-semibold uppercase tracking-tight ${
                                   log.status === 'APPROVED' ? 'text-emerald-600' : 
                                   log.status === 'REJECTED' ? 'text-rose-600' : 
                                   'text-blue-600'
@@ -744,7 +744,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                 {confirmAction === 'APPROVED' ? <ShieldCheck size={24} className="text-white" /> : <AlertTriangle size={24} className="text-white" />}
               </div>
               <div>
-                <h2 className="text-lg font-black text-white">
+                <h2 className="text-lg font-semibold text-white">
                   {confirmAction === 'APPROVED' ? 'Konfirmasi Persetujuan' : 'Konfirmasi Penolakan'}
                 </h2>
                 <p className="text-sm text-white/80">
@@ -754,7 +754,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
             </div>
             <div className="p-6 space-y-4">
               <div className="space-y-1">
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Catatan / Alasan (Opsional)</label>
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-tight">Catatan / Alasan (Opsional)</label>
                 <textarea
                   value={confirmNotes}
                   onChange={e => setConfirmNotes(e.target.value)}
@@ -782,7 +782,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                 <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
                    <ShieldCheck size={32} />
                 </div>
-                <h2 className="text-xl font-black">Dokumen Disetujui!</h2>
+                <h2 className="text-xl font-semibold">Dokumen Disetujui!</h2>
                 <p className="text-emerald-50 text-sm text-center">Tanda tangan digital Anda telah disematkan. QR ini adalah bukti verifikasi sah.</p>
              </div>
 
@@ -791,7 +791,7 @@ export function ApprovalClient({ orgId, activeBranchId = null, initialApprovals 
                     <QRCodeSVG value={signatureData} size={160} level="H" fgColor="#059669" />
                 </div>
                 <div className="text-center space-y-1">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID Verifikasi</p>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">ID Verifikasi</p>
                   <p className="text-xs text-slate-500 font-mono break-all px-4">{signatureData}</p>
                 </div>
                 <button onClick={() => setSignOpen(false)}

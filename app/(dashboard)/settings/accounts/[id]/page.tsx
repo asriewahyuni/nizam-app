@@ -171,10 +171,10 @@ export default function EditAccountPage() {
                 <div className="flex items-center justify-between border-b border-slate-50 pb-2">
                    <div className="flex items-center gap-2">
                       <Tag size={16} className="text-blue-600" />
-                      <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Identitas Akun</h3>
+                      <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-tight">Identitas Akun</h3>
                    </div>
                    {formData.is_system && (
-                      <span className="px-3 py-1 bg-slate-900 text-white text-[10px] font-black rounded-full uppercase tracking-widest">AKUN SISTEM (TERKUNCI)</span>
+                      <span className="px-3 py-1 bg-slate-900 text-white text-[10px] font-semibold rounded-full uppercase tracking-tight">AKUN SISTEM (TERKUNCI)</span>
                    )}
                 </div>
 
@@ -246,7 +246,7 @@ export default function EditAccountPage() {
               <div className="space-y-6 pt-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
                   <Layers size={16} className="text-blue-600" />
-                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Hierarki & Struktur</h3>
+                  <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-tight">Hierarki & Struktur</h3>
                 </div>
 
                 <div className={`space-y-2 ${formData.is_system ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -271,7 +271,7 @@ export default function EditAccountPage() {
               <div className="space-y-6 pt-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
                   <FileText size={16} className="text-blue-600" />
-                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Detail & Status</h3>
+                  <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-tight">Detail & Status</h3>
                 </div>
                 <textarea 
                   value={formData.description}

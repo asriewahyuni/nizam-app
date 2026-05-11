@@ -241,7 +241,7 @@ export default function JournalClient({
                 <button
                   key={s}
                   onClick={() => setFilterStatus(s)}
-                  className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${filterStatus === s ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`px-4 py-2 text-[10px] font-semibold tracking-tight rounded-xl transition-all ${filterStatus === s ? 'bg-white text-blue-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   {s}
                 </button>
@@ -324,7 +324,7 @@ export default function JournalClient({
           subtitle={`Menampilkan daftar jurnal entri dengan status ${filterStatus}.`}
           actions={
              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
                   <Filter size={10} className="inline mr-1" /> Auto-Refresh Active
                 </span>
              </div>
@@ -363,7 +363,7 @@ export default function JournalClient({
                     <td className="px-6 py-6 align-top">
                        <div className="text-sm font-black text-slate-800 leading-tight">{entry.description}</div>
                        <div className="flex items-center gap-2 mt-2">
-                         <span className="text-[9px] font-black text-slate-400 border border-slate-200 bg-white px-2 py-0.5 rounded uppercase tracking-widest">{entry.reference_type}</span>
+                         <span className="text-[9px] font-semibold text-slate-400 border border-slate-200 bg-white px-2 py-0.5 rounded uppercase tracking-tight">{entry.reference_type}</span>
                          {disclosureNote && <span className="text-[10px] font-medium text-slate-400 italic truncate max-w-[220px]">{disclosureNote}</span>}
                        </div>
                     </td>
@@ -410,7 +410,7 @@ export default function JournalClient({
                             </div>
                           </div>
                         )}
-                        <div className="grid grid-cols-12 gap-2 text-[8px] font-black text-slate-300 uppercase tracking-widest mb-1 pb-2 border-b border-slate-100">
+                        <div className="grid grid-cols-12 gap-2 text-[8px] font-semibold text-slate-300 uppercase tracking-tight mb-1 pb-2 border-b border-slate-100">
                           <div className="col-span-6">Akun (CoA)</div>
                           <div className="col-span-3 text-right text-emerald-600/50">Debit</div>
                           <div className="col-span-3 text-right text-rose-600/50">Kredit</div>
@@ -443,7 +443,7 @@ export default function JournalClient({
 	                         }
 	                       />
                              {lockMessage && (
-                               <div className="text-[9px] font-black uppercase tracking-widest text-rose-500">
+                               <div className="text-[9px] font-semibold tracking-tight text-rose-500">
                                  Periode Terkunci
                                </div>
                              )}
@@ -471,7 +471,7 @@ export default function JournalClient({
 	                                  else window.location.reload()
 	                                }} 
                                     disabled={Boolean(lockedPeriod)}
-	                                className="text-[9px] font-black text-rose-400 hover:text-rose-600 px-2 py-1 uppercase tracking-widest transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-rose-400"
+	                                className="text-[9px] font-semibold text-rose-400 hover:text-rose-600 px-2 py-1 uppercase tracking-tight transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-rose-400"
                                     title={lockMessage || undefined}
 	                              >
 	                                Delete Draft
@@ -507,10 +507,10 @@ export default function JournalClient({
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="px-10 py-8 bg-blue-600 text-white flex justify-between items-start shrink-0">
                     <div>
-                      <h3 className="text-2xl font-black tracking-tight flex items-center gap-2">
+                      <h3 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
                         <FilePlus size={24} /> New Journal Entry
                       </h3>
                       <p className="text-xs text-blue-100 mt-1 font-medium italic">Manually create a draft journal entry into the ledger.</p>
@@ -521,17 +521,17 @@ export default function JournalClient({
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-10">
-                   <div className="grid grid-cols-2 gap-6 mb-10 bg-slate-50 p-6 rounded-[28px] border border-slate-100 shadow-inner">
+                   <div className="grid grid-cols-2 gap-6 mb-10 bg-slate-50 p-6 rounded-xl border border-slate-100 shadow-inner">
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jurnal Date</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Jurnal Date</label>
                           <input type="date" required value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className="w-full px-5 py-4 bg-white rounded-2xl border border-slate-200 font-bold outline-none focus:border-blue-500 transition-all shadow-sm" />
                       </div>
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Main Description</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Main Description</label>
                           <input required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Initial Capital Deposit" className="w-full px-5 py-4 bg-white rounded-2xl border border-slate-200 font-bold outline-none focus:border-blue-500 transition-all shadow-sm" />
                       </div>
                       <div className="col-span-2 space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Additional Notes</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Additional Notes</label>
                           <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="External reference or specific explanation" className="w-full px-5 py-4 bg-white rounded-2xl border border-slate-200 font-medium text-slate-600 outline-none focus:border-blue-500 transition-all shadow-sm" />
                       </div>
                    </div>
@@ -544,14 +544,14 @@ export default function JournalClient({
                          </button>
                       </div>
 
-                      <div className="bg-white border border-slate-100 rounded-[32px] shadow-sm overflow-hidden">
+                      <div className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
                          <table className="w-full text-left">
                             <thead className="bg-slate-50/50 border-b border-slate-100">
                                <tr>
-                                  <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Account</th>
-                                  <th className="px-4 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Debit (Rp)</th>
-                                  <th className="px-4 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Credit (Rp)</th>
-                                  <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Action</th>
+                                  <th className="px-6 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-tight">Account</th>
+                                  <th className="px-4 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-tight text-right">Debit (Rp)</th>
+                                  <th className="px-4 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-tight text-right">Credit (Rp)</th>
+                                  <th className="px-6 py-4 text-[9px] font-semibold text-slate-400 uppercase tracking-tight text-center">Action</th>
                                </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
@@ -587,14 +587,14 @@ export default function JournalClient({
                             </tbody>
                             <tfoot className="bg-slate-900 border-t border-slate-800 text-white font-mono">
                                <tr>
-                                  <td className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Consolidated Balance</td>
+                                  <td className="px-6 py-4 text-[10px] font-semibold tracking-tight">Consolidated Balance</td>
                                   <td className="px-4 py-4 text-right text-xs font-black text-emerald-400">{formatRupiah(totalDebit)}</td>
                                   <td className="px-4 py-4 text-right text-xs font-black text-rose-400">{formatRupiah(totalCredit)}</td>
                                   <td className="px-6 py-4 text-center">
                                      {isBalanced ? (
-                                       <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-500/30 tracking-widest">BALANCED</span>
+                                       <span className="text-[9px] font-semibold bg-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-500/30 tracking-tight">BALANCED</span>
                                      ) : (
-                                       <span className="text-[9px] font-black bg-rose-500/20 text-rose-400 px-2.5 py-1 rounded-lg border border-rose-500/30 tracking-widest animate-pulse">UNBALANCED</span>
+                                       <span className="text-[9px] font-semibold bg-rose-500/20 text-rose-400 px-2.5 py-1 rounded-lg border border-rose-500/30 tracking-tight animate-pulse">UNBALANCED</span>
                                      )}
                                   </td>
                                </tr>

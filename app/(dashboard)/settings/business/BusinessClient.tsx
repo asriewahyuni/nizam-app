@@ -156,18 +156,18 @@ export default function BusinessClient({
   return (
     <div className="flex flex-col gap-8 w-full max-w-5xl mx-auto pb-20">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+        <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
           <Settings className="text-blue-600" size={32} />
           PROFIL BISNIS
         </h1>
         <p className="text-sm text-slate-500 font-medium">Konfigurasi profile bisnis and system-wide identification formats.</p>
       </div>
 
-      <div className="rounded-[32px] border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-slate-50 p-6 shadow-lg shadow-blue-100/40">
+      <div className="rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-slate-50 p-6 shadow-lg shadow-blue-100/40">
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div className="max-w-2xl space-y-2">
             <div className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-700">Migrasi & Onboarding</div>
-            <h2 className="text-xl font-black tracking-tight text-slate-900">Butuh panduan migrasi client dari Excel atau aplikasi lama?</h2>
+            <h2 className="text-xl font-semibold tracking-tight text-slate-900">Butuh panduan migrasi client dari Excel atau aplikasi lama?</h2>
             <p className="text-sm font-medium leading-6 text-slate-600">
               Buka pusat migrasi untuk melihat urutan cut-off, checklist onboarding, dan download template Excel yang siap dibagikan ke client.
             </p>
@@ -184,11 +184,11 @@ export default function BusinessClient({
         </div>
       </div>
 
-      <div className="rounded-[32px] border border-violet-100 bg-gradient-to-r from-violet-50 via-white to-slate-50 p-6 shadow-lg shadow-violet-100/40">
+      <div className="rounded-xl border border-violet-100 bg-gradient-to-r from-violet-50 via-white to-slate-50 p-6 shadow-lg shadow-violet-100/40">
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div className="max-w-2xl space-y-2">
             <div className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-700">Open API & Webhook</div>
-            <h2 className="text-xl font-black tracking-tight text-slate-900">Integrasi dengan Sistem Eksternal?</h2>
+            <h2 className="text-xl font-semibold tracking-tight text-slate-900">Integrasi dengan Sistem Eksternal?</h2>
             <p className="text-sm font-medium leading-6 text-slate-600">
               Akses endpoint API Nizam untuk transaksi kas otomatis, webhook, dan data flow ke aplikasi lain. Generate API Key Anda dari panel khusus ini.
             </p>
@@ -205,25 +205,25 @@ export default function BusinessClient({
         </div>
       </div>
 
-      <form onSubmit={handleSave} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-12">
+      <form onSubmit={handleSave} className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-12">
         
         <div className="space-y-8">
            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
+              <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
                 <Building size={20} className="text-slate-400" /> Profil Instansi
               </h3>
            </div>
            
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 p-10 bg-slate-50/50 rounded-[32px] border border-slate-100/50 shadow-inner">
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 p-10 bg-slate-50/50 rounded-xl border border-slate-100/50 shadow-inner">
               <div className="md:col-span-3 bg-white p-8 rounded-3xl border border-slate-200 flex flex-col md:flex-row gap-8 items-center shadow-sm">
-                 <div className="w-32 h-32 bg-slate-50 rounded-[28px] border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-inner group relative">
+                 <div className="w-32 h-32 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-inner group relative">
                     {savedLogoUrl ? (
                        // eslint-disable-next-line @next/next/no-img-element
                        <img src={savedLogoUrl} alt="Logo" className="w-full h-full object-contain" />
                     ) : (
                        <Building size={32} className="text-slate-300" />
                     )}
-                    <label htmlFor="logo-upload" className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center cursor-pointer text-white text-[10px] font-black uppercase tracking-widest">Ganti Logo</label>
+                    <label htmlFor="logo-upload" className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center cursor-pointer text-white text-[10px] font-semibold tracking-tight">Ganti Logo</label>
                  </div>
                   <div className="flex-1 space-y-6 w-full">
                      <div className="space-y-1">
@@ -264,7 +264,7 @@ export default function BusinessClient({
                             }} disabled={loading || logoUploading} />
                             
                             <div className="flex-1 w-full space-y-1 group">
-                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Logo URL Connection</label>
+                               <label className="text-[9px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Logo URL Connection</label>
                                <input 
                                   name="logo_url" 
                                   value={logoInputValue}
@@ -320,7 +320,7 @@ export default function BusinessClient({
                                 alert('Identitas bisnis berhasil dikunci!');
                              });
                           }}
-                          className="px-6 py-3 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg flex items-center gap-2"
+                          className="px-6 py-3 bg-emerald-600 text-white rounded-2xl text-[10px] font-semibold tracking-tight hover:bg-emerald-700 transition-all shadow-lg flex items-center gap-2"
                        >
                           <Check size={14} /> Gunakan
                        </button>
@@ -334,7 +334,7 @@ export default function BusinessClient({
                              });
                           }}
                           disabled={!currentSlug || slugStatus === 'checking'}
-                          className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${
+                          className={`px-6 py-3 rounded-2xl text-[10px] font-semibold tracking-tight transition-all shadow-lg active:scale-95 ${
                              slugStatus === 'taken' ? 'bg-rose-500 text-white' : 'bg-slate-900 text-white hover:bg-black'
                           }`}
                        >
@@ -368,12 +368,12 @@ export default function BusinessClient({
 
         <div className="space-y-8">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
+            <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
               <Sparkles size={20} className="text-slate-400" /> Startup Wizard
             </h3>
           </div>
 
-          <div className="rounded-[32px] border border-amber-100 bg-amber-50/40 p-8 shadow-inner space-y-6">
+          <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-8 shadow-inner space-y-6">
             <label className="flex items-start gap-4 rounded-3xl border border-slate-200 bg-white px-5 py-4 cursor-pointer">
               <input
                 type="checkbox"
@@ -425,19 +425,19 @@ export default function BusinessClient({
 
         <div className="space-y-8">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
+            <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
               <MessageCircle size={20} className="text-slate-400" /> Template WhatsApp POS
             </h3>
           </div>
 
-          <div className="rounded-[32px] border border-emerald-100 bg-emerald-50/40 p-8 shadow-inner space-y-4">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-8 shadow-inner space-y-4">
             <div className="space-y-2">
               <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Pesan Tambahan Default</label>
               <textarea
                 name="pos_wa_custom_message"
                 defaultValue={String(settings.pos_wa_custom_message ?? '')}
                 placeholder="Contoh: Terima kasih Kak {customer_name}. Simpan nomor ini untuk info promo berikutnya."
-                className="w-full min-h-[140px] px-5 py-4 text-sm border border-slate-200 rounded-[28px] outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 font-medium bg-white"
+                className="w-full min-h-[140px] px-5 py-4 text-sm border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-emerald-50 focus:border-emerald-500 font-medium bg-white"
               />
             </div>
             <p className="text-[11px] font-medium text-slate-500 leading-6">
@@ -449,12 +449,12 @@ export default function BusinessClient({
 
         <div className="space-y-8">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
+            <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
               <Clock size={20} className="text-slate-400" /> Operasional Shift POS
             </h3>
           </div>
 
-          <div className="rounded-[32px] border border-blue-100 bg-blue-50/40 p-8 shadow-inner space-y-6">
+          <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-8 shadow-inner space-y-6">
             <label className="flex items-start gap-4 rounded-3xl border border-slate-200 bg-white px-5 py-4 cursor-pointer">
               <input
                 type="checkbox"
@@ -518,12 +518,12 @@ export default function BusinessClient({
 
         <div className="space-y-8">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
+            <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2 uppercase italic tracking-tight">
               <Fingerprint size={20} className="text-slate-400" /> Format Kode Dokumen
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 bg-slate-50/50 rounded-[32px] border border-slate-100/50 shadow-inner">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 bg-slate-50/50 rounded-xl border border-slate-100/50 shadow-inner">
             <div className="space-y-2">
               <label className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em] ml-1">Format NIK Karyawan</label>
               <input
@@ -573,17 +573,17 @@ export default function BusinessClient({
         </div>
 
         <div className="flex justify-end pt-10 border-t border-slate-100 gap-6">
-           <button type="submit" disabled={loading} className="flex items-center gap-3 px-12 py-5 bg-slate-900 text-white rounded-[24px] font-black text-[12px] uppercase tracking-[0.2em] hover:bg-black transition-all shadow-2xl shadow-slate-900/20 disabled:opacity-50 active:scale-95">
+           <button type="submit" disabled={loading} className="flex items-center gap-3 px-12 py-5 bg-slate-900 text-white rounded-xl font-black text-[12px] uppercase tracking-[0.2em] hover:bg-black transition-all shadow-2xl shadow-slate-900/20 disabled:opacity-50 active:scale-95">
              <Save size={18}/>
              {loading ? 'Processing...' : 'Simpan Seluruh Pengaturan'}
            </button>
         </div>
       </form>
 
-      <div className="bg-white rounded-[40px] border border-rose-100 shadow-xl shadow-rose-100/40 p-10 space-y-6">
+      <div className="bg-white rounded-2xl border border-rose-100 shadow-xl shadow-rose-100/40 p-10 space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div>
-            <h3 className="text-lg font-black text-rose-700 uppercase tracking-tight flex items-center gap-3">
+            <h3 className="text-lg font-semibold text-rose-700 uppercase tracking-tight flex items-center gap-3">
               <Zap size={20} />
               Danger Zone
             </h3>
@@ -606,7 +606,7 @@ export default function BusinessClient({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 space-y-3">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 space-y-3">
             <div className="flex items-center gap-3 text-slate-900 font-black uppercase text-sm tracking-tight">
               <RotateCcw size={18} className="text-blue-600" />
               Reset Transaksi
@@ -616,7 +616,7 @@ export default function BusinessClient({
             </p>
           </div>
 
-          <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-6 space-y-3">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 space-y-3">
             <div className="flex items-center gap-3 text-rose-700 font-black uppercase text-sm tracking-tight">
               <Zap size={18} />
               Reset Semua Data Operasional
@@ -642,12 +642,12 @@ export default function BusinessClient({
               initial={{ opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 16 }}
-              className="relative w-full max-w-2xl rounded-[40px] border border-white/70 bg-white shadow-2xl overflow-hidden"
+              className="relative w-full max-w-2xl rounded-2xl border border-white/70 bg-white shadow-2xl overflow-hidden"
             >
               <div className="p-8 md:p-10 space-y-8">
                 <div className="flex items-start justify-between gap-6">
                   <div className="space-y-2">
-                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">Reset Data Organisasi</h3>
+                    <h3 className="text-2xl font-semibold text-slate-900 tracking-tight">Reset Data Organisasi</h3>
                     <p className="text-sm text-slate-500 leading-6">
                       Pilih mode reset yang sesuai. Aksi ini tidak bisa di-undo dan hanya dapat dijalankan oleh owner organisasi.
                     </p>
@@ -665,7 +665,7 @@ export default function BusinessClient({
                   <button
                     type="button"
                     onClick={() => setResetMode('transactions')}
-                    className={`text-left rounded-[28px] border p-6 transition-all ${
+                    className={`text-left rounded-xl border p-6 transition-all ${
                       resetMode === 'transactions'
                         ? 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-100'
                         : 'border-slate-200 bg-white hover:border-slate-300'
@@ -680,7 +680,7 @@ export default function BusinessClient({
                   <button
                     type="button"
                     onClick={() => setResetMode('all_data')}
-                    className={`text-left rounded-[28px] border p-6 transition-all ${
+                    className={`text-left rounded-xl border p-6 transition-all ${
                       resetMode === 'all_data'
                         ? 'border-rose-500 bg-rose-50 shadow-lg shadow-rose-100'
                         : 'border-slate-200 bg-white hover:border-slate-300'
@@ -693,7 +693,7 @@ export default function BusinessClient({
                   </button>
                 </div>
 
-                <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-6 space-y-3">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 space-y-3">
                   <p className="text-xs font-black text-amber-700 uppercase tracking-[0.2em]">Konfirmasi Wajib</p>
                   <p className="text-sm text-amber-900 leading-6">
                     {resetMode === 'all_data'
@@ -708,7 +708,7 @@ export default function BusinessClient({
                   />
                 </div>
 
-                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 space-y-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 space-y-3">
                   <p className="text-xs font-black text-slate-500 uppercase tracking-[0.2em]">Yang Tetap Dipertahankan</p>
                   <p className="text-sm text-slate-700 leading-6">
                     Profil bisnis, slug, owner membership, role, chart of accounts, dan data billing SaaS.

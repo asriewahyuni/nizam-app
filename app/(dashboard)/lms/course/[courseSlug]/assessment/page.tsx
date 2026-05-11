@@ -137,7 +137,7 @@ export default async function LearningCourseAssessmentPage(props: {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <Link
           href={`/lms/course/${course.slug}`}
           className="inline-flex items-center gap-2 text-sm font-black text-slate-600 hover:text-slate-900"
@@ -152,7 +152,7 @@ export default async function LearningCourseAssessmentPage(props: {
               <FileText className="h-3.5 w-3.5" />
               Lembar Asesmen Formal
             </div>
-            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 md:text-4xl">
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
               {assessment.documentTitle}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
@@ -182,11 +182,11 @@ export default async function LearningCourseAssessmentPage(props: {
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Metode Penilaian</div>
             <div className="mt-4 space-y-3 text-sm text-slate-600">
               {assessment.methods.map((method) => (
-                <div key={method} className="rounded-[20px] border border-slate-200 bg-white p-4">
+                <div key={method} className="rounded-xl border border-slate-200 bg-white p-4">
                   {method}
                 </div>
               ))}
@@ -196,71 +196,71 @@ export default async function LearningCourseAssessmentPage(props: {
       </section>
 
       {searchParams?.saved === '1' ? (
-        <section className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
+        <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 shadow-sm">
           Submission asesmen berhasil disimpan. Riwayat terbaru muncul di bagian bawah halaman ini.
         </section>
       ) : null}
 
       {searchParams?.error ? (
-        <section className="rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-800 shadow-sm">
+        <section className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-800 shadow-sm">
           {searchParams.error}
         </section>
       ) : null}
 
       {canManageAssessment ? (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Peserta Terpantau</div>
-            <div className="mt-3 text-3xl font-black tracking-tight text-slate-900">{participantStatuses.length}</div>
+            <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{participantStatuses.length}</div>
             <p className="mt-2 text-sm text-slate-600">Status peserta dihitung dari submission terbaru tiap peserta.</p>
           </div>
-          <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">Kompeten</div>
-            <div className="mt-3 text-3xl font-black tracking-tight text-emerald-900">{competentParticipantCount}</div>
+            <div className="mt-3 text-3xl font-semibold tracking-tight text-emerald-900">{competentParticipantCount}</div>
             <p className="mt-2 text-sm text-emerald-800">Peserta dengan keputusan terbaru kompeten.</p>
           </div>
-          <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-5 shadow-sm">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-amber-700">Belum Kompeten</div>
-            <div className="mt-3 text-3xl font-black tracking-tight text-amber-900">{notYetParticipantCount}</div>
+            <div className="mt-3 text-3xl font-semibold tracking-tight text-amber-900">{notYetParticipantCount}</div>
             <p className="mt-2 text-sm text-amber-800">Peserta yang masih perlu remedial atau review ulang.</p>
           </div>
-          <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Total Submission</div>
-            <div className="mt-3 text-3xl font-black tracking-tight text-slate-900">{submissions.length}</div>
+            <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{submissions.length}</div>
             <p className="mt-2 text-sm text-slate-600">Riwayat asesmen online yang tampil pada filter saat ini.</p>
           </div>
         </section>
       ) : null}
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <div className="rounded-[28px] border border-emerald-200 bg-emerald-50/60 p-6 shadow-sm">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <BadgeCheck className="h-5 w-5 text-emerald-700" />
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">Keputusan</div>
-              <h2 className="mt-1 text-xl font-black text-slate-900">Kompeten jika</h2>
+              <h2 className="mt-1 text-xl font-semibold text-slate-900">Kompeten jika</h2>
             </div>
           </div>
           <div className="mt-5 space-y-3 text-sm text-slate-700">
             {assessment.competentWhen.map((item) => (
-              <div key={item} className="rounded-[22px] border border-emerald-200 bg-white/90 p-4">
+              <div key={item} className="rounded-xl border border-emerald-200 bg-white/90 p-4">
                 {item}
               </div>
             ))}
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-amber-200 bg-amber-50/70 p-6 shadow-sm">
+        <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <ShieldAlert className="h-5 w-5 text-amber-700" />
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-700">Remedial</div>
-              <h2 className="mt-1 text-xl font-black text-slate-900">Belum kompeten jika</h2>
+              <h2 className="mt-1 text-xl font-semibold text-slate-900">Belum kompeten jika</h2>
             </div>
           </div>
           <div className="mt-5 space-y-3 text-sm text-slate-700">
             {assessment.notYetCompetentWhen.map((item) => (
-              <div key={item} className="rounded-[22px] border border-amber-200 bg-white/90 p-4">
+              <div key={item} className="rounded-xl border border-amber-200 bg-white/90 p-4">
                 {item}
               </div>
             ))}
@@ -269,17 +269,17 @@ export default async function LearningCourseAssessmentPage(props: {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <ClipboardCheck className="h-5 w-5 text-slate-700" />
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Teori</div>
-              <h2 className="mt-1 text-xl font-black text-slate-900">Pertanyaan acuan penilai</h2>
+              <h2 className="mt-1 text-xl font-semibold text-slate-900">Pertanyaan acuan penilai</h2>
             </div>
           </div>
           <div className="mt-5 space-y-3 text-sm text-slate-600">
             {assessment.theoryQuestions.map((question, index) => (
-              <div key={question} className="flex items-start gap-3 rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+              <div key={question} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-white text-sm font-black text-slate-900 shadow-sm">
                   {index + 1}
                 </div>
@@ -289,17 +289,17 @@ export default async function LearningCourseAssessmentPage(props: {
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <ShieldCheck className="h-5 w-5 text-emerald-600" />
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Kunci Acuan</div>
-              <h2 className="mt-1 text-xl font-black text-slate-900">Panduan jawaban singkat</h2>
+              <h2 className="mt-1 text-xl font-semibold text-slate-900">Panduan jawaban singkat</h2>
             </div>
           </div>
           <div className="mt-5 space-y-3 text-sm text-slate-600">
             {assessment.answerGuide.map((answer, index) => (
-              <div key={answer} className="flex items-start gap-3 rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+              <div key={answer} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-white text-sm font-black text-slate-900 shadow-sm">
                   {index + 1}
                 </div>
@@ -310,20 +310,20 @@ export default async function LearningCourseAssessmentPage(props: {
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div>
           <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Praktik</div>
-          <h2 className="mt-2 text-xl font-black text-slate-900">Tugas unjuk kerja</h2>
+          <h2 className="mt-2 text-xl font-semibold text-slate-900">Tugas unjuk kerja</h2>
         </div>
         <div className="mt-5 grid gap-4 xl:grid-cols-2">
           {assessment.practicalTasks.map((task, index) => (
-            <div key={task.title} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+            <div key={task.title} className="rounded-xl border border-slate-200 bg-slate-50 p-5">
               <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
                 Tugas {index + 1}
               </div>
-              <h3 className="mt-2 text-lg font-black text-slate-900">{task.title}</h3>
+              <h3 className="mt-2 text-lg font-semibold text-slate-900">{task.title}</h3>
               <p className="mt-3 text-sm leading-6 text-slate-600">{task.instruction}</p>
-              <div className="mt-4 rounded-[20px] border border-slate-200 bg-white p-4 text-sm text-slate-600">
+              <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
                 <span className="font-black text-slate-900">Bukti minimum:</span> {task.expectedEvidence}
               </div>
             </div>
@@ -332,14 +332,14 @@ export default async function LearningCourseAssessmentPage(props: {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Checklist</div>
-            <h2 className="mt-2 text-xl font-black text-slate-900">Daftar cek unjuk kerja</h2>
+            <h2 className="mt-2 text-xl font-semibold text-slate-900">Daftar cek unjuk kerja</h2>
           </div>
           <div className="mt-5 space-y-3 text-sm text-slate-600">
             {assessment.performanceChecklist.map((item, index) => (
-              <div key={item} className="flex items-start gap-3 rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+              <div key={item} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-white text-sm font-black text-slate-900 shadow-sm">
                   {index + 1}
                 </div>
@@ -350,28 +350,28 @@ export default async function LearningCourseAssessmentPage(props: {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Bukti</div>
-              <h2 className="mt-2 text-xl font-black text-slate-900">Bukti yang dikumpulkan penilai</h2>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">Bukti yang dikumpulkan penilai</h2>
             </div>
             <div className="mt-5 space-y-3 text-sm text-slate-600">
               {assessment.evidenceChecklist.map((item) => (
-                <div key={item} className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+                <div key={item} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   {item}
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Tindak Lanjut</div>
-              <h2 className="mt-2 text-xl font-black text-slate-900">Panduan remedial dan kelulusan</h2>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">Panduan remedial dan kelulusan</h2>
             </div>
             <div className="mt-5 space-y-3 text-sm text-slate-600">
               {assessment.followUpGuidance.map((item) => (
-                <div key={item} className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+                <div key={item} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   {item}
                 </div>
               ))}
@@ -381,11 +381,11 @@ export default async function LearningCourseAssessmentPage(props: {
       </section>
 
       {canManageAssessment ? (
-        <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Status Peserta</div>
-              <h2 className="mt-2 text-xl font-black text-slate-900">Kelulusan terbaru per trainee</h2>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">Kelulusan terbaru per trainee</h2>
             </div>
             <div className="rounded-full bg-slate-100 px-3 py-2 text-xs font-black uppercase tracking-[0.16em] text-slate-600">
               Latest only
@@ -430,19 +430,19 @@ export default async function LearningCourseAssessmentPage(props: {
           </div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Jawaban Masuk</div>
-              <div className="mt-2 text-2xl font-black text-slate-900">{participantAnswerSubmissions.length}</div>
+              <div className="mt-2 text-2xl font-semibold text-slate-900">{participantAnswerSubmissions.length}</div>
             </div>
-            <div className="rounded-[22px] border border-amber-200 bg-amber-50 p-4">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
               <div className="text-[11px] font-black uppercase tracking-[0.16em] text-amber-700">Menunggu Review</div>
-              <div className="mt-2 text-2xl font-black text-amber-900">{pendingAnswerReviewCount}</div>
+              <div className="mt-2 text-2xl font-semibold text-amber-900">{pendingAnswerReviewCount}</div>
             </div>
-            <div className="rounded-[22px] border border-emerald-200 bg-emerald-50 p-4">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
               <div className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">Sudah Direview</div>
-              <div className="mt-2 text-2xl font-black text-emerald-900">{reviewedAnswerCount}</div>
+              <div className="mt-2 text-2xl font-semibold text-emerald-900">{reviewedAnswerCount}</div>
             </div>
-            <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Submission Dipilih</div>
               <div className="mt-2 text-sm font-black text-slate-900">
                 {selectedAnswerSubmission ? selectedAnswerSubmission.participantName : 'Belum ada'}
@@ -451,7 +451,7 @@ export default async function LearningCourseAssessmentPage(props: {
           </div>
 
           {participantStatuses.length === 0 ? (
-            <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
+            <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
               {participantFilter
                 ? 'Tidak ada peserta yang cocok dengan filter ini.'
                 : 'Belum ada status peserta karena submission online belum masuk.'}
@@ -459,7 +459,7 @@ export default async function LearningCourseAssessmentPage(props: {
           ) : (
             <div className="mt-5 grid gap-4 xl:grid-cols-2">
               {participantStatuses.map((item) => (
-                <div key={item.participantKey} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+                <div key={item.participantKey} className="rounded-xl border border-slate-200 bg-slate-50 p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="flex flex-wrap gap-2">
@@ -474,14 +474,14 @@ export default async function LearningCourseAssessmentPage(props: {
                           {item.assessmentCount} asesmen
                         </span>
                       </div>
-                      <h3 className="mt-3 text-lg font-black text-slate-900">{item.participantName}</h3>
+                      <h3 className="mt-3 text-lg font-semibold text-slate-900">{item.participantName}</h3>
                       <div className="mt-2 text-sm text-slate-600">
                         {item.participantRole || 'Peran belum diisi'}
                         {item.participantReference ? ` • ${item.participantReference}` : ''}
                       </div>
                     </div>
 
-                    <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-right">
+                    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-right">
                       <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Update</div>
                       <div className="mt-2 text-sm font-black text-slate-900">{formatAssessmentDate(item.latestAssessedAt)}</div>
                       <div className="mt-1 text-xs text-slate-500">{item.latestAssessorName}</div>
@@ -489,7 +489,7 @@ export default async function LearningCourseAssessmentPage(props: {
                   </div>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-[18px] border border-slate-200 bg-white p-4">
+                    <div className="rounded-lg border border-slate-200 bg-white p-4">
                       <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Status Teori</div>
                       <div className="mt-2 text-sm font-black text-slate-900">
                         {item.latestTheoryStatus === 'UNDERSTOOD'
@@ -499,7 +499,7 @@ export default async function LearningCourseAssessmentPage(props: {
                             : 'Belum Paham'}
                       </div>
                     </div>
-                    <div className="rounded-[18px] border border-slate-200 bg-white p-4">
+                    <div className="rounded-lg border border-slate-200 bg-white p-4">
                       <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Status Praktik</div>
                       <div className="mt-2 text-sm font-black text-slate-900">
                         {item.latestPracticeStatus === 'SUCCESS'
@@ -518,11 +518,11 @@ export default async function LearningCourseAssessmentPage(props: {
       ) : null}
 
       {canManageAssessment ? (
-        <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Review Jawaban</div>
-              <h2 className="mt-2 text-xl font-black text-slate-900">Jawaban peserta yang masuk</h2>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">Jawaban peserta yang masuk</h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                 Pilih submission peserta untuk ditarik ke form asesmen penilai. Saat asesmen final disimpan, submission ini otomatis ditandai sudah direview.
               </p>
@@ -533,7 +533,7 @@ export default async function LearningCourseAssessmentPage(props: {
           </div>
 
           {participantAnswerSubmissions.length === 0 ? (
-            <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
+            <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
               {participantFilter
                 ? 'Belum ada submission jawaban peserta yang cocok dengan filter ini.'
                 : 'Belum ada submission jawaban peserta untuk course ini.'}
@@ -549,7 +549,7 @@ export default async function LearningCourseAssessmentPage(props: {
                 return (
                   <div
                     key={submission.id}
-                    className={`rounded-[24px] border p-5 shadow-sm ${
+                    className={`rounded-xl border p-5 shadow-sm ${
                       selectedAnswerSubmission?.id === submission.id
                         ? 'border-emerald-300 bg-emerald-50/60'
                         : 'border-slate-200 bg-slate-50'
@@ -569,7 +569,7 @@ export default async function LearningCourseAssessmentPage(props: {
                             {submission.assessmentVersion}
                           </span>
                         </div>
-                        <h3 className="mt-3 text-lg font-black text-slate-900">{submission.participantName}</h3>
+                        <h3 className="mt-3 text-lg font-semibold text-slate-900">{submission.participantName}</h3>
                         <div className="mt-2 text-sm text-slate-600">
                           {submission.participantRole || 'Peran belum diisi'}
                           {submission.participantReference ? ` • ${submission.participantReference}` : ''}
@@ -594,7 +594,7 @@ export default async function LearningCourseAssessmentPage(props: {
                     <div className="mt-4 grid gap-4 xl:grid-cols-2">
                       <div className="space-y-3">
                         {submission.theoryAnswers.map((item, index) => (
-                          <div key={`${submission.id}-theory-${index}`} className="rounded-[20px] border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                          <div key={`${submission.id}-theory-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
                             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Teori {index + 1}</div>
                             <div className="mt-2 font-bold text-slate-900">{item.prompt}</div>
                             <p className="mt-2 leading-6">{item.answer || '-'}</p>
@@ -604,7 +604,7 @@ export default async function LearningCourseAssessmentPage(props: {
 
                       <div className="space-y-3">
                         {submission.practicalAnswers.map((item, index) => (
-                          <div key={`${submission.id}-practice-${index}`} className="rounded-[20px] border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                          <div key={`${submission.id}-practice-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
                             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Praktik {index + 1}</div>
                             <div className="mt-2 font-bold text-slate-900">{item.prompt}</div>
                             <p className="mt-2 leading-6">{item.answer || '-'}</p>
@@ -612,14 +612,14 @@ export default async function LearningCourseAssessmentPage(props: {
                         ))}
 
                         {submission.generalNotes ? (
-                          <div className="rounded-[20px] border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                          <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
                             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Catatan Peserta</div>
                             <p className="mt-2 leading-6">{submission.generalNotes}</p>
                           </div>
                         ) : null}
 
                         {submission.reviewerNote ? (
-                          <div className="rounded-[20px] border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                          <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
                             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Catatan Reviewer</div>
                             <p className="mt-2 leading-6">{submission.reviewerNote}</p>
                           </div>
@@ -634,11 +634,11 @@ export default async function LearningCourseAssessmentPage(props: {
         </section>
       ) : null}
 
-      <section id="assessor-form" className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+      <section id="assessor-form" className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Form Online</div>
-            <h2 className="mt-2 text-xl font-black text-slate-900">Input hasil asesmen penilai</h2>
+            <h2 className="mt-2 text-xl font-semibold text-slate-900">Input hasil asesmen penilai</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               Form ini dipakai untuk asesmen online tanpa cetak. Hasilnya tersimpan per course dan bisa dipakai sebagai arsip penilaian internal.
             </p>
@@ -655,12 +655,12 @@ export default async function LearningCourseAssessmentPage(props: {
             <input type="hidden" name="participantQuery" value={participantFilter} />
 
             {selectedAnswerSubmission ? (
-              <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 p-5">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
                 <div className="flex items-center gap-3">
                   <MessageSquareText className="h-5 w-5 text-emerald-700" />
                   <div>
                     <div className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">Submission Dipakai</div>
-                    <h3 className="mt-1 text-lg font-black text-slate-900">{selectedAnswerSubmission.participantName}</h3>
+                    <h3 className="mt-1 text-lg font-semibold text-slate-900">{selectedAnswerSubmission.participantName}</h3>
                   </div>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-700">
@@ -745,11 +745,11 @@ export default async function LearningCourseAssessmentPage(props: {
               </label>
             </div>
 
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Checklist Unjuk Kerja</div>
               <div className="mt-4 grid gap-4 xl:grid-cols-2">
                 {assessment.performanceChecklist.map((item, index) => (
-                  <label key={item} className="space-y-2 rounded-[20px] border border-slate-200 bg-white p-4">
+                  <label key={item} className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
                     <span className="block text-sm font-bold leading-6 text-slate-800">{item}</span>
                     <select
                       name={`check_${index}`}
@@ -773,7 +773,7 @@ export default async function LearningCourseAssessmentPage(props: {
                   rows={5}
                   defaultValue={selectedAnswerSubmission ? buildAnswerSubmissionContext(selectedAnswerSubmission) : ''}
                   placeholder="Tuliskan bukti praktik, screenshot, jawaban teori, atau observasi yang mendukung keputusan."
-                  className="w-full rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white"
                 />
               </label>
 
@@ -783,7 +783,7 @@ export default async function LearningCourseAssessmentPage(props: {
                   name="strengths"
                   rows={5}
                   placeholder="Contoh: cepat membedakan jalur login dan memahami letak menu Profil Saya."
-                  className="w-full rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white"
                 />
               </label>
 
@@ -793,7 +793,7 @@ export default async function LearningCourseAssessmentPage(props: {
                   name="repeatedErrors"
                   rows={5}
                   placeholder="Contoh: masih tertukar antara login admin bisnis dan panel staf."
-                  className="w-full rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white"
                 />
               </label>
 
@@ -803,7 +803,7 @@ export default async function LearningCourseAssessmentPage(props: {
                   name="followUp"
                   rows={5}
                   placeholder="Contoh: remedial lesson 2 dan 3 sebelum lanjut ke level berikutnya."
-                  className="w-full rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-emerald-400 focus:bg-white"
                 />
               </label>
             </div>
@@ -822,17 +822,17 @@ export default async function LearningCourseAssessmentPage(props: {
             </div>
           </form>
         ) : (
-          <div className="mt-6 rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-bold text-slate-600">
+          <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-bold text-slate-600">
             Pengelola kompetensi internal dengan akses `learning:write` atau assessor SaaS dapat mengirim asesmen online. Peserta tenant tetap bisa membaca rubrik dan kriteria penilaian di halaman ini.
           </div>
         )}
       </section>
 
-      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Langkah Berikutnya</div>
-            <h2 className="mt-2 text-xl font-black text-slate-900">Gunakan lembar ini saat review trainer</h2>
+            <h2 className="mt-2 text-xl font-semibold text-slate-900">Gunakan lembar ini saat review trainer</h2>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
@@ -854,11 +854,11 @@ export default async function LearningCourseAssessmentPage(props: {
       </section>
 
       {canManageAssessment ? (
-        <section id="submissions" className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <section id="submissions" className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Riwayat Online</div>
-              <h2 className="mt-2 text-xl font-black text-slate-900">Submission asesmen terbaru</h2>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">Submission asesmen terbaru</h2>
             </div>
             <div className="rounded-full bg-slate-100 px-3 py-2 text-xs font-black uppercase tracking-[0.16em] text-slate-600">
               {submissions.length} data
@@ -866,7 +866,7 @@ export default async function LearningCourseAssessmentPage(props: {
           </div>
 
           {submissions.length === 0 ? (
-            <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
+            <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
               {participantFilter
                 ? 'Belum ada submission online yang cocok dengan filter peserta ini.'
                 : 'Belum ada submission online untuk course ini.'}
@@ -878,7 +878,7 @@ export default async function LearningCourseAssessmentPage(props: {
                 const checklistNoCount = submission.checklistResults.filter((item) => item.status === 'no').length
 
                 return (
-                  <div key={submission.id} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+                  <div key={submission.id} className="rounded-xl border border-slate-200 bg-slate-50 p-5">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div>
                         <div className="flex flex-wrap gap-2">
@@ -894,7 +894,7 @@ export default async function LearningCourseAssessmentPage(props: {
                           </span>
                         </div>
 
-                        <h3 className="mt-3 text-lg font-black text-slate-900">{submission.participantName}</h3>
+                        <h3 className="mt-3 text-lg font-semibold text-slate-900">{submission.participantName}</h3>
                         <div className="mt-2 text-sm text-slate-600">
                           {submission.participantRole || 'Peran belum diisi'}
                           {submission.participantReference ? ` • ${submission.participantReference}` : ''}
@@ -909,7 +909,7 @@ export default async function LearningCourseAssessmentPage(props: {
                       </div>
 
                       <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[320px]">
-                        <div className="rounded-[20px] border border-slate-200 bg-white p-4">
+                        <div className="rounded-xl border border-slate-200 bg-white p-4">
                           <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Teori</div>
                           <div className="mt-2 text-sm font-black text-slate-900">
                             {submission.theoryStatus === 'UNDERSTOOD'
@@ -919,7 +919,7 @@ export default async function LearningCourseAssessmentPage(props: {
                                 : 'Belum Paham'}
                           </div>
                         </div>
-                        <div className="rounded-[20px] border border-slate-200 bg-white p-4">
+                        <div className="rounded-xl border border-slate-200 bg-white p-4">
                           <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Praktik</div>
                           <div className="mt-2 text-sm font-black text-slate-900">
                             {submission.practiceStatus === 'SUCCESS'
@@ -929,7 +929,7 @@ export default async function LearningCourseAssessmentPage(props: {
                                 : 'Gagal'}
                           </div>
                         </div>
-                        <div className="rounded-[20px] border border-slate-200 bg-white p-4">
+                        <div className="rounded-xl border border-slate-200 bg-white p-4">
                           <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Checklist</div>
                           <div className="mt-2 text-sm font-black text-slate-900">
                             {checklistYesCount} ya • {checklistNoCount} tidak
@@ -941,13 +941,13 @@ export default async function LearningCourseAssessmentPage(props: {
                     <div className="mt-4 grid gap-4 xl:grid-cols-2">
                       <div className="space-y-3 text-sm text-slate-600">
                         {submission.evidenceSummary ? (
-                          <div className="rounded-[20px] border border-slate-200 bg-white p-4">
+                          <div className="rounded-xl border border-slate-200 bg-white p-4">
                             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Bukti</div>
                             <p className="mt-2 leading-6">{submission.evidenceSummary}</p>
                           </div>
                         ) : null}
                         {submission.strengths ? (
-                          <div className="rounded-[20px] border border-slate-200 bg-white p-4">
+                          <div className="rounded-xl border border-slate-200 bg-white p-4">
                             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Kekuatan</div>
                             <p className="mt-2 leading-6">{submission.strengths}</p>
                           </div>
@@ -956,13 +956,13 @@ export default async function LearningCourseAssessmentPage(props: {
 
                       <div className="space-y-3 text-sm text-slate-600">
                         {submission.repeatedErrors ? (
-                          <div className="rounded-[20px] border border-slate-200 bg-white p-4">
+                          <div className="rounded-xl border border-slate-200 bg-white p-4">
                             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Kesalahan Berulang</div>
                             <p className="mt-2 leading-6">{submission.repeatedErrors}</p>
                           </div>
                         ) : null}
                         {submission.followUp ? (
-                          <div className="rounded-[20px] border border-slate-200 bg-white p-4">
+                          <div className="rounded-xl border border-slate-200 bg-white p-4">
                             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Tindak Lanjut</div>
                             <p className="mt-2 leading-6">{submission.followUp}</p>
                           </div>

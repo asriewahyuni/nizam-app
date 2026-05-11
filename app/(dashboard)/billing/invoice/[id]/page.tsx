@@ -99,18 +99,18 @@ export default function InvoicePrintPage() {
             <button onClick={() => router.back()} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 font-bold transition-all">
               <ArrowLeft size={18} /> Kembali
             </button>
-            <button onClick={handlePrint} className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all">
+            <button onClick={handlePrint} className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-2xl font-semibold text-xs uppercase tracking-tight shadow-xl hover:bg-slate-800 transition-all">
               <Printer size={16} /> Print / PDF
             </button>
           </div>
 
-          <article id="invoice-card" className="bg-white rounded-[32px] border border-slate-200 shadow-md overflow-hidden print:rounded-none print:border-none print:shadow-none print:text-[11px]">
+          <article id="invoice-card" className="bg-white rounded-xl border border-slate-200 shadow-md overflow-hidden print:rounded-none print:border-none print:shadow-none print:text-[11px]">
             <header className="px-10 py-8 border-b-2 border-slate-900">
               <div className="flex items-start justify-between gap-8">
                 <div className="flex items-start gap-4">
                   <img src={companyProfile.logo} alt="Logo Perusahaan" className="w-14 h-14 object-contain" />
                   <div className="space-y-1.5">
-                    <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">{companyProfile.name}</h1>
+                    <h1 className="text-2xl font-semibold text-slate-900 uppercase tracking-tight">{companyProfile.name}</h1>
                     <p className="text-xs font-semibold text-slate-600 flex items-center gap-2">
                       <MapPin size={12} className="text-slate-400" /> {companyProfile.address}
                     </p>
@@ -123,7 +123,7 @@ export default function InvoicePrintPage() {
                 </div>
 
                 <div className="text-right">
-                  <h2 className="text-4xl font-black text-slate-900 tracking-tight">INVOICE</h2>
+                  <h2 className="text-4xl font-semibold text-slate-900 tracking-tight">INVOICE</h2>
                   <p className="text-sm font-black text-slate-700 mt-2">{invoice.invoice_number}</p>
                   <p className="text-xs font-semibold text-slate-500 mt-1">
                     Tanggal: {new Date(invoice.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -134,13 +134,13 @@ export default function InvoicePrintPage() {
 
             <section className="px-10 py-6 border-b border-slate-200 grid grid-cols-2 gap-10">
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Tagihan Untuk</p>
-                <p className="text-lg font-black text-slate-900">{invoice.organization?.name || '-'}</p>
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight mb-2">Tagihan Untuk</p>
+                <p className="text-lg font-semibold text-slate-900">{invoice.organization?.name || '-'}</p>
                 <p className="text-xs text-slate-500 mt-1">Organisasi terdaftar pada platform</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Status</p>
-                <span className={`inline-flex px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${invoice.status === 'PAID' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight mb-2">Status</p>
+                <span className={`inline-flex px-3 py-1 rounded-full text-[10px] font-semibold tracking-tight border ${invoice.status === 'PAID' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
                   {invoice.status === 'PAID' ? 'Lunas' : 'Menunggu Pembayaran'}
                 </span>
                 <p className="text-xs font-semibold text-slate-500 mt-2">
@@ -153,9 +153,9 @@ export default function InvoicePrintPage() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-slate-300">
-                    <th className="py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Deskripsi</th>
-                    <th className="py-3 text-right text-[10px] font-black text-slate-500 uppercase tracking-widest w-24">Qty</th>
-                    <th className="py-3 text-right text-[10px] font-black text-slate-500 uppercase tracking-widest w-56">Total</th>
+                    <th className="py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-tight">Deskripsi</th>
+                    <th className="py-3 text-right text-[10px] font-semibold text-slate-500 uppercase tracking-tight w-24">Qty</th>
+                    <th className="py-3 text-right text-[10px] font-semibold text-slate-500 uppercase tracking-tight w-56">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -180,17 +180,17 @@ export default function InvoicePrintPage() {
 
             <section className="px-10 py-6 bg-slate-50 border-t border-slate-200 grid grid-cols-[1.2fr_0.8fr] gap-8">
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight flex items-center gap-2 mb-3">
                   <CreditCard size={12} /> Pembayaran Transfer
                 </p>
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-1">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{bank.bank || '-'}</p>
-                  <p className="text-xl font-black text-slate-900 font-mono">{bank.account || '-'}</p>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">{bank.bank || '-'}</p>
+                  <p className="text-xl font-semibold text-slate-900 font-mono">{bank.account || '-'}</p>
                   <p className="text-xs font-semibold text-slate-500">a.n {bank.name || companyProfile.name}</p>
                 </div>
                 {invoiceNote && (
                   <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Catatan</p>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Catatan</p>
                     <p className="mt-2 whitespace-pre-line text-xs font-semibold leading-relaxed text-slate-600">{invoiceNote}</p>
                   </div>
                 )}
@@ -206,8 +206,8 @@ export default function InvoicePrintPage() {
                   <span>{formatRupiah(0)}</span>
                 </div>
                 <div className="border-t border-slate-300 pt-2 flex items-center justify-between">
-                  <span className="text-sm font-black text-slate-900 uppercase tracking-wider">Grand Total</span>
-                  <span className="text-xl font-black text-slate-900">{formatRupiah(invoice.amount)}</span>
+                  <span className="text-sm font-semibold text-slate-900 uppercase tracking-tight">Grand Total</span>
+                  <span className="text-xl font-semibold text-slate-900">{formatRupiah(invoice.amount)}</span>
                 </div>
               </div>
             </section>

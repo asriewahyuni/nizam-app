@@ -169,7 +169,7 @@ export function SetupClient({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <h1 className="text-2xl font-black text-slate-900 mt-4">Setup {mod.name}</h1>
+            <h1 className="text-2xl font-semibold text-slate-900 mt-4">Setup {mod.name}</h1>
             <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">{mod.description}</p>
           </motion.div>
         </div>
@@ -263,7 +263,7 @@ export function SetupClient({
                     <BookOpen className="w-6 h-6" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-black text-slate-900">Instal Chart of Accounts</h2>
+                    <h2 className="text-lg font-semibold text-slate-900">Instal Chart of Accounts</h2>
                     <p className="text-sm text-slate-500">
                       {mod.onboardingSteps.find((s) => s.id === 'coa')?.description ?? `Siapkan akun akuntansi untuk ${mod.name}`}
                     </p>
@@ -312,7 +312,7 @@ export function SetupClient({
                     <Settings className="w-6 h-6" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-black text-slate-900">Pengaturan Awal</h2>
+                    <h2 className="text-lg font-semibold text-slate-900">Pengaturan Awal</h2>
                     <p className="text-sm text-slate-500">Konfigurasi dasar untuk modul {mod.name}</p>
                   </div>
                 </div>
@@ -382,7 +382,7 @@ export function SetupClient({
                 </motion.div>
 
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900">Setup Selesai! 🎉</h2>
+                  <h2 className="text-2xl font-semibold text-slate-900">Setup Selesai! 🎉</h2>
                   <p className="text-sm text-slate-500 mt-2">
                     Modul <strong>{mod.name}</strong> sudah aktif dan siap digunakan.
                   </p>

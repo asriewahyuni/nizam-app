@@ -279,13 +279,13 @@ export default function ContactClient({
       {(error || success) && (
         <div className="space-y-3">
           {error && (
-            <div className="flex items-start gap-3 rounded-[28px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-700 shadow-sm">
+            <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-700 shadow-sm">
               <AlertCircle size={18} className="mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
           {success && (
-            <div className="flex items-start gap-3 rounded-[28px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-700 shadow-sm">
+            <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-700 shadow-sm">
               <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
               <span>{success}</span>
             </div>
@@ -301,16 +301,16 @@ export default function ContactClient({
       </div>
 
       {customerPareto && activeType !== 'SUPPLIER' && (
-        <div className="bg-indigo-900 rounded-[48px] p-10 text-white relative overflow-hidden shadow-2xl shadow-indigo-900/20">
+        <div className="bg-indigo-900 rounded-2xl p-10 text-white relative overflow-hidden shadow-2xl shadow-indigo-900/20">
           <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12">
             <Trophy size={180} />
           </div>
           <div className="relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-12">
             <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500 text-amber-950 rounded-full text-[9px] font-black uppercase tracking-widest">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500 text-amber-950 rounded-full text-[9px] font-semibold tracking-tight">
                 <Target size={12} /> Pareto Intelligence
               </div>
-              <h2 className="text-3xl font-black italic tracking-tighter leading-tight">Analisis 80/20 Pelanggan VIP</h2>
+              <h2 className="text-3xl font-semibold italic tracking-tighter leading-tight">Analisis 80/20 Pelanggan VIP</h2>
               <p className="text-sm font-medium text-indigo-200 leading-relaxed">
                 Sistem mendeteksi bahwa <span className="text-white font-bold">{customerPareto.top20Count} pelanggan</span> Anda berkontribusi terhadap <span className="text-amber-400 font-bold">80% dari total pendapatan</span> ({formatRupiah(customerPareto.top20Revenue)}).
               </p>
@@ -318,14 +318,14 @@ export default function ContactClient({
 
             <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
               {customerPareto.paretoCustomers?.slice(0, 4).map((contact: any, index: number) => (
-                <div key={`${contact.id || contact.name}-${index}`} className="bg-white/10 backdrop-blur-md border border-white/10 p-5 rounded-[32px] flex items-center justify-between group hover:bg-white/20 transition-all">
+                <div key={`${contact.id || contact.name}-${index}`} className="bg-white/10 backdrop-blur-md border border-white/10 p-5 rounded-xl flex items-center justify-between group hover:bg-white/20 transition-all">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-2xl bg-amber-400 text-amber-950 flex items-center justify-center font-black">#{index + 1}</div>
                     <div>
                       <div className="text-sm font-bold text-white">{contact.name}</div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">{formatRupiah(contact.revenue)}</span>
-                        <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest leading-none">/ {formatRupiah(contact.profit || 0)} PROFIT</span>
+                        <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-tight">{formatRupiah(contact.revenue)}</span>
+                        <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-tight leading-none">/ {formatRupiah(contact.profit || 0)} PROFIT</span>
                       </div>
                     </div>
                   </div>
@@ -349,7 +349,7 @@ export default function ContactClient({
                     key={button.key}
                     type="button"
                     onClick={() => setActiveType(button.key)}
-                    className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${
+                    className={`px-4 py-2 text-[10px] font-semibold tracking-tight rounded-xl transition-all ${
                       activeType === button.key ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
                     }`}
                   >
@@ -371,7 +371,7 @@ export default function ContactClient({
           }
         />
 
-        <div className="px-10 pt-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+        <div className="px-10 pt-6 text-[11px] font-bold text-slate-400 tracking-tight">
           Menampilkan {filteredContacts.length} dari {visibleBaseCount} data aktif
         </div>
 
@@ -385,7 +385,7 @@ export default function ContactClient({
                 return (
                   <div
                     key={contact.id}
-                    className={`border rounded-[32px] p-6 hover:shadow-xl transition-all group relative overflow-hidden ${
+                    className={`border rounded-xl p-6 hover:shadow-xl transition-all group relative overflow-hidden ${
                       isSupplier
                         ? 'bg-white border-emerald-100 hover:shadow-emerald-500/5'
                         : 'bg-white border-slate-100 hover:shadow-blue-500/5'
@@ -399,13 +399,13 @@ export default function ContactClient({
                           {contact.name.slice(0, 1)}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-xl font-black text-slate-800 tracking-tight truncate">{contact.name}</h3>
+                          <h3 className="text-xl font-semibold text-slate-800 tracking-tight truncate">{contact.name}</h3>
                           <div className="flex flex-wrap items-center gap-2 mt-2">
-                            <span className={`px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full border ${isSupplier ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                            <span className={`px-3 py-1 text-[9px] font-semibold tracking-tight rounded-full border ${isSupplier ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
                               {isSupplier ? 'VENDOR' : 'CUSTOMER'}
                             </span>
                             {isVip && (
-                              <span className="px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full border bg-amber-50 text-amber-600 border-amber-100 inline-flex items-center gap-1">
+                              <span className="px-3 py-1 text-[9px] font-semibold tracking-tight rounded-full border bg-amber-50 text-amber-600 border-amber-100 inline-flex items-center gap-1">
                                 <Trophy size={10} />
                                 VIP Pareto
                               </span>
@@ -488,7 +488,7 @@ export default function ContactClient({
             <form onSubmit={handleSubmit} className="space-y-4">
               {activeType === 'ALL' ? (
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipe Kontak</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Tipe Kontak</label>
                   <select
                     value={formState.type}
                     onChange={(event) => setFormState((current) => ({ ...current, type: event.target.value as ContactType }))}
@@ -501,7 +501,7 @@ export default function ContactClient({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipe Kontak</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Tipe Kontak</label>
                   <div className={`w-full h-12 px-4 border rounded-xl text-sm font-black flex items-center ${formType === 'SUPPLIER' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-blue-50 border-blue-100 text-blue-700'}`}>
                     {formType === 'SUPPLIER' ? 'VENDOR / SUPPLIER' : 'CUSTOMER / PELANGGAN'}
                   </div>
@@ -509,7 +509,7 @@ export default function ContactClient({
               )}
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama Lengkap / Perusahaan</label>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Nama Lengkap / Perusahaan</label>
                 <input
                   value={formState.name}
                   onChange={(event) => setFormState((current) => ({ ...current, name: event.target.value }))}
@@ -521,7 +521,7 @@ export default function ContactClient({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nomor HP</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Nomor HP</label>
                   <input
                     value={formState.phone}
                     onChange={(event) => setFormState((current) => ({ ...current, phone: event.target.value }))}
@@ -530,7 +530,7 @@ export default function ContactClient({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">WhatsApp</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">WhatsApp</label>
                   <input
                     value={formState.phone_wa}
                     onChange={(event) => setFormState((current) => ({ ...current, phone_wa: event.target.value }))}
@@ -542,7 +542,7 @@ export default function ContactClient({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Email</label>
                   <input
                     value={formState.email}
                     onChange={(event) => setFormState((current) => ({ ...current, email: event.target.value }))}
@@ -552,7 +552,7 @@ export default function ContactClient({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Instagram</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Instagram</label>
                   <input
                     value={formState.instagram}
                     onChange={(event) => setFormState((current) => ({ ...current, instagram: event.target.value }))}
@@ -563,7 +563,7 @@ export default function ContactClient({
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alamat</label>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Alamat</label>
                 <textarea
                   value={formState.address}
                   onChange={(event) => setFormState((current) => ({ ...current, address: event.target.value }))}

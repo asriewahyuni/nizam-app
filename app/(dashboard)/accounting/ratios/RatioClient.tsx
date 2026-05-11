@@ -139,7 +139,7 @@ export default function RatioClient({ initialData }: Props) {
       {/* Header */}
       <motion.div variants={item} className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
+          <h1 className="text-4xl font-semibold text-slate-900 tracking-tight flex items-center gap-4">
             <Activity size={40} className="text-violet-500" />
             Rasio Keuangan
           </h1>
@@ -152,10 +152,10 @@ export default function RatioClient({ initialData }: Props) {
       </motion.div>
 
       {/* Health Score */}
-      <motion.div variants={item} className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8">
+      <motion.div variants={item} className="bg-white rounded-xl border border-slate-100 shadow-sm p-8">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Skor Kesehatan</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-tight">Skor Kesehatan</p>
             <p className="text-5xl font-black text-slate-900 tracking-tight">
               {healthyCount}/{totalRatios}
             </p>
@@ -173,33 +173,33 @@ export default function RatioClient({ initialData }: Props) {
 
       {/* Summary Cards — Raw Data */}
       <motion.div variants={item} className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm space-y-2">
+        <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm space-y-2">
           <div className="flex items-center gap-2 text-slate-400">
             <DollarSign size={16} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Total Aset</span>
+            <span className="text-[10px] font-semibold tracking-tight">Total Aset</span>
           </div>
-          <p className="text-2xl font-black text-slate-900 font-mono">{formatRupiah(ratios.raw.totalAssets)}</p>
+          <p className="text-2xl font-semibold text-slate-900 font-mono">{formatRupiah(ratios.raw.totalAssets)}</p>
         </div>
-        <div className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm space-y-2">
+        <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm space-y-2">
           <div className="flex items-center gap-2 text-slate-400">
             <CreditCard size={16} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Total Hutang</span>
+            <span className="text-[10px] font-semibold tracking-tight">Total Hutang</span>
           </div>
-          <p className="text-2xl font-black text-slate-900 font-mono">{formatRupiah(ratios.raw.totalLiabilities)}</p>
+          <p className="text-2xl font-semibold text-slate-900 font-mono">{formatRupiah(ratios.raw.totalLiabilities)}</p>
         </div>
-        <div className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm space-y-2">
+        <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm space-y-2">
           <div className="flex items-center gap-2 text-slate-400">
             <Scale size={16} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Total Ekuitas</span>
+            <span className="text-[10px] font-semibold tracking-tight">Total Ekuitas</span>
           </div>
-          <p className="text-2xl font-black text-slate-900 font-mono">{formatRupiah(ratios.raw.totalEquity)}</p>
+          <p className="text-2xl font-semibold text-slate-900 font-mono">{formatRupiah(ratios.raw.totalEquity)}</p>
         </div>
-        <div className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm space-y-2">
+        <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm space-y-2">
           <div className="flex items-center gap-2 text-slate-400">
             <TrendingUp size={16} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Laba Bersih</span>
+            <span className="text-[10px] font-semibold tracking-tight">Laba Bersih</span>
           </div>
-          <p className={`text-2xl font-black font-mono ${ratios.raw.netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+          <p className={`text-2xl font-semibold font-mono ${ratios.raw.netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             {formatRupiah(ratios.raw.netProfit)}
           </p>
         </div>
@@ -235,12 +235,12 @@ export default function RatioClient({ initialData }: Props) {
           return (
             <div
               key={idx}
-              className="bg-white rounded-[24px] border border-slate-100 shadow-sm p-6 space-y-4 hover:shadow-md transition-all"
+              className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 space-y-4 hover:shadow-md transition-all"
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">{ratio.label}</h4>
-                  <p className="text-3xl font-black text-slate-900 font-mono tracking-tight mt-1">
+                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-tight">{ratio.label}</h4>
+                  <p className="text-3xl font-semibold text-slate-900 font-mono tracking-tight mt-1">
                     {ratio.value}{unit}
                   </p>
                 </div>
@@ -262,10 +262,10 @@ export default function RatioClient({ initialData }: Props) {
       </motion.div>
 
       {/* Bar Chart Summary */}
-      <motion.div variants={item} className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 space-y-6">
+      <motion.div variants={item} className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 space-y-6">
         <div className="flex items-center gap-3">
           <BarChart3 size={20} className="text-violet-500" />
-          <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Ringkasan Rasio</h3>
+          <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-tight">Ringkasan Rasio</h3>
         </div>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
@@ -302,10 +302,10 @@ export default function RatioClient({ initialData }: Props) {
       </motion.div>
 
       {/* Interpretation */}
-      <motion.div variants={item} className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-[32px] border border-violet-100 p-8 space-y-4">
+      <motion.div variants={item} className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-xl border border-violet-100 p-8 space-y-4">
         <div className="flex items-center gap-3">
           <Eye size={20} className="text-violet-600" />
-          <h3 className="text-sm font-black text-violet-900 uppercase tracking-widest">Interpretasi</h3>
+          <h3 className="text-sm font-semibold text-violet-900 uppercase tracking-tight">Interpretasi</h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm font-medium text-slate-600 leading-relaxed">
           <div className="space-y-3">

@@ -674,7 +674,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
                         <p className="text-xs text-slate-500">{isAbdan(contractType) ? 'Pengelola' : member.role}</p>
                       </div>
                     </div>
-                    <span className="text-2xl font-black text-blue-600">{member.profit_share_percentage}%</span>
+                    <span className="text-2xl font-semibold text-blue-600">{member.profit_share_percentage}%</span>
                   </div>
                   <input
                     type="range"
@@ -837,7 +837,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
         {/* ── STEP 9: Tanda Tangan (was 8) ── */}
         {step === 9 && (
           <StepCard title="Tanda Tangan Digital" desc="Masing-masing pihak dan saksi melakukan tanda tangan digital dengan scan QR Code." icon={QrCode}>
-            <h3 className="font-black text-slate-700 text-sm uppercase tracking-wider">Para Pihak Bersyirkah</h3>
+            <h3 className="font-semibold text-slate-700 text-sm uppercase tracking-tight">Para Pihak Bersyirkah</h3>
             <div className="space-y-4">
               {members.filter(m => m.member_name && m.sign_token).map((member, index) => {
                 const signUrl = `${origin}/syirkah-sign/${member.sign_token}`
@@ -941,7 +941,7 @@ function StepCard({ title, desc, icon: Icon, children }: {
           <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center shadow-md">
             <Icon size={20} className="text-white" />
           </div>
-          <h2 className="text-2xl font-black text-slate-900">{title}</h2>
+          <h2 className="text-2xl font-semibold text-slate-900">{title}</h2>
         </div>
         <p className="text-sm text-slate-500 ml-[52px]">{desc}</p>
       </div>
@@ -955,7 +955,7 @@ function Field({ label, children, required, hint }: {
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-black text-slate-600 uppercase tracking-wider">
+      <label className="text-xs font-semibold text-slate-600 uppercase tracking-tight">
         {label} {required && <span className="text-rose-500">*</span>}
       </label>
       {hint && <p className="text-xs text-slate-400 -mt-0.5 mb-1">{hint}</p>}

@@ -811,7 +811,7 @@ export default function ThemeHomepageEditor({
 
       <div className="space-y-6 px-10 py-8">
         {localMessage && (
-          <div className={`rounded-[22px] border px-5 py-4 text-sm font-bold ${
+          <div className={`rounded-xl border px-5 py-4 text-sm font-bold ${
             localMessage.tone === 'success'
               ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
               : localMessage.tone === 'error'
@@ -824,14 +824,14 @@ export default function ThemeHomepageEditor({
 
         <div className="grid gap-4 xl:grid-cols-[0.78fr_0.92fr_1.3fr]">
           <div className="space-y-5">
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Versi Theme</div>
               <div className="mt-3 space-y-3">
                 <input
                   value={versionName}
                   onChange={(event) => setVersionName(event.target.value)}
                   placeholder="Nama draft theme"
-                  className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
                 />
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge label={`Draft: ${storeThemeDraft?.versionName || 'Belum ada'}`} variant="info" />
@@ -849,7 +849,7 @@ export default function ThemeHomepageEditor({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Halaman Yang Sedang Diedit</div>
               <div className="mt-4 grid gap-3">
                 {THEME_EDITOR_PAGES.map((page) => (
@@ -863,7 +863,7 @@ export default function ThemeHomepageEditor({
                         [page.key]: current[page.key] || themeLayout[page.key][0]?.id || '',
                       }))
                     }}
-                    className={`rounded-[22px] border px-4 py-4 text-left transition ${
+                    className={`rounded-xl border px-4 py-4 text-left transition ${
                       activePage === page.key
                         ? 'border-blue-300 bg-blue-50'
                         : 'border-slate-200 bg-white hover:border-slate-300'
@@ -891,21 +891,21 @@ export default function ThemeHomepageEditor({
                 appendStoreContext(formData)
                 void runAction(uploadStoreThemeAssetAction, formData, 'Asset theme berhasil diunggah.')
               }}
-              className="rounded-[28px] border border-slate-200 bg-slate-50 p-5"
+              className="rounded-xl border border-slate-200 bg-slate-50 p-5"
             >
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Upload Asset Theme</div>
               <div className="mt-4 space-y-3">
                 <input
                   name="label"
                   placeholder="Label asset, misalnya Hero Banner"
-                  className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
                 />
                 <input
                   name="file"
                   type="file"
                   accept="image/*"
                   required
-                  className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm font-medium outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium outline-none focus:border-blue-500"
                 />
                 <SafeButton type="submit" isLoading={isPending} icon={<ImagePlus size={16} />}>
                   Upload Asset
@@ -922,14 +922,14 @@ export default function ThemeHomepageEditor({
                 appendStoreContext(formData)
                 void runAction(resetStoreThemeDraftAction, formData, 'Draft theme berhasil diganti dari starter template.')
               }}
-              className="rounded-[28px] border border-slate-200 bg-slate-50 p-5"
+              className="rounded-xl border border-slate-200 bg-slate-50 p-5"
             >
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Starter Template</div>
               <div className="mt-4 space-y-3">
                 <select
                   value={templateKey}
                   onChange={(event) => setTemplateKey(event.target.value)}
-                  className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
                 >
                   {dashboardData.templates.map((template) => (
                     <option key={template.key} value={template.key}>
@@ -943,7 +943,7 @@ export default function ThemeHomepageEditor({
               </div>
             </form>
 
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Blok {activePageMeta.label}</div>
                 <div className="text-xs font-black text-slate-500">{pageBlocks.length} blok</div>
@@ -955,7 +955,7 @@ export default function ThemeHomepageEditor({
                     ...current,
                     [activePage]: event.target.value as StoreThemeBlockType,
                   }))}
-                  className="rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
                 >
                   {STORE_THEME_BLOCK_SCHEMA_LIST.filter((schema) => schema.allowedPages.includes(activePage)).map((schema) => (
                     <option key={schema.type} value={schema.type}>
@@ -969,7 +969,7 @@ export default function ThemeHomepageEditor({
               </div>
               <div className="mt-4 space-y-3">
                 {pageBlocks.length === 0 && (
-                  <div className="rounded-[20px] border border-dashed border-slate-200 bg-white px-4 py-5 text-sm font-medium text-slate-500">
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm font-medium text-slate-500">
                     Belum ada blok untuk halaman {activePageMeta.label.toLowerCase()}. Tambahkan blok pertama dari daftar di atas.
                   </div>
                 )}
@@ -978,7 +978,7 @@ export default function ThemeHomepageEditor({
                     key={block.id}
                     type="button"
                     onClick={() => setSelectedBlockByPage((current) => ({ ...current, [activePage]: block.id }))}
-                    className={`w-full rounded-[22px] border px-4 py-4 text-left transition ${
+                    className={`w-full rounded-xl border px-4 py-4 text-left transition ${
                       block.id === activeBlock?.id
                         ? 'border-blue-300 bg-blue-50'
                         : 'border-slate-200 bg-white hover:border-slate-300'
@@ -1006,18 +1006,18 @@ export default function ThemeHomepageEditor({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Pustaka Asset</div>
               <div className="mt-4 space-y-3">
                 {selectedThemeAssets.length === 0 && (
-                  <div className="rounded-[20px] border border-dashed border-slate-200 bg-white px-4 py-5 text-sm font-medium text-slate-500">
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm font-medium text-slate-500">
                     Belum ada asset theme untuk store ini.
                   </div>
                 )}
                 {selectedThemeAssets.slice(0, 8).map((asset) => (
-                  <div key={asset.id} className="rounded-[22px] border border-slate-200 bg-white p-4">
+                  <div key={asset.id} className="rounded-xl border border-slate-200 bg-white p-4">
                     <div
-                      className="h-24 rounded-[18px] bg-cover bg-center"
+                      className="h-24 rounded-lg bg-cover bg-center"
                       style={{
                         backgroundImage: asset.publicUrl ? `url(${asset.publicUrl})` : undefined,
                         backgroundColor: '#E2E8F0',
@@ -1063,13 +1063,13 @@ export default function ThemeHomepageEditor({
           </div>
 
           <div className="space-y-5">
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Token Theme</div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 {TOKEN_COLOR_FIELDS.map((field) => (
                   <div key={field.key} className="space-y-2">
                     <EditorLabel>{field.label}</EditorLabel>
-                    <div className="flex items-center gap-3 rounded-[20px] border border-slate-200 bg-white px-3 py-3">
+                    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3">
                       <input
                         type="color"
                         value={themeTokens[field.key]}
@@ -1089,13 +1089,13 @@ export default function ThemeHomepageEditor({
                   <select
                     value={themeTokens.fontLabel}
                     onChange={(event) => setThemeTokens((current) => ({ ...current, fontLabel: event.target.value as StoreThemeTokens['fontLabel'] }))}
-                    className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
                   >
                     {Object.keys(STORE_THEME_FONT_MAP).map((label) => (
                       <option key={label} value={label}>{label}</option>
                     ))}
                   </select>
-                  <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600" style={{ fontFamily: STORE_THEME_FONT_MAP[themeTokens.fontLabel] }}>
+                  <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600" style={{ fontFamily: STORE_THEME_FONT_MAP[themeTokens.fontLabel] }}>
                     Contoh huruf untuk brand store Anda.
                   </div>
                 </div>
@@ -1104,7 +1104,7 @@ export default function ThemeHomepageEditor({
                   <select
                     value={themeTokens.cardRadius}
                     onChange={(event) => setThemeTokens((current) => ({ ...current, cardRadius: event.target.value as StoreThemeTokens['cardRadius'] }))}
-                    className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
                   >
                     <option value="soft">Soft</option>
                     <option value="rounded">Rounded</option>
@@ -1116,7 +1116,7 @@ export default function ThemeHomepageEditor({
                   <select
                     value={themeTokens.buttonRadius}
                     onChange={(event) => setThemeTokens((current) => ({ ...current, buttonRadius: event.target.value as StoreThemeTokens['buttonRadius'] }))}
-                    className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
                   >
                     <option value="soft">Soft</option>
                     <option value="rounded">Rounded</option>
@@ -1128,7 +1128,7 @@ export default function ThemeHomepageEditor({
                   <select
                     value={themeTokens.density}
                     onChange={(event) => setThemeTokens((current) => ({ ...current, density: event.target.value as StoreThemeTokens['density'] }))}
-                    className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
                   >
                     <option value="compact">Compact</option>
                     <option value="comfortable">Comfortable</option>
@@ -1139,7 +1139,7 @@ export default function ThemeHomepageEditor({
                   <select
                     value={themeTokens.shadow}
                     onChange={(event) => setThemeTokens((current) => ({ ...current, shadow: event.target.value as StoreThemeTokens['shadow'] }))}
-                    className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
                   >
                     <option value="soft">Soft</option>
                     <option value="medium">Medium</option>
@@ -1149,7 +1149,7 @@ export default function ThemeHomepageEditor({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Branding Checkout</div>
               <div className="mt-4 space-y-3">
                 <div className="space-y-2">
@@ -1157,7 +1157,7 @@ export default function ThemeHomepageEditor({
                   <input
                     value={themeLayout.checkout.bannerTitle}
                     onChange={(event) => updateCheckoutBranding({ bannerTitle: event.target.value })}
-                    className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1166,7 +1166,7 @@ export default function ThemeHomepageEditor({
                     value={themeLayout.checkout.bannerBody}
                     onChange={(event) => updateCheckoutBranding({ bannerBody: event.target.value })}
                     rows={4}
-                    className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1174,14 +1174,14 @@ export default function ThemeHomepageEditor({
                   <input
                     value={themeLayout.checkout.supportLabel}
                     onChange={(event) => updateCheckoutBranding({ supportLabel: event.target.value })}
-                    className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
             </div>
 
             {advancedMode ? (
-              <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Mode Lanjutan</div>
@@ -1198,21 +1198,21 @@ export default function ThemeHomepageEditor({
                     value={tokensJson}
                     onChange={(event) => setTokensJson(event.target.value)}
                     rows={10}
-                    className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none focus:border-blue-500"
                   />
                   <textarea
                     value={layoutJson}
                     onChange={(event) => setLayoutJson(event.target.value)}
                     rows={14}
-                    className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none focus:border-blue-500"
                   />
                   <textarea
                     value={checkoutJson}
                     onChange={(event) => setCheckoutJson(event.target.value)}
                     rows={6}
-                    className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm outline-none focus:border-blue-500"
                   />
-                  <div className={`rounded-[18px] border px-4 py-3 text-xs font-bold ${
+                  <div className={`rounded-lg border px-4 py-3 text-xs font-bold ${
                     advancedResult.error
                       ? 'border-rose-200 bg-rose-50 text-rose-700'
                       : 'border-emerald-200 bg-emerald-50 text-emerald-700'
@@ -1222,7 +1222,7 @@ export default function ThemeHomepageEditor({
                 </div>
               </div>
             ) : (
-              <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Editor Blok Aktif</div>
@@ -1236,14 +1236,14 @@ export default function ThemeHomepageEditor({
                 </div>
 
                 {!activeBlock && (
-                  <div className="mt-4 rounded-[20px] border border-dashed border-slate-200 bg-white px-4 py-5 text-sm font-medium text-slate-500">
+                  <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm font-medium text-slate-500">
                     Pilih atau tambahkan blok untuk halaman {activePageMeta.label.toLowerCase()} dulu.
                   </div>
                 )}
 
                 {activeBlock && blockSchema && (
                   <div className="mt-4 space-y-5">
-                    <div className="rounded-[22px] border border-slate-200 bg-white p-4">
+                    <div className="rounded-xl border border-slate-200 bg-white p-4">
                       <div className="flex flex-wrap gap-2">
                         <SafeButton
                           size="sm"
@@ -1294,7 +1294,7 @@ export default function ThemeHomepageEditor({
                               <select
                                 value={activeBlock.featuredProductId || ''}
                                 onChange={(event) => updateBlockField(activeBlock.id, field, event.target.value)}
-                                className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
                               >
                                 <option value="">Pilih produk unggulan</option>
                                 {previewProducts.map((product) => (
@@ -1304,7 +1304,7 @@ export default function ThemeHomepageEditor({
                                 ))}
                               </select>
                               {activeBlock.featuredProductId && previewProductById.get(activeBlock.featuredProductId) && (
-                                <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600">
+                                <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600">
                                   Produk terpilih: <span className="font-black text-slate-900">{previewProductById.get(activeBlock.featuredProductId)?.name}</span>
                                 </div>
                               )}
@@ -1321,7 +1321,7 @@ export default function ThemeHomepageEditor({
                                 onChange={(event) => updateBlockField(activeBlock.id, field, event.target.value)}
                                 rows={4}
                                 placeholder={meta.placeholder}
-                                className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
                               />
                             </div>
                           )
@@ -1337,7 +1337,7 @@ export default function ThemeHomepageEditor({
                               value={currentValue}
                               onChange={(event) => updateBlockField(activeBlock.id, field, event.target.value)}
                               placeholder={meta.placeholder}
-                              className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
                             />
                           </div>
                         )
@@ -1345,7 +1345,7 @@ export default function ThemeHomepageEditor({
                     </div>
 
                     {blockSchema.supportsItems && (
-                      <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+                      <div className="rounded-xl border border-slate-200 bg-white p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
@@ -1361,12 +1361,12 @@ export default function ThemeHomepageEditor({
                         </div>
                         <div className="mt-4 space-y-4">
                           {(activeBlock.items || []).length === 0 && (
-                            <div className="rounded-[18px] border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm font-medium text-slate-500">
+                            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm font-medium text-slate-500">
                               Belum ada item di blok ini.
                             </div>
                           )}
                           {(activeBlock.items || []).map((item, itemIndex) => (
-                            <div key={`${activeBlock.id}-item-${itemIndex}`} className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                            <div key={`${activeBlock.id}-item-${itemIndex}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                               <div className="flex flex-wrap gap-2">
                                 <SafeButton size="sm" variant="white" icon={<ArrowUp size={14} />} onClick={() => moveBlockItem(activeBlock.id, itemIndex, -1)}>
                                   Naik
@@ -1383,32 +1383,32 @@ export default function ThemeHomepageEditor({
                                   value={item.label || ''}
                                   onChange={(event) => updateBlockItem(activeBlock.id, itemIndex, 'label', event.target.value)}
                                   placeholder="Label kecil item"
-                                  className="rounded-[18px] border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
+                                  className="rounded-lg border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
                                 />
                                 <input
                                   value={item.title}
                                   onChange={(event) => updateBlockItem(activeBlock.id, itemIndex, 'title', event.target.value)}
                                   placeholder="Judul item"
-                                  className="rounded-[18px] border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
+                                  className="rounded-lg border border-slate-200 bg-white px-4 py-3 font-bold outline-none focus:border-blue-500"
                                 />
                                 <textarea
                                   value={item.body || ''}
                                   onChange={(event) => updateBlockItem(activeBlock.id, itemIndex, 'body', event.target.value)}
                                   rows={3}
                                   placeholder="Isi item"
-                                  className="rounded-[18px] border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
+                                  className="rounded-lg border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
                                 />
                                 <input
                                   value={item.href || ''}
                                   onChange={(event) => updateBlockItem(activeBlock.id, itemIndex, 'href', event.target.value)}
                                   placeholder="Link item, jika perlu"
-                                  className="rounded-[18px] border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
+                                  className="rounded-lg border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
                                 />
                                 <input
                                   value={item.imageUrl || ''}
                                   onChange={(event) => updateBlockItem(activeBlock.id, itemIndex, 'imageUrl', event.target.value)}
                                   placeholder="URL gambar item, jika perlu"
-                                  className="rounded-[18px] border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
+                                  className="rounded-lg border border-slate-200 bg-white px-4 py-3 font-medium outline-none focus:border-blue-500"
                                 />
                               </div>
                             </div>
@@ -1423,7 +1423,7 @@ export default function ThemeHomepageEditor({
           </div>
 
           <div className="space-y-5">
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Live Preview</div>
@@ -1451,7 +1451,7 @@ export default function ThemeHomepageEditor({
                 </div>
               </div>
             </div>
-            <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white">
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
               <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
                 {activePageMeta.previewLabel}
               </div>

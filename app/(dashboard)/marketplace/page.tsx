@@ -67,14 +67,14 @@ export default async function MarketplacePage() {
     <div className="space-y-10">
 
       {/* ── Hero ── */}
-      <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-8 text-white shadow-2xl">
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-8 text-white shadow-2xl">
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl opacity-10 -mr-32 -mt-32" />
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500 rounded-full blur-3xl opacity-10 -ml-20 -mb-20" />
         <div className="relative">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest mb-4">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3 py-1.5 text-[10px] font-semibold tracking-tight mb-4">
             <Sparkles className="h-3 w-3" /> Model Hub
           </div>
-          <h1 className="text-3xl font-black tracking-tight">Pilih Operasional Bisnis Anda</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Pilih Operasional Bisnis Anda</h1>
           <p className="mt-2 text-slate-300 text-sm font-medium max-w-xl">
             Modul inti sudah aktif. Pilih modul operasional untuk mendefinisikan model bisnis Anda.
           </p>
@@ -246,7 +246,7 @@ function CoreModuleCard({ mod, enabled }: { mod: ModuleDefinition; enabled: bool
 
       {enabled ? (
         <div className="flex-shrink-0 flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
+          <span className="inline-flex items-center gap-1 text-[9px] font-semibold tracking-tight text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
             <CheckCircle2 className="h-2.5 w-2.5" /> Aktif
           </span>
           {!isMinimum && <DeactivateModuleButton moduleKey={mod.key} moduleName={mod.name} />}
@@ -337,7 +337,7 @@ function OperationalModuleCard({
       {/* ── Harga (jika sudah diset di SaaS) ── */}
       {price !== undefined && !isReady && !isPending && (
         <div className="mt-4 pt-4 border-t border-slate-100 flex items-baseline gap-1.5">
-          <span className="text-lg font-black text-slate-900">{formatRp(price)}</span>
+          <span className="text-lg font-semibold text-slate-900">{formatRp(price)}</span>
           <span className="text-xs text-slate-400 font-medium">/ bulan</span>
         </div>
       )}
@@ -445,7 +445,7 @@ function StatusPill({
     emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   }
   return (
-    <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest border px-2 py-1 rounded-full ${colors[color]}`}>
+    <span className={`inline-flex items-center gap-1 text-[9px] font-semibold tracking-tight border px-2 py-1 rounded-full ${colors[color]}`}>
       {icon} {label}
     </span>
   )

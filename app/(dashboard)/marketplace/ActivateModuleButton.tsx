@@ -181,7 +181,7 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-1.5">
                   <Tag className="h-3 w-3 text-purple-500" />
-                  <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Voucher</span>
+                  <span className="text-[10px] font-bold text-purple-600 tracking-tight">Voucher</span>
                 </div>
                 <div className="flex gap-2">
                   <input

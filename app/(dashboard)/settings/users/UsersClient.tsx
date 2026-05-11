@@ -308,10 +308,10 @@ export default function UsersClient({
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">User ID & Info</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Peran (Role)</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest">Akses Unit</th>
-                  <th className="px-6 py-4 text-right text-xs font-bold text-slate-400 uppercase tracking-widest">Aksi</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 tracking-tight">User ID & Info</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 tracking-tight">Peran (Role)</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 tracking-tight">Akses Unit</th>
+                  <th className="px-6 py-4 text-right text-xs font-bold text-slate-400 tracking-tight">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -332,13 +332,13 @@ export default function UsersClient({
                       {member.custom_role?.name ? (
                         <div className="flex flex-col gap-1">
                           <span className="text-xs font-bold text-slate-900">{member.custom_role.name}</span>
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                          <span className="text-[10px] font-semibold tracking-tight text-slate-400">
                             base: {member.role}
                           </span>
                         </div>
                       ) : (
                       <span
-                        className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full border ${
+                        className={`px-2.5 py-1 text-[10px] font-semibold tracking-tight rounded-full border ${
                           member.role === 'owner'
                             ? 'bg-blue-50 text-blue-600 border-blue-100'
                             : member.role === 'hr'
@@ -362,7 +362,7 @@ export default function UsersClient({
                             return (
                               <span
                                 key={branchId}
-                                className="px-2.5 py-1 rounded-full bg-slate-100 text-[10px] font-bold uppercase tracking-widest text-slate-600"
+                                className="px-2.5 py-1 rounded-full bg-slate-100 text-[10px] font-semibold tracking-tight text-slate-600"
                               >
                                 {branch?.code || branch?.name || 'Unit'}
                               </span>
@@ -466,7 +466,7 @@ export default function UsersClient({
             className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
             onClick={() => setMemberUnitsModal(null)}
           />
-          <div className="relative w-full max-w-xl rounded-[32px] border border-slate-100 bg-white p-6 shadow-2xl">
+          <div className="relative w-full max-w-xl rounded-xl border border-slate-100 bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-xl font-bold text-slate-900">Atur Akses Unit</h3>
@@ -499,7 +499,7 @@ export default function UsersClient({
                     />
                     <div className="min-w-0">
                       <div className="text-sm font-bold text-slate-900">{branch.name}</div>
-                      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{branch.code}</div>
+                      <div className="text-[10px] font-semibold tracking-tight text-slate-400">{branch.code}</div>
                     </div>
                   </label>
                 )

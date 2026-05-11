@@ -747,7 +747,7 @@ export default function InventoryClient({
       />
 
       {physicalStockGuardMessage && (
-        <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-800 shadow-sm">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-800 shadow-sm">
           {physicalStockGuardMessage}
         </div>
       )}
@@ -827,7 +827,7 @@ export default function InventoryClient({
                 key={option.value}
                 type="button"
                 onClick={() => setActiveCategoryFilter(option.value)}
-                className={`h-full rounded-[28px] border px-5 py-4 text-left transition-all ${
+                className={`h-full rounded-xl border px-5 py-4 text-left transition-all ${
                   isActive
                     ? 'border-blue-200 bg-blue-50 shadow-md shadow-blue-100 ring-1 ring-blue-100'
                     : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
@@ -862,17 +862,17 @@ export default function InventoryClient({
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Produk Tampil</div>
-            <div className="mt-2 text-2xl font-black text-slate-900">{filteredStats.totalSku}</div>
+            <div className="mt-2 text-2xl font-semibold text-slate-900">{filteredStats.totalSku}</div>
             <div className="text-[11px] font-bold text-slate-500">Daftar yang sedang Anda telusuri</div>
           </div>
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-4">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-600">Nilai Stok Tampil</div>
-            <div className="mt-2 text-2xl font-black text-emerald-700">{formatRupiah(filteredStats.totalValue)}</div>
+            <div className="mt-2 text-2xl font-semibold text-emerald-700">{formatRupiah(filteredStats.totalValue)}</div>
             <div className="text-[11px] font-bold text-emerald-700/70">Nilai aset pada hasil filter saat ini</div>
           </div>
           <div className="rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Stok Tipis Tampil</div>
-            <div className="mt-2 text-2xl font-black text-amber-700">{filteredStats.lowStock}</div>
+            <div className="mt-2 text-2xl font-semibold text-amber-700">{filteredStats.lowStock}</div>
             <div className="text-[11px] font-bold text-amber-700/70">Memudahkan penelusuran per kategori</div>
           </div>
         </div>
@@ -901,7 +901,7 @@ export default function InventoryClient({
                        <div className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-2">
                          <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{product.sku || 'TANPA SKU'}</span>
                          <span>•</span>
-                         <span className="uppercase tracking-widest">{product.type}</span>
+                         <span className="tracking-tight">{product.type}</span>
                        </div>
                        <div className="mt-2 flex items-center gap-2">
                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${categoryMeta.badgeClass}`}>
@@ -941,7 +941,7 @@ export default function InventoryClient({
                               exit={{ opacity: 0, y: 5 }}
                               className="absolute top-full left-1/2 -translate-x-1/2 z-30 w-48 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 text-left shadow-blue-900/10 pointer-events-none"
                             >
-                               <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-3 pb-2 border-b border-slate-50">Lokasi Barang</div>
+                               <div className="text-[8px] font-semibold text-slate-400 uppercase tracking-tight mb-3 pb-2 border-b border-slate-50">Lokasi Barang</div>
                                <div className="space-y-3">
                                   {whStocks.length === 0 ? (
                                     <div className="text-[10px] text-slate-400 italic font-bold">Memuat data...</div>
@@ -1036,17 +1036,17 @@ export default function InventoryClient({
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Gudang Aktif</div>
-            <div className="mt-2 text-2xl font-black text-slate-900">{warehouseSnapshotStats.uniqueWarehouses}</div>
+            <div className="mt-2 text-2xl font-semibold text-slate-900">{warehouseSnapshotStats.uniqueWarehouses}</div>
             <div className="text-[11px] font-bold text-slate-500">Lokasi dengan stok tersedia</div>
           </div>
           <div className="rounded-2xl border border-blue-100 bg-blue-50 px-5 py-4">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600">Baris Snapshot</div>
-            <div className="mt-2 text-2xl font-black text-blue-700">{warehouseSnapshotStats.totalRows}</div>
+            <div className="mt-2 text-2xl font-semibold text-blue-700">{warehouseSnapshotStats.totalRows}</div>
             <div className="text-[11px] font-bold text-blue-700/70">Kombinasi produk dan gudang</div>
           </div>
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-4">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-600">Total Nilai Tampil</div>
-            <div className="mt-2 text-2xl font-black text-emerald-700">{formatRupiah(warehouseSnapshotStats.totalValue)}</div>
+            <div className="mt-2 text-2xl font-semibold text-emerald-700">{formatRupiah(warehouseSnapshotStats.totalValue)}</div>
             <div className="text-[11px] font-bold text-emerald-700/70">Berdasarkan HPP rata-rata produk</div>
           </div>
         </div>
@@ -1252,10 +1252,10 @@ export default function InventoryClient({
         {isAdjustmentModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdjustmentModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden border-t-8 border-emerald-600">
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border-t-8 border-emerald-600">
                 <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center">
                     <div>
-                      <h3 className="text-2xl font-black tracking-tight flex items-center gap-2">
+                      <h3 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
                         <CheckCircle2 className="text-emerald-600" size={24} /> Stok Opname
                       </h3>
                       <p className="text-xs text-slate-400 mt-1 font-medium">Betulkan saldo stok dengan pencatatan fisik.</p>
@@ -1265,11 +1265,11 @@ export default function InventoryClient({
                 <form onSubmit={handleAdjustmentSubmit} className="p-10 space-y-6">
                     <div className="grid grid-cols-2 gap-5">
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tanggal</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Tanggal</label>
                           <input type="date" required value={adjForm.adj_date} onChange={e => setAdjForm({...adjForm, adj_date: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 rounded-2xl border border-slate-100 font-bold" />
                       </div>
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gudang</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Gudang</label>
                           <select required value={adjForm.warehouse_id} onChange={e => setAdjForm({...adjForm, warehouse_id: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 rounded-2xl border border-slate-100 font-bold focus:ring-2 focus:ring-emerald-100 transition-all outline-none">
                             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                           </select>
@@ -1278,7 +1278,7 @@ export default function InventoryClient({
 
                     <div className="space-y-1">
                       <div className="flex justify-between items-end">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cari Produk</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Cari Produk</label>
                         <button 
                           type="button" 
                           onClick={() => setIsBarcodeScannerOpen(true)}
@@ -1309,15 +1309,15 @@ export default function InventoryClient({
 
                     <div className="grid grid-cols-2 gap-5 p-6 rounded-3xl bg-slate-50 border border-slate-100">
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic flex items-center gap-1">
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight italic flex items-center gap-1">
                             <Info size={10} /> Stok di Gudang Terpilih
                           </label>
-                          <div className={`text-xl font-black ${adjForm.current_qty < 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                          <div className={`text-xl font-semibold ${adjForm.current_qty < 0 ? 'text-rose-600' : 'text-slate-400'}`}>
                             {adjForm.current_qty}
                           </div>
                       </div>
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Stok Fisik (Opname)</label>
+                          <label className="text-[10px] font-semibold text-emerald-600 uppercase tracking-tight">Stok Fisik (Opname)</label>
                           <input type="number" required value={adjForm.actual_qty} onChange={e => setAdjForm({...adjForm, actual_qty: Number(e.target.value)})} className="w-full px-4 py-2 bg-white rounded-xl border border-emerald-200 font-black text-emerald-600 shadow-sm outline-none focus:ring-2 focus:ring-emerald-100 transition-all" />
                       </div>
                     </div>
@@ -1341,10 +1341,10 @@ export default function InventoryClient({
         {isTransferModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsTransferModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden border-t-8 border-indigo-600">
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border-t-8 border-indigo-600">
                 <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center">
                     <div>
-                      <h3 className="text-2xl font-black tracking-tight flex items-center gap-2">
+                      <h3 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
                         <ArrowLeftRight className="text-indigo-600" size={24} /> Transfer Stok
                       </h3>
                       <p className="text-xs text-slate-400 mt-1 font-medium">Mutasi barang antar lokasi gudang.</p>
@@ -1353,7 +1353,7 @@ export default function InventoryClient({
 
                 <form onSubmit={handleTransferSubmit} className="p-10 space-y-6">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Produk</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Pilih Produk</label>
                       <select required value={trfForm.product_id} onChange={async (e) => {
                         const id = e.target.value
                         handleFetchWhStocks(id)
@@ -1366,7 +1366,7 @@ export default function InventoryClient({
 
                     <div className="grid grid-cols-2 gap-5 p-6 rounded-3xl bg-indigo-50 border border-indigo-100 items-center">
                       <div className="space-y-1 text-center">
-                          <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Gudang Asal</label>
+                          <label className="text-[9px] font-semibold text-indigo-400 uppercase tracking-tight">Gudang Asal</label>
                           <select required value={trfForm.source_wh_id} onChange={e => setTrfForm({...trfForm, source_wh_id: e.target.value})} className="w-full mt-2 bg-transparent text-[11px] font-black focus:outline-none">
                             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                           </select>
@@ -1378,7 +1378,7 @@ export default function InventoryClient({
                          <ArrowRight size={24} />
                       </div>
                       <div className="space-y-1 text-center">
-                          <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Gudang Tujuan</label>
+                          <label className="text-[9px] font-semibold text-indigo-400 uppercase tracking-tight">Gudang Tujuan</label>
                           <select required value={trfForm.target_wh_id} onChange={e => setTrfForm({...trfForm, target_wh_id: e.target.value})} className="w-full mt-2 bg-transparent text-[11px] font-black focus:outline-none">
                             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                           </select>
@@ -1390,7 +1390,7 @@ export default function InventoryClient({
 
                     <div className="space-y-1">
                       <div className="flex justify-between items-center mb-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jumlah yang Dipindahkan (Qty)</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Jumlah yang Dipindahkan (Qty)</label>
                         {trfForm.quantity > (whStocks.find(s => s.warehouse_id === trfForm.source_wh_id)?.quantity || 0) && (
                           <span className="text-[10px] font-black text-rose-600 flex items-center gap-1 animate-pulse">
                             <AlertTriangle size={12} /> Stok Tidak Cukup!
@@ -1401,7 +1401,7 @@ export default function InventoryClient({
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Catatan</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Catatan</label>
                       <textarea value={trfForm.notes} onChange={e => setTrfForm({...trfForm, notes: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 rounded-2xl border border-slate-100 text-sm outline-none h-20 resize-none transition-all" />
                     </div>
 
@@ -1417,10 +1417,10 @@ export default function InventoryClient({
         {isWriteOffModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsWriteOffModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden shadow-rose-900/20">
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden shadow-rose-900/20">
                 <div className="px-10 py-8 bg-rose-600 text-white flex justify-between items-start">
                     <div>
-                      <h3 className="text-2xl font-black tracking-tight flex items-center gap-2">
+                      <h3 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
                         <Trash2 size={24} /> Stock Write-off
                       </h3>
                       <p className="text-xs text-rose-100 mt-1 font-medium italic">Hapus stok yang rusak dan akui sebagai Beban Kerugian.</p>
@@ -1433,11 +1433,11 @@ export default function InventoryClient({
                 <form onSubmit={handleWriteOffSubmit} className="p-10 space-y-6">
                     <div className="grid grid-cols-2 gap-5">
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tanggal</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Tanggal</label>
                           <input type="date" required value={writeOffForm.adj_date} onChange={e => setWriteOffForm({...writeOffForm, adj_date: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 rounded-2xl border border-slate-100 font-bold outline-none focus:border-rose-500 transition-all shadow-inner" />
                       </div>
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Gudang</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Pilih Gudang</label>
                           <select required value={writeOffForm.warehouse_id} onChange={e => setWriteOffForm({...writeOffForm, warehouse_id: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 rounded-2xl border border-slate-100 font-bold outline-none focus:border-rose-500 appearance-none transition-all shadow-inner">
                             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                           </select>
@@ -1445,7 +1445,7 @@ export default function InventoryClient({
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Produk yang Di-writeoff</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Produk yang Di-writeoff</label>
                       <select required value={writeOffForm.product_id} onChange={e => handleOpenWriteOff(products.find(p => p.id === e.target.value))} className="w-full px-5 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-bold outline-none focus:border-rose-500 transition-all shadow-inner">
                           <option value="">-- Pilih Barang --</option>
                           {products.filter(p => p.type === 'INVENTORY').map(p => <option key={p.id} value={p.id}>{p.name} (Stok: {p.stock_available})</option>)}
@@ -1454,17 +1454,17 @@ export default function InventoryClient({
 
                     <div className="grid grid-cols-2 gap-5">
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jumlah (Qty)</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Jumlah (Qty)</label>
                           <input type="number" required min="1" value={writeOffForm.quantity} onChange={e => setWriteOffForm({...writeOffForm, quantity: Number(e.target.value)})} className="w-full px-5 py-3.5 bg-slate-50 rounded-2xl border border-slate-100 font-black outline-none focus:border-rose-500 transition-all shadow-inner" />
                       </div>
                       <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">HPP per Unit (Rp)</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">HPP per Unit (Rp)</label>
                           <input type="number" required value={writeOffForm.unit_cost} onChange={e => setWriteOffForm({...writeOffForm, unit_cost: Number(e.target.value)})} className="w-full px-5 py-3.5 bg-slate-50 rounded-2xl border border-slate-100 font-black outline-none focus:border-rose-500 transition-all shadow-inner font-mono" />
                       </div>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Alasan Kerugian</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Alasan Kerugian</label>
                       <textarea required value={writeOffForm.line_notes} onChange={e => setWriteOffForm({...writeOffForm, line_notes: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 rounded-2xl border border-slate-100 text-sm outline-none focus:border-rose-500 h-24 resize-none transition-all shadow-inner" />
                     </div>
 
@@ -1487,21 +1487,21 @@ export default function InventoryClient({
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden p-10 border-t-8 border-blue-600">
-                <h3 className="text-2xl font-black mb-8 tracking-tight text-slate-900">{editId ? 'Update Detail Produk' : 'Registrasi Produk Baru'}</h3>
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden p-10 border-t-8 border-blue-600">
+                <h3 className="text-2xl font-semibold mb-8 tracking-tight text-slate-900">{editId ? 'Update Detail Produk' : 'Registrasi Produk Baru'}</h3>
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Produk</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Nama Produk</label>
                       <input required placeholder="Contoh: Laptop Asus ExpertBook" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-bold text-slate-900 outline-none focus:border-blue-500 shadow-inner" />
                     </div>
                     
                     <div className="grid grid-cols-2 gap-5">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">SKU / Kode</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">SKU / Kode</label>
                         <input placeholder="SKU-XXX" value={formData.sku} onChange={(e) => setFormData({...formData, sku: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-mono font-bold text-slate-900 outline-none focus:border-blue-500 shadow-inner" />
                       </div>
                       <div className="space-y-1 text-left relative">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Barcode</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Barcode</label>
                         <input placeholder="Scan or Type" value={formData.barcode} onChange={(e) => setFormData({...formData, barcode: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-mono font-bold text-blue-600 outline-none focus:border-blue-500 shadow-inner" />
                         <button type="button" onClick={() => setIsBarcodeScannerOpen(true)} className="absolute right-4 bottom-4 text-slate-400 hover:text-blue-600">
                           <Box size={16} />
@@ -1511,7 +1511,7 @@ export default function InventoryClient({
 
                     <div className="grid grid-cols-2 gap-5">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Satuan Produk</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Satuan Produk</label>
                         <select required value={formData.unit} onChange={(e) => setFormData({...formData, unit: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-bold text-slate-900 outline-none focus:border-blue-500 shadow-inner">
                            {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
                         </select>
@@ -1520,7 +1520,7 @@ export default function InventoryClient({
                         )}
                       </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Kategori Produk</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Kategori Produk</label>
                       <select required value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value as any})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-bold text-blue-600 outline-none focus:border-blue-500 shadow-inner">
                            <option value="Bahan">Bahan Baku</option>
                            <option value="Setengah Jadi">Barang Setengah Jadi</option>
@@ -1541,11 +1541,11 @@ export default function InventoryClient({
 
                     <div className="grid grid-cols-2 gap-5">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">HPP (Modal)</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">HPP (Modal)</label>
                         <input type="number" placeholder="0" value={formData.purchase_price} onChange={(e) => setFormData({...formData, purchase_price: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-mono font-bold text-slate-900 outline-none focus:border-blue-500 shadow-inner" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Harga Jual</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Harga Jual</label>
                         <input type="number" placeholder="0" value={formData.selling_price} onChange={(e) => setFormData({...formData, selling_price: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl border border-slate-100 font-mono font-bold text-slate-900 outline-none focus:border-blue-500 shadow-inner" />
                       </div>
                     </div>
@@ -1591,9 +1591,9 @@ export default function InventoryClient({
       {isPrintModalOpen && selectedPrintProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsPrintModalOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-sm bg-white rounded-[32px] shadow-2xl overflow-hidden p-8 flex flex-col">
+           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-sm bg-white rounded-xl shadow-2xl overflow-hidden p-8 flex flex-col">
               <div className="flex justify-between items-center mb-6">
-                 <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Cetak Label</h3>
+                 <h3 className="text-lg font-semibold text-slate-900 uppercase tracking-tight">Cetak Label</h3>
                  <button onClick={() => setIsPrintModalOpen(false)} className="text-slate-400 hover:text-slate-900"><X size={20} /></button>
               </div>
 

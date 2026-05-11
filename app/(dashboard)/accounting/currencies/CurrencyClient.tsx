@@ -149,7 +149,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
       {/* Header */}
       <motion.div variants={item} className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
+          <h1 className="text-4xl font-semibold text-slate-900 tracking-tight flex items-center gap-4">
             <Globe size={40} className="text-blue-500" />
             Multi Mata Uang
           </h1>
@@ -158,11 +158,11 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
       </motion.div>
 
       {/* Base Currency Settings */}
-      <motion.div variants={item} className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 space-y-6">
+      <motion.div variants={item} className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <DollarSign size={20} className="text-blue-500" />
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Mata Uang Dasar</h3>
+            <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-tight">Mata Uang Dasar</h3>
           </div>
           <button
             onClick={handleSaveSettings}
@@ -176,13 +176,13 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Base Currency</label>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Base Currency</label>
             <div className="bg-slate-50 rounded-2xl px-5 py-4 font-black text-slate-900 text-lg">
               {settings.base_currency}
             </div>
           </div>
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Decimal Places</label>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Decimal Places</label>
             <select
               value={settings.decimal_places}
               onChange={e => setSettings({ ...settings, decimal_places: parseInt(e.target.value) })}
@@ -194,7 +194,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
             </select>
           </div>
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Auto Update Rates</label>
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Auto Update Rates</label>
             <div className="flex items-center gap-4 pt-2">
               <div
                 className={`w-14 h-8 rounded-full relative transition-all cursor-pointer ${settings.auto_update_rates ? 'bg-emerald-500' : 'bg-slate-300'}`}
@@ -209,11 +209,11 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
       </motion.div>
 
       {/* Allowed Currencies */}
-      <motion.div variants={item} className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 space-y-6">
+      <motion.div variants={item} className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Globe size={20} className="text-blue-500" />
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Mata Uang Asing Aktif</h3>
+            <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-tight">Mata Uang Asing Aktif</h3>
           </div>
           <button
             onClick={() => setShowAddCurrency(!showAddCurrency)}
@@ -269,11 +269,11 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
       </motion.div>
 
       {/* Exchange Rates */}
-      <motion.div variants={item} className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 space-y-6">
+      <motion.div variants={item} className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <TrendingUp size={20} className="text-blue-500" />
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Kurs Valuta Asing</h3>
+            <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-tight">Kurs Valuta Asing</h3>
           </div>
           <button
             onClick={() => setShowAddRate(true)}
@@ -302,7 +302,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Dari Mata Uang</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight mb-1 block">Dari Mata Uang</label>
                     <select
                       value={rateCurrency}
                       onChange={e => setRateCurrency(e.target.value)}
@@ -314,7 +314,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nilai Kurs (1 {rateCurrency} = Rp...)</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight mb-1 block">Nilai Kurs (1 {rateCurrency} = Rp...)</label>
                     <input
                       type="number"
                       step="0.01"
@@ -325,7 +325,7 @@ export default function CurrencyClient({ orgId, settings: initialSettings, allow
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Tanggal</label>
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight mb-1 block">Tanggal</label>
                     <input
                       type="date"
                       value={rateDate}

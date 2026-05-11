@@ -68,11 +68,11 @@ export default function AccountRowActions({ accountId, orgId, accountCode, accou
                   <AlertTriangle size={32} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Hapus Akun?</h3>
+                  <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Hapus Akun?</h3>
                   <p className="text-sm text-slate-500 font-medium mt-1">
                      Anda akan menghapus <strong className="text-slate-800">[{accountCode}] {accountName}</strong>. 
                   </p>
-                  <p className="text-[10px] text-rose-500 font-bold uppercase tracking-widest mt-2">Tindakan ini tidak bisa dibatalkan.</p>
+                  <p className="text-[10px] text-rose-500 font-semibold tracking-tight mt-2">Tindakan ini tidak bisa dibatalkan.</p>
                 </div>
 
                 <div className="flex flex-col w-full gap-2 pt-4">

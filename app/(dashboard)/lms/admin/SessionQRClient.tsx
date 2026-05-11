@@ -35,8 +35,8 @@ export default function SessionQRClient({
           <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
               <div>
-                <h3 className="text-lg font-black text-slate-900">Docking Presensi</h3>
-                <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-widest">{sessionTitle}</p>
+                <h3 className="text-lg font-semibold text-slate-900">Docking Presensi</h3>
+                <p className="mt-1 text-xs font-bold text-slate-500 tracking-tight">{sessionTitle}</p>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
@@ -47,7 +47,7 @@ export default function SessionQRClient({
             </div>
             
             <div className="p-8 flex flex-col items-center">
-              <div className="relative rounded-[32px] border-8 border-blue-50 p-6 bg-white shadow-inner">
+              <div className="relative rounded-xl border-8 border-blue-50 p-6 bg-white shadow-inner">
                 <QRCodeSVG
                   value={url}
                   size={240}

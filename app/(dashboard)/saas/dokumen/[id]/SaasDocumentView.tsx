@@ -599,7 +599,7 @@ export default function SaasDocumentView({
           <button
             type="button"
             onClick={() => router.back()}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-600"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-tight text-slate-600"
           >
             <ArrowLeft size={14} /> Kembali
           </button>
@@ -607,14 +607,14 @@ export default function SaasDocumentView({
             <button
               type="button"
               onClick={handlePrintOrPdf}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-wider text-white"
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-tight text-white"
             >
               <Printer size={14} /> Print / Download PDF
             </button>
             <button
               type="button"
               onClick={handleDownloadHtml}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-600"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-tight text-slate-600"
             >
               <Download size={14} /> Download HTML
             </button>
@@ -623,7 +623,7 @@ export default function SaasDocumentView({
 
         <article
           id="saas-document-card"
-          className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm print:rounded-none print:border-none print:shadow-none"
+          className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm print:rounded-none print:border-none print:shadow-none"
         >
           <header className="bg-slate-950 px-6 py-8 text-white md:px-10 print:px-8 print:py-7">
             <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between print:flex-row print:items-start print:justify-between print:gap-8">
@@ -639,13 +639,13 @@ export default function SaasDocumentView({
                     />
                   </span>
                   <span className="flex flex-col leading-none">
-                    <span className="text-lg font-black uppercase tracking-tight text-white">NIZAM</span>
+                    <span className="text-lg font-semibold uppercase tracking-tight text-white">NIZAM</span>
                     <MiniErpWordmark className="mt-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-300" erpClassName="text-amber-300" />
                   </span>
                 </div>
                 <div>
                   <p className="text-sm font-bold uppercase tracking-[0.35em] text-slate-300">Dokumen Komersial</p>
-                  <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">{documentLabel}</h1>
+                  <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">{documentLabel}</h1>
                   <p className="mt-2 text-xs font-semibold text-slate-300">
                     {isQuotation
                       ? 'Ruang lingkup layanan dan nilai komersial yang ditawarkan kepada calon pelanggan.'
@@ -677,7 +677,7 @@ export default function SaasDocumentView({
             <div className="space-y-3">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Kepada Yth.</p>
               <div>
-                <p className="text-2xl font-black tracking-tight text-slate-900">{invoice.organization?.name || '-'}</p>
+                <p className="text-2xl font-semibold tracking-tight text-slate-900">{invoice.organization?.name || '-'}</p>
                 <p className="mt-1 text-sm font-semibold text-slate-500">
                   {invoice.organization?.owner_email || 'Organisasi Tenant NIZAM SaaS'}
                 </p>
@@ -817,7 +817,7 @@ export default function SaasDocumentView({
               {bankInfo?.bank || bankInfo?.account || bankInfo?.name ? (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs font-black text-slate-800">{bankInfo?.bank || '-'}</p>
-                  <p className="mt-1 font-mono text-lg font-black tracking-tight text-slate-900">{bankInfo?.account || '-'}</p>
+                  <p className="mt-1 font-mono text-lg font-semibold tracking-tight text-slate-900">{bankInfo?.account || '-'}</p>
                   <p className="text-xs font-semibold text-slate-500">a.n {bankInfo?.name || '-'}</p>
                 </div>
               ) : (

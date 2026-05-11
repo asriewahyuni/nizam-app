@@ -56,7 +56,7 @@ export default function StockLedgerClient({ productId, data }: StockLedgerClient
       <div className="flex flex-col gap-6">
         <Link 
           href="/inventory" 
-          className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors w-fit group"
+          className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-tight hover:text-slate-900 transition-colors w-fit group"
         >
           <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-slate-100 transition-all">
             <ArrowLeft size={16} />
@@ -66,7 +66,7 @@ export default function StockLedgerClient({ productId, data }: StockLedgerClient
 
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-4">
+            <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-indigo-100">
                 <History size={24} />
               </div>
@@ -82,8 +82,8 @@ export default function StockLedgerClient({ productId, data }: StockLedgerClient
                    <ArrowDownRight size={20} />
                 </div>
                 <div>
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Masuk</p>
-                   <p className="text-xl font-black text-slate-900 leading-none">{totalIn} {product?.unit}</p>
+                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight leading-none mb-1">Total Masuk</p>
+                   <p className="text-xl font-semibold text-slate-900 leading-none">{totalIn} {product?.unit}</p>
                 </div>
              </div>
              <div className="bg-white px-6 py-4 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
@@ -91,8 +91,8 @@ export default function StockLedgerClient({ productId, data }: StockLedgerClient
                    <ArrowUpRight size={20} />
                 </div>
                 <div>
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Keluar</p>
-                   <p className="text-xl font-black text-slate-900 leading-none">{totalOut} {product?.unit}</p>
+                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight leading-none mb-1">Total Keluar</p>
+                   <p className="text-xl font-semibold text-slate-900 leading-none">{totalOut} {product?.unit}</p>
                 </div>
              </div>
           </div>
@@ -101,17 +101,17 @@ export default function StockLedgerClient({ productId, data }: StockLedgerClient
 
       {/* Stats Quick View */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-         <div className="bg-slate-900 text-white rounded-[40px] p-8 relative overflow-hidden shadow-2xl shadow-indigo-500/10 md:col-span-1">
+         <div className="bg-slate-900 text-white rounded-2xl p-8 relative overflow-hidden shadow-2xl shadow-indigo-500/10 md:col-span-1">
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/20 rounded-full blur-3xl -mr-10 -mt-10" />
             <div className="relative z-10">
-               <p className="text-[10px] font-black uppercase text-blue-400 tracking-widest mb-2">Stok Akhir</p>
+               <p className="text-[10px] font-semibold uppercase text-blue-400 tracking-tight mb-2">Stok Akhir</p>
                <h4 className="text-5xl font-black tracking-tighter">{currentBalance}</h4>
                <p className="text-xs font-bold text-slate-400 mt-2 uppercase tracking-tight">{product?.unit || 'Unit'}</p>
             </div>
          </div>
-         <div className="bg-white rounded-[40px] p-8 border border-slate-100 shadow-sm md:col-span-3 flex items-center justify-around">
+         <div className="bg-white rounded-2xl p-8 border border-slate-100 shadow-sm md:col-span-3 flex items-center justify-around">
             <div className="text-center space-y-2">
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaksi Terakhir</p>
+               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Transaksi Terakhir</p>
                <div className="flex items-center gap-2 text-slate-900 font-black justify-center">
                   <Calendar size={14} className="text-indigo-500" />
                   {movements.length > 0 ? formatDate(movements[movements.length-1].created_at) : '---'}
@@ -119,7 +119,7 @@ export default function StockLedgerClient({ productId, data }: StockLedgerClient
             </div>
             <div className="w-px h-12 bg-slate-100" />
             <div className="text-center space-y-2">
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aset Persediaan</p>
+               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Aset Persediaan</p>
                <div className="flex items-center gap-2 text-slate-900 font-black justify-center">
                   <Layers size={14} className="text-emerald-500" />
                   {formatRupiah(movements.reduce((s, m) => s + (m.quantity * m.unit_price), 0))}
@@ -127,7 +127,7 @@ export default function StockLedgerClient({ productId, data }: StockLedgerClient
             </div>
             <div className="w-px h-12 bg-slate-100" />
             <div className="text-center space-y-2">
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Pergerakan</p>
+               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Total Pergerakan</p>
                <div className="flex items-center gap-2 text-slate-900 font-black justify-center">
                   <FileText size={14} className="text-blue-500" />
                   {movements.length} Log
@@ -137,7 +137,7 @@ export default function StockLedgerClient({ productId, data }: StockLedgerClient
       </div>
 
       {/* Ledger Table */}
-      <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden min-h-[400px]">
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden min-h-[400px]">
          <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
             <h3 className="font-black text-slate-900 text-lg flex items-center gap-3">
                <History size={18} className="text-indigo-500" />
@@ -149,7 +149,7 @@ export default function StockLedgerClient({ productId, data }: StockLedgerClient
          </div>
          <div className="overflow-x-auto">
             <table className="w-full text-left">
-               <thead className="bg-slate-50/50 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-100">
+               <thead className="bg-slate-50/50 text-[10px] uppercase font-semibold tracking-tight text-slate-400 border-b border-slate-100">
                   <tr>
                      <th className="px-10 py-5">Tanggal & Waktu</th>
                      <th className="px-6 py-5">Tipe & Ref</th>
@@ -166,7 +166,7 @@ export default function StockLedgerClient({ productId, data }: StockLedgerClient
                       <td colSpan={7} className="px-10 py-20 text-center">
                          <div className="flex flex-col items-center gap-3 opacity-20">
                             <Package size={48} />
-                            <p className="text-sm font-black uppercase tracking-widest">Belum ada pergerakan stok.</p>
+                            <p className="text-sm font-semibold tracking-tight">Belum ada pergerakan stok.</p>
                          </div>
                       </td>
                     </tr>
@@ -178,7 +178,7 @@ export default function StockLedgerClient({ productId, data }: StockLedgerClient
                            <span className="block text-[10px] font-medium opacity-60 mt-1">{new Date(m.created_at).toLocaleTimeString()}</span>
                         </td>
                         <td className="px-6 py-6">
-                           <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest w-fit mb-1.5 border
+                           <div className={`px-3 py-1 rounded-full text-[10px] font-semibold tracking-tight w-fit mb-1.5 border
                              ${m.reference_type === 'PURCHASE' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
                                m.reference_type === 'SALES' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
                                'bg-slate-50 text-slate-500 border-slate-200'}`}>

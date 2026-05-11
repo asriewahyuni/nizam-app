@@ -50,7 +50,7 @@ export function MetricCard({
       whileHover={{ y: -2 }}
       transition={{ duration: 0.15, ease: 'easeOut' }}
       onClick={() => router.push(href)}
-      className="rounded-2xl border border-[#e5e7eb] bg-white p-5 min-h-[180px] flex flex-col justify-between cursor-pointer transition-shadow duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)]"
+      className="rounded-2xl border border-[#e5e7eb] bg-white p-5 min-h-[180px] flex flex-col justify-between cursor-pointer transition-shadow duration-200 hover:shadow-sm"
       title={hint}
     >
       <div className="flex items-start justify-between">

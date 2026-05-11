@@ -226,7 +226,7 @@ export function WarehouseClient({
       />
 
       {warehouseMutationGuardMessage && (
-        <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-800 shadow-sm">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-800 shadow-sm">
           {warehouseMutationGuardMessage} {activeBranchName ? `Unit aktif saat ini: ${activeBranchName}.` : ''}
         </div>
       )}
@@ -234,13 +234,13 @@ export function WarehouseClient({
       {(error || success) && (
         <div className="space-y-3">
           {error && (
-            <div className="flex items-start gap-3 rounded-[28px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-700 shadow-sm">
+            <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-700 shadow-sm">
               <AlertCircle size={18} className="mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
           {success && (
-            <div className="flex items-start gap-3 rounded-[28px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-700 shadow-sm">
+            <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-700 shadow-sm">
               <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
               <span>{success}</span>
             </div>
@@ -265,7 +265,7 @@ export function WarehouseClient({
           }
         />
 
-        <div className="px-10 pt-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+        <div className="px-10 pt-6 text-[11px] font-bold text-slate-400 tracking-tight">
           Menampilkan {filteredWarehouses.length} dari {warehouses.length} gudang aktif
         </div>
 
@@ -339,7 +339,7 @@ export function WarehouseClient({
                         <Package size={18} className="text-emerald-500" />
                         <span>Atur Bin & Layout</span>
                       </div>
-                      <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="text-[10px] font-bold text-emerald-600 tracking-tight bg-emerald-50 px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
                         Buka &rarr;
                       </div>
                     </div>

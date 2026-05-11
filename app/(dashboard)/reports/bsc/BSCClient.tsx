@@ -544,18 +544,18 @@ export function BSCClient({
       
       {/* Header */}
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-3 text-blue-600 font-black tracking-widest text-xs uppercase bg-blue-50 w-fit px-4 py-2 rounded-full border border-blue-100 mb-2">
+        <div className="flex items-center gap-3 text-blue-600 font-semibold tracking-tight text-xs uppercase bg-blue-50 w-fit px-4 py-2 rounded-full border border-blue-100 mb-2">
            <BarChart3 size={14} />
            Performance Navigation · Live Data
         </div>
-        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Balanced Scorecard (BSC)</h1>
+        <h1 className="text-4xl font-semibold text-slate-900 tracking-tight">Balanced Scorecard (BSC)</h1>
         <p className="text-slate-500 font-medium text-lg italic opacity-80">4 Perspektif strategis — semua dari data operasional real-time.</p>
       </div>
 
-      <div className="bg-white rounded-[36px] border border-slate-100 shadow-sm p-8 space-y-5">
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Card Utama</p>
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 space-y-5">
+        <p className="text-[10px] font-semibold tracking-tight text-slate-400">Card Utama</p>
         <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
-          <p className="text-sm font-black text-slate-700 uppercase tracking-widest">Sementara dikosongkan</p>
+          <p className="text-sm font-semibold text-slate-700 uppercase tracking-tight">Sementara dikosongkan</p>
           <p className="text-sm text-slate-500 font-medium mt-2">Siap untuk layout utama versi berikutnya.</p>
         </div>
       </div>
@@ -586,12 +586,12 @@ export function BSCClient({
                     <Icon size={22} />
                   </div>
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Perspective</p>
-                    <h3 className="text-lg font-black text-slate-900">{visual.title}</h3>
+                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Perspective</p>
+                    <h3 className="text-lg font-semibold text-slate-900">{visual.title}</h3>
                   </div>
                 </div>
                 <div className={`px-3 py-2 rounded-2xl border text-right ${visual.scorePillClass}`}>
-                  <p className="text-[10px] font-black uppercase tracking-widest">Score</p>
+                  <p className="text-[10px] font-semibold tracking-tight">Score</p>
                   <p className="text-base font-black">{perspectiveSummary.score_100}/100</p>
                 </div>
               </div>
@@ -599,22 +599,22 @@ export function BSCClient({
               <div className="mt-5 space-y-4">
                 <div className="grid grid-cols-3 gap-3">
                   <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">KPI Aktif</p>
-                    <p className="text-lg font-black text-slate-900 mt-1">{perspectiveSummary.kpi_count}</p>
+                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">KPI Aktif</p>
+                    <p className="text-lg font-semibold text-slate-900 mt-1">{perspectiveSummary.kpi_count}</p>
                   </div>
                   <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Terukur</p>
-                    <p className="text-lg font-black text-slate-900 mt-1">{measuredCount}</p>
+                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Terukur</p>
+                    <p className="text-lg font-semibold text-slate-900 mt-1">{measuredCount}</p>
                   </div>
                   <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Auto</p>
-                    <p className="text-lg font-black text-slate-900 mt-1">{autoCount}</p>
+                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Auto</p>
+                    <p className="text-lg font-semibold text-slate-900 mt-1">{autoCount}</p>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Coverage</p>
+                    <p className="text-[10px] font-semibold tracking-tight text-slate-500">Coverage</p>
                     <p className="text-xs font-black text-slate-700">{coveragePercent}%</p>
                   </div>
                   <div className="h-2 rounded-full bg-white border border-slate-200 overflow-hidden">
@@ -635,7 +635,7 @@ export function BSCClient({
                                 Target {formatMetricValue(kpi.unit, kpi.target_value)}
                               </p>
                             </div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            <span className="text-[10px] font-semibold tracking-tight text-slate-400">
                               {kpi.latest_measurement ? 'Measured' : 'Pending'}
                             </span>
                           </div>
@@ -649,7 +649,7 @@ export function BSCClient({
                     </div>
                   ) : perspectiveSuggestions.length > 0 ? (
                     <div className="space-y-2">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Siap Digenerate</p>
+                      <p className="text-[10px] font-semibold tracking-tight text-slate-500">Siap Digenerate</p>
                       {perspectiveSuggestions.slice(0, 2).map((suggestion) => (
                         <div key={`${perspective}-${suggestion.key}`} className="rounded-xl bg-white border border-dashed border-slate-300 p-3">
                           <p className="text-xs font-black text-slate-900">{suggestion.label}</p>
@@ -661,7 +661,7 @@ export function BSCClient({
                     </div>
                   ) : (
                     <div className="rounded-xl bg-white border border-dashed border-slate-300 p-4 text-center">
-                      <p className="text-xs font-black text-slate-700 uppercase tracking-widest">Belum Ada KPI</p>
+                      <p className="text-xs font-semibold text-slate-700 uppercase tracking-tight">Belum Ada KPI</p>
                       <p className="text-xs text-slate-500 font-medium mt-2">Perspective ini belum punya KPI maupun saran dari data saat ini.</p>
                     </div>
                   )}
@@ -674,11 +674,11 @@ export function BSCClient({
 
       {/* BSC Setup & Measurement */}
       <div className="space-y-8">
-        <div className="bg-white rounded-[36px] border border-slate-100 shadow-sm p-8 space-y-4">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Strategy Workbench</p>
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">Setup KPI, Bobot, dan Pengukuran</h3>
+              <p className="text-[10px] font-semibold tracking-tight text-indigo-500">Strategy Workbench</p>
+              <h3 className="text-2xl font-semibold text-slate-900 tracking-tight">Setup KPI, Bobot, dan Pengukuran</h3>
               <p className="text-sm text-slate-500 font-medium mt-1">Skor internal dihitung dalam skala 0-100, lalu ditampilkan juga sebagai skala 0-4.</p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
@@ -686,7 +686,7 @@ export function BSCClient({
                 type="button"
                 onClick={handleGenerateFromExistingData}
                 disabled={isPending}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black uppercase tracking-wider disabled:opacity-60"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold uppercase tracking-tight disabled:opacity-60"
                 title="Buat KPI siap pakai dari data existing lalu isi nilai awal otomatis."
               >
                 <Zap size={14} />
@@ -696,7 +696,7 @@ export function BSCClient({
                 type="button"
                 onClick={handleSyncFromExistingData}
                 disabled={isPending}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-wider disabled:opacity-60"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold uppercase tracking-tight disabled:opacity-60"
                 title="Segarkan nilai KPI yang sudah punya sumber data existing."
               >
                 <RefreshCcw size={14} />
@@ -706,7 +706,7 @@ export function BSCClient({
                 type="button"
                 onClick={handleSeedTemplate}
                 disabled={isPending}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-black uppercase tracking-wider disabled:opacity-60"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold uppercase tracking-tight disabled:opacity-60"
                 title="Isi KPI contoh 4 perspektif x 4 indikator agar cepat mulai."
               >
                 <RefreshCcw size={14} />
@@ -715,11 +715,11 @@ export function BSCClient({
               <button
                 type="button"
                 onClick={() => setShowAdvancedSetup((prev) => !prev)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-black uppercase tracking-wider text-slate-700"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold uppercase tracking-tight text-slate-700"
               >
                 {showAdvancedSetup ? 'Sembunyikan Mode Lanjutan' : 'Buka Mode Lanjutan'}
               </button>
-              <div className={`px-4 py-2 rounded-full border text-[10px] font-black uppercase tracking-widest ${activeBranchName ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+              <div className={`px-4 py-2 rounded-full border text-[10px] font-semibold tracking-tight ${activeBranchName ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
                 Scope: {scopeLabel}
               </div>
             </div>
@@ -742,16 +742,16 @@ export function BSCClient({
           )}
         </div>
 
-        <div className="bg-gradient-to-br from-blue-50 via-white to-emerald-50 rounded-[32px] border border-blue-100 shadow-sm p-8 space-y-6">
+        <div className="bg-gradient-to-br from-blue-50 via-white to-emerald-50 rounded-xl border border-blue-100 shadow-sm p-8 space-y-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2 max-w-3xl">
-              <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Quick Start</p>
-              <h4 className="text-xl font-black text-slate-900">Jalur tercepat: ubah data operasional jadi KPI siap pakai</h4>
+              <p className="text-[10px] font-semibold tracking-tight text-blue-600">Quick Start</p>
+              <h4 className="text-xl font-semibold text-slate-900">Jalur tercepat: ubah data operasional jadi KPI siap pakai</h4>
               <p className="text-sm text-slate-600 font-medium">
                 Sistem akan membuat KPI yang paling relevan dari data yang sudah ada, memberi target awal otomatis, lalu langsung mengisi nilai awalnya.
               </p>
             </div>
-            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-tight">
               <span className="px-3 py-1 rounded-full bg-white border border-blue-200 text-blue-700">
                 Siap dibuat: {quickStartSuggestionCount}
               </span>
@@ -763,7 +763,7 @@ export function BSCClient({
 
           {quickStartSuggestionCount === 0 ? (
             <div className="rounded-3xl border border-dashed border-emerald-200 bg-white/80 px-6 py-8 text-center">
-              <p className="text-sm font-black text-emerald-800 uppercase tracking-widest">Jalur cepat sudah terpakai semua</p>
+              <p className="text-sm font-semibold text-emerald-800 uppercase tracking-tight">Jalur cepat sudah terpakai semua</p>
               <p className="text-sm text-slate-600 font-medium mt-2">
                 KPI rekomendasi dari data existing sudah aktif. Tinggal klik refresh nilai atau buka mode lanjutan jika ingin KPI tambahan.
               </p>
@@ -774,10 +774,10 @@ export function BSCClient({
                 <div key={`quick-start-${group.perspective}`} className="rounded-3xl border border-white/70 bg-white/85 p-5 space-y-3 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Perspective</p>
+                      <p className="text-[10px] font-semibold tracking-tight text-slate-400">Perspective</p>
                       <h5 className="text-base font-black text-slate-900">{perspectiveLabel[group.perspective]}</h5>
                     </div>
-                    <span className="px-2 py-1 rounded-full bg-blue-50 border border-blue-100 text-[10px] font-black uppercase tracking-widest text-blue-700">
+                    <span className="px-2 py-1 rounded-full bg-blue-50 border border-blue-100 text-[10px] font-semibold tracking-tight text-blue-700">
                       {group.suggestions.length} KPI
                     </span>
                   </div>
@@ -801,17 +801,17 @@ export function BSCClient({
           )}
         </div>
 
-        <div className="rounded-[32px] border border-slate-200 bg-slate-50/80 p-6 space-y-5">
+        <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-6 space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mode Lanjutan</p>
-              <h4 className="text-lg font-black text-slate-900">Bobot perspektif dan KPI manual</h4>
+              <p className="text-[10px] font-semibold tracking-tight text-slate-500">Mode Lanjutan</p>
+              <h4 className="text-lg font-semibold text-slate-900">Bobot perspektif dan KPI manual</h4>
               <p className="text-sm text-slate-500 font-medium mt-1">Buka bagian ini hanya jika ingin mengatur bobot sendiri atau menambah KPI yang tidak ditemukan otomatis.</p>
             </div>
             <button
               type="button"
               onClick={() => setShowAdvancedSetup((prev) => !prev)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-black uppercase tracking-wider text-slate-700"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold uppercase tracking-tight text-slate-700"
             >
               {showAdvancedSetup ? 'Sembunyikan' : 'Buka'}
             </button>
@@ -819,14 +819,14 @@ export function BSCClient({
 
           {showAdvancedSetup ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 space-y-6">
+              <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 space-y-6">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-black text-slate-900">Bobot Perspektif</h4>
+                  <h4 className="text-lg font-semibold text-slate-900">Bobot Perspektif</h4>
                   <button
                     type="button"
                     onClick={handleSaveWeights}
                     disabled={isPending}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-wider disabled:opacity-60"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold uppercase tracking-tight disabled:opacity-60"
                   >
                     <Save size={14} />
                     Simpan Bobot
@@ -835,7 +835,7 @@ export function BSCClient({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {(Object.keys(weightDraft) as BSCPerspective[]).map((perspective) => (
                     <label key={perspective} className="space-y-2">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{perspectiveLabel[perspective]}</span>
+                      <span className="text-[10px] font-semibold tracking-tight text-slate-400">{perspectiveLabel[perspective]}</span>
                       <input
                         type="number"
                         min={0}
@@ -857,14 +857,14 @@ export function BSCClient({
                 </div>
               </div>
 
-              <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 space-y-6">
+              <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 space-y-6">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-black text-slate-900">Tambah KPI Manual</h4>
+                  <h4 className="text-lg font-semibold text-slate-900">Tambah KPI Manual</h4>
                 </div>
                 <form onSubmit={handleSubmitKpi} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <label className="space-y-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Perspektif</span>
+                      <span className="text-[10px] font-semibold tracking-tight text-slate-400">Perspektif</span>
                       <select
                         value={kpiForm.perspective}
                         onChange={(event) => setKpiForm((prev) => ({ ...prev, perspective: event.target.value as BSCPerspective }))}
@@ -878,7 +878,7 @@ export function BSCClient({
                       </select>
                     </label>
                     <label className="space-y-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Arah KPI</span>
+                      <span className="text-[10px] font-semibold tracking-tight text-slate-400">Arah KPI</span>
                       <select
                         value={kpiForm.direction}
                         onChange={(event) => setKpiForm((prev) => ({ ...prev, direction: event.target.value as BSCDirection }))}
@@ -891,7 +891,7 @@ export function BSCClient({
                   </div>
 
                   <label className="space-y-1 block">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nama KPI</span>
+                    <span className="text-[10px] font-semibold tracking-tight text-slate-400">Nama KPI</span>
                     <input
                       value={kpiForm.name}
                       onChange={(event) => setKpiForm((prev) => ({ ...prev, name: event.target.value }))}
@@ -902,7 +902,7 @@ export function BSCClient({
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <label className="space-y-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target</span>
+                      <span className="text-[10px] font-semibold tracking-tight text-slate-400">Target</span>
                       <input
                         type="number"
                         value={kpiForm.targetValue}
@@ -911,7 +911,7 @@ export function BSCClient({
                       />
                     </label>
                     <label className="space-y-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Bobot KPI (%)</span>
+                      <span className="text-[10px] font-semibold tracking-tight text-slate-400">Bobot KPI (%)</span>
                       <input
                         type="number"
                         value={kpiForm.weightPercent}
@@ -920,7 +920,7 @@ export function BSCClient({
                       />
                     </label>
                     <label className="space-y-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Satuan</span>
+                      <span className="text-[10px] font-semibold tracking-tight text-slate-400">Satuan</span>
                       <input
                         value={kpiForm.unit}
                         onChange={(event) => setKpiForm((prev) => ({ ...prev, unit: event.target.value }))}
@@ -933,7 +933,7 @@ export function BSCClient({
                   <button
                     type="submit"
                     disabled={isPending}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black uppercase tracking-wider disabled:opacity-60"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold uppercase tracking-tight disabled:opacity-60"
                   >
                     <Plus size={14} />
                     Tambah KPI
@@ -948,15 +948,15 @@ export function BSCClient({
           )}
         </div>
 
-        <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 space-y-6">
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h4 className="text-lg font-black text-slate-900">Audit Sinkron KPI vs Data Existing</h4>
+              <h4 className="text-lg font-semibold text-slate-900">Audit Sinkron KPI vs Data Existing</h4>
               <p className="text-xs font-semibold text-slate-500 mt-1">
                 Menandai KPI yang sudah bisa diukur otomatis dan KPI yang belum punya sumber data saat ini.
               </p>
             </div>
-            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-tight">
               <span className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700">
                 Terukur: {kpiCoverage.measurable.length}
               </span>
@@ -968,7 +968,7 @@ export function BSCClient({
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <div className="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-5 space-y-3">
-              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Data Yang Bisa Diukur KPI-nya</p>
+              <p className="text-[10px] font-semibold tracking-tight text-emerald-700">Data Yang Bisa Diukur KPI-nya</p>
               {kpiCoverage.measurable.length === 0 ? (
                 <p className="text-sm font-semibold text-emerald-800">Belum ada KPI yang match dengan data existing.</p>
               ) : (
@@ -986,7 +986,7 @@ export function BSCClient({
             </div>
 
             <div className="rounded-3xl border border-amber-100 bg-amber-50/60 p-5 space-y-3">
-              <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">KPI Yang Belum Punya Sumber Data</p>
+              <p className="text-[10px] font-semibold tracking-tight text-amber-700">KPI Yang Belum Punya Sumber Data</p>
               {kpiCoverage.unmapped.length === 0 ? (
                 <p className="text-sm font-semibold text-emerald-700">Semua KPI aktif sudah punya sumber data.</p>
               ) : (
@@ -994,7 +994,7 @@ export function BSCClient({
                   {PERSPECTIVES.filter((perspective) => unmappedByPerspective[perspective].length > 0).map((perspective) => (
                     <div key={perspective} className="rounded-2xl border border-amber-100 bg-white p-3 space-y-2">
                       <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-amber-800">
+                        <p className="text-[10px] font-semibold tracking-tight text-amber-800">
                           {perspectiveLabel[perspective]}
                         </p>
                         <span className="px-2 py-1 rounded-md bg-amber-50 border border-amber-100 text-[10px] font-black text-amber-700">
@@ -1023,7 +1023,7 @@ export function BSCClient({
                                       <Link
                                         key={`${item.kpi_id}-${suggestion.key}-${reference.path}`}
                                         href={reference.path}
-                                        className="inline-flex items-center rounded-md border border-amber-200 bg-white px-2 py-1 text-[10px] font-black uppercase tracking-wider text-amber-700 hover:bg-amber-100 transition-colors"
+                                        className="inline-flex items-center rounded-md border border-amber-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-tight text-amber-700 hover:bg-amber-100 transition-colors"
                                       >
                                         {reference.label}
                                       </Link>
@@ -1032,7 +1032,7 @@ export function BSCClient({
                                       type="button"
                                       disabled={isPending}
                                       onClick={() => handleApplySuggestedIndicator(item.kpi_id, suggestion.key)}
-                                      className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-60"
+                                      className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-tight text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-60"
                                     >
                                       Pakai Indikator Ini
                                     </button>
@@ -1051,11 +1051,11 @@ export function BSCClient({
           </div>
         </div>
 
-        <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 space-y-5">
-          <h4 className="text-lg font-black text-slate-900">Daftar KPI Aktif</h4>
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 space-y-5">
+          <h4 className="text-lg font-semibold text-slate-900">Daftar KPI Aktif</h4>
           {sortedKpis.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center space-y-2">
-              <p className="text-sm font-black text-slate-700 uppercase tracking-widest">Belum ada KPI di siklus ini</p>
+              <p className="text-sm font-semibold text-slate-700 uppercase tracking-tight">Belum ada KPI di siklus ini</p>
               <p className="text-sm text-slate-500 font-medium">Klik `Generate KPI dari Data Saya` untuk jalur tercepat, atau buka mode lanjutan jika ingin bikin KPI manual.</p>
             </div>
           ) : (
@@ -1070,7 +1070,7 @@ export function BSCClient({
                   <div key={kpi.id} className="rounded-3xl border border-slate-200 p-5 space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        <p className="text-[10px] font-semibold tracking-tight text-slate-400">
                           {perspectiveLabel[kpi.perspective]} · {kpi.code}
                         </p>
                         <h5 className="text-base font-black text-slate-900">{kpi.name}</h5>
@@ -1079,7 +1079,7 @@ export function BSCClient({
                         </p>
                         <div className="mt-2">
                           <span
-                            className={`px-2 py-1 rounded-lg border text-[10px] font-black uppercase tracking-wider ${
+                            className={`px-2 py-1 rounded-lg border text-[10px] font-semibold uppercase tracking-tight ${
                               kpi.source_type === 'AUTO'
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                                 : 'bg-slate-50 text-slate-600 border-slate-200'
@@ -1093,14 +1093,14 @@ export function BSCClient({
                         <button
                           type="button"
                           onClick={() => openEditKpiModal(kpi)}
-                          className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-black uppercase tracking-wider text-slate-600"
+                          className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold uppercase tracking-tight text-slate-600"
                         >
                           Edit
                         </button>
                         <button
                           type="button"
                           onClick={() => handleArchiveKpi(kpi.id)}
-                          className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-xs font-black uppercase tracking-wider text-rose-700"
+                          className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-xs font-semibold uppercase tracking-tight text-rose-700"
                         >
                           <Trash2 size={12} />
                           Nonaktifkan
@@ -1110,7 +1110,7 @@ export function BSCClient({
 
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 items-end">
                       <label className="space-y-1 lg:col-span-1">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Actual</span>
+                        <span className="text-[10px] font-semibold tracking-tight text-slate-400">Actual</span>
                         <input
                           type="number"
                           value={draft.actual}
@@ -1124,7 +1124,7 @@ export function BSCClient({
                         />
                       </label>
                       <label className="space-y-1 lg:col-span-1">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tanggal</span>
+                        <span className="text-[10px] font-semibold tracking-tight text-slate-400">Tanggal</span>
                         <input
                           type="date"
                           value={draft.date}
@@ -1138,7 +1138,7 @@ export function BSCClient({
                         />
                       </label>
                       <label className="space-y-1 lg:col-span-2">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Catatan</span>
+                        <span className="text-[10px] font-semibold tracking-tight text-slate-400">Catatan</span>
                         <input
                           value={draft.note}
                           onChange={(event) =>
@@ -1161,7 +1161,7 @@ export function BSCClient({
                             kpi.latest_measurement?.measurement_date || null
                           )
                         }
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black uppercase tracking-wider disabled:opacity-60"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-slate-900 text-white text-xs font-semibold uppercase tracking-tight disabled:opacity-60"
                       >
                         <Save size={13} />
                         Simpan
@@ -1189,16 +1189,16 @@ export function BSCClient({
 
       {isEditModalOpen && kpiForm.id && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-[32px] bg-white border border-slate-100 shadow-2xl p-8 space-y-6">
+          <div className="w-full max-w-2xl rounded-xl bg-white border border-slate-100 shadow-2xl p-8 space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Popup Edit KPI</p>
-                <h4 className="text-xl font-black text-slate-900">Ubah KPI Aktif</h4>
+                <p className="text-[10px] font-semibold tracking-tight text-indigo-500">Popup Edit KPI</p>
+                <h4 className="text-xl font-semibold text-slate-900">Ubah KPI Aktif</h4>
               </div>
               <button
                 type="button"
                 onClick={closeEditKpiModal}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-black uppercase tracking-wider text-slate-600"
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold uppercase tracking-tight text-slate-600"
               >
                 Tutup
               </button>
@@ -1207,7 +1207,7 @@ export function BSCClient({
             <form onSubmit={handleSubmitKpi} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Perspektif</span>
+                  <span className="text-[10px] font-semibold tracking-tight text-slate-400">Perspektif</span>
                   <select
                     value={kpiForm.perspective}
                     onChange={(event) => setKpiForm((prev) => ({ ...prev, perspective: event.target.value as BSCPerspective }))}
@@ -1221,7 +1221,7 @@ export function BSCClient({
                   </select>
                 </label>
                 <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Arah KPI</span>
+                  <span className="text-[10px] font-semibold tracking-tight text-slate-400">Arah KPI</span>
                   <select
                     value={kpiForm.direction}
                     onChange={(event) => setKpiForm((prev) => ({ ...prev, direction: event.target.value as BSCDirection }))}
@@ -1234,7 +1234,7 @@ export function BSCClient({
               </div>
 
               <label className="space-y-1 block">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nama KPI</span>
+                <span className="text-[10px] font-semibold tracking-tight text-slate-400">Nama KPI</span>
                 <input
                   value={kpiForm.name}
                   onChange={(event) => setKpiForm((prev) => ({ ...prev, name: event.target.value }))}
@@ -1245,7 +1245,7 @@ export function BSCClient({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target</span>
+                  <span className="text-[10px] font-semibold tracking-tight text-slate-400">Target</span>
                   <input
                     type="number"
                     value={kpiForm.targetValue}
@@ -1254,7 +1254,7 @@ export function BSCClient({
                   />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Bobot KPI (%)</span>
+                  <span className="text-[10px] font-semibold tracking-tight text-slate-400">Bobot KPI (%)</span>
                   <input
                     type="number"
                     value={kpiForm.weightPercent}
@@ -1263,7 +1263,7 @@ export function BSCClient({
                   />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Satuan</span>
+                  <span className="text-[10px] font-semibold tracking-tight text-slate-400">Satuan</span>
                   <input
                     value={kpiForm.unit}
                     onChange={(event) => setKpiForm((prev) => ({ ...prev, unit: event.target.value }))}
@@ -1277,14 +1277,14 @@ export function BSCClient({
                 <button
                   type="button"
                   onClick={closeEditKpiModal}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-black uppercase tracking-wider text-slate-600"
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold uppercase tracking-tight text-slate-600"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black uppercase tracking-wider disabled:opacity-60"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold uppercase tracking-tight disabled:opacity-60"
                 >
                   <Save size={14} />
                   Simpan Perubahan

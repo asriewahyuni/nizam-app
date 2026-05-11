@@ -89,7 +89,7 @@ export default function TicketingClient({ tickets }: TicketingClientProps) {
               <LifeBuoy size={14} />
               Support Ticket
             </div>
-            <h1 className="mt-3 text-2xl font-black text-slate-900 md:text-3xl">Kirim Support Ticket</h1>
+            <h1 className="mt-3 text-2xl font-semibold text-slate-900 md:text-3xl">Kirim Support Ticket</h1>
             <p className="mt-2 max-w-3xl text-sm font-medium leading-relaxed text-slate-600">
               Isi detail bug atau kendala sejelas mungkin, termasuk menu tempat masalah muncul, kapan kejadian terjadi,
               dan screenshot agar proses investigasi lebih cepat.

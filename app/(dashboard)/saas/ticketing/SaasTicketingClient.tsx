@@ -92,7 +92,7 @@ export default function SaasTicketingClient({ snapshot }: SaasTicketingClientPro
               <LifeBuoy size={14} />
               Support Ticket Operator
             </div>
-            <h1 className="mt-3 text-2xl font-black text-slate-900 md:text-3xl">Kelola Progress Support Ticket</h1>
+            <h1 className="mt-3 text-2xl font-semibold text-slate-900 md:text-3xl">Kelola Progress Support Ticket</h1>
             <p className="mt-2 text-sm font-medium text-slate-600">
               Kelola progres support ticket dari user dan publikasikan update yang akan tampil pada halaman doc update pengguna.
             </p>
@@ -116,17 +116,17 @@ export default function SaasTicketingClient({ snapshot }: SaasTicketingClientPro
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Total Support Ticket</div>
-          <div className="mt-2 text-2xl font-black text-slate-900">{snapshot.tickets.length}</div>
+          <div className="mt-2 text-2xl font-semibold text-slate-900">{snapshot.tickets.length}</div>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Open / Progress</div>
-          <div className="mt-2 text-2xl font-black text-amber-600">
+          <div className="mt-2 text-2xl font-semibold text-amber-600">
             {snapshot.tickets.filter((ticket) => ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS').length}
           </div>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Resolved / Closed</div>
-          <div className="mt-2 text-2xl font-black text-emerald-600">
+          <div className="mt-2 text-2xl font-semibold text-emerald-600">
             {snapshot.tickets.filter((ticket) => ticket.status === 'RESOLVED' || ticket.status === 'CLOSED').length}
           </div>
         </div>

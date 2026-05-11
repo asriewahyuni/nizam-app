@@ -181,7 +181,7 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
         <div className="space-y-1">
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+          <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
             <Wrench size={32} className="text-[#003366]" />
             Bengkel Motor
           </h1>
@@ -214,8 +214,8 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
           { label: 'Selesai',   value: stats.selesai,    color: 'text-emerald-600', bg: 'bg-emerald-50' },
         ].map(s => (
           <div key={s.label} className={`${s.bg} rounded-2xl p-5 border border-slate-100`}>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{s.label}</p>
-            <p className={`text-3xl font-black ${s.color}`}>{s.value}</p>
+            <p className="text-xs font-bold text-slate-400 tracking-tight mb-1">{s.label}</p>
+            <p className={`text-3xl font-semibold ${s.color}`}>{s.value}</p>
           </div>
         ))}
       </div>
@@ -435,7 +435,7 @@ function SpkList({
 }) {
   if (orders.length === 0) {
     return (
-      <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-bold italic">
+      <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold italic">
         Belum ada Surat Perintah Kerja.
       </div>
     )
@@ -524,7 +524,7 @@ function SpkCard({
   const transitions = STATUS_TRANSITIONS[order.status]
 
   return (
-    <div className="bg-white rounded-[24px] border border-slate-100 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
       {/* Card header — selalu terlihat */}
       <button
         onClick={onToggle}
@@ -532,11 +532,11 @@ function SpkCard({
       >
         <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">SPK</p>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">SPK</p>
             <p className="text-sm font-black text-slate-900">{order.spkNumber}</p>
           </div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kendaraan</p>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Kendaraan</p>
             <p className="text-sm font-bold text-slate-700">
               {order.vehicle
                 ? `${order.vehicle.plateNumber} · ${order.vehicle.brand} ${order.vehicle.model}`
@@ -544,11 +544,11 @@ function SpkCard({
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pelanggan</p>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Pelanggan</p>
             <p className="text-sm font-bold text-slate-700">{order.contactName || '—'}</p>
           </div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total</p>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Total</p>
             <p className="text-sm font-black text-[#003366]">{formatRupiah(order.total)}</p>
           </div>
         </div>
@@ -585,7 +585,7 @@ function SpkCard({
               {/* Items */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Item Pekerjaan</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-tight">Item Pekerjaan</p>
                   {!['SELESAI','DISERAHKAN','CANCEL'].includes(order.status) && (
                     <button
                       onClick={() => setShowItemForm(v => !v)}
@@ -605,11 +605,11 @@ function SpkCard({
                     <table className="w-full text-sm">
                       <thead className="bg-slate-50">
                         <tr>
-                          <th className="text-left px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama</th>
-                          <th className="text-center px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipe</th>
-                          <th className="text-right px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Qty</th>
-                          <th className="text-right px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Harga</th>
-                          <th className="text-right px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Subtotal</th>
+                          <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Nama</th>
+                          <th className="text-center px-4 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Tipe</th>
+                          <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Qty</th>
+                          <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Harga</th>
+                          <th className="text-right px-4 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Subtotal</th>
                           <th className="w-8"></th>
                         </tr>
                       </thead>
@@ -641,7 +641,7 @@ function SpkCard({
                       </tbody>
                       <tfoot className="bg-slate-50">
                         <tr>
-                          <td colSpan={4} className="px-4 py-2.5 text-right text-xs font-black text-slate-500 uppercase tracking-widest">Total</td>
+                          <td colSpan={4} className="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-tight">Total</td>
                           <td className="px-4 py-2.5 text-right font-black text-[#003366]">{formatRupiah(order.total)}</td>
                           <td></td>
                         </tr>
@@ -788,7 +788,7 @@ function SpkCard({
               <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-50">
                 {transitions.length > 0 && (
                   <>
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest self-center mr-2">Ubah status:</p>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-tight self-center mr-2">Ubah status:</p>
                     {transitions.map(nextStatus => {
                       const nextCfg = STATUS_CONFIG[nextStatus]
                       return (
@@ -820,7 +820,7 @@ function SpkCard({
 function VehicleList({ vehicles }: { vehicles: WorkshopVehicle[] }) {
   if (vehicles.length === 0) {
     return (
-      <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-bold italic">
+      <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold italic">
         Belum ada kendaraan terdaftar.
       </div>
     )
@@ -832,14 +832,14 @@ function VehicleList({ vehicles }: { vehicles: WorkshopVehicle[] }) {
         <motion.div
           key={v.id}
           whileHover={{ y: -4 }}
-          className="bg-white rounded-[24px] border border-slate-100 shadow-sm p-6 space-y-4 relative overflow-hidden group"
+          className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 space-y-4 relative overflow-hidden group"
         >
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-all">
             <Car size={80} strokeWidth={1} />
           </div>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xl font-black text-slate-900 tracking-tight">{v.plateNumber}</p>
+              <p className="text-xl font-semibold text-slate-900 tracking-tight">{v.plateNumber}</p>
               <p className="text-sm font-bold text-[#003366]">{v.brand} {v.model} {v.year ? `(${v.year})` : ''}</p>
             </div>
             <span className="px-3 py-1 bg-slate-100 text-slate-500 text-[10px] font-black rounded-full uppercase">
@@ -848,14 +848,14 @@ function VehicleList({ vehicles }: { vehicles: WorkshopVehicle[] }) {
           </div>
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div>
-              <p className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Pemilik</p>
+              <p className="font-semibold text-slate-400 uppercase tracking-tight text-[10px]">Pemilik</p>
               <div className="flex items-center gap-1 mt-0.5">
                 <User size={11} className="text-slate-400" />
                 <span className="font-bold text-slate-700">{v.contactName || '—'}</span>
               </div>
             </div>
             <div>
-              <p className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Odometer</p>
+              <p className="font-semibold text-slate-400 uppercase tracking-tight text-[10px]">Odometer</p>
               <div className="flex items-center gap-1 mt-0.5">
                 <Gauge size={11} className="text-slate-400" />
                 <span className="font-bold text-slate-700">{v.lastOdometer.toLocaleString('id-ID')} km</span>
@@ -863,12 +863,12 @@ function VehicleList({ vehicles }: { vehicles: WorkshopVehicle[] }) {
             </div>
             {v.color && (
               <div>
-                <p className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Warna</p>
+                <p className="font-semibold text-slate-400 uppercase tracking-tight text-[10px]">Warna</p>
                 <p className="font-bold text-slate-700 mt-0.5">{v.color}</p>
               </div>
             )}
             <div>
-              <p className="font-black text-slate-400 uppercase tracking-widest text-[10px]">BBM</p>
+              <p className="font-semibold text-slate-400 uppercase tracking-tight text-[10px]">BBM</p>
               <p className="font-bold text-slate-700 mt-0.5">{v.fuelType}</p>
             </div>
           </div>
@@ -889,7 +889,7 @@ function InvoiceList({ invoices, workOrders }: {
 }) {
   if (invoices.length === 0) {
     return (
-      <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-bold italic">
+      <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold italic">
         Belum ada invoice. Buat invoice dari SPK yang sudah selesai.
       </div>
     )
@@ -905,16 +905,16 @@ function InvoiceList({ invoices, workOrders }: {
   }
 
   return (
-    <div className="rounded-[24px] overflow-hidden border border-slate-100 shadow-sm">
+    <div className="rounded-xl overflow-hidden border border-slate-100 shadow-sm">
       <table className="w-full text-sm">
         <thead className="bg-slate-50">
           <tr>
-            <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">No. Invoice</th>
-            <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pelanggan</th>
-            <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ref. SPK</th>
-            <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tanggal</th>
-            <th className="text-right px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total</th>
-            <th className="text-center px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+            <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">No. Invoice</th>
+            <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Pelanggan</th>
+            <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Ref. SPK</th>
+            <th className="text-left px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Tanggal</th>
+            <th className="text-right px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Total</th>
+            <th className="text-center px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Status</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50">
@@ -937,7 +937,7 @@ function InvoiceList({ invoices, workOrders }: {
         </tbody>
         <tfoot className="bg-slate-50">
           <tr>
-            <td colSpan={4} className="px-5 py-3 text-right text-xs font-black text-slate-400 uppercase tracking-widest">Total</td>
+            <td colSpan={4} className="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-tight">Total</td>
             <td className="px-5 py-3 text-right font-black text-[#003366]">
               {formatRupiah(invoices.reduce((s, i) => s + i.grandTotal, 0))}
             </td>
@@ -958,7 +958,7 @@ const inputCls =
 function FormRow({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5">
+      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-tight mb-1.5">
         {label}{required && <span className="text-rose-400 ml-1">*</span>}
       </label>
       {children}
@@ -969,7 +969,7 @@ function FormRow({ label, required, children }: { label: string; required?: bool
 function InfoCell({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">{label}</p>
       <p className="text-sm font-medium text-slate-700 mt-0.5">{value}</p>
     </div>
   )
@@ -989,10 +989,10 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 40, opacity: 0 }}
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-[32px] w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
+        className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
       >
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
-          <h2 className="text-lg font-black text-slate-900">{title}</h2>
+          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
           <button onClick={onClose} className="p-2 text-slate-300 hover:text-slate-600 rounded-xl transition">
             <X size={20} />
           </button>

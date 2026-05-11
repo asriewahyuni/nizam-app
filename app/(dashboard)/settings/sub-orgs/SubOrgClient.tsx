@@ -450,7 +450,7 @@ export default function SubOrgClient({
     <div className="flex flex-col gap-8 w-full max-w-5xl mx-auto pb-20">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
          <div className="flex flex-col gap-2 max-w-xl">
-           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+           <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
              <Layers className="text-blue-600" size={32} />
              Anak Perusahaan / Afiliasi
            </h1>
@@ -474,7 +474,7 @@ export default function SubOrgClient({
                  }}
                  disabled={!canCreateMore}
                  title={!canCreateMore ? 'Batas entitas tercapai.' : ''}
-                 className="px-6 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 flex-1 shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                 className="px-6 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-semibold tracking-tight hover:bg-blue-700 transition-all flex items-center justify-center gap-2 flex-1 shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
                >
                  <Plus size={16} /> Tambah Anak Perusahaan
                </button>
@@ -485,7 +485,7 @@ export default function SubOrgClient({
                  onClick={() => setIsLinkModalOpen(true)}
                  disabled={!canCreateMore}
                  title={!canCreateMore ? 'Batas entitas tercapai.' : ''}
-                 className="px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-2 flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                 className="px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl text-[10px] font-semibold tracking-tight hover:bg-slate-50 transition-all flex items-center justify-center gap-2 flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
                >
                  <LinkIcon size={16} /> Tautkan Entitas
                </button>
@@ -503,7 +503,7 @@ export default function SubOrgClient({
           const currentCoAMode = normalizeCoAManagementMode(child.coa_management_mode)
 
           return (
-            <div key={child.id} className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8 space-y-6 flex flex-col justify-between">
+            <div key={child.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 space-y-6 flex flex-col justify-between">
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-4 min-w-0">
@@ -516,8 +516,8 @@ export default function SubOrgClient({
                        )}
                     </div>
                     <div className="min-w-0">
-                       <h3 className="text-xl font-black text-slate-900 truncate">{child.name}</h3>
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 truncate">Slug: {child.slug}</p>
+                       <h3 className="text-xl font-semibold text-slate-900 truncate">{child.name}</h3>
+                       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight mt-1 truncate">Slug: {child.slug}</p>
                        <div className="mt-2 flex flex-wrap items-center gap-2">
                          <span
                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.15em] ${
@@ -536,7 +536,7 @@ export default function SubOrgClient({
                     <button
                       type="button"
                       onClick={() => setEditingChild({ id: child.id, name: child.name })}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-[10px] font-black uppercase tracking-wider hover:bg-slate-50 transition"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-700 text-[10px] font-semibold uppercase tracking-tight hover:bg-slate-50 transition"
                     >
                       <Pencil size={12} />
                       Edit
@@ -546,7 +546,7 @@ export default function SubOrgClient({
                         type="button"
                         onClick={() => handleDeleteChild(child.id, child.name)}
                         disabled={deletingChildId === child.id}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 text-rose-700 text-[10px] font-black uppercase tracking-wider hover:bg-rose-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 text-rose-700 text-[10px] font-semibold uppercase tracking-tight hover:bg-rose-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Trash2 size={12} />
                         {deletingChildId === child.id ? 'Menghapus...' : 'Hapus'}
@@ -690,10 +690,10 @@ export default function SubOrgClient({
           )
         })}
       {childOrgList.length === 0 && (
-          <div className="col-span-1 md:col-span-2 border-2 border-dashed border-slate-200 rounded-[32px] bg-slate-50 p-8 md:p-12">
+          <div className="col-span-1 md:col-span-2 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 p-8 md:p-12">
             <div className="flex flex-col items-center justify-center text-center space-y-4">
               <Layers size={48} className="text-slate-300" />
-              <h3 className="text-lg font-black text-slate-700">Belum Ada Anak Perusahaan</h3>
+              <h3 className="text-lg font-semibold text-slate-700">Belum Ada Anak Perusahaan</h3>
               <p className="max-w-xl text-sm text-slate-500">
                 Mulai dari membuat entitas anak baru langsung dari halaman ini, atau tautkan organisasi mandiri yang sudah Anda miliki.
               </p>
@@ -707,7 +707,7 @@ export default function SubOrgClient({
                   setIsCreateModalOpen(true)
                 }}
                 disabled={!canMutate || !canCreateMore}
-                className="rounded-[28px] border border-blue-200 bg-white p-6 text-left transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-xl border border-blue-200 bg-white p-6 text-left transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
@@ -727,7 +727,7 @@ export default function SubOrgClient({
                 type="button"
                 onClick={() => setIsLinkModalOpen(true)}
                 disabled={!canMutate || availableUnlinkedOrgs.length === 0 || !canCreateMore}
-                className="rounded-[28px] border border-slate-200 bg-white p-6 text-left transition hover:border-slate-300 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-xl border border-slate-200 bg-white p-6 text-left transition hover:border-slate-300 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
@@ -766,13 +766,13 @@ export default function SubOrgClient({
           <motion.div
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
-            className="relative w-full max-w-6xl bg-white rounded-[40px] shadow-2xl overflow-hidden border-t-8 border-blue-600"
+            className="relative w-full max-w-6xl bg-white rounded-2xl shadow-2xl overflow-hidden border-t-8 border-blue-600"
           >
             <div className="p-8 md:p-10 border-b border-slate-100">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="space-y-2">
                   <p className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-600">Mapping Konsolidasi</p>
-                  <h3 className="text-2xl font-black text-slate-900">
+                  <h3 className="text-2xl font-semibold text-slate-900">
                     {mappingTargetChild?.name || 'Entitas Anak'}
                   </h3>
                   <p className="max-w-2xl text-sm font-medium text-slate-500">
@@ -784,7 +784,7 @@ export default function SubOrgClient({
                     type="button"
                     onClick={closeMappingModal}
                     disabled={mappingSaving}
-                    className="px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all disabled:opacity-50"
+                    className="px-5 py-3 rounded-2xl font-semibold text-xs uppercase tracking-tight text-slate-500 hover:bg-slate-100 transition-all disabled:opacity-50"
                   >
                     Tutup
                   </button>
@@ -792,7 +792,7 @@ export default function SubOrgClient({
                     type="button"
                     onClick={handleSaveCoAConsolidationMappings}
                     disabled={!mappingWorkspace || mappingLoading || mappingSaving || !canManageConsolidationMappings}
-                    className="px-6 py-3 rounded-2xl bg-blue-600 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all disabled:opacity-50"
+                    className="px-6 py-3 rounded-2xl bg-blue-600 text-white font-semibold text-xs uppercase tracking-tight shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all disabled:opacity-50"
                   >
                     {mappingSaving ? 'Menyimpan...' : 'Simpan Mapping'}
                   </button>
@@ -802,13 +802,13 @@ export default function SubOrgClient({
 
             <div className="max-h-[78vh] overflow-y-auto p-8 md:p-10 space-y-6 bg-slate-50">
               {mappingLoading ? (
-                <div className="rounded-[32px] border border-slate-200 bg-white p-10 flex items-center justify-center gap-3 text-slate-500">
+                <div className="rounded-xl border border-slate-200 bg-white p-10 flex items-center justify-center gap-3 text-slate-500">
                   <Loader2 size={18} className="animate-spin text-blue-600" />
                   <span className="text-sm font-semibold">Menyiapkan workspace mapping konsolidasi...</span>
                 </div>
               ) : mappingError ? (
-                <div className="rounded-[32px] border border-rose-200 bg-rose-50 p-8 space-y-4">
-                  <div className="text-lg font-black text-rose-800">Mapping konsolidasi belum bisa dibuka</div>
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-8 space-y-4">
+                  <div className="text-lg font-semibold text-rose-800">Mapping konsolidasi belum bisa dibuka</div>
                   <p className="text-sm font-medium text-rose-700">{mappingError}</p>
                   {mappingTargetChild && (
                     <button
@@ -823,31 +823,31 @@ export default function SubOrgClient({
               ) : mappingWorkspace ? (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="rounded-[28px] border border-slate-200 bg-white p-5">
+                    <div className="rounded-xl border border-slate-200 bg-white p-5">
                       <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Akun Lokal</div>
-                      <div className="mt-2 text-3xl font-black text-slate-900">{mappingWorkspace.summary.totalLocalAccounts}</div>
+                      <div className="mt-2 text-3xl font-semibold text-slate-900">{mappingWorkspace.summary.totalLocalAccounts}</div>
                       <div className="mt-1 text-xs font-medium text-slate-500">Akun aktif child LOCAL.</div>
                     </div>
-                    <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5">
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
                       <div className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">Terpetakan</div>
-                      <div className="mt-2 text-3xl font-black text-emerald-800">{draftMappedCount}</div>
+                      <div className="mt-2 text-3xl font-semibold text-emerald-800">{draftMappedCount}</div>
                       <div className="mt-1 text-xs font-medium text-emerald-700">Draft mapping yang siap dipakai laporan.</div>
                     </div>
-                    <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-5">
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
                       <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">Belum Terpetakan</div>
-                      <div className="mt-2 text-3xl font-black text-amber-800">
+                      <div className="mt-2 text-3xl font-semibold text-amber-800">
                         {Math.max(mappingWorkspace.summary.totalLocalAccounts - draftMappedCount, 0)}
                       </div>
                       <div className="mt-1 text-xs font-medium text-amber-700">Akun ini masih muncul dengan struktur lokal child.</div>
                     </div>
-                    <div className="rounded-[28px] border border-blue-200 bg-blue-50 p-5">
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
                       <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-700">Saran Kode Sama</div>
-                      <div className="mt-2 text-3xl font-black text-blue-800">{suggestedDraftCount}</div>
+                      <div className="mt-2 text-3xl font-semibold text-blue-800">{suggestedDraftCount}</div>
                       <div className="mt-1 text-xs font-medium text-blue-700">Bisa diisi cepat dari akun holding berkode sama.</div>
                     </div>
                   </div>
 
-                  <div className="rounded-[32px] border border-slate-200 bg-white p-5 md:p-6 space-y-4">
+                  <div className="rounded-xl border border-slate-200 bg-white p-5 md:p-6 space-y-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
                         <div className="text-sm font-black text-slate-900">Peta Akun Lokal ke Akun Holding</div>
@@ -882,7 +882,7 @@ export default function SubOrgClient({
                           : null
 
                         return (
-                          <div key={account.id} className="grid grid-cols-1 gap-3 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:items-center">
+                          <div key={account.id} className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:items-center">
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-xs font-black text-blue-700">{account.code}</span>
@@ -947,7 +947,7 @@ export default function SubOrgClient({
                     </div>
 
                     {filteredMappingLocalAccounts.length === 0 && (
-                      <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm font-medium text-slate-500">
+                      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm font-medium text-slate-500">
                         Tidak ada akun lokal yang cocok dengan pencarian saat ini.
                       </div>
                     )}
@@ -965,8 +965,8 @@ export default function SubOrgClient({
             className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
             onClick={() => !createLoading && setIsCreateModalOpen(false)}
           />
-          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl p-10">
-            <h3 className="text-2xl font-black text-slate-900 mb-2">Tambah Anak Perusahaan</h3>
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl p-10">
+            <h3 className="text-2xl font-semibold text-slate-900 mb-2">Tambah Anak Perusahaan</h3>
             <p className="text-sm text-slate-500 mb-8">
               Buat organisasi anak baru yang langsung terhubung ke holding ini. Unit utama dan struktur dasarnya akan disiapkan otomatis.
             </p>
@@ -992,14 +992,14 @@ export default function SubOrgClient({
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all"
+                  className="px-6 py-3 rounded-2xl font-semibold text-xs uppercase tracking-tight text-slate-500 hover:bg-slate-100 transition-all"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={createLoading}
-                  className="px-8 py-3 rounded-2xl bg-blue-600 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all disabled:opacity-50"
+                  className="px-8 py-3 rounded-2xl bg-blue-600 text-white font-semibold text-xs uppercase tracking-tight shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all disabled:opacity-50"
                 >
                   {createLoading ? 'Membuat...' : 'Buat Anak Perusahaan'}
                 </button>
@@ -1012,8 +1012,8 @@ export default function SubOrgClient({
       {isLinkModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !loading && setIsLinkModalOpen(false)} />
-          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl p-10">
-            <h3 className="text-2xl font-black text-slate-900 mb-2">Tautkan Entitas Afiliasi</h3>
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl p-10">
+            <h3 className="text-2xl font-semibold text-slate-900 mb-2">Tautkan Entitas Afiliasi</h3>
             <p className="text-sm text-slate-500 mb-8">Pilih organisasi yang sudah Anda miliki untuk digabungkan konterks laporannya di bawah Holding ini.</p>
             
             <form onSubmit={handleLinkOrg} className="space-y-6">
@@ -1028,8 +1028,8 @@ export default function SubOrgClient({
                </div>
                
                <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
-                  <button type="button" onClick={() => setIsLinkModalOpen(false)} className="px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all">Batal</button>
-                  <button type="submit" disabled={loading} className="px-8 py-3 rounded-2xl bg-blue-600 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all disabled:opacity-50">
+                  <button type="button" onClick={() => setIsLinkModalOpen(false)} className="px-6 py-3 rounded-2xl font-semibold text-xs uppercase tracking-tight text-slate-500 hover:bg-slate-100 transition-all">Batal</button>
+                  <button type="submit" disabled={loading} className="px-8 py-3 rounded-2xl bg-blue-600 text-white font-semibold text-xs uppercase tracking-tight shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all disabled:opacity-50">
                      {loading ? 'Menyimpan...' : 'Tautkan Sekarang'}
                   </button>
                </div>
@@ -1041,8 +1041,8 @@ export default function SubOrgClient({
       {editingChild && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !editLoading && setEditingChild(null)} />
-          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl p-10">
-            <h3 className="text-2xl font-black text-slate-900 mb-2">Edit Anak Perusahaan</h3>
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl p-10">
+            <h3 className="text-2xl font-semibold text-slate-900 mb-2">Edit Anak Perusahaan</h3>
             <p className="text-sm text-slate-500 mb-8">Perbarui nama organisasi anak. Slug akan disesuaikan otomatis.</p>
 
             <form onSubmit={handleEditChild} className="space-y-6">
@@ -1061,14 +1061,14 @@ export default function SubOrgClient({
                 <button
                   type="button"
                   onClick={() => setEditingChild(null)}
-                  className="px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 hover:bg-slate-100 transition-all"
+                  className="px-6 py-3 rounded-2xl font-semibold text-xs uppercase tracking-tight text-slate-500 hover:bg-slate-100 transition-all"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={editLoading}
-                  className="px-8 py-3 rounded-2xl bg-blue-600 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all disabled:opacity-50"
+                  className="px-8 py-3 rounded-2xl bg-blue-600 text-white font-semibold text-xs uppercase tracking-tight shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all disabled:opacity-50"
                 >
                   {editLoading ? 'Menyimpan...' : 'Simpan Perubahan'}
                 </button>
@@ -1089,7 +1089,7 @@ export default function SubOrgClient({
           >
             <div className="flex items-start justify-between mb-6">
               <div>
-                <h3 className="text-2xl font-black text-slate-900">Upload Chart of Accounts</h3>
+                <h3 className="text-2xl font-semibold text-slate-900">Upload Chart of Accounts</h3>
                 <p className="text-sm text-slate-500 mt-1">
                   {childOrgList.find((c) => c.id === uploadingCoAForChildId)?.name}
                 </p>

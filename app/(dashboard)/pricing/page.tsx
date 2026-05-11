@@ -116,7 +116,7 @@ export default function PricingPage() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
-              className={`relative flex flex-col rounded-[32px] border overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl
+              className={`relative flex flex-col rounded-xl border overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl
                 ${isEnterprise ? 'border-[#003366]/30 shadow-xl shadow-[#003366]/10' : 'border-slate-200 shadow-md'}
                 ${isCurrentPlan ? 'ring-2 ring-[#003366] ring-offset-2' : ''}
               `}
@@ -124,22 +124,22 @@ export default function PricingPage() {
               {/* Top Gradient Header */}
               <div className={`bg-gradient-to-br ${gradient} p-6 text-white`}>
                 {isCurrentPlan && (
-                  <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-white/20">
+                  <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm text-white text-[9px] font-semibold tracking-tight px-3 py-1 rounded-full border border-white/20">
                     Paket Aktif
                   </div>
                 )}
                 <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mb-4">
                   <Icon size={24} className={isEnterprise ? 'text-amber-300' : 'text-white'} />
                 </div>
-                <h3 className="text-2xl font-black tracking-tight">{pkg.name}</h3>
+                <h3 className="text-2xl font-semibold tracking-tight">{pkg.name}</h3>
                 <div className="mt-3 flex items-baseline gap-1">
-                  <span className="text-3xl font-black font-mono">
+                  <span className="text-3xl font-semibold font-mono">
                     {pkg.price === 0 ? 'Gratis' : `Rp ${pkg.price.toLocaleString('id-ID')}`}
                   </span>
                   {pkg.price > 0 && <span className="text-white/60 text-sm font-bold">/{pkg.billing}</span>}
                 </div>
                 {pkg.duration_days && (
-                  <p className="text-[10px] text-white/60 font-bold mt-1 uppercase tracking-wider">
+                  <p className="text-[10px] text-white/60 font-bold mt-1 tracking-tight">
                     Durasi: {pkg.duration_days} Hari
                   </p>
                 )}
@@ -150,7 +150,7 @@ export default function PricingPage() {
                 {/* Section: Limits */}
                 <div className="grid grid-cols-2 gap-3 pb-5 border-b border-dashed border-slate-200">
                   <div className="flex flex-col gap-1">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Entitas</p>
+                    <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-tight leading-none mb-1">Entitas</p>
                     <div className="flex items-center gap-1.5 text-slate-900">
                       <div className="w-5 h-5 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-100">
                         <Building2 size={12} className="text-emerald-600" />
@@ -159,7 +159,7 @@ export default function PricingPage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-1 border-l border-slate-100 pl-3">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Gudang/WMS</p>
+                    <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-tight leading-none mb-1">Gudang/WMS</p>
                     <div className="flex items-center gap-1.5 text-slate-900">
                       <div className="w-5 h-5 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-100">
                         <Warehouse size={12} className="text-emerald-600" />
@@ -181,7 +181,7 @@ export default function PricingPage() {
                   </div>
 
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 px-1">Paket Fitur Lengkap:</p>
+                    <p className="text-[10px] font-semibold tracking-tight text-slate-400 mb-4 px-1">Paket Fitur Lengkap:</p>
                     <div className="space-y-4">
                       {architectureSections.map((section) => (
                         <div key={`${pkg.id}-${section.title}`}>
@@ -247,16 +247,16 @@ export default function PricingPage() {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
-        className="bg-slate-900 rounded-[40px] p-8 md:p-12 text-white relative overflow-hidden"
+        className="bg-slate-900 rounded-2xl p-8 md:p-12 text-white relative overflow-hidden"
       >
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-[100px]" />
         
         <div className="relative z-10 flex flex-col md:flex-row items-center gap-12">
           <div className="flex-1 space-y-6 text-center md:text-left">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/20 text-blue-300 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-500/30">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/20 text-blue-300 rounded-full text-[10px] font-semibold tracking-tight border border-blue-500/30">
               Module Marketplace & Add-on Marketplace
             </div>
-            <h2 className="text-4xl font-black tracking-tighter">Butuh Lapisan Tambahan? <br />Aktifkan Sesuai Kebutuhan.</h2>
+            <h2 className="text-4xl font-semibold tracking-tighter">Butuh Lapisan Tambahan? <br />Aktifkan Sesuai Kebutuhan.</h2>
             <p className="text-slate-400 font-bold max-w-lg">
               Core Family tetap stabil. Tinggal tambahkan Module atau Add-on saat bisnis butuh perluasan proses, channel, atau kapasitas.
             </p>
@@ -279,13 +279,13 @@ export default function PricingPage() {
                           <Icon size={20} className="text-blue-400" />
                         </div>
                         <div>
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{addon.name}</p>
+                          <p className="text-xs font-semibold text-slate-400 uppercase tracking-tight">{addon.name}</p>
                           {addon.anchorPrice && addon.anchorPrice > addon.price && (
                             <p className="text-[10px] font-bold text-slate-500 line-through">
                               {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(addon.anchorPrice)}
                             </p>
                           )}
-                          <p className="text-xl font-black text-white">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(addon.price)}</p>
+                          <p className="text-xl font-semibold text-white">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(addon.price)}</p>
                           <p className="text-[10px] text-slate-500 font-bold">{getOperatorMarketplaceLabel(addon)} • {meta.detail}</p>
                           <p className="text-[10px] text-blue-200 font-black uppercase tracking-[0.16em]">
                             Min. {getSaasCoreFamilyLabel(getOperatorMarketplaceMinCoreFamily(addon))}

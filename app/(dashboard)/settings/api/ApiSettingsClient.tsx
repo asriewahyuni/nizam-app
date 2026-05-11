@@ -173,7 +173,7 @@ function ScopeBadge({ scope }: { scope: string }) {
   }
   const color = colorMap[def?.color ?? 'blue'] ?? 'bg-slate-100 text-slate-600'
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${color}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-tight ${color}`}>
       {def?.label ?? scope}
     </span>
   )
@@ -2310,7 +2310,7 @@ export function ApiSettingsClient({
 
       {/* ── Header ── */}
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+        <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
           <Code className="text-violet-600" size={32} />
           OPEN API & INTEGRASI
         </h1>
@@ -2320,7 +2320,7 @@ export function ApiSettingsClient({
       </div>
 
       {/* ── Base URL info card ── */}
-      <div className="rounded-[28px] border border-violet-100 bg-gradient-to-r from-violet-50 via-white to-slate-50 p-5 shadow-sm">
+      <div className="rounded-xl border border-violet-100 bg-gradient-to-r from-violet-50 via-white to-slate-50 p-5 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-600 mb-1">Base URL API</p>
@@ -2342,11 +2342,11 @@ export function ApiSettingsClient({
         </div>
       </div>
 
-      <div className="rounded-[32px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-amber-50 p-6 shadow-sm space-y-5">
+      <div className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-amber-50 p-6 shadow-sm space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">Onboarding Checklist</p>
-            <h2 className="text-xl font-black text-slate-900">Kesiapan Integrasi Open API</h2>
+            <h2 className="text-xl font-semibold text-slate-900">Kesiapan Integrasi Open API</h2>
             <p className="text-sm text-slate-600 font-medium">
               Checklist ini memastikan endpoint write tidak macet karena key, rekening, atau mapping default belum siap.
             </p>
@@ -2361,7 +2361,7 @@ export function ApiSettingsClient({
           {onboardingItems.map((item) => (
             <div
               key={item.id}
-              className={`rounded-[24px] border p-4 ${
+              className={`rounded-xl border p-4 ${
                 item.ready
                   ? 'border-emerald-200 bg-white'
                   : 'border-amber-200 bg-amber-50/70'
@@ -2381,10 +2381,10 @@ export function ApiSettingsClient({
         </div>
       </div>
 
-      <div className="rounded-[32px] border border-slate-100 bg-white p-6 shadow-sm space-y-5">
+      <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm space-y-5">
         <div className="flex flex-col gap-2">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">OpenAPI 3.1 Documentation</p>
-          <h2 className="text-xl font-black text-slate-900">International-Standard API Reference</h2>
+          <h2 className="text-xl font-semibold text-slate-900">International-Standard API Reference</h2>
           <p className="text-sm text-slate-500 font-medium">
             Referensi ini mengikuti struktur OpenAPI: operation summary, operationId, security scheme, parameters, request body, responses, dan contoh payload.
           </p>
@@ -2396,7 +2396,7 @@ export function ApiSettingsClient({
               key={doc.id}
               type="button"
               onClick={() => setActiveDoc(doc.id)}
-              className={`px-4 py-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+              className={`px-4 py-2 rounded-2xl border text-[11px] font-semibold tracking-tight transition-all ${
                 activeDoc === doc.id
                   ? 'bg-slate-900 text-white border-slate-900 shadow-md'
                   : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'
@@ -2409,9 +2409,9 @@ export function ApiSettingsClient({
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-5">
-          <div className="rounded-[28px] border border-slate-100 bg-slate-50 p-5 space-y-4">
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-5 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="px-3 py-1 rounded-xl bg-white border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-700">
+              <div className="px-3 py-1 rounded-xl bg-white border border-slate-200 text-[10px] font-semibold tracking-tight text-slate-700">
                 {activeEndpointDoc.method}
               </div>
               <code className="text-sm font-black text-slate-900">{activeEndpointDoc.path}</code>
@@ -2423,16 +2423,16 @@ export function ApiSettingsClient({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-violet-100 text-violet-700 text-[10px] font-black uppercase tracking-widest">
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-violet-100 text-violet-700 text-[10px] font-semibold tracking-tight">
                 <Shield size={12} /> Scope: {activeEndpointDoc.scope}
               </span>
-              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-200 text-slate-700 text-[10px] font-black uppercase tracking-widest">
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-200 text-slate-700 text-[10px] font-semibold tracking-tight">
                 <Lock size={12} /> Security: {activeEndpointDoc.auth.join(' / ')}
               </span>
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Operation Metadata</p>
+              <p className="text-[10px] font-semibold tracking-tight text-slate-400">Operation Metadata</p>
               <div className="space-y-2">
                 <div className="rounded-2xl bg-white border border-slate-100 px-4 py-3 text-sm text-slate-600">
                   <span className="font-black text-slate-800">operationId:</span> {activeEndpointDoc.operationId}
@@ -2444,14 +2444,14 @@ export function ApiSettingsClient({
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Parameters</p>
+              <p className="text-[10px] font-semibold tracking-tight text-slate-400">Parameters</p>
               <div className="space-y-2">
                 {activeEndpointDoc.parameters.map((item: EndpointParameter) => (
                   <div key={`${item.in}-${item.name}`} className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-black text-slate-900">{item.name}</span>
-                      <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">{item.in}</span>
-                      <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">{item.required ? 'required' : 'optional'}</span>
+                      <span className="text-[10px] uppercase font-semibold tracking-tight text-slate-400">{item.in}</span>
+                      <span className="text-[10px] uppercase font-semibold tracking-tight text-slate-400">{item.required ? 'required' : 'optional'}</span>
                     </div>
                     <p className="mt-1 text-xs text-slate-500">Schema: {item.schema}</p>
                     <p className="mt-1">{item.description}</p>
@@ -2462,7 +2462,7 @@ export function ApiSettingsClient({
 
             {activeEndpointDoc.requestBody && (
               <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Request Body</p>
+                <p className="text-[10px] font-semibold tracking-tight text-slate-400">Request Body</p>
                 <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
                   <p><span className="font-black text-slate-900">Required:</span> {activeEndpointDoc.requestBody.required ? 'yes' : 'no'}</p>
                   <p className="mt-1"><span className="font-black text-slate-900">Content-Type:</span> {activeEndpointDoc.requestBody.contentType}</p>
@@ -2476,7 +2476,7 @@ export function ApiSettingsClient({
             )}
 
             <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Responses</p>
+              <p className="text-[10px] font-semibold tracking-tight text-slate-400">Responses</p>
               <div className="space-y-2">
                 {activeEndpointDoc.responses.map((item: EndpointResponse) => (
                   <div key={item.status} className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600">
@@ -2487,7 +2487,7 @@ export function ApiSettingsClient({
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Implementation Notes</p>
+              <p className="text-[10px] font-semibold tracking-tight text-slate-400">Implementation Notes</p>
               <div className="space-y-2">
                 {activeEndpointDoc.notes.map((note) => (
                   <div key={note} className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900/80">
@@ -2499,9 +2499,9 @@ export function ApiSettingsClient({
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-[28px] border border-slate-100 bg-white p-5 space-y-3">
+            <div className="rounded-xl border border-slate-100 bg-white p-5 space-y-3">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Example Templates</p>
+                <p className="text-[10px] font-semibold tracking-tight text-slate-400">Example Templates</p>
                 <p className="text-sm text-slate-500 mt-1">
                   Pilih contoh yang akan dipakai untuk dokumentasi visual dan prefill di tab Try API.
                 </p>
@@ -2512,7 +2512,7 @@ export function ApiSettingsClient({
                     key={example.id}
                     type="button"
                     onClick={() => setActiveExampleId(example.id)}
-                    className={`px-4 py-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+                    className={`px-4 py-2 rounded-2xl border text-[11px] font-semibold tracking-tight transition-all ${
                       activeEndpointExample.id === example.id
                         ? 'bg-violet-600 text-white border-violet-600 shadow-md'
                         : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-violet-300'
@@ -2527,20 +2527,20 @@ export function ApiSettingsClient({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-slate-100 bg-slate-950 p-5">
+            <div className="rounded-xl border border-slate-100 bg-slate-950 p-5">
               <div className="flex items-center gap-2 mb-3 text-slate-300">
                 <Globe size={14} />
-                <p className="text-[10px] font-black uppercase tracking-widest">Contoh Request</p>
+                <p className="text-[10px] font-semibold tracking-tight">Contoh Request</p>
               </div>
               <pre className="text-[11px] text-emerald-300 font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap">
 {activeEndpointExample.curl}
               </pre>
             </div>
 
-            <div className="rounded-[28px] border border-slate-100 bg-white p-5">
+            <div className="rounded-xl border border-slate-100 bg-white p-5">
               <div className="flex items-center gap-2 mb-3 text-slate-500">
                 <Code size={14} />
-                <p className="text-[10px] font-black uppercase tracking-widest">Contoh Response</p>
+                <p className="text-[10px] font-semibold tracking-tight">Contoh Response</p>
               </div>
               <pre className="text-[11px] text-slate-700 font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap">
 {activeEndpointExample.response}
@@ -2565,7 +2565,7 @@ export function ApiSettingsClient({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-semibold tracking-tight transition-all ${
                 activeTab === tab.id
                   ? 'bg-white text-slate-900 shadow-md'
                   : 'text-slate-400 hover:text-slate-600'
@@ -2589,7 +2589,7 @@ export function ApiSettingsClient({
               <p className="text-sm text-slate-500 font-medium">{apiKeys.length} API key terdaftar</p>
               <button
                 onClick={() => setShowGenModal(true)}
-                className="flex items-center gap-2 px-5 py-3 bg-violet-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 active:scale-95"
+                className="flex items-center gap-2 px-5 py-3 bg-violet-600 text-white rounded-2xl text-[11px] font-semibold tracking-tight hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 active:scale-95"
               >
                 <Plus size={14} /> Buat API Key Baru
               </button>
@@ -2599,7 +2599,7 @@ export function ApiSettingsClient({
           {/* Keys list */}
           <div className="space-y-3">
             {apiKeys.length === 0 && (
-              <div className="rounded-[28px] border border-dashed border-slate-200 py-16 flex flex-col items-center gap-3 text-slate-400">
+              <div className="rounded-xl border border-dashed border-slate-200 py-16 flex flex-col items-center gap-3 text-slate-400">
                 <Key size={32} strokeWidth={1} />
                 <p className="text-sm font-bold">Belum ada API key</p>
                 <p className="text-xs">Buat key baru untuk mulai integrasi</p>
@@ -2610,7 +2610,7 @@ export function ApiSettingsClient({
                 key={key.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`rounded-[24px] border p-5 flex flex-col sm:flex-row sm:items-center gap-4 justify-between ${
+                className={`rounded-xl border p-5 flex flex-col sm:flex-row sm:items-center gap-4 justify-between ${
                   key.is_active ? 'bg-white border-slate-100 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-60'
                 }`}
               >
@@ -2624,7 +2624,7 @@ export function ApiSettingsClient({
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-black text-slate-900">{key.name}</p>
                       {!key.is_active && (
-                        <span className="px-2 py-0.5 rounded-lg bg-red-100 text-red-600 text-[9px] font-black uppercase tracking-widest">Dinonaktifkan</span>
+                        <span className="px-2 py-0.5 rounded-lg bg-red-100 text-red-600 text-[9px] font-semibold tracking-tight">Dinonaktifkan</span>
                       )}
                     </div>
                     <code className="text-[11px] text-slate-400 font-mono">{key.key_prefix}{'•'.repeat(16)}</code>
@@ -2664,7 +2664,7 @@ export function ApiSettingsClient({
                     <button
                       onClick={() => handleOpenEditKey(key)}
                       disabled={loading}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-2xl text-[10px] font-semibold tracking-tight hover:bg-slate-200 transition-all disabled:opacity-50"
                     >
                       <Pencil size={13} /> Edit
                     </button>
@@ -2672,7 +2672,7 @@ export function ApiSettingsClient({
                       <button
                         onClick={() => handleRevoke(key.id, key.name)}
                         disabled={loading}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all disabled:opacity-50"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-2xl text-[10px] font-semibold tracking-tight hover:bg-red-100 transition-all disabled:opacity-50"
                       >
                         <Trash2 size={13} /> Revoke
                       </button>
@@ -2684,8 +2684,8 @@ export function ApiSettingsClient({
           </div>
 
           {/* Docs hint */}
-          <div className="rounded-[20px] border border-slate-100 bg-slate-50 p-5">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Cara Menggunakan</p>
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-5">
+            <p className="text-[10px] font-semibold tracking-tight text-slate-400 mb-2">Cara Menggunakan</p>
             <pre className="text-[11px] text-slate-600 font-mono leading-relaxed overflow-x-auto">
 {`curl ${baseUrl}/api/v1/cash \\
   -H "x-api-key: nzm_live_<your-key>" \\
@@ -2700,10 +2700,10 @@ export function ApiSettingsClient({
 
       {activeTab === 'tryout' && (
         <div className="grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-5">
-          <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-6 space-y-5">
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 space-y-5">
             <div className="space-y-2">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Interactive Console</p>
-              <h3 className="text-xl font-black text-slate-900">Try API with Real Key</h3>
+              <h3 className="text-xl font-semibold text-slate-900">Try API with Real Key</h3>
               <p className="text-sm text-slate-500 font-medium">
                 Gunakan API key yang baru dibuat untuk menguji endpoint langsung dari browser pada origin saat ini.
               </p>
@@ -2717,7 +2717,7 @@ export function ApiSettingsClient({
                     key={`try-${doc.id}`}
                     type="button"
                     onClick={() => setActiveDoc(doc.id)}
-                    className={`px-4 py-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+                    className={`px-4 py-2 rounded-2xl border text-[11px] font-semibold tracking-tight transition-all ${
                       activeDoc === doc.id
                         ? 'bg-slate-900 text-white border-slate-900 shadow-md'
                         : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'
@@ -2737,7 +2737,7 @@ export function ApiSettingsClient({
                     key={`try-example-${example.id}`}
                     type="button"
                     onClick={() => setActiveExampleId(example.id)}
-                    className={`px-4 py-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+                    className={`px-4 py-2 rounded-2xl border text-[11px] font-semibold tracking-tight transition-all ${
                       activeEndpointExample.id === example.id
                         ? 'bg-violet-600 text-white border-violet-600 shadow-md'
                         : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300'
@@ -2761,7 +2761,7 @@ export function ApiSettingsClient({
                       key={mode}
                       type="button"
                       onClick={() => setTryAuthMode(mode)}
-                      className={`px-4 py-3 rounded-2xl border text-[11px] font-black uppercase tracking-widest transition-all ${
+                      className={`px-4 py-3 rounded-2xl border text-[11px] font-semibold tracking-tight transition-all ${
                         tryAuthMode === mode
                           ? 'bg-violet-600 text-white border-violet-600'
                           : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300'
@@ -2842,7 +2842,7 @@ export function ApiSettingsClient({
                 type="button"
                 onClick={handleRunTryout}
                 disabled={tryLoading}
-                className="px-6 py-3 bg-violet-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50"
+                className="px-6 py-3 bg-violet-600 text-white rounded-2xl text-[11px] font-semibold tracking-tight hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50"
               >
                 {tryLoading ? 'Menjalankan...' : 'Run Request'}
               </button>
@@ -2850,13 +2850,13 @@ export function ApiSettingsClient({
           </div>
 
           <div className="space-y-5">
-            <div className="bg-slate-950 rounded-[32px] border border-slate-800 p-6 space-y-4 shadow-sm">
+            <div className="bg-slate-950 rounded-xl border border-slate-800 p-6 space-y-4 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Response</p>
-                  <h3 className="text-lg font-black text-white">Live Result</h3>
+                  <h3 className="text-lg font-semibold text-white">Live Result</h3>
                 </div>
-                <div className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest ${
+                <div className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold tracking-tight ${
                   tryStatus === null
                     ? 'bg-slate-800 text-slate-300'
                     : tryStatus < 300
@@ -2871,19 +2871,19 @@ export function ApiSettingsClient({
               </pre>
             </div>
 
-            <div className="bg-white rounded-[32px] border border-slate-100 p-6 space-y-3 shadow-sm">
+            <div className="bg-white rounded-xl border border-slate-100 p-6 space-y-3 shadow-sm">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Current Operation</p>
-              <h4 className="text-lg font-black text-slate-900">{activeEndpointDoc.summary}</h4>
+              <h4 className="text-lg font-semibold text-slate-900">{activeEndpointDoc.summary}</h4>
               <p className="text-sm text-slate-500">{activeEndpointDoc.description}</p>
               <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 <span className="font-black text-slate-900">Template aktif:</span> {activeEndpointExample.label}
                 <p className="mt-1 text-slate-500">{activeEndpointExample.description}</p>
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
-                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-violet-100 text-violet-700 text-[10px] font-black uppercase tracking-widest">
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-violet-100 text-violet-700 text-[10px] font-semibold tracking-tight">
                   <Shield size={12} /> Scope: {activeEndpointDoc.scope}
                 </span>
-                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-widest">
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-[10px] font-semibold tracking-tight">
                   <Code size={12} /> operationId: {activeEndpointDoc.operationId}
                 </span>
               </div>
@@ -2903,13 +2903,13 @@ export function ApiSettingsClient({
       {/* TAB: CASH IN CONFIG                           */}
       {/* ══════════════════════════════════════════════ */}
       {activeTab === 'cashin' && (
-        <div className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-8">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-8">
           <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
             <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center">
               <ArrowDownCircle size={20} className="text-emerald-600" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Konfigurasi Cash In</h3>
+              <h3 className="text-lg font-semibold text-slate-900 uppercase tracking-tight">Konfigurasi Cash In</h3>
               <p className="text-xs text-slate-400 font-medium mt-0.5">Akun tujuan & parameter saat POST /api/v1/cash {"{ type: 'in' }"}</p>
             </div>
           </div>
@@ -2956,7 +2956,7 @@ export function ApiSettingsClient({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-emerald-100 bg-emerald-50/60 p-5 space-y-4">
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-5 space-y-4">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">Mapping Settlement Lanjutan</p>
                 <p className="text-xs text-emerald-900/70 font-medium mt-1">Digunakan ketika request mengirim `settlement_type` agar kas masuk otomatis diarahkan ke akun piutang, hutang, pajak, diskon, atau biaya lain.</p>
@@ -3055,7 +3055,7 @@ export function ApiSettingsClient({
             <button
               onClick={handleSaveConfig}
               disabled={loading}
-              className="flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 disabled:opacity-50 active:scale-95"
+              className="flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white rounded-2xl text-[11px] font-semibold tracking-tight hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 disabled:opacity-50 active:scale-95"
             >
               <Check size={15} /> {loading ? 'Menyimpan...' : 'Simpan Konfigurasi Cash In'}
             </button>
@@ -3067,13 +3067,13 @@ export function ApiSettingsClient({
       {/* TAB: CASH OUT CONFIG                          */}
       {/* ══════════════════════════════════════════════ */}
       {activeTab === 'cashout' && (
-        <div className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-8">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-8">
           <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
             <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center">
               <ArrowUpCircle size={20} className="text-rose-500" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Konfigurasi Cash Out</h3>
+              <h3 className="text-lg font-semibold text-slate-900 uppercase tracking-tight">Konfigurasi Cash Out</h3>
               <p className="text-xs text-slate-400 font-medium mt-0.5">Akun sumber & parameter saat POST /api/v1/cash {"{ type: 'out' }"}</p>
             </div>
           </div>
@@ -3120,7 +3120,7 @@ export function ApiSettingsClient({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-rose-100 bg-rose-50/60 p-5 space-y-4">
+            <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-5 space-y-4">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-700">Mapping Settlement Lanjutan</p>
                 <p className="text-xs text-rose-900/70 font-medium mt-1">Digunakan ketika request mengirim `settlement_type` agar kas keluar otomatis diarahkan ke akun piutang, hutang, pajak, diskon, atau biaya lain.</p>
@@ -3219,7 +3219,7 @@ export function ApiSettingsClient({
             <button
               onClick={handleSaveConfig}
               disabled={loading}
-              className="flex items-center gap-2 px-8 py-4 bg-rose-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 disabled:opacity-50 active:scale-95"
+              className="flex items-center gap-2 px-8 py-4 bg-rose-600 text-white rounded-2xl text-[11px] font-semibold tracking-tight hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 disabled:opacity-50 active:scale-95"
             >
               <Check size={15} /> {loading ? 'Menyimpan...' : 'Simpan Konfigurasi Cash Out'}
             </button>
@@ -3232,13 +3232,13 @@ export function ApiSettingsClient({
       {/* ══════════════════════════════════════════════ */}
       {activeTab === 'webhook' && (
         <div className="space-y-5">
-          <div className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-8">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-8">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
               <div className="w-10 h-10 rounded-2xl bg-violet-100 flex items-center justify-center">
                 <Webhook size={20} className="text-violet-600" />
               </div>
               <div>
-                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Konfigurasi Webhook</h3>
+                <h3 className="text-lg font-semibold text-slate-900 uppercase tracking-tight">Konfigurasi Webhook</h3>
                 <p className="text-xs text-slate-400 font-medium mt-0.5">Nizam push notifikasi ke URL Anda saat ada event transaksi.</p>
               </div>
             </div>
@@ -3307,7 +3307,7 @@ export function ApiSettingsClient({
                             ? c.webhook_events.filter(e => e !== option.value)
                             : [...c.webhook_events, option.value],
                         }))}
-                        className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border ${
+                        className={`px-4 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-tight transition-all border ${
                           active
                             ? 'bg-violet-600 text-white border-violet-600 shadow-md'
                             : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300'
@@ -3321,9 +3321,9 @@ export function ApiSettingsClient({
               </div>
 
               {config.webhook_events.includes('inventory_movement') && (
-                <div className="rounded-[28px] border border-violet-100 bg-violet-50/50 p-5 space-y-5">
+                <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-5 space-y-5">
                   <div>
-                    <p className="text-[10px] font-black text-violet-700 uppercase tracking-widest">Filter Inventory Movement</p>
+                    <p className="text-[10px] font-semibold text-violet-700 uppercase tracking-tight">Filter Inventory Movement</p>
                     <p className="text-xs text-violet-700/80 mt-1">
                       Deteksi stok masuk atau keluar dihitung dari tanda `quantity` pada `stock_movements`, bukan dari akun buku besar.
                       Kosongkan filter jika webhook harus dikirim untuk semua mutasi inventory.
@@ -3346,7 +3346,7 @@ export function ApiSettingsClient({
                                 ? current.webhook_inventory_directions.filter((value) => value !== option.value)
                                 : [...current.webhook_inventory_directions, option.value],
                             }))}
-                            className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border ${
+                            className={`px-4 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-tight transition-all border ${
                               active
                                 ? 'bg-violet-600 text-white border-violet-600 shadow-md'
                                 : 'bg-white text-slate-500 border-violet-200 hover:border-violet-400'
@@ -3375,7 +3375,7 @@ export function ApiSettingsClient({
                                 ? current.webhook_inventory_reference_types.filter((value) => value !== option.value)
                                 : [...current.webhook_inventory_reference_types, option.value],
                             }))}
-                            className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border ${
+                            className={`px-4 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-tight transition-all border ${
                               active
                                 ? 'bg-white text-violet-700 border-violet-400 shadow-sm'
                                 : 'bg-white/80 text-slate-500 border-violet-100 hover:border-violet-300'
@@ -3395,7 +3395,7 @@ export function ApiSettingsClient({
 
               {/* Signature hint */}
               <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
-                <p className="text-[10px] font-black text-violet-700 uppercase tracking-widest mb-2">Verifikasi Signature di Server Anda</p>
+                <p className="text-[10px] font-semibold text-violet-700 uppercase tracking-tight mb-2">Verifikasi Signature di Server Anda</p>
                 <pre className="text-[11px] text-violet-800 font-mono leading-relaxed overflow-x-auto">
 {`// Node.js / TypeScript
 const crypto = require('crypto')
@@ -3415,7 +3415,7 @@ if (signature !== expected) {
                 </pre>
               </div>
 
-              <div className="rounded-[30px] border border-slate-100 bg-slate-50/80 p-6 space-y-5">
+              <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-6 space-y-5">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Payload Reference</p>
@@ -3439,7 +3439,7 @@ if (signature !== expected) {
                         : 'bg-amber-100 text-amber-700 border-amber-200'
 
                     return (
-                      <div key={card.event} className="rounded-[26px] border border-slate-200 bg-white p-5 space-y-4">
+                      <div key={card.event} className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
@@ -3534,7 +3534,7 @@ if (signature !== expected) {
               <button
                 onClick={handleSaveConfig}
                 disabled={loading}
-                className="flex items-center gap-2 px-8 py-4 bg-violet-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
+                className="flex items-center gap-2 px-8 py-4 bg-violet-600 text-white rounded-2xl text-[11px] font-semibold tracking-tight hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
               >
                 <Check size={15} /> {loading ? 'Menyimpan...' : 'Simpan Webhook Config'}
               </button>
@@ -3543,7 +3543,7 @@ if (signature !== expected) {
 
           {/* Delivery log */}
           {webhookDeliveries.length > 0 && (
-            <div className="bg-white rounded-[32px] border border-slate-100 p-6 space-y-4">
+            <div className="bg-white rounded-xl border border-slate-100 p-6 space-y-4">
               <h4 className="text-sm font-black text-slate-700 uppercase tracking-wide flex items-center gap-2">
                 <Activity size={16} className="text-slate-400" /> Log Pengiriman Terakhir
               </h4>
@@ -3583,13 +3583,13 @@ if (signature !== expected) {
       {/* ══════════════════════════════════════════════ */}
       {activeTab === 'history' && (
         <div className="space-y-5">
-          <div className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/50 p-10 space-y-6">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
               <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
                 <History size={20} className="text-slate-600" />
               </div>
               <div>
-                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Call History</h3>
+                <h3 className="text-lg font-semibold text-slate-900 uppercase tracking-tight">Call History</h3>
                 <p className="text-xs text-slate-400 font-medium mt-0.5">
                   Log setiap request ke Open API v1 — 50 request terakhir.
                 </p>
@@ -3666,7 +3666,7 @@ if (signature !== expected) {
               initial={{ opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12 }}
-              className="relative w-full max-w-5xl max-h-[calc(100vh-2rem)] rounded-[40px] bg-white shadow-2xl overflow-hidden"
+              className="relative w-full max-w-5xl max-h-[calc(100vh-2rem)] rounded-2xl bg-white shadow-2xl overflow-hidden"
             >
               <div className="p-5 md:p-8 space-y-6 overflow-y-auto max-h-[calc(100vh-2rem)]">
                 <div className="flex items-start justify-between">
@@ -3675,7 +3675,7 @@ if (signature !== expected) {
                       <Shield size={12} />
                       API Key Security
                     </div>
-                    <h3 className="text-xl md:text-2xl font-black text-slate-900">
+                    <h3 className="text-xl md:text-2xl font-semibold text-slate-900">
                       {generatedKey ? 'Simpan API Key Ini' : 'Buat API Key Baru'}
                     </h3>
                     <p className="text-xs md:text-sm text-slate-500 mt-2 font-medium max-w-2xl">
@@ -3695,10 +3695,10 @@ if (signature !== expected) {
                   /* ── Show generated key ── */
                   <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-5">
                     <div className="space-y-4">
-                      <div className="rounded-[28px] bg-slate-950 p-5 relative">
+                      <div className="rounded-xl bg-slate-950 p-5 relative">
                         <div className="flex items-center gap-2 mb-3 text-slate-300">
                           <Key size={14} />
-                          <p className="text-[10px] font-black uppercase tracking-widest">Plaintext Key</p>
+                          <p className="text-[10px] font-semibold tracking-tight">Plaintext Key</p>
                         </div>
                         <code className="text-emerald-400 text-xs md:text-sm font-mono break-all leading-relaxed">{generatedKey}</code>
                         <button
@@ -3709,7 +3709,7 @@ if (signature !== expected) {
                         </button>
                       </div>
 
-                      <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-4 flex gap-3">
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex gap-3">
                         <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
                         <p className="text-xs text-amber-800 font-bold leading-relaxed">
                           Key ini tidak akan bisa dilihat lagi setelah panel ini ditutup. Simpan di password manager atau secret vault partner Anda.
@@ -3717,10 +3717,10 @@ if (signature !== expected) {
                       </div>
                     </div>
 
-                    <div className="rounded-[28px] border border-slate-100 bg-slate-50 p-5 space-y-4">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-5 space-y-4">
                       <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Next Step</p>
-                        <h4 className="text-lg font-black text-slate-900 mt-2">Sebelum Menutup Modal</h4>
+                        <p className="text-[10px] font-semibold tracking-tight text-slate-400">Next Step</p>
+                        <h4 className="text-lg font-semibold text-slate-900 mt-2">Sebelum Menutup Modal</h4>
                       </div>
 
                       <div className="space-y-3">
@@ -3738,7 +3738,7 @@ if (signature !== expected) {
 
                       <button
                         onClick={() => { setGeneratedKey(null); setShowGenModal(false) }}
-                        className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all"
+                        className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-semibold tracking-tight hover:bg-black transition-all"
                       >
                         Sudah Disimpan, Tutup
                       </button>
@@ -3748,13 +3748,13 @@ if (signature !== expected) {
                   /* ── Form generate ── */
                   <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-5">
                     <div className="space-y-5">
-                      <div className="rounded-[28px] border border-slate-100 bg-white p-5 md:p-6 space-y-5">
+                      <div className="rounded-xl border border-slate-100 bg-white p-5 md:p-6 space-y-5">
                         <div className="flex items-center justify-between gap-3 flex-wrap">
                           <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Step 1</p>
-                            <h4 className="text-lg font-black text-slate-900 mt-1">Identitas & Akses</h4>
+                            <p className="text-[10px] font-semibold tracking-tight text-slate-400">Step 1</p>
+                            <h4 className="text-lg font-semibold text-slate-900 mt-1">Identitas & Akses</h4>
                           </div>
-                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest">
+                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold tracking-tight">
                             {selectedGenScopeDefs.length} scope dipilih
                           </div>
                         </div>
@@ -3806,10 +3806,10 @@ if (signature !== expected) {
                         </div>
                       </div>
 
-                      <div className="rounded-[28px] border border-slate-100 bg-white p-5 md:p-6 space-y-5">
+                      <div className="rounded-xl border border-slate-100 bg-white p-5 md:p-6 space-y-5">
                         <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Step 2</p>
-                          <h4 className="text-lg font-black text-slate-900 mt-1">Limit & Boundary</h4>
+                          <p className="text-[10px] font-semibold tracking-tight text-slate-400">Step 2</p>
+                          <h4 className="text-lg font-semibold text-slate-900 mt-1">Limit & Boundary</h4>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -3869,14 +3869,14 @@ if (signature !== expected) {
                       <div className="flex flex-col sm:flex-row gap-3">
                         <button
                           onClick={() => setShowGenModal(false)}
-                          className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                          className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-2xl text-[11px] font-semibold tracking-tight hover:bg-slate-200 transition-all"
                         >
                           Batal
                         </button>
                         <button
                           onClick={handleGenerate}
                           disabled={loading || !genName.trim() || genScopes.length === 0}
-                          className="flex-1 py-4 bg-violet-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
+                          className="flex-1 py-4 bg-violet-600 text-white rounded-2xl text-[11px] font-semibold tracking-tight hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
                         >
                           {loading ? 'Membuat Key...' : 'Generate API Key'}
                         </button>
@@ -3884,13 +3884,13 @@ if (signature !== expected) {
                     </div>
 
                     <div className="space-y-5">
-                      <div className="rounded-[28px] border border-slate-100 bg-slate-950 p-5 md:p-6 text-white space-y-4">
+                      <div className="rounded-xl border border-slate-100 bg-slate-950 p-5 md:p-6 text-white space-y-4">
                         <div className="flex items-center gap-2 text-slate-300">
                           <Lock size={14} />
-                          <p className="text-[10px] font-black uppercase tracking-widest">Preview Policy</p>
+                          <p className="text-[10px] font-semibold tracking-tight">Preview Policy</p>
                         </div>
                         <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                          <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black">Key Label</p>
+                          <p className="text-[10px] tracking-tight text-slate-400 font-black">Key Label</p>
                           <p className="mt-2 text-sm font-black text-white">
                             {genName.trim() || 'Belum diberi nama'}
                           </p>
@@ -3899,30 +3899,30 @@ if (signature !== expected) {
 
                         <div className="grid grid-cols-2 gap-3">
                           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                            <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black">Scope</p>
-                            <p className="mt-2 text-lg font-black">{selectedGenScopeDefs.length}</p>
+                            <p className="text-[10px] tracking-tight text-slate-400 font-black">Scope</p>
+                            <p className="mt-2 text-lg font-semibold">{selectedGenScopeDefs.length}</p>
                             <p className="text-[10px] text-slate-400">scope aktif</p>
                           </div>
                           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                            <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black">Rate Limit</p>
-                            <p className="mt-2 text-lg font-black">{genRpm}</p>
+                            <p className="text-[10px] tracking-tight text-slate-400 font-black">Rate Limit</p>
+                            <p className="mt-2 text-lg font-semibold">{genRpm}</p>
                             <p className="text-[10px] text-slate-400">req/menit</p>
                           </div>
                         </div>
 
                         <div className="space-y-3 text-[11px]">
                           <div className="flex items-start justify-between gap-4">
-                            <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Cabang</span>
+                            <span className="text-slate-400 font-semibold tracking-tight text-[10px]">Cabang</span>
                             <span className="text-right font-medium text-slate-100">
                               {selectedGenBranch ? `${selectedGenBranch.name}${selectedGenBranch.code ? ` (${selectedGenBranch.code})` : ''}` : 'Semua Cabang'}
                             </span>
                           </div>
                           <div className="flex items-start justify-between gap-4">
-                            <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Expiry</span>
+                            <span className="text-slate-400 font-semibold tracking-tight text-[10px]">Expiry</span>
                             <span className="text-right font-medium text-slate-100">{formatOptionalDateLabel(genExpiry)}</span>
                           </div>
                           <div className="flex items-start justify-between gap-4">
-                            <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Whitelist</span>
+                            <span className="text-slate-400 font-semibold tracking-tight text-[10px]">Whitelist</span>
                             <span className="text-right font-medium text-slate-100">
                               {genAllowlistEntries.length > 0 ? `${genAllowlistEntries.length} IP/range` : 'Semua IP'}
                             </span>
@@ -3938,10 +3938,10 @@ if (signature !== expected) {
                         )}
                       </div>
 
-                      <div className="rounded-[28px] border border-slate-100 bg-slate-50 p-5 md:p-6 space-y-4">
+                      <div className="rounded-xl border border-slate-100 bg-slate-50 p-5 md:p-6 space-y-4">
                         <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Readiness</p>
-                          <h4 className="text-lg font-black text-slate-900 mt-1">Sebelum Generate</h4>
+                          <p className="text-[10px] font-semibold tracking-tight text-slate-400">Readiness</p>
+                          <h4 className="text-lg font-semibold text-slate-900 mt-1">Sebelum Generate</h4>
                         </div>
                         <div className="space-y-3">
                           {generateChecklist.map((item) => (
@@ -3956,7 +3956,7 @@ if (signature !== expected) {
                         </div>
 
                         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Catatan Security</p>
+                          <p className="text-[10px] font-semibold tracking-tight text-slate-400 mb-2">Catatan Security</p>
                           <div className="space-y-2">
                             <p className="text-xs text-slate-600 font-medium leading-relaxed">
                               Plaintext key hanya muncul sekali setelah generate.
@@ -3989,12 +3989,12 @@ if (signature !== expected) {
               initial={{ opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12 }}
-              className="relative w-full max-w-2xl rounded-[40px] bg-white shadow-2xl overflow-hidden"
+              className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl overflow-hidden"
             >
               <div className="p-8 space-y-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="text-xl font-black text-slate-900">Edit API Key</h3>
+                    <h3 className="text-xl font-semibold text-slate-900">Edit API Key</h3>
                     <p className="text-xs text-slate-400 mt-1">
                       Perbarui scope, rate limit, expiry, cabang, dan whitelist IP tanpa revoke key.
                     </p>
@@ -4095,14 +4095,14 @@ if (signature !== expected) {
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={() => setShowEditModal(false)}
-                      className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                      className="flex-1 py-4 bg-slate-100 text-slate-700 rounded-2xl text-[11px] font-semibold tracking-tight hover:bg-slate-200 transition-all"
                     >
                       Batal
                     </button>
                     <button
                       onClick={handleUpdateKey}
                       disabled={loading || !editName.trim() || editScopes.length === 0}
-                      className="flex-1 py-4 bg-violet-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
+                      className="flex-1 py-4 bg-violet-600 text-white rounded-2xl text-[11px] font-semibold tracking-tight hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 active:scale-95"
                     >
                       {loading ? 'Menyimpan...' : 'Simpan Perubahan'}
                     </button>

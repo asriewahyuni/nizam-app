@@ -157,12 +157,12 @@ export default function PromoClient({ orgId, initialPromos }: PromoClientProps) 
                     </div>
                     <div>
                       <div className="flex items-center gap-3 mb-1">
-                        <h4 className={`text-xl font-black tracking-tight ${
+                        <h4 className={`text-xl font-semibold tracking-tight ${
                           promo.status === 'ACTIVE' ? 'text-slate-800' : 'text-slate-400 line-through'
                         }`}>
                           {promo.code}
                         </h4>
-                        <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-full ${
+                        <span className={`px-2 py-0.5 text-[9px] font-semibold tracking-tight rounded-full ${
                           promo.status === 'ACTIVE'
                             ? 'bg-emerald-50 text-emerald-600'
                             : promo.status === 'EXPIRED'
@@ -218,14 +218,14 @@ export default function PromoClient({ orgId, initialPromos }: PromoClientProps) 
         </div>
 
         <div className="space-y-6">
-          <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-[32px] p-8 text-white relative shadow-2xl overflow-hidden">
+          <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl p-8 text-white relative shadow-2xl overflow-hidden">
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay"></div>
             <Gift size={28} className="text-white/80 mb-6 drop-shadow-md" />
-            <h3 className="text-xl font-black mb-2 relative z-10">Customer Loyalty Points</h3>
+            <h3 className="text-xl font-semibold mb-2 relative z-10">Customer Loyalty Points</h3>
             <p className="text-sm font-semibold text-white/80 mb-8 relative z-10 leading-relaxed">
               Persiapkan program poin loyalitas untuk menjaga pelanggan setia Anda tidak kabur ke kompetitor.
             </p>
-            <button className="relative z-10 w-full bg-white text-blue-600 font-black tracking-widest uppercase text-[10px] py-4 rounded-2xl hover:bg-blue-50 transition-colors shadow-lg shadow-black/10">
+            <button className="relative z-10 w-full bg-white text-blue-600 font-semibold tracking-tight uppercase text-[10px] py-4 rounded-2xl hover:bg-blue-50 transition-colors shadow-lg shadow-black/10">
               Aktifkan Modul Loyalty
             </button>
           </div>
@@ -246,7 +246,7 @@ export default function PromoClient({ orgId, initialPromos }: PromoClientProps) 
             <h3 className="text-xl font-bold mb-6">Buat Kupon Spesial</h3>
             <form onSubmit={handleAddPromo} className="space-y-5">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kode Promo (Harus Unik)</label>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Kode Promo (Harus Unik)</label>
                 <input
                   name="code"
                   required
@@ -259,14 +259,14 @@ export default function PromoClient({ orgId, initialPromos }: PromoClientProps) 
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipe Diskon</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Tipe Diskon</label>
                   <select name="type" className="w-full h-12 px-4 border rounded-xl bg-slate-50 text-sm font-bold focus:border-blue-500 outline-none">
                     <option value="PERCENT">Persentase (%)</option>
                     <option value="FIXED">Nominal (Rp)</option>
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nilai Potongan</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Nilai Potongan</label>
                   <input
                     type="number"
                     name="value"
@@ -278,7 +278,7 @@ export default function PromoClient({ orgId, initialPromos }: PromoClientProps) 
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tanggal Expired</label>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Tanggal Expired</label>
                 <input
                   type="date"
                   name="expires_at"

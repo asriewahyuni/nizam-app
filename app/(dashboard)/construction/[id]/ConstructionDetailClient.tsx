@@ -686,7 +686,7 @@ export function ConstructionDetailClient({
 
   return (
     <div className="mx-auto max-w-7xl space-y-8">
-      <section className="relative overflow-hidden rounded-[36px] border border-[#d7d2c9] bg-[radial-gradient(circle_at_top_left,_rgba(224,122,95,0.22),_transparent_36%),linear-gradient(135deg,_#17324d_0%,_#254b63_54%,_#efe3cd_155%)] px-6 py-7 text-white shadow-xl shadow-slate-900/10 md:px-8 md:py-9">
+      <section className="relative overflow-hidden rounded-2xl border border-[#d7d2c9] bg-[radial-gradient(circle_at_top_left,_rgba(224,122,95,0.22),_transparent_36%),linear-gradient(135deg,_#17324d_0%,_#254b63_54%,_#efe3cd_155%)] px-6 py-7 text-white shadow-xl shadow-slate-900/10 md:px-8 md:py-9">
         <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
         <div className="relative flex flex-col gap-6">
           <div className="flex flex-wrap items-center gap-3">
@@ -710,7 +710,7 @@ export function ConstructionDetailClient({
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.9fr]">
             <div>
-              <h1 className="text-3xl font-black tracking-tight md:text-4xl">{project.projectName}</h1>
+              <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{project.projectName}</h1>
               <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-white/80">
                 {project.clientName || 'Belum ada kontak klien terhubung'}.
                 {' '}
@@ -719,13 +719,13 @@ export function ConstructionDetailClient({
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-[24px] border border-white/15 bg-white/10 p-4">
+              <div className="rounded-xl border border-white/15 bg-white/10 p-4">
                 <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">Progress Stage</div>
-                <div className="mt-2 text-3xl font-black tracking-tight">{totals.weightedProgress.toFixed(1)}%</div>
+                <div className="mt-2 text-3xl font-semibold tracking-tight">{totals.weightedProgress.toFixed(1)}%</div>
               </div>
-              <div className="rounded-[24px] border border-white/15 bg-white/10 p-4">
+              <div className="rounded-xl border border-white/15 bg-white/10 p-4">
                 <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">Termin Billing</div>
-                <div className="mt-2 text-3xl font-black tracking-tight">{billingTerms.length}</div>
+                <div className="mt-2 text-3xl font-semibold tracking-tight">{billingTerms.length}</div>
               </div>
             </div>
           </div>
@@ -733,47 +733,47 @@ export function ConstructionDetailClient({
       </section>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Contract Value</div>
             <Wallet size={18} className="text-[#e07a5f]" />
           </div>
-          <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">{formatRupiah(project.contractValue)}</div>
+          <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{formatRupiah(project.contractValue)}</div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">RAB Planned</div>
             <ClipboardList size={18} className="text-[#254b63]" />
           </div>
-          <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">{formatRupiah(totals.plannedTotal)}</div>
+          <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{formatRupiah(totals.plannedTotal)}</div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Actual Cost</div>
             <BarChart3 size={18} className="text-[#3b6b5a]" />
           </div>
-          <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">{formatRupiah(totals.actualTotal)}</div>
+          <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{formatRupiah(totals.actualTotal)}</div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Billing Planned</div>
             <Wallet size={18} className="text-[#6a8d73]" />
           </div>
-          <div className="mt-3 text-2xl font-black tracking-tight text-slate-900">{formatRupiah(totals.totalBillingAmount)}</div>
+          <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{formatRupiah(totals.totalBillingAmount)}</div>
           <div className="mt-2 text-xs font-bold text-slate-500">
             Paid: {formatRupiah(totals.paidBillingAmount)}
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Approved CO</div>
             <Pencil size={18} className="text-[#d97706]" />
           </div>
-          <div className={`mt-3 text-2xl font-black tracking-tight ${getCurrencyDeltaClass(totals.approvedChangeOrderContractDelta, 'text-emerald-700', 'text-rose-700')}`}>
+          <div className={`mt-3 text-2xl font-semibold tracking-tight ${getCurrencyDeltaClass(totals.approvedChangeOrderContractDelta, 'text-emerald-700', 'text-rose-700')}`}>
             {formatSignedCurrency(totals.approvedChangeOrderContractDelta)}
           </div>
           <div className="mt-2 text-xs font-bold text-slate-500">
@@ -784,11 +784,11 @@ export function ConstructionDetailClient({
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.95fr]">
         <div className="space-y-6">
-          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">RAB / BoQ</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Budget & Actual Cost</h2>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Budget & Actual Cost</h2>
               </div>
               <button
                 type="button"
@@ -815,7 +815,7 @@ export function ConstructionDetailClient({
                 <tbody>
                   {budgetItems.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm font-medium text-slate-500">
+                      <td colSpan={6} className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm font-medium text-slate-500">
                         Belum ada item RAB. Tambahkan material, upah, subkon, atau alat untuk project ini.
                       </td>
                     </tr>
@@ -824,7 +824,7 @@ export function ConstructionDetailClient({
                       const variance = item.actualTotal - item.plannedTotal
 
                       return (
-                        <tr key={item.id} className="rounded-[24px] bg-slate-50">
+                        <tr key={item.id} className="rounded-xl bg-slate-50">
                           <td className="rounded-l-[24px] px-3 py-4 align-top">
                             <div className="font-black text-slate-900">{item.description}</div>
                             <div className="mt-1 text-xs font-medium text-slate-500">
@@ -880,11 +880,11 @@ export function ConstructionDetailClient({
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Progress Log</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Catatan Lapangan Harian</h2>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Catatan Lapangan Harian</h2>
               </div>
               <button
                 type="button"
@@ -898,12 +898,12 @@ export function ConstructionDetailClient({
 
             <div className="mt-6 space-y-4">
               {progressLogs.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-medium text-slate-500">
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-medium text-slate-500">
                   Belum ada log harian. Mulai catat progres lapangan, cuaca, issue, dan bukti pekerjaan.
                 </div>
               ) : (
                 progressLogs.map((log) => (
-                  <article key={log.id} className="rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
+                  <article key={log.id} className="rounded-xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
@@ -919,7 +919,7 @@ export function ConstructionDetailClient({
                             </span>
                           ) : null}
                         </div>
-                        <h3 className="text-lg font-black tracking-tight text-slate-900">{log.summary}</h3>
+                        <h3 className="text-lg font-semibold tracking-tight text-slate-900">{log.summary}</h3>
                         {log.weather ? (
                           <div className="text-sm font-bold text-slate-500">Cuaca: {log.weather}</div>
                         ) : null}
@@ -968,11 +968,11 @@ export function ConstructionDetailClient({
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Change Order</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Register Perubahan Scope</h2>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Register Perubahan Scope</h2>
               </div>
               <button
                 type="button"
@@ -986,7 +986,7 @@ export function ConstructionDetailClient({
 
             <div className="mt-6 space-y-4">
               {changeOrders.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-medium text-slate-500">
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-medium text-slate-500">
                   Belum ada change order. Catat pekerjaan tambah/kurang, revisi desain, atau perpanjangan waktu di sini.
                 </div>
               ) : (
@@ -998,7 +998,7 @@ export function ConstructionDetailClient({
                   )
 
                   return (
-                  <article key={changeOrder.id} className="rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
+                  <article key={changeOrder.id} className="rounded-xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
@@ -1024,7 +1024,7 @@ export function ConstructionDetailClient({
                         </div>
 
                         <div>
-                          <h3 className="text-lg font-black tracking-tight text-slate-900">{changeOrder.title}</h3>
+                          <h3 className="text-lg font-semibold tracking-tight text-slate-900">{changeOrder.title}</h3>
                           <div className="mt-1 text-sm font-medium text-slate-500">
                             Request: {changeOrder.requestedDate ? formatDate(changeOrder.requestedDate, 'short') : 'Belum diisi'}
                             {changeOrder.effectiveDate ? ` • Berlaku: ${formatDate(changeOrder.effectiveDate, 'short')}` : ''}
@@ -1097,17 +1097,17 @@ export function ConstructionDetailClient({
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Stage Breakdown</div>
-            <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Tahap Pekerjaan</h2>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Tahap Pekerjaan</h2>
 
             <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
               {stages.map((stage) => (
-                <article key={stage.id} className="rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
+                <article key={stage.id} className="rounded-xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{stage.stageCode}</div>
-                      <h3 className="mt-2 text-lg font-black tracking-tight text-slate-900">{stage.stageName}</h3>
+                      <h3 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">{stage.stageName}</h3>
                     </div>
                     <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${stageStatusStyles[stage.status] || stageStatusStyles.NOT_STARTED}`}>
                       {stage.status}
@@ -1117,11 +1117,11 @@ export function ConstructionDetailClient({
                   <div className="mt-5 flex items-end justify-between">
                     <div>
                       <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Bobot</div>
-                      <div className="mt-2 text-2xl font-black tracking-tight text-slate-900">{stage.weightPercent}%</div>
+                      <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{stage.weightPercent}%</div>
                     </div>
                     <div className="text-right">
                       <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Progress</div>
-                      <div className="mt-2 text-2xl font-black tracking-tight text-slate-900">{stage.progressPercent}%</div>
+                      <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{stage.progressPercent}%</div>
                     </div>
                   </div>
 
@@ -1143,11 +1143,11 @@ export function ConstructionDetailClient({
         </div>
 
         <aside className="space-y-6">
-          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Snapshot Project</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Update Ringkasan</h2>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Update Ringkasan</h2>
               </div>
               <button
                 type="button"
@@ -1318,11 +1318,11 @@ export function ConstructionDetailClient({
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Termin Billing</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Jadwal Penagihan</h2>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Jadwal Penagihan</h2>
               </div>
               <button
                 type="button"
@@ -1336,12 +1336,12 @@ export function ConstructionDetailClient({
 
             <div className="mt-6 space-y-4">
               {billingTerms.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-medium text-slate-500">
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm font-medium text-slate-500">
                   Belum ada termin billing. Tambahkan DP, progress billing, final, atau retensi.
                 </div>
               ) : (
                 billingTerms.map((term) => (
-                  <article key={term.id} className="rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
+                  <article key={term.id} className="rounded-xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
@@ -1356,7 +1356,7 @@ export function ConstructionDetailClient({
                           </span>
                         </div>
 
-                        <h3 className="text-lg font-black tracking-tight text-slate-900">{term.termLabel}</h3>
+                        <h3 className="text-lg font-semibold tracking-tight text-slate-900">{term.termLabel}</h3>
                         <div className="grid grid-cols-2 gap-3 text-sm font-medium text-slate-600 md:grid-cols-3">
                           <div>
                             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Amount</div>
@@ -1405,7 +1405,7 @@ export function ConstructionDetailClient({
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Timeline</div>
             <div className="mt-4 space-y-4">
               <div className="flex items-start gap-3">
@@ -1443,11 +1443,11 @@ export function ConstructionDetailClient({
             aria-label="Tutup modal"
           />
 
-          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">RAB / BoQ</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
                   {budgetForm.id ? 'Edit Item Budget' : 'Tambah Item Budget'}
                 </h2>
               </div>
@@ -1626,11 +1626,11 @@ export function ConstructionDetailClient({
             aria-label="Tutup modal"
           />
 
-          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Progress Log</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
                   {progressForm.id ? 'Edit Progress Log' : 'Tambah Progress Log'}
                 </h2>
               </div>
@@ -1762,11 +1762,11 @@ export function ConstructionDetailClient({
             aria-label="Tutup modal"
           />
 
-          <div className="relative z-10 w-full max-w-3xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-w-3xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Change Order</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
                   {changeOrderForm.id ? 'Edit Change Order' : 'Tambah Change Order'}
                 </h2>
               </div>
@@ -1971,11 +1971,11 @@ export function ConstructionDetailClient({
             aria-label="Tutup modal"
           />
 
-          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Termin Billing</div>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
                   {billingForm.id ? 'Edit Termin Billing' : 'Tambah Termin Billing'}
                 </h2>
               </div>

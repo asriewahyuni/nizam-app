@@ -118,7 +118,7 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
               <div className="space-y-6">
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
                   <Tag size={16} className="text-blue-600" />
-                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Identitas Akun</h3>
+                  <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-tight">Identitas Akun</h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -188,7 +188,7 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
               <div className="space-y-6 pt-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
                   <Layers size={16} className="text-blue-600" />
-                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Hierarki & Struktur</h3>
+                  <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-tight">Hierarki & Struktur</h3>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-700 ml-1">Akun Induk (Parent Account)</label>
@@ -213,7 +213,7 @@ export default function NewAccountForm({ orgId, existingAccounts }: Props) {
               <div className="space-y-2 pt-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
                   <FileText size={16} className="text-blue-600" />
-                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Keterangan Opsional</h3>
+                  <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-tight">Keterangan Opsional</h3>
                 </div>
                 <textarea
                   placeholder="Berikan catatan detail tentang fungsi akun ini..."

@@ -342,7 +342,7 @@ export function ManufacturingClient({
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+          <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
             <Factory size={28} className="text-blue-600" />
             Nizam Manufacturing
           </h1>
@@ -394,12 +394,12 @@ export function ManufacturingClient({
       </div>
 
       {!activeBranchId && (
-        <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-6 py-5 flex items-start gap-4">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-6 py-5 flex items-start gap-4">
           <div className="w-12 h-12 rounded-2xl bg-white text-amber-500 border border-amber-100 flex items-center justify-center shrink-0">
             <AlertTriangle size={22} />
           </div>
           <div className="space-y-1">
-            <h3 className="text-sm font-black text-amber-900 uppercase tracking-widest">Pilih Unit Aktif</h3>
+            <h3 className="text-sm font-semibold text-amber-900 uppercase tracking-tight">Pilih Unit Aktif</h3>
             <p className="text-sm font-medium text-amber-800/80">
               Anda sedang melihat data lintas unit. Pilih satu unit dari header untuk membuat BoM, menerbitkan SPK, mencatat biaya produksi, atau menyelesaikan produksi.
             </p>
@@ -417,8 +417,8 @@ export function ManufacturingClient({
                         <stat.icon size={24} />
                      </div>
                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                        <p className="text-xl font-black text-slate-900">{stat.value}</p>
+                        <p className="text-[10px] font-bold text-slate-400 tracking-tight">{stat.label}</p>
+                        <p className="text-xl font-semibold text-slate-900">{stat.value}</p>
                      </div>
                   </div>
                 ))}
@@ -429,11 +429,11 @@ export function ManufacturingClient({
                 <table className="w-full text-left">
                    <thead className="bg-slate-50 border-b border-slate-100">
                       <tr>
-                         <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">No. SPK & Produk</th>
-                         <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Qty Rencana</th>
-                         <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Status</th>
-                         <th className="px-6 py-5 text-xs font-black text-slate-400 uppercase tracking-widest">Waktu & Dateline</th>
-                         <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Aksi</th>
+                         <th className="px-8 py-5 text-xs font-semibold text-slate-400 uppercase tracking-tight">No. SPK & Produk</th>
+                         <th className="px-6 py-5 text-xs font-semibold text-slate-400 uppercase tracking-tight text-right">Qty Rencana</th>
+                         <th className="px-6 py-5 text-xs font-semibold text-slate-400 uppercase tracking-tight">Status</th>
+                         <th className="px-6 py-5 text-xs font-semibold text-slate-400 uppercase tracking-tight">Waktu & Dateline</th>
+                         <th className="px-8 py-5 text-xs font-semibold text-slate-400 uppercase tracking-tight text-right">Aksi</th>
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-50">
@@ -450,8 +450,8 @@ export function ManufacturingClient({
                              <td className="px-8 py-5">
                                 <div className="flex items-center gap-2">
                                   <p className="text-sm font-black text-slate-900">{wo.wo_number}</p>
-                                  {isOverdue && <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[9px] font-black uppercase rounded-full tracking-widest flex items-center gap-1"><AlertTriangle size={10}/> Terlambat</span>}
-                                  {!isOverdue && isUrgent && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-black uppercase rounded-full tracking-widest flex items-center gap-1"><Clock size={10}/> Segera</span>}
+                                  {isOverdue && <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[9px] font-semibold uppercase rounded-full tracking-tight flex items-center gap-1"><AlertTriangle size={10}/> Terlambat</span>}
+                                  {!isOverdue && isUrgent && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-semibold uppercase rounded-full tracking-tight flex items-center gap-1"><Clock size={10}/> Segera</span>}
                                 </div>
                                 <p className="text-xs text-slate-500">{wo.bom?.product?.name}</p>
                                 <div className="flex items-center gap-2 mt-1">
@@ -567,9 +567,9 @@ export function ManufacturingClient({
                      </div>
                      <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                           <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black uppercase rounded-lg tracking-widest">{bom.code}</span>
+                           <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-semibold uppercase rounded-lg tracking-tight">{bom.code}</span>
                            <div className="flex flex-col items-end">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Est. HPP / Unit</span>
+                              <span className="text-[10px] font-bold text-slate-400 tracking-tight">Est. HPP / Unit</span>
                               <span className="text-sm font-black text-rose-600">{formatRupiah(estimatedHppPerUnit)}</span>
                            </div>
                         </div>
@@ -583,7 +583,7 @@ export function ManufacturingClient({
                      </div>
                      
                      <div className="pt-6 border-t border-slate-50 space-y-3">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Komposisi Bahan</p>
+                        <p className="text-[10px] font-bold text-slate-400 tracking-tight">Komposisi Bahan</p>
                         <div className="space-y-2">
                            {bom.items && bom.items.length > 0 ? (
                              bom.items.map((bi: any, idx: number) => (
@@ -610,7 +610,7 @@ export function ManufacturingClient({
                             })) || [])
                             setShowBomModal(true)
                           }}
-                          className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2 hover:gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="text-[10px] font-semibold text-blue-600 uppercase tracking-tight flex items-center gap-2 hover:gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                            Edit Resep <ChevronRight size={14} />
                         </button>
@@ -626,7 +626,7 @@ export function ManufacturingClient({
                               setLoading(false)
                             }
                           }}
-                          className="flex items-center gap-2 px-3 py-1 text-[10px] font-black text-rose-400 hover:text-rose-600 transition-all uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex items-center gap-2 px-3 py-1 text-[10px] font-semibold text-rose-400 hover:text-rose-600 transition-all uppercase tracking-tight disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Trash2 size={12} /> Hapus
                         </button>
@@ -723,7 +723,7 @@ export function ManufacturingClient({
                   <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">{companyName}</p>
-                      <h2 className="text-3xl font-black text-slate-900 tracking-tight mt-2">Surat Perintah Kerja</h2>
+                      <h2 className="text-3xl font-semibold text-slate-900 tracking-tight mt-2">Surat Perintah Kerja</h2>
                       <p className="text-sm font-bold text-blue-600 mt-1">{selectedPrintWo.wo_number}</p>
                       <p className="text-xs text-slate-500 mt-3 max-w-xl">
                         Dokumen operasional untuk pelaksanaan produksi berdasarkan resep dan target output yang sudah ditetapkan.
@@ -739,15 +739,15 @@ export function ManufacturingClient({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
                   <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Produk Jadi</p>
-                    <p className="text-lg font-black text-slate-900 mt-2">{selectedPrintWo.bom?.product?.name || '-'}</p>
+                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Produk Jadi</p>
+                    <p className="text-lg font-semibold text-slate-900 mt-2">{selectedPrintWo.bom?.product?.name || '-'}</p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Qty Target</p>
-                    <p className="text-lg font-black text-slate-900 mt-2">{formatQty(selectedPrintWo.quantity_planned)} Unit</p>
+                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Qty Target</p>
+                    <p className="text-lg font-semibold text-slate-900 mt-2">{formatQty(selectedPrintWo.quantity_planned)} Unit</p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50/60">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Status</p>
+                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Status</p>
                     <div className="mt-2">
                       <span className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-tighter border ${
                         selectedPrintWo.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
@@ -759,32 +759,32 @@ export function ManufacturingClient({
                     </div>
                   </div>
                   <div className="rounded-2xl border border-slate-200 p-4 bg-white">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tanggal Dibuat</p>
+                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Tanggal Dibuat</p>
                     <p className="text-sm font-bold text-slate-900 mt-2">{formatDate(selectedPrintWo.created_at)}</p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 p-4 bg-white">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Batas Selesai</p>
+                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Batas Selesai</p>
                     <p className="text-sm font-bold text-slate-900 mt-2">{selectedPrintWo.deadline_date ? formatDate(selectedPrintWo.deadline_date) : '-'}</p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 p-4 bg-white">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Resep Produksi</p>
+                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Resep Produksi</p>
                     <p className="text-sm font-bold text-slate-900 mt-2">{selectedPrintWo.bom?.code || '-'}</p>
                   </div>
                 </div>
 
-                <div className="rounded-[28px] border border-slate-200 overflow-hidden mb-6">
+                <div className="rounded-xl border border-slate-200 overflow-hidden mb-6">
                   <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
-                    <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Komposisi Bahan Produksi</h4>
+                    <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-tight">Komposisi Bahan Produksi</h4>
                     <p className="text-xs text-slate-500 mt-1">Total kebutuhan mengikuti satuan yang dipasang di resep.</p>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse">
                       <thead className="bg-white">
                         <tr>
-                          <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200">Bahan</th>
-                          <th className="px-4 py-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200">Qty per Unit</th>
-                          <th className="px-4 py-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200">Total Kebutuhan</th>
-                          <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200">Satuan</th>
+                          <th className="px-6 py-4 text-left text-[10px] font-semibold tracking-tight text-slate-400 border-b border-slate-200">Bahan</th>
+                          <th className="px-4 py-4 text-right text-[10px] font-semibold tracking-tight text-slate-400 border-b border-slate-200">Qty per Unit</th>
+                          <th className="px-4 py-4 text-right text-[10px] font-semibold tracking-tight text-slate-400 border-b border-slate-200">Total Kebutuhan</th>
+                          <th className="px-6 py-4 text-left text-[10px] font-semibold tracking-tight text-slate-400 border-b border-slate-200">Satuan</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -816,15 +816,15 @@ export function ManufacturingClient({
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-6">
-                  <div className="rounded-[28px] border border-slate-200 p-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Catatan Produksi</p>
+                  <div className="rounded-xl border border-slate-200 p-6">
+                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Catatan Produksi</p>
                     <p className="text-sm text-slate-700 leading-relaxed mt-3">
                       {selectedPrintWo.notes?.trim() || 'Tidak ada catatan tambahan pada SPK ini.'}
                     </p>
                   </div>
 
-                  <div className="rounded-[28px] border border-slate-200 p-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-8">Paraf Operasional</p>
+                  <div className="rounded-xl border border-slate-200 p-6">
+                    <p className="text-[10px] font-semibold tracking-tight text-slate-400 mb-8">Paraf Operasional</p>
                     <div className="space-y-8">
                       <div>
                         <p className="text-xs text-slate-500 mb-8">Pelaksana Produksi</p>
@@ -858,11 +858,11 @@ export function ManufacturingClient({
                </div>
                <form onSubmit={handleCreateSpk} className="space-y-6">
                   <div className="space-y-2 text-left">
-                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">No SPK (Internal Number)</label>
+                     <label className="text-[10px] font-bold text-slate-400 tracking-tight ml-1">No SPK (Internal Number)</label>
                      <input name="wo_number" required placeholder="SPK-XXXXX" defaultValue={draftSpkNumber} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-bold" />
                   </div>
                   <div className="space-y-2 text-left">
-                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Pilih Resep Produksi (BoM)</label>
+                     <label className="text-[10px] font-bold text-slate-400 tracking-tight ml-1">Pilih Resep Produksi (BoM)</label>
                      <select name="bom_id" required className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-bold">
                         <option value="">-- Pilih Produk Jadi --</option>
                         {boms.map(b => (
@@ -872,11 +872,11 @@ export function ManufacturingClient({
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2 text-left">
-                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Jumlah Target Produksi</label>
+                       <label className="text-[10px] font-bold text-slate-400 tracking-tight ml-1">Jumlah Target Produksi</label>
                        <input name="quantity_planned" type="number" required placeholder="0" className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-bold text-xl" />
                     </div>
                     <div className="space-y-2 text-left">
-                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Batas Selesai (Dateline)</label>
+                       <label className="text-[10px] font-bold text-slate-400 tracking-tight ml-1">Batas Selesai (Dateline)</label>
                        <input name="deadline_date" type="date" required className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:border-rose-500 font-bold text-slate-700" />
                     </div>
                   </div>
@@ -901,20 +901,20 @@ export function ManufacturingClient({
                <form onSubmit={handleCreateBom} className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
                   <div className="grid grid-cols-2 gap-4">
                      <div className="space-y-2 text-left">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Pilih Produk Jadi</label>
+                        <label className="text-[10px] font-bold text-slate-400 tracking-tight ml-1">Pilih Produk Jadi</label>
                         <select name="product_id" required defaultValue={editingBom?.product?.id} className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none">
                            <option value="">-- Pilih Produk --</option>
                            {products.filter(p => ['Siap Jual', 'Layanan'].includes(p.category) || !p.category).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
                      </div>
                      <div className="space-y-2 text-left">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Kode BoM</label>
+                        <label className="text-[10px] font-bold text-slate-400 tracking-tight ml-1">Kode BoM</label>
                         <input name="code" required defaultValue={editingBom?.code} placeholder="BOM-PRD-01" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
                      </div>
                   </div>
                   
                   <div className="p-6 bg-slate-50 rounded-2xl space-y-4">
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Komposisi Bahan Baku</p>
+                     <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Komposisi Bahan Baku</p>
                      <div className="flex gap-2">
                         <select id="item-product" className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm" onChange={(e) => {
                            const p = products.find(prod => prod.id === e.target.value);
@@ -998,7 +998,7 @@ export function ManufacturingClient({
               <form onSubmit={handleFinishSpk} className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar text-left">
                 {/* Inventory Section */}
                 <div className="p-6 bg-slate-50 rounded-2xl space-y-4">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight flex items-center gap-2">
                     <Package size={12} /> Tujuan Penyimpanan Stok
                   </p>
                   <div className="grid grid-cols-2 gap-4">
@@ -1026,7 +1026,7 @@ export function ManufacturingClient({
                 {/* Overhead Section & HPP Calculation */}
                 <div className="p-6 border border-slate-100 rounded-2xl space-y-4">
                   <div className="flex justify-between items-center">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight flex items-center gap-2">
                       <Zap size={12} /> Biaya Tambahan (Labor/Overhead)
                     </p>
                     <button
@@ -1127,7 +1127,7 @@ export function ManufacturingClient({
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-bold text-emerald-900">Rekomendasi Harga Jual:</span>
-                            <span className="text-lg font-black text-emerald-600">{formatRupiah(suggestedPrice)}</span>
+                            <span className="text-lg font-semibold text-emerald-600">{formatRupiah(suggestedPrice)}</span>
                           </div>
                           <p className="text-[10px] text-emerald-600/80 leading-snug">Formula: HPP / (100% - Margin%). Harga yang dioptimalkan untuk melindungi margin bersih Anda.</p>
                         </div>
@@ -1155,7 +1155,7 @@ export function ManufacturingClient({
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl overflow-hidden border border-rose-100"
+              className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-rose-100"
             >
               <div className="bg-rose-50 p-8 flex flex-col items-center text-center space-y-4">
                 <div className="w-20 h-20 bg-white rounded-full shadow-xl shadow-rose-200/50 flex items-center justify-center relative overflow-hidden">
@@ -1169,14 +1169,14 @@ export function ManufacturingClient({
                   <div className="absolute inset-0 bg-rose-500/5 animate-pulse" />
                 </div>
                 <div className="space-y-1">
-                  <h2 className="text-2xl font-black text-rose-900 leading-tight uppercase tracking-tight">Kekurangan Stok Bahan!</h2>
-                  <p className="text-rose-600/70 font-bold text-xs uppercase tracking-widest">Peringatan Ketersediaan Inventory</p>
+                  <h2 className="text-2xl font-semibold text-rose-900 leading-tight uppercase tracking-tight">Kekurangan Stok Bahan!</h2>
+                  <p className="text-rose-600/70 font-bold text-xs tracking-tight">Peringatan Ketersediaan Inventory</p>
                 </div>
               </div>
 
               <div className="p-8 space-y-6">
                 <div className="space-y-3">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Daftar Bahan Kurang:</p>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Daftar Bahan Kurang:</p>
                   <div className="space-y-2">
                     {shortItems.map((item, i) => (
                       <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 transition hover:border-rose-200 group">
@@ -1218,7 +1218,7 @@ export function ManufacturingClient({
                         proceedWithRelease(pendingWo.id)
                       }
                     }}
-                    className="w-full py-5 bg-slate-900 text-white font-black rounded-[24px] shadow-xl hover:bg-black transition-all transform hover:-translate-y-1 active:scale-95 text-xs tracking-widest uppercase"
+                    className="w-full py-5 bg-slate-900 text-white font-semibold rounded-xl shadow-xl hover:bg-black transition-all transform hover:-translate-y-1 active:scale-95 text-xs tracking-tight uppercase"
                   >
                     Bypass & Lanjut Produksi
                   </button>
@@ -1226,7 +1226,7 @@ export function ManufacturingClient({
                   <button
                     disabled={loading}
                     onClick={handleRequestToPurchasing}
-                    className="w-full py-5 bg-blue-600 text-white font-black rounded-[24px] shadow-xl hover:bg-blue-700 transition-all transform hover:-translate-y-1 active:scale-95 text-xs tracking-widest uppercase flex items-center justify-center gap-2"
+                    className="w-full py-5 bg-blue-600 text-white font-semibold rounded-xl shadow-xl hover:bg-blue-700 transition-all transform hover:-translate-y-1 active:scale-95 text-xs tracking-tight uppercase flex items-center justify-center gap-2"
                   >
                     <Truck size={14} /> {loading ? 'Mengirim...' : 'Kirim Rikues ke Purchasing'}
                   </button>
@@ -1236,7 +1236,7 @@ export function ManufacturingClient({
                       setShowStockWarningModal(false)
                       setShowQuotationPrompt(true)
                     }}
-                    className="w-full py-4 bg-rose-50 text-rose-600 font-bold rounded-[20px] hover:bg-rose-100 transition-all text-[10px] tracking-widest uppercase border border-rose-100"
+                    className="w-full py-4 bg-rose-50 text-rose-600 font-bold rounded-xl hover:bg-rose-100 transition-all text-[10px] tracking-widest uppercase border border-rose-100"
                   >
                     Batalkan SPK Ini
                   </button>
@@ -1254,13 +1254,13 @@ export function ManufacturingClient({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-md bg-white rounded-[40px] shadow-2xl p-10 text-center space-y-8"
+              className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-10 text-center space-y-8"
             >
               <div className="w-24 h-24 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto shadow-inner border-4 border-white">
                 <TrendingUp size={44} />
               </div>
               <div className="space-y-4">
-                <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Alihkan ke Akad Pre-Order?</h3>
+                <h3 className="text-2xl font-semibold text-slate-900 tracking-tight leading-tight">Alihkan ke Akad Pre-Order?</h3>
                 <p className="text-sm font-medium text-slate-500 px-4">
                   Produksi tertunda karena stok kurang. Ingin beralih ke menu <span className="font-bold text-blue-600 italic">Penawaran (Quotation)</span> untuk mencatat akad Salam/Istisna agar operasional tetap aman?
                 </p>
@@ -1268,13 +1268,13 @@ export function ManufacturingClient({
               <div className="flex gap-4">
                 <button
                   onClick={() => setShowQuotationPrompt(false)}
-                  className="flex-1 py-5 bg-slate-100 text-slate-600 font-bold rounded-3xl hover:bg-slate-200 transition text-[11px] uppercase tracking-widest"
+                  className="flex-1 py-5 bg-slate-100 text-slate-600 font-bold rounded-3xl hover:bg-slate-200 transition text-[11px] tracking-tight"
                 >
                   Nanti Saja
                 </button>
                 <button
                   onClick={() => router.push('/sales/quotations')}
-                  className="flex-1 py-5 bg-blue-600 text-white font-black rounded-3xl hover:bg-blue-500 shadow-xl shadow-blue-100 transition text-[11px] uppercase tracking-widest"
+                  className="flex-1 py-5 bg-blue-600 text-white font-semibold rounded-3xl hover:bg-blue-500 shadow-xl shadow-blue-100 transition text-[11px] uppercase tracking-tight"
                 >
                   Ya, Alihkan
                 </button>

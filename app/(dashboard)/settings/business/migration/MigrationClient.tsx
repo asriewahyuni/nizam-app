@@ -609,7 +609,7 @@ function SheetPreviewTable({ sheet }: { sheet: SheetReport }) {
   if (sheet.samples.length === 0 || previewColumns.length === 0) return null
 
   return (
-    <div className="mt-4 overflow-x-auto rounded-[24px] border border-slate-100">
+    <div className="mt-4 overflow-x-auto rounded-xl border border-slate-100">
       <table className="min-w-full divide-y divide-slate-100 text-sm">
         <thead className="bg-slate-50">
           <tr>
@@ -642,7 +642,7 @@ function SheetDetailCard({ sheet }: { sheet: SheetReport }) {
   const toneClasses = getToneClasses(sheet.status)
 
   return (
-    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
           <div className="flex items-center gap-3">
@@ -1366,7 +1366,7 @@ export default function MigrationClient() {
         />
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-5">
           {migrationSteps.map((step, index) => (
-            <div key={step.title} className="rounded-[28px] border border-slate-100 bg-white p-5 shadow-sm">
+            <div key={step.title} className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
               <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-sm font-black text-white">
                 {index + 1}
               </div>
@@ -1378,17 +1378,17 @@ export default function MigrationClient() {
       </SectionCard>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <SectionCard className="rounded-[36px] border border-slate-200 bg-gradient-to-br from-white via-blue-50 to-slate-50">
+        <SectionCard className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-blue-50 to-slate-50">
           <SectionHeader
             title="Upload Workbook Migrasi"
             subtitle="Workbook tetap satu file, tetapi sekarang sudah termasuk sheet CoA resmi, sample implementasi, dan referensi pengisian."
             icon={Upload}
           />
 
-          <div className="mt-6 flex flex-col gap-5 rounded-[28px] border border-dashed border-blue-200 bg-white/80 p-6">
+          <div className="mt-6 flex flex-col gap-5 rounded-xl border border-dashed border-blue-200 bg-white/80 p-6">
             <div className="space-y-2">
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-700">Workbook Excel</div>
-              <h3 className="text-xl font-black tracking-tight text-slate-900">Pilih file `.xlsx` hasil pengisian client</h3>
+              <h3 className="text-xl font-semibold tracking-tight text-slate-900">Pilih file `.xlsx` hasil pengisian client</h3>
               <p className="text-sm font-medium leading-6 text-slate-600">
                 Template ini sudah berisi sheet `coa`, `coa_sample`, dan `coa_referensi` agar tim finance bisa langsung mengisi struktur akun sebelum bagian lain dimigrasikan.
               </p>
@@ -1408,7 +1408,7 @@ export default function MigrationClient() {
               <a
                 href="/templates/migrasi/NIZAM_Migration_Template.xlsx"
                 download
-                className="inline-flex items-center justify-center gap-2 rounded-[22px] border border-slate-200 bg-white px-7 py-3.5 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-7 py-3.5 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
               >
                 <FileSpreadsheet size={16} />
                 Ambil Template Resmi
@@ -1424,13 +1424,13 @@ export default function MigrationClient() {
             />
 
             {errorMessage ? (
-              <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold text-rose-700">
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold text-rose-700">
                 {errorMessage}
               </div>
             ) : null}
 
             {report ? (
-              <div className="space-y-3 rounded-[24px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">
+              <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">
                 <div>
                   File aktif: <span className="font-black">{report.fileName}</span>
                 </div>
@@ -1446,7 +1446,7 @@ export default function MigrationClient() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-600">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-600">
                 Belum ada file yang di-upload. Gunakan workbook standar agar validasi per bagian lebih akurat.
               </div>
             )}
@@ -1494,11 +1494,11 @@ export default function MigrationClient() {
 
         <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-5">
           {flowStages.map((stage) => (
-            <div key={stage.id} className={`rounded-[28px] border p-5 ${getFlowStageClasses(stage.status)}`}>
+            <div key={stage.id} className={`rounded-xl border p-5 ${getFlowStageClasses(stage.status)}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-2">
                   <div className="text-[10px] font-black uppercase tracking-[0.18em] opacity-70">Step {stage.step}</div>
-                  <h3 className="text-lg font-black tracking-tight">{stage.title}</h3>
+                  <h3 className="text-lg font-semibold tracking-tight">{stage.title}</h3>
                 </div>
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-current/20 bg-white/80">
                   <FlowStageIcon status={stage.status} step={stage.step} />
@@ -1509,7 +1509,7 @@ export default function MigrationClient() {
           ))}
         </div>
 
-        <div className="mt-6 rounded-[28px] border border-slate-200 bg-white/90 px-5 py-4 text-sm font-semibold leading-6 text-slate-700">
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white/90 px-5 py-4 text-sm font-semibold leading-6 text-slate-700">
           <span className="font-black text-slate-900">Arah sistem sekarang:</span> {flowCallout}
         </div>
       </SectionCard>
@@ -1526,14 +1526,14 @@ export default function MigrationClient() {
               Approval Gate
             </div>
             <div>
-              <h3 className="text-xl font-black tracking-tight text-slate-900">{approvalNotice.title}</h3>
+              <h3 className="text-xl font-semibold tracking-tight text-slate-900">{approvalNotice.title}</h3>
               <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-700">
                 {approvalNotice.message}
               </p>
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-white/70 bg-white/80 px-5 py-4 text-sm font-semibold leading-6 text-slate-700 lg:max-w-sm">
+          <div className="rounded-xl border border-white/70 bg-white/80 px-5 py-4 text-sm font-semibold leading-6 text-slate-700 lg:max-w-sm">
             Approval ideal diberikan setelah:
             <div className="mt-2">1. File lolos validasi dasar</div>
             <div>2. Warning penting sudah direview</div>
@@ -1551,12 +1551,12 @@ export default function MigrationClient() {
         />
 
         {!report ? (
-          <div className="mt-6 rounded-[28px] border border-slate-200 bg-slate-50 p-8 text-sm font-semibold text-slate-500">
+          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-8 text-sm font-semibold text-slate-500">
             Upload workbook dulu untuk melihat status tiap bagian, mulai dari Chart of Accounts, master data, sampai opening balances.
           </div>
         ) : (
           <div className="mt-6 space-y-6">
-            <div className="rounded-[28px] border border-blue-200 bg-blue-50 px-5 py-4 text-sm font-semibold text-blue-800">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm font-semibold text-blue-800">
               Tiap tombol upload di bawah tetap memakai satu workbook yang sama. Bedanya, sekarang review-nya diurutkan per bagian supaya tim onboarding lebih gampang mengikuti tahap kerja.
             </div>
 
@@ -1595,7 +1595,7 @@ export default function MigrationClient() {
               const showApprovalSectionNotice = isMigratableSection && section.status === 'ok' && !hasMigratedSection
 
               return (
-                <div key={section.id} className="rounded-[32px] border border-slate-200 bg-slate-50/70 p-5">
+                <div key={section.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-5">
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div className="flex gap-4">
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-sm font-black text-white">
@@ -1603,7 +1603,7 @@ export default function MigrationClient() {
                       </div>
                       <div className="space-y-2">
                         <div className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-700">Bagian Migrasi</div>
-                        <h3 className="text-2xl font-black tracking-tight text-slate-900">{section.title}</h3>
+                        <h3 className="text-2xl font-semibold tracking-tight text-slate-900">{section.title}</h3>
                         <p className="max-w-3xl text-sm font-medium leading-6 text-slate-600">
                           {section.description}
                         </p>
@@ -1769,10 +1769,10 @@ export default function MigrationClient() {
                   </div>
 
                   <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
-                    <div className="rounded-[24px] border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800">
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800">
                       {section.nextStep}
                     </div>
-                    <div className="rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
+                    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
                       {section.status === 'blocked'
                         ? 'Bagian ini masih blocked. Rapikan header atau isi kolom wajib dulu sebelum lanjut.'
                         : section.status === 'warning'
@@ -1786,67 +1786,67 @@ export default function MigrationClient() {
                   </div>
 
                   {showApprovalSectionNotice ? (
-                    <div className="mt-4 rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-semibold leading-6 text-amber-800">
+                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-semibold leading-6 text-amber-800">
                       <span className="font-black">Notifikasi Approval:</span> bagian ini sudah `Ready`, tetapi sebaiknya tetap menunggu persetujuan PIC atau finance lead sebelum tombol `Migrate Now` ditekan karena proses ini akan menulis data pembuka langsung ke sistem.
                     </div>
                   ) : null}
 
                   {isCoaSection && coaImportError ? (
-                    <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
+                    <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
                       {coaImportError}
                     </div>
                   ) : null}
 
                   {isMasterDataSection && masterDataImportError ? (
-                    <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
+                    <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
                       {masterDataImportError}
                     </div>
                   ) : null}
 
                   {isOpeningStockSection && openingStockImportError ? (
-                    <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
+                    <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
                       {openingStockImportError}
                     </div>
                   ) : null}
 
                   {isOpeningArSection && openingArImportError ? (
-                    <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
+                    <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
                       {openingArImportError}
                     </div>
                   ) : null}
 
                   {isOpeningApSection && openingApImportError ? (
-                    <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
+                    <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
                       {openingApImportError}
                     </div>
                   ) : null}
 
                   {isOpeningCashBankSection && openingCashBankImportError ? (
-                    <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
+                    <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
                       {openingCashBankImportError}
                     </div>
                   ) : null}
 
                   {isFixedAssetsSection && fixedAssetsImportError ? (
-                    <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
+                    <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
                       {fixedAssetsImportError}
                     </div>
                   ) : null}
 
                   {isManufacturingSection && manufacturingImportError ? (
-                    <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
+                    <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
                       {manufacturingImportError}
                     </div>
                   ) : null}
 
                   {isEmployeesSection && employeesImportError ? (
-                    <div className="mt-4 rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
+                    <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700">
                       {employeesImportError}
                     </div>
                   ) : null}
 
                   {isCoaSection && coaImportResult?.success ? (
-                    <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${
+                    <div className={`mt-4 rounded-xl border px-4 py-4 text-sm ${
                       coaImportResult.hasErrors
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
@@ -1888,7 +1888,7 @@ export default function MigrationClient() {
                   ) : null}
 
                   {isMasterDataSection && masterDataImportResult?.success ? (
-                    <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${
+                    <div className={`mt-4 rounded-xl border px-4 py-4 text-sm ${
                       masterDataImportResult.hasErrors
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
@@ -1936,7 +1936,7 @@ export default function MigrationClient() {
                   ) : null}
 
                   {isOpeningStockSection && openingStockImportResult?.success ? (
-                    <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${
+                    <div className={`mt-4 rounded-xl border px-4 py-4 text-sm ${
                       openingStockImportResult.hasErrors
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
@@ -1997,7 +1997,7 @@ export default function MigrationClient() {
                   ) : null}
 
                   {isOpeningArSection && openingArImportResult?.success ? (
-                    <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${
+                    <div className={`mt-4 rounded-xl border px-4 py-4 text-sm ${
                       openingArImportResult.hasErrors
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
@@ -2058,7 +2058,7 @@ export default function MigrationClient() {
                   ) : null}
 
                   {isOpeningApSection && openingApImportResult?.success ? (
-                    <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${
+                    <div className={`mt-4 rounded-xl border px-4 py-4 text-sm ${
                       openingApImportResult.hasErrors
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
@@ -2119,7 +2119,7 @@ export default function MigrationClient() {
                   ) : null}
 
                   {isOpeningCashBankSection && openingCashBankImportResult?.success ? (
-                    <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${
+                    <div className={`mt-4 rounded-xl border px-4 py-4 text-sm ${
                       openingCashBankImportResult.hasErrors
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
@@ -2180,7 +2180,7 @@ export default function MigrationClient() {
                   ) : null}
 
                   {isFixedAssetsSection && fixedAssetsImportResult?.success ? (
-                    <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${
+                    <div className={`mt-4 rounded-xl border px-4 py-4 text-sm ${
                       fixedAssetsImportResult.hasErrors
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
@@ -2241,7 +2241,7 @@ export default function MigrationClient() {
                   ) : null}
 
                   {isManufacturingSection && manufacturingImportResult?.success ? (
-                    <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${
+                    <div className={`mt-4 rounded-xl border px-4 py-4 text-sm ${
                       manufacturingImportResult.hasErrors
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'
@@ -2296,7 +2296,7 @@ export default function MigrationClient() {
                   ) : null}
 
                   {isEmployeesSection && employeesImportResult?.success ? (
-                    <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${
+                    <div className={`mt-4 rounded-xl border px-4 py-4 text-sm ${
                       employeesImportResult.hasErrors
                         ? 'border-amber-200 bg-amber-50 text-amber-800'
                         : 'border-emerald-200 bg-emerald-50 text-emerald-800'

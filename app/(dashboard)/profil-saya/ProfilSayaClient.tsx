@@ -243,12 +243,12 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
 
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Profil Saya</h1>
+        <h1 className="text-3xl font-semibold text-slate-900 tracking-tight">Profil Saya</h1>
         <p className="text-sm font-medium text-slate-400 mt-1">Kelola foto profil, kontak, dan keamanan akun Anda</p>
       </div>
 
       {/* === IDENTITY CARD === */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
         <div className="h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
         <div className="p-10 space-y-8">
           <div className="flex items-center gap-4">
@@ -261,16 +261,16 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
           {/* Avatar */}
           <div className="flex flex-col items-center gap-4">
             <button type="button" onClick={() => avatarInputRef.current?.click()} className="relative group">
-              <div className="w-28 h-28 rounded-[32px] overflow-hidden shadow-2xl shadow-blue-100 border-4 border-white">
+              <div className="w-28 h-28 rounded-xl overflow-hidden shadow-2xl shadow-blue-100 border-4 border-white">
                 {avatarPreview ? (
                   <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-4xl font-black text-white">
+                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-4xl font-semibold text-white">
                     {initials}
                   </div>
                 )}
               </div>
-              <div className="absolute inset-0 bg-black/40 rounded-[32px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+              <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
                 <Camera size={28} className="text-white" />
               </div>
             </button>
@@ -279,8 +279,8 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
               <p className="font-black text-lg text-slate-900 tracking-tight">
                 {employee ? `${employee.first_name} ${employee.last_name || ''}` : userName}
               </p>
-              <p className="text-sm font-bold text-blue-600 uppercase tracking-widest mt-0.5">{employee?.job_title || 'Karyawan'}</p>
-              {employee?.nik && <p className="text-[11px] font-black text-slate-300 font-mono tracking-widest mt-1">#{employee.nik}</p>}
+              <p className="text-sm font-bold text-blue-600 tracking-tight mt-0.5">{employee?.job_title || 'Karyawan'}</p>
+              {employee?.nik && <p className="text-[11px] font-semibold text-slate-300 font-mono tracking-tight mt-1">#{employee.nik}</p>}
               {employee?.branch?.name && <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-2">{employee.branch.name}</p>}
             </div>
           </div>
@@ -289,16 +289,16 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
           {employee && (
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Departemen</p>
+                <p className="text-[9px] font-semibold text-slate-300 uppercase tracking-tight mb-1">Departemen</p>
                 <p className="text-sm font-black text-slate-700">{employee.department || 'Umum'}</p>
               </div>
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Status</p>
+                <p className="text-[9px] font-semibold text-slate-300 uppercase tracking-tight mb-1">Status</p>
                 <p className="text-sm font-black text-slate-700">{(employee.employment_status || 'FULL_TIME').replace('_', ' ')}</p>
               </div>
               {employee.email && (
                 <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 col-span-2">
-                  <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Email</p>
+                  <p className="text-[9px] font-semibold text-slate-300 uppercase tracking-tight mb-1">Email</p>
                   <p className="text-sm font-black text-slate-700">{employee.email}</p>
                 </div>
               )}
@@ -325,7 +325,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
           <button
             onClick={handleSaveProfile}
             disabled={saving}
-            className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-blue-200 active:scale-[0.98]"
+            className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold tracking-tight text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-blue-200 active:scale-[0.98]"
           >
             {saving ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -338,7 +338,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
       </motion.div>
 
       {/* === SELF SERVICE ATTENDANCE === */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
         <div className="h-2 bg-gradient-to-r from-emerald-400 via-sky-400 to-blue-500" />
         <div className="p-10 space-y-8">
           <div className="flex items-center gap-4">
@@ -350,15 +350,15 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-              <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Status Hari Ini</p>
+              <p className="text-[9px] font-semibold text-slate-300 uppercase tracking-tight mb-1">Status Hari Ini</p>
               <p className="text-sm font-black text-slate-700">{todayAttendance?.status || 'BELUM CLOCK-IN'}</p>
             </div>
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-              <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Jam Masuk</p>
+              <p className="text-[9px] font-semibold text-slate-300 uppercase tracking-tight mb-1">Jam Masuk</p>
               <p className="text-sm font-black text-slate-700">{todayAttendance?.check_in ? new Date(todayAttendance.check_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
             </div>
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-              <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Jam Keluar</p>
+              <p className="text-[9px] font-semibold text-slate-300 uppercase tracking-tight mb-1">Jam Keluar</p>
               <p className="text-sm font-black text-slate-700">{todayAttendance?.check_out ? new Date(todayAttendance.check_out).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
             </div>
           </div>
@@ -378,7 +378,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
             <button
               onClick={() => handleClockAttendance('IN')}
               disabled={attendanceSaving || Boolean(todayAttendance)}
-              className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-200 active:scale-[0.98]"
+              className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-semibold tracking-tight text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-200 active:scale-[0.98]"
             >
               {attendanceSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle size={16} />}
               CLOCK IN
@@ -386,7 +386,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
             <button
               onClick={() => handleClockAttendance('OUT')}
               disabled={attendanceSaving || !todayAttendance || Boolean(todayAttendance?.check_out)}
-              className="w-full py-4 rounded-2xl bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-sky-200 active:scale-[0.98]"
+              className="w-full py-4 rounded-2xl bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white font-semibold tracking-tight text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-sky-200 active:scale-[0.98]"
             >
               {attendanceSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Clock size={16} />}
               CLOCK OUT
@@ -407,7 +407,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
                     <p className="text-[11px] font-bold text-slate-500">{record.branch?.name || employee?.branch?.name || 'Unit tidak diketahui'}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">{record.status}</p>
+                    <p className="text-[10px] font-semibold tracking-tight text-blue-600">{record.status}</p>
                     <p className="text-[11px] font-bold text-slate-500">
                       {record.check_in ? new Date(record.check_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                       {' · '}
@@ -422,7 +422,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
       </motion.div>
 
       {/* === SELF SERVICE EXPENSE CLAIM === */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }} className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
         <div className="h-2 bg-gradient-to-r from-amber-400 via-orange-400 to-rose-500" />
         <div className="p-10 space-y-8">
           <div className="flex items-center gap-4">
@@ -516,7 +516,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
           <button
             onClick={handleSubmitExpenseClaim}
             disabled={expenseSaving || receiptUploading || !employee}
-            className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-amber-200 active:scale-[0.98]"
+            className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-semibold tracking-tight text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-amber-200 active:scale-[0.98]"
           >
             {expenseSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <ReceiptText size={16} />}
             KIRIM KLAIM BIAYA
@@ -536,7 +536,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
                     <p className="text-[11px] font-bold text-slate-500">{formatDate(claim.claim_date)} • {claim.branch?.name || employee?.branch?.name || 'Unit tidak diketahui'}</p>
                     <p className="text-[11px] font-medium text-slate-500">{claim.description}</p>
                     {claim.receipt_url && (
-                      <a href={claim.receipt_url} target="_blank" rel="noreferrer" className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700">
+                      <a href={claim.receipt_url} target="_blank" rel="noreferrer" className="text-[10px] font-semibold tracking-tight text-blue-600 hover:text-blue-700">
                         Lihat Nota
                       </a>
                     )}
@@ -555,7 +555,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
                       <button
                         onClick={() => handleDeleteExpenseClaim(claim.id)}
                         disabled={expenseSaving}
-                        className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 disabled:opacity-40 flex items-center gap-1"
+                        className="text-[10px] font-semibold tracking-tight text-rose-500 hover:text-rose-600 disabled:opacity-40 flex items-center gap-1"
                       >
                         <Trash2 size={12} />
                         Hapus
@@ -570,7 +570,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
       </motion.div>
 
       {/* === SELF SERVICE LEAVE === */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
         <div className="h-2 bg-gradient-to-r from-indigo-400 via-violet-400 to-fuchsia-500" />
         <div className="p-10 space-y-8">
           <div className="flex items-center gap-4">
@@ -595,7 +595,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
               </select>
             </div>
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-              <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Unit Pengajuan</p>
+              <p className="text-[9px] font-semibold text-slate-300 uppercase tracking-tight mb-1">Unit Pengajuan</p>
               <p className="text-sm font-black text-slate-700">{employee?.branch?.name || 'Belum terhubung ke unit'}</p>
             </div>
           </div>
@@ -635,7 +635,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
           <button
             onClick={handleSubmitLeave}
             disabled={leaveSaving || !employee}
-            className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-200 active:scale-[0.98]"
+            className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-semibold tracking-tight text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-200 active:scale-[0.98]"
           >
             {leaveSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CalendarDays size={16} />}
             KIRIM PENGAJUAN CUTI
@@ -671,7 +671,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
                       <button
                         onClick={() => handleCancelLeave(request.id)}
                         disabled={leaveSaving}
-                        className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 disabled:opacity-40"
+                        className="text-[10px] font-semibold tracking-tight text-rose-500 hover:text-rose-600 disabled:opacity-40"
                       >
                         Batalkan
                       </button>
@@ -685,7 +685,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
       </motion.div>
 
       {/* === SECURITY CARD === */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-[40px] border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-900/5 overflow-hidden">
         <div className="h-2 bg-gradient-to-r from-amber-400 via-orange-400 to-rose-500" />
         <div className="p-10 space-y-8">
           <div className="flex items-center gap-4">
@@ -733,7 +733,7 @@ export default function ProfilSayaClient({ employee, orgId, userName, initialAtt
           <button
             onClick={handleChangePassword}
             disabled={pwdSaving || !newPwd || !confirmPwd}
-            className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-amber-200 active:scale-[0.98]"
+            className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-semibold tracking-tight text-[11px] flex items-center justify-center gap-2 transition-all shadow-xl shadow-amber-200 active:scale-[0.98]"
           >
             {pwdSaving ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

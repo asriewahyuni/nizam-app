@@ -273,12 +273,12 @@ export default function CommissionClient({
       />
 
       {error && (
-        <div className="rounded-[28px] border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-bold text-rose-700">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-bold text-rose-700">
           {error}
         </div>
       )}
       {success && (
-        <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-bold text-emerald-700">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-bold text-emerald-700">
           {success}
         </div>
       )}
@@ -324,7 +324,7 @@ export default function CommissionClient({
 
             <div className="space-y-4">
               {resellerRows.length === 0 && (
-                <div className="rounded-[28px] border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
                   <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm">
                     <Handshake size={24} />
                   </div>
@@ -340,7 +340,7 @@ export default function CommissionClient({
                 const typeLabel = isCompany ? 'Perusahaan Mitra' : 'Reseller Personal'
 
                 return (
-                  <div key={reseller.id} className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
+                  <div key={reseller.id} className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
@@ -385,16 +385,16 @@ export default function CommissionClient({
 
                     <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
                       <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Omzet Bulan Ini</div>
-                        <div className="mt-2 text-lg font-black text-slate-900">{formatRupiah(netSales)}</div>
+                        <div className="text-[10px] font-semibold tracking-tight text-slate-400">Omzet Bulan Ini</div>
+                        <div className="mt-2 text-lg font-semibold text-slate-900">{formatRupiah(netSales)}</div>
                       </div>
                       <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target Bulanan</div>
-                        <div className="mt-2 text-lg font-black text-slate-900">{formatRupiah(targetAmount)}</div>
+                        <div className="text-[10px] font-semibold tracking-tight text-slate-400">Target Bulanan</div>
+                        <div className="mt-2 text-lg font-semibold text-slate-900">{formatRupiah(targetAmount)}</div>
                       </div>
                       <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Estimasi Komisi</div>
-                        <div className="mt-2 text-lg font-black text-emerald-600">{formatRupiah(commissionAmount)}</div>
+                        <div className="text-[10px] font-semibold tracking-tight text-slate-400">Estimasi Komisi</div>
+                        <div className="mt-2 text-lg font-semibold text-emerald-600">{formatRupiah(commissionAmount)}</div>
                       </div>
                     </div>
 
@@ -439,7 +439,7 @@ export default function CommissionClient({
                 const estimatedCommission = calculateCommissionAmount(baseAmount, schemeType, Number(schemeValue || 0))
 
                 return (
-                  <div key={sale.id} className="flex flex-col gap-4 rounded-[24px] border border-slate-100 bg-white px-5 py-4 md:flex-row md:items-center md:justify-between">
+                  <div key={sale.id} className="flex flex-col gap-4 rounded-xl border border-slate-100 bg-white px-5 py-4 md:flex-row md:items-center md:justify-between">
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-black text-slate-900">{sale.sale_number}</span>
@@ -457,11 +457,11 @@ export default function CommissionClient({
 
                     <div className="grid grid-cols-2 gap-4 md:w-[340px]">
                       <div className="text-right">
-                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Net Invoice</div>
+                        <div className="text-[10px] font-semibold tracking-tight text-slate-400">Net Invoice</div>
                         <div className="mt-1 text-sm font-black text-slate-900">{formatRupiah(baseAmount)}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Komisi</div>
+                        <div className="text-[10px] font-semibold tracking-tight text-slate-400">Komisi</div>
                         <div className="mt-1 text-sm font-black text-emerald-600">{formatRupiah(estimatedCommission)}</div>
                       </div>
                     </div>
@@ -473,10 +473,10 @@ export default function CommissionClient({
         </div>
 
         <div className="space-y-8">
-          <div className="rounded-[32px] bg-slate-900 p-8 text-white shadow-2xl">
+          <div className="rounded-xl bg-slate-900 p-8 text-white shadow-2xl">
             <div className="mb-6 flex items-center gap-3 text-blue-300">
               <Handshake size={22} />
-              <h3 className="text-sm font-black uppercase tracking-widest">Aturan Komisi Aman</h3>
+              <h3 className="text-sm font-semibold tracking-tight">Aturan Komisi Aman</h3>
             </div>
             <div className="space-y-4 text-sm font-bold leading-relaxed text-slate-200">
               <p>Komisi reseller dihitung di luar invoice customer. Jadi nilai tagihan ke customer tetap sama.</p>
@@ -485,7 +485,7 @@ export default function CommissionClient({
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-blue-100 bg-blue-50 p-8">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-8">
             <div className="mb-3 flex items-center gap-2 text-blue-600">
               <Target size={18} />
               <h3 className="font-black">Sorotan Bulan Ini</h3>
@@ -493,11 +493,11 @@ export default function CommissionClient({
             {topReseller ? (
               <div className="space-y-4">
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-widest text-blue-500">Top Reseller</div>
-                  <div className="mt-2 text-xl font-black text-slate-900">{getResellerDisplayName(topReseller.reseller)}</div>
+                  <div className="text-[10px] font-semibold tracking-tight text-blue-500">Top Reseller</div>
+                  <div className="mt-2 text-xl font-semibold text-slate-900">{getResellerDisplayName(topReseller.reseller)}</div>
                   <div className="text-sm font-bold text-slate-500">{getResellerSubtitle(topReseller.reseller)}</div>
                 </div>
-                <div className="rounded-[24px] bg-white px-5 py-4 shadow-sm">
+                <div className="rounded-xl bg-white px-5 py-4 shadow-sm">
                   <div className="flex items-center justify-between text-sm font-bold text-slate-500">
                     <span>Omzet channel</span>
                     <span className="text-slate-900">{formatRupiah(topReseller.netSales)}</span>
@@ -544,11 +544,11 @@ export default function CommissionClient({
       {showFormModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeFormModal} />
-          <div className="relative w-full max-w-2xl rounded-[32px] bg-white shadow-2xl flex flex-col max-h-[90dvh]">
+          <div className="relative w-full max-w-2xl rounded-xl bg-white shadow-2xl flex flex-col max-h-[90dvh]">
             {/* Header — tidak ikut scroll */}
             <div className="px-8 pt-8 pb-4 flex items-start justify-between gap-4 shrink-0">
               <div>
-                <h3 className="text-2xl font-black text-slate-900">
+                <h3 className="text-2xl font-semibold text-slate-900">
                   {editingReseller ? 'Edit Reseller' : 'Tambah Reseller Baru'}
                 </h3>
                 <p className="mt-2 text-sm font-bold text-slate-400">
@@ -569,7 +569,7 @@ export default function CommissionClient({
               <div className="flex-1 overflow-y-auto px-8 py-2 space-y-5">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tipe Reseller</label>
+                    <label className="text-[10px] font-semibold tracking-tight text-slate-400">Tipe Reseller</label>
                     <select
                       value={formState.resellerType}
                       onChange={(event) => setFormState((current) => ({ ...current, resellerType: event.target.value === 'COMPANY' ? 'COMPANY' : 'PERSONAL' }))}
@@ -580,7 +580,7 @@ export default function CommissionClient({
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <label className="text-[10px] font-semibold tracking-tight text-slate-400">
                       {formState.resellerType === 'COMPANY' ? 'Nama Tampilan / Kode Partner' : 'Nama Reseller'}
                     </label>
                     <input
@@ -595,7 +595,7 @@ export default function CommissionClient({
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Perusahaan Mitra</label>
+                    <label className="text-[10px] font-semibold tracking-tight text-slate-400">Perusahaan Mitra</label>
                     <input
                       value={formState.companyName}
                       onChange={(event) => setFormState((current) => ({ ...current, companyName: event.target.value }))}
@@ -604,7 +604,7 @@ export default function CommissionClient({
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">PIC / Contact Person</label>
+                    <label className="text-[10px] font-semibold tracking-tight text-slate-400">PIC / Contact Person</label>
                     <input
                       value={formState.contactPerson}
                       onChange={(event) => setFormState((current) => ({ ...current, contactPerson: event.target.value }))}
@@ -616,7 +616,7 @@ export default function CommissionClient({
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email</label>
+                    <label className="text-[10px] font-semibold tracking-tight text-slate-400">Email</label>
                     <input
                       type="email"
                       value={formState.email}
@@ -626,7 +626,7 @@ export default function CommissionClient({
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">No. Telepon / WA</label>
+                    <label className="text-[10px] font-semibold tracking-tight text-slate-400">No. Telepon / WA</label>
                     <input
                       value={formState.phone}
                       onChange={(event) => setFormState((current) => ({ ...current, phone: event.target.value }))}
@@ -638,7 +638,7 @@ export default function CommissionClient({
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target Bulanan (Rp)</label>
+                    <label className="text-[10px] font-semibold tracking-tight text-slate-400">Target Bulanan (Rp)</label>
                     <input
                       type="number"
                       min="0"
@@ -648,7 +648,7 @@ export default function CommissionClient({
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tipe Komisi</label>
+                    <label className="text-[10px] font-semibold tracking-tight text-slate-400">Tipe Komisi</label>
                     <select
                       value={formState.commissionType}
                       onChange={(event) => setFormState((current) => ({ ...current, commissionType: event.target.value === 'FIXED' ? 'FIXED' : 'PERCENT' }))}
@@ -662,7 +662,7 @@ export default function CommissionClient({
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <label className="text-[10px] font-semibold tracking-tight text-slate-400">
                       {formState.commissionType === 'PERCENT' ? 'Nilai Komisi (%)' : 'Nominal Komisi / Invoice'}
                     </label>
                     <input
@@ -674,8 +674,8 @@ export default function CommissionClient({
                       className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-500"
                     />
                   </div>
-                  <div className="rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-blue-500">Ringkasan Skema</div>
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 px-5 py-4">
+                    <div className="text-[10px] font-semibold tracking-tight text-blue-500">Ringkasan Skema</div>
                     <div className="mt-2 text-sm font-black text-slate-900">
                       {getCommissionSchemeLabel(formState.commissionType, Number(formState.commissionValue || 0))}
                     </div>
@@ -686,7 +686,7 @@ export default function CommissionClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Alamat</label>
+                  <label className="text-[10px] font-semibold tracking-tight text-slate-400">Alamat</label>
                   <textarea
                     value={formState.address}
                     onChange={(event) => setFormState((current) => ({ ...current, address: event.target.value }))}
@@ -696,7 +696,7 @@ export default function CommissionClient({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Catatan Internal</label>
+                  <label className="text-[10px] font-semibold tracking-tight text-slate-400">Catatan Internal</label>
                   <textarea
                     value={formState.notes}
                     onChange={(event) => setFormState((current) => ({ ...current, notes: event.target.value }))}

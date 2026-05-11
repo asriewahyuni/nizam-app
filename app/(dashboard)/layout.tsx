@@ -243,7 +243,7 @@ export default async function DashboardLayout({
         <main id="dashboard-scroll-root" className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6 print:overflow-visible print:p-0 print:pb-0">
           <div className="max-w-7xl mx-auto print:max-w-none">
             {allowAllBranchSelection && !activeBranch && (
-              <div className="mb-6 rounded-[28px] border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50 px-5 py-4 shadow-sm">
+              <div className="mb-6 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50 px-5 py-4 shadow-sm">
                 <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
                   <div>
                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Mode Semua Unit</div>

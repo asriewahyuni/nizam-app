@@ -778,13 +778,13 @@ export default function PurchasingClient({
       <div className="flex bg-slate-100/50 p-1.5 rounded-2xl w-fit border border-slate-100">
          <button
             onClick={() => setActiveTab('PURCHASES')}
-            className={`px-8 py-2.5 text-xs font-black rounded-xl transition-all uppercase tracking-widest ${activeTab === 'PURCHASES' ? 'bg-white text-rose-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+            className={`px-8 py-2.5 text-xs font-semibold rounded-xl transition-all uppercase tracking-tight ${activeTab === 'PURCHASES' ? 'bg-white text-rose-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
          >
             Purchase Orders
          </button>
          <button
             onClick={() => setActiveTab('REQUESTS')}
-            className={`px-8 py-2.5 text-xs font-black rounded-xl transition-all uppercase tracking-widest flex items-center gap-2 ${activeTab === 'REQUESTS' ? 'bg-white text-rose-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+            className={`px-8 py-2.5 text-xs font-semibold rounded-xl transition-all uppercase tracking-tight flex items-center gap-2 ${activeTab === 'REQUESTS' ? 'bg-white text-rose-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
          >
             Permintaan Produksi
             {purchaseRequests.filter((r: any) => r.status === 'PENDING').length > 0 && (
@@ -862,7 +862,7 @@ export default function PurchasingClient({
                                  Faktur: {formatRupiah(p.grand_total)}
                                </div>
                              )}
-                             <div className={`text-[9px] font-black uppercase tracking-widest ${p.payment_status === 'PAID' ? 'text-emerald-500' : 'text-amber-500'}`}>
+                             <div className={`text-[9px] font-semibold tracking-tight ${p.payment_status === 'PAID' ? 'text-emerald-500' : 'text-amber-500'}`}>
                                {p.payment_status === 'PAID' ? 'Lunas' : outstanding < p.grand_total ? 'Cicilan / Sisa' : 'Belum Lunas'}
                              </div>
                            </div>
@@ -911,7 +911,7 @@ export default function PurchasingClient({
                          )}
 
                          {(p.status === 'RECEIVED' || (isPurchaseSalam(p) && p.status === 'ORDERED')) && p.payment_status !== 'PAID' && (
-                           <button onClick={() => handleOpenPayment(p)} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+                           <button onClick={() => handleOpenPayment(p)} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-[10px] font-semibold tracking-tight rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
                              <CreditCard size={14}/> Bayar
                            </button>
                          )}
@@ -960,7 +960,7 @@ export default function PurchasingClient({
                       </td>
                       <td className="px-8 py-6">
                         <div className="text-sm font-bold text-slate-900">{r.product_name}</div>
-                        <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">Butuh: {r.quantity} {r.unit}</div>
+                        <div className="text-[10px] font-semibold text-blue-600 uppercase tracking-tight mt-1">Butuh: {r.quantity} {r.unit}</div>
                       </td>
                       <td className="px-8 py-6">
                         <div className="text-[10px] font-black text-rose-500 uppercase">{r.source_type}</div>
@@ -1012,7 +1012,7 @@ export default function PurchasingClient({
                             </>
                           )}
                           {r.status === 'ORDERED' && (
-                            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest italic">Sudah di-PO</span>
+                            <span className="text-[10px] font-semibold text-emerald-500 uppercase tracking-tight italic">Sudah di-PO</span>
                           )}
                         </div>
                       </td>
@@ -1039,9 +1039,9 @@ export default function PurchasingClient({
                 <form onSubmit={handleCreatePurchase} className="space-y-6">
                   {/* HEADER PO */}
                   {/* HEADER PO & PAYMENT GUARDRAIL */}
-                  <div className={`grid grid-cols-1 ${paymentTerm === 'TEMPO' ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4 p-5 bg-slate-50 rounded-[28px] border border-slate-100 shadow-inner transition-all`}>
+                  <div className={`grid grid-cols-1 ${paymentTerm === 'TEMPO' ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4 p-5 bg-slate-50 rounded-xl border border-slate-100 shadow-inner transition-all`}>
                     <div className="flex-1 space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Mode Transaksi</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight block px-1">Mode Transaksi</label>
                       <select value={shariahMode} onChange={(e) => setShariahMode(e.target.value as any)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-black text-indigo-600 shadow-sm focus:border-indigo-500 transition-all">
                          <option value="CASH">PEMBELIAN LANGSUNG (CASH)</option>
                          <option value="SALAM">PEMBELIAN SALAM (BAYAR DEPAN)</option>
@@ -1052,7 +1052,7 @@ export default function PurchasingClient({
                     </div>
 
                     <div className={`${paymentTerm === 'TEMPO' ? 'md:col-span-1' : 'md:col-span-2'} space-y-2`}>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Vendor / Supplier</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight block px-1">Vendor / Supplier</label>
                       <select required value={vendorId} onChange={(e) => setVendorId(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-black text-slate-900 shadow-sm focus:border-rose-500 transition-all">
                          <option value="">Pilih Vendor / Supplier...</option>
                          {vendors.map((v: any) => <option key={v.id} value={v.id}>{v.name}</option>)}
@@ -1060,7 +1060,7 @@ export default function PurchasingClient({
                     </div>
 
                     <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Metode Pembayaran</label>
+                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight block px-1">Metode Pembayaran</label>
                        <div className="flex p-1 bg-white border border-slate-200 rounded-2xl h-[52px]">
                           <button 
                              type="button" 
@@ -1087,13 +1087,13 @@ export default function PurchasingClient({
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Tanggal Belanja</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight block px-1">Tanggal Belanja</label>
                       <input type="date" required value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-rose-500 transition-all" />
                     </div>
 
                     {(paymentTerm === 'TEMPO' || shariahMode === 'SALAM') && (
                       <div className="space-y-2 animate-in slide-in-from-right-2">
-                        <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest block px-1">{shariahMode === 'SALAM' ? 'Tanggal Barang Disediakan' : 'Jatuh Tempo'}</label>
+                        <label className="text-[10px] font-semibold text-amber-600 uppercase tracking-tight block px-1">{shariahMode === 'SALAM' ? 'Tanggal Barang Disediakan' : 'Jatuh Tempo'}</label>
                         <input type="date" required={paymentTerm === 'TEMPO' || shariahMode === 'SALAM'} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-amber-200 rounded-2xl outline-none text-sm bg-white font-bold text-amber-600 shadow-sm focus:border-amber-500 transition-all" />
                       </div>
                     )}
@@ -1116,7 +1116,7 @@ export default function PurchasingClient({
                                />
                              </div>
                              <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block px-1">Nominal DP</label>
+                                <label className="text-[10px] font-semibold text-indigo-400 uppercase tracking-tight block px-1">Nominal DP</label>
                                 <div className="flex bg-white rounded-2xl p-1 border border-indigo-200 shadow-sm">
                                    <button type="button" onClick={() => setDpMode('NOMINAL')} className={`px-4 py-2 text-[10px] font-black rounded-xl transition flex-1 ${dpMode === 'NOMINAL' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Nominal (Rp)</button>
                                    <button type="button" onClick={() => setDpMode('PERCENT')} className={`px-4 py-2 text-[10px] font-black rounded-xl transition flex-1 ${dpMode === 'PERCENT' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Persentase (%)</button>
@@ -1167,7 +1167,7 @@ export default function PurchasingClient({
                   {/* LINE ITEMS */}
                   <div className="space-y-3">
                     <div className="flex justify-between items-center mb-2">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Detail Barang (Items)</label>
+                      <label className="text-[10px] font-bold text-slate-400 tracking-tight">Detail Barang (Items)</label>
                       <button type="button" onClick={handleAddLine} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
                         <Plus size={14}/> Tambah Baris
                       </button>
@@ -1202,7 +1202,7 @@ export default function PurchasingClient({
                       <div key={line.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center bg-white p-4 sm:p-0 border sm:border-0 border-slate-100 rounded-3xl sm:rounded-none mb-4 sm:mb-2 text-left">
                         
                         <div className="sm:col-span-2 min-h-[58px] flex flex-col justify-start">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Nama Barang</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 tracking-tight block mb-1">Nama Barang</label>
                           <input 
                             required 
                             list="product_suggestions" 
@@ -1219,7 +1219,7 @@ export default function PurchasingClient({
                         </div>
 
                         <div className="col-span-1 min-h-[58px]">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Jenis</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 tracking-tight block mb-1">Jenis</label>
                           <select 
                             value={line.category} 
                             onChange={(e) => handleLineChange(line.id, 'category', e.target.value)} 
@@ -1235,7 +1235,7 @@ export default function PurchasingClient({
                         </div>
 
                         <div className="col-span-1 min-h-[58px]">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Qty</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 tracking-tight block mb-1">Qty</label>
                           <input 
                             type="number" required min="1" step="any"
                             value={line.quantity || ''} 
@@ -1246,7 +1246,7 @@ export default function PurchasingClient({
                         </div>
 
                         <div className="col-span-1 min-h-[58px]">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Satuan</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 tracking-tight block mb-1">Satuan</label>
                           <select
                             value={line.unit}
                             onChange={(e) => handleLineChange(line.id, 'unit', e.target.value)}
@@ -1277,7 +1277,7 @@ export default function PurchasingClient({
                         </div>
 
                         <div className="col-span-1 min-h-[58px]">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Margin (%)</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 tracking-tight block mb-1">Margin (%)</label>
                           <div className="relative">
                             <input 
                               type="number" required min="0" max="99"
@@ -1291,7 +1291,7 @@ export default function PurchasingClient({
                         </div>
 
                         <div className="col-span-3 min-h-[58px] sm:text-right flex flex-col justify-start">
-                          <label className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Final Jual</label>
+                          <label className="sm:hidden text-[10px] font-bold text-slate-400 tracking-tight block mb-1">Final Jual</label>
                           <div className="flex items-center gap-1">
                             <CurrencyInput 
                                label="Final Jual"
@@ -1353,7 +1353,7 @@ export default function PurchasingClient({
                      <div className="bg-white rounded-2xl border border-slate-200 p-4 mt-2">
                         <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-2 border-b border-slate-50 pb-3">
                           <div>
-                            <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Landed Cost (Overhead)</h4>
+                            <h4 className="text-[11px] font-semibold text-slate-800 uppercase tracking-tight">Landed Cost (Overhead)</h4>
                             <p className="text-[10px] font-medium text-slate-400 mt-0.5">Ongkir/Ekspedisi & Asuransi (otomatis menambah HPP / Modal barang).</p>
                           </div>
                           {paymentTerm === 'TEMPO' && (
@@ -1444,22 +1444,22 @@ export default function PurchasingClient({
         {showPaymentModal && selectedPurchase && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowPaymentModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[40px] shadow-2xl p-10 overflow-hidden">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl p-10 overflow-hidden">
                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16" />
                <div className="flex items-center gap-4 mb-8">
                   <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-200">
                     <CreditCard size={24}/>
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-slate-900 leading-none">Bayar Tagihan Vendor</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">{selectedPurchase.purchase_number} • {selectedPurchase.contacts?.name}</p>
+                    <h3 className="text-xl font-semibold text-slate-900 leading-none">Bayar Tagihan Vendor</h3>
+                    <p className="text-[10px] font-bold text-slate-400 tracking-tight mt-1.5">{selectedPurchase.purchase_number} • {selectedPurchase.contacts?.name}</p>
                   </div>
                </div>
 
                <form onSubmit={handleSubmitPayment} className="space-y-6">
-                 <div className="p-6 bg-slate-50 rounded-[32px] border border-slate-100 space-y-4">
+                 <div className="p-6 bg-slate-50 rounded-xl border border-slate-100 space-y-4">
                     <div className="flex justify-between items-center px-2 py-3 bg-white rounded-2xl border border-slate-100 shadow-sm mb-4">
-                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sisa Hutang Tagihan:</span>
+                       <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Sisa Hutang Tagihan:</span>
                        <span className="text-sm font-black text-rose-600">{formatCurrency(debtAmount)}</span>
                     </div>
 
@@ -1517,10 +1517,10 @@ export default function PurchasingClient({
                     <div className="pt-2 px-1">
                        <div className="flex justify-between items-center py-3 border-t border-slate-200">
                           <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Pelunasan Hutang</span>
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight leading-none mb-1">Total Pelunasan Hutang</span>
                             <span className="text-[10px] font-bold text-slate-400 opacity-60 italic leading-none">(Bayar + Potongan)</span>
                           </div>
-                          <span className={`text-xl font-black ${paymentAmount + paymentDiscount > debtAmount ? 'text-rose-500' : 'text-slate-900'}`}>
+                          <span className={`text-xl font-semibold ${paymentAmount + paymentDiscount > debtAmount ? 'text-rose-500' : 'text-slate-900'}`}>
                             {formatCurrency(paymentAmount + paymentDiscount)}
                           </span>
                        </div>
@@ -1542,18 +1542,18 @@ export default function PurchasingClient({
 
                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Tanggal</label>
+                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight px-1">Tanggal</label>
                        <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className="w-full px-5 py-3 border border-slate-200 rounded-2xl outline-none text-sm font-bold" />
                     </div>
                     <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Catatan</label>
+                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight px-1">Catatan</label>
                        <input value={payNotes} onChange={(e) => setPayNotes(e.target.value)} className="w-full px-5 py-3 border border-slate-200 rounded-2xl outline-none text-sm font-bold" />
                     </div>
                  </div>
 
                  <div className="flex gap-3 pt-4">
-                    <button type="button" onClick={() => setShowPaymentModal(false)} className="flex-1 py-4 text-xs font-black text-slate-400 hover:bg-slate-50 rounded-2xl transition-colors uppercase tracking-widest">Batal</button>
-                    <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-black text-white bg-blue-600 hover:bg-blue-700 rounded-2xl shadow-xl shadow-blue-100 transition-all uppercase tracking-widest">
+                    <button type="button" onClick={() => setShowPaymentModal(false)} className="flex-1 py-4 text-xs font-semibold text-slate-400 hover:bg-slate-50 rounded-2xl transition-colors uppercase tracking-tight">Batal</button>
+                    <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-2xl shadow-xl shadow-blue-100 transition-all uppercase tracking-tight">
                        {loading ? 'Proses...' : 'Konfirmasi Bayar'}
                     </button>
                  </div>
@@ -1566,31 +1566,31 @@ export default function PurchasingClient({
         {showReturnModal && selectedPurchase && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowReturnModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-[40px] shadow-2xl p-10 overflow-hidden max-h-[90vh] overflow-y-auto">
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-10 overflow-hidden max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center gap-4 mb-8">
                   <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-200">
                     <RotateCcw size={24}/>
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-slate-900 leading-none">Retur Pembelian Barang</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">{selectedPurchase.purchase_number} • {selectedPurchase.contacts?.name}</p>
+                    <h3 className="text-xl font-semibold text-slate-900 leading-none">Retur Pembelian Barang</h3>
+                    <p className="text-[10px] font-bold text-slate-400 tracking-tight mt-1.5">{selectedPurchase.purchase_number} • {selectedPurchase.contacts?.name}</p>
                   </div>
                 </div>
 
                 <form onSubmit={handleSubmitReturn} className="space-y-6">
                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">No. Retur</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight px-1">No. Retur</label>
                         <input value={returnNumber} onChange={(e) => setReturnNumber(e.target.value)} className="w-full px-5 py-3 border border-slate-200 rounded-2xl outline-none text-sm font-bold bg-slate-50" />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Tanggal Retur</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight px-1">Tanggal Retur</label>
                         <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} className="w-full px-5 py-3 border border-slate-200 rounded-2xl outline-none text-sm font-bold bg-white" />
                       </div>
                    </div>
 
-                   <div className="bg-slate-50 rounded-[32px] border border-slate-100 p-6 space-y-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Pilih Barang yang Dikembalikan</label>
+                   <div className="bg-slate-50 rounded-xl border border-slate-100 p-6 space-y-3">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight px-1">Pilih Barang yang Dikembalikan</label>
                       <div className="space-y-2">
                          {returnItems.map((it, idx) => (
                            <div key={it.id} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 transition-all hover:border-amber-200 group">
@@ -1623,18 +1623,18 @@ export default function PurchasingClient({
                       </div>
                       <div className="pt-4 flex justify-between items-center border-t border-slate-200">
                          <span className="text-[10px] font-black text-slate-400 uppercase">Total Estimasi Kredit AP</span>
-                         <span className="text-lg font-black text-rose-600">{formatCurrency(returnItems.reduce((s, x) => s + (x.return_qty * x.unit_price * 1.11), 0))}</span>
+                         <span className="text-lg font-semibold text-rose-600">{formatCurrency(returnItems.reduce((s, x) => s + (x.return_qty * x.unit_price * 1.11), 0))}</span>
                       </div>
                    </div>
 
                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Alasan Retur / Catatan</label>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight px-1">Alasan Retur / Catatan</label>
                       <textarea value={returnNotes} onChange={(e) => setReturnNotes(e.target.value)} placeholder="Contoh: Barang rusak atau tidak sesuai spek..." className="w-full px-5 py-4 border border-slate-200 rounded-2xl outline-none text-sm font-medium min-h-[80px]" />
                    </div>
 
                    <div className="flex gap-3 pt-4">
-                      <button type="button" onClick={() => setShowReturnModal(false)} className="flex-1 py-4 text-xs font-black text-slate-400 hover:bg-slate-50 rounded-2xl transition-colors uppercase tracking-widest">Batal</button>
-                      <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-black text-white bg-amber-500 hover:bg-amber-600 rounded-2xl shadow-xl shadow-amber-100 transition-all uppercase tracking-widest">
+                      <button type="button" onClick={() => setShowReturnModal(false)} className="flex-1 py-4 text-xs font-semibold text-slate-400 hover:bg-slate-50 rounded-2xl transition-colors uppercase tracking-tight">Batal</button>
+                      <button type="submit" disabled={loading} className="flex-2 py-4 px-8 text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 rounded-2xl shadow-xl shadow-amber-100 transition-all uppercase tracking-tight">
                          {loading ? 'Memproses...' : 'Konfirmasi Retur'}
                       </button>
                    </div>
@@ -1705,7 +1705,7 @@ export default function PurchasingClient({
                       <div className="flex items-start gap-5">
                         <img src={companyProfile.logo} alt="Logo Perusahaan" className="w-14 h-14 object-contain" />
                         <div>
-                          <h1 className="text-3xl font-black tracking-tighter text-slate-900 mb-1">{companyProfile.name}</h1>
+                          <h1 className="text-3xl font-semibold tracking-tighter text-slate-900 mb-1">{companyProfile.name}</h1>
                           <p className="text-sm text-slate-500 max-w-sm">{companyProfile.address}</p>
                           <div className="flex items-center flex-wrap gap-3 mt-1.5 text-[10px] font-bold text-slate-500">
                             {companyProfile.hotline && <span>Telp/WA: {companyProfile.hotline}</span>}
@@ -1715,10 +1715,10 @@ export default function PurchasingClient({
                         </div>
                       </div>
                       <div className="text-right">
-                        <h2 className="text-2xl font-black text-blue-600 uppercase tracking-widest mb-1">PURCHASE ORDER</h2>
+                        <h2 className="text-2xl font-semibold text-blue-600 uppercase tracking-tight mb-1">PURCHASE ORDER</h2>
                         <p className="text-sm font-bold text-slate-900 font-mono">{selectedDetailPurchase.purchase_number}</p>
                         <div className="mt-4 inline-block px-3 py-1 bg-slate-100 rounded-md">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-0.5">Tanggal Terbit</span>
+                          <span className="text-[10px] font-semibold tracking-tight text-slate-400 block mb-0.5">Tanggal Terbit</span>
                           <span className="text-sm font-bold text-slate-900">{formatDate(selectedDetailPurchase.purchase_date, 'long')}</span>
                         </div>
                       </div>
@@ -1728,7 +1728,7 @@ export default function PurchasingClient({
                    <div className="grid grid-cols-2 gap-12 mb-10 relative z-10">
                       <div className="space-y-4">
                          <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-6">
-                            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-200 pb-2">Ditujukan Kepada (Vendor):</h4>
+                            <h4 className="text-[10px] font-semibold tracking-tight text-slate-400 mb-4 border-b border-slate-200 pb-2">Ditujukan Kepada (Vendor):</h4>
                             <p className="text-lg font-bold text-slate-900">{selectedDetailPurchase.contacts?.name || 'Unknown Vendor'}</p>
                             {selectedDetailPurchase.contacts?.address && (
                               <p className="text-sm text-slate-500 mt-2 whitespace-pre-wrap">{selectedDetailPurchase.contacts.address}</p>
@@ -1739,19 +1739,19 @@ export default function PurchasingClient({
                          <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-6 h-full flex flex-col justify-center">
                             <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
                               <div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Jatuh Tempo</span>
+                                <span className="text-[10px] font-semibold tracking-tight text-slate-400 block">Jatuh Tempo</span>
                                 <span className="font-bold text-slate-900">{selectedDetailPurchase.due_date ? formatDate(selectedDetailPurchase.due_date, 'long') : 'Pembayaran Lunas (Tunai)'}</span>
                               </div>
                               <div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Metode Pembayaran</span>
+                                <span className="text-[10px] font-semibold tracking-tight text-slate-400 block">Metode Pembayaran</span>
                                 <span className="font-bold text-slate-900">{selectedDetailPurchase.payment_term}</span>
                               </div>
                               <div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Mode Syariah</span>
+                                <span className="text-[10px] font-semibold tracking-tight text-slate-400 block">Mode Syariah</span>
                                 <span className="font-bold text-indigo-600">{selectedDetailPurchase.shariah_mode || 'CASH'}</span>
                               </div>
                               <div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Status Eksekusi</span>
+                                <span className="text-[10px] font-semibold tracking-tight text-slate-400 block">Status Eksekusi</span>
                                 <span className="font-bold text-slate-900">{selectedDetailPurchase.status}</span>
                               </div>
                             </div>
@@ -1849,7 +1849,7 @@ export default function PurchasingClient({
                                   includeMargin={false} 
                                   fgColor="#0f172a" 
                                 />
-                                <p className="text-[8px] font-mono text-emerald-600 font-bold mt-2 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded">e-Signed Verified</p>
+                                <p className="text-[8px] font-mono text-emerald-600 font-bold mt-2 tracking-tight bg-emerald-50 px-2 py-0.5 rounded">e-Signed Verified</p>
                               </div>
                             ) : approvalData?.status === 'REJECTED' ? (
                               <div className="text-rose-500 font-black border-4 border-rose-500 rounded-lg px-4 py-2 rotate-[-10deg] opacity-60">REJECTED</div>
@@ -1946,16 +1946,16 @@ export default function PurchasingClient({
                   <div className="space-y-5">
                     <div className="grid grid-cols-3 gap-3">
                       <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-center">
-                        <div className="text-2xl font-black text-emerald-600">{repairResult.fixed}</div>
-                        <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mt-1">Diperbaiki</div>
+                        <div className="text-2xl font-semibold text-emerald-600">{repairResult.fixed}</div>
+                        <div className="text-[10px] font-bold text-emerald-500 tracking-tight mt-1">Diperbaiki</div>
                       </div>
                       <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center">
-                        <div className="text-2xl font-black text-slate-500">{repairResult.skipped}</div>
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Dilewati</div>
+                        <div className="text-2xl font-semibold text-slate-500">{repairResult.skipped}</div>
+                        <div className="text-[10px] font-bold text-slate-400 tracking-tight mt-1">Dilewati</div>
                       </div>
                       <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-center">
-                        <div className="text-2xl font-black text-red-500">{repairResult.errors.length}</div>
-                        <div className="text-[10px] font-bold text-red-400 uppercase tracking-widest mt-1">Error</div>
+                        <div className="text-2xl font-semibold text-red-500">{repairResult.errors.length}</div>
+                        <div className="text-[10px] font-bold text-red-400 tracking-tight mt-1">Error</div>
                       </div>
                     </div>
 
@@ -1968,7 +1968,7 @@ export default function PurchasingClient({
 
                     {repairResult.errors.length > 0 && (
                       <div className="bg-red-50 border border-red-100 rounded-2xl p-4 space-y-1">
-                        <p className="text-red-700 text-[10px] font-black uppercase tracking-widest mb-2">Error</p>
+                        <p className="text-red-700 text-[10px] font-semibold tracking-tight mb-2">Error</p>
                         {repairResult.errors.map((e, i) => (
                           <p key={i} className="text-red-600 text-xs font-medium">{e}</p>
                         ))}
@@ -1977,7 +1977,7 @@ export default function PurchasingClient({
 
                     {repairResult.details.length > 0 && (
                       <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 max-h-48 overflow-y-auto space-y-1">
-                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-2">Log Detail</p>
+                        <p className="text-slate-400 text-[10px] font-semibold tracking-tight mb-2">Log Detail</p>
                         {repairResult.details.map((d, i) => (
                           <p key={i} className={`text-xs font-medium font-mono ${d.startsWith('[FIXED]') ? 'text-emerald-600' : d.startsWith('[ERROR]') ? 'text-red-500' : 'text-slate-400'}`}>{d}</p>
                         ))}

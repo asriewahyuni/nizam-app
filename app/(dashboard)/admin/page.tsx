@@ -1629,21 +1629,21 @@ export default function SaaSAdminPage() {
     <div className="p-8 pb-32 max-w-[1600px] mx-auto space-y-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
          <div>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tighter flex items-center gap-4 italic uppercase">
+            <h1 className="text-4xl font-semibold text-slate-900 tracking-tighter flex items-center gap-4 italic uppercase">
                <ShieldCheck size={48} className="text-blue-600" /> Control Center
             </h1>
             <p className="text-slate-400 font-bold text-sm tracking-widest mt-1 uppercase">NIZAM SaaS Platform Administration</p>
          </div>
 	         <div className="flex flex-wrap gap-3">
-	            <button onClick={() => setActiveTab('users')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Tenants</button>
-	            <button onClick={() => setActiveTab('module_management')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'module_management' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Manajemen Modul</button>
-	            <button onClick={() => setActiveTab('addon_management')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'addon_management' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Manajemen Add-on</button>
-	            <button onClick={() => setActiveTab('activity')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'activity' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Activity</button>
-	            <button onClick={() => setActiveTab('assessors')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'assessors' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Assessors</button>
-	            <button onClick={() => setActiveTab('packages')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'packages' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>SaaS Plans</button>
-	            <button onClick={() => setActiveTab('ai_tokens')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'ai_tokens' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>AI Tokens</button>
-	            <button onClick={() => setActiveTab('invoices')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'invoices' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Billing</button>
-	            <button onClick={() => setActiveTab('settings')} className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Settings</button>
+	            <button onClick={() => setActiveTab('users')} className={`px-6 py-3 rounded-2xl text-xs font-semibold tracking-tight transition-all ${activeTab === 'users' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Tenants</button>
+	            <button onClick={() => setActiveTab('module_management')} className={`px-6 py-3 rounded-2xl text-xs font-semibold tracking-tight transition-all ${activeTab === 'module_management' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Manajemen Modul</button>
+	            <button onClick={() => setActiveTab('addon_management')} className={`px-6 py-3 rounded-2xl text-xs font-semibold tracking-tight transition-all ${activeTab === 'addon_management' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Manajemen Add-on</button>
+	            <button onClick={() => setActiveTab('activity')} className={`px-6 py-3 rounded-2xl text-xs font-semibold tracking-tight transition-all ${activeTab === 'activity' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Activity</button>
+	            <button onClick={() => setActiveTab('assessors')} className={`px-6 py-3 rounded-2xl text-xs font-semibold tracking-tight transition-all ${activeTab === 'assessors' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Assessors</button>
+	            <button onClick={() => setActiveTab('packages')} className={`px-6 py-3 rounded-2xl text-xs font-semibold tracking-tight transition-all ${activeTab === 'packages' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>SaaS Plans</button>
+	            <button onClick={() => setActiveTab('ai_tokens')} className={`px-6 py-3 rounded-2xl text-xs font-semibold tracking-tight transition-all ${activeTab === 'ai_tokens' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>AI Tokens</button>
+	            <button onClick={() => setActiveTab('invoices')} className={`px-6 py-3 rounded-2xl text-xs font-semibold tracking-tight transition-all ${activeTab === 'invoices' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Billing</button>
+	            <button onClick={() => setActiveTab('settings')} className={`px-6 py-3 rounded-2xl text-xs font-semibold tracking-tight transition-all ${activeTab === 'settings' ? 'bg-slate-900 text-white shadow-xl' : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'}`}>Settings</button>
 	         </div>
       </div>
 
@@ -1662,7 +1662,7 @@ export default function SaaSAdminPage() {
 	              <SectionCard>
 	                <form onSubmit={saveAssessorForm} className="grid grid-cols-1 gap-4 p-6 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
 	                  <div>
-	                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Email Member SaaS</label>
+	                    <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1.5">Email Member SaaS</label>
 	                    <input
 	                      name="email"
 	                      type="email"
@@ -1672,7 +1672,7 @@ export default function SaaSAdminPage() {
 	                    />
 	                  </div>
 	                  <div>
-	                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Nama Tampilan</label>
+	                    <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1.5">Nama Tampilan</label>
 	                    <input
 	                      name="display_name"
 	                      placeholder="Nama assessor"
@@ -1688,7 +1688,7 @@ export default function SaaSAdminPage() {
 	              <SectionCard>
 	                <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-6 py-4">
 	                  <div>
-	                    <h3 className="text-xl font-black tracking-tight text-slate-900">Assessor SaaS</h3>
+	                    <h3 className="text-xl font-semibold tracking-tight text-slate-900">Assessor SaaS</h3>
 	                    <p className="mt-1 text-xs font-bold text-slate-400">Akses panel assessor di tenant hanya membaca daftar ini.</p>
 	                  </div>
 	                  <button onClick={fetchAssessors} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors shadow-sm">
@@ -1700,10 +1700,10 @@ export default function SaaSAdminPage() {
 	                  <table className="w-full border-collapse">
 	                    <thead>
 	                      <tr className="border-b border-slate-100">
-	                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Assessor</th>
-	                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Dibuat</th>
-	                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Status</th>
-	                        <th className="text-right py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Aksi</th>
+	                        <th className="text-left py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Assessor</th>
+	                        <th className="text-left py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Dibuat</th>
+	                        <th className="text-left py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Status</th>
+	                        <th className="text-right py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Aksi</th>
 	                      </tr>
 	                    </thead>
 	                    <tbody className="divide-y divide-slate-50">
@@ -1764,28 +1764,28 @@ export default function SaaSAdminPage() {
 	              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
 	                <SectionCard>
 	                  <div className="p-5 space-y-2">
-	                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stok Provider</p>
-	                    <p className="text-2xl font-black text-slate-900 tracking-tight">{Number(aiTokenInventory?.total_stock_tokens || 0).toLocaleString('id-ID')}</p>
+	                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Stok Provider</p>
+	                    <p className="text-2xl font-semibold text-slate-900 tracking-tight">{Number(aiTokenInventory?.total_stock_tokens || 0).toLocaleString('id-ID')}</p>
 	                  </div>
 	                </SectionCard>
 	                <SectionCard>
 	                  <div className="p-5 space-y-2">
-	                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Saldo Tenant Aktif</p>
-	                    <p className="text-2xl font-black text-slate-900 tracking-tight">{aiWalletSummary.totalBalance.toLocaleString('id-ID')}</p>
+	                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Saldo Tenant Aktif</p>
+	                    <p className="text-2xl font-semibold text-slate-900 tracking-tight">{aiWalletSummary.totalBalance.toLocaleString('id-ID')}</p>
 	                  </div>
 	                </SectionCard>
 	                <SectionCard>
 	                  <div className="p-5 space-y-2">
-	                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stok Tersedia</p>
-	                    <p className={`text-2xl font-black tracking-tight ${aiAvailableStock < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+	                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Stok Tersedia</p>
+	                    <p className={`text-2xl font-semibold tracking-tight ${aiAvailableStock < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
 	                      {aiAvailableStock.toLocaleString('id-ID')}
 	                    </p>
 	                  </div>
 	                </SectionCard>
 	                <SectionCard>
 	                  <div className="p-5 space-y-2">
-	                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pemakaian Total</p>
-	                    <p className="text-2xl font-black text-slate-900 tracking-tight">{aiWalletSummary.totalUsed.toLocaleString('id-ID')}</p>
+	                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Pemakaian Total</p>
+	                    <p className="text-2xl font-semibold text-slate-900 tracking-tight">{aiWalletSummary.totalUsed.toLocaleString('id-ID')}</p>
 	                  </div>
 	                </SectionCard>
 	              </div>
@@ -1793,12 +1793,12 @@ export default function SaaSAdminPage() {
 	              <SectionCard>
 	                <div className="p-6 space-y-6">
 	                  <div>
-	                    <h3 className="text-xl font-black text-slate-900 tracking-tight">Konfigurasi Biaya & Pricing Token AI</h3>
+	                    <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Konfigurasi Biaya & Pricing Token AI</h3>
 	                    <p className="text-sm font-medium text-slate-500 mt-1">Atur input cost, overhead, margin, dan stok global token untuk kalkulasi HPP otomatis.</p>
 	                  </div>
 	                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
 	                    <div>
-	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Biaya Input / 1K (IDR)</label>
+	                      <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1">Biaya Input / 1K (IDR)</label>
 	                      <input
 	                        type="number"
 	                        value={aiPolicy.costPer1kInputIdr}
@@ -1807,7 +1807,7 @@ export default function SaaSAdminPage() {
 	                      />
 	                    </div>
 	                    <div>
-	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Biaya Output / 1K (IDR)</label>
+	                      <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1">Biaya Output / 1K (IDR)</label>
 	                      <input
 	                        type="number"
 	                        value={aiPolicy.costPer1kOutputIdr}
@@ -1816,7 +1816,7 @@ export default function SaaSAdminPage() {
 	                      />
 	                    </div>
 	                    <div>
-	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Avg Input Tokens</label>
+	                      <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1">Avg Input Tokens</label>
 	                      <input
 	                        type="number"
 	                        value={aiPolicy.avgInputTokens}
@@ -1825,7 +1825,7 @@ export default function SaaSAdminPage() {
 	                      />
 	                    </div>
 	                    <div>
-	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Avg Output Tokens</label>
+	                      <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1">Avg Output Tokens</label>
 	                      <input
 	                        type="number"
 	                        value={aiPolicy.avgOutputTokens}
@@ -1837,7 +1837,7 @@ export default function SaaSAdminPage() {
 
 	                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
 	                    <div>
-	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Token / Generate</label>
+	                      <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1">Token / Generate</label>
 	                      <input
 	                        type="number"
 	                        value={aiPolicy.tokensPerGeneration}
@@ -1846,7 +1846,7 @@ export default function SaaSAdminPage() {
 	                      />
 	                    </div>
 	                    <div>
-	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Overhead (%)</label>
+	                      <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1">Overhead (%)</label>
 	                      <input
 	                        type="number"
 	                        value={aiPolicy.overheadPercent}
@@ -1855,7 +1855,7 @@ export default function SaaSAdminPage() {
 	                      />
 	                    </div>
 	                    <div>
-	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Margin (%)</label>
+	                      <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1">Margin (%)</label>
 	                      <input
 	                        type="number"
 	                        value={aiPolicy.marginPercent}
@@ -1864,7 +1864,7 @@ export default function SaaSAdminPage() {
 	                      />
 	                    </div>
 	                    <div>
-	                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Stok Token Global</label>
+	                      <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1">Stok Token Global</label>
 	                      <input
 	                        type="number"
 	                        value={Number(aiTokenInventory?.total_stock_tokens || 0)}
@@ -1876,16 +1876,16 @@ export default function SaaSAdminPage() {
 
 	                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 	                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-	                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">HPP / Generate</div>
-	                      <div className="mt-1 text-lg font-black text-slate-900">Rp {Math.ceil(aiHppPerGenerate).toLocaleString('id-ID')}</div>
+	                      <div className="text-[10px] font-semibold tracking-tight text-slate-400">HPP / Generate</div>
+	                      <div className="mt-1 text-lg font-semibold text-slate-900">Rp {Math.ceil(aiHppPerGenerate).toLocaleString('id-ID')}</div>
 	                    </div>
 	                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-	                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rekomendasi / Generate</div>
-	                      <div className="mt-1 text-lg font-black text-emerald-700">Rp {Math.ceil(aiRecommendedPerGenerate).toLocaleString('id-ID')}</div>
+	                      <div className="text-[10px] font-semibold tracking-tight text-slate-400">Rekomendasi / Generate</div>
+	                      <div className="mt-1 text-lg font-semibold text-emerald-700">Rp {Math.ceil(aiRecommendedPerGenerate).toLocaleString('id-ID')}</div>
 	                    </div>
 	                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-	                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rekomendasi / 1K Token</div>
-	                      <div className="mt-1 text-lg font-black text-indigo-700">Rp {Math.ceil(aiRecommendedPer1kToken).toLocaleString('id-ID')}</div>
+	                      <div className="text-[10px] font-semibold tracking-tight text-slate-400">Rekomendasi / 1K Token</div>
+	                      <div className="mt-1 text-lg font-semibold text-indigo-700">Rp {Math.ceil(aiRecommendedPer1kToken).toLocaleString('id-ID')}</div>
 	                    </div>
 	                  </div>
 
@@ -1901,7 +1901,7 @@ export default function SaaSAdminPage() {
 	                <div className="p-6 space-y-5">
 	                  <div className="flex items-center justify-between gap-4">
 	                    <div>
-	                      <h3 className="text-xl font-black text-slate-900 tracking-tight">Paket Top Up Token AI</h3>
+	                      <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Paket Top Up Token AI</h3>
 	                      <p className="text-sm font-medium text-slate-500 mt-1">Kelola paket yang akan tampil di halaman billing tenant.</p>
 	                    </div>
 	                    <SafeButton variant="primary" onClick={() => setAiTopupModal({ open: true, editData: null })} icon={<Plus size={16} />}>
@@ -1921,12 +1921,12 @@ export default function SaaSAdminPage() {
 	                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${pkg.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
 	                          </button>
 	                        </div>
-	                        <div className="mt-4 text-3xl font-black tracking-tighter text-slate-900">{Number(pkg.tokens || 0).toLocaleString('id-ID')}</div>
-	                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Token</div>
+	                        <div className="mt-4 text-3xl font-semibold tracking-tighter text-slate-900">{Number(pkg.tokens || 0).toLocaleString('id-ID')}</div>
+	                        <div className="text-[10px] font-semibold tracking-tight text-slate-400">Token</div>
 	                        <div className="mt-3 text-xs font-bold text-slate-500">{pkg.description || '-'}</div>
 	                        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
 	                          <div>
-	                            <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">Sell Price</div>
+	                            <div className="text-[9px] font-semibold tracking-tight text-slate-400">Sell Price</div>
 	                            <div className="text-sm font-black text-slate-900">Rp {Number(pkg.price_idr || 0).toLocaleString('id-ID')}</div>
 	                          </div>
 	                          <div className="flex gap-2">
@@ -1952,20 +1952,20 @@ export default function SaaSAdminPage() {
                <form onSubmit={saveSettings} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <SectionCard>
                     <div className="p-6 space-y-4">
-                       <h4 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-indigo-600 border-b pb-3 mb-4">
+                       <h4 className="flex items-center gap-2 text-sm font-semibold tracking-tight text-indigo-600 border-b pb-3 mb-4">
                           <Building2 size={18} /> Bank Info (Main Account)
                        </h4>
                        <div className="space-y-4">
                           <div>
-                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Nama Bank</label>
+                             <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-tight mb-1.5 ml-1">Nama Bank</label>
                              <input name="bank_name" defaultValue={saasSettings.bank_info?.bank} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold" />
                           </div>
                           <div>
-                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Nomor Rekening</label>
-                             <input name="bank_acc" defaultValue={saasSettings.bank_info?.account} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-mono text-lg font-black tracking-widest" />
+                             <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-tight mb-1.5 ml-1">Nomor Rekening</label>
+                             <input name="bank_acc" defaultValue={saasSettings.bank_info?.account} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-mono text-lg font-semibold tracking-tight" />
                           </div>
                           <div>
-                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Atas Nama (Pemilik)</label>
+                             <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-tight mb-1.5 ml-1">Atas Nama (Pemilik)</label>
                              <input name="bank_user" defaultValue={saasSettings.bank_info?.name} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold" />
                           </div>
                        </div>
@@ -1974,16 +1974,16 @@ export default function SaaSAdminPage() {
 
                   <SectionCard>
                     <div className="p-6 space-y-4">
-                       <h4 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-emerald-600 border-b pb-3 mb-4">
+                       <h4 className="flex items-center gap-2 text-sm font-semibold tracking-tight text-emerald-600 border-b pb-3 mb-4">
                           <Mail size={18} /> Support Contacts
                        </h4>
                        <div className="space-y-4">
                           <div>
-                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">WhatsApp (62xxx)</label>
+                             <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-tight mb-1.5 ml-1">WhatsApp (62xxx)</label>
                              <input name="wa_num" defaultValue={saasSettings.support_info?.wa} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold" />
                           </div>
                           <div>
-                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Label / Nama CS</label>
+                             <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-tight mb-1.5 ml-1">Label / Nama CS</label>
                              <input name="wa_label" defaultValue={saasSettings.support_info?.label} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold" />
                           </div>
                           <div className="pt-6">
@@ -2008,7 +2008,7 @@ export default function SaaSAdminPage() {
                       <ShieldCheck size={12} className="text-sky-500" />
                       Tenant Workspace
                     </div>
-                    <h2 className="mt-4 max-w-2xl text-3xl font-black tracking-tight text-slate-900">
+                    <h2 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-slate-900">
                       Kelola tenant dengan tampilan yang lebih bersih dan modern.
                     </h2>
                     <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-slate-500">
@@ -2079,7 +2079,7 @@ export default function SaaSAdminPage() {
                               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
                                 {item.label}
                               </p>
-                              <p className="mt-3 text-3xl font-black tracking-tight text-slate-900">
+                              <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
                                 {item.value}
                               </p>
                               <p className="mt-1 text-[11px] font-medium text-slate-500">
@@ -2097,7 +2097,7 @@ export default function SaaSAdminPage() {
                 </div>
               </div>
 
-              <SectionCard glass className="border-slate-200/80 bg-white/80 shadow-[0_20px_40px_-24px_rgba(15,23,42,0.18)]">
+              <SectionCard glass className="border-slate-200/80 bg-white/80 shadow-md">
                 <div className="grid grid-cols-1 gap-4 p-5 lg:grid-cols-[minmax(0,1.4fr)_220px_220px]">
                   <div className="relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -2109,7 +2109,7 @@ export default function SaaSAdminPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">Tipe Akun</label>
+                    <label className="mb-1.5 ml-1 block text-[10px] font-semibold tracking-tight text-slate-400">Tipe Akun</label>
                     <select
                       value={typeFilter}
                       onChange={(e) => setTypeFilter(e.target.value as any)}
@@ -2121,7 +2121,7 @@ export default function SaaSAdminPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">Filter Paket</label>
+                    <label className="mb-1.5 ml-1 block text-[10px] font-semibold tracking-tight text-slate-400">Filter Paket</label>
                     <select
                       value={packageFilter}
                       onChange={(e) => setPackageFilter(e.target.value)}
@@ -2135,16 +2135,16 @@ export default function SaaSAdminPage() {
               </SectionCard>
 
               {tenantDeleteMode && (
-                <div className="rounded-[26px] border border-rose-200 bg-[linear-gradient(135deg,#fff1f2_0%,#fff7f7_100%)] px-5 py-4 text-xs font-bold text-rose-700 shadow-[0_18px_35px_-28px_rgba(225,29,72,0.55)]">
+                <div className="rounded-xl border border-rose-200 bg-[linear-gradient(135deg,#fff1f2_0%,#fff7f7_100%)] px-5 py-4 text-xs font-bold text-rose-700 shadow-[0_18px_35px_-28px_rgba(225,29,72,0.55)]">
                   Mode hapus aktif: hanya tenant berstatus <span className="font-black">Suspended</span> yang dapat dihapus.
                 </div>
               )}
 
-              <SectionCard className="border-slate-200/80 shadow-[0_24px_60px_-28px_rgba(15,23,42,0.16)]">
+              <SectionCard className="border-slate-200/80 shadow-md">
                 <div className="flex flex-col gap-3 border-b border-slate-100 bg-[linear-gradient(180deg,rgba(248,250,252,0.92)_0%,rgba(255,255,255,0.9)_100%)] px-6 py-5 md:flex-row md:items-end md:justify-between">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Tenant Overview</p>
-                    <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Daftar tenant yang sedang Anda pantau</h3>
+                    <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Daftar tenant yang sedang Anda pantau</h3>
                     <p className="mt-1 text-sm font-medium text-slate-500">
                       {filteredOrgs.length} tenant cocok dengan filter • {visibleHierarchicalFilteredOrgs.length} baris terlihat pada struktur saat ini
                     </p>
@@ -2161,12 +2161,12 @@ export default function SaaSAdminPage() {
                   <table className="w-full min-w-[1080px] border-separate border-spacing-0">
                     <thead>
                       <tr>
-                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-black uppercase tracking-widest text-slate-400 backdrop-blur">Organisasi / Pemilik</th>
-                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-black uppercase tracking-widest text-slate-400 backdrop-blur">Tipe</th>
-                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-black uppercase tracking-widest text-slate-400 backdrop-blur">Paket / Entitlement</th>
-                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-black uppercase tracking-widest text-slate-400 backdrop-blur">Masa Berlaku</th>
-                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-black uppercase tracking-widest text-slate-400 backdrop-blur">Status</th>
-                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-right text-[11px] font-black uppercase tracking-widest text-slate-400 backdrop-blur">Aksi</th>
+                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-semibold tracking-tight text-slate-400 backdrop-blur">Organisasi / Pemilik</th>
+                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-semibold tracking-tight text-slate-400 backdrop-blur">Tipe</th>
+                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-semibold tracking-tight text-slate-400 backdrop-blur">Paket / Entitlement</th>
+                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-semibold tracking-tight text-slate-400 backdrop-blur">Masa Berlaku</th>
+                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-left text-[11px] font-semibold tracking-tight text-slate-400 backdrop-blur">Status</th>
+                        <th className="sticky top-0 z-10 border-b border-slate-100 bg-white/92 px-6 py-4 text-right text-[11px] font-semibold tracking-tight text-slate-400 backdrop-blur">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -2177,7 +2177,7 @@ export default function SaaSAdminPage() {
                               <div className="flex h-14 w-14 items-center justify-center rounded-3xl border border-slate-200 bg-slate-50 text-slate-400 shadow-sm">
                                 <Search size={20} />
                               </div>
-                              <h4 className="mt-4 text-lg font-black text-slate-900">Belum ada tenant yang cocok</h4>
+                              <h4 className="mt-4 text-lg font-semibold text-slate-900">Belum ada tenant yang cocok</h4>
                               <p className="mt-2 text-sm font-medium leading-6 text-slate-500">
                                 Coba longgarkan kata kunci pencarian atau ubah filter tipe dan paket untuk melihat tenant lain.
                               </p>
@@ -2314,7 +2314,7 @@ export default function SaaSAdminPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-widest">Tipe Akun</label>
+                  <label className="block text-[10px] font-semibold uppercase text-slate-400 mb-1.5 ml-1 tracking-tight">Tipe Akun</label>
                   <select
                     value={typeFilter}
                     onChange={(e) => setTypeFilter(e.target.value as any)}
@@ -2326,7 +2326,7 @@ export default function SaaSAdminPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-widest">Filter Paket</label>
+                  <label className="block text-[10px] font-semibold uppercase text-slate-400 mb-1.5 ml-1 tracking-tight">Filter Paket</label>
                   <select
                     value={packageFilter}
                     onChange={(e) => setPackageFilter(e.target.value)}
@@ -2340,7 +2340,7 @@ export default function SaaSAdminPage() {
 
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-2xl font-black tracking-tight text-slate-900">Manajemen Modul</h3>
+                  <h3 className="text-2xl font-semibold tracking-tight text-slate-900">Manajemen Modul</h3>
                   <p className="mt-1 text-sm font-semibold text-slate-500">
                     Kelola bundle plan dan module aktif tenant dari tab khusus ini.
                   </p>
@@ -2355,12 +2355,12 @@ export default function SaaSAdminPage() {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="border-b border-slate-100">
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Tenant</th>
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Plan Aktif</th>
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Core Family</th>
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Module Plan</th>
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Total Capability</th>
-                        <th className="text-right py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Aksi</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Tenant</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Plan Aktif</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Core Family</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Module Plan</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Total Capability</th>
+                        <th className="text-right py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -2431,7 +2431,7 @@ export default function SaaSAdminPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-widest">Tipe Akun</label>
+                  <label className="block text-[10px] font-semibold uppercase text-slate-400 mb-1.5 ml-1 tracking-tight">Tipe Akun</label>
                   <select
                     value={typeFilter}
                     onChange={(e) => setTypeFilter(e.target.value as any)}
@@ -2443,7 +2443,7 @@ export default function SaaSAdminPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-widest">Filter Paket</label>
+                  <label className="block text-[10px] font-semibold uppercase text-slate-400 mb-1.5 ml-1 tracking-tight">Filter Paket</label>
                   <select
                     value={packageFilter}
                     onChange={(e) => setPackageFilter(e.target.value)}
@@ -2457,7 +2457,7 @@ export default function SaaSAdminPage() {
 
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-2xl font-black tracking-tight text-slate-900">Manajemen Add-on</h3>
+                  <h3 className="text-2xl font-semibold tracking-tight text-slate-900">Manajemen Add-on</h3>
                   <p className="mt-1 text-sm font-semibold text-slate-500">
                     Kelola entitlement add-on manual tenant tanpa mencampurinya dengan module bawaan plan.
                   </p>
@@ -2472,12 +2472,12 @@ export default function SaaSAdminPage() {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="border-b border-slate-100">
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Tenant</th>
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Plan Aktif</th>
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Add-on Manual</th>
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Blueprint</th>
-                        <th className="text-left py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Total Capability</th>
-                        <th className="text-right py-4 px-6 text-[11px] font-black uppercase text-slate-400 tracking-widest">Aksi</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Tenant</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Plan Aktif</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Add-on Manual</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Blueprint</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Total Capability</th>
+                        <th className="text-right py-4 px-6 text-[11px] font-semibold uppercase text-slate-400 tracking-tight">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -2548,12 +2548,12 @@ export default function SaaSAdminPage() {
                     const totalCoreItems = architecture.liteCore.length + architecture.starterCore.length
                     return (
                     <div key={pkg.id || pkg.name} className={`
-                      relative p-6 rounded-[32px] border transition-all duration-300 shadow-sm flex flex-col justify-between
+                      relative p-6 rounded-xl border transition-all duration-300 shadow-sm flex flex-col justify-between
                       ${pkg.active ? 'bg-white border-slate-200 hover:shadow-xl hover:-translate-y-1' : 'bg-slate-50/50 border-slate-200 opacity-75 grayscale-[30%]'}
                     `}>
                       <div>
                         <div className="flex justify-between items-start mb-4">
-                          <div className={`px-3 py-1.5 rounded-xl text-xs font-black tracking-widest uppercase border shadow-sm ${pkg.active ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-slate-200 text-slate-500'}`}>
+                          <div className={`px-3 py-1.5 rounded-xl text-xs font-semibold tracking-tight uppercase border shadow-sm ${pkg.active ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-slate-200 text-slate-500'}`}>
                             {pkg.name}
                           </div>
                           <div className="flex gap-1">
@@ -2568,7 +2568,7 @@ export default function SaaSAdminPage() {
 
                         <div className="mb-6 space-y-1">
                           <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-black font-mono text-slate-900 tracking-tighter">
+                            <span className="text-2xl font-semibold font-mono text-slate-900 tracking-tighter">
                               {pkg.price === 0 ? `Free` : `Rp ${pkg.price.toLocaleString('id-ID')}`}
                             </span>
                             {pkg.price > 0 && <span className="text-xs text-slate-400 font-bold">/{pkg.billing}</span>}
@@ -2576,7 +2576,7 @@ export default function SaaSAdminPage() {
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-600">
                             {architecture.bundleLabel}
                           </p>
-                          <p className={`text-[10px] font-black uppercase tracking-wider ${pkg.price === 0 ? 'text-orange-500' : 'text-emerald-600'}`}>
+                          <p className={`text-[10px] font-semibold uppercase tracking-tight ${pkg.price === 0 ? 'text-orange-500' : 'text-emerald-600'}`}>
                             Batas: {pkg.duration_days ?? '?'} Hari
                           </p>
                         </div>
@@ -2617,10 +2617,10 @@ export default function SaaSAdminPage() {
           )}
 
           {activeTab === 'invoices' && (
-            <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                <table className="w-full text-left border-collapse">
                   <thead className="bg-slate-50/50">
-                     <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                     <tr className="text-[10px] font-semibold tracking-tight text-slate-400">
                         <th className="px-8 py-5">Tanggal</th>
                         <th className="px-8 py-5">Tenant / Bisnis</th>
                         <th className="px-8 py-5">Paket / Add-on</th>
@@ -2713,13 +2713,13 @@ export default function SaaSAdminPage() {
               initial={{ scale: 0.96, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.96, opacity: 0 }}
-              className={`relative w-full rounded-[40px] border border-white bg-white p-8 shadow-2xl ${
+              className={`relative w-full rounded-2xl border border-white bg-white p-8 shadow-2xl ${
                 entitlementViewMode === 'all' ? 'max-w-7xl' : 'max-w-4xl'
               }`}
             >
               <div className="flex items-start justify-between gap-6 border-b border-slate-100 pb-6">
                 <div>
-                  <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900">
+                  <h2 className="text-2xl font-semibold uppercase tracking-tight text-slate-900">
                     {entitlementModalTitle}
                   </h2>
                   <p className="mt-1 text-sm font-semibold text-slate-500">
@@ -2736,13 +2736,13 @@ export default function SaaSAdminPage() {
 
               <div className="mt-6 max-h-[72vh] space-y-6 overflow-y-auto pr-2">
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.3fr_1fr]">
-                  <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Tenant</div>
-                    <div className="mt-2 text-xl font-black text-slate-900">{entitlementModal.org?.name || 'Tenant'}</div>
+                    <div className="mt-2 text-xl font-semibold text-slate-900">{entitlementModal.org?.name || 'Tenant'}</div>
                     <div className="mt-1 text-xs font-bold text-blue-600">{String((entitlementModal.org as any)?.owner_email || '')}</div>
                   </div>
 
-                  <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
                     <label className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Plan / Bundle Aktif</label>
                     <select
                       value={entitlementModal.selectedPlan}
@@ -2822,9 +2822,9 @@ export default function SaaSAdminPage() {
                 {entitlementSelectedPackage ? (
                   <>
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                      <div className="rounded-[28px] border border-slate-200 bg-white p-5">
+                      <div className="rounded-xl border border-slate-200 bg-white p-5">
                         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Core Family</div>
-                        <div className="mt-2 text-lg font-black text-slate-900">
+                        <div className="mt-2 text-lg font-semibold text-slate-900">
                           {getSaasPackageArchitecture(entitlementSelectedPackage.modules || [], []).bundleLabel}
                         </div>
                         <p className="mt-2 text-[11px] font-semibold text-slate-500">
@@ -2832,9 +2832,9 @@ export default function SaaSAdminPage() {
                         </p>
                       </div>
 
-                      <div className="rounded-[28px] border border-slate-200 bg-white p-5">
+                      <div className="rounded-xl border border-slate-200 bg-white p-5">
                         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Module Dari Plan</div>
-                        <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">
+                        <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
                           {entitlementPackageModules.length}
                         </div>
                         <p className="mt-2 text-[11px] font-semibold text-slate-500">
@@ -2842,7 +2842,7 @@ export default function SaaSAdminPage() {
                         </p>
                       </div>
 
-                      <div className="rounded-[28px] border border-slate-200 bg-white p-5">
+                      <div className="rounded-xl border border-slate-200 bg-white p-5">
                         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
                           {entitlementViewMode === 'modules'
                             ? 'Module Tersetel'
@@ -2850,7 +2850,7 @@ export default function SaaSAdminPage() {
                               ? 'Add-on Aktif Manual'
                               : 'Entitlement Tersetel'}
                         </div>
-                        <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">
+                        <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
                           {entitlementViewMode === 'modules'
                             ? entitlementManagedModules.length
                             : entitlementViewMode === 'all'
@@ -2868,10 +2868,10 @@ export default function SaaSAdminPage() {
                     </div>
 
                     {entitlementViewMode === 'all' && (
-                      <div className="rounded-[32px] border border-slate-200 bg-slate-50 p-6">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-6">
                         <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 xl:flex-row xl:items-end xl:justify-between">
                           <div>
-                            <h3 className="text-lg font-black text-slate-900">Provisioning Flow</h3>
+                            <h3 className="text-lg font-semibold text-slate-900">Provisioning Flow</h3>
                             <p className="mt-1 text-[11px] font-semibold text-slate-500">
                               Pilih core family, aktifkan module yang diinginkan, lalu pilih add-on yang kompatibel dengan module fokus.
                             </p>
@@ -2887,7 +2887,7 @@ export default function SaaSAdminPage() {
                         </div>
 
                         <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.25fr_1.25fr_0.95fr]">
-                          <div className="rounded-[28px] border border-slate-200 bg-white p-4">
+                          <div className="rounded-xl border border-slate-200 bg-white p-4">
                             <div className="flex items-center justify-between gap-3">
                               <div>
                                 <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">1. Core</h4>
@@ -2905,7 +2905,7 @@ export default function SaaSAdminPage() {
                                     key={`core-family-${coreFamily}`}
                                     type="button"
                                     onClick={() => handleEntitlementCoreFamilyChange(coreFamily)}
-                                    className={`w-full rounded-[24px] border px-4 py-4 text-left transition-all ${
+                                    className={`w-full rounded-xl border px-4 py-4 text-left transition-all ${
                                       isSelected
                                         ? 'border-indigo-200 bg-indigo-50 shadow-sm'
                                         : 'border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50'
@@ -2939,7 +2939,7 @@ export default function SaaSAdminPage() {
                             </div>
                           </div>
 
-                          <div className="rounded-[28px] border border-slate-200 bg-white p-4">
+                          <div className="rounded-xl border border-slate-200 bg-white p-4">
                             <div className="flex items-center justify-between gap-3">
                               <div>
                                 <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">2. Modules</h4>
@@ -2960,7 +2960,7 @@ export default function SaaSAdminPage() {
                                 return (
                                   <label
                                     key={`builder-module-${option.value}`}
-                                    className={`block rounded-[24px] border px-4 py-4 transition-all ${
+                                    className={`block rounded-xl border px-4 py-4 transition-all ${
                                       isFocused
                                         ? 'border-indigo-300 bg-indigo-50/80 shadow-sm'
                                         : isSelected
@@ -3018,7 +3018,7 @@ export default function SaaSAdminPage() {
                             </div>
                           </div>
 
-                          <div className="rounded-[28px] border border-slate-200 bg-white p-4">
+                          <div className="rounded-xl border border-slate-200 bg-white p-4">
                             <div className="flex items-center justify-between gap-3">
                               <div>
                                 <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">3. Add-ons</h4>
@@ -3046,7 +3046,7 @@ export default function SaaSAdminPage() {
                                   return (
                                     <label
                                       key={`builder-addon-${option.value}`}
-                                      className={`block rounded-[24px] border px-4 py-4 transition-all ${
+                                      className={`block rounded-xl border px-4 py-4 transition-all ${
                                         isCompatible
                                           ? isSelected
                                             ? 'border-emerald-200 bg-emerald-50/80 shadow-sm'
@@ -3095,14 +3095,14 @@ export default function SaaSAdminPage() {
                                   )
                                 })
                               ) : (
-                                <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
+                                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-bold text-slate-400">
                                   Pilih atau fokuskan satu module dulu untuk melihat add-on yang relevan.
                                 </div>
                               )}
                             </div>
                           </div>
 
-                          <div className="rounded-[28px] border border-slate-200 bg-white p-4">
+                          <div className="rounded-xl border border-slate-200 bg-white p-4">
                             <div className="flex items-center justify-between gap-3">
                               <div>
                                 <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">4. Summary</h4>
@@ -3128,11 +3128,11 @@ export default function SaaSAdminPage() {
                               <div className="grid grid-cols-2 gap-3">
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                                   <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Modules</div>
-                                  <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">{entitlementManagedModules.length}</div>
+                                  <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{entitlementManagedModules.length}</div>
                                 </div>
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                                   <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Add-ons</div>
-                                  <div className="mt-1 text-2xl font-black tracking-tight text-slate-900">{entitlementManualAddonsCount}</div>
+                                  <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{entitlementManualAddonsCount}</div>
                                 </div>
                               </div>
                               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
@@ -3147,10 +3147,10 @@ export default function SaaSAdminPage() {
                       </div>
                     )}
 
-                    <div className="rounded-[32px] border border-slate-200 bg-slate-50 p-6">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-6">
                       <div className="flex items-center justify-between gap-4">
                         <div>
-                          <h3 className="text-lg font-black text-slate-900">Module Aktif dari Plan</h3>
+                          <h3 className="text-lg font-semibold text-slate-900">Module Aktif dari Plan</h3>
                           <p className="mt-1 text-[11px] font-semibold text-slate-500">
                             Ini adalah capability yang akan otomatis aktif berdasarkan bundle tenant.
                           </p>
@@ -3172,10 +3172,10 @@ export default function SaaSAdminPage() {
                     </div>
 
                     {entitlementViewMode === 'modules' && (
-                      <div className="rounded-[32px] border border-slate-200 bg-slate-50 p-6">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-6">
                         <div className="flex items-center justify-between gap-4">
                           <div>
-                            <h3 className="text-lg font-black text-slate-900">Module Settings</h3>
+                            <h3 className="text-lg font-semibold text-slate-900">Module Settings</h3>
                             <p className="mt-1 text-[11px] font-semibold text-slate-500">
                               Pilih module yang benar-benar aktif untuk tenant ini. Jika sama persis dengan plan, tenant akan kembali mengikuti plan default.
                             </p>
@@ -3202,7 +3202,7 @@ export default function SaaSAdminPage() {
                           {SAAS_PACKAGE_EDITOR_SECTIONS
                             .filter((section) => section.kind !== 'addon')
                             .map((section) => (
-                              <div key={`module-settings-${section.key}`} className="space-y-4 rounded-[28px] border border-slate-200 bg-white p-5">
+                              <div key={`module-settings-${section.key}`} className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
                                 <div className="flex items-center justify-between gap-4">
                                   <div>
                                     <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">{section.title}</h4>
@@ -3230,7 +3230,7 @@ export default function SaaSAdminPage() {
                                       >
                                         <div className="absolute top-4 right-4 flex items-center gap-2">
                                           {isPlanDefault && (
-                                            <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest border px-2 py-1 rounded-full bg-slate-100 text-slate-500 border-slate-200">
+                                            <span className="inline-flex items-center gap-1 text-[9px] font-semibold tracking-tight border px-2 py-1 rounded-full bg-slate-100 text-slate-500 border-slate-200">
                                               Plan Default
                                             </span>
                                           )}
@@ -3272,10 +3272,10 @@ export default function SaaSAdminPage() {
                     )}
 
                     {entitlementViewMode === 'addons' && (
-                    <div className="rounded-[32px] border border-slate-200 bg-slate-50 p-6">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-6">
                       <div className="flex items-center justify-between gap-4">
                         <div>
-                          <h3 className="text-lg font-black text-slate-900">Add-on Management</h3>
+                          <h3 className="text-lg font-semibold text-slate-900">Add-on Management</h3>
                           <p className="mt-1 text-[11px] font-semibold text-slate-500">
                             Pilih capability tambahan yang boleh aktif untuk tenant ini di luar module aktif tenant.
                           </p>
@@ -3290,7 +3290,7 @@ export default function SaaSAdminPage() {
                           const sectionItems = section.items
 
                           return (
-                            <div key={section.key} className="space-y-4 rounded-[28px] border border-slate-200 bg-white p-5">
+                            <div key={section.key} className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
                               <div className="flex items-center justify-between gap-4">
                                 <div>
                                   <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">{section.title}</h4>
@@ -3321,12 +3321,12 @@ export default function SaaSAdminPage() {
                                     >
                                       <div className="absolute top-4 right-4 flex items-center gap-2">
                                         {!includedByPlan && isBlueprintOption && (
-                                          <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest border px-2 py-1 rounded-full bg-slate-100 text-slate-500 border-slate-200">
+                                          <span className="inline-flex items-center gap-1 text-[9px] font-semibold tracking-tight border px-2 py-1 rounded-full bg-slate-100 text-slate-500 border-slate-200">
                                             Blueprint
                                           </span>
                                         )}
                                         {includedByPlan && (
-                                          <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest border px-2 py-1 rounded-full bg-indigo-100 text-indigo-600 border-indigo-200">
+                                          <span className="inline-flex items-center gap-1 text-[9px] font-semibold tracking-tight border px-2 py-1 rounded-full bg-indigo-100 text-indigo-600 border-indigo-200">
                                             Included
                                           </span>
                                         )}
@@ -3367,7 +3367,7 @@ export default function SaaSAdminPage() {
                         })}
 
                         {entitlementUnknownSelectedAddons.length > 0 && (
-                          <div className="space-y-3 rounded-[28px] border border-amber-200 bg-amber-50/70 p-4">
+                          <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4">
                             <div>
                               <h4 className="text-sm font-black uppercase tracking-[0.14em] text-amber-700">Legacy / Override Entitlements</h4>
                               <p className="mt-1 text-[11px] font-semibold text-amber-700/80">
@@ -3395,10 +3395,10 @@ export default function SaaSAdminPage() {
                     </div>
                     )}
 
-                    <div className="rounded-[32px] border border-slate-200 bg-white p-6">
+                    <div className="rounded-xl border border-slate-200 bg-white p-6">
                       <div className="flex items-center justify-between gap-4">
                         <div>
-                          <h3 className="text-lg font-black text-slate-900">Capability Final Tenant</h3>
+                          <h3 className="text-lg font-semibold text-slate-900">Capability Final Tenant</h3>
                           <p className="mt-1 text-[11px] font-semibold text-slate-500">
                             Gabungan module aktif tenant dan add-on manual yang dipilih.
                           </p>
@@ -3417,7 +3417,7 @@ export default function SaaSAdminPage() {
                     </div>
                   </>
                 ) : (
-                  <div className="rounded-[32px] border border-rose-200 bg-rose-50 p-6 text-sm font-bold text-rose-700">
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm font-bold text-rose-700">
                     Paket yang dipilih belum ditemukan. Pilih plan yang valid sebelum menyimpan entitlement tenant.
                   </div>
                 )}
@@ -3455,22 +3455,22 @@ export default function SaaSAdminPage() {
          {orgModal.open && (
            <div key="org-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <motion.div key="org-modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeOrgModal} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-              <motion.div key="org-modal-content" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-xl bg-white rounded-[40px] shadow-2xl p-10 overflow-hidden border border-white">
-                 <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight mb-8">
+              <motion.div key="org-modal-content" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl p-10 overflow-hidden border border-white">
+                 <h2 className="text-xl font-semibold text-slate-900 uppercase italic tracking-tight mb-8">
                     {orgModal.editData ? 'Edit Data Tenant' : 'Registrasi Tenant Manual'}
                  </h2>
                  <form onSubmit={saveOrgForm} className="space-y-6">
                     <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Organisasi</label>
+                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Nama Organisasi</label>
                        <input name="name" required defaultValue={orgModal.editData?.name} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                     </div>
                     <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Pemilik (Login Akun)</label>
+                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Email Pemilik (Login Akun)</label>
                        <input name="owner_email" required type="email" defaultValue={orgModal.editData?.owner_email} placeholder="email@perusahaan.com" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Paket SaaS</label>
+                           <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Paket SaaS</label>
                            <select
                               name="plan"
                               value={orgModalPlanName}
@@ -3485,7 +3485,7 @@ export default function SaaSAdminPage() {
                         </div>
                         <div className="space-y-2">
                            <div className="flex justify-between items-center ml-1">
-                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Masa Berlaku (Expire Date)</label>
+                              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Masa Berlaku (Expire Date)</label>
                               <div className="flex gap-1">
                                  {[3, 5, 30].map(days => (
                                     <button 
@@ -3553,18 +3553,18 @@ export default function SaaSAdminPage() {
          {pkgModal.open && (
            <div key="pkg-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <motion.div key="pkg-modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPkgModal({ open: false, editData: null })} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-              <motion.div key="pkg-modal-content" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-2xl bg-white rounded-[40px] shadow-2xl p-10 overflow-hidden border border-white">
-                 <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight mb-8">
+              <motion.div key="pkg-modal-content" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-10 overflow-hidden border border-white">
+                 <h2 className="text-xl font-semibold text-slate-900 uppercase italic tracking-tight mb-8">
                     {pkgModal.editData ? 'Edit Paket SaaS' : 'Buat Paket SaaS Baru'}
                  </h2>
                  <form onSubmit={savePackageForm} className="space-y-6 max-h-[70vh] overflow-y-auto px-1 pr-4">
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Paket</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Nama Paket</label>
                           <input name="name" required defaultValue={pkgModal.editData?.name} placeholder="e.g. Basic, Pro" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                        </div>
                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipe Billing</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Tipe Billing</label>
                           <select name="billing" defaultValue={pkgModal.editData?.billing || 'Bulan'} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold">
                              <option value="Bulan">Bulan</option>
                              <option value="Tahun">Tahun</option>
@@ -3575,49 +3575,49 @@ export default function SaaSAdminPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Harga (Angka)</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Harga (Angka)</label>
                           <input name="price" type="number" required defaultValue={pkgModal.editData?.price ?? 0} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                        </div>
                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Durasi (Hari)</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Durasi (Hari)</label>
                           <input name="duration_days" type="number" required defaultValue={pkgModal.editData?.duration_days ?? 30} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                        </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Branch / Cabang</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Maks. Branch / Cabang</label>
                           <input name="max_branches" type="number" defaultValue={pkgModal.editData?.max_branches ?? ''} placeholder="Kosong = Unlimited" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                        </div>
                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Anak Perusahaan</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Maks. Anak Perusahaan</label>
                           <input name="max_child_orgs" type="number" defaultValue={pkgModal.editData?.max_child_orgs ?? ''} placeholder="Kosong = Unlimited" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                        </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-4">
                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Org</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Maks. Org</label>
                           <input name="max_orgs" type="number" required defaultValue={pkgModal.editData?.max_orgs ?? 1} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                        </div>
                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Warehouse</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Maks. Warehouse</label>
                           <input name="max_warehouses" type="number" required defaultValue={pkgModal.editData?.max_warehouses ?? 1} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                        </div>
                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Maks. Users</label>
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Maks. Users</label>
                           <input name="max_users" type="number" defaultValue={pkgModal.editData?.max_users ?? ''} placeholder="Unlimited" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold" />
                        </div>
                     </div>
 
                     <div className="space-y-6">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Bundle Core & Modul Operasional</label>
+                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Bundle Core & Modul Operasional</label>
                        
-                       <div className="space-y-6 p-6 bg-slate-50 border border-slate-100 rounded-[32px]">
+                       <div className="space-y-6 p-6 bg-slate-50 border border-slate-100 rounded-xl">
                           <div className="space-y-2">
                              <div className="flex items-center gap-2 px-2">
                                 <div className="h-[1px] flex-1 bg-slate-200" />
-                                <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Modul Inti</span>
+                                <span className="text-[9px] font-semibold uppercase text-slate-400 tracking-tight">Modul Inti</span>
                                 <div className="h-[1px] flex-1 bg-slate-200" />
                              </div>
                              <p className="px-2 text-[11px] font-semibold text-slate-500 mb-2">Pilih modul-modul inti yang disertakan dalam paket ini.</p>
@@ -3638,7 +3638,7 @@ export default function SaaSAdminPage() {
                                          <div className="flex items-center gap-2 flex-wrap">
                                            <span className="text-base">{mod.icon}</span>
                                            <span className="text-sm font-bold text-slate-800">{mod.name}</span>
-                                           {isMinimum && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-emerald-700">Wajib</span>}
+                                           {isMinimum && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-tight text-emerald-700">Wajib</span>}
                                          </div>
                                          <p className="mt-0.5 text-[10px] text-slate-500">{mod.tagline}</p>
                                        </div>
@@ -3651,7 +3651,7 @@ export default function SaaSAdminPage() {
                           <div className="space-y-2 mt-6">
                              <div className="flex items-center gap-2 px-2">
                                 <div className="h-[1px] flex-1 bg-slate-200" />
-                                <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Modul Operasional</span>
+                                <span className="text-[9px] font-semibold uppercase text-slate-400 tracking-tight">Modul Operasional</span>
                                 <div className="h-[1px] flex-1 bg-slate-200" />
                              </div>
                              <p className="px-2 text-[11px] font-semibold text-slate-500 mb-2">Tambahkan ekstensi bisnis spesifik.</p>
@@ -3680,9 +3680,9 @@ export default function SaaSAdminPage() {
                     </div>
 
                     <div className="space-y-6">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Add-on Opsional</label>
+                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Add-on Opsional</label>
 
-                       <div className="space-y-6 p-6 bg-slate-50 border border-slate-100 rounded-[32px]">
+                       <div className="space-y-6 p-6 bg-slate-50 border border-slate-100 rounded-xl">
                           <div className="space-y-2">
                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                 {OPERATOR_GROWTH_ADDON_OPTIONS.map((addon) => (
@@ -3731,38 +3731,38 @@ export default function SaaSAdminPage() {
 	              initial={{ scale: 0.9, opacity: 0 }}
 	              animate={{ scale: 1, opacity: 1 }}
 	              exit={{ scale: 0.9, opacity: 0 }}
-	              className="relative w-full max-w-xl bg-white rounded-[40px] shadow-2xl p-8 border border-white"
+	              className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl p-8 border border-white"
 	            >
-	              <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6">
+	              <h2 className="text-xl font-semibold text-slate-900 uppercase tracking-tight mb-6">
 	                {aiTopupModal.editData ? 'Edit Paket Topup Token' : 'Tambah Paket Topup Token'}
 	              </h2>
 
 	              <form onSubmit={saveAiTopupPackageForm} className="space-y-4">
 	                <div>
-	                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Nama Paket</label>
+	                  <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1">Nama Paket</label>
 	                  <input name="name" required defaultValue={aiTopupModal.editData?.name} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
 	                </div>
 	                <div>
-	                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Deskripsi</label>
+	                  <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1">Deskripsi</label>
 	                  <textarea name="description" rows={3} defaultValue={aiTopupModal.editData?.description} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
 	                </div>
 	                <div className="grid grid-cols-2 gap-4">
 	                  <div>
-	                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Jumlah Token</label>
+	                    <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1">Jumlah Token</label>
 	                    <input name="tokens" type="number" min={1} required defaultValue={aiTopupModal.editData?.tokens || 50000} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
 	                  </div>
 	                  <div>
-	                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Sort Order</label>
+	                    <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1">Sort Order</label>
 	                    <input name="sort_order" type="number" defaultValue={aiTopupModal.editData?.sort_order || 0} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
 	                  </div>
 	                </div>
 	                <div className="grid grid-cols-2 gap-4">
 	                  <div>
-	                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Harga Jual (IDR)</label>
+	                    <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1">Harga Jual (IDR)</label>
 	                    <input name="price_idr" type="number" min={0} required defaultValue={aiTopupModal.editData?.price_idr || 0} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
 	                  </div>
 	                  <div>
-	                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">HPP Paket (IDR)</label>
+	                    <label className="block text-[10px] font-semibold tracking-tight text-slate-400 mb-1">HPP Paket (IDR)</label>
 	                    <input name="cost_idr" type="number" min={0} defaultValue={aiTopupModal.editData?.cost_idr || 0} className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 font-bold" />
 	                  </div>
 	                </div>

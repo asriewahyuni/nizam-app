@@ -743,7 +743,7 @@ export default function SaasOperatorClient({
     <div className="space-y-6 pb-20">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">SaaS Operator Desk</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">SaaS Operator Desk</h1>
           <p className="mt-1 text-sm font-medium text-slate-500">
             Modul khusus pengelola SaaS untuk mengelola penawaran dan penjualan tanpa membuka halaman admin utama.
           </p>
@@ -751,13 +751,13 @@ export default function SaasOperatorClient({
         <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1">
           <Link
             href="/saas/penawaran"
-            className={`rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wider ${isQuotesMode ? 'bg-[#003366] text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+            className={`rounded-xl px-4 py-2 text-xs font-semibold uppercase tracking-tight ${isQuotesMode ? 'bg-[#003366] text-white' : 'text-slate-500 hover:bg-slate-50'}`}
           >
             Penawaran
           </Link>
           <Link
             href="/saas/penjualan"
-            className={`rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wider ${!isQuotesMode ? 'bg-[#003366] text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+            className={`rounded-xl px-4 py-2 text-xs font-semibold uppercase tracking-tight ${!isQuotesMode ? 'bg-[#003366] text-white' : 'text-slate-500 hover:bg-slate-50'}`}
           >
             Penjualan
           </Link>
@@ -766,20 +766,20 @@ export default function SaasOperatorClient({
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-slate-400"><ClipboardList size={14} /> Total Penawaran</div>
-          <div className="mt-2 text-2xl font-black text-slate-900">{stats.totalQuotes}</div>
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-tight text-slate-400"><ClipboardList size={14} /> Total Penawaran</div>
+          <div className="mt-2 text-2xl font-semibold text-slate-900">{stats.totalQuotes}</div>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-slate-400"><Receipt size={14} /> Open Sales</div>
-          <div className="mt-2 text-2xl font-black text-amber-600">{stats.totalOpenSales}</div>
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-tight text-slate-400"><Receipt size={14} /> Open Sales</div>
+          <div className="mt-2 text-2xl font-semibold text-amber-600">{stats.totalOpenSales}</div>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-slate-400"><CheckCircle2 size={14} /> Paid Sales</div>
-          <div className="mt-2 text-2xl font-black text-emerald-600">{stats.totalPaidSales}</div>
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-tight text-slate-400"><CheckCircle2 size={14} /> Paid Sales</div>
+          <div className="mt-2 text-2xl font-semibold text-emerald-600">{stats.totalPaidSales}</div>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-slate-400"><BadgeDollarSign size={14} /> Nilai Penjualan</div>
-          <div className="mt-2 text-lg font-black text-[#003366]">{formatIdr(stats.totalSalesValue)}</div>
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-tight text-slate-400"><BadgeDollarSign size={14} /> Nilai Penjualan</div>
+          <div className="mt-2 text-lg font-semibold text-[#003366]">{formatIdr(stats.totalSalesValue)}</div>
         </div>
       </div>
 
@@ -791,7 +791,7 @@ export default function SaasOperatorClient({
 
       {(isQuotesMode || Boolean(editingSaleInvoiceId)) && (
         <div className="rounded-3xl border border-slate-200 bg-white p-5">
-          <h2 className="text-sm font-black uppercase tracking-wider text-slate-700">
+          <h2 className="text-sm font-semibold uppercase tracking-tight text-slate-700">
             {editingQuoteId ? 'Edit Penawaran SaaS' : editingSaleInvoiceId ? 'Edit Invoice SaaS' : 'Buat Penawaran SaaS Baru'}
           </h2>
           <form action={handleSaveQuote} className="mt-4 space-y-3">
@@ -806,7 +806,7 @@ export default function SaasOperatorClient({
               <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">1 · Nama Paket & Tenant</p>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Tenant</span>
+                  <span className="block text-[10px] font-semibold uppercase tracking-tight text-slate-500">Tenant</span>
                   <select
                     name="org_id" required value={selectedOrgId}
                     onChange={(e) => setSelectedOrgId(e.target.value)}
@@ -818,7 +818,7 @@ export default function SaasOperatorClient({
                   </select>
                 </label>
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  <span className="block text-[10px] font-semibold uppercase tracking-tight text-slate-500">
                     Jenis Layanan / Base Plan <span className="font-normal normal-case text-slate-400">(Referensi)</span>
                   </span>
                   <select
@@ -844,7 +844,7 @@ export default function SaasOperatorClient({
               {(snapshot.resellers?.length ?? 0) > 0 && (
                 <div className="mt-3">
                   <label className="space-y-1.5">
-                    <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Reseller <span className="font-normal normal-case text-slate-400">(Opsional)</span></span>
+                    <span className="block text-[10px] font-semibold uppercase tracking-tight text-slate-500">Reseller <span className="font-normal normal-case text-slate-400">(Opsional)</span></span>
                     <select
                       name="reseller_id" value={selectedResellerId}
                       onChange={(e) => setSelectedResellerId(e.target.value)}
@@ -867,14 +867,14 @@ export default function SaasOperatorClient({
               <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">2 · Kebutuhan Entitas</p>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Child Entity (Anak Perusahaan)</span>
+                  <span className="block text-[10px] font-semibold uppercase tracking-tight text-slate-500">Child Entity (Anak Perusahaan)</span>
                   <input type="number" min="0" value={extraEntityQty}
                     onChange={(e) => setExtraEntityQty(Math.max(0, Number(e.target.value || 0)))}
                     className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold"
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Harga / Child Entity</span>
+                  <span className="block text-[10px] font-semibold uppercase tracking-tight text-slate-500">Harga / Child Entity</span>
                   <input type="number" min="0" value={extraEntityUnitPrice}
                     onChange={(e) => setExtraEntityUnitPrice(e.target.value)}
                     placeholder={String(199000)}
@@ -882,14 +882,14 @@ export default function SaasOperatorClient({
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Unit / Cabang</span>
+                  <span className="block text-[10px] font-semibold uppercase tracking-tight text-slate-500">Unit / Cabang</span>
                   <input type="number" min="0" value={extraBranchQty}
                     onChange={(e) => setExtraBranchQty(Math.max(0, Number(e.target.value || 0)))}
                     className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold"
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Harga / Unit</span>
+                  <span className="block text-[10px] font-semibold uppercase tracking-tight text-slate-500">Harga / Unit</span>
                   <input type="number" min="0" value={extraBranchUnitPrice}
                     onChange={(e) => setExtraBranchUnitPrice(e.target.value)}
                     placeholder={String(99000)}
@@ -958,7 +958,7 @@ export default function SaasOperatorClient({
                           <div className="flex items-center gap-2">
                             <span className="text-base">{mod.icon}</span>
                             <span className="text-sm font-bold text-slate-800">{mod.name}</span>
-                            {isMinimum && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-emerald-700">Wajib</span>}
+                            {isMinimum && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-tight text-emerald-700">Wajib</span>}
                           </div>
                           {price > 0 && <span className="text-xs font-black text-emerald-700">{formatIdr(price)}/bln</span>}
                         </div>
@@ -1056,14 +1056,14 @@ export default function SaasOperatorClient({
               <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">7 · Durasi & Harga Override</p>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Durasi (Bulan)</span>
+                  <span className="block text-[10px] font-semibold uppercase tracking-tight text-slate-500">Durasi (Bulan)</span>
                   <input name="duration_months" type="number" min="1" step="1"
                     value={durationMonths} onChange={(e) => setDurationMonths(e.target.value)}
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold"
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Harga Base Override <span className="font-normal normal-case text-slate-400">(Opsional)</span></span>
+                  <span className="block text-[10px] font-semibold uppercase tracking-tight text-slate-500">Harga Base Override <span className="font-normal normal-case text-slate-400">(Opsional)</span></span>
                   <input name="amount" type="number" min="0"
                     value={overrideAmount} onChange={(e) => setOverrideAmount(e.target.value)}
                     placeholder="Kosongkan = ikut template"
@@ -1071,7 +1071,7 @@ export default function SaasOperatorClient({
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Catatan</span>
+                  <span className="block text-[10px] font-semibold uppercase tracking-tight text-slate-500">Catatan</span>
                   <input name="note" type="text"
                     value={note} onChange={(e) => setNote(e.target.value)}
                     placeholder="Catatan opsional..."
@@ -1086,7 +1086,7 @@ export default function SaasOperatorClient({
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-400">8–10 · Subtotal · Diskon & Pajak · Total</p>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1 rounded-xl border border-indigo-100 bg-white p-3">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">8 · Subtotal per Bulan</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-tight text-slate-400">8 · Subtotal per Bulan</p>
                   <div className="space-y-0.5 text-[11px] text-slate-600 font-semibold">
                     {(overrideAmount || selectedPackage?.price) ? <div className="flex justify-between"><span>Base paket</span><span>{formatIdr(baseAmount)}</span></div> : null}
                     {selectedModulesMonthlyTotal > 0 && <div className="flex justify-between text-emerald-700"><span>Modul custom</span><span>{formatIdr(selectedModulesMonthlyTotal)}</span></div>}
@@ -1101,7 +1101,7 @@ export default function SaasOperatorClient({
                   </div>
                 </div>
                 <div className="space-y-3 rounded-xl border border-indigo-100 bg-white p-3">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">9 · Diskon & Pajak</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-tight text-slate-400">9 · Diskon & Pajak</p>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="space-y-1">
                       <span className="block text-[10px] font-bold text-slate-500">Diskon (%)</span>
@@ -1125,20 +1125,20 @@ export default function SaasOperatorClient({
                     </div>
                   )}
                   <div className="mt-2 flex items-baseline justify-between border-t border-indigo-100 pt-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400">10 · Grand Total</span>
-                    <span className="text-2xl font-black text-indigo-700">{formatIdr(estimateGrandTotal)}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-tight text-indigo-400">10 · Grand Total</span>
+                    <span className="text-2xl font-semibold text-indigo-700">{formatIdr(estimateGrandTotal)}</span>
                   </div>
                 </div>
               </div>
               <div className="flex items-center justify-end gap-2 pt-1">
                 {(editingQuoteId || editingSaleInvoiceId) && (
                   <button type="button" disabled={isPending} onClick={resetQuoteForm}
-                    className="h-11 rounded-xl border border-slate-300 bg-white px-5 text-xs font-black uppercase tracking-wider text-slate-600 disabled:opacity-60">
+                    className="h-11 rounded-xl border border-slate-300 bg-white px-5 text-xs font-semibold uppercase tracking-tight text-slate-600 disabled:opacity-60">
                     Batal Edit
                   </button>
                 )}
                 <button type="submit" disabled={isPending || !selectedOrgId || !selectedPackageId}
-                  className="h-11 rounded-xl bg-[#003366] px-6 text-xs font-black uppercase tracking-wider text-white disabled:opacity-60 hover:bg-indigo-700 transition-colors">
+                  className="h-11 rounded-xl bg-[#003366] px-6 text-xs font-semibold uppercase tracking-tight text-white disabled:opacity-60 hover:bg-indigo-700 transition-colors">
                   {isPending ? 'Menyimpan...' : editingQuoteId || editingSaleInvoiceId ? 'Simpan Perubahan' : 'Buat Penawaran'}
                 </button>
               </div>
@@ -1162,13 +1162,13 @@ export default function SaasOperatorClient({
 
       <div className="rounded-3xl border border-slate-200 bg-white p-5">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-black uppercase tracking-wider text-slate-700">
+          <h2 className="text-sm font-semibold uppercase tracking-tight text-slate-700">
             {isQuotesMode ? 'Daftar Penawaran SaaS' : 'Daftar Penjualan SaaS'}
           </h2>
           <button
             type="button"
             onClick={() => router.refresh()}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-black uppercase tracking-wider text-slate-500"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-semibold uppercase tracking-tight text-slate-500"
           >
             <RefreshCcw size={12} /> Refresh
           </button>
@@ -1177,7 +1177,7 @@ export default function SaasOperatorClient({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1120px] border-collapse">
             <thead>
-              <tr className="border-b border-slate-100 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+              <tr className="border-b border-slate-100 text-left text-[10px] font-semibold uppercase tracking-tight text-slate-400">
                 <th className="px-3 py-3">Nomor</th>
                 <th className="px-3 py-3">Tenant</th>
                 <th className="px-3 py-3">Item</th>
@@ -1290,7 +1290,7 @@ export default function SaasOperatorClient({
                           type="button"
                           disabled={isPending}
                           onClick={() => handleStartEditQuote(item)}
-                          className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-indigo-700 disabled:opacity-60"
+                          className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-tight text-indigo-700 disabled:opacity-60"
                         >
                           Edit
                         </button>
@@ -1298,13 +1298,13 @@ export default function SaasOperatorClient({
                           type="button"
                           disabled={isPending}
                           onClick={() => handleConvert(item.id)}
-                          className="rounded-lg bg-[#003366] px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white disabled:opacity-60"
+                          className="rounded-lg bg-[#003366] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-tight text-white disabled:opacity-60"
                         >
                           Konversi ke Penjualan
                         </button>
                         <Link
                           href={`/saas/dokumen/${item.id}`}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50"
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-tight text-slate-600 hover:bg-slate-50"
                         >
                           <Download size={11} /> Download
                         </Link>
@@ -1312,7 +1312,7 @@ export default function SaasOperatorClient({
                           type="button"
                           disabled={isPending}
                           onClick={() => handleDeleteQuote(item.id, item.invoice_number)}
-                          className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-rose-700 disabled:opacity-60"
+                          className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-tight text-rose-700 disabled:opacity-60"
                         >
                           Hapus
                         </button>
@@ -1322,7 +1322,7 @@ export default function SaasOperatorClient({
                         <span className="text-xs font-bold text-slate-400">Dibatalkan</span>
                         <Link
                           href={`/saas/dokumen/${item.id}`}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50"
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-tight text-slate-600 hover:bg-slate-50"
                         >
                           <Download size={11} /> Download
                         </Link>
@@ -1333,7 +1333,7 @@ export default function SaasOperatorClient({
                           type="button"
                           disabled={isPending}
                           onClick={() => handleStartEditSale(item)}
-                          className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-indigo-700 disabled:opacity-60"
+                          className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-tight text-indigo-700 disabled:opacity-60"
                         >
                           Edit Invoice
                         </button>
@@ -1341,7 +1341,7 @@ export default function SaasOperatorClient({
                           type="button"
                           disabled={isPending}
                           onClick={() => handleMarkPaid(item.id)}
-                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white disabled:opacity-60"
+                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-tight text-white disabled:opacity-60"
                         >
                           Tandai Paid
                         </button>
@@ -1349,13 +1349,13 @@ export default function SaasOperatorClient({
                           type="button"
                           disabled={isPending}
                           onClick={() => handleVoidSale(item.id, item.invoice_number)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-rose-700 disabled:opacity-60"
+                          className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-tight text-rose-700 disabled:opacity-60"
                         >
                           <XCircle size={11} /> Void
                         </button>
                         <Link
                           href={`/saas/dokumen/${item.id}`}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50"
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-tight text-slate-600 hover:bg-slate-50"
                         >
                           <Download size={11} /> Download
                         </Link>
@@ -1365,7 +1365,7 @@ export default function SaasOperatorClient({
                         <span className="text-xs font-bold text-emerald-600">Selesai</span>
                         <Link
                           href={`/saas/dokumen/${item.id}`}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50"
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-tight text-slate-600 hover:bg-slate-50"
                         >
                           <Download size={11} /> Download
                         </Link>

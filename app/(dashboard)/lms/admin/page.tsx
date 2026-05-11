@@ -38,10 +38,10 @@ function StatCard({
 }) {
   return (
     <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
-      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+      <div className="text-[10px] font-semibold tracking-tight text-slate-400">
         {label}
       </div>
-      <div className={`mt-2 text-3xl font-black tracking-tight ${colorClass}`}>{value}</div>
+      <div className={`mt-2 text-3xl font-semibold tracking-tight ${colorClass}`}>{value}</div>
       <p className="mt-1 text-xs font-bold text-slate-400 uppercase tracking-wide">{hint}</p>
     </div>
   )
@@ -99,7 +99,7 @@ export default async function LearningAdminPage() {
       {/* ── Header ── */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-1">
         <div className="space-y-1">
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+          <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
              <Settings size={32} className="text-blue-600" />
              Admin & Trainer LMS
           </h1>
@@ -160,10 +160,10 @@ export default async function LearningAdminPage() {
           <div className="flex items-center gap-3">
             <ClipboardCheck className="h-6 w-6 text-slate-400" />
             <div>
-              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <div className="text-[10px] font-semibold tracking-tight text-slate-400">
                 Assessment Overview
               </div>
-              <h2 className="mt-1 text-xl font-black text-slate-900">
+              <h2 className="mt-1 text-xl font-semibold text-slate-900">
                 Status assessment per course
               </h2>
             </div>
@@ -173,7 +173,7 @@ export default async function LearningAdminPage() {
             {dashboard.courseSummaries.map((course) => (
               <div
                 key={course.courseSlug}
-                className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-all group"
+                className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-all group"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -197,12 +197,12 @@ export default async function LearningAdminPage() {
                   ].map(({ label, value }) => (
                     <div
                       key={label}
-                      className="rounded-[18px] border border-slate-200 bg-white p-3 text-center"
+                      className="rounded-lg border border-slate-200 bg-white p-3 text-center"
                     >
                       <div className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
                         {label}
                       </div>
-                      <div className="mt-1.5 text-xl font-black text-slate-900">{value}</div>
+                      <div className="mt-1.5 text-xl font-semibold text-slate-900">{value}</div>
                     </div>
                   ))}
                 </div>
@@ -236,17 +236,17 @@ export default async function LearningAdminPage() {
         <div className="flex items-center gap-3">
           <CalendarDays className="h-6 w-6 text-slate-400" />
           <div>
-            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            <div className="text-[10px] font-semibold tracking-tight text-slate-400">
               Commercial
             </div>
-            <h2 className="mt-1 text-xl font-black text-slate-900">
+            <h2 className="mt-1 text-xl font-semibold text-slate-900">
               Manajemen Angkatan / Batch
             </h2>
           </div>
         </div>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
             <h3 className="text-base font-black text-slate-900">Buka Batch Baru</h3>
             <p className="mt-1 text-sm text-slate-500 font-medium">
               Buat angkatan baru untuk course tertentu dan tetapkan harganya.
@@ -298,19 +298,19 @@ export default async function LearningAdminPage() {
           <div className="space-y-4">
             <h3 className="text-base font-black text-slate-900">Daftar Batch Aktif</h3>
             {batches.length === 0 ? (
-              <div className="rounded-[24px] border border-dashed border-slate-300 p-8 text-center text-sm font-bold text-slate-400 italic">
+              <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm font-bold text-slate-400 italic">
                 Belum ada batch yang dibuat.
               </div>
             ) : (
               batches.map((b: any) => (
-                <div key={b.id} className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-all group">
+                <div key={b.id} className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-all group">
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100 inline-block">
                         {b.status}
                       </div>
-                      <h4 className="mt-3 text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">{b.name}</h4>
-                      <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-widest">{b.learning_courses?.title}</p>
+                      <h4 className="mt-3 text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">{b.name}</h4>
+                      <p className="mt-1 text-xs font-bold text-slate-500 tracking-tight">{b.learning_courses?.title}</p>
                     </div>
                     <div className="text-right">
                       <div className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-600">
@@ -335,17 +335,17 @@ export default async function LearningAdminPage() {
         <div className="flex items-center gap-3">
           <CalendarDays className="h-6 w-6 text-slate-400" />
           <div>
-            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            <div className="text-[10px] font-semibold tracking-tight text-slate-400">
               Commercial
             </div>
-            <h2 className="mt-1 text-xl font-black text-slate-900">
+            <h2 className="mt-1 text-xl font-semibold text-slate-900">
               Manajemen Jadwal Sesi
             </h2>
           </div>
         </div>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
             <h3 className="text-base font-black text-slate-900">Buat Sesi Baru</h3>
             <p className="mt-1 text-sm text-slate-500 font-medium">
               Tambahkan jadwal sesi belajar (Live/Offline) untuk sebuah batch.
@@ -397,19 +397,19 @@ export default async function LearningAdminPage() {
           <div className="space-y-4">
             <h3 className="text-base font-black text-slate-900 mb-4 px-2">Daftar Sesi Terjadwal</h3>
             {sessions.length === 0 ? (
-              <div className="rounded-[24px] border border-dashed border-slate-300 p-8 text-center text-sm font-bold text-slate-400 italic">
+              <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm font-bold text-slate-400 italic">
                 Belum ada sesi untuk batch mana pun.
               </div>
             ) : (
               sessions.map((s: any) => (
-                <div key={s.id} className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-all group">
+                <div key={s.id} className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-all group">
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100 inline-block">
                         {s.lms_course_batches?.name}
                       </div>
-                      <h4 className="mt-3 text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">{s.title}</h4>
-                      <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-widest">{s.instructor_name || 'Instruktur TBA'}</p>
+                      <h4 className="mt-3 text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">{s.title}</h4>
+                      <p className="mt-1 text-xs font-bold text-slate-500 tracking-tight">{s.instructor_name || 'Instruktur TBA'}</p>
                     </div>
                   </div>
                   <div className="mt-5 pt-5 border-t border-slate-50 flex items-center justify-between gap-6 text-xs font-bold text-slate-500 uppercase tracking-wide">
@@ -427,21 +427,21 @@ export default async function LearningAdminPage() {
       <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            <div className="text-[10px] font-semibold tracking-tight text-slate-400">
               Course Catalog
             </div>
-            <h2 className="mt-1 text-xl font-black text-slate-900">
+            <h2 className="mt-1 text-xl font-semibold text-slate-900">
               Semua course di Training Center
             </h2>
           </div>
-          <div className="rounded-full bg-slate-50 border border-slate-100 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
+          <div className="rounded-full bg-slate-50 border border-slate-100 px-3 py-2 text-[10px] font-semibold tracking-tight text-slate-500">
             {courses.length} course
           </div>
         </div>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
           {/* Form Buat Course */}
-          <div id="buat-pelatihan" className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-sm">
+          <div id="buat-pelatihan" className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
             <h3 className="text-base font-black text-slate-900">Buat Program / Course Baru</h3>
             <p className="mt-1 text-sm text-slate-500 font-medium">
               Tambahkan materi course ke dalam katalog organisasi Anda.
@@ -470,7 +470,7 @@ export default async function LearningAdminPage() {
 
           <div className="space-y-4">
             {courses.length === 0 ? (
-              <div className="rounded-[24px] border border-dashed border-slate-300 p-8 text-center text-sm font-bold text-slate-400 italic">
+              <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm font-bold text-slate-400 italic">
                 Belum ada course di katalog. Silakan buat course baru.
               </div>
             ) : (
@@ -481,25 +481,25 @@ export default async function LearningAdminPage() {
             return (
               <div
                 key={course.slug}
-                className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-all group"
+                className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-all group"
               >
                 <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span
-                        className={`rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest border ${
+                        className={`rounded-full px-3 py-1 text-[9px] font-semibold tracking-tight border ${
                           isLive ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-slate-50 text-slate-400 border-slate-100'
                         }`}
                       >
                         {isLive ? 'Live' : 'Soon'}
                       </span>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      <span className="text-[10px] font-semibold tracking-tight text-slate-400">
                         {course.level_code || 'ALL'}
                       </span>
                     </div>
-                    <h3 className="mt-3 text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">{course.title}</h3>
+                    <h3 className="mt-3 text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">{course.title}</h3>
                     <p className="mt-1.5 text-sm font-medium text-slate-500 leading-relaxed">{course.description || '-'}</p>
-                    <div className="mt-4 flex flex-wrap gap-3 text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    <div className="mt-4 flex flex-wrap gap-3 text-xs font-bold text-slate-400 tracking-tight">
                       <span>{lessons.length} lesson</span>
                     </div>
                   </div>
@@ -537,13 +537,13 @@ export default async function LearningAdminPage() {
           <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
              <Users size={24} />
           </div>
-          <h3 className="mt-5 text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">Manajemen Peserta</h3>
+          <h3 className="mt-5 text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">Manajemen Peserta</h3>
           <p className="mt-2 text-sm leading-relaxed text-slate-500 font-medium">
             Kelola program pelatihan internal, tambah peserta, dan pantau status per program.
           </p>
           <Link
             href="/lms#daftar-pelatihan"
-            className="mt-6 inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-400 group-hover:text-blue-600 transition-colors"
+            className="mt-6 inline-flex items-center gap-2 text-[11px] font-semibold tracking-tight text-slate-400 group-hover:text-blue-600 transition-colors"
           >
             Buka Program
             <ArrowRight className="h-4 w-4" />
@@ -554,20 +554,20 @@ export default async function LearningAdminPage() {
           <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
              <FileText size={24} />
           </div>
-          <h3 className="mt-5 text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">Review Assessment</h3>
+          <h3 className="mt-5 text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">Review Assessment</h3>
           <p className="mt-2 text-sm leading-relaxed text-slate-500 font-medium">
             Tinjau jawaban peserta, beri feedback, dan putuskan status kompeten.
           </p>
           {accessContext.canReviewAssessments ? (
             <Link
               href="/lms/assessment-center"
-              className="mt-6 inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-400 group-hover:text-blue-600 transition-colors"
+              className="mt-6 inline-flex items-center gap-2 text-[11px] font-semibold tracking-tight text-slate-400 group-hover:text-blue-600 transition-colors"
             >
               Panel Penilai
               <ArrowRight className="h-4 w-4" />
             </Link>
           ) : (
-            <span className="mt-6 block text-[11px] font-black uppercase tracking-widest text-slate-300">
+            <span className="mt-6 block text-[11px] font-semibold tracking-tight text-slate-300">
               Tidak ada akses
             </span>
           )}
@@ -577,13 +577,13 @@ export default async function LearningAdminPage() {
           <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
              <ShieldCheck size={24} />
           </div>
-          <h3 className="mt-5 text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">Lihat Progress</h3>
+          <h3 className="mt-5 text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">Lihat Progress</h3>
           <p className="mt-2 text-sm leading-relaxed text-slate-500 font-medium">
             Simulasikan view peserta untuk memastikan alur materi sudah benar.
           </p>
           <Link
             href="/lms/my-progress"
-            className="mt-6 inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-400 group-hover:text-blue-600 transition-colors"
+            className="mt-6 inline-flex items-center gap-2 text-[11px] font-semibold tracking-tight text-slate-400 group-hover:text-blue-600 transition-colors"
           >
             My Progress View
             <ArrowRight className="h-4 w-4" />

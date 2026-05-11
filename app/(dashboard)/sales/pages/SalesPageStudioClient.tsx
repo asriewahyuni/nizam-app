@@ -233,10 +233,10 @@ function GeneratorSection({
   children: ReactNode
 }) {
   return (
-    <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.28)]">
+    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-lg">
       <div className="mb-5">
         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{eyebrow}</div>
-        <h4 className="mt-2 text-lg font-black tracking-tight text-slate-900">{title}</h4>
+        <h4 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">{title}</h4>
         <p className="mt-1 text-sm font-medium text-slate-500">{description}</p>
       </div>
       {children}
@@ -810,12 +810,12 @@ export default function SalesPageStudioClient({
       />
 
       {error && (
-        <div className="rounded-[28px] border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-bold text-rose-700">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm font-bold text-rose-700">
           {error}
         </div>
       )}
       {success && (
-        <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-bold text-emerald-700">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm font-bold text-emerald-700">
           {success}
         </div>
       )}
@@ -846,7 +846,7 @@ export default function SalesPageStudioClient({
         />
 
         <form id="brand-brain-form" onSubmit={handleSaveBrandBrain} className="p-8 space-y-6">
-          <div className="rounded-[28px] border border-slate-200 bg-slate-50 px-5 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Reusable Defaults</div>
               <p className="mt-1 text-sm font-medium text-slate-500">
@@ -1002,7 +1002,7 @@ Proses kerja transparan`}
             <div className="relative space-y-6">
               <div>
                 <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">AI Campaign Architect</div>
-                <h3 className="mt-3 max-w-xl text-3xl font-black tracking-tight text-white">
+                <h3 className="mt-3 max-w-xl text-3xl font-semibold tracking-tight text-white">
                   User tidak lagi isi prompt kosong. User tinggal isi section, AI yang merakit strategi dan draft halaman.
                 </h3>
                 <p className="mt-3 max-w-2xl text-sm font-medium leading-relaxed text-slate-300">
@@ -1011,25 +1011,25 @@ Proses kerja transparan`}
               </div>
 
               <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-[24px] border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
+                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
                   <div className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100">Brand Brain</div>
-                  <div className="mt-2 text-lg font-black text-white">
+                  <div className="mt-2 text-lg font-semibold text-white">
                     {profileSnapshot.brandPositioning ? 'Aktif' : 'Belum Diisi'}
                   </div>
                   <p className="mt-1 text-xs font-medium leading-relaxed text-slate-300">
                     Default tone, CTA, proof, dan guardrail AI tersimpan untuk semua draft berikutnya.
                   </p>
                 </div>
-                <div className="rounded-[24px] border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
+                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
                   <div className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100">Service Seeds</div>
-                  <div className="mt-2 text-lg font-black text-white">{serviceSeeds.length}</div>
+                  <div className="mt-2 text-lg font-semibold text-white">{serviceSeeds.length}</div>
                   <p className="mt-1 text-xs font-medium leading-relaxed text-slate-300">
                     Job order bisa langsung dipakai untuk prefill offer, pain point, dan value stack.
                   </p>
                 </div>
-                <div className="rounded-[24px] border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
+                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
                   <div className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-100">Live Preview</div>
-                  <div className="mt-2 text-lg font-black text-white">Aktif</div>
+                  <div className="mt-2 text-lg font-semibold text-white">Aktif</div>
                   <p className="mt-1 text-xs font-medium leading-relaxed text-slate-300">
                     Objective, CTA, brief, dan mini visual landing page sekarang terlihat sebelum generate.
                   </p>
@@ -1051,7 +1051,7 @@ Proses kerja transparan`}
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Workflow Preview</div>
-                <h4 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Alur baru generator sekarang kelihatan jelas</h4>
+                <h4 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Alur baru generator sekarang kelihatan jelas</h4>
               </div>
               <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
                 Guided
@@ -1062,7 +1062,7 @@ Proses kerja transparan`}
               {GENERATOR_WORKFLOW_STEPS.map((step) => (
                 <div
                   key={step.id}
-                  className="flex items-start gap-4 rounded-[26px] border border-slate-200 bg-white px-5 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.22)]"
+                  className="flex items-start gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.22)]"
                 >
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-sm font-black text-white">
                     {step.id}
@@ -1113,7 +1113,7 @@ Proses kerja transparan`}
                 return (
                   <div
                     key={page.id}
-                    className={`w-full rounded-[28px] border p-6 transition-all ${
+                    className={`w-full rounded-xl border p-6 transition-all ${
                       isSelected
                         ? 'border-slate-900 bg-slate-900 text-white shadow-2xl shadow-slate-900/10'
                         : 'border-slate-100 bg-white hover:border-slate-300 hover:-translate-y-0.5'
@@ -1129,7 +1129,7 @@ Proses kerja transparan`}
                           </span>
                         </div>
                         <div>
-                          <h3 className={`text-2xl font-black tracking-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{page.title}</h3>
+                          <h3 className={`text-2xl font-semibold tracking-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{page.title}</h3>
                           <p className={`text-sm font-medium mt-1 ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>{page.headline}</p>
                         </div>
                         <div className="text-[11px] font-bold text-slate-400">
@@ -1200,7 +1200,7 @@ Proses kerja transparan`}
             {selectedPage ? (
               <div className="p-8 space-y-6">
                 <div
-                  className="rounded-[32px] p-6 border relative overflow-hidden"
+                  className="rounded-xl p-6 border relative overflow-hidden"
                   style={{
                     background: `linear-gradient(145deg, ${selectedPage.theme.surface} 0%, ${selectedPage.theme.accentContrast} 100%)`,
                     borderColor: selectedPage.theme.border,
@@ -1213,7 +1213,7 @@ Proses kerja transparan`}
                   <div className="relative space-y-4">
                     <StatusBadge label={selectedPage.status} variant={getStatusVariant(selectedPage.status)} />
                     <div>
-                      <h3 className="text-2xl font-black tracking-tight text-slate-900">{selectedPage.headline}</h3>
+                      <h3 className="text-2xl font-semibold tracking-tight text-slate-900">{selectedPage.headline}</h3>
                       <p className="text-sm text-slate-600 font-medium mt-2 leading-relaxed">{selectedPage.subheadline || selectedPage.description}</p>
                     </div>
                     <div className="flex flex-wrap gap-3">
@@ -1251,11 +1251,11 @@ Proses kerja transparan`}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-4">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 px-5 py-4">
                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Lead Masuk</div>
-                    <div className="mt-2 text-2xl font-black tracking-tight text-slate-900">{selectedPageLeads.length}</div>
+                    <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{selectedPageLeads.length}</div>
                   </div>
-                  <div className="rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-4">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 px-5 py-4">
                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Meta Pixel</div>
                     <div className="mt-2 text-sm font-black tracking-tight text-slate-900">
                       {selectedPage.metaPixelId ? selectedPage.metaPixelId : 'Belum diisi'}
@@ -1263,7 +1263,7 @@ Proses kerja transparan`}
                   </div>
                 </div>
 
-                <div className="rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-4 space-y-3">
+                <div className="rounded-xl border border-slate-100 bg-slate-50 px-5 py-4 space-y-3">
                   <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Custom Domain (DNS)</div>
                   <div className="flex flex-col sm:flex-row gap-3">
                      <input
@@ -1292,7 +1292,7 @@ Proses kerja transparan`}
                   <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Value Stack</div>
                   <div className="space-y-3">
                     {selectedPage.offerItems.slice(0, 3).map((item) => (
-                      <div key={item.title} className="rounded-[22px] border border-slate-100 bg-white px-4 py-4">
+                      <div key={item.title} className="rounded-xl border border-slate-100 bg-white px-4 py-4">
                         <div className="font-black text-slate-900 text-sm">{item.title}</div>
                         <div className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">{item.description}</div>
                       </div>
@@ -1322,7 +1322,7 @@ Proses kerja transparan`}
                 />
               ) : (
                 selectedPageLeads.slice(0, 8).map((lead) => (
-                  <div key={lead.id} className="rounded-[24px] border border-slate-100 bg-white px-5 py-4">
+                  <div key={lead.id} className="rounded-xl border border-slate-100 bg-white px-5 py-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="font-black text-slate-900">{lead.fullName}</div>
@@ -1349,29 +1349,29 @@ Proses kerja transparan`}
       {showCreateModal && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowCreateModal(false)} />
-          <div className="relative w-full max-w-7xl rounded-[40px] bg-white shadow-2xl overflow-hidden">
+          <div className="relative w-full max-w-7xl rounded-2xl bg-white shadow-2xl overflow-hidden">
             <div className="border-b border-slate-100 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.16),_transparent_26%),linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)] px-8 py-7">
               <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-500">Generator</div>
-                  <h3 className="mt-2 text-3xl font-black tracking-tight text-slate-900">Generate Sales Page Baru</h3>
+                  <h3 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Generate Sales Page Baru</h3>
                   <p className="mt-3 max-w-2xl text-sm font-medium leading-relaxed text-slate-500">
                     Ini sekarang bukan lagi form datar. Isi step by step, lalu lihat objective, visual hero, CTA, offer stack, dan brief AI berubah secara live sebelum draft dibuat.
                   </p>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-[24px] border border-white/70 bg-white/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] backdrop-blur-sm">
+                  <div className="rounded-xl border border-white/70 bg-white/80 px-4 py-4 shadow-md backdrop-blur-sm">
                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Auto Fill</div>
                     <div className="mt-2 text-sm font-black text-slate-900">Job Order + Brand Brain</div>
                     <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">Gunakan seed dan default brand supaya user tidak mulai dari nol.</p>
                   </div>
-                  <div className="rounded-[24px] border border-white/70 bg-white/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] backdrop-blur-sm">
+                  <div className="rounded-xl border border-white/70 bg-white/80 px-4 py-4 shadow-md backdrop-blur-sm">
                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Live Feedback</div>
                     <div className="mt-2 text-sm font-black text-slate-900">Preview + Brief</div>
                     <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">User bisa langsung lihat bentuk output sebelum menekan generate.</p>
                   </div>
-                  <div className="rounded-[24px] border border-white/70 bg-white/80 px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.18)] backdrop-blur-sm">
+                  <div className="rounded-xl border border-white/70 bg-white/80 px-4 py-4 shadow-md backdrop-blur-sm">
                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Draft Engine</div>
                     <div className="mt-2 text-sm font-black text-slate-900">Siap Publish</div>
                     <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">AI tetap menyusun hero, proof, FAQ, dan form lead siap edit.</p>
@@ -1385,7 +1385,7 @@ Proses kerja transparan`}
                 {GENERATOR_WORKFLOW_STEPS.map((step) => (
                   <div
                     key={step.id}
-                    className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.16)]"
+                    className="rounded-xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.16)]"
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-xs font-black text-white">
@@ -1415,7 +1415,7 @@ Proses kerja transparan`}
                               key={template.id}
                               type="button"
                               onClick={() => handleTemplateChange(template.id)}
-                              className={`rounded-[24px] border p-4 text-left transition-all ${
+                              className={`rounded-xl border p-4 text-left transition-all ${
                                 isSelected
                                   ? 'border-slate-900 bg-slate-900 text-white shadow-xl shadow-slate-900/15'
                                   : 'border-slate-200 bg-white hover:border-slate-400'
@@ -1461,7 +1461,7 @@ Proses kerja transparan`}
                         })}
                       </div>
 
-                      <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
                         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Color Guide</div>
                         <div className="mt-2 flex items-center justify-between gap-3">
                           <div>
@@ -1505,7 +1505,7 @@ Proses kerja transparan`}
                           ))}
                         </select>
                       </div>
-                      <div className="rounded-[22px] border border-emerald-200 bg-emerald-50/60 px-4 py-3">
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
                         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">Status Seed</div>
                         <div className="mt-2 text-sm font-black text-slate-900">
                           {selectedServiceSeed ? selectedServiceSeed.status : 'Belum dipilih'}
@@ -1810,7 +1810,7 @@ Laporan & rekomendasi`}
                     </div>
                   </GeneratorSection>
 
-                  <div className="flex items-center justify-between gap-4 rounded-[28px] border border-slate-200 bg-slate-50 px-5 py-4">
+                  <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
                     <div>
                       <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Ready To Generate</div>
                       <p className="mt-1 text-sm font-medium text-slate-500">
@@ -1833,7 +1833,7 @@ Laporan & rekomendasi`}
                 </div>
 
                 <aside className="space-y-4 lg:sticky lg:top-0 self-start">
-                  <div className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.28)]">
+                  <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-lg">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Live Preview</div>
@@ -1863,7 +1863,7 @@ Laporan & rekomendasi`}
                   </div>
 
                   <div
-                    className="rounded-[34px] border p-5 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.35)]"
+                    className="rounded-[34px] border p-5 shadow-lg"
                     style={{
                       borderColor: previewPage.theme.border,
                       background: previewPage.templateId === 'CONSULTING'
@@ -1876,7 +1876,7 @@ Laporan & rekomendasi`}
                     </div>
 
                     <div className="mt-5 space-y-4">
-                      <h4 className={`text-3xl font-black tracking-tight ${previewPage.templateId === 'CONSULTING' ? 'text-white' : 'text-slate-950'}`}>
+                      <h4 className={`text-3xl font-semibold tracking-tight ${previewPage.templateId === 'CONSULTING' ? 'text-white' : 'text-slate-950'}`}>
                         {previewPage.headline}
                       </h4>
                       <p className={`text-sm font-medium leading-relaxed ${previewPage.templateId === 'CONSULTING' ? 'text-slate-300' : 'text-slate-600'}`}>
@@ -1886,13 +1886,13 @@ Laporan & rekomendasi`}
 
                     <div className="mt-5 flex flex-wrap gap-3">
                       <div
-                        className="inline-flex items-center rounded-[20px] px-5 py-3 text-xs font-black text-white shadow-xl"
+                        className="inline-flex items-center rounded-xl px-5 py-3 text-xs font-black text-white shadow-xl"
                         style={{ backgroundColor: previewPage.theme.accent }}
                       >
                         {previewPage.primaryCtaLabel}
                       </div>
                       {previewPage.secondaryCtaLabel && (
-                        <div className={`inline-flex items-center rounded-[20px] border px-5 py-3 text-xs font-black ${previewPage.templateId === 'CONSULTING' ? 'border-slate-700 bg-slate-900/40 text-slate-100' : 'bg-white text-slate-800'}`} style={{ borderColor: previewPage.templateId === 'CONSULTING' ? undefined : previewPage.theme.border }}>
+                        <div className={`inline-flex items-center rounded-xl border px-5 py-3 text-xs font-black ${previewPage.templateId === 'CONSULTING' ? 'border-slate-700 bg-slate-900/40 text-slate-100' : 'bg-white text-slate-800'}`} style={{ borderColor: previewPage.templateId === 'CONSULTING' ? undefined : previewPage.theme.border }}>
                           {previewPage.secondaryCtaLabel}
                         </div>
                       )}
@@ -1902,7 +1902,7 @@ Laporan & rekomendasi`}
                       {previewPage.proofPoints.slice(0, 3).map((point) => (
                         <div
                           key={`${point.label}-${point.value}`}
-                          className={`rounded-[22px] border px-4 py-4 ${previewPage.templateId === 'CONSULTING' ? 'border-slate-700 bg-slate-900/50' : 'bg-white/90'}`}
+                          className={`rounded-xl border px-4 py-4 ${previewPage.templateId === 'CONSULTING' ? 'border-slate-700 bg-slate-900/50' : 'bg-white/90'}`}
                           style={{ borderColor: previewPage.templateId === 'CONSULTING' ? undefined : previewPage.theme.border }}
                         >
                           <div className={`text-[9px] font-black uppercase tracking-[0.18em] ${previewPage.templateId === 'CONSULTING' ? 'text-slate-400' : ''}`} style={{ color: previewPage.templateId === 'CONSULTING' ? undefined : previewPage.theme.muted }}>
@@ -1914,7 +1914,7 @@ Laporan & rekomendasi`}
                     </div>
 
                     <div
-                      className="mt-5 rounded-[28px] border p-4"
+                      className="mt-5 rounded-xl border p-4"
                       style={{
                         borderColor: previewPage.theme.border,
                         background: previewPage.heroImageUrl
@@ -1922,9 +1922,9 @@ Laporan & rekomendasi`}
                           : `linear-gradient(145deg, ${previewPage.theme.accent} 0%, ${previewPage.theme.text} 100%)`,
                       }}
                     >
-                      <div className="rounded-[24px] border border-white/15 bg-white/10 p-4 text-white backdrop-blur-sm">
+                      <div className="rounded-xl border border-white/15 bg-white/10 p-4 text-white backdrop-blur-sm">
                         <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/70">Offer Value</div>
-                        <div className="mt-2 text-2xl font-black tracking-tight">{previewPage.priceLabel || 'Penawaran spesial'}</div>
+                        <div className="mt-2 text-2xl font-semibold tracking-tight">{previewPage.priceLabel || 'Penawaran spesial'}</div>
                         <div className="mt-4 space-y-2 text-xs font-bold leading-relaxed text-white/85">
                           <div>{previewPage.bonusText}</div>
                           <div>{previewPage.guaranteeText}</div>
@@ -1934,11 +1934,11 @@ Laporan & rekomendasi`}
                     </div>
                   </div>
 
-                  <div className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.28)]">
+                  <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-lg">
                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Offer Stack Preview</div>
                     <div className="mt-4 space-y-3">
                       {previewPage.offerItems.slice(0, 3).map((item) => (
-                        <div key={item.title} className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
+                        <div key={item.title} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
                           <div className="text-sm font-black text-slate-900">{item.title}</div>
                           <div className="mt-1 text-xs font-medium leading-relaxed text-slate-500">{item.description}</div>
                         </div>
@@ -1946,7 +1946,7 @@ Laporan & rekomendasi`}
                     </div>
                   </div>
 
-                  <div className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.28)]">
+                  <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-lg">
                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Brief Preview</div>
                     <p className="mt-1 text-[11px] font-medium text-slate-500">Inilah ringkasan yang akan dipakai engine AI untuk generate copy.</p>
                     <pre className="mt-4 whitespace-pre-wrap rounded-2xl bg-slate-50 px-4 py-4 text-[11px] font-medium leading-relaxed text-slate-600">
@@ -1963,10 +1963,10 @@ Laporan & rekomendasi`}
       {editingPageId && editState && selectedPage && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setEditingPageId(null)} />
-          <div className="relative w-full max-w-5xl rounded-[40px] bg-white shadow-2xl overflow-hidden">
+          <div className="relative w-full max-w-5xl rounded-2xl bg-white shadow-2xl overflow-hidden">
             <div className="px-8 py-6 border-b border-slate-100 bg-slate-50">
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-500">Editor</div>
-              <h3 className="text-2xl font-black tracking-tight text-slate-900 mt-2">Edit Sales Page</h3>
+              <h3 className="text-2xl font-semibold tracking-tight text-slate-900 mt-2">Edit Sales Page</h3>
               <p className="text-sm text-slate-500 font-medium mt-2">
                 Format textarea:
                 <span className="font-black text-slate-700"> `Label | Value`</span> untuk proof point,
