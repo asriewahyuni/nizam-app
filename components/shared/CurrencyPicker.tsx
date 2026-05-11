@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { Globe, ChevronDown, RefreshCw, Loader2 } from 'lucide-react'
-import { CURRENCY_SYMBOLS, POPULAR_CURRENCIES } from '@/lib/currency'
 
 interface CurrencyPickerProps {
   orgId: string

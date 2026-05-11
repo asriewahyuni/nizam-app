@@ -3,9 +3,6 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { POPULAR_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
-
-export { POPULAR_CURRENCIES, getCurrencySymbol }
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  CURRENCY — Org Settings
