@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
@@ -218,6 +217,7 @@ export async function upsertOrgTaxSettings(orgId: string, input: Record<string, 
     .select()
 
   if (error) return { error: error.message }
+  const { revalidatePath } = await import('next/cache')
   revalidatePath('/accounting/tax')
   return { success: true }
 }
@@ -228,14 +228,18 @@ export async function upsertOrgTaxSettings(orgId: string, input: Record<string, 
 
 export async function getSptPpn1111(orgId: string, taxPeriod: string) {
   const supabase = await createClient()
-  const { queryPostgres } = await import('@/lib/db/postgres')
   
-  const { rows } = await queryPostgres<{ get_spt_ppn_1111: any }>(
-    `SELECT get_spt_ppn_1111($1::uuid, $2::date) as result`,
-    [orgId, taxPeriod + '-01']
-  )
-  
-  return rows?.[0]?.get_spt_ppn_1111 || null
+  const { data, error } = await supabase.rpc('get_spt_ppn_1111', {
+    p_org_id: orgId,
+    p_tax_period: taxPeriod + '-01'
+  })
+
+  if (error) {
+    console.error('getSptPpn1111 error:', error)
+    return null
+  }
+
+  return data
 }
 
 export async function downloadSptCsv(orgId: string, taxPeriod: string) {
@@ -273,25 +277,32 @@ export async function downloadSptCsv(orgId: string, taxPeriod: string) {
 
 export async function payTax(orgId: string, taxPeriod: string, paidAt: string, fromAccountId: string, notes?: string) {
   const supabase = await createClient()
-  const { queryPostgres } = await import('@/lib/db/postgres')
 
-  const { rows } = await queryPostgres<{ create_tax_payment_journal: any }>(
-    `SELECT create_tax_payment_journal($1::uuid, $2::date, $3::date, $4::uuid, $5::text) as result`,
-    [orgId, taxPeriod + '-01', paidAt, fromAccountId, notes || null]
-  )
+  const { data, error } = await supabase.rpc('create_tax_payment_journal', {
+    p_org_id: orgId,
+    p_tax_period: taxPeriod + '-01',
+    p_paid_at: paidAt,
+    p_paid_from_account_id: fromAccountId,
+    p_notes: notes || null
+  })
 
-  const result = rows?.[0]?.create_tax_payment_journal
-  if (!result?.success) {
-    return { error: result?.error || 'Gagal membuat jurnal pembayaran pajak.' }
+  if (error) {
+    console.error('payTax error:', error)
+    return { error: error.message }
   }
 
+  if (!data?.success) {
+    return { error: data?.error || 'Gagal membuat jurnal pembayaran pajak.' }
+  }
+
+  const { revalidatePath } = await import('next/cache')
   revalidatePath('/accounting/tax')
   return {
     success: true,
-    entry_id: result.entry_id,
-    entry_number: result.entry_number,
-    amount: result.amount,
-    spt_data: result.spt_data,
+    entry_id: data.entry_id,
+    entry_number: data.entry_number,
+    amount: data.amount,
+    spt_data: data.spt_data,
   }
 }
 
@@ -348,6 +359,7 @@ export async function generateTaxInvoice(orgId: string, referenceType: 'SALE' | 
   })
 
   if (error) return { error: `Gagal membuat Faktur Pajak: ${error.message}` }
+  const { revalidatePath } = await import('next/cache')
   revalidatePath('/accounting/tax')
   return { success: true, factur_number: facturNumber }
 }

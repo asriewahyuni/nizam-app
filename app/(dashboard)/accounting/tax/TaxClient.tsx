@@ -33,19 +33,17 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { PieChart, Pie, Cell, Tooltip as ReTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts'
 import { SafeResponsiveContainer } from '@/components/ui/SafeResponsiveContainer'
-import {
-  payTax,
-  downloadSptCsv,
-  getOrgTaxSettings,
-  upsertOrgTaxSettings,
-  generateTaxInvoice,
-  getTaxInvoices,
-  getSptPpn1111,
-} from '@/modules/accounting/actions/tax.actions'
 
 interface TaxClientProps {
   summary: any
   orgId: string
+  payTax: (orgId: string, taxPeriod: string, paidAt: string, fromAccountId: string, notes?: string) => Promise<any>
+  downloadSptCsv: (orgId: string, taxPeriod: string) => Promise<any>
+  getOrgTaxSettings: (orgId: string) => Promise<any>
+  upsertOrgTaxSettings: (orgId: string, settings: any) => Promise<any>
+  generateTaxInvoice: (orgId: string, referenceType: 'SALE' | 'PURCHASE', referenceId: string) => Promise<any>
+  getTaxInvoices: (orgId: string, period?: string) => Promise<any[]>
+  getSptPpn1111: (orgId: string, taxPeriod: string) => Promise<any>
 }
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
@@ -87,7 +85,17 @@ const item = {
   show: { opacity: 1, y: 0 }
 }
 
-export default function TaxClient({ summary, orgId }: TaxClientProps) {
+export default function TaxClient({ 
+  summary, 
+  orgId, 
+  payTax, 
+  downloadSptCsv, 
+  getOrgTaxSettings, 
+  upsertOrgTaxSettings, 
+  generateTaxInvoice, 
+  getTaxInvoices, 
+  getSptPpn1111 
+}: TaxClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<'VAT' | 'PPH'>('VAT')

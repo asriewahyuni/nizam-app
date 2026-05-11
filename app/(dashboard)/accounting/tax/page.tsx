@@ -1,5 +1,5 @@
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
-import { getTaxSummary } from '@/modules/accounting/actions/tax.actions'
+import { getTaxSummary, payTax, downloadSptCsv, getOrgTaxSettings, upsertOrgTaxSettings, generateTaxInvoice, getTaxInvoices, getSptPpn1111 } from '@/modules/accounting/actions/tax.actions'
 import { redirect } from 'next/navigation'
 import TaxClient from './TaxClient'
 
@@ -17,7 +17,17 @@ export default async function TaxPage({ searchParams }: { searchParams: Promise<
 
   return (
     <main className="p-8">
-      <TaxClient summary={summary} orgId={orgId} />
+      <TaxClient 
+        summary={summary} 
+        orgId={orgId}
+        payTax={payTax}
+        downloadSptCsv={downloadSptCsv}
+        getOrgTaxSettings={getOrgTaxSettings}
+        upsertOrgTaxSettings={upsertOrgTaxSettings}
+        generateTaxInvoice={generateTaxInvoice}
+        getTaxInvoices={getTaxInvoices}
+        getSptPpn1111={getSptPpn1111}
+      />
     </main>
   )
 }
