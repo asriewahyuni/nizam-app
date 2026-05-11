@@ -460,7 +460,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
                <h2 className="text-sm font-semibold text-[#0a0c10]">Star Products</h2>
                <div className="bg-white rounded-[40px] p-8 border border-slate-100 shadow-sm space-y-6">
                   {topProducts.length === 0 ? (
-                     <div className="py-24 text-center opacity-30 font-black text-xs uppercase italic border-2 border-dashed border-slate-100 rounded-3xl">No performance data</div>
+                     <div className="py-20 text-center text-sm text-[#9ca3af] border-2 border-dashed border-[#e5e7eb] rounded-2xl">Belum ada data produk</div>
                   ) : (
                      <div className="space-y-3">
                         {topProducts.slice(0, 7).map((p, i) => (
@@ -481,8 +481,8 @@ export function DashboardClient({ data }: DashboardClientProps) {
                         ))}
                      </div>
                   )}
-                  <Link href="/inventory" className="w-full py-4 border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
-                     All Products <ChevronRight size={14} />
+                  <Link href="/inventory" className="w-full py-3.5 border border-[#e5e7eb] rounded-xl text-xs font-medium text-[#6b7280] hover:text-[#0a0c10] hover:bg-[#f9fafb] transition-all flex items-center justify-center gap-2">
+                     Semua Produk <ChevronRight size={14} />
                   </Link>
                </div>
             </motion.div>
@@ -521,7 +521,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
 
             {/* Quick Strategic Actions - Buttons that pop */}
             <motion.div variants={item} className="xl:col-span-1 space-y-5">
-               <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-2">Strategy Hub</h2>
+               <h2 className="text-sm font-semibold text-[#0a0c10]">Strategy Hub</h2>
                <div className="grid grid-cols-1 gap-6 h-full">
                   <div className="bg-emerald-600 rounded-[40px] p-10 text-white flex flex-col justify-between shadow-2xl shadow-emerald-100 relative overflow-hidden group">
                      <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-125 transition-transform duration-700">
