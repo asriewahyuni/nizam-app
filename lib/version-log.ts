@@ -49,6 +49,20 @@ export const VERSION_LOG: VersionLogEntry[] = [
   // ║  CURRENT VERSION — N2.6.3.x                                       ║
   // ║  Core=2 (Syirkah pillar baru), BusinessType=6, Addon=3            ║
   // ╚════════════════════════════════════════════════════════════════════╝
+  // ── PATCH: PPN Tax Engine ──────────────────────────────────────────
+  {
+    date: '2026-05-11',
+    type: 'patch',
+    label: 'Feat: PPN Tax Engine — Bayar Pajak, Download SPT, PKP Settings',
+    description: 'PPN engine full live: (1) PKP settings modal — toggle PKP, NPWP, tarif 11%/12%. ' +
+      '(2) Bayar Pajak — pilih rekening bank, auto-generate journal entry ' +
+      '(debit PPN Keluaran 2201, credit Kas). (3) Download SPT Masa PPN 1111 ' +
+      'format CSV siap DJP Online. (4) Faktur Pajak generation (via tax_invoices table). ' +
+      '(5) Migration 1303: org_tax_settings, tax_invoice_numbers, tax_invoices tables + ' +
+      'get_spt_ppn_1111() + create_tax_payment_journal() functions. ' +
+      'Gantikan semua "Segera Hadir" stubs dengan real functionality.',
+    by: 'Z',
+  },
   // ── PATCH: accounting core audit fixes ─────────────────────────────
   {
     date: '2026-05-11',
