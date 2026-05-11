@@ -7,6 +7,9 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { createOrganization } from '@/modules/organization/actions/org.actions'
 import { SafeButton } from '@/components/ui/NizamUI'
 
+// Prevent CDN/incremental cache — this page is fully dynamic
+export const dynamic = 'force-dynamic'
+
 type CreateOrganizationResult = Awaited<ReturnType<typeof createOrganization>>
 
 export default function OnboardingPage() {
