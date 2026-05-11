@@ -19,15 +19,15 @@ export default function OnboardingPage() {
 
 function OnboardingFallback() {
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-6 overflow-hidden bg-[#0a0c10]">
-      <div className="w-full max-w-md relative z-10 rounded-[40px] border border-white/10 bg-white/95 px-10 py-12 text-center shadow-[0_24px_64px_-16px_rgba(0,0,0,0.3)]">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-[24px] bg-slate-900 text-white shadow-xl">
-          <Building2 size={28} />
+    <div className="min-h-screen relative flex items-center justify-center p-6 overflow-hidden bg-[#07080a]">
+      <div className="w-full max-w-sm relative z-10 rounded-3xl border border-white/[0.04] bg-white/[0.96] px-10 py-14 text-center shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+        <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0a0c10] text-white">
+          <Building2 size={24} />
         </div>
-        <h1 className="text-2xl font-black uppercase italic tracking-tighter text-slate-900">NIZAM Setup</h1>
-        <p className="mt-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Mempersiapkan Lingkungan ERP Anda</p>
-        <div className="mt-8 rounded-3xl border border-slate-100 bg-slate-50 px-6 py-8 text-sm font-bold text-slate-500">
-          Memuat onboarding perusahaan...
+        <h1 className="text-xl font-semibold tracking-tight text-[#0a0c10]">NIZAM</h1>
+        <p className="mt-1 text-xs text-[#6b7280]">Mempersiapkan lingkungan Anda</p>
+        <div className="mt-8 rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-6 py-8 text-sm text-[#6b7280]">
+          Memuat...
         </div>
       </div>
     </div>
@@ -57,14 +57,10 @@ function OnboardingContent() {
         setError(res.error)
         setLoading(false)
       } else {
-        // Org berhasil dibuat — tampilkan success state lalu arahkan ke dashboard.
-        // router.push memastikan navigasi aktif terjadi meski redirect dari server
-        // action tidak otomatis ter-handle oleh client Next.js router.
         setSuccess(true)
         router.push('/dashboard')
       }
     } catch (err: unknown) {
-      // Next.js redirect error: biarkan framework menanganinya.
       if (err instanceof Error && err.message === 'NEXT_REDIRECT') throw err
       setError('Terjadi kesalahan sistem. Silakan coba lagi.')
       setLoading(false)
@@ -72,73 +68,70 @@ function OnboardingContent() {
   }
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-6 overflow-hidden bg-[#0a0c10]">
-      {/* Background Orbs */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-40">
-        <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/20 blur-[100px] rounded-full" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[30%] h-[30%] bg-indigo-600/10 blur-[80px] rounded-full" />
+    <div className="min-h-screen relative flex items-center justify-center p-6 overflow-hidden bg-[#07080a] selection:bg-blue-200/30">
+      {/* Deep background atmosphere */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-15%] right-[-20%] w-[50%] h-[55%] bg-gradient-to-br from-blue-500/[0.08] via-transparent to-transparent rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-15%] left-[-20%] w-[45%] h-[45%] bg-gradient-to-tr from-indigo-500/[0.06] via-transparent to-transparent rounded-full blur-[120px]" />
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMCAwaDQwdjQwSDB6IiBmaWxsPSJub25lIi8+PHBhdGggZD0iTTAgMjBoNDBNMjAgMHY0MCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iMC4wMTUiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==')] opacity-40" />
       </div>
 
-      <div className="w-full max-w-md relative z-10">
+      <div className="w-full max-w-sm relative z-10">
         <motion.div
           initial={false}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="bg-white/95 backdrop-blur-xl rounded-[40px] shadow-[0_24px_64px_-16px_rgba(0,0,0,0.3)] p-10 md:p-12 border border-white relative overflow-hidden"
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+          className="relative"
         >
-          {/* Top Branding Bar */}
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600" />
-          
-          <div className="flex flex-col items-center text-center mb-10">
-            <motion.div 
-              whileHover={{ rotate: 10, scale: 1.1 }}
-              className="w-16 h-16 bg-gradient-to-br from-slate-900 to-slate-800 rounded-[24px] flex items-center justify-center shadow-xl mb-6 border border-white/20 relative"
-            >
-              <Building2 size={28} className="text-white" />
-              <div className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center border-2 border-white">
-                <Sparkles size={10} className="text-white fill-white" />
-              </div>
-            </motion.div>
-            
-            <h1 className="text-2xl font-black text-slate-900 tracking-tighter mb-2 uppercase italic">
-              NIZAM <span className="text-blue-600 not-italic tracking-normal">Setup</span>
-            </h1>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Mempersiapkan Lingkungan ERP Anda</p>
-          </div>
+          {/* Card — refined glass */}
+          <div className="bg-white/[0.97] rounded-3xl shadow-[0_8px_32px_-8px_rgba(0,0,0,0.08),0_0_0_1px_rgba(0,0,0,0.02)] p-9 md:p-10">
+            {/* Subtle top accent */}
+            <div className="absolute top-0 left-8 right-8 h-[2px] bg-gradient-to-r from-blue-600/20 via-blue-600/60 to-blue-600/20 rounded-full" />
 
-          {!success ? (
-            <motion.form 
-              layout
-              onSubmit={handleSubmit} 
-              className="space-y-6"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between px-1">
-                  <label htmlFor="name" className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama Perusahaan</label>
-                  <span className="text-[9px] text-blue-500 font-bold italic">Wajib</span>
-                </div>
-                
-                <div className="relative group">
-                  <input
-                    id="name"
-                    name="name"
-                    required
-                    autoFocus
-                    defaultValue={businessName}
-                    placeholder="Contoh: PT Nusantara Pangan"
-                    className={`w-full px-6 py-4 bg-slate-50 border-2 rounded-[22px] text-base font-bold text-slate-900 outline-none transition-all shadow-inner placeholder:text-slate-300 ${error ? 'border-rose-500 bg-rose-50/20' : 'border-slate-100 focus:bg-white focus:border-blue-500'}`}
-                  />
-                  <div className={`absolute right-5 top-1/2 -translate-y-1/2 transition-colors ${error ? 'text-rose-500' : 'text-slate-300 group-focus-within:text-blue-500'}`}>
-                    <Globe size={18} />
+            <div className="flex flex-col items-center text-center mb-8">
+              <div className="w-12 h-12 rounded-2xl bg-[#0a0c10] flex items-center justify-center shadow-sm mb-5">
+                <Building2 size={22} className="text-white" />
+              </div>
+              <h1 className="text-xl font-semibold tracking-tight text-[#0a0c10]">
+                NIZAM <span className="text-blue-600">Setup</span>
+              </h1>
+              <p className="mt-1 text-xs text-[#6b7280]">Siapkan perusahaan Anda</p>
+            </div>
+
+            {!success ? (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Nama Perusahaan */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="name" className="text-xs font-medium text-[#374151]">Nama perusahaan</label>
+                    <span className="text-[10px] text-[#9ca3af]">wajib</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      id="name"
+                      name="name"
+                      required
+                      autoFocus
+                      defaultValue={businessName}
+                      placeholder="cth: PT Nusantara Pangan"
+                      className={`w-full h-11 px-4 bg-white border rounded-xl text-sm text-[#0a0c10] placeholder:text-[#9ca3af] outline-none transition-all duration-200
+                        ${error
+                          ? 'border-[#f87171] ring-1 ring-[#f87171]/20'
+                          : 'border-[#e5e7eb] hover:border-[#d1d5db] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20'
+                        }`}
+                    />
+                    <Globe size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#9ca3af] pointer-events-none" />
                   </div>
                 </div>
 
+                {/* Error */}
                 <AnimatePresence>
                   {error && (
-                    <motion.div 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="p-3 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-2 text-rose-600 text-[10px] font-black uppercase tracking-tight"
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      className="flex items-center gap-2 px-3 py-2.5 bg-[#fef2f2] border border-[#fecaca] rounded-xl text-xs font-medium text-[#dc2626]"
                     >
                       <AlertCircle size={14} className="shrink-0" />
                       {error}
@@ -146,78 +139,79 @@ function OnboardingContent() {
                   )}
                 </AnimatePresence>
 
-                <div className="grid grid-cols-1 gap-3 mt-4">
-                  <div className="p-4 bg-slate-50/50 rounded-[20px] border border-slate-100 flex items-center gap-3">
-                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 shrink-0">
-                      <Wallet size={16} />
+                {/* Feature highlights */}
+                <div className="grid gap-2.5 pt-1">
+                  <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl border border-[#f3f4f6] bg-[#fafbfc]">
+                    <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600 shrink-0">
+                      <Wallet size={14} />
                     </div>
                     <div>
-                      <h4 className="text-[9px] font-black text-slate-900 uppercase leading-none">
+                      <div className="text-xs font-medium text-[#0a0c10]">
                         {isDemoSetup ? 'CoA & Demo Budget' : 'Aktivasi CoA PSAK'}
-                      </h4>
-                      <p className="text-[9px] text-slate-400 font-bold mt-1">
+                      </div>
+                      <div className="text-[11px] text-[#6b7280] mt-px">
                         {isDemoSetup
                           ? 'Untuk akun demo, CoA dan contoh budgeting disiapkan otomatis.'
                           : 'Aktifkan dari menu CoA setelah organisasi dibuat.'}
-                      </p>
+                      </div>
                     </div>
                   </div>
-                  <div className="p-4 bg-slate-50/50 rounded-[20px] border border-slate-100 flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 rounded-lg text-blue-600 shrink-0">
-                      <ShieldCheck size={16} />
+                  <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl border border-[#f3f4f6] bg-[#fafbfc]">
+                    <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600 shrink-0">
+                      <ShieldCheck size={14} />
                     </div>
                     <div>
-                      <h4 className="text-[9px] font-black text-slate-900 uppercase leading-none">Security Verified</h4>
-                      <p className="text-[9px] text-slate-400 font-bold mt-1">Isolasi data multi-tenant tingkat tinggi.</p>
+                      <div className="text-xs font-medium text-[#0a0c10]">Security Verified</div>
+                      <div className="text-[11px] text-[#6b7280] mt-px">Isolasi data multi-tenant tingkat tinggi.</div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="pt-2 flex flex-col gap-3">
-                <SafeButton 
-                  type="submit" 
-                  size="lg" 
-                  isLoading={loading}
-                  className="w-full shadow-xl shadow-blue-500/10 py-5 text-sm" 
-                  icon={<ArrowRight size={16} />}
-                >
-                  AKTIFKAN SEKARANG
-                </SafeButton>
-                
-                <p className="text-[9px] text-slate-300 text-center font-bold px-4 leading-relaxed">
-                   Dengan melanjutkan, Anda menyetujui Ketentuan Layanan NIZAM secara penuh.
-                </p>
-              </div>
-              <input type="hidden" name="plan" value={plan || ''} />
-              <input type="hidden" name="type" value={type || ''} />
-            </motion.form>
-          ) : (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center text-center py-8"
-            >
-              <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
-                <CheckCircle2 size={36} className="text-emerald-500" />
-              </div>
-              <h2 className="text-2xl font-black text-slate-900 mb-2 tracking-tighter uppercase italic">BERHASIL!</h2>
-              <p className="text-slate-500 text-xs font-bold mb-8 max-w-[200px]">Infrastruktur database Anda sedang disiapkan...</p>
-              <div className="w-full max-w-[180px] h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: "100%" }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="h-full bg-blue-600 rounded-full"
-                />
-              </div>
-            </motion.div>
-          )}
+                {/* Submit */}
+                <div className="pt-2 space-y-3">
+                  <SafeButton
+                    type="submit"
+                    size="lg"
+                    isLoading={loading}
+                    className="w-full h-11 rounded-xl text-sm font-medium"
+                  >
+                    Aktifkan Sekarang
+                  </SafeButton>
+                  <p className="text-[10px] text-[#9ca3af] text-center leading-relaxed px-2">
+                    Dengan melanjutkan, Anda menyetujui Ketentuan Layanan NIZAM.
+                  </p>
+                </div>
+
+                <input type="hidden" name="plan" value={plan || ''} />
+                <input type="hidden" name="type" value={type || ''} />
+              </form>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="flex flex-col items-center text-center py-6"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center mb-5">
+                  <CheckCircle2 size={28} className="text-emerald-600" />
+                </div>
+                <h2 className="text-lg font-semibold text-[#0a0c10]">Bersiap...</h2>
+                <p className="text-xs text-[#6b7280] mt-1 mb-6">Menyiapkan infrastruktur database Anda.</p>
+                <div className="w-full max-w-[140px] h-1 bg-[#e5e7eb] rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: '100%' }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                    className="h-full bg-blue-600 rounded-full"
+                  />
+                </div>
+              </motion.div>
+            )}
+          </div>
         </motion.div>
 
-        {/* Brand Link */}
-        <div className="mt-8 flex items-center justify-center gap-2 opacity-30">
-          <div className="text-[8px] font-black text-white uppercase tracking-[0.4em]">NIZAM CORESYSTEM</div>
+        <div className="mt-8 text-center">
+          <span className="text-[9px] tracking-[0.3em] text-white/20 font-medium">NIZAM CORESYSTEM</span>
         </div>
       </div>
     </div>
