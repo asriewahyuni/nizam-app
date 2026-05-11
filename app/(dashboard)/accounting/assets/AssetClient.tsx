@@ -736,7 +736,7 @@ export function AssetClient({
       {showLabelModal && selectedAsset && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-8 animate-in zoom-in-95">
-              <div className="flex items-center justify-between print-hidden">
+              <div className="flex items-center justify-between nz-print-hide">
                  <h2 className="text-xl font-black text-slate-900 flex items-center gap-2"> <Printer className="text-blue-600" /> Label Aset </h2>
                  <button onClick={() => setShowLabelModal(false)} className="text-slate-400 hover:text-slate-900"> <X size={24} /> </button>
               </div>
@@ -748,25 +748,19 @@ export function AssetClient({
                  </div>
                  <p className="text-[10px] font-mono font-bold text-blue-600">{selectedAsset.code}</p>
               </div>
-              <div className="flex gap-4 print-hidden">
+              <div className="flex gap-4 nz-print-hide">
                  <button onClick={() => setShowLabelModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl" > Tutup </button>
                  <button onClick={() => window.print()} className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-2" > <Printer size={18} /> Cetak </button>
               </div>
            </div>
            <style jsx global>{`
              @media print {
-               body > :not(.fixed) { display: none; }
-               .fixed { background: transparent !important; backdrop-filter: none !important; }
-               .fixed > div { box-shadow: none !important; border: none !important; }
-               .print-hidden { display: none !important; }
-               #printable-label { 
-                 display: flex !important;
-                 position: fixed;
-                 top: 0; left: 0;
-                 width: 100%; height: 100%;
-                 border: none !important;
-                 background: white;
-               }
+               body * { display: none; }
+               .fixed { display: flex !important; background: transparent !important; backdrop-filter: none !important; }
+               .fixed > div { box-shadow: none !important; border: none !important; border-radius: 0 !important; padding: 4px !important; }
+               .nz-print-hide { display: none !important; }
+               #printable-label { display: flex !important; }
+               #printable-label * { display: revert; }
                @page { margin: 0; }
              }
            `}</style>
