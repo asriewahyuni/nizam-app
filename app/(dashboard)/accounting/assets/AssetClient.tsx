@@ -1,6 +1,6 @@
 'use client'
 
-import React, { startTransition, useState } from 'react'
+import React, { startTransition, useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Landmark, Building2, CarFront, Monitor, Plus, Calculator, History, Trash2, Calendar, FileText, X, Printer, QrCode, Pencil, DollarSign, AlertTriangle } from 'lucide-react'
 import Barcode from 'react-barcode'
@@ -69,6 +69,59 @@ function SearchableSelect({ label, options, value, onChange, placeholder, requir
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── LABEL PRINT MODAL ─────────────────────────────────────────────────────────
+function LabelPrintModal({ asset, onClose }: { asset: any; onClose: () => void }) {
+  const labelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    // Inject print CSS ke head (reliable, gak kena scoping React)
+    const styleEl = document.createElement('style')
+    styleEl.id = 'nz-label-print-css'
+    styleEl.textContent = `
+@media print {
+  body * { visibility: hidden !important; }
+  .nz-label-overlay { visibility: visible !important; background: transparent !important; backdrop-filter: none !important; }
+  .nz-label-overlay > div { visibility: visible !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; }
+  #printable-label, #printable-label * { visibility: visible !important; }
+  .nz-print-hide { display: none !important; }
+  @page { margin: 0; }
+}
+`
+    document.head.appendChild(styleEl)
+    return () => {
+      const existing = document.getElementById('nz-label-print-css')
+      if (existing) existing.remove()
+    }
+  }, [])
+
+  function handlePrint() {
+    window.print()
+  }
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-300 nz-label-overlay">
+       <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-8 animate-in zoom-in-95 nz-label-card">
+          <div className="flex items-center justify-between nz-print-hide">
+             <h2 className="text-xl font-black text-slate-900 flex items-center gap-2"> <Printer className="text-blue-600" /> Label Aset </h2>
+             <button onClick={onClose} className="text-slate-400 hover:text-slate-900"> <X size={24} /> </button>
+          </div>
+          <div ref={labelRef} id="printable-label" className="bg-white p-6 flex flex-col items-center gap-4 text-center">
+             <h4 className="text-sm font-black text-slate-900 truncate w-full">{asset.name}</h4>
+             <div className="p-2 bg-slate-50 rounded-2xl flex flex-col items-center gap-3">
+                <Barcode value={asset.code} width={1.2} height={40} fontSize={10} background="transparent" />
+                <QRCodeCanvas value={`https://nizam.app/asset/${asset.id}`} size={48} level="H" />
+             </div>
+             <p className="text-[10px] font-mono font-bold text-blue-600">{asset.code}</p>
+          </div>
+          <div className="flex gap-4 nz-print-hide">
+             <button onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl" > Tutup </button>
+             <button onClick={handlePrint} className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-2" > <Printer size={18} /> Cetak </button>
+          </div>
+       </div>
     </div>
   )
 }
@@ -733,39 +786,7 @@ export function AssetClient({
       )}
 
       {/* LABEL MODAL */}
-      {showLabelModal && selectedAsset && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-8 animate-in zoom-in-95">
-              <div className="flex items-center justify-between nz-print-hide">
-                 <h2 className="text-xl font-black text-slate-900 flex items-center gap-2"> <Printer className="text-blue-600" /> Label Aset </h2>
-                 <button onClick={() => setShowLabelModal(false)} className="text-slate-400 hover:text-slate-900"> <X size={24} /> </button>
-              </div>
-              <div id="printable-label" className="bg-white p-6 flex flex-col items-center gap-4 text-center">
-                 <h4 className="text-sm font-black text-slate-900 truncate w-full">{selectedAsset.name}</h4>
-                 <div className="p-2 bg-slate-50 rounded-2xl flex flex-col items-center gap-3">
-                    <Barcode value={selectedAsset.code} width={1.2} height={40} fontSize={10} background="transparent" />
-                    <QRCodeCanvas value={`https://nizam.app/asset/${selectedAsset.id}`} size={48} level="H" />
-                 </div>
-                 <p className="text-[10px] font-mono font-bold text-blue-600">{selectedAsset.code}</p>
-              </div>
-              <div className="flex gap-4 nz-print-hide">
-                 <button onClick={() => setShowLabelModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl" > Tutup </button>
-                 <button onClick={() => window.print()} className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-2" > <Printer size={18} /> Cetak </button>
-              </div>
-           </div>
-           <style jsx global>{`
-             @media print {
-               body * { display: none; }
-               .fixed { display: flex !important; background: transparent !important; backdrop-filter: none !important; }
-               .fixed > div { box-shadow: none !important; border: none !important; border-radius: 0 !important; padding: 4px !important; }
-               .nz-print-hide { display: none !important; }
-               #printable-label { display: flex !important; }
-               #printable-label * { display: revert; }
-               @page { margin: 0; }
-             }
-           `}</style>
-        </div>
-      )}
+      {showLabelModal && selectedAsset && <LabelPrintModal asset={selectedAsset} onClose={() => setShowLabelModal(false)} />}
       {/* DEPRECIATION PREVIEW MODAL */}
       {showPreview && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-300">
@@ -966,6 +987,59 @@ export function AssetClient({
            </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── LABEL PRINT MODAL ─────────────────────────────────────────────────────────
+function LabelPrintModal({ asset, onClose }: { asset: any; onClose: () => void }) {
+  const labelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    // Inject print CSS ke head (reliable, gak kena scoping React)
+    const styleEl = document.createElement('style')
+    styleEl.id = 'nz-label-print-css'
+    styleEl.textContent = `
+@media print {
+  body * { visibility: hidden !important; }
+  .nz-label-overlay { visibility: visible !important; background: transparent !important; backdrop-filter: none !important; }
+  .nz-label-overlay > div { visibility: visible !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; }
+  #printable-label, #printable-label * { visibility: visible !important; }
+  .nz-print-hide { display: none !important; }
+  @page { margin: 0; }
+}
+`
+    document.head.appendChild(styleEl)
+    return () => {
+      const existing = document.getElementById('nz-label-print-css')
+      if (existing) existing.remove()
+    }
+  }, [])
+
+  function handlePrint() {
+    window.print()
+  }
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-300 nz-label-overlay">
+       <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-8 animate-in zoom-in-95 nz-label-card">
+          <div className="flex items-center justify-between nz-print-hide">
+             <h2 className="text-xl font-black text-slate-900 flex items-center gap-2"> <Printer className="text-blue-600" /> Label Aset </h2>
+             <button onClick={onClose} className="text-slate-400 hover:text-slate-900"> <X size={24} /> </button>
+          </div>
+          <div ref={labelRef} id="printable-label" className="bg-white p-6 flex flex-col items-center gap-4 text-center">
+             <h4 className="text-sm font-black text-slate-900 truncate w-full">{asset.name}</h4>
+             <div className="p-2 bg-slate-50 rounded-2xl flex flex-col items-center gap-3">
+                <Barcode value={asset.code} width={1.2} height={40} fontSize={10} background="transparent" />
+                <QRCodeCanvas value={`https://nizam.app/asset/${asset.id}`} size={48} level="H" />
+             </div>
+             <p className="text-[10px] font-mono font-bold text-blue-600">{asset.code}</p>
+          </div>
+          <div className="flex gap-4 nz-print-hide">
+             <button onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl" > Tutup </button>
+             <button onClick={handlePrint} className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-2" > <Printer size={18} /> Cetak </button>
+          </div>
+       </div>
     </div>
   )
 }
