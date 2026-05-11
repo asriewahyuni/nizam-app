@@ -1,5 +1,3 @@
-import { isInternalAuthProvider } from '@/lib/auth/provider'
-import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { queryPostgres } from '@/lib/db/postgres'
 import { format, subMonths } from 'date-fns'
 
@@ -30,33 +28,13 @@ function buildEmptyAnalytics() {
 }
 
 export async function getDashboardAnalytics(orgId: string, branchId?: string) {
-  const sessionClient = await createClient()
-
-  if (isInternalAuthProvider()) {
-    const { data: { user } } = await sessionClient.auth.getUser()
-    if (!user) return buildEmptyAnalytics()
-
-    const admin = await createAdminClient()
-    const { data: membership } = await (admin as any)
-      .from('org_members')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .maybeSingle()
-
-    if (!membership?.id) return buildEmptyAnalytics()
-  }
-
   const startDate = format(subMonths(new Date(), 5), 'yyyy-MM-01')
   const paretoStartDate = format(subMonths(new Date(), 3), 'yyyy-MM-01')
 
-  // ── 1. Financial Analytics via raw SQL ──────────────────────────────────
-  let chartData: any[] = []
-  let topExpenses: any[] = []
-
-  try {
-    const linesResult = await queryPostgres<{
+  // Jalankan 3 query berat secara paralel
+  const [linesResult, productResult, customerResult] = await Promise.all([
+    // ── 1. Journal lines untuk chart revenue/expense
+    queryPostgres<{
       debit: string
       credit: string
       entry_date: string
@@ -79,43 +57,10 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
          AND je.entry_date >= $2
          ${branchId ? 'AND je.branch_id = $3' : ''}`,
       branchId ? [orgId, startDate, branchId] : [orgId, startDate]
-    )
+    ).catch(() => ({ rows: [] as any[] })),
 
-    const monthlyData: Record<string, { revenue: number; expense: number }> = {}
-    const expenseBreakdown: Record<string, number> = {}
-
-    for (const line of linesResult.rows) {
-      const month = format(new Date(line.entry_date), 'MMM yyyy')
-      if (!monthlyData[month]) monthlyData[month] = { revenue: 0, expense: 0 }
-
-      if (line.account_type === 'REVENUE') {
-        monthlyData[month].revenue += Number(line.credit) - Number(line.debit)
-      }
-      if (line.account_type === 'EXPENSE') {
-        const val = Number(line.debit) - Number(line.credit)
-        monthlyData[month].expense += val
-        const label = line.account_name || line.account_code
-        expenseBreakdown[label] = (expenseBreakdown[label] || 0) + val
-      }
-    }
-
-    chartData = Object.entries(monthlyData)
-      .map(([name, vals]) => ({ name, revenue: vals.revenue, expense: vals.expense, profit: vals.revenue - vals.expense }))
-      .sort((a: any, b: any) => new Date(a.name).getTime() - new Date(b.name).getTime())
-
-    topExpenses = Object.entries(expenseBreakdown)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a: any, b: any) => b.value - a.value)
-      .slice(0, 5)
-  } catch { /* noop — analytics non-critical */ }
-
-  // ── 2. Product Pareto Analytics ─────────────────────────────────────────
-  let sortedProducts: any[] = []
-  let totalRevenue = 0
-  let totalProfit = 0
-
-  try {
-    const productResult = await queryPostgres<{
+    // ── 2. Product pareto
+    queryPostgres<{
       product_id: string
       product_name: string
       average_cost: string
@@ -134,38 +79,10 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
          AND si.created_at >= $2
          ${branchId ? 'AND si.branch_id = $3' : ''}`,
       branchId ? [orgId, paretoStartDate, branchId] : [orgId, paretoStartDate]
-    )
+    ).catch(() => ({ rows: [] as any[] })),
 
-    const productStats: Record<string, { name: string; revenue: number; profit: number; qty: number }> = {}
-    for (const item of productResult.rows) {
-      if (!productStats[item.product_id]) {
-        productStats[item.product_id] = { name: item.product_name, revenue: 0, profit: 0, qty: 0 }
-      }
-      const rev = Number(item.total_amount || 0)
-      const cost = Number(item.average_cost || 0) * Number(item.quantity || 0)
-      productStats[item.product_id].revenue += rev
-      productStats[item.product_id].profit += rev - cost
-      productStats[item.product_id].qty += Number(item.quantity || 0)
-      totalRevenue += rev
-      totalProfit += rev - cost
-    }
-
-    sortedProducts = Object.values(productStats).sort((a: any, b: any) => b.revenue - a.revenue)
-  } catch { /* noop */ }
-
-  let runningRevenue = 0
-  const paretoTop20 = sortedProducts.filter((p: any, idx: number) => {
-    runningRevenue += p.revenue
-    return runningRevenue <= totalRevenue * 0.8 || idx + 1 <= Math.ceil(sortedProducts.length * 0.2)
-  })
-
-  // ── 3. Customer Pareto Analytics ────────────────────────────────────────
-  let sortedCustomers: any[] = []
-  let totalCustomerRevenue = 0
-  let totalCustomerProfit = 0
-
-  try {
-    const customerResult = await queryPostgres<{
+    // ── 3. Customer pareto
+    queryPostgres<{
       customer_id: string
       customer_name: string
       total_amount: string
@@ -186,24 +103,83 @@ export async function getDashboardAnalytics(orgId: string, branchId?: string) {
          AND s.sale_date >= $2
          ${branchId ? 'AND si.branch_id = $3' : ''}`,
       branchId ? [orgId, paretoStartDate, branchId] : [orgId, paretoStartDate]
-    )
+    ).catch(() => ({ rows: [] as any[] })),
+  ])
 
-    const customerStats: Record<string, { id: string; name: string; revenue: number; profit: number }> = {}
-    for (const item of customerResult.rows) {
-      if (!customerStats[item.customer_id]) {
-        customerStats[item.customer_id] = { id: item.customer_id, name: item.customer_name, revenue: 0, profit: 0 }
-      }
-      const rev = Number(item.total_amount || 0)
-      const cost = Number(item.average_cost || 0) * Number(item.quantity || 0)
-      customerStats[item.customer_id].revenue += rev
-      customerStats[item.customer_id].profit += rev - cost
-      totalCustomerRevenue += rev
-      totalCustomerProfit += rev - cost
+  // ── Process chart data ───────────────────────────────────────────────────
+  let chartData: any[] = []
+  let topExpenses: any[] = []
+
+  const monthlyData: Record<string, { revenue: number; expense: number }> = {}
+  const expenseBreakdown: Record<string, number> = {}
+
+  for (const line of linesResult.rows) {
+    const month = format(new Date(line.entry_date), 'MMM yyyy')
+    if (!monthlyData[month]) monthlyData[month] = { revenue: 0, expense: 0 }
+
+    if (line.account_type === 'REVENUE') {
+      monthlyData[month].revenue += Number(line.credit) - Number(line.debit)
     }
+    if (line.account_type === 'EXPENSE') {
+      const val = Number(line.debit) - Number(line.credit)
+      monthlyData[month].expense += val
+      const label = line.account_name || line.account_code
+      expenseBreakdown[label] = (expenseBreakdown[label] || 0) + val
+    }
+  }
 
-    sortedCustomers = Object.values(customerStats).sort((a: any, b: any) => b.revenue - a.revenue)
-  } catch { /* noop */ }
+  chartData = Object.entries(monthlyData)
+    .map(([name, vals]) => ({ name, revenue: vals.revenue, expense: vals.expense, profit: vals.revenue - vals.expense }))
+    .sort((a: any, b: any) => new Date(a.name).getTime() - new Date(b.name).getTime())
 
+  topExpenses = Object.entries(expenseBreakdown)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a: any, b: any) => b.value - a.value)
+    .slice(0, 5)
+
+  // ── Process product pareto ───────────────────────────────────────────────
+  let totalRevenue = 0
+  let totalProfit = 0
+  const productStats: Record<string, { name: string; revenue: number; profit: number; qty: number }> = {}
+
+  for (const item of productResult.rows) {
+    if (!productStats[item.product_id]) {
+      productStats[item.product_id] = { name: item.product_name, revenue: 0, profit: 0, qty: 0 }
+    }
+    const rev = Number(item.total_amount || 0)
+    const cost = Number(item.average_cost || 0) * Number(item.quantity || 0)
+    productStats[item.product_id].revenue += rev
+    productStats[item.product_id].profit += rev - cost
+    productStats[item.product_id].qty += Number(item.quantity || 0)
+    totalRevenue += rev
+    totalProfit += rev - cost
+  }
+
+  const sortedProducts = Object.values(productStats).sort((a: any, b: any) => b.revenue - a.revenue)
+  let runningRevenue = 0
+  const paretoTop20 = sortedProducts.filter((p: any, idx: number) => {
+    runningRevenue += p.revenue
+    return runningRevenue <= totalRevenue * 0.8 || idx + 1 <= Math.ceil(sortedProducts.length * 0.2)
+  })
+
+  // ── Process customer pareto ──────────────────────────────────────────────
+  let totalCustomerRevenue = 0
+  let totalCustomerProfit = 0
+  const customerStats: Record<string, { id: string; name: string; revenue: number; profit: number }> = {}
+
+  for (const item of customerResult.rows) {
+    if (!customerStats[item.customer_id]) {
+      customerStats[item.customer_id] = { id: item.customer_id, name: item.customer_name, revenue: 0, profit: 0 }
+    }
+    const rev = Number(item.total_amount || 0)
+    const cost = Number(item.average_cost || 0) * Number(item.quantity || 0)
+    customerStats[item.customer_id].revenue += rev
+    customerStats[item.customer_id].profit += rev - cost
+    totalCustomerRevenue += rev
+    totalCustomerProfit += rev - cost
+  }
+
+  const sortedCustomers = Object.values(customerStats).sort((a: any, b: any) => b.revenue - a.revenue)
   let cRunningRevenue = 0
   const paretoTopCustomers = sortedCustomers.filter((c: any, idx: number) => {
     cRunningRevenue += c.revenue

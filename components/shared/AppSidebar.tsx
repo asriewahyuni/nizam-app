@@ -8,7 +8,6 @@ import { approvalSignalMatchesScope, subscribeApprovalSignal } from '@/lib/brows
 import { scheduleIdleTask } from '@/lib/browser/idle'
 import { isPlatformAdminEmail } from '@/lib/saas/platform-admin'
 import { saasModuleCoversCapability, normalizeSaasEntitlementName } from '@/lib/saas/module-catalog'
-import { PILLAR_MODULES } from '@/modules/marketplace/lib/module-registry'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import {
   LayoutDashboard,
@@ -74,7 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
     group: 'Utama',
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission_key: 'dashboard' },
-      { label: 'Modul Marketplace', href: '/marketplace', icon: Store, permission_key: 'config', admin_only: true },
+      { label: 'Model Hub', href: '/marketplace', icon: Store, permission_key: 'config', admin_only: true },
       { label: 'Audit Integritas', href: '/accounting/audit', icon: ShieldCheck, permission_key: 'audit', module_key: 'Audit' },
     ]
   },
@@ -442,12 +441,6 @@ export function AppSidebar({
 
     // 0. DEMO BYPASS: Tampilkan SEMUA modul di mode Demo/Latihan agar klien bisa eksplorasi fitur penuh
     if (isDemo) return true
-
-    // 0b. PILLAR BYPASS: Modul pillar (Finance, Marketing, HRIS) selalu muncul di sidebar
-    //     Sidebar items yang punya module_key milik pillar modules auto-visible.
-    if (item.module_key && PILLAR_MODULES.some(p => p.key.toLowerCase() === item.module_key!.toLowerCase())) {
-      return true
-    }
 
     // 1. SaaS Module Check
     if (item.module_key && enabledModules.length > 0) {

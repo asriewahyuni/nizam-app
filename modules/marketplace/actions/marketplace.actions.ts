@@ -135,8 +135,26 @@ export async function activateModule(moduleKey: string) {
     p_module_key: moduleKey,
   })
 
-  return { success: true }
+  // ── Ensure use_custom_modules = true ─────────────────────────────────────
+  // Operational modules are stored in org.enabled_modules array.
+  // use_custom_modules must be true for getActiveOrg() to read enabled_modules
+  // instead of relying only on saas_packages plan modules.
+  // This applies to both main and child orgs.
+  if (!orgData.org.settings?.use_custom_modules) {
+    const currentSettings = (orgData.org.settings && typeof orgData.org.settings === 'object')
+      ? orgData.org.settings
+      : {}
+    await supabase
+      .from('organizations')
+      .update({ settings: { ...currentSettings, use_custom_modules: true } })
+      .eq('id', orgData.org.id)
+  }
+
+  revalidatePath('/marketplace')
+
+  return { success: true, redirectUrl: `/marketplace/setup/${encodeURIComponent(moduleKey)}` }
 }
+
 
 /**
  * Install CoA untuk sebuah modul dengan memanggil SQL injection function.
@@ -182,7 +200,7 @@ export async function saveModuleSettings(moduleKey: string, settings: Record<str
 
   if (error) throw new Error(error.message)
 
-  revalidatePath(`/${moduleKey.toLowerCase().replace(/[^a-z]/g, '-')}/onboarding`)
+  // Tidak perlu revalidatePath — client langsung pindah step via state lokal
   return { success: true }
 }
 
@@ -205,8 +223,9 @@ export async function completeModuleOnboarding(moduleKey: string) {
 
   if (error) throw new Error(error.message)
 
-  revalidatePath('/lms')
+  // Revalidate paths to ensure fresh data — revalidate layout so sidebar reflects READY status
   revalidatePath('/marketplace')
+  revalidatePath('/', 'layout')
   return { success: true }
 }
 
@@ -238,8 +257,8 @@ export async function deactivateModule(moduleKey: string) {
   })
 
   revalidatePath('/marketplace')
-  revalidatePath('/dashboard')
-  return { success: true }
+
+  return { success: true, redirectUrl: '/marketplace' }
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────────────

@@ -999,3 +999,200 @@ export async function seedInitialCoA(orgId: string, options?: SeedInitialCoAOpti
 export async function setShariahAccountsActive(orgId: string, active: boolean) {
   return syncShariahAccountsActive(orgId, active)
 }
+
+// ─────────────────────────────────────────────────────────────
+// uploadCoAFromExcel — Upload & Apply CoA from Excel File
+// ─────────────────────────────────────────────────────────────
+export async function uploadCoAFromExcel(
+  orgId: string,
+  fileBuffer: Buffer,
+  fileName: string,
+  mappingToParentCode?: Record<string, string>
+) {
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) {
+    return { success: false, error: 'Organization ID tidak valid' }
+  }
+
+  try {
+    const supabase = await createClient()
+
+    // Validate org exists and check management mode
+    const { data: orgData, error: orgError } = await supabase
+      .from('organizations')
+      .select('id, parent_org_id, coa_management_mode')
+      .eq('id', trimmedOrgId)
+      .single()
+
+    if (orgError || !orgData) {
+      return { success: false, error: 'Organisasi tidak ditemukan' }
+    }
+
+    // Only child org with LOCAL mode or parent org can upload custom CoA
+    if (orgData.parent_org_id && orgData.coa_management_mode === 'INHERITED') {
+      return {
+        success: false,
+        error: 'Organisasi anak dengan mode INHERITED tidak bisa mengupload CoA. Hubungi organisasi induk untuk perubahan CoA.'
+      }
+    }
+
+    // Parse Excel
+    const ExcelJS = (await import('exceljs')).default
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(fileBuffer)
+    const worksheet = workbook.getWorksheet(1)
+
+    if (!worksheet) {
+      return { success: false, error: 'File Excel tidak valid atau kosong' }
+    }
+
+    // Extract headers from first row
+    const headerRow = worksheet.getRow(1)
+    const headers: Record<string, number> = {}
+    const requiredFields = ['code', 'name', 'type', 'normal_balance']
+
+    headerRow.eachCell((cell, colNumber) => {
+      const header = String(cell.value || '').trim().toLowerCase()
+      headers[header] = colNumber
+    })
+
+    // Validate required fields exist
+    for (const field of requiredFields) {
+      if (!(field in headers)) {
+        return {
+          success: false,
+          error: `Kolom "${field}" tidak ditemukan di Excel. Kolom wajib: code, name, type, normal_balance, parent_code (opsional)`
+        }
+      }
+    }
+
+    // Parse accounts from Excel
+    const accounts: Array<{
+      code: string
+      name: string
+      type: AccountType
+      normal_balance: NormalBalance
+      parent_code?: string
+      description?: string
+    }> = []
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return // Skip header
+
+      const code = String(row.getCell(headers.code).value || '').trim()
+      const name = String(row.getCell(headers.name).value || '').trim()
+      const type = String(row.getCell(headers.type).value || '').trim().toUpperCase()
+      const normalBalance = String(row.getCell(headers.normal_balance).value || '').trim().toUpperCase()
+      const parentCode = headers['parent_code'] ? String(row.getCell(headers['parent_code']).value || '').trim() : undefined
+      const description = headers['description'] ? String(row.getCell(headers['description']).value || '').trim() : undefined
+
+      if (!code || !name) return // Skip empty rows
+
+      // Validate type
+      if (!['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'].includes(type)) {
+        return
+      }
+
+      // Validate normal balance
+      if (!['DEBIT', 'CREDIT'].includes(normalBalance)) {
+        return
+      }
+
+      accounts.push({
+        code,
+        name,
+        type: type as AccountType,
+        normal_balance: normalBalance as NormalBalance,
+        parent_code: parentCode,
+        description
+      })
+    })
+
+    if (accounts.length === 0) {
+      return { success: false, error: 'Tidak ada data akun yang valid di file Excel' }
+    }
+
+    // Build parent code to ID mapping
+    const codeToParentId: Record<string, string> = {}
+    const { data: existingAccounts } = await supabase
+      .from('accounts')
+      .select('id, code')
+      .eq('org_id', trimmedOrgId)
+      .order('code', { ascending: true })
+
+    for (const acc of existingAccounts || []) {
+      codeToParentId[String(acc.code).trim()] = acc.id
+    }
+
+    // Insert/update accounts
+    let insertedCount = 0
+    let updatedCount = 0
+    const createdAccounts: Record<string, string> = {} // code -> id mapping for new accounts
+
+    for (const account of accounts) {
+      const parentId = account.parent_code ? codeToParentId[account.parent_code] || null : null
+
+      // Check if account with this code already exists
+      const existing = existingAccounts?.find(a => String(a.code).trim() === account.code)
+
+      if (existing) {
+        // Update existing account
+        const { error: updateError } = await supabase
+          .from('accounts')
+          .update({
+            name: account.name,
+            type: account.type,
+            normal_balance: account.normal_balance,
+            parent_id: parentId,
+            description: account.description || null
+          })
+          .eq('id', existing.id)
+
+        if (!updateError) {
+          updatedCount++
+          codeToParentId[account.code] = existing.id
+        }
+      } else {
+        // Insert new account
+        const { data: insertedData, error: insertError } = await supabase
+          .from('accounts')
+          .insert({
+            org_id: trimmedOrgId,
+            code: account.code,
+            name: account.name,
+            type: account.type,
+            normal_balance: account.normal_balance,
+            parent_id: parentId,
+            description: account.description || null,
+            is_system: false,
+            is_active: true
+          })
+          .select('id')
+          .single()
+
+        if (!insertError && insertedData) {
+          insertedCount++
+          codeToParentId[account.code] = insertedData.id
+          createdAccounts[account.code] = insertedData.id
+        }
+      }
+    }
+
+    revalidatePath('/accounting/coa')
+    revalidatePath('/settings/accounts')
+
+    return {
+      success: true,
+      insertedCount,
+      updatedCount,
+      totalProcessed: accounts.length,
+      message: `Berhasil mengupload CoA: ${insertedCount} akun baru, ${updatedCount} akun diperbarui`
+    }
+  } catch (error: any) {
+    console.error('Error uploading CoA:', error)
+    return {
+      success: false,
+      error: error.message || 'Terjadi kesalahan saat mengupload file CoA'
+    }
+  }
+}

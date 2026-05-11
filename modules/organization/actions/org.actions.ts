@@ -2209,6 +2209,25 @@ const getActiveOrgCached = cache(async () => {
     }
   }
 
+  // Fetch active branch info if branch_id is set
+  let activeBranchId: string | null = null
+  let activeBranchName: string | null = null
+  let activeBranchCode: string | null = null
+  const branchIdFromMember = String(memberData.last_active_branch_id || '').trim() || null
+  if (branchIdFromMember) {
+    const { data: branchData } = await db
+      .from('branches')
+      .select('id, name, code')
+      .eq('id', branchIdFromMember)
+      .maybeSingle()
+
+    if (branchData) {
+      activeBranchId = String(branchData.id || '').trim() || null
+      activeBranchName = String(branchData.name || '').trim() || null
+      activeBranchCode = String(branchData.code || '').trim() || null
+    }
+  }
+
   return {
     org,
     role: memberData.role as string,
@@ -2219,6 +2238,9 @@ const getActiveOrgCached = cache(async () => {
     user,
     isSubscriptionExpired,
     subscriptionEnd,
+    activeBranchId,
+    activeBranchName,
+    activeBranchCode,
   }
 })
 
