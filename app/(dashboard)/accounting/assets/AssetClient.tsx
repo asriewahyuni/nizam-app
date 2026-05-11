@@ -940,70 +940,58 @@ export function AssetClient({
 
 // ── LABEL PRINT MODAL ─────────────────────────────────────────────────────────
 function LabelPrintModal({ asset, onClose }: { asset: any; onClose: () => void }) {
-  const labelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    // Inject print CSS ke head (reliable, gak kena scoping React)
-    const styleEl = document.createElement('style')
-    styleEl.id = 'nz-label-print-css'
-    styleEl.textContent = `
-@media print {
-  body { margin: 0 !important; padding: 0 !important; }
-  body * { visibility: hidden !important; }
-  .nz-label-overlay {
-    visibility: visible !important;
-    background: transparent !important;
-    backdrop-filter: none !important;
-    justify-content: flex-start !important;
-    align-items: flex-start !important;
-    padding: 0 !important;
-  }
-  .nz-label-overlay > div {
-    visibility: visible !important;
-    box-shadow: none !important;
-    border: none !important;
-    border-radius: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    max-width: none !important;
-    width: auto !important;
-  }
-  #printable-label, #printable-label * { visibility: visible !important; }
-  #printable-label {
-    padding: 4mm !important;
-    margin: 0 !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    gap: 2mm !important;
-    width: fit-content !important;
-  }
-  #printable-label h4 { font-size: 10pt !important; margin: 0 !important; }
-  #printable-label div { padding: 1mm !important; gap: 1mm !important; }
-  #printable-label p { font-size: 8pt !important; }
-  .nz-print-hide { display: none !important; }
-  @page { margin: 0; }
-}
-`
-    document.head.appendChild(styleEl)
-    return () => {
-      const existing = document.getElementById('nz-label-print-css')
-      if (existing) existing.remove()
-    }
-  }, [])
+  const printContentRef = useRef<HTMLDivElement>(null)
 
   function handlePrint() {
-    window.print()
+    // Ambil HTML label yang sudah dirender (dengan barcode SVG + QR canvas)
+    const sourceDiv = printContentRef.current
+    if (!sourceDiv) return
+
+    // Clone node biar gak merusak yang asli
+    const clone = sourceDiv.cloneNode(true) as HTMLElement
+
+    // Convert QR canvas ke image data biar kebawa ke window baru
+    const canvases = sourceDiv.querySelectorAll('canvas')
+    const cloneCanvases = clone.querySelectorAll('canvas')
+    canvases.forEach((canvas, i) => {
+      if (cloneCanvases[i]) {
+        const img = document.createElement('img')
+        img.src = canvas.toDataURL('image/png')
+        img.style.width = canvas.style.width || '48px'
+        img.style.height = canvas.style.height || '48px'
+        cloneCanvases[i].replaceWith(img)
+      }
+    })
+
+    const labelHtml = clone.innerHTML
+
+    const printWin = window.open('', '_blank', 'width=400,height=300,scrollbars=no')
+    if (!printWin) { window.print(); return }
+
+    printWin.document.write(`
+      <html><head><style>
+        @page { margin: 0; }
+        html,body { margin:0; padding:0; width:100%; height:auto; }
+        body { display:flex; padding:4mm; }
+        .label-wrap { display:flex; flex-direction:column; align-items:center; gap:2mm; }
+        .label-wrap h4 { font-size:10pt; margin:0; text-align:center; max-width:200px; overflow:hidden; }
+        .label-wrap p { font-size:8pt; margin:0; font-family:monospace; font-weight:bold; color:#2563eb; }
+      </style></head><body>
+        <div class="label-wrap">${labelHtml}</div>
+        <script>window.onload=function(){window.print();window.close()};<\/script>
+      </body></html>
+    `)
+    printWin.document.close()
   }
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-300 nz-label-overlay">
-       <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-8 animate-in zoom-in-95 nz-label-card">
-          <div className="flex items-center justify-between nz-print-hide">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-300">
+       <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-8 animate-in zoom-in-95">
+          <div className="flex items-center justify-between">
              <h2 className="text-xl font-black text-slate-900 flex items-center gap-2"> <Printer className="text-blue-600" /> Label Aset </h2>
              <button onClick={onClose} className="text-slate-400 hover:text-slate-900"> <X size={24} /> </button>
           </div>
-          <div ref={labelRef} id="printable-label" className="bg-white p-6 flex flex-col items-center gap-4 text-center">
+          <div ref={printContentRef} className="bg-white p-6 flex flex-col items-center gap-4 text-center border-2 border-slate-100 rounded-3xl">
              <h4 className="text-sm font-black text-slate-900 truncate w-full">{asset.name}</h4>
              <div className="p-2 bg-slate-50 rounded-2xl flex flex-col items-center gap-3">
                 <Barcode value={asset.code} width={1.2} height={40} fontSize={10} background="transparent" />
@@ -1011,7 +999,7 @@ function LabelPrintModal({ asset, onClose }: { asset: any; onClose: () => void }
              </div>
              <p className="text-[10px] font-mono font-bold text-blue-600">{asset.code}</p>
           </div>
-          <div className="flex gap-4 nz-print-hide">
+          <div className="flex gap-4">
              <button onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl" > Tutup </button>
              <button onClick={handlePrint} className="flex-1 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-2" > <Printer size={18} /> Cetak </button>
           </div>
