@@ -5,10 +5,10 @@
  */
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, createContext, useContext } from 'react'
 import Link, { type LinkProps } from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, CheckCircle2, AlertTriangle, X } from 'lucide-react'
+import { Loader2, CheckCircle2, AlertTriangle, AlertCircle, X } from 'lucide-react'
 
 // ============================================================
 // 1. SAFE ACTION BUTTON
@@ -374,4 +374,282 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, conf
       </motion.div>
     </div>
   )
+}
+
+// ============================================================
+// 10. LOADING SKELETON
+// Skeleton components untuk loading state di semua halaman.
+// ============================================================
+interface SkeletonProps {
+  className?: string
+  width?: string | number
+  height?: string | number
+  rounded?: string
+}
+
+export function Skeleton({ className = '', width, height, rounded = 'rounded-xl' }: SkeletonProps) {
+  return (
+    <div
+      className={`animate-pulse bg-slate-100 ${rounded} ${className}`}
+      style={{ width, height }}
+    />
+  )
+}
+
+export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
+  return (
+    <div className="card space-y-4">
+      {/* Header */}
+      <div className="flex gap-4">
+        {Array.from({ length: cols }).map((_, i) => (
+          <Skeleton key={i} className="h-4 flex-1" rounded="rounded-md" />
+        ))}
+      </div>
+      {/* Rows */}
+      {Array.from({ length: rows }).map((_, r) => (
+        <div key={r} className="flex gap-4 pt-3 border-t border-slate-100">
+          {Array.from({ length: cols }).map((_, c) => (
+            <Skeleton key={c} className="h-3 flex-1" rounded="rounded-md" />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function FormSkeleton({ fields = 3 }: { fields?: number }) {
+  return (
+    <div className="card space-y-5">
+      {Array.from({ length: fields }).map((_, i) => (
+        <div key={i} className="space-y-2">
+          <Skeleton className="h-3 w-24" rounded="rounded-md" />
+          <Skeleton className="h-[42px] w-full" rounded="rounded-xl" />
+        </div>
+      ))}
+      <Skeleton className="h-10 w-32 mt-4" rounded="rounded-xl" />
+    </div>
+  )
+}
+
+export function CardSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="card space-y-3">
+          <Skeleton className="h-3 w-20" rounded="rounded-md" />
+          <Skeleton className="h-8 w-32" rounded="rounded-lg" />
+          <Skeleton className="h-3 w-16" rounded="rounded-md" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ============================================================
+// 11. FORM COMPONENTS
+// Input, Select, Textarea dengan label + error state konsisten.
+// ============================================================
+interface FormFieldProps {
+  label: string
+  error?: string
+  hint?: string
+  required?: boolean
+  children: React.ReactNode
+  className?: string
+}
+
+export function FormField({ label, error, hint, required, children, className = '' }: FormFieldProps) {
+  return (
+    <div className={`space-y-1.5 ${className}`}>
+      <label className="block text-sm font-semibold text-slate-700">
+        {label}
+        {required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      {children}
+      {hint && !error && <p className="text-xs text-slate-400">{hint}</p>}
+      {error && <p className="text-xs font-medium text-red-600 flex items-center gap-1"><AlertCircle size={12} />{error}</p>}
+    </div>
+  )
+}
+
+interface FormInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label: string
+  error?: string
+  hint?: string
+}
+
+export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
+  ({ label, error, hint, required, className = '', id, ...props }, ref) => {
+    const inputId = id || `input-${label.toLowerCase().replace(/\s+/g, '-')}`
+    return (
+      <FormField label={label} error={error} hint={hint} required={required}>
+        <input
+          ref={ref}
+          id={inputId}
+          className={`input ${error ? 'input-error' : ''} ${className}`}
+          {...props}
+        />
+      </FormField>
+    )
+  }
+)
+FormInput.displayName = 'FormInput'
+
+interface FormSelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  label: string
+  error?: string
+  hint?: string
+  options: Array<{ value: string; label: string }>
+  placeholder?: string
+}
+
+export const FormSelect = React.forwardRef<HTMLSelectElement, FormSelectProps>(
+  ({ label, error, hint, required, options, placeholder, className = '', id, ...props }, ref) => {
+    const selectId = id || `select-${label.toLowerCase().replace(/\s+/g, '-')}`
+    return (
+      <FormField label={label} error={error} hint={hint} required={required}>
+        <select
+          ref={ref}
+          id={selectId}
+          className={`input appearance-none bg-no-repeat ${error ? 'input-error' : ''} ${className}`}
+          style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%236b7280'%3e%3cpath d='M8 11L3 6h10l-5 5z'/%3e%3c/svg%3e")`, backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+          {...props}
+        >
+          {placeholder && <option value="" className="text-slate-400">{placeholder}</option>}
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </FormField>
+    )
+  }
+)
+FormSelect.displayName = 'FormSelect'
+
+interface FormTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label: string
+  error?: string
+  hint?: string
+}
+
+export const FormTextarea = React.forwardRef<HTMLTextAreaElement, FormTextareaProps>(
+  ({ label, error, hint, required, className = '', id, ...props }, ref) => {
+    const textareaId = id || `textarea-${label.toLowerCase().replace(/\s+/g, '-')}`
+    return (
+      <FormField label={label} error={error} hint={hint} required={required}>
+        <textarea
+          ref={ref}
+          id={textareaId}
+          className={`input min-h-[100px] py-3 resize-y ${error ? 'input-error' : ''} ${className}`}
+          {...props}
+        />
+      </FormField>
+    )
+  }
+)
+FormTextarea.displayName = 'FormTextarea'
+
+// ============================================================
+// 12. PAGE SHELL
+// Universal wrapper untuk konsistensi layout tiap halaman.
+// ============================================================
+interface PageShellProps {
+  title: string
+  subtitle?: string
+  children: React.ReactNode
+  actions?: React.ReactNode
+  className?: string
+  isLoading?: boolean
+  skeleton?: React.ReactNode
+}
+
+export function PageShell({ title, subtitle, children, actions, className = '', isLoading, skeleton }: PageShellProps) {
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="section-header">
+          <div>
+            <Skeleton className="h-7 w-48" rounded="rounded-lg" />
+            {subtitle && <Skeleton className="h-4 w-32 mt-2" rounded="rounded-md" />}
+          </div>
+        </div>
+        {skeleton || <CardSkeleton />}
+      </div>
+    )
+  }
+
+  return (
+    <div className={`space-y-6 ${className}`}>
+      <div className="section-header">
+        <div>
+          <h1 className="section-title">{title}</h1>
+          {subtitle && <p className="section-subtitle">{subtitle}</p>}
+        </div>
+        {actions && <div className="flex items-center gap-3">{actions}</div>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+// ============================================================
+// 13. ERROR BOUNDARY
+// Global error boundary untuk setiap route segment.
+// ============================================================
+interface ErrorBoundaryProps {
+  children: React.ReactNode
+  fallback?: React.ReactNode
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean
+  error: Error | null
+}
+
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('ErrorBoundary caught:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      if (this.props.fallback) return this.props.fallback
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[400px] p-8 text-center">
+          <div className="w-20 h-20 rounded-[32px] bg-rose-50 flex items-center justify-center mx-auto shadow-inner mb-6">
+            <AlertTriangle size={40} className="text-rose-600" />
+          </div>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tighter mb-2">Terjadi Kesalahan</h2>
+          <p className="text-sm text-slate-400 font-medium max-w-md mb-6">
+            Ada yang tidak beres. Tim teknis sudah mendapat notifikasi. Coba refresh halaman.
+          </p>
+          <SafeButton
+            onClick={() => {
+              this.setState({ hasError: false, error: null })
+              window.location.reload()
+            }}
+            variant="primary"
+          >
+            Refresh Halaman
+          </SafeButton>
+          {process.env.NODE_ENV === 'development' && this.state.error && (
+            <pre className="mt-6 p-4 bg-slate-100 rounded-2xl text-xs text-left max-w-lg overflow-auto text-slate-600">
+              {this.state.error.message}
+              {this.state.error.stack}
+            </pre>
+          )}
+        </div>
+      )
+    }
+    return this.props.children
+  }
 }
