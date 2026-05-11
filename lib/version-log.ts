@@ -49,6 +49,16 @@ export const VERSION_LOG: VersionLogEntry[] = [
   // ║  CURRENT VERSION — N2.6.3.x                                       ║
   // ║  Core=2 (Syirkah pillar baru), BusinessType=6, Addon=3            ║
   // ╚════════════════════════════════════════════════════════════════════╝
+  // ── PATCH: Financial Ratios Dashboard ──────────────────────────────
+  {
+    date: '2026-05-11',
+    type: 'patch',
+    label: 'Feat: Financial Ratios Dashboard — 11 rasio akuntansi',
+    description: 'Halaman /accounting/ratios dengan 11 rasio standar: Likuiditas (Current Ratio, Quick, Cash), ' +
+      'Solvabilitas (DER, DAR, Equity Ratio), Profitabilitas (GPM, NPM, ROA, ROE), Efisiensi (OER). ' +
+      'Fitur: health score, category tabs, bar chart, gauge bars, auto-interpretation.',
+    by: 'Z',
+  },
   // ── PATCH: PPN Tax Engine ──────────────────────────────────────────
   {
     date: '2026-05-11',
