@@ -241,30 +241,15 @@ export function DashboardClient({ data }: DashboardClientProps) {
          variants={container}
          initial={false}
          animate="show"
-         className="space-y-12 pb-20"
+         className="space-y-10 pb-20"
       >
          {/* Header Section */}
-         <motion.div variants={item} className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2 border-b border-slate-100">
-            <div className="space-y-1">
-               <h1 className="text-4xl font-black text-slate-900 tracking-tighter flex items-center gap-4">
-                  <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-100 text-white">
-                     <BarChart3 size={28} />
-                  </div>
-                  Overview
-               </h1>
-               <div className="flex items-center gap-3 pl-1">
-                  <p className="text-sm text-slate-400 font-medium tracking-tight">Real-time business intelligence for <span className="text-slate-900 font-bold">{data.orgName}</span></p>
-                  <div className="h-1 w-1 bg-slate-300 rounded-full" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-1.5 bg-amber-50 px-3 py-1 rounded-full border border-amber-100 italic">
-                     <Star size={10} className="fill-amber-500" /> Pareto Mode
-                  </p>
-               </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-               <button className="bg-white border border-slate-200 p-3 rounded-2xl text-slate-400 hover:text-slate-900 transition-all shadow-sm">
-                  <Search size={20} />
-               </button>
+         <motion.div variants={item} className="flex items-start justify-between gap-4">
+            <div>
+               <h1 className="text-2xl font-semibold text-[#0a0c10] tracking-tight">Overview</h1>
+               <p className="text-sm text-[#6b7280] mt-0.5">
+                  {data.orgName}
+               </p>
             </div>
          </motion.div>
 
@@ -292,26 +277,27 @@ export function DashboardClient({ data }: DashboardClientProps) {
             })}
          </div>
 
-         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Revenue Trend Chart - Clean & Pro */}
-            <motion.div variants={item} className="lg:col-span-2 space-y-5">
-               <div className="flex items-center justify-between px-2">
+         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Revenue Trend Chart */}
+
+            <motion.div variants={item} className="lg:col-span-2 space-y-4">
+               <div className="flex items-center justify-between">
                   <div>
-                     <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest">Financial Performance</h2>
-                     <p className="text-[10px] font-bold text-slate-400 italic">Moving average revenue vs net profit</p>
+                     <h2 className="text-sm font-semibold text-[#0a0c10]">Financial Performance</h2>
+                     <p className="text-xs text-[#6b7280] mt-px">Moving average revenue vs net profit</p>
                   </div>
-                  <div className="flex items-center gap-4 bg-slate-50 p-2 px-4 rounded-xl border border-slate-100">
-                     <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-200" />
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">Revenue</span>
+                  <div className="flex items-center gap-3 bg-[#f9fafb] px-3 py-1.5 rounded-lg border border-[#e5e7eb]">
+                     <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-[10px] font-medium text-[#4b5563]">Revenue</span>
                      </div>
-                     <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-200" />
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">Profit</span>
+                     <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                        <span className="text-[10px] font-medium text-[#4b5563]">Profit</span>
                      </div>
                   </div>
                </div>
-               <div className="bg-white rounded-[40px] p-10 border border-slate-100 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.04)] h-[380px] group transition-all">
+               <div className="bg-white rounded-2xl p-6 border border-[#e5e7eb] h-[360px] transition-shadow hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)]">
                   <SafeResponsiveContainer>
                      <AreaChart data={data.analytics} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                         <defs>
@@ -348,8 +334,8 @@ export function DashboardClient({ data }: DashboardClientProps) {
             </motion.div>
 
             {/* Pareto High Impact Card - Dark Mode Aesthetic */}
-            <motion.div variants={item} className="lg:col-span-1 space-y-5">
-               <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-2">Market Impact</h2>
+            <motion.div variants={item} className="lg:col-span-1 space-y-4">
+               <h2 className="text-sm font-semibold text-[#0a0c10]">Market Impact</h2>
                <Link href="/reports/pareto" className="block h-full group relative z-10">
                   <div className="bg-slate-900 rounded-[48px] p-10 text-white relative overflow-hidden shadow-[0_30px_60px_-15px_rgba(15,23,42,0.3)] h-full min-h-[380px] hover:ring-2 hover:ring-emerald-500/50 transition-all group-hover:shadow-emerald-900/40">
                      <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12 group-hover:rotate-0 transition-transform duration-700 pointer-events-none">
@@ -358,11 +344,11 @@ export function DashboardClient({ data }: DashboardClientProps) {
                      <div className="relative z-10 flex flex-col justify-between h-full pointer-events-none">
                         <div className="space-y-6 pointer-events-auto">
                            <div>
-                              <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full text-[9px] font-black uppercase tracking-widest border border-amber-500/20 mb-4">
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg text-[10px] font-medium border border-amber-200/60 mb-4">
                                  <Target size={12} /> Pareto Focus
                               </div>
-                              <p className="text-2xl font-black leading-tight italic tracking-tighter">
-                                 {pareto.top20Count} Produk penguasa pendapatan.
+                              <p className="text-xl font-semibold leading-tight tracking-tight text-white">
+                                 {pareto.top20Count} produk penguasa pendapatan.
                               </p>
                               <p className="text-[11px] font-medium text-slate-400 mt-2 leading-relaxed">
                                  Strategi 80/20 otomatis mendeteksi item pelarisan untuk optimasi stok.
@@ -408,7 +394,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
 
             {/* Customer Pareto High Impact Card */}
             <motion.div variants={item} className="lg:col-span-1 space-y-5">
-               <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-2">Top Customers (80/20)</h2>
+               <h2 className="text-sm font-semibold text-[#0a0c10]">Top Customers</h2>
                <Link href="/contacts" className="block h-full group relative z-10">
                   <div className="bg-indigo-900 rounded-[48px] p-10 text-white relative overflow-hidden shadow-[0_30px_60px_-15px_rgba(49,46,129,0.3)] h-full min-h-[380px] hover:ring-2 hover:ring-indigo-400/50 transition-all group-hover:shadow-indigo-900/50">
                      <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12 group-hover:rotate-0 transition-transform duration-700 pointer-events-none">
@@ -417,11 +403,11 @@ export function DashboardClient({ data }: DashboardClientProps) {
                      <div className="relative z-10 flex flex-col justify-between h-full pointer-events-none">
                         <div className="space-y-6 pointer-events-auto">
                            <div>
-                              <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full text-[9px] font-black uppercase tracking-widest border border-amber-500/20 mb-4">
-                                 <Target size={12} /> VIP Whales
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg text-[10px] font-medium border border-amber-200/60 mb-4">
+                                 <Star size={12} /> VIP
                               </div>
-                              <p className="text-2xl font-black leading-tight italic tracking-tighter">
-                                 {paretoCust.top20Count} Klien sumbang 80% omset.
+                              <p className="text-xl font-semibold leading-tight tracking-tight text-white">
+                                 {paretoCust.top20Count} klien sumbang 80% omset.
                               </p>
                               <p className="text-[11px] font-medium text-indigo-200 mt-2 leading-relaxed">
                                  Prioritaskan layanan ekstra untuk daftar pelanggan emas ini.
@@ -471,7 +457,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
             {/* Top Products - More like a list of achievements */}
             <motion.div variants={item} className="xl:col-span-1 space-y-5">
-               <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-2">Star Products</h2>
+               <h2 className="text-sm font-semibold text-[#0a0c10]">Star Products</h2>
                <div className="bg-white rounded-[40px] p-8 border border-slate-100 shadow-sm space-y-6">
                   {topProducts.length === 0 ? (
                      <div className="py-24 text-center opacity-30 font-black text-xs uppercase italic border-2 border-dashed border-slate-100 rounded-3xl">No performance data</div>
@@ -503,7 +489,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
 
             {/* Expense Progress - With more visual weight */}
             <motion.div variants={item} className="xl:col-span-1 space-y-5">
-               <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-2">Cost Centers</h2>
+               <h2 className="text-sm font-semibold text-[#0a0c10]">Cost Centers</h2>
                <div className="bg-white rounded-[40px] p-8 border border-slate-100 shadow-sm space-y-6 flex flex-col justify-between h-full min-h-[460px]">
                   <div className="space-y-7">
                      {data.topExpenses.length === 0 ? (
