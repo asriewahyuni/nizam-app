@@ -475,6 +475,8 @@ export default function SalesClient({
     setDpPercent('0')
     setDpAmount('0')
     setDpAccountId('')
+    setCurrencyCode('IDR')
+    setExchangeRate(null)
     setError(null)
   }
 
