@@ -49,6 +49,16 @@ export const VERSION_LOG: VersionLogEntry[] = [
   // ║  CURRENT VERSION — N2.6.3.x                                       ║
   // ║  Core=2 (Syirkah pillar baru), BusinessType=6, Addon=3            ║
   // ╚════════════════════════════════════════════════════════════════════╝
+  // ── PATCH: Multi-Currency Integration ─────────────────────────────
+  {
+    date: '2026-05-11',
+    type: 'patch',
+    label: 'Integrasi Multi Mata Uang ke Sales — CurrencyPicker + badge',
+    description: 'CurrencyPicker component (dropdown dengan live rate lookup) ' +
+      'terintegrasi ke form Create Sale. Sales list nampilin currency badge ' +
+      'untuk transaksi valas. createSaleEntry terima currency_code & exchange_rate.',
+    by: 'Z',
+  },
   // ── PATCH: Multi-Currency Engine ──────────────────────────────────
   {
     date: '2026-05-11',
