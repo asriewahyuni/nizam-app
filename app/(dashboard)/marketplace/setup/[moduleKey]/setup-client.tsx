@@ -193,7 +193,7 @@ export function SetupClient({
                     animate={{
                       scale: status === 'active' ? 1.1 : 1,
                     }}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black transition-all duration-300 ${
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
                       status === 'done'
                         ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
                         : status === 'active'
@@ -211,7 +211,7 @@ export function SetupClient({
                       idx + 1
                     )}
                   </motion.div>
-                  <p className={`text-[10px] font-black mt-2 text-center leading-tight max-w-[80px] ${
+                  <p className={`text-[10px] font-bold mt-2 text-center leading-tight max-w-[80px] ${
                     status === 'done' ? 'text-emerald-600' : status === 'active' ? 'text-blue-600' : 'text-slate-300'
                   }`}>
                     {step.title}
@@ -271,7 +271,7 @@ export function SetupClient({
                 </div>
 
                 <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100 space-y-2">
-                  <p className="text-xs font-black text-blue-800">Yang akan dipasang:</p>
+                  <p className="text-xs font-semibold text-blue-800">Yang akan dipasang:</p>
                   {mod.onboardingSteps.find((s) => s.id === 'coa') ? (
                     <p className="text-xs text-blue-600">
                       {mod.onboardingSteps.find((s) => s.id === 'coa')!.description}

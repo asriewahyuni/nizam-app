@@ -154,7 +154,7 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
                   {moduleIcon || '📦'}
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-900">{moduleName || 'Modul'}</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">{moduleName || 'Modul'}</h3>
                   <p className="text-[10px] font-semibold text-slate-400">Konfirmasi Aktivasi</p>
                 </div>
               </div>
@@ -173,7 +173,7 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
                 )}
                 <div className="border-t border-slate-200 pt-2 flex justify-between text-sm">
                   <span className="font-bold text-slate-700">Total</span>
-                  <span className="font-black text-slate-900">{formatRp(finalPrice)}</span>
+                  <span className="font-semibold text-slate-900">{formatRp(finalPrice)}</span>
                 </div>
               </div>
 
@@ -194,7 +194,7 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
                   <button
                     onClick={handleApplyVoucher}
                     disabled={!voucher.trim()}
-                    className="rounded-xl bg-purple-600 px-3 py-2 text-[10px] font-black text-white hover:bg-purple-700 transition-all disabled:opacity-40"
+                    className="rounded-xl bg-purple-600 px-3 py-2 text-[10px] font-semibold text-white hover:bg-purple-700 transition-all disabled:opacity-40"
                   >
                     Pakai
                   </button>
@@ -211,7 +211,7 @@ export function ActivateModuleButton({ moduleKey, moduleName, moduleIcon, module
               <button
                 onClick={handleActivate}
                 disabled={isPending}
-                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-xs font-black text-white shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-xs font-semibold text-white shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50"
               >
                 {isPending ? (
                   <><Loader2 className="h-4 w-4 animate-spin" /> Memproses...</>
