@@ -68,7 +68,11 @@ const MODULE_CATEGORIES = [
     modules: [
       { id: 'purchasing', name: 'Pembelian & PO', perms: ['purchasing:read', 'purchasing:write'] },
       { id: 'inventory', name: 'Gudang & Stok', perms: ['inventory:read', 'inventory:write'] },
+      { id: 'warehouse', name: 'Gudang (WMS)', perms: ['warehouse:read', 'warehouse:write'] },
       { id: 'factory', name: 'Manufaktur & BoM', perms: ['factory:read', 'factory:write'] },
+      { id: 'workshop', name: 'Workshop & Service', perms: ['workshop:read', 'workshop:write'] },
+      { id: 'joborder', name: 'Job Order (Jasa)', perms: ['joborder:read', 'joborder:write'] },
+      { id: 'project', name: 'Proyek & Konstruksi', perms: ['project:read', 'project:write'] },
       { id: 'fleet', name: 'Fleet & Rental', perms: ['fleet:read', 'fleet:write'] },
       { id: 'syirkah', name: 'Akad Syirkah', perms: ['syirkah:read', 'syirkah:write'] },
     ]
@@ -79,6 +83,7 @@ const MODULE_CATEGORIES = [
     modules: [
       { id: 'crm', name: 'Pelanggan (CRM)', perms: ['crm:read', 'crm:write'] },
       { id: 'pos', name: 'POS (Kasir)', perms: ['pos:read', 'pos:write'] },
+      { id: 'salespage', name: 'Landing Penjualan', perms: ['salespage:read', 'salespage:write'] },
       { id: 'quotation', name: 'Penawaran Harga', perms: ['quotation:read', 'quotation:write'] },
       { id: 'sales', name: 'Penjualan', perms: ['sales:read', 'sales:write'] },
     ]
@@ -90,7 +95,7 @@ const MODULE_CATEGORIES = [
       { id: 'employees', name: 'Karyawan Dasar', perms: ['employees:read', 'employees:write'] },
       { id: 'payroll', name: 'Payroll & Slip Gaji', perms: ['payroll:read', 'payroll:write'] },
       { id: 'attendance', name: 'Absensi & Cuti', perms: ['attendance:read', 'attendance:write'] },
-      { id: 'learning', name: 'Peningkatan Kompetensi', perms: ['learning:read', 'learning:write'] },
+      { id: 'lms', name: 'LMS / Lembaga Pelatihan', perms: ['lms:read', 'lms:write'] },
     ]
   }
 ]
