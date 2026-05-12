@@ -74,6 +74,7 @@ const MODULE_CATEGORIES = [
       { id: 'joborder', name: 'Job Order (Jasa)', perms: ['joborder:read', 'joborder:write'] },
       { id: 'project', name: 'Proyek & Konstruksi', perms: ['project:read', 'project:write'] },
       { id: 'fleet', name: 'Fleet & Rental', perms: ['fleet:read', 'fleet:write'] },
+      { id: 'lms', name: 'LMS / Lembaga Pelatihan', perms: ['lms:read', 'lms:write'] },
       { id: 'syirkah', name: 'Akad Syirkah', perms: ['syirkah:read', 'syirkah:write'] },
     ]
   },
@@ -95,7 +96,6 @@ const MODULE_CATEGORIES = [
       { id: 'employees', name: 'Karyawan Dasar', perms: ['employees:read', 'employees:write'] },
       { id: 'payroll', name: 'Payroll & Slip Gaji', perms: ['payroll:read', 'payroll:write'] },
       { id: 'attendance', name: 'Absensi & Cuti', perms: ['attendance:read', 'attendance:write'] },
-      { id: 'lms', name: 'LMS / Lembaga Pelatihan', perms: ['lms:read', 'lms:write'] },
     ]
   }
 ]
