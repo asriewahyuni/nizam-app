@@ -81,6 +81,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Finance',
     items: [
+      { label: 'Dashboard Keuangan', href: '/accounting', icon: BarChart3, permission_key: 'fin_dashboard', module_key: 'Finance' },
       { label: 'Akun (CoA)', href: '/settings/accounts', icon: Layers, permission_key: 'coa', module_key: 'Finance' },
       { label: 'Kas & Bank', href: '/cash', icon: Wallet, permission_key: 'bank', module_key: 'Finance' },
       { label: 'Buku Besar', href: '/accounting/journal', icon: BookOpen, permission_key: 'journal', module_key: 'Accounting' },
