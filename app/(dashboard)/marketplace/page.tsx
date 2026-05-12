@@ -11,7 +11,7 @@ import {
   ADDON_MODULES,
   type ModuleDefinition,
 } from '@/modules/marketplace/lib/module-registry'
-import { CheckCircle2, Lock, ArrowRight, Sparkles, ShieldCheck, Zap, Circle } from 'lucide-react'
+import { CheckCircle2, Lock, ArrowRight, Sparkles, ShieldCheck, Zap, Circle, Building2 } from 'lucide-react'
 import { DeactivateModuleButton } from './DeactivateModuleButton'
 import { ActivateModuleButton } from './ActivateModuleButton'
 import { ActivateCoreModuleButton } from './ActivateCoreModuleButton'
@@ -34,13 +34,9 @@ export default async function MarketplacePage() {
   if (!orgData) return redirect('/onboarding')
   if (!['owner', 'admin'].includes(orgData.role)) return redirect('/dashboard')
 
-  // Unit/child org cannot manage modules — mereka inherit dari parent org.
-  // Cek parent_org_id (bukan activeBranchId) karena activeBranchId hanya
-  // branch filter dan bisa aktif di parent org juga.
+  // Unit/child org can browse but cannot manage pillar/business type modules
+  // They inherit those from parent org.
   const isChildOrg = !!(orgData.org as any).parent_org_id
-  if (isChildOrg) {
-    return redirect('/dashboard')
-  }
 
   const [instances, pricing] = await Promise.all([
     getOrgModuleInstances(orgData.org.id),
@@ -65,6 +61,23 @@ export default async function MarketplacePage() {
 
   return (
     <div className="space-y-10">
+
+      {/* ── Child Org Banner ── */}
+      {isChildOrg && (
+        <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+              <Building2 className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Organisasi Anak / Cabang</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Modul inti dan operasional dikelola oleh organisasi induk. Kamu bisa mengaktifkan add-on secara mandiri.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Hero ── */}
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-8 text-white shadow-2xl">
@@ -114,7 +127,7 @@ export default async function MarketplacePage() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {CORE_MODULES.map(mod => {
             const isEnabled = enabledModules.some(m => moduleNameMatches(m, mod.key))
-            return <CoreModuleCard key={mod.key} mod={mod} enabled={isEnabled} />
+            return <CoreModuleCard key={mod.key} mod={mod} enabled={isEnabled} isChildOrg={isChildOrg} />
           })}
         </div>
       </section>
@@ -176,6 +189,7 @@ export default async function MarketplacePage() {
                 price={price}
                 readyAt={readyAt}
                 unmetRequirements={unmetRequirements}
+                isChildOrg={isChildOrg}
               />
             )
           })}
@@ -213,6 +227,7 @@ export default async function MarketplacePage() {
                 price={price}
                 readyAt={readyAt}
                 unmetRequirements={unmetRequirements}
+                isChildOrg={isChildOrg}
               />
             )
           })}
@@ -226,7 +241,7 @@ export default async function MarketplacePage() {
 const MINIMUM_CORE_KEYS = new Set(['Accounting', 'Finance'])
 
 // ── Core Module Card ─────────────────────────────────────────────────────────
-function CoreModuleCard({ mod, enabled }: { mod: ModuleDefinition; enabled: boolean }) {
+function CoreModuleCard({ mod, enabled, isChildOrg = false }: { mod: ModuleDefinition; enabled: boolean; isChildOrg?: boolean }) {
   const isMinimum = MINIMUM_CORE_KEYS.has(mod.key)
   return (
     <div className={`flex items-center gap-4 rounded-2xl border px-5 py-4 transition-all ${
@@ -249,7 +264,11 @@ function CoreModuleCard({ mod, enabled }: { mod: ModuleDefinition; enabled: bool
           <span className="inline-flex items-center gap-1 text-[9px] font-semibold tracking-tight text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-full whitespace-nowrap">
             <CheckCircle2 className="h-2.5 w-2.5" /> Aktif
           </span>
-          {!isMinimum && <DeactivateModuleButton moduleKey={mod.key} moduleName={mod.name} />}
+          {!isMinimum && !isChildOrg && <DeactivateModuleButton moduleKey={mod.key} moduleName={mod.name} />}
+        </div>
+      ) : isChildOrg ? (
+        <div className="flex-shrink-0 inline-flex items-center gap-1 rounded-xl bg-slate-100 border border-slate-200 px-3 py-1.5 text-[10px] font-semibold text-slate-500 whitespace-nowrap">
+          <Building2 className="h-3 w-3" /> Dikelola Induk
         </div>
       ) : (
         <ActivateCoreModuleButton moduleKey={mod.key} />
@@ -265,18 +284,21 @@ function OperationalModuleCard({
   price,
   readyAt,
   unmetRequirements = [],
+  isChildOrg = false,
 }: {
   mod: ModuleDefinition
   state: ModuleState
   price?: number
   readyAt?: string | null
   unmetRequirements?: string[]
+  isChildOrg?: boolean
 }) {
   const isLocked   = state === 'locked'
   const isReady    = state === 'active_ready'
   const isPending  = state === 'active_pending'
   const isInactive = state === 'inactive'
   const isAvailable = !isLocked && !isReady && !isPending && !isInactive
+  const isManagedByParent = isChildOrg && mod.category !== 'addon'
 
   return (
     <div className={`relative flex flex-col rounded-3xl border p-6 transition-all
@@ -367,12 +389,17 @@ function OperationalModuleCard({
       {/* ── CTA ── */}
       <div className="mt-5 flex items-center justify-between gap-2">
         <div className="flex-1">
-          {isLocked && (
+          {isManagedByParent && !isPending && !isReady && (
+            <div className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-500">
+              <Building2 className="h-3.5 w-3.5" /> Dikelola Induk
+            </div>
+          )}
+          {!isManagedByParent && isLocked && (
             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
               <Lock className="h-3.5 w-3.5" /> Tidak tersedia di paket ini
             </div>
           )}
-          {isInactive && (
+          {!isManagedByParent && isInactive && (
             <div className="flex flex-col gap-2">
               {unmetRequirements.length > 0 && (
                 <div className="text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
@@ -389,7 +416,7 @@ function OperationalModuleCard({
               />
             </div>
           )}
-          {isAvailable && (
+          {!isManagedByParent && isAvailable && (
             <div className="flex flex-col gap-2">
               {unmetRequirements.length > 0 && (
                 <div className="text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
@@ -418,8 +445,8 @@ function OperationalModuleCard({
           )}
         </div>
 
-        {/* Deactivate button — only for active/pending */}
-        {(isReady || isPending) && (
+        {/* Deactivate button — only for active/pending, not for managed-by-parent */}
+        {(isReady || isPending) && !isManagedByParent && (
           <DeactivateModuleButton moduleKey={mod.key} moduleName={mod.name} />
         )}
       </div>
