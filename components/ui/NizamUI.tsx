@@ -258,9 +258,9 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-24 gap-6 text-center bg-white rounded-[48px] border-2 border-dashed border-slate-100 shadow-inner">
+    <div className="flex flex-col items-center justify-center py-24 gap-6 text-center bg-white rounded-2xl border-2 border-dashed border-slate-100 shadow-inner">
       {Icon && (
-        <div className="w-20 h-20 rounded-[32px] bg-slate-50 flex items-center justify-center text-slate-300 shadow-inner">
+        <div className="w-20 h-20 rounded-xl bg-slate-50 flex items-center justify-center text-slate-300 shadow-inner">
           <Icon size={40} strokeWidth={1.5} />
         </div>
       )}
@@ -652,29 +652,4 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     }
     return this.props.children
   }
-}
-
-// ── Empty State ──
-interface EmptyStateProps {
-  icon?: React.ReactNode
-  title: string
-  description?: string
-  action?: React.ReactNode
-}
-
-export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-      {icon && (
-        <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4 text-slate-300">
-          {icon}
-        </div>
-      )}
-      <h3 className="text-sm font-semibold text-slate-900 tracking-tight">{title}</h3>
-      {description && (
-        <p className="text-xs text-slate-400 mt-1.5 max-w-sm leading-relaxed">{description}</p>
-      )}
-      {action && <div className="mt-4">{action}</div>}
-    </div>
-  )
 }
