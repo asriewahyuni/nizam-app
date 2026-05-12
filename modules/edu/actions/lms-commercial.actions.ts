@@ -393,7 +393,7 @@ export async function deleteLmsSession(sessionId: string) {
   revalidatePath('/lms/admin')
 }
 
-// ── Internal helpers ──────────────────────────────────────────────────────────
+// ── Lesson CRUD ───────────────────────────────────────────────────────────────
 
 export async function getLmsLessonsByCourseId(orgId: string, courseId: string) {
   const supabase = await createClient()
@@ -407,3 +407,85 @@ export async function getLmsLessonsByCourseId(orgId: string, courseId: string) {
   if (error) return []
   return data
 }
+
+export async function createLmsLesson(formData: FormData) {
+  const orgData = await assertOrgAdmin()
+
+  const courseId = formData.get('courseId') as string
+  const title = formData.get('title') as string
+  const contentMd = formData.get('contentMd') as string
+  const lessonType = (formData.get('lessonType') as string) || 'TEXT'
+  const sortOrder = parseInt(formData.get('sortOrder') as string) || 0
+  const isRequired = formData.get('isRequired') !== 'false'
+
+  if (!courseId || !title) throw new Error('Course ID dan judul wajib diisi')
+
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now()
+
+  const supabase = await createClient()
+  const { error } = await supabase.from('learning_lessons').insert({
+    org_id: orgData.org.id,
+    course_id: courseId,
+    slug,
+    title,
+    content_md: contentMd || null,
+    lesson_type: lessonType,
+    sort_order: sortOrder,
+    is_required: isRequired,
+  })
+
+  if (error) throw new Error(getErrorMessage(error))
+
+  revalidatePath(`/lms/course/${formData.get('courseSlug') || ''}`)
+  revalidatePath('/lms/admin')
+}
+
+export async function updateLmsLesson(formData: FormData) {
+  const orgData = await assertOrgAdmin()
+
+  const lessonId = formData.get('lessonId') as string
+  const title = formData.get('title') as string
+  const contentMd = formData.get('contentMd') as string
+  const lessonType = (formData.get('lessonType') as string) || 'TEXT'
+  const sortOrder = parseInt(formData.get('sortOrder') as string) || 0
+  const isRequired = formData.get('isRequired') !== 'false'
+
+  if (!lessonId || !title) throw new Error('ID dan judul wajib diisi')
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('learning_lessons')
+    .update({
+      title,
+      content_md: contentMd || null,
+      lesson_type: lessonType,
+      sort_order: sortOrder,
+      is_required: isRequired,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', lessonId)
+    .eq('org_id', orgData.org.id)
+
+  if (error) throw new Error(getErrorMessage(error))
+
+  revalidatePath(`/lms/course/${formData.get('courseSlug') || ''}`)
+  revalidatePath('/lms/admin')
+}
+
+export async function deleteLmsLesson(lessonId: string) {
+  const orgData = await assertOrgAdmin()
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('learning_lessons')
+    .delete()
+    .eq('id', lessonId)
+    .eq('org_id', orgData.org.id)
+
+  if (error) throw new Error(getErrorMessage(error))
+
+  revalidatePath('/lms/admin')
+  revalidatePath('/lms', 'layout')
+}
+
+// ── Internal helpers ──────────────────────────────────────────────────────────

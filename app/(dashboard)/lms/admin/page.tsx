@@ -24,6 +24,7 @@ import {
 } from '@/modules/edu/lib/training-center-mvp'
 import SessionQRClient from './SessionQRClient'
 import BatchStructureBuilder from './BatchStructureBuilder'
+import { CourseActions, BatchActions, SessionActions } from './AdminCRUDActions'
 
 function StatCard({
   label,
@@ -323,6 +324,7 @@ export default async function LearningAdminPage() {
                     <span>Kuota: <span className="text-slate-900">{b.quota === 0 ? 'Unlimited' : b.quota}</span></span>
                     <span>Mulai: <span className="text-slate-900">{b.start_date ? String(b.start_date) : '-'}</span></span>
                   </div>
+                  <BatchActions batch={b} />
                 </div>
               ))
             )}
@@ -416,6 +418,7 @@ export default async function LearningAdminPage() {
                     <span>Mulai: <span className="text-slate-900">{new Date(s.start_time).toLocaleString('id-ID')}</span></span>
                     <SessionQRClient sessionId={s.id} sessionTitle={s.title} />
                   </div>
+                  <SessionActions session={s} />
                 </div>
               ))
             )}
@@ -502,6 +505,7 @@ export default async function LearningAdminPage() {
                     <div className="mt-4 flex flex-wrap gap-3 text-xs font-bold text-slate-400 tracking-tight">
                       <span>{lessons.length} lesson</span>
                     </div>
+                    <CourseActions course={course} />
                   </div>
 
                   <div className="flex flex-wrap gap-3">

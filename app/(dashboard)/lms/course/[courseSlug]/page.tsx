@@ -16,6 +16,7 @@ import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getLmsCourseBySlug, getLmsLessonsByCourseId } from '@/modules/edu/actions/lms-commercial.actions'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { getLearningAccessContext } from '@/modules/edu/lib/learning-access.server'
+import { KelolaMateri } from '../../KelolaMateri'
 
 export default async function LearningCoursePage(props: { params: Promise<{ courseSlug: string }> }) {
   noStore()
@@ -39,6 +40,7 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
     permissions: orgData.permissions,
     email: orgData.user?.email,
   })
+  const canManage = learningAccess.canManage
   const canManageAssessment = learningAccess.canReviewAssessments
   const canAccessParticipantAssessment = hasRolePermission(orgData.role, orgData.permissions, 'learning') || canManageAssessment
 
@@ -221,6 +223,13 @@ export default async function LearningCoursePage(props: { params: Promise<{ cour
           ))}
         </div>
       </section>
+
+      {/* ── Lesson Management (Admin only) ── */}
+      {canManage && (
+        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <KelolaMateri courseSlug={course.slug} courseId={course.id} lessons={lessons} />
+        </section>
+      )}
     </div>
   )
 }
