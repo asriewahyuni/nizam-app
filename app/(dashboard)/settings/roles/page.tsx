@@ -7,6 +7,7 @@ import { SafeButton, ConfirmDialog } from '@/components/ui/NizamUI'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
 import {
   deleteOrganizationRole,
+  getActiveOrgEnabledModules,
   getRolesForOrganization,
   reorderOrganizationRoles,
   saveOrganizationRole,
@@ -113,8 +114,21 @@ export default function RolesManagementPage() {
   const [newRoleDepts, setNewRoleDepts] = useState<string[]>([])
   const [newRoleParent, setNewRoleParent] = useState<string | null>(null)
   const [editingInfo, setEditingInfo] = useState<any>(null)
+  const [enabledModules, setEnabledModules] = useState<string[]>([])
 
   const [confirmDelete, setConfirmDelete] = useState<{ open: boolean, id: string, name: string }>({ open: false, id: '', name: '' })
+
+  /** Modul yang kelihatan di roles cumanya kalau udah aktif (business type & add-on) */
+  const GATED_MODULE_MAP: Record<string, string> = {
+    factory: 'Manufacturing',
+    workshop: 'Workshop',
+    joborder: 'Job Order',
+    project: 'Project & Construction',
+    fleet: 'Fleet & Rental',
+    lms: 'LMS',
+    pos: 'POS',
+    salespage: 'Sales Page',
+  }
 
   const loadData = async (shouldSelectFirst = false) => {
     setLoading(true)
@@ -140,6 +154,10 @@ export default function RolesManagementPage() {
           setActiveRoleId(normalizedRoles[0]?.id || null)
         }
       }
+
+      // Ambil modul yang aktif biar permission checkbox disesuaikan
+      const { modules } = await getActiveOrgEnabledModules()
+      setEnabledModules(modules || [])
     } catch (e: any) {
       setErrorMsg('Terjadi kesalahan fatal: ' + (e.message || 'Unknown Error'))
     }
@@ -170,12 +188,29 @@ export default function RolesManagementPage() {
   const activeRoleDepartmentIds = useMemo(() => normalizeDepartmentIds(activeRole?.department_ids), [activeRole])
   const activeRolePermissions = useMemo(() => normalizePermissions(activeRole?.permissions), [activeRole])
 
-  // FILTERED MODULES
+  // FILTERED MODULES — cuma nampilin modul yang udah aktif di org
   const activeCategories = useMemo(() => {
     if (!activeRole) return []
     if (activeRoleDepartmentIds.length === 0) return []
-    return MODULE_CATEGORIES.filter(cat => activeRoleDepartmentIds.includes(cat.val))
-  }, [activeRole, activeRoleDepartmentIds])
+
+    const normalizedEnabled = new Set(
+      enabledModules.map((e: string) => e.toLowerCase().replace(/\s+/g, ''))
+    )
+
+    return MODULE_CATEGORIES
+      .filter(cat => activeRoleDepartmentIds.includes(cat.val))
+      .map(cat => ({
+        ...cat,
+        modules: cat.modules.filter((mod: { id: string; name: string; perms: string[] }) => {
+          const registryKey = GATED_MODULE_MAP[mod.id]
+          // Not gated → pillar sub-module, always visible
+          if (!registryKey) return true
+          // Gated → only show if its module key is in enabledModules
+          return normalizedEnabled.has(registryKey.toLowerCase().replace(/\s+/g, ''))
+        })
+      }))
+      .filter(cat => cat.modules.length > 0) // sembunyiin kategori yang semua modulnya nonaktif
+  }, [activeRole, activeRoleDepartmentIds, enabledModules])
 
   const togglePermission = async (perm: string) => {
     if (!activeRole || !activeRoleId || !org?.org_id) return

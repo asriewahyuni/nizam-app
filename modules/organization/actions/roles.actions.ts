@@ -206,3 +206,10 @@ export async function deleteOrganizationRole(orgId: string, roleId: string) {
   revalidateRolePages()
   return { success: true as const }
 }
+
+export async function getActiveOrgEnabledModules() {
+  const activeOrg = await getActiveOrg()
+  if (!activeOrg) return { modules: [] as string[] }
+
+  return { modules: Array.isArray(activeOrg.enabledModules) ? activeOrg.enabledModules : [] }
+}
