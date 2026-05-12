@@ -3,8 +3,8 @@
 /**
  * app/global-error.tsx
  *
- * Error boundary global App Router.
- * Dipakai agar error render React juga terkirim ke Sentry.
+ * Error boundary global — menangkap error di root layout.
+ * Pesan selalu ramah untuk user non-teknis.
  */
 
 import { useEffect } from 'react'
@@ -30,15 +30,16 @@ export default function GlobalError({
               Sistem Mengalami Gangguan
             </div>
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
-              Halaman gagal dimuat.
+              Lagi ada masalah teknis, nih.
             </h1>
             <p className="mt-4 text-sm leading-6 text-slate-600">
-              Error sudah direkam untuk tim developer. Silakan coba muat ulang halaman ini.
+              Tim udah dapat notifikasi otomatis soal error ini. Sementara itu, kamu bisa coba muat ulang atau
+              kembali ke dashboard.
             </p>
 
             {error.digest ? (
               <p className="mt-5 rounded-2xl bg-slate-100 px-4 py-3 text-xs font-bold text-slate-500">
-                Ref error: {error.digest}
+                Kode error: {error.digest}
               </p>
             ) : null}
 
