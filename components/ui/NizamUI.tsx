@@ -91,7 +91,7 @@ export function SafeButton({
       onClick={handleClick}
       disabled={loading || done || disabled}
       className={`
-        inline-flex items-center justify-center gap-2 font-black transition-all active:scale-95
+        inline-flex items-center justify-center gap-2 font-semibold transition-all active:scale-95
         disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100
         ${variants[variant]} ${sizes[size]} ${className}
       `}
@@ -149,11 +149,11 @@ export function PageHeader({ tag, title, subtitle, actions, icon, iconColor = 't
           )}
           <div className="space-y-0.5">
             {tag && (
-              <div className="flex items-center gap-2 text-indigo-500 font-black tracking-[0.2em] text-[8px] uppercase bg-indigo-50 w-fit px-3 py-1 rounded-full border border-indigo-100 mb-1 italic">
+              <div className="flex items-center gap-2 text-indigo-500 font-semibold tracking-tight text-[10px] bg-indigo-50 w-fit px-3 py-1 rounded-full border border-indigo-100 mb-1">
                 {tag}
               </div>
             )}
-            <h1 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">{title}</h1>
+            <h1 className="text-4xl font-semibold text-slate-900 tracking-tight leading-none">{title}</h1>
           </div>
         </div>
         {subtitle && <p className="text-sm text-slate-400 font-medium tracking-tight pl-1">{subtitle}</p>}
@@ -208,10 +208,10 @@ export function StatCard({ label, value, sub, color = 'slate', icon: Icon, alert
     >
       <div className="flex items-start justify-between mb-4 relative z-10">
         <div className="space-y-1">
-          <p className={`text-[10px] font-black uppercase tracking-[0.2em] opacity-60 ${isOrange ? 'text-white' : 'text-slate-400'}`}>
+          <p className={`text-[10px] font-semibold tracking-tight opacity-60 ${isOrange ? 'text-white' : 'text-slate-400'}`}>
             {label}
           </p>
-          <div className={`text-2xl font-black font-mono tracking-tighter truncate ${isOrange ? 'text-white' : 'text-slate-900'}`}>{value}</div>
+          <div className={`text-2xl font-bold font-mono tracking-tight truncate ${isOrange ? 'text-white' : 'text-slate-900'}`}>{value}</div>
         </div>
         {Icon && (
           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 ${iconColors[color]}`}>
@@ -223,7 +223,7 @@ export function StatCard({ label, value, sub, color = 'slate', icon: Icon, alert
       <div className="relative z-10 space-y-3">
         {sub && <p className={`text-[10px] font-bold italic opacity-60 ${isOrange ? 'text-white' : 'text-slate-400'}`}>{sub}</p>}
         {trend && (
-           <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black font-mono border
+           <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold font-mono border
              ${trend.positive ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}
            `}>
              {trend.value}
@@ -265,7 +265,7 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
         </div>
       )}
       <div className="space-y-1">
-        <p className="font-black text-slate-900 text-xl tracking-tight">{title}</p>
+        <p className="font-semibold text-slate-900 text-xl tracking-tight">{title}</p>
         {description && <p className="text-sm text-slate-400 font-medium mt-1 max-w-sm mx-auto leading-relaxed">{description}</p>}
       </div>
       {action && <div className="mt-4">{action}</div>}
@@ -303,7 +303,7 @@ export function SectionHeader({ title, subtitle, actions, icon }: { title: React
           </div>
         )}
         <div>
-          <div className="font-black text-slate-900 text-sm uppercase tracking-widest">{title}</div>
+          <div className="font-semibold text-slate-900 text-sm tracking-tight">{title}</div>
           {subtitle && <div className="text-[10px] text-slate-400 font-bold italic mt-0.5 tracking-tight">{subtitle}</div>}
         </div>
       </div>
@@ -328,7 +328,7 @@ export function StatusBadge({ label, variant = 'neutral' }: { label: string; var
   }
 
   return (
-    <span className={`inline-block px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] border shadow-sm ${styles[variant]}`}>
+    <span className={`inline-block px-3 py-1.5 rounded-xl text-[9px] font-semibold tracking-tight border shadow-sm ${styles[variant]}`}>
       {label}
     </span>
   )
@@ -359,7 +359,7 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, conf
             <AlertTriangle size={40} className="text-rose-600" />
           </div>
           <div>
-            <h3 className="font-black text-slate-900 text-2xl tracking-tighter">{title}</h3>
+            <h3 className="font-semibold text-slate-900 text-2xl tracking-tight">{title}</h3>
             <p className="text-sm text-slate-400 font-medium mt-2 leading-relaxed px-2">{message}</p>
           </div>
         </div>
@@ -367,7 +367,7 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, conf
           <SafeButton onClick={onConfirm} variant={variant === 'danger' ? 'danger' : 'primary'} size="lg" className="w-full">
             {confirmLabel}
           </SafeButton>
-          <button onClick={onClose} className="py-4 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">
+          <button onClick={onClose} className="py-4 text-xs font-semibold text-slate-400 tracking-tight hover:text-slate-900 transition-colors">
             Batalkan Aksi
           </button>
         </div>
@@ -628,7 +628,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           <div className="w-20 h-20 rounded-[32px] bg-rose-50 flex items-center justify-center mx-auto shadow-inner mb-6">
             <AlertTriangle size={40} className="text-rose-600" />
           </div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tighter mb-2">Terjadi Kesalahan</h2>
+          <h2 className="text-2xl font-semibold text-slate-900 tracking-tight mb-2">Terjadi Kesalahan</h2>
           <p className="text-sm text-slate-400 font-medium max-w-md mb-6">
             Ada yang tidak beres. Tim teknis sudah mendapat notifikasi. Coba refresh halaman.
           </p>
