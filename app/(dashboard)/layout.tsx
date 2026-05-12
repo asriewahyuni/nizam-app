@@ -246,12 +246,12 @@ export default async function DashboardLayout({
               <div className="mb-6 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-orange-50 px-5 py-4 shadow-sm">
                 <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Mode Semua Unit</div>
-                    <p className="mt-1 text-sm font-bold text-slate-900">
+                    <div className="text-[10px] font-semibold tracking-tight text-amber-600">Mode Semua Unit</div>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">
                       Ringkasan lintas unit sedang aktif. Pilih satu unit dari header untuk membuat transaksi baru.
                     </p>
                   </div>
-                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-amber-700">
+                  <div className="text-[11px] font-semibold tracking-tight text-amber-700">
                     Read-only agregat
                   </div>
                 </div>
