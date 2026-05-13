@@ -89,6 +89,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Rasio Keuangan', href: '/accounting/ratios', icon: Activity, permission_key: 'ratios', module_key: 'Finance' },
       { label: 'Manajemen Zakat', href: '/accounting/zakat', icon: Zap, permission_key: 'zakat', module_key: 'Accounting' },
       { label: 'Multi Mata Uang', href: '/accounting/currencies', icon: Globe, permission_key: 'currencies', module_key: 'Finance' },
+      { label: 'Selisih Kurs (FX)', href: '/accounting/forex', icon: TrendingUp, permission_key: 'currencies', module_key: 'Finance' },
       { label: 'Manajemen Pajak', href: '/accounting/tax', icon: ShieldCheck, permission_key: 'tax', module_key: 'Accounting' },
       { label: 'Reimbursement', href: '/accounting/reimburse', icon: FileText, permission_key: 'reimburse', module_key: 'Finance' },
       { label: 'Penutupan Buku', href: '/accounting/closing', icon: Lock, permission_key: 'closing', module_key: 'Accounting' },

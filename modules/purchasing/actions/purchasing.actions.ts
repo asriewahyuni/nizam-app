@@ -1591,6 +1591,15 @@ export async function createPurchasePayment(orgId: string, payload: {
     return { error: data?.error || error?.message || 'Gagal memproses pembayaran.' }
   }
 
+  // Catat FX gain/loss jika purchase menggunakan mata uang asing
+  try {
+    const { recordFxGainLoss } = await import('@/modules/accounting/actions/forex.actions')
+    await recordFxGainLoss('PURCHASE', payload.purchase_id)
+  } catch (fxError) {
+    // Non-bloking — FX gain/loss gagal dicatat, tapi payment tetap sukses
+    console.error('FX gain/loss recording failed (non-blocking):', fxError)
+  }
+
   revalidatePath('/purchasing')
   return { success: true }
 }
