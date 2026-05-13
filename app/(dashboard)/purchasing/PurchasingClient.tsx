@@ -30,6 +30,7 @@ import { createPurchaseEntry, receivePurchase, voidPurchase, createPurchasePayme
 import { createContact } from '@/modules/contacts/actions/contact.actions'
 import type { Product } from '@/types/database.types'
 
+import CurrencyPicker, { CurrencyBadge, ExchangeRateDisplay } from '@/components/shared/CurrencyPicker'
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import {
@@ -126,6 +127,8 @@ export default function PurchasingClient({
   const [hasDp, setHasDp] = useState(false)
   const [dpAmount, setDpAmount] = useState('0')
   const [dpAccountId, setDpAccountId] = useState('')
+  const [currencyCode, setCurrencyCode] = useState('IDR')
+  const [exchangeRate, setExchangeRate] = useState<number | null>(null)
   const [dpMode, setDpMode] = useState<'NOMINAL' | 'PERCENT'>('NOMINAL')
   const [dpPercent, setDpPercent] = useState('0')
 
@@ -212,6 +215,8 @@ export default function PurchasingClient({
     setPayOverheadNow(false)
     setOverheadAccountId('')
     setShariahMode('CASH')
+    setCurrencyCode('IDR')
+    setExchangeRate(null)
     setError(null)
   }
 
@@ -387,6 +392,8 @@ export default function PurchasingClient({
       insurance_amount: parseFloat(insuranceAmount) || 0,
       shariah_mode: shariahMode,
       mode: submitMode,
+      currency_code: currencyCode,
+      exchange_rate: exchangeRate,
       draft_id: editingDraftPurchaseId || undefined,
       lines: usableLines.map(line => {
         const totalOverhead = (parseFloat(shippingAmount) || 0) + (parseFloat(insuranceAmount) || 0)
@@ -837,7 +844,10 @@ export default function PurchasingClient({
                       </td>
                       <td className="px-8 py-6">
                          <div className="text-sm font-bold text-slate-900">{p.contacts?.name || 'Unknown Vendor'}</div>
-                         <div className="flex gap-2 mt-1.5 overflow-hidden max-w-[300px]">
+                         <div className="flex items-center gap-2 mt-1.5">
+                            {p.currency_code && p.currency_code !== 'IDR' && (
+                              <CurrencyBadge currency={p.currency_code} />
+                            )}
                             <span className="shrink-0 text-[10px] font-black px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-md border border-slate-200 uppercase tracking-tighter">
                               {p.purchase_items?.length || 0} SKU
                             </span>
@@ -1039,7 +1049,7 @@ export default function PurchasingClient({
                 <form onSubmit={handleCreatePurchase} className="space-y-6">
                   {/* HEADER PO */}
                   {/* HEADER PO & PAYMENT GUARDRAIL */}
-                  <div className={`grid grid-cols-1 ${paymentTerm === 'TEMPO' ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4 p-5 bg-slate-50 rounded-xl border border-slate-100 shadow-inner transition-all`}>
+                  <div className={`grid grid-cols-1 ${paymentTerm === 'TEMPO' ? 'md:grid-cols-6' : 'md:grid-cols-5'} gap-4 p-5 bg-slate-50 rounded-xl border border-slate-100 shadow-inner transition-all`}>
                     <div className="flex-1 space-y-2">
                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight block px-1">Mode Transaksi</label>
                       <select value={shariahMode} onChange={(e) => setShariahMode(e.target.value as any)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-black text-indigo-600 shadow-sm focus:border-indigo-500 transition-all">
@@ -1089,6 +1099,19 @@ export default function PurchasingClient({
                     <div className="space-y-2">
                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight block px-1">Tanggal Belanja</label>
                       <input type="date" required value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} className="w-full h-[52px] px-4 py-2.5 border border-slate-200 rounded-2xl outline-none text-sm bg-white font-bold text-slate-900 shadow-sm focus:border-rose-500 transition-all" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight block px-1">Mata Uang</label>
+                      <CurrencyPicker
+                        orgId={orgId}
+                        value={currencyCode}
+                        onChange={(code, rate) => {
+                          setCurrencyCode(code)
+                          setExchangeRate(code === 'IDR' ? null : (rate || null))
+                        }}
+                        showRate
+                      />
                     </div>
 
                     {(paymentTerm === 'TEMPO' || shariahMode === 'SALAM') && (

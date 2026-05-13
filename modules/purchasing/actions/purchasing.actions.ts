@@ -677,6 +677,9 @@ export interface CreatePurchaseData {
   shariah_mode?: 'CASH' | 'SALAM' | 'ISTISHNA'
   mode?: 'DRAFT' | 'PUBLISH'
   draft_id?: string
+  currency_code?: string
+  exchange_rate?: number | null
+  base_currency_amount?: number | null
   lines: PurchaseLineData[]
 }
 
@@ -925,6 +928,8 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
         grand_total: headerGrand,
         notes: notesWithTerm,
         shariah_mode: shariahMode,
+        currency_code: payload.currency_code || 'IDR',
+        exchange_rate: payload.exchange_rate || null,
         status: 'DRAFT',
         created_by: user.id,
       },
@@ -1010,6 +1015,28 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
         error:
           'PO berhasil dibuat, tetapi sinkronisasi diskon/biaya header gagal: ' +
           String(headerSyncError.message || 'unknown error'),
+      }
+    }
+  }
+
+  // Sync currency fields (process_purchase_atomic doesn't handle multi-currency)
+  if (payload.currency_code && payload.currency_code !== 'IDR') {
+    const { error: currencySyncError } = await updatePurchaseRecord(
+      supabase,
+      {
+        currency_code: payload.currency_code,
+        exchange_rate: payload.exchange_rate || null,
+      },
+      [
+        ['id', rpcRes.purchase_id],
+        ['org_id', orgId],
+      ]
+    )
+    if (currencySyncError) {
+      return {
+        error:
+          'PO berhasil, tetapi sinkronisasi mata uang gagal: ' +
+          String(currencySyncError.message || 'unknown error'),
       }
     }
   }
