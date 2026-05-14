@@ -47,9 +47,64 @@ export interface VersionLogEntry {
 export const VERSION_LOG: VersionLogEntry[] = [
   // ╔════════════════════════════════════════════════════════════════════╗
   // ║  CURRENT VERSION — N2.6.3.x                                       ║
-  // ║  Core=2 (Syirkah pillar baru), BusinessType=6, Addon=3            ║
+  // ║  Core=2 (Syirkah pillar), BusinessType=6, Addon=3                 ║
+  // ║  Phase 1–3 feature complete milestone                             ║
   // ╚════════════════════════════════════════════════════════════════════╝
-  // ── PATCH: UI Design System Phase 1 ───────────────────────────────
+  // ── BUMP: module — Phase 1–3 milestone ────────────────────────────
+  {
+    date: '2026-05-13',
+    type: 'module',
+    label: 'Phase 3 milestone — Mobile responsive + PWA + Auto FX',
+    description: 'Complete Phase 2.4 (Auto FX Gain/Loss) and Phase 3 (Mobile/PWA). ' +
+      'Service worker (network-first caching, offline fallback) + PWA registration. ' +
+      'Safe area CSS utilities (pb-safe/pt-safe/pl-safe/pr-safe/min-h-safe). ' +
+      'Mobile touch target utilities (.touch-target/.touch-table-row). ' +
+      'Auto FX Gain/Loss recording on sales + purchase payments. ' +
+      'Multi-currency purchases integration (CurrencyPicker, DRAFT/PUBLISH sync). ' +
+      'Phase 1 UI Design System:  CSS tokens, utility classes, Form components, loading skeletons. ' +
+      'PPN Tax Engine: Bayar Pajak, Download SPT, PKP Settings. ' +
+      'Financial Ratios (11 rasio). Multi-currency engine. ' +
+      '6 accounting core bug fixes. Child org module independence. ' +
+      'LMS CRUD full. Roles page dynamic module filtering.',
+    by: 'Z',
+  },
+  // ── PATCH: Phase 3 Mobile + PWA ──────────────────────────────────
+  {
+    date: '2026-05-13',
+    type: 'patch',
+    label: 'PWA Service Worker + Safe Area CSS + Touch Targets',
+    description: 'Service worker (public/sw.js): network-first caching, offline fallback, ' +
+      'auto-install pada browser modern. Root layout: SW registration inline script. ' +
+      'Safe area CSS: pb-safe/pt-safe/pl-safe/pr-safe/minh-safe via env(safe-area-inset-*). ' +
+      'Mobile touch targets: .touch-target (44px min) dan .touch-table-row (48px min) ' +
+      'aktif via @media (hover: none) and (pointer: coarse). ' +
+      'Manifest, viewport, MobileBottomNav, MobilePullToRefresh sudah ada sebelumnya.',
+    by: 'Z',
+  },
+  // ── PATCH: Auto FX Gain/Loss Phase 2.4 ────────────────────────────
+  {
+    date: '2026-05-13',
+    type: 'patch',
+    label: 'Auto FX Gain/Loss — Phase 2.4 complete',
+    description: 'recordFxGainLoss(): compares exchange rate at transaction vs payment ' +
+      'settlement rate, auto-creates gain/loss journal entry. ' +
+      'Akun CoA: Laba Selisih Kurs (4-8010), Rugi Selisih Kurs (6-8010). ' +
+      'Integrasi: createPurchasePayment + processSalesPayment otomatis record FX. ' +
+      'UI: /accounting/forex dengan summary cards + riwayat + hapus. ' +
+      'Sidebar: Selisih Kurs (FX) di grup Finance.',
+    by: 'Z',
+  },
+  // ── PATCH: Multi-currency purchases ───────────────────────────────
+  {
+    date: '2026-05-12',
+    type: 'patch',
+    label: 'Multi-currency purchases integration — Phase 2.3',
+    description: 'CurrencyPicker di purchase form header. CurrencyBadge di list untuk ' +
+      'transaksi non-IDR. DRAFT: currency fields di insertPurchaseRecord. ' +
+      'PUBLISH: sync via updatePurchaseRecord setelah process_purchase_atomic. ' +
+      'Pattern sama dengan sales integration.',
+    by: 'Z',
+  },
   {
     date: '2026-05-11',
     type: 'patch',
