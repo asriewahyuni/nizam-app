@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getModuleByKey } from '@/modules/marketplace/lib/module-registry'
 import { SetupClient } from './setup-client'
 
 type Props = {
@@ -16,13 +17,26 @@ export default async function ModuleSetupPage({ params }: Props) {
   const orgData = await getActiveOrg()
   if (!orgData || !orgData.org) return redirect('/onboarding')
 
-  // Manual mod object (NOT from getModuleByKey)
-  const mod = {
-    icon: '🕌',
-    name: decodeURIComponent(moduleKey),
-    description: 'Halaman setup untuk modul ini.',
-    href: '/marketplace',
+  // Use full registry object
+  const mod = getModuleByKey(moduleKey)
+  if (!mod) return redirect('/marketplace')
+
+  // Recreate as plain object to avoid serialization issues
+  const safeMod = {
+    key: mod.key,
+    name: mod.name,
+    tagline: mod.tagline,
+    description: mod.description,
+    icon: mod.icon,
+    color: mod.color,
+    href: mod.href,
+    isCore: mod.isCore,
+    category: mod.category,
+    coaInjectionFn: mod.coaInjectionFn,
+    onboardingSteps: mod.onboardingSteps,
+    tags: mod.tags,
+    requires: mod.requires,
   }
 
-  return <SetupClient mod={mod} />
+  return <SetupClient mod={safeMod} />
 }
