@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { PageHeader, SectionCard, StatusBadge } from '@/components/ui/NizamUI'
-import { BarChart3, TrendingUp, PieChart } from 'lucide-react'
+import { BarChart3, TrendingUp, PieChart, Calculator, FileText } from 'lucide-react'
+import Link from 'next/link'
 import { getProyek } from '@/modules/koperasi/actions/koperasi.actions'
 import { getDashboardStats } from '@/modules/koperasi/actions/koperasi.actions'
 
@@ -25,7 +26,11 @@ export default function LaporanClient({ orgId }: { orgId: string }) {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Laporan Koperasi" subtitle="Neraca, SHU, dan laporan bagi hasil" />
+      <PageHeader title="Laporan Koperasi" subtitle="Neraca, SHU, dan laporan bagi hasil">
+        <Link href="/koperasi/laporan/shu" className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-all">
+          <Calculator className="w-4 h-4" /> Hitung SHU
+        </Link>
+      </PageHeader>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <SectionCard>
