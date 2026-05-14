@@ -157,7 +157,7 @@ export function SetupClient({
         {/* Header */}
         <div className="text-center">
           <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
+            initial={false}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
             className={`w-20 h-20 rounded-3xl ${mod.color} flex items-center justify-center text-4xl mx-auto shadow-2xl`}
@@ -165,7 +165,7 @@ export function SetupClient({
             {mod.icon}
           </motion.div>
           <motion.div
-            initial={{ opacity: 0, y: 12 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
@@ -226,7 +226,7 @@ export function SetupClient({
         <AnimatePresence>
           {toast && (
             <motion.div
-              initial={{ opacity: 0, y: -16 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -16 }}
               className={`px-5 py-3 rounded-2xl flex items-center gap-3 shadow-lg ${
@@ -249,7 +249,7 @@ export function SetupClient({
         <AnimatePresence mode="wait">
           <motion.div
             key={currentStepIdx}
-            initial={{ opacity: 0, x: 20 }}
+            initial={false}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
@@ -373,7 +373,7 @@ export function SetupClient({
             {currentStepIdx === doneStepIdx && (
               <div className="space-y-6 text-center">
                 <motion.div
-                  initial={{ scale: 0 }}
+                  initial={false}
                   animate={{ scale: 1 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                   className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/30"
