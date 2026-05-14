@@ -13,36 +13,34 @@ export default async function ModuleSetupPage({ params }: Props) {
   noStore()
 
   const { moduleKey } = await params
+  if (!moduleKey || typeof moduleKey !== 'string') return redirect('/marketplace')
 
   const orgData = await getActiveOrg()
-  if (!orgData) return redirect('/onboarding')
+  if (!orgData || !orgData.org) return redirect('/onboarding')
+
+  const orgId = orgData.org.id
+  if (!orgId) return redirect('/onboarding')
 
   const mod = getModuleByKey(moduleKey)
   if (!mod) return notFound()
 
-  const isEnabled = orgData.enabledModules?.some(
-    (m: string) => m.toLowerCase().replace(/[^a-z0-9]/g, '') === moduleKey.toLowerCase().replace(/[^a-z0-9]/g, '')
-  )
-  if (!isEnabled) {
-    // Maybe user just activated — check if module_key exists in enabled_modules more leniently
-    const isEnabledLoose = (orgData.enabledModules || []).some(
-      (m: string) => m.toLowerCase().includes(moduleKey.toLowerCase().replace(/[^a-z0-9]/g, '')) 
-        || moduleKey.toLowerCase().replace(/[^a-z0-9]/g, '').includes(m.toLowerCase().replace(/[^a-z0-9]/g, ''))
-    )
-    if (!isEnabledLoose) return redirect('/marketplace')
-  }
+  // Check enabled — loose
+  const enabled = orgData.enabledModules || []
+  const normalizedKeys = enabled.map((m: string) => (m || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
+  const normalizedModuleKey = moduleKey.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const isEnabled = normalizedKeys.some((k: string) => k === normalizedModuleKey)
 
-  const instance = await getModuleInstanceStatus(orgData.org.id, moduleKey)
+  if (!isEnabled) return redirect('/marketplace')
+
+  const instance = await getModuleInstanceStatus(orgId, moduleKey)
+
   if (instance?.status === 'READY') return redirect(mod.href)
-
-  const coaInstalled = instance?.coa_installed ?? false
-  const currentSettings = instance?.settings ?? (mod.defaultSettings || {})
 
   return (
     <SetupClient
       mod={mod}
-      coaInstalled={coaInstalled}
-      currentSettings={currentSettings}
+      coaInstalled={instance?.coa_installed ?? false}
+      currentSettings={instance?.settings ?? (mod.defaultSettings || {})}
     />
   )
 }
