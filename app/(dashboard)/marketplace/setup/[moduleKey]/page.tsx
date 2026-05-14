@@ -16,7 +16,7 @@ export default async function ModuleSetupPage({ params }: Props) {
   const orgData = await getActiveOrg()
   if (!orgData || !orgData.org) return redirect('/onboarding')
 
-  // ═══ 13 PROPS (same structure as getModuleByKey result) ═══
+  // 12 PROPS — removed onboardingSteps (array of objects)
   const mod = {
     key: moduleKey,
     name: moduleKey,
@@ -28,9 +28,6 @@ export default async function ModuleSetupPage({ params }: Props) {
     isCore: false,
     category: 'business_type',
     coaInjectionFn: 'inject_test_coa',
-    onboardingSteps: [
-      { id: 'step1', title: 'Langkah 1', description: 'Deskripsi langkah 1' },
-    ],
     tags: ['tag1', 'tag2'],
     requires: ['Finance'],
   }
