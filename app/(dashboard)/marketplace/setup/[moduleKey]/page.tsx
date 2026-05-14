@@ -17,20 +17,21 @@ export default async function ModuleSetupPage({ params }: Props) {
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
 
-  // ── Child/unit org juga bisa setup modul miliknya sendiri ──
-  // getActiveOrg() sudah ngambil data org yang login,
-  // jadi enabled_modules dan module instances diarahkan ke org yang benar.
-
   const mod = getModuleByKey(moduleKey)
   if (!mod) return notFound()
 
-  // If not core and not enabled, redirect to marketplace
   const isEnabled = orgData.enabledModules?.some(
     (m: string) => m.toLowerCase().replace(/[^a-z0-9]/g, '') === moduleKey.toLowerCase().replace(/[^a-z0-9]/g, '')
   )
-  if (!isEnabled) return redirect('/marketplace')
+  if (!isEnabled) {
+    // Maybe user just activated — check if module_key exists in enabled_modules more leniently
+    const isEnabledLoose = (orgData.enabledModules || []).some(
+      (m: string) => m.toLowerCase().includes(moduleKey.toLowerCase().replace(/[^a-z0-9]/g, '')) 
+        || moduleKey.toLowerCase().replace(/[^a-z0-9]/g, '').includes(m.toLowerCase().replace(/[^a-z0-9]/g, ''))
+    )
+    if (!isEnabledLoose) return redirect('/marketplace')
+  }
 
-  // If already READY, go to module home
   const instance = await getModuleInstanceStatus(orgData.org.id, moduleKey)
   if (instance?.status === 'READY') return redirect(mod.href)
 
