@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { PageHeader, StatCard, SafeButton, SectionCard } from '@/components/ui/NizamUI'
 import { Users, Wallet, TrendingUp, BadgePercent, UserPlus, BookOpen, List, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
-type Stats = {
+interface Stats {
   totalAnggota: number
   anggotaAktif: number
   totalProyek: number
@@ -12,20 +13,6 @@ type Stats = {
   totalModal: number
   totalSimpananPokok: number
   totalShahibulMaal: number
-}
-
-function StatCard({ label, value, icon: Icon }: { label: string; value: string | number; icon: any }) {
-  return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="p-2.5 rounded-xl bg-emerald-500/20">
-          <Icon className="w-5 h-5 text-emerald-400" />
-        </div>
-        <span className="text-sm font-semibold text-white/60">{label}</span>
-      </div>
-      <p className="text-2xl font-semibold text-white">{value}</p>
-    </div>
-  )
 }
 
 export default function KoperasiDashboardPage() {
@@ -49,21 +36,16 @@ export default function KoperasiDashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#07080a] flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-emerald-400 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#07080a] p-4 md:p-8 space-y-6">
-      {/* Header */}
-      <div className="pb-4 border-b border-white/10">
-        <h1 className="text-2xl font-semibold text-white">Koperasi Syariah</h1>
-        <p className="text-sm text-white/50 mt-1">Dashboard operasional koperasi serba usaha</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title="Koperasi Syariah" subtitle="Dashboard operasional koperasi serba usaha" />
 
-      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Anggota" value={stats?.totalAnggota || 0} icon={Users} />
         <StatCard label="Proyek Aktif" value={stats?.proyekAktif || 0} icon={TrendingUp} />
@@ -71,9 +53,7 @@ export default function KoperasiDashboardPage() {
         <StatCard label="Shahibul Maal" value={stats?.totalShahibulMaal || 0} icon={BadgePercent} />
       </div>
 
-      {/* Aksi Cepat */}
-      <div>
-        <h2 className="text-sm font-semibold text-white/60 mb-3">Aksi Cepat</h2>
+      <SectionCard title="Aksi Cepat">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {quickActions.map(action => (
             <button
@@ -81,16 +61,14 @@ export default function KoperasiDashboardPage() {
               onClick={() => router.push(action.href)}
               className={`${action.color} text-white p-4 rounded-2xl flex items-center gap-3 hover:opacity-90 transition-all`}
             >
-              <action.icon className="w-5 h-5" />
+              <action.icon className="w-6 h-6" />
               <span className="font-semibold text-sm">{action.label}</span>
             </button>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
-      {/* Menu Lainnya */}
-      <div>
-        <h2 className="text-sm font-semibold text-white/60 mb-3">Menu Lainnya</h2>
+      <SectionCard title="Menu Lainnya">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {[
             { label: 'Akad Wakalah', icon: BookOpen, href: '/koperasi/akad-wakalah' },
@@ -103,14 +81,14 @@ export default function KoperasiDashboardPage() {
             <button
               key={item.label}
               onClick={() => router.push(item.href)}
-              className="bg-white/5 hover:bg-white/10 border border-white/10 p-4 rounded-2xl flex items-center gap-3 transition-all text-left"
+              className="bg-white hover:bg-slate-50 border border-slate-200 p-4 rounded-2xl flex items-center gap-3 transition-all text-left shadow-sm"
             >
-              <item.icon className="w-5 h-5 text-emerald-400" />
-              <span className="text-sm font-semibold text-white/80">{item.label}</span>
+              <item.icon className="w-5 h-5 text-emerald-500" />
+              <span className="text-sm font-semibold text-slate-700">{item.label}</span>
             </button>
           ))}
         </div>
-      </div>
+      </SectionCard>
     </div>
   )
 }
