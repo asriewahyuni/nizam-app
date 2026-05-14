@@ -16,11 +16,14 @@ export default async function ModuleSetupPage({ params }: Props) {
   const orgData = await getActiveOrg()
   if (!orgData || !orgData.org) return redirect('/onboarding')
 
-  // Build object incrementally — test each property
-  const mod: Record<string, any> = {}
-  mod.icon = '🕌'
-  mod.name = moduleKey
-  mod.description = 'Setup untuk modul ini.'
-  mod.href = '/marketplace'
+  // TEST 1: tambah properti 'key'
+  const mod: Record<string, any> = {
+    icon: '🕌',
+    name: moduleKey,
+    description: 'Setup untuk modul ini.',
+    href: '/marketplace',
+    key: moduleKey,
+  }
+
   return <SetupClient mod={mod} />
 }
