@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getModuleByKey } from '@/modules/marketplace/lib/module-registry'
+import { getModuleInstanceStatus, completeModuleOnboarding } from '@/modules/marketplace/actions/marketplace.actions'
 import { SetupClient } from './setup-client'
 
 type Props = {
@@ -15,22 +17,31 @@ export default async function ModuleSetupPage({ params }: Props) {
 
   const orgData = await getActiveOrg()
   if (!orgData || !orgData.org) return redirect('/onboarding')
+  const orgId = orgData.org.id
 
-  // 12 PROPS — removed onboardingSteps (array of objects)
-  const mod = {
-    key: moduleKey,
-    name: moduleKey,
-    tagline: 'Tagline module',
-    description: 'Setup untuk modul ini.',
-    icon: '🕌',
-    color: 'bg-emerald-600',
-    href: '/marketplace',
-    isCore: false,
-    category: 'business_type',
-    coaInjectionFn: 'inject_test_coa',
-    tags: ['tag1', 'tag2'],
-    requires: ['Finance'],
+  const mod = getModuleByKey(moduleKey)
+  if (!mod) return redirect('/marketplace')
+
+  const instance = await getModuleInstanceStatus(orgId, moduleKey)
+  if (instance?.status === 'READY') return redirect(mod.href)
+
+  // ⚠️ Next.js 16 React Flight can't serialize arrays of objects.
+  // Serialize onboardingSteps as JSON string to work around it.
+  const modForClient = {
+    key: mod.key,
+    name: mod.name,
+    tagline: mod.tagline,
+    description: mod.description,
+    icon: mod.icon,
+    color: mod.color,
+    href: mod.href,
+    isCore: mod.isCore,
+    category: mod.category,
+    coaInjectionFn: mod.coaInjectionFn,
+    onboardingStepsJson: JSON.stringify(mod.onboardingSteps),
+    tags: mod.tags,
+    requires: mod.requires,
   }
 
-  return <SetupClient mod={mod} />
+  return <SetupClient mod={modForClient} coaInstalled={false} currentSettings={{}} completeOnboarding={completeModuleOnboarding} />
 }
