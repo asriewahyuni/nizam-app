@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, Modal, StatusBadge, StatCard } from '@/components/ui/NizamUI'
-import { Plus, TrendingUp, Users, Wallet, ArrowRightCircle, CheckCircle, XCircle, Eye, Send, AlertTriangle } from 'lucide-react'
+import { Plus, TrendingUp, Users, Wallet, ArrowRightCircle, CheckCircle, XCircle, Eye, Send, AlertTriangle, ExternalLink } from 'lucide-react'
+import Link from 'next/link'
 import { getProyek, createProyek, updateStatusProyek, tambahInvestasi, getInvestasiProyek, getMudharib } from '@/modules/koperasi/actions/koperasi.actions'
 
 const STATUS_FLOW: Record<string, { next: string[]; color: string; label: string }> = {
@@ -127,6 +128,9 @@ export default function ProyekClient({ orgId }: { orgId: string }) {
                     </div>
                     {/* Actions */}
                     <div className="flex flex-col gap-1.5">
+                      <Link href={`/koperasi/proyek/${p.id}`} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium transition-all">
+                        <ExternalLink className="w-3 h-3" /> Buka Detail
+                      </Link>
                       {flow.next.includes('DIVERIFIKASI') && <SafeButton size="sm" onClick={() => handleStatus(p.id, 'DIVERIFIKASI')}><CheckCircle className="w-3 h-3" /> Verifikasi</SafeButton>}
                       {flow.next.includes('DIPUBLIKASI') && <SafeButton size="sm" onClick={() => handleStatus(p.id, 'DIPUBLIKASI')}><Send className="w-3 h-3" /> Publikasi</SafeButton>}
                       {flow.next.includes('PENDANAAN') && <SafeButton size="sm" onClick={() => handleStatus(p.id, 'PENDANAAN')}><Users className="w-3 h-3" /> Buka Pendanaan</SafeButton>}

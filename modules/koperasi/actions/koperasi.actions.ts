@@ -360,7 +360,7 @@ export async function getMurabahahTransaksi(orgId: string) {
   const { data, error } = await db
     .from('koperasi_murabahah_transaksi')
     .select('*, pembeli:koperasi_anggota!inner(nama, kode_anggota), akad:koperasi_akad_wakalah(nomor_akad)')
-    .eq('pembeli.org_id', orgId)
+    .eq('org_id', orgId)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data || []
@@ -370,11 +370,77 @@ export async function getAkadWakalah(orgId: string) {
   const db = getDb()
   const { data, error } = await db
     .from('koperasi_akad_wakalah')
-    .select('*, shahibul_maal:koperasi_shahibul_maal!inner(anggota:koperasi_anggota!inner(nama))')
-    .eq('shahibul_maal.org_id', orgId)
+    .select('*, shahibul_maal:koperasi_shahibul_maal(id, anggota:koperasi_anggota(id, nama))')
+    .eq('org_id', orgId)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data || []
+}
+
+export async function createAkadWakalah(orgId: string, payload: {
+  shahibul_maal_id: string
+  jenis_barang: string
+  ujrah_flat: number
+  tgl_akad?: string
+}) {
+  const db = getDb()
+  const { data: noAkad } = await db.rpc('koperasi_generate_nomor_akad', { p_org_id: orgId })
+  const { data, error } = await db.from('koperasi_akad_wakalah').insert({
+    org_id: orgId,
+    nomor_akad: noAkad || `W-${orgId.slice(0,4)}-${Date.now()}`,
+    shahibul_maal_id: payload.shahibul_maal_id,
+    jenis_barang: payload.jenis_barang,
+    ujrah_flat: payload.ujrah_flat,
+    tgl_akad: payload.tgl_akad || new Date().toISOString().split('T')[0],
+  }).select().single()
+  if (error) throw new Error(error.message)
+  revalidatePath('/koperasi/akad-wakalah')
+  return data
+}
+
+export async function createMurabahahTransaksi(orgId: string, payload: {
+  akad_wakalah_id: string
+  pembeli_id: string
+  nama_barang: string
+  harga_pokok: number
+  margin: number
+  tenor_bulan: number
+}) {
+  const db = getDb()
+  const hargaJual = payload.harga_pokok + payload.margin
+  const noTrans = `MB-${orgId.slice(0,4)}-${Date.now()}`
+  
+  const { data, error } = await db.from('koperasi_murabahah_transaksi').insert({
+    org_id: orgId,
+    akad_wakalah_id: payload.akad_wakalah_id,
+    nomor_transaksi: noTrans,
+    pembeli_id: payload.pembeli_id,
+    nama_barang: payload.nama_barang,
+    harga_pokok: payload.harga_pokok,
+    margin: payload.margin,
+    harga_jual: hargaJual,
+    tenor_bulan: payload.tenor_bulan,
+  }).select().single()
+  if (error) throw new Error(error.message)
+  
+  // Generate auto angsuran
+  const angsuranPerBulan = Math.ceil(hargaJual / payload.tenor_bulan)
+  const angsuran: any[] = []
+  const today = new Date()
+  for (let i = 1; i <= payload.tenor_bulan; i++) {
+    const jt = new Date(today.getFullYear(), today.getMonth() + i, today.getDate())
+    angsuran.push({
+      transaksi_id: data.id,
+      angsuran_ke: i,
+      jatuh_tempo: jt.toISOString().split('T')[0],
+      jumlah: i === payload.tenor_bulan ? hargaJual - (angsuranPerBulan * (payload.tenor_bulan - 1)) : angsuranPerBulan,
+    })
+  }
+  const { error: aError } = await db.from('koperasi_murabahah_angsuran').insert(angsuran)
+  if (aError) throw new Error(aError.message)
+  
+  revalidatePath('/koperasi/murabahah')
+  return data
 }
 
 // ── DASHBOARD ────────────────────────────────────────────────────────────────
