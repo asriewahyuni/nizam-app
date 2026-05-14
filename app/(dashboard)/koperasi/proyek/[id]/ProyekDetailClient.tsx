@@ -3,14 +3,18 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, Modal, StatusBadge } from '@/components/ui/NizamUI'
-import { ArrowLeft, Plus, BookOpen, BarChart3, TrendingUp, Wallet, FileText } from 'lucide-react'
+import { ArrowLeft, Plus, BookOpen, BarChart3, TrendingUp, Wallet, FileText, Gift } from 'lucide-react'
 import { updateStatusProyek } from '@/modules/koperasi/actions/koperasi.actions'
 import {
   generateProjectCoa, getProjectCoa, getProjectJournal,
   createProjectJournalEntry, getProjectBalanceSheet, getProjectProfitLoss,
 } from '@/modules/koperasi/actions/proyek-jurnal.actions'
+import {
+  hitungBagiHasil, getBagiHasil, konfirmasiBagiHasil,
+  setujuiDistribusi, syncProyekKeBukuBesar, getProjectFinancialSummary,
+} from '@/modules/koperasi/actions/bagi-hasil.actions'
 
-type TabType = 'overview' | 'jurnal' | 'neraca' | 'laba-rugi'
+type TabType = 'overview' | 'jurnal' | 'neraca' | 'laba-rugi' | 'bagi-hasil'
 
 export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; orgId: string }) {
   const router = useRouter()
@@ -19,6 +23,9 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
   const [journal, setJournal] = useState<any[]>([])
   const [neraca, setNeraca] = useState<any>(null)
   const [pnl, setPnl] = useState<any>(null)
+  const [bagiHasil, setBagiHasil] = useState<any[]>([])
+  const [finSummary, setFinSummary] = useState<any>(null)
+  const [loadingBh, setLoadingBh] = useState(false)
   const [showJurnal, setShowJurnal] = useState(false)
   const [jurnalForm, setJurnalForm] = useState({
     tgl_transaksi: new Date().toISOString().split('T')[0],
@@ -39,6 +46,7 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
     if (tab === 'jurnal') loadJournal()
     if (tab === 'neraca') loadNeraca()
     if (tab === 'laba-rugi') loadPnl()
+    if (tab === 'bagi-hasil') { loadBagiHasil(); loadFinSummary() }
   }, [tab])
 
   async function loadCoa() {
@@ -68,6 +76,59 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
   async function loadPnl() {
     const p = await getProjectProfitLoss(proyek.id)
     setPnl(p)
+  }
+
+  async function loadBagiHasil() {
+    const bh = await getBagiHasil(proyek.id)
+    setBagiHasil(bh)
+  }
+
+  async function loadFinSummary() {
+    try {
+      const s = await getProjectFinancialSummary(proyek.id)
+      setFinSummary(s)
+    } catch (e) { console.error('fin summary error:', e) }
+  }
+
+  async function handleHitungBagiHasil() {
+    setLoadingBh(true)
+    try {
+      const result = await hitungBagiHasil(proyek.id)
+      alert(`✅ Bagi hasil berhasil dihitung!\nLaba: Rp ${result.totalLaba.toLocaleString()}\nBagian SM: Rp ${result.bagianSM.toLocaleString()}\nBagian Mudharib: Rp ${result.bagianMudharib.toLocaleString()}`)
+      loadBagiHasil()
+    } catch (e: any) {
+      alert('❌ ' + e.message)
+    }
+    setLoadingBh(false)
+  }
+
+  async function handleKonfirmasiBagiHasil(bhId: string) {
+    await konfirmasiBagiHasil(bhId)
+    loadBagiHasil()
+  }
+
+  async function handleDistribusi(bhId: string) {
+    setLoadingBh(true)
+    try {
+      await setujuiDistribusi(bhId, proyek.id)
+      alert('✅ Distribusi disetujui! Proyek masuk status DISTRIBUSI.')
+      router.refresh()
+    } catch (e: any) {
+      alert('❌ ' + e.message)
+    }
+    setLoadingBh(false)
+  }
+
+  async function handleSyncL2(bhId: string) {
+    setLoadingBh(true)
+    try {
+      await syncProyekKeBukuBesar(orgId, proyek.id)
+      alert('✅ Proyek berhasil disinkronkan ke buku besar dan ditutup!')
+      router.refresh()
+    } catch (e: any) {
+      alert('❌ ' + e.message)
+    }
+    setLoadingBh(false)
   }
 
   async function handleGenerateCoa() {
@@ -122,6 +183,7 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
     { key: 'jurnal', label: 'Jurnal', icon: BookOpen },
     { key: 'neraca', label: 'Neraca', icon: BarChart3 },
     { key: 'laba-rugi', label: 'Laba/Rugi', icon: FileText },
+    { key: 'bagi-hasil', label: 'Bagi Hasil', icon: Gift },
   ]
 
   const totalDebit = jurnalForm.lines.reduce((s, l) => s + Number(l.debit || 0), 0)
@@ -350,6 +412,121 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
             </div>
           ) : <div className="text-white/50 p-4 text-center">Memuat...</div>}
         </SectionCard>
+      )}
+
+      {/* ── BAGI HASIL ── */}
+      {tab === 'bagi-hasil' && (
+        <div className="space-y-4">
+          {/* Summary Cards */}
+          {finSummary && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <SectionCard>
+                <div className="text-xs text-white/40">Total Pendapatan</div>
+                <div className="text-sm font-semibold text-emerald-400">Rp {finSummary.totalPendapatan.toLocaleString()}</div>
+              </SectionCard>
+              <SectionCard>
+                <div className="text-xs text-white/40">Total Beban</div>
+                <div className="text-sm font-semibold text-amber-400">Rp {finSummary.totalBeban.toLocaleString()}</div>
+              </SectionCard>
+              <SectionCard>
+                <div className="text-xs text-white/40">Laba Bersih</div>
+                <div className={`text-sm font-semibold ${finSummary.labaBersih >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  Rp {finSummary.labaBersih.toLocaleString()}
+                </div>
+              </SectionCard>
+              <SectionCard>
+                <div className="text-xs text-white/40">Nisbah</div>
+                <div className="text-sm font-semibold text-white">SM {finSummary.nisbahSM}% : M {finSummary.nisbahMudharib}%</div>
+              </SectionCard>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 flex-wrap">
+            {(proyek.status === 'SELESAI' || proyek.status === 'DISTRIBUSI') && bagiHasil.length === 0 && (
+              <SafeButton onClick={handleHitungBagiHasil} disabled={loadingBh}>
+                <Gift className="w-4 h-4" /> {loadingBh ? 'Menghitung...' : 'Hitung Bagi Hasil'}
+              </SafeButton>
+            )}
+            {bagiHasil.length > 0 && bagiHasil[0].status === 'ESTIMASI' && (
+              <SafeButton onClick={() => handleKonfirmasiBagiHasil(bagiHasil[0].id)}>
+                ✅ Konfirmasi Bagi Hasil
+              </SafeButton>
+            )}
+            {bagiHasil.length > 0 && bagiHasil[0].status === 'DIKONFIRMASI' && (
+              <SafeButton onClick={() => handleDistribusi(bagiHasil[0].id)} disabled={loadingBh}>
+                <Gift className="w-4 h-4" /> Setujui Distribusi
+              </SafeButton>
+            )}
+            {bagiHasil.length > 0 && bagiHasil[0].status === 'DIDISTRIBUSI' && (
+              <SafeButton onClick={() => handleSyncL2(bagiHasil[0].id)} disabled={loadingBh} variant="primary">
+                <Wallet className="w-4 h-4" /> Sync ke Buku Besar + Tutup
+              </SafeButton>
+            )}
+          </div>
+
+          {/* Bagi Hasil Detail */}
+          {bagiHasil.length > 0 && (
+            <SectionCard title={`Bagi Hasil — ${bagiHasil[0].status}`}>
+              <div className="space-y-3 mt-2">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3 rounded-xl bg-emerald-900/20">
+                    <div className="text-xs text-emerald-400">Total Laba</div>
+                    <div className="text-lg font-bold text-emerald-400">Rp {Number(bagiHasil[0].total_laba).toLocaleString()}</div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-blue-900/20">
+                    <div className="text-xs text-blue-400">Bagian Shahibul Maal</div>
+                    <div className="text-lg font-bold text-blue-400">Rp {Number(bagiHasil[0].total_distribusi_shahibul_maal).toLocaleString()}</div>
+                    <div className="text-[10px] text-white/40">{finSummary ? finSummary.nisbahSM : '?'}% dari laba</div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-purple-900/20">
+                    <div className="text-xs text-purple-400">Bagian Mudharib</div>
+                    <div className="text-lg font-bold text-purple-400">Rp {Number(bagiHasil[0].total_distribusi_mudharib).toLocaleString()}</div>
+                    <div className="text-[10px] text-white/40">{finSummary ? finSummary.nisbahMudharib : '?'}% dari laba</div>
+                  </div>
+                </div>
+                
+                {Number(bagiHasil[0].ujrah_koperasi) > 0 && (
+                  <div className="p-2 rounded-lg bg-amber-900/20 text-xs">
+                    <span className="text-amber-400">Ujrah Koperasi:</span>
+                    <span className="text-white ml-1">Rp {Number(bagiHasil[0].ujrah_koperasi).toLocaleString()}</span>
+                  </div>
+                )}
+
+                {/* Distribution per party */}
+                {(bagiHasil[0] as any).distribusi?.length > 0 && (
+                  <div className="mt-3">
+                    <h4 className="text-xs text-white/40 mb-2">Distribusi per Pihak</h4>
+                    <div className="space-y-2">
+                      {(bagiHasil[0] as any).distribusi.map((d: any) => (
+                        <div key={d.id} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
+                          <div>
+                            <span className="text-xs font-medium text-white">
+                              {d.shahibul_maal?.anggota?.nama || d.mudharib?.anggota?.nama || d.pihak_id?.slice(0, 8)}
+                            </span>
+                            <span className="ml-2 text-[10px] text-white/30">{d.pihak_type}</span>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs text-white">Rp {Number(d.nominal).toLocaleString()}</div>
+                            <div className="text-[10px] text-white/40">{d.porsi_persen}%</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </SectionCard>
+          )}
+
+          {bagiHasil.length === 0 && finSummary && finSummary.labaBersih <= 0 && (
+            <SectionCard>
+              <div className="p-4 text-center text-white/50">
+                Proyek belum menghasilkan laba. Input transaksi pendapatan dan beban dulu di tab Jurnal.
+              </div>
+            </SectionCard>
+          )}
+        </div>
       )}
 
       {/* ── MODAL INPUT JURNAL ── */}
