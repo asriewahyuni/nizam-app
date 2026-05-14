@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { CheckCircle2, Loader2, ArrowRight, Home, Sparkles, AlertCircle } from 'lucide-react'
 import { getSetupModData, completeSetupOnboarding } from './setup.actions'
 
@@ -16,10 +15,8 @@ type ModData = {
 
 export function SetupClient({
   moduleKey,
-  orgId,
 }: {
   moduleKey: string
-  orgId: string
 }) {
   const router = useRouter()
   const [mod, setMod] = useState<ModData | null>(null)
