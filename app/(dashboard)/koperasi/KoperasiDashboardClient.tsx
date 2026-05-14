@@ -1,21 +1,22 @@
 'use client'
 
-import { PageHeader, StatCard, SafeButton, SectionCard } from '@/components/ui/NizamUI'
-import { Users, Wallet, TrendingUp, BadgePercent, ArrowRightCircle, UserPlus, BookOpen, List } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { PageHeader, StatCard, SectionCard } from '@/components/ui/NizamUI'
+import { Users, Wallet, TrendingUp, BadgePercent, UserPlus, BookOpen, List } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
 
-interface Stats {
-  totalAnggota: number
-  anggotaAktif: number
-  totalProyek: number
-  proyekAktif: number
-  totalModal: number
-  totalSimpananPokok: number
-  totalShahibulMaal: number
-}
-
-export default function KoperasiDashboardClient({ stats, orgId }: { stats: Stats; orgId: string }) {
+export default function KoperasiDashboardPage() {
   const router = useRouter()
+  const [stats, setStats] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/koperasi/dashboard')
+      .then(res => res.json())
+      .then(data => { setStats(data); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
 
   const quickActions = [
     { label: 'Daftar Anggota', icon: UserPlus, href: '/koperasi/anggota', color: 'bg-emerald-600' },
@@ -24,48 +25,61 @@ export default function KoperasiDashboardClient({ stats, orgId }: { stats: Stats
     { label: 'Murabahah', icon: BadgePercent, href: '/koperasi/murabahah', color: 'bg-orange-600' },
   ]
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#07080a] flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-emerald-400 animate-spin" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader title="Koperasi Syariah" subtitle="Dashboard operasional koperasi serba usaha" />
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="Anggota" value={stats.totalAnggota.toString()} subtitle={`${stats.anggotaAktif} aktif`} icon={Users} />
-        <StatCard title="Shahibul Maal" value={stats.totalShahibulMaal.toString()} subtitle="Total investor" icon={Wallet} />
-        <StatCard title="Proyek" value={stats.totalProyek.toString()} subtitle={`${stats.proyekAktif} aktif`} icon={TrendingUp} />
-        <StatCard title="Simpanan Pokok" value={`Rp ${(stats.totalSimpananPokok / 1000).toFixed(0)}rb`} subtitle="Terkumpul" icon={Wallet} />
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="Total Anggota" value={stats?.totalAnggota || 0} icon={Users} />
+        <StatCard title="Proyek Aktif" value={stats?.proyekAktif || 0} icon={TrendingUp} />
+        <StatCard title="Total Modal" value={`Rp ${(stats?.totalModal || 0).toLocaleString('id-ID')}`} icon={Wallet} />
+        <StatCard title="Shahibul Maal" value={stats?.totalShahibulMaal || 0} icon={BadgePercent} />
       </div>
 
-      {/* Quick Actions */}
-      <SectionCard title="Menu Cepat">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {quickActions.map((action) => (
+      <SectionCard title="Aksi Cepat">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {quickActions.map(action => (
             <button
-              key={action.href}
+              key={action.label}
               onClick={() => router.push(action.href)}
-              className="flex items-center gap-3 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-left"
+              className={`${action.color} text-white p-4 rounded-2xl flex items-center gap-3 hover:opacity-90 transition-all`}
             >
-              <div className={`w-10 h-10 rounded-lg ${action.color} flex items-center justify-center`}>
-                <action.icon className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-white">{action.label}</div>
-                <div className="text-xs text-white/50">Klik untuk buka</div>
-              </div>
+              <action.icon className="w-6 h-6" />
+              <span className="font-semibold text-sm">{action.label}</span>
             </button>
           ))}
         </div>
       </SectionCard>
 
-      {/* Info Section */}
-      <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-900/30 to-teal-900/20 border border-emerald-800/30">
-        <h3 className="text-sm font-semibold text-emerald-300 mb-2">Tentang Modul</h3>
-        <p className="text-sm text-white/60 leading-relaxed">
-          Koperasi Syariah mengelola simpanan (Pokok, Wajib, Sukarela), Murabahah bil Wakalah,
-          Mudharabah Multi Shahibul Maal, sertifikasi DPS, dan akuntansi dua lapis syariah.
-          Seluruh transaksi menggunakan akad syariah dengan pendapatan Ujrah flat (bukan bunga/profit-rate).
-        </p>
-      </div>
+      <SectionCard title="Menu Lainnya">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[
+            { label: 'Akad Wakalah', icon: BookOpen, href: '/koperasi/akad-wakalah' },
+            { label: 'Shahibul Maal', icon: Users, href: '/koperasi/shahibul-maal' },
+            { label: 'Mudharib', icon: Users, href: '/koperasi/mudharib' },
+            { label: 'Sertifikasi DPS', icon: BadgePercent, href: '/koperasi/sertifikasi' },
+            { label: 'Pengurus', icon: List, href: '/koperasi/pengurus' },
+            { label: 'Laporan', icon: List, href: '/koperasi/laporan' },
+          ].map(item => (
+            <button
+              key={item.label}
+              onClick={() => router.push(item.href)}
+              className="bg-white/5 hover:bg-white/10 border border-white/10 p-4 rounded-2xl flex items-center gap-3 transition-all text-left"
+            >
+              <item.icon className="w-5 h-5 text-emerald-400" />
+              <span className="text-sm font-semibold text-white/80">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </SectionCard>
     </div>
   )
 }
