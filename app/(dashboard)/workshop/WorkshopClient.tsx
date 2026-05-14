@@ -28,6 +28,7 @@ import {
   addWorkOrderItem,
   deleteWorkOrderItem,
 } from '@/modules/workshop/actions/workshop.actions'
+import { PageHeader, StatCard, StatusBadge, SafeButton, SectionCard, FormField, FormInput, FormSelect, FormTextarea } from '@/components/ui/NizamUI'
 import {
   getVehicleForSpkPrefill,
   createInvoiceFromWorkOrder,
@@ -179,45 +180,29 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto space-y-8">
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
-            <Wrench size={32} className="text-[#003366]" />
-            Bengkel Motor
-          </h1>
-          <p className="text-sm text-slate-500 font-medium">
-            Manajemen Surat Perintah Kerja, kendaraan, dan servis bengkel motor.
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowVehicleModal(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-700 text-sm font-bold rounded-2xl hover:bg-slate-200 transition-all"
-          >
-            <Car size={16} /> Daftarkan Kendaraan
-          </button>
-          <button
-            onClick={() => setShowSpkModal(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#003366] text-white text-sm font-bold rounded-2xl hover:bg-[#002d5a] shadow-xl shadow-[#003366]/10 transition-all"
-          >
-            <Plus size={16} /> Buat SPK
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Bengkel Motor"
+        subtitle="Manajemen Surat Perintah Kerja, kendaraan, dan servis bengkel motor."
+        icon={<Wrench size={32} />}
+        iconColor="text-blue-600"
+        actions={
+          <div className="flex gap-3">
+            <SafeButton variant="secondary" onClick={() => setShowVehicleModal(true)}>
+              <Car size={16} /> Daftarkan Kendaraan
+            </SafeButton>
+            <SafeButton onClick={() => setShowSpkModal(true)}>
+              <Plus size={16} /> Buat SPK
+            </SafeButton>
+          </div>
+        }
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Total SPK', value: stats.total,      color: 'text-slate-700', bg: 'bg-slate-50' },
-          { label: 'Antri',     value: stats.antri,      color: 'text-slate-500', bg: 'bg-slate-50' },
-          { label: 'Dikerjakan',value: stats.dikerjakan, color: 'text-blue-600',  bg: 'bg-blue-50' },
-          { label: 'Selesai',   value: stats.selesai,    color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        ].map(s => (
-          <div key={s.label} className={`${s.bg} rounded-2xl p-5 border border-slate-100`}>
-            <p className="text-xs font-bold text-slate-400 tracking-tight mb-1">{s.label}</p>
-            <p className={`text-3xl font-semibold ${s.color}`}>{s.value}</p>
-          </div>
-        ))}
+        <StatCard label="Total SPK" value={stats.total} color="slate" />
+        <StatCard label="Antri" value={stats.antri} color="slate" />
+        <StatCard label="Dikerjakan" value={stats.dikerjakan} color="blue" />
+        <StatCard label="Selesai" value={stats.selesai} color="emerald" />
       </div>
 
       {/* Tabs + Search */}
@@ -227,14 +212,14 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
             <button
               key={t}
               onClick={() => { setTab(t); setSearch('') }}
-              className={`px-5 py-2 text-sm font-black rounded-xl transition-all ${
-                tab === t ? 'bg-white text-[#003366] shadow-sm' : 'text-slate-400 hover:text-slate-600'
+              className={`px-5 py-2 text-sm font-semibold rounded-xl transition-all ${
+                tab === t ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
               }`}
             >
               {t === 'spk' ? (
                 <span className="flex items-center gap-2"><ClipboardList size={14} /> SPK</span>
               ) : t === 'invoices' ? (
-                <span className="flex items-center gap-2">🧾 Invoice <span className="bg-[#003366] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">{invoices.length}</span></span>
+                <span className="flex items-center gap-2">🧾 Invoice <span className="bg-[#003366] text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-full">{invoices.length}</span></span>
               ) : (
                 <span className="flex items-center gap-2"><Car size={14} /> Kendaraan</span>
               )}
@@ -533,7 +518,7 @@ function SpkCard({
         <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">SPK</p>
-            <p className="text-sm font-black text-slate-900">{order.spkNumber}</p>
+            <p className="text-sm font-semibold text-slate-900">{order.spkNumber}</p>
           </div>
           <div>
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Kendaraan</p>
@@ -549,11 +534,11 @@ function SpkCard({
           </div>
           <div>
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Total</p>
-            <p className="text-sm font-black text-[#003366]">{formatRupiah(order.total)}</p>
+            <p className="text-sm font-semibold text-[#003366]">{formatRupiah(order.total)}</p>
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <span className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black rounded-full uppercase border ${cfg.color}`}>
+          <span className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold rounded-full uppercase border ${cfg.color}`}>
             {cfg.icon} {cfg.label}
           </span>
           {isExpanded ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
@@ -618,7 +603,7 @@ function SpkCard({
                           <tr key={item.id} className="hover:bg-slate-50/50">
                             <td className="px-4 py-3 font-medium text-slate-700">{item.name}</td>
                             <td className="px-4 py-3 text-center">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
                                 item.itemType === 'JASA'
                                   ? 'bg-blue-50 text-blue-600'
                                   : 'bg-orange-50 text-orange-600'
@@ -642,7 +627,7 @@ function SpkCard({
                       <tfoot className="bg-slate-50">
                         <tr>
                           <td colSpan={4} className="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-tight">Total</td>
-                          <td className="px-4 py-2.5 text-right font-black text-[#003366]">{formatRupiah(order.total)}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-[#003366]">{formatRupiah(order.total)}</td>
                           <td></td>
                         </tr>
                       </tfoot>
@@ -667,7 +652,7 @@ function SpkCard({
                             key={t}
                             type="button"
                             onClick={() => { setItemType(t); resetItemForm() }}
-                            className={`px-4 py-1.5 text-xs font-black rounded-xl border transition-all ${
+                            className={`px-4 py-1.5 text-xs font-semibold rounded-xl border transition-all ${
                               itemType === t
                                 ? t === 'JASA' ? 'bg-blue-600 text-white border-blue-600' : 'bg-orange-500 text-white border-orange-500'
                                 : 'bg-white text-slate-500 border-slate-200'
@@ -684,7 +669,7 @@ function SpkCard({
                         <div className="space-y-2">
                           {serviceRates.length > 0 && (
                             <div>
-                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Pilih dari Tarif Jasa</label>
+                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Pilih dari Tarif Jasa</label>
                               <select
                                 className={inputCls}
                                 onChange={e => handleSelectRate(e.target.value)}
@@ -701,7 +686,7 @@ function SpkCard({
                           )}
                           <div className="grid grid-cols-2 gap-3">
                             <div className="col-span-2">
-                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Nama Jasa <span className="text-rose-400">*</span></label>
+                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Nama Jasa <span className="text-rose-400">*</span></label>
                               <input
                                 name="name"
                                 required
@@ -712,11 +697,11 @@ function SpkCard({
                               />
                             </div>
                             <div>
-                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Qty</label>
+                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Qty</label>
                               <input name="quantity" type="number" min="0.01" step="0.01" defaultValue="1" className={inputCls} />
                             </div>
                             <div>
-                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Harga Satuan</label>
+                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Harga Satuan</label>
                               <input
                                 name="unit_price"
                                 type="number"
@@ -731,7 +716,7 @@ function SpkCard({
                       ) : (
                         <div className="space-y-2">
                           <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
                               Pilih dari Inventori
                               {partProducts.length === 0 && <span className="text-amber-500 ml-2 normal-case font-medium">— Belum ada produk tipe INVENTORY</span>}
                             </label>
@@ -754,11 +739,11 @@ function SpkCard({
                           <input type="hidden" name="name" value={selectedName || 'Spare Part'} />
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Qty</label>
+                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Qty</label>
                               <input name="quantity" type="number" min="0.01" step="0.01" defaultValue="1" className={inputCls} />
                             </div>
                             <div>
-                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Harga Jual</label>
+                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">Harga Jual</label>
                               <input
                                 name="unit_price"
                                 type="number"
@@ -795,7 +780,7 @@ function SpkCard({
                         <button
                           key={nextStatus}
                           onClick={() => onStatusChange(order, nextStatus)}
-                          className={`flex items-center gap-1.5 px-4 py-2 text-xs font-black rounded-xl border transition-all hover:opacity-80 ${nextCfg.color}`}
+                          className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border transition-all hover:opacity-80 ${nextCfg.color}`}
                         >
                           {nextCfg.icon} {nextCfg.label}
                         </button>
@@ -842,7 +827,7 @@ function VehicleList({ vehicles }: { vehicles: WorkshopVehicle[] }) {
               <p className="text-xl font-semibold text-slate-900 tracking-tight">{v.plateNumber}</p>
               <p className="text-sm font-bold text-[#003366]">{v.brand} {v.model} {v.year ? `(${v.year})` : ''}</p>
             </div>
-            <span className="px-3 py-1 bg-slate-100 text-slate-500 text-[10px] font-black rounded-full uppercase">
+            <span className="px-3 py-1 bg-slate-100 text-slate-500 text-[10px] font-semibold rounded-full uppercase">
               {v.transmission}
             </span>
           </div>
@@ -920,15 +905,15 @@ function InvoiceList({ invoices, workOrders }: {
         <tbody className="divide-y divide-slate-50">
           {invoices.map(inv => (
             <tr key={inv.id} className="hover:bg-slate-50/50">
-              <td className="px-5 py-4 font-black text-[#003366]">{inv.saleNumber}</td>
+              <td className="px-5 py-4 font-semibold text-[#003366]">{inv.saleNumber}</td>
               <td className="px-5 py-4 font-medium text-slate-700">{inv.customerName || '—'}</td>
               <td className="px-5 py-4 text-slate-500 text-xs font-mono">
                 {inv.spkId ? (spkMap[inv.spkId] || inv.spkId.slice(0, 8) + '...') : '—'}
               </td>
               <td className="px-5 py-4 text-slate-500">{inv.saleDate ? formatDate(inv.saleDate) : '—'}</td>
-              <td className="px-5 py-4 text-right font-black text-slate-900">{formatRupiah(inv.grandTotal)}</td>
+              <td className="px-5 py-4 text-right font-semibold text-slate-900">{formatRupiah(inv.grandTotal)}</td>
               <td className="px-5 py-4 text-center">
-                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${STATUS_BADGE[inv.status] || 'bg-slate-100 text-slate-500'}`}>
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase ${STATUS_BADGE[inv.status] || 'bg-slate-100 text-slate-500'}`}>
                   {inv.status}
                 </span>
               </td>
@@ -938,7 +923,7 @@ function InvoiceList({ invoices, workOrders }: {
         <tfoot className="bg-slate-50">
           <tr>
             <td colSpan={4} className="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-tight">Total</td>
-            <td className="px-5 py-3 text-right font-black text-[#003366]">
+            <td className="px-5 py-3 text-right font-semibold text-[#003366]">
               {formatRupiah(invoices.reduce((s, i) => s + i.grandTotal, 0))}
             </td>
             <td />
@@ -1025,7 +1010,7 @@ function CreateInvoiceButton({ orderId, orgId: _orgId }: { orderId: string; orgI
     <button
       onClick={handleCreateInvoice}
       disabled={loading}
-      className="flex items-center gap-1.5 px-4 py-2 text-xs font-black rounded-xl border bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 transition-all disabled:opacity-50 ml-auto"
+      className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 transition-all disabled:opacity-50 ml-auto"
     >
       {loading ? 'Memproses...' : '🧾 Buat Invoice'}
     </button>

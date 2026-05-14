@@ -110,6 +110,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Project Konstruksi', href: '/construction', icon: Building2, permission_key: 'construction,project,services', module_key: 'Project & Construction' },
       { label: 'LMS (Pelatihan Komersial)', href: '/lms', icon: GraduationCap, permission_key: 'learning', module_key: 'LMS' },
       { label: 'Panel Penilai', href: '/lms/assessment-center', icon: ShieldCheck, permission_key: 'learning:write', module_key: 'LMS', saas_assessor_only: true },
+      { label: 'Koperasi Syariah', href: '/koperasi', icon: Landmark, permission_key: 'koperasi', module_key: 'Koperasi Syariah' },
     ]
   },
   {

@@ -26,6 +26,7 @@ import {
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { createBom, updateBom, deleteBom, createWorkOrder, updateWorkOrderStatus, deleteWorkOrder, addWorkOrderCost, getFGBins, createPurchaseRequests } from '@/modules/factory/actions/factory.actions'
 import { convertQuantityBetweenUnits } from '@/modules/factory/lib/unit-conversion'
+import { PageHeader, StatCard, StatusBadge, SafeButton, SectionCard, SectionHeader } from '@/components/ui/NizamUI'
 
 interface ManufacturingClientProps {
   orgId: string
@@ -449,23 +450,23 @@ export function ManufacturingClient({
                           <tr key={wo.id} className={`hover:bg-slate-50/50 transition ${isOverdue ? 'bg-rose-50/30' : isUrgent ? 'bg-amber-50/30' : ''}`}>
                              <td className="px-8 py-5">
                                 <div className="flex items-center gap-2">
-                                  <p className="text-sm font-black text-slate-900">{wo.wo_number}</p>
+                                  <p className="text-sm font-semibold text-slate-900">{wo.wo_number}</p>
                                   {isOverdue && <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[9px] font-semibold uppercase rounded-full tracking-tight flex items-center gap-1"><AlertTriangle size={10}/> Terlambat</span>}
                                   {!isOverdue && isUrgent && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-semibold uppercase rounded-full tracking-tight flex items-center gap-1"><Clock size={10}/> Segera</span>}
                                 </div>
                                 <p className="text-xs text-slate-500">{wo.bom?.product?.name}</p>
                                 <div className="flex items-center gap-2 mt-1">
-                                  <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-[0.18em] border border-blue-100">
+                                  <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[9px] font-semibold uppercase tracking-[0.18em] border border-blue-100">
                                     {wo.branch?.name || 'Semua Unit'}
                                   </span>
                                   {wo.bom?.branch?.name && (
-                                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-black uppercase tracking-[0.18em] border border-slate-200">
+                                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-semibold uppercase tracking-[0.18em] border border-slate-200">
                                       BOM {wo.bom.branch.name}
                                     </span>
                                   )}
                                 </div>
                              </td>
-                             <td className="px-6 py-5 text-right font-black text-slate-900">{formatQty(wo.quantity_planned)} Unit</td>
+                             <td className="px-6 py-5 text-right font-semibold text-slate-900">{formatQty(wo.quantity_planned)} Unit</td>
                              <td className="px-6 py-5">
                                 <span className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-tighter border ${
                                   wo.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
@@ -487,7 +488,7 @@ export function ManufacturingClient({
                                  <div className="flex justify-end gap-2">
                                  <button
                                    onClick={() => handleOpenPrintPreview(wo)}
-                                   className="px-4 py-2 bg-white text-slate-700 text-[10px] font-black uppercase rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
+                                   className="px-4 py-2 bg-white text-slate-700 text-[10px] font-semibold uppercase rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-2"
                                  >
                                    <Printer size={14} />
                                    Cetak SPK
@@ -496,7 +497,7 @@ export function ManufacturingClient({
                                    <button 
                                      disabled={!activeBranchId || loading}
                                      onClick={() => handleRelease(wo)} 
-                                     className="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                     className="px-4 py-2 bg-blue-600 text-white text-[10px] font-semibold uppercase rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                    >
                                      {loading ? 'Processing...' : 'Mulai Produksi'}
                                    </button>
@@ -509,7 +510,7 @@ export function ManufacturingClient({
                                         setSelectedWo(wo)
                                         setShowFinishModal(true)
                                       }} 
-                                      className="px-4 py-2 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-lg shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      className="px-4 py-2 bg-emerald-600 text-white text-[10px] font-semibold uppercase rounded-lg shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                       Selesaikan
                                     </button>
@@ -570,11 +571,11 @@ export function ManufacturingClient({
                            <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-semibold uppercase rounded-lg tracking-tight">{bom.code}</span>
                            <div className="flex flex-col items-end">
                               <span className="text-[10px] font-bold text-slate-400 tracking-tight">Est. HPP / Unit</span>
-                              <span className="text-sm font-black text-rose-600">{formatRupiah(estimatedHppPerUnit)}</span>
+                              <span className="text-sm font-semibold text-rose-600">{formatRupiah(estimatedHppPerUnit)}</span>
                            </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-[0.18em] border border-indigo-100">
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[9px] font-semibold uppercase tracking-[0.18em] border border-indigo-100">
                             {bom.branch?.name || 'Shared / Semua Unit'}
                           </span>
                         </div>
@@ -589,7 +590,7 @@ export function ManufacturingClient({
                              bom.items.map((bi: any, idx: number) => (
                                <div key={idx} className="flex justify-between items-center text-xs font-bold text-slate-600 p-2 bg-slate-50 rounded-xl">
                                   <span>{bi.product?.name || 'Unknown Product'}</span>
-                                  <span className="text-blue-600 font-black">{bi.quantity} <span className="text-[10px] text-slate-400 font-bold uppercase">{bi.unit || bi.product?.unit}</span></span>
+                                  <span className="text-blue-600 font-semibold">{bi.quantity} <span className="text-[10px] text-slate-400 font-bold uppercase">{bi.unit || bi.product?.unit}</span></span>
                                </div>
                              ))
                            ) : (
@@ -722,7 +723,7 @@ export function ManufacturingClient({
                 <div className="border-b-2 border-slate-900 pb-6 mb-6">
                   <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
                     <div>
-                      <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">{companyName}</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{companyName}</p>
                       <h2 className="text-3xl font-semibold text-slate-900 tracking-tight mt-2">Surat Perintah Kerja</h2>
                       <p className="text-sm font-bold text-blue-600 mt-1">{selectedPrintWo.wo_number}</p>
                       <p className="text-xs text-slate-500 mt-3 max-w-xl">
@@ -798,7 +799,7 @@ export function ManufacturingClient({
                               <tr key={`${bi.product_id || idx}-${idx}`} className="odd:bg-slate-50/40">
                                 <td className="px-6 py-4 text-sm font-bold text-slate-900 border-b border-slate-100">{bi.product?.name || 'Bahan produksi'}</td>
                                 <td className="px-4 py-4 text-sm text-right text-slate-700 border-b border-slate-100">{formatQty(qtyPerUnit)}</td>
-                                <td className="px-4 py-4 text-sm text-right font-black text-slate-900 border-b border-slate-100">{formatQty(totalNeed)}</td>
+                                <td className="px-4 py-4 text-sm text-right font-semibold text-slate-900 border-b border-slate-100">{formatQty(totalNeed)}</td>
                                 <td className="px-6 py-4 text-sm text-slate-700 border-b border-slate-100">{unitLabel}</td>
                               </tr>
                             )
@@ -880,7 +881,7 @@ export function ManufacturingClient({
                        <input name="deadline_date" type="date" required className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none focus:border-rose-500 font-bold text-slate-700" />
                     </div>
                   </div>
-                  <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-500 text-white font-black rounded-2xl shadow-xl shadow-emerald-100">
+                  <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-500 text-white font-semibold rounded-2xl shadow-xl shadow-emerald-100">
                      {loading ? 'Processing...' : 'Terbitkan Sekarang'}
                   </button>
                </form>
@@ -963,7 +964,7 @@ export function ManufacturingClient({
                              <div key={idx} className="flex justify-between items-center p-3 bg-white rounded-xl border border-slate-100 text-sm">
                                 <span className="font-bold text-slate-700">{p?.name}</span>
                                 <div className="flex items-center gap-4">
-                                   <span className="font-black text-blue-600">{item.quantity} <span className="text-blue-400 font-bold text-xs">{(item as any).unit || p?.unit || 'Pcs'}</span></span>
+                                   <span className="font-semibold text-blue-600">{item.quantity} <span className="text-blue-400 font-bold text-xs">{(item as any).unit || p?.unit || 'Pcs'}</span></span>
                                    <button type="button" onClick={() => setBomItems(bomItems.filter((_, i) => i !== idx))} className="text-rose-500"><X size={14} /></button>
                                 </div>
                              </div>
@@ -1032,7 +1033,7 @@ export function ManufacturingClient({
                     <button
                       type="button"
                       onClick={() => setOverheadCosts([...overheadCosts, { description: '', amount: 0, cost_type: 'LABOR' }])}
-                      className="text-[10px] font-black text-blue-600 uppercase"
+                      className="text-[10px] font-semibold text-blue-600 uppercase"
                     >
                       + Tambah Biaya
                     </button>
@@ -1105,11 +1106,11 @@ export function ManufacturingClient({
                         </div>
                         <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-100">
                           <span className="font-bold text-slate-800">Total HPP Produksi:</span>
-                          <span className="font-black text-rose-600">{formatRupiah(grandTotalHPP)}</span>
+                          <span className="font-semibold text-rose-600">{formatRupiah(grandTotalHPP)}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm">
                           <span className="font-bold text-slate-800">HPP per Unit (Modal Bersih):</span>
-                          <span className="font-black text-rose-600">{formatRupiah(hppPerUnit)}</span>
+                          <span className="font-semibold text-rose-600">{formatRupiah(hppPerUnit)}</span>
                         </div>
 
                         <div className="mt-6 p-4 bg-emerald-50 border border-emerald-100 rounded-xl space-y-3">
@@ -1137,7 +1138,7 @@ export function ManufacturingClient({
                 </div>
 
                 <div className="pt-4">
-                  <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-600 text-white font-black rounded-2xl shadow-xl shadow-emerald-100 flex items-center justify-center gap-3">
+                  <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-600 text-white font-semibold rounded-2xl shadow-xl shadow-emerald-100 flex items-center justify-center gap-3">
                     {loading ? 'Processing...' : <><CheckCircle2 size={20} /> Konfirmasi & Selesaikan Produksi</>}
                   </button>
                   <p className="text-[10px] text-center text-slate-400 mt-4 px-8">Menyelesaikan SPK akan otomatis memotong stok bahan baku dan menambah stok produk jadi sesuai resep.</p>
@@ -1181,11 +1182,11 @@ export function ManufacturingClient({
                     {shortItems.map((item, i) => (
                       <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 transition hover:border-rose-200 group">
                         <div className="flex flex-col">
-                          <span className="text-sm font-black text-slate-800">{item.name}</span>
+                          <span className="text-sm font-semibold text-slate-800">{item.name}</span>
                           <span className="text-[10px] font-bold text-slate-400">Inventory saat ini: {item.available}</span>
                         </div>
                         <div className="flex flex-col items-end">
-                          <span className="text-xs font-black text-rose-600">Butuh {item.needed}</span>
+                          <span className="text-xs font-semibold text-rose-600">Butuh {item.needed}</span>
                           <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full mt-1">-{item.needed - item.available}</span>
                         </div>
                       </div>
@@ -1199,9 +1200,9 @@ export function ManufacturingClient({
                       <Layers size={20} className="text-amber-500" />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xs font-black text-amber-900">Bahan baku tidak mencukupi.</p>
+                      <p className="text-xs font-semibold text-amber-900">Bahan baku tidak mencukupi.</p>
                       <p className="text-[10px] font-medium text-amber-700/80 leading-relaxed italic">
-                        Klik <span className="font-black">Lanjut Produksi</span> untuk sistem Backorder (Stok Minus), atau <span className="font-black text-blue-600">Ganti Akad</span> untuk beralih ke Pre-Order (Salam/Istisna).
+                        Klik <span className="font-semibold">Lanjut Produksi</span> untuk sistem Backorder (Stok Minus), atau <span className="font-semibold text-blue-600">Ganti Akad</span> untuk beralih ke Pre-Order (Salam/Istisna).
                       </p>
                     </div>
                   </div>

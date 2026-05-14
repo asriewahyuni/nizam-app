@@ -32,6 +32,7 @@ import {
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { createAsset, createBooking, updateBookingStatus, createRoute, createSchedule, createTicket, createMedicalRecord, createCrew, recordCrewAttendance } from '@/modules/fleet/actions/fleet.actions'
 import { Html5Qrcode } from 'html5-qrcode'
+import { PageHeader, StatCard, StatusBadge, SafeButton, SectionCard, SectionHeader } from '@/components/ui/NizamUI'
 
 interface FleetClientProps {
   orgId: string
@@ -61,6 +62,20 @@ const statusColor = {
   RENTED: 'bg-blue-50 text-blue-600 border-blue-100',
   MAINTENANCE: 'bg-amber-50 text-amber-600 border-amber-100',
   OUT_OF_SERVICE: 'bg-rose-50 text-rose-600 border-rose-100'
+}
+
+const statusLabel: Record<string, string> = {
+  AVAILABLE: 'Tersedia',
+  RENTED: 'Disewa',
+  MAINTENANCE: 'Perawatan',
+  OUT_OF_SERVICE: 'Rusak',
+}
+
+const statusVariant: Record<string, string> = {
+  AVAILABLE: 'success',
+  RENTED: 'info',
+  MAINTENANCE: 'warning',
+  OUT_OF_SERVICE: 'danger',
 }
 
 const getFleetIcon = (type: string) => {
@@ -263,33 +278,12 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
     <motion.div variants={container} initial="hidden" animate="show" className="max-w-7xl mx-auto space-y-10">
       
       {/* Header */}
-      <motion.div variants={item} className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-1">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
-             <Truck size={32} className="text-blue-600" />
-             Fleet & Rental
-          </h1>
-          <p className="text-sm text-slate-500 font-medium">Manajemen Aset Bergerak, Reservasi, dan Perawatan.</p>
-        </div>
-
-        <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-sm w-full md:w-auto">
-           {[
-             { id: 'PO_BUS', label: 'Operasional Bus (PO)', icon: Bus },
-             { id: 'UNITS', label: 'Armada (Unit)', icon: Car },
-             { id: 'BOOKINGS', label: 'Pesanan (Rental)', icon: Calendar },
-             { id: 'LABS', label: 'Perawatan (Labs)', icon: Wrench },
-           ].map(tab => (
-             <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex-1 flex items-center justify-center gap-2 px-6 py-2.5 text-xs font-bold rounded-xl transition-all ${activeTab === tab.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-             >
-               <tab.icon size={14} />
-               {tab.label}
-             </button>
-           ))}
-        </div>
-      </motion.div>
+      <PageHeader
+        title="Fleet & Rental"
+        subtitle="Manajemen Aset Bergerak, Reservasi, dan Perawatan."
+        icon={<Truck size={32} />}
+        iconColor="text-blue-600"
+      />
 
       <AnimatePresence mode="wait">
         {activeTab === 'PO_BUS' && (
@@ -342,7 +336,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                                  </div>
                              </div>
                              <div className="mt-6 pt-6 border-t border-slate-50 flex items-center justify-between">
-                                <div className="text-[10px] font-black uppercase tracking-tighter text-slate-400">
+                                <div className="text-[10px] font-semibold uppercase tracking-tighter text-slate-400">
                                    {sc.tickets?.count || 0} / {sc.asset?.capacity || 40} Kursi Terjual
                                 </div>
                                 <button 
@@ -350,7 +344,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                                     setSelectedSchedule(sc)
                                     setShowTicketModal(true)
                                   }}
-                                  className="px-4 py-2 bg-slate-900 text-white text-[10px] font-black rounded-xl hover:bg-blue-600 transition-all uppercase tracking-tighter shadow-lg shadow-blue-50"
+                                  className="px-4 py-2 bg-slate-900 text-white text-[10px] font-semibold rounded-xl hover:bg-blue-600 transition-all uppercase tracking-tighter shadow-lg shadow-blue-50"
                                 >
                                    Jual Tiket
                                 </button>
@@ -388,10 +382,10 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                             ) : (
                               routes.map(r => (
                                 <tr key={r.id}>
-                                   <td className="px-8 py-5 font-black text-slate-900 text-sm">{r.name}</td>
+                                   <td className="px-8 py-5 font-semibold text-slate-900 text-sm">{r.name}</td>
                                    <td className="px-6 py-5 text-xs text-slate-500 font-bold uppercase">{r.origin}</td>
                                    <td className="px-6 py-5 text-xs text-slate-500 font-bold uppercase">{r.destination}</td>
-                                   <td className="px-6 py-5 text-right font-black text-slate-900 text-sm">{formatRupiah(r.base_price)}</td>
+                                   <td className="px-6 py-5 text-right font-semibold text-slate-900 text-sm">{formatRupiah(r.base_price)}</td>
                                    <td className="px-8 py-5 text-right"><button className="text-blue-600 font-bold text-xs">Edit</button></td>
                                 </tr>
                               ))
@@ -426,17 +420,17 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                               schedules.flatMap(s => (s.tickets || []).map((t: any) => ({ ...t, schedule: s }))).map((t: any) => (
                                 <tr key={t.id}>
                                    <td className="px-8 py-5">
-                                      <p className="font-black text-slate-900 text-sm">{t.passenger?.name || 'Anon'}</p>
+                                      <p className="font-semibold text-slate-900 text-sm">{t.passenger?.name || 'Anon'}</p>
                                       <p className="text-[10px] text-slate-400 font-bold uppercase">{formatDate(t.created_at)}</p>
                                     </td>
                                    <td className="px-6 py-5">
                                       <p className="text-xs text-slate-700 font-bold uppercase">{t.schedule?.route?.name}</p>
                                       <p className="text-[10px] text-slate-400 font-bold">{t.schedule?.asset?.plate_number}</p>
                                    </td>
-                                   <td className="px-6 py-5 font-black text-emerald-600 text-sm">{t.seat_number}</td>
-                                   <td className="px-6 py-5 text-right font-black text-slate-900 text-sm">{formatRupiah(t.price)}</td>
+                                   <td className="px-6 py-5 font-semibold text-emerald-600 text-sm">{t.seat_number}</td>
+                                   <td className="px-6 py-5 text-right font-semibold text-slate-900 text-sm">{formatRupiah(t.price)}</td>
                                    <td className="px-8 py-5">
-                                      <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-black rounded-full uppercase border border-emerald-100">{t.status}</span>
+                                      <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-semibold rounded-full uppercase border border-emerald-100">{t.status}</span>
                                    </td>
                                  </tr>
                                ))
@@ -478,14 +472,14 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                                       <div className="w-8 h-8 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400"><FileBadge size={14} /></div>
                                       <div>
                                          <p className="text-[9px] text-slate-400 uppercase">SIM / License</p>
-                                         <p className="tracking-tighter font-black text-slate-700">{c.license_number || 'TIDAK ADA DATA'}</p>
+                                         <p className="tracking-tighter font-semibold text-slate-700">{c.license_number || 'TIDAK ADA DATA'}</p>
                                       </div>
                                    </div>
                                    <div className="flex items-center gap-3 text-xs font-bold text-slate-600">
                                       <div className="w-8 h-8 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400"><ShieldAlert size={14} /></div>
                                       <div>
                                          <p className="text-[9px] text-slate-400 uppercase">Masa Berlaku SIM</p>
-                                         <p className={`${new Date(c.license_expiry) < new Date() ? 'text-rose-500' : 'text-slate-600'} font-black`}>
+                                         <p className={`${new Date(c.license_expiry) < new Date() ? 'text-rose-500' : 'text-slate-600'} font-semibold`}>
                                             {c.license_expiry ? formatDate(c.license_expiry) : 'EXPIRED / NO DATA'}
                                          </p>
                                       </div>
@@ -507,10 +501,10 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                          <p className="text-[10px] text-slate-400 font-semibold tracking-tight">{new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
                       </div>
                       <div className="flex gap-3 w-full md:w-auto">
-                         <button onClick={() => { setScanType('IN'); setShowScanModal(true) }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white text-sm font-black rounded-2xl hover:bg-emerald-700 shadow-xl shadow-emerald-100 transition-all">
+                         <button onClick={() => { setScanType('IN'); setShowScanModal(true) }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white text-sm font-semibold rounded-2xl hover:bg-emerald-700 shadow-xl shadow-emerald-100 transition-all">
                             <QrCode size={18} /> Clock In (Mulai)
                          </button>
-                         <button onClick={() => { setScanType('OUT'); setShowScanModal(true) }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-4 bg-rose-600 text-white text-sm font-black rounded-2xl hover:bg-rose-700 shadow-xl shadow-rose-100 transition-all">
+                         <button onClick={() => { setScanType('OUT'); setShowScanModal(true) }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-4 bg-rose-600 text-white text-sm font-semibold rounded-2xl hover:bg-rose-700 shadow-xl shadow-rose-100 transition-all">
                             <Navigation size={18} /> Clock Out (Selesai)
                          </button>
                       </div>
@@ -534,7 +528,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                                attendanceToday.map((a: any) => (
                                  <tr key={a.id} className="hover:bg-slate-50/50 transition">
                                     <td className="px-8 py-5">
-                                       <p className="font-black text-slate-900 text-sm">{a.employee ? `${a.employee.first_name} ${a.employee.last_name}` : 'Unknown'}</p>
+                                       <p className="font-semibold text-slate-900 text-sm">{a.employee ? `${a.employee.first_name} ${a.employee.last_name}` : 'Unknown'}</p>
                                     </td>
                                     <td className="px-6 py-5">
                                        <div className="flex flex-col gap-1">
@@ -544,7 +538,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                                     </td>
                                     <td className="px-6 py-5 text-center">
                                        {a.location_gps ? (
-                                         <a href={`https://www.google.com/maps?q=${a.location_gps}`} target="_blank" className="inline-flex items-center gap-2 px-3 py-1 bg-slate-50 text-blue-600 rounded-lg border border-slate-100 text-[10px] font-black hover:bg-blue-50 transition-colors">
+                                         <a href={`https://www.google.com/maps?q=${a.location_gps}`} target="_blank" className="inline-flex items-center gap-2 px-3 py-1 bg-slate-50 text-blue-600 rounded-lg border border-slate-100 text-[10px] font-semibold hover:bg-blue-50 transition-colors">
                                             <MapIcon size={12} /> Buka Peta
                                          </a>
                                        ) : <span className="text-slate-300">-</span>}
@@ -553,7 +547,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                                        <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">{a.qr_scanned_payload || '-'}</span>
                                     </td>
                                     <td className="px-8 py-5 text-right">
-                                       <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-black rounded-full uppercase border border-emerald-100">{a.status}</span>
+                                       <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-semibold rounded-full uppercase border border-emerald-100">{a.status}</span>
                                     </td>
                                  </tr>
                                ))
@@ -605,9 +599,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                             <div className="w-14 h-14 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
                                <Icon size={28} />
                             </div>
-                            <span className={`px-4 py-1.5 text-[10px] font-bold rounded-full uppercase tracking-tighter border ${statusColor[asset.status as keyof typeof statusColor]}`}>
-                               {asset.status.replace('_', ' ')}
-                            </span>
+                            <StatusBadge label={statusLabel[asset.status as keyof typeof statusLabel] || asset.status.replace('_', ' ')} variant={(statusVariant[asset.status as keyof typeof statusVariant] as any) || 'neutral'} />
                          </div>
 
                          <div className="space-y-4">
@@ -631,7 +623,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                                Lihat Detail <ChevronRight size={14} />
                             </button>
                             {asset.status === 'AVAILABLE' && (
-                              <button onClick={() => setShowBookingModal(true)} className="px-4 py-2 bg-slate-900 text-white text-[10px] font-black rounded-xl hover:bg-blue-600 transition-all uppercase tracking-tighter shadow-lg shadow-blue-50 opacity-0 group-hover:opacity-100">
+                              <button onClick={() => setShowBookingModal(true)} className="px-4 py-2 bg-slate-900 text-white text-[10px] font-semibold rounded-xl hover:bg-blue-600 transition-all uppercase tracking-tighter shadow-lg shadow-blue-50 opacity-0 group-hover:opacity-100">
                                 Sewakan
                               </button>
                             )}
@@ -668,11 +660,11 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                           <tr key={b.id} className="hover:bg-slate-50/50 transition cursor-pointer group">
                              <td className="px-8 py-6">
                                 <div className="flex items-center gap-4">
-                                   <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-black">
+                                   <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-semibold">
                                       {b.contact?.name?.[0]}
                                    </div>
                                    <div>
-                                      <p className="text-sm font-black text-slate-900 leading-tight">{b.contact?.name}</p>
+                                      <p className="text-sm font-semibold text-slate-900 leading-tight">{b.contact?.name}</p>
                                       <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-tight">{b.asset?.model} • {b.asset?.plate_number}</p>
                                    </div>
                                 </div>
@@ -684,15 +676,15 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                                    <span>{formatDate(b.end_date)}</span>
                                 </div>
                              </td>
-                             <td className="px-6 py-6 text-right font-black text-slate-900 text-xs">
+                             <td className="px-6 py-6 text-right font-semibold text-slate-900 text-xs">
                                 {Math.ceil((new Date(b.end_date).getTime() - new Date(b.start_date).getTime()) / (1000 * 3600 * 24))} Hari
                              </td>
                              <td className="px-6 py-6 text-right">
-                                <p className="text-sm font-black text-slate-900">{formatRupiah(b.total_amount)}</p>
+                                <p className="text-sm font-semibold text-slate-900">{formatRupiah(b.total_amount)}</p>
                                 {b.deposit > 0 && <p className="text-[10px] text-emerald-500 font-bold">Dep: {formatRupiah(b.deposit)}</p>}
                              </td>
                              <td className="px-6 py-6">
-                                <span className={`px-3 py-1 text-[10px] font-black rounded-full uppercase tracking-tighter border ${
+                                <span className={`px-3 py-1 text-[10px] font-semibold rounded-full uppercase tracking-tighter border ${
                                   b.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                                   b.status === 'ACTIVE' ? 'bg-blue-50 text-blue-600 border-blue-100' :
                                   b.status === 'CANCELLED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
@@ -722,7 +714,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                     <h3 className="text-xl font-semibold text-slate-900 tracking-tight flex items-center gap-3">
                        <Wrench size={24} className="text-amber-500" /> Rekam Medis & Servis
                     </h3>
-                    <p className="text-xs text-slate-400 font-medium tracking-tight uppercase font-black">Kardeks Kendaraan (Vehicle Medical History)</p>
+                    <p className="text-xs text-slate-400 font-medium tracking-tight uppercase font-semibold">Kardeks Kendaraan (Vehicle Medical History)</p>
                  </div>
                  <button onClick={() => setShowMedicalModal(true)} className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white text-sm font-bold rounded-2xl hover:bg-amber-600 shadow-xl shadow-amber-100 transition-all">
                     <Plus size={18} /> Catat Servis Baru
@@ -750,12 +742,12 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                          medicalRecords.map(m => (
                            <tr key={m.id} className="hover:bg-amber-50/10 transition group">
                               <td className="px-8 py-6">
-                                 <p className="text-sm font-black text-slate-900 leading-tight">{m.maintenance_number || 'MT-NEW'}</p>
+                                 <p className="text-sm font-semibold text-slate-900 leading-tight">{m.maintenance_number || 'MT-NEW'}</p>
                                  <p className="text-[10px] text-slate-500 font-bold mt-1 uppercase tracking-tight">{m.asset?.plate_number} • {m.asset?.model}</p>
                                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">{formatDate(m.service_date)}</p>
                               </td>
                               <td className="px-6 py-6">
-                                 <span className={`px-2 py-0.5 text-[9px] font-black rounded-lg uppercase border mb-1 inline-block ${
+                                 <span className={`px-2 py-0.5 text-[9px] font-semibold rounded-lg uppercase border mb-1 inline-block ${
                                    m.maintenance_type === 'EMERGENCY' ? 'bg-rose-50 text-rose-500 border-rose-100' :
                                    m.maintenance_type === 'CORRECTIVE' ? 'bg-amber-50 text-amber-500 border-amber-100' :
                                    'bg-blue-50 text-blue-500 border-blue-100'
@@ -764,11 +756,11 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                                  </span>
                                  <p className="text-xs text-slate-600 font-medium line-clamp-2">{m.description}</p>
                               </td>
-                              <td className="px-6 py-6 text-right font-black text-slate-900 text-sm">
+                              <td className="px-6 py-6 text-right font-semibold text-slate-900 text-sm">
                                  {formatRupiah(m.cost)}
                               </td>
                               <td className="px-6 py-6">
-                                 <p className="text-xs font-black text-slate-700">{m.odometer_at || 0} KM</p>
+                                 <p className="text-xs font-semibold text-slate-700">{m.odometer_at || 0} KM</p>
                                  {m.next_service_date && <p className="text-[9px] text-rose-400 font-bold mt-1">Next: {formatDate(m.next_service_date)}</p>}
                               </td>
                               <td className="px-6 py-6 font-bold text-xs text-slate-500">
@@ -842,7 +834,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                          <input name="odometer" type="number" placeholder="0" className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold" />
                       </div>
                    </div>
-                   <button type="submit" disabled={loading} className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 mt-4">
+                   <button type="submit" disabled={loading} className="w-full py-5 bg-blue-600 text-white font-semibold rounded-2xl shadow-xl shadow-blue-100 mt-4">
                       {loading ? 'Processing...' : 'Simpan & Aktifkan Armada'}
                    </button>
                 </form>
@@ -887,9 +879,9 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                    </div>
                    <div className="space-y-1.5">
                       <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Total Biaya (Akomodasi)</label>
-                      <input name="total_amount" type="number" required placeholder="0" className="w-full px-5 py-4 bg-slate-50 border border-emerald-100 rounded-2xl outline-none focus:border-emerald-500 font-black text-2xl text-slate-900" />
+                      <input name="total_amount" type="number" required placeholder="0" className="w-full px-5 py-4 bg-slate-50 border border-emerald-100 rounded-2xl outline-none focus:border-emerald-500 font-semibold text-2xl text-slate-900" />
                    </div>
-                   <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-600 text-white font-black rounded-2xl shadow-xl shadow-emerald-50 mt-4">
+                   <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-600 text-white font-semibold rounded-2xl shadow-xl shadow-emerald-50 mt-4">
                       {loading ? 'Processing...' : 'Konfirmasi Reservasi'}
                    </button>
                 </form>
@@ -931,7 +923,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                          <input name="base_price" type="number" required placeholder="250000" className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-500 font-bold" />
                       </div>
                    </div>
-                   <button type="submit" disabled={loading} className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-50 mt-4">
+                   <button type="submit" disabled={loading} className="w-full py-5 bg-blue-600 text-white font-semibold rounded-2xl shadow-xl shadow-blue-50 mt-4">
                       {loading ? 'Processing...' : 'Simpan Master Rute'}
                    </button>
                 </form>
@@ -990,7 +982,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                           </select>
                        </div>
                     </div>
-                   <button type="submit" disabled={loading} className="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-50 mt-4">
+                   <button type="submit" disabled={loading} className="w-full py-5 bg-indigo-600 text-white font-semibold rounded-2xl shadow-xl shadow-indigo-50 mt-4">
                       {loading ? 'Processing...' : 'Aktifkan Jadwal'}
                    </button>
                 </form>
@@ -1010,7 +1002,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                 </div>
                 <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Info Perjalanan</p>
-                   <p className="text-sm font-black text-slate-900 mt-1 uppercase">{selectedSchedule.route?.name}</p>
+                   <p className="text-sm font-semibold text-slate-900 mt-1 uppercase">{selectedSchedule.route?.name}</p>
                    <p className="text-[10px] font-bold text-slate-500 mt-0.5">{selectedSchedule.asset?.plate_number} • {formatDate(selectedSchedule.departure_time)}</p>
                 </div>
                 <form onSubmit={handleBookTicket} className="space-y-5">
@@ -1024,14 +1016,14 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">No. Kursi</label>
-                         <input name="seat_number" required placeholder="Cth: 1A" className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:border-emerald-500 font-black text-center text-emerald-600" />
+                         <input name="seat_number" required placeholder="Cth: 1A" className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:border-emerald-500 font-semibold text-center text-emerald-600" />
                       </div>
                       <div className="space-y-1.5">
                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Harga Final (Rp)</label>
-                         <input name="price" type="number" required defaultValue={selectedSchedule.route?.base_price || 0} className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:border-emerald-500 font-black" />
+                         <input name="price" type="number" required defaultValue={selectedSchedule.route?.base_price || 0} className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:border-emerald-500 font-semibold" />
                       </div>
                    </div>
-                   <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-600 text-white font-black rounded-2xl shadow-xl shadow-emerald-50 mt-4">
+                   <button type="submit" disabled={loading} className="w-full py-5 bg-emerald-600 text-white font-semibold rounded-2xl shadow-xl shadow-emerald-50 mt-4">
                       {loading ? 'Processing...' : 'Cetak & Jual Tiket'}
                    </button>
                 </form>
@@ -1085,7 +1077,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                       </div>
                       <div className="space-y-1.5">
                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight ml-1">Biaya Servis (Rp)</label>
-                         <input name="cost" type="number" required placeholder="0" className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-amber-500 font-black text-rose-500" />
+                         <input name="cost" type="number" required placeholder="0" className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-amber-500 font-semibold text-rose-500" />
                       </div>
                    </div>
 
@@ -1111,7 +1103,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                       </div>
                    </div>
 
-                   <button type="submit" disabled={loading} className="w-full py-5 bg-amber-500 text-white font-black rounded-2xl shadow-xl shadow-amber-50 mt-4 flex items-center justify-center gap-3">
+                   <button type="submit" disabled={loading} className="w-full py-5 bg-amber-500 text-white font-semibold rounded-2xl shadow-xl shadow-amber-50 mt-4 flex items-center justify-center gap-3">
                       {loading ? 'Processing...' : <><CheckCircle2 size={20} /> Simpan Rekam Medis</>}
                    </button>
                    <p className="text-[9px] text-center text-slate-400 px-8">Data servis akan tersimpan permanen dalam riwayat aset kendaraan (Kardeks).</p>
@@ -1180,7 +1172,7 @@ export function FleetClient({ orgId, assets, bookings, routes, schedules, medica
                          </select>
                       </div>
                    </div>
-                   <button type="submit" disabled={loading} className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-50 mt-4">
+                   <button type="submit" disabled={loading} className="w-full py-5 bg-blue-600 text-white font-semibold rounded-2xl shadow-xl shadow-blue-50 mt-4">
                       {loading ? 'Processing...' : 'Simpan & Aktifkan Kru'}
                    </button>
                 </form>

@@ -76,6 +76,7 @@ const MODULE_CATEGORIES = [
       { id: 'project', name: 'Proyek & Konstruksi', perms: ['project:read', 'project:write'] },
       { id: 'fleet', name: 'Fleet & Rental', perms: ['fleet:read', 'fleet:write'] },
       { id: 'lms', name: 'LMS / Lembaga Pelatihan', perms: ['lms:read', 'lms:write'] },
+      { id: 'koperasi', name: 'Koperasi Syariah', perms: ['koperasi:read', 'koperasi:write'] },
       { id: 'syirkah', name: 'Akad Syirkah', perms: ['syirkah:read', 'syirkah:write'] },
     ]
   },
