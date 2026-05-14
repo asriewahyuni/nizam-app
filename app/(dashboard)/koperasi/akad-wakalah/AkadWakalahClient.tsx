@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, StatusBadge, Modal } from '@/components/ui/NizamUI'
-import { Plus, FileText } from 'lucide-react'
+import { Plus, FileText, Printer } from 'lucide-react'
 import { getAkadWakalah, createAkadWakalah, getShahibulMaal } from '@/modules/koperasi/actions/koperasi.actions'
 
 export default function AkadWakalahClient({ orgId }: { orgId: string }) {
@@ -55,6 +55,12 @@ export default function AkadWakalahClient({ orgId }: { orgId: string }) {
                 <div className="text-xs text-white/60">Barang: {a.jenis_barang}</div>
                 <div className="text-xs text-emerald-400">Ujrah: Rp {Number(a.ujrah_flat).toLocaleString()}</div>
                 <div className="text-xs text-white/40">Tanggal: {new Date(a.tgl_akad).toLocaleDateString('id-ID')}</div>
+                <button
+                  onClick={() => window.open('/api/koperasi/akad-wakalah/' + a.id + '/pdf', '_blank')}
+                  className="mt-2 flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300"
+                >
+                  <Printer className="w-3 h-3" /> Cetak Akad
+                </button>
               </div>
             ))}
           </div>

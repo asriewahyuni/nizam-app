@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, StatusBadge, Modal } from '@/components/ui/NizamUI'
-import { Plus, ShoppingCart } from 'lucide-react'
+import { Plus, ShoppingCart, Printer } from 'lucide-react'
 import { getMurabahahTransaksi, createMurabahahTransaksi, getAkadWakalah, getAnggota } from '@/modules/koperasi/actions/koperasi.actions'
 
 export default function MurabahahClient({ orgId }: { orgId: string }) {
@@ -94,6 +94,12 @@ export default function MurabahahClient({ orgId }: { orgId: string }) {
                     <span>Progress: {progress.toFixed(0)}%</span>
                     <span>Rp {totalBayar.toLocaleString()} / Rp {totalTagihan.toLocaleString()}</span>
                   </div>
+                  <button
+                    onClick={() => window.open('/api/koperasi/murabahah/' + t.id + '/pdf', '_blank')}
+                    className="mt-2 flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300"
+                  >
+                    <Printer className="w-3 h-3" /> Cetak Akad
+                  </button>
                 </div>
               )
             })}
