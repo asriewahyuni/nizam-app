@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { CheckCircle2, Loader2, ArrowRight, Home, Sparkles, AlertCircle } from 'lucide-react'
-import { getSetupModData, completeSetupOnboarding } from './setup.actions'
 
 type Step = { id: string; title: string; description: string }
 type ModData = {
@@ -13,12 +12,7 @@ type ModData = {
   tags?: string[]; requires?: string[]
 }
 
-export function SetupClient({
-  moduleKey,
-}: {
-  moduleKey: string
-}) {
-  const router = useRouter()
+export function SetupClient() {
   const [mod, setMod] = useState<ModData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -26,25 +20,44 @@ export function SetupClient({
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
 
-  // Fetch module data on mount
+  // Extract moduleKey from URL on mount
   useEffect(() => {
-    getSetupModData(moduleKey)
+    const match = window.location.pathname.match(/\/marketplace\/setup\/(.+)/)
+    if (!match) {
+      setError('Module key not found in URL')
+      setLoading(false)
+      return
+    }
+    const moduleKey = decodeURIComponent(match[1])
+
+    fetch(`/api/setup?moduleKey=${encodeURIComponent(moduleKey)}`)
+      .then(res => res.json())
       .then(data => {
-        setMod(data as ModData)
+        if (data.error) {
+          setError(data.error)
+        } else {
+          setMod(data as ModData)
+        }
         setLoading(false)
       })
       .catch(err => {
-        setError(err?.message || 'Gagal memuat data modul')
+        setError(err?.message || 'Gagal memuat data')
         setLoading(false)
       })
-  }, [moduleKey])
+  }, [])
 
   const handleFinish = async () => {
     if (!mod) return
     setBusy(true)
     setError(null)
     try {
-      const result = await completeSetupOnboarding(mod.key)
+      const res = await fetch('/api/setup/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moduleKey: mod.key }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Gagal')
       setDone(true)
     } catch (e: any) {
       setError(e?.message || 'Gagal menyelesaikan setup')
