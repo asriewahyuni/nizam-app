@@ -1,61 +1,105 @@
 'use client'
 
-import { useState } from 'react'
-import { CheckCircle2, Loader2, ArrowRight, Home, BookOpen, Sparkles } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { CheckCircle2, Loader2, ArrowRight, Home, Sparkles, AlertCircle } from 'lucide-react'
+import { getSetupModData, completeSetupOnboarding } from './setup.actions'
 
 type Step = { id: string; title: string; description: string }
-type ModInfo = {
+type ModData = {
   key: string; name: string; tagline?: string; description?: string
   icon?: string; color?: string; href: string; isCore: boolean
   category: string; coaInjectionFn?: string
-  onboardingStepsJson: string
+  onboardingSteps: Step[]
   tags?: string[]; requires?: string[]
 }
 
 export function SetupClient({
-  mod,
-  coaInstalled = false,
-  currentSettings = {},
-  completeOnboarding,
+  moduleKey,
+  orgId,
 }: {
-  mod: ModInfo
-  coaInstalled?: boolean
-  currentSettings?: Record<string, any>
-  completeOnboarding?: (key: string) => Promise<any>
+  moduleKey: string
+  orgId: string
 }) {
-  const steps: Step[] = JSON.parse(mod.onboardingStepsJson || '[]')
-  const [currentStep, setCurrentStep] = useState(coaInstalled ? 1 : 0)
-  const [loading, setLoading] = useState(false)
-  const [done, setDone] = useState(false)
+  const router = useRouter()
+  const [mod, setMod] = useState<ModData | null>(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentStep, setCurrentStep] = useState(0)
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
 
-  const coaStepIdx = steps.findIndex(s => s.id === 'coa')
-  const hasCoaStep = coaStepIdx >= 0
+  // Fetch module data on mount
+  useEffect(() => {
+    getSetupModData(moduleKey)
+      .then(data => {
+        setMod(data as ModData)
+        setLoading(false)
+      })
+      .catch(err => {
+        setError(err?.message || 'Gagal memuat data modul')
+        setLoading(false)
+      })
+  }, [moduleKey])
 
   const handleFinish = async () => {
-    if (!completeOnboarding) {
-      setDone(true)
-      return
-    }
-    setLoading(true)
+    if (!mod) return
+    setBusy(true)
     setError(null)
     try {
-      await completeOnboarding(mod.key)
+      const result = await completeSetupOnboarding(mod.key)
       setDone(true)
     } catch (e: any) {
       setError(e?.message || 'Gagal menyelesaikan setup')
     } finally {
-      setLoading(false)
+      setBusy(false)
     }
   }
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#07080a] flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 text-emerald-400 animate-spin mx-auto mb-4" />
+          <p className="text-white/50">Memuat data modul...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error && !mod) {
+    return (
+      <div className="min-h-screen bg-[#07080a] flex items-center justify-center p-8">
+        <div className="text-center max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <h1 className="text-xl font-semibold text-white mb-2">Gagal Memuat Halaman</h1>
+          <p className="text-white/50 mb-6">{error}</p>
+          <div className="flex gap-3 justify-center">
+            <button onClick={() => window.location.reload()} className="px-6 py-3 rounded-2xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-all">
+              Coba Lagi
+            </button>
+            <a href="/marketplace" className="px-6 py-3 rounded-2xl border border-white/20 text-white/50 hover:text-white/80 transition-all">
+              Kembali
+            </a>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!mod) return null
+
+  const steps = mod.onboardingSteps || []
+  const isLastStep = currentStep >= steps.length - 1
+
+  // Done state
   if (done) {
     return (
       <div className="min-h-screen bg-[#07080a] flex items-center justify-center p-8">
         <div className="text-center max-w-md">
-          <div className="text-6xl mb-6 flex justify-center">
-            <Sparkles className="w-16 h-16 text-emerald-400" />
-          </div>
+          <Sparkles className="w-16 h-16 text-emerald-400 mx-auto mb-6" />
           <h1 className="text-2xl font-semibold text-white mb-2">Setup Selesai! 🎉</h1>
           <p className="text-white/50 mb-8">{mod.name} siap digunakan.</p>
           <a
@@ -77,9 +121,7 @@ export function SetupClient({
         <div className="text-center mb-10">
           <div className="text-5xl mb-4">{mod.icon || '🚀'}</div>
           <h1 className="text-2xl font-semibold text-white mb-2">Setup {mod.name}</h1>
-          {mod.tagline && (
-            <p className="text-white/50 text-sm">{mod.tagline}</p>
-          )}
+          {mod.tagline && <p className="text-white/50 text-sm">{mod.tagline}</p>}
         </div>
 
         {/* Steps */}
@@ -109,15 +151,11 @@ export function SetupClient({
                     }`}>
                       {isPast ? <CheckCircle2 className="w-4 h-4" /> : idx + 1}
                     </div>
-                    <div className="flex-1">
-                      <h3 className={`text-base font-semibold ${
-                        isActive ? 'text-white' : isPast ? 'text-white/60' : 'text-white/30'
-                      }`}>
+                    <div className="flex-1 text-left">
+                      <h3 className={`text-base font-semibold ${isActive ? 'text-white' : isPast ? 'text-white/60' : 'text-white/30'}`}>
                         {step.title}
                       </h3>
-                      <p className={`text-sm mt-1 ${
-                        isActive ? 'text-white/60' : 'text-white/30'
-                      }`}>
+                      <p className={`text-sm mt-1 ${isActive ? 'text-white/60' : 'text-white/30'}`}>
                         {step.description}
                       </p>
                     </div>
@@ -128,11 +166,11 @@ export function SetupClient({
           </div>
         ) : (
           <div className="text-center mb-8">
-            <p className="text-white/50">Tidak ada langkah setup yang diperlukan.</p>
+            <p className="text-white/50">Tidak ada langkah setup khusus.</p>
           </div>
         )}
 
-        {/* Error */}
+        {/* Error toast */}
         {error && (
           <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
             {error}
@@ -141,32 +179,35 @@ export function SetupClient({
 
         {/* Actions */}
         <div className="flex justify-center gap-3">
-          {currentStep < steps.length - 1 && (
+          {!isLastStep && steps.length > 0 && (
             <button
-              onClick={() => {
-                if (hasCoaStep && currentStep === coaStepIdx) {
-                  setLoading(true)
-                  setTimeout(() => { setLoading(false); setCurrentStep(c => c + 1) }, 500)
-                  return
-                }
-                setCurrentStep(c => Math.min(c + 1, steps.length - 1))
-              }}
-              disabled={loading}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-all"
+              onClick={() => setCurrentStep(c => Math.min(c + 1, steps.length - 1))}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-all"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+              <ArrowRight className="w-4 h-4" />
               Lanjutkan
             </button>
           )}
 
-          {currentStep === steps.length - 1 && (
+          {isLastStep && steps.length > 0 && (
             <button
               onClick={handleFinish}
-              disabled={loading}
+              disabled={busy}
               className="inline-flex items-center gap-2 px-8 py-3 rounded-2xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-all"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
               Selesai & Buka Modul
+            </button>
+          )}
+
+          {steps.length === 0 && (
+            <button
+              onClick={handleFinish}
+              disabled={busy}
+              className="inline-flex items-center gap-2 px-8 py-3 rounded-2xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-all"
+            >
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Home className="w-4 h-4" />}
+              Buka Modul
             </button>
           )}
 
