@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
-import { getModuleInstanceStatus } from '@/modules/marketplace/actions/marketplace.actions'
 import { getModuleByKey } from '@/modules/marketplace/lib/module-registry'
 import { SetupClient } from './setup-client'
 
@@ -20,10 +19,6 @@ export default async function ModuleSetupPage({ params }: Props) {
 
   const mod = getModuleByKey(moduleKey)
   if (!mod) return redirect('/marketplace')
-
-  const orgId = orgData.org.id
-  const instance = await getModuleInstanceStatus(orgId, moduleKey)
-  if (instance?.status === 'READY') return redirect(mod.href)
 
   return <SetupClient mod={mod} />
 }
