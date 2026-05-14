@@ -2,12 +2,12 @@
 
 import { useState } from 'react'
 import { PageHeader, SafeButton, SectionCard, StatusBadge } from '@/components/ui/NizamUI'
-import { Calculator, Download, Users, PiggyBank, GraduationCap, Heart, Building, Shield, UserCog } from 'lucide-react'
+import { Calculator, Download, Users, Shield, GraduationCap, Heart, Building, Save, UserCog } from 'lucide-react'
 import { hitungSHU } from '@/modules/koperasi/actions/shu.actions'
 
 const ALOKASI_LABEL: Record<string, { label: string; icon: any; color: string; desc: string }> = {
   anggota: { label: 'Bagi Hasil Anggota', icon: Users, color: 'text-emerald-400', desc: '40% — Dibagikan ke anggota proporsional simpanan' },
-  cadangan: { label: 'Cadangan Koperasi', icon: PiggyBank, color: 'text-blue-400', desc: '20% — Dana cadangan koperasi' },
+  cadangan: { label: 'Cadangan Koperasi', icon: Save, color: 'text-blue-400', desc: '20% — Dana cadangan koperasi' },
   pengurus: { label: 'Pengurus', icon: UserCog, color: 'text-purple-400', desc: '10% — Honorarium pengurus' },
   dps: { label: 'DPS', icon: Shield, color: 'text-cyan-400', desc: '10% — Dewan Pengawas Syariah' },
   sosial: { label: 'Dana Sosial', icon: Heart, color: 'text-red-400', desc: '10% — Kegiatan sosial dan CSR' },

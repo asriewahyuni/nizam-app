@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormSelect, FormInput, Modal, StatusBadge } from '@/components/ui/NizamUI'
-import { Plus, Wallet, PiggyBank, Banknote } from 'lucide-react'
+import { Plus, Wallet, Banknote, Save } from 'lucide-react'
 import { getSimpananPokok, getSimpananWajib, getSimpananSukarela, bayarSimpananPokok, bayarSimpananWajib, transaksiSimpananSukarela, getAnggota } from '@/modules/koperasi/actions/koperasi.actions'
 
 type TabType = 'pokok' | 'wajib' | 'sukarela'
@@ -16,7 +16,7 @@ export default function SimpananClient({ orgId }: { orgId: string }) {
   const [form, setForm] = useState({ anggota_id: '', jumlah: '', tgl_bayar: new Date().toISOString().split('T')[0], keterangan: '', periode_bulan: '', jenis: 'SETOR' as 'SETOR'|'TARIK' })
 
   const tabs: { key: TabType; label: string; icon: any }[] = [
-    { key: 'pokok', label: 'Simpanan Pokok', icon: PiggyBank },
+    { key: 'pokok', label: 'Simpanan Pokok', icon: Save },
     { key: 'wajib', label: 'Simpanan Wajib', icon: Banknote },
     { key: 'sukarela', label: 'Simpanan Sukarela', icon: Wallet },
   ]
