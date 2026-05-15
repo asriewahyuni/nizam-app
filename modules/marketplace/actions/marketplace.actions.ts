@@ -192,15 +192,35 @@ export async function saveModuleSettings(moduleKey: string, settings: Record<str
   if (!orgData) throw new Error('Not authenticated')
 
   const supabase = await createClient()
+
+  // Pastikan row instance ada — jika modul diaktifkan via plan tanpa activateModule()
+  // update akan silent no-op (0 rows) tanpa ini
+  const { data: existing } = await supabase
+    .from('org_module_instances')
+    .select('id')
+    .eq('org_id', orgData.org.id)
+    .eq('module_key', moduleKey)
+    .maybeSingle()
+
+  if (!existing) {
+    await supabase
+      .from('org_module_instances')
+      .insert({ org_id: orgData.org.id, module_key: moduleKey, status: 'PENDING' })
+    await supabase.rpc('append_enabled_module', {
+      p_org_id: orgData.org.id,
+      p_module_key: moduleKey,
+    })
+  }
+
   const { error } = await supabase
     .from('org_module_instances')
-    .update({ settings, status: 'ONBOARDING' })
+    .update({ settings: JSON.stringify(settings), status: 'ONBOARDING' })
     .eq('org_id', orgData.org.id)
     .eq('module_key', moduleKey)
 
   if (error) throw new Error(error.message)
 
-  // Tidak perlu revalidatePath — client langsung pindah step via state lokal
+  revalidatePath('/lms/onboarding')
   return { success: true }
 }
 
@@ -212,6 +232,24 @@ export async function completeModuleOnboarding(moduleKey: string) {
   if (!orgData) throw new Error('Not authenticated')
 
   const supabase = await createClient()
+
+  const { data: existing } = await supabase
+    .from('org_module_instances')
+    .select('id')
+    .eq('org_id', orgData.org.id)
+    .eq('module_key', moduleKey)
+    .maybeSingle()
+
+  if (!existing) {
+    await supabase
+      .from('org_module_instances')
+      .insert({ org_id: orgData.org.id, module_key: moduleKey, status: 'PENDING' })
+    await supabase.rpc('append_enabled_module', {
+      p_org_id: orgData.org.id,
+      p_module_key: moduleKey,
+    })
+  }
+
   const { error } = await supabase
     .from('org_module_instances')
     .update({
@@ -223,8 +261,8 @@ export async function completeModuleOnboarding(moduleKey: string) {
 
   if (error) throw new Error(error.message)
 
-  // Revalidate paths to ensure fresh data — revalidate layout so sidebar reflects READY status
   revalidatePath('/marketplace')
+  revalidatePath('/lms/onboarding')
   revalidatePath('/', 'layout')
   return { success: true }
 }
@@ -265,6 +303,20 @@ export async function deactivateModule(moduleKey: string) {
 
 async function markCoaInstalled(orgId: string, moduleKey: string) {
   const supabase = await createClient()
+
+  const { data: existing } = await supabase
+    .from('org_module_instances')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('module_key', moduleKey)
+    .maybeSingle()
+
+  if (!existing) {
+    await supabase
+      .from('org_module_instances')
+      .insert({ org_id: orgId, module_key: moduleKey, status: 'PENDING' })
+  }
+
   await supabase
     .from('org_module_instances')
     .update({ coa_installed: true })
