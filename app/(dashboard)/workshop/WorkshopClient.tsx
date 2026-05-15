@@ -810,7 +810,7 @@ function SpkCard({
                   </>
                 )}
                 {(order.status === 'SELESAI' || order.status === 'DISERAHKAN') && order.total > 0 && (
-                  <CreateInvoiceButton orderId={order.id} orgId={orgId} />
+                  <CreateInvoiceButton orderId={order.id} orgId={orgId} orderSpkNumber={order.spkNumber} invoices={invoices} />
                 )}
               </div>
             </div>
@@ -1060,8 +1060,22 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 // ─── Create Invoice Button ─────────────────────────────────────────────────────
 
-function CreateInvoiceButton({ orderId, orgId: _orgId }: { orderId: string; orgId: string }) {
+function CreateInvoiceButton({ orderId, orgId: _orgId, orderSpkNumber, invoices }: {
+  orderId: string
+  orgId: string
+  orderSpkNumber: string
+  invoices: WorkshopInvoice[]
+}) {
   const [loading, setLoading] = React.useState(false)
+  const existingInvoice = invoices.find(i => i.spkId === orderId)
+
+  if (existingInvoice) {
+    return (
+      <span className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border bg-emerald-50 text-emerald-700 border-emerald-200 ml-auto">
+        ✅ Invoice: {existingInvoice.saleNumber}
+      </span>
+    )
+  }
 
   async function handleCreateInvoice() {
     if (!confirm('Buat Sales Invoice dari SPK ini? Invoice akan otomatis dibuat berdasarkan item yang ada.')) return

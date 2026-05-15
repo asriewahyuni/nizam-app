@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Loader2, CheckCircle, AlertCircle, Check } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { installModuleCoa, saveModuleSettings } from '@/modules/marketplace/actions/marketplace.actions'
+import { installModuleCoa, saveModuleSettings, completeModuleOnboarding } from '@/modules/marketplace/actions/marketplace.actions'
 
 // ── Toast Notification ──────────────────────────────────────────────────────
 
@@ -117,8 +117,7 @@ export function SimpleSettingsForm({
     const fd = new FormData(e.currentTarget)
     const settings: Record<string, string> = {}
     fields.forEach((f) => {
-      const val = fd.get(f.name)
-      if (val) settings[f.name] = val as string
+      settings[f.name] = (fd.get(f.name) as string) ?? ''
     })
 
     startTransition(async () => {
@@ -196,7 +195,6 @@ export function CompleteOnboardingButton({
 
   const handleComplete = () => {
     startTransition(async () => {
-      const { completeModuleOnboarding } = await import('@/modules/marketplace/actions/marketplace.actions')
       await completeModuleOnboarding(moduleKey)
       router.push(redirectTo)
     })

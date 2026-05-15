@@ -177,12 +177,26 @@ export async function createWorkshopWorkOrder(orgId: string, formData: FormData)
 
   const spkNumber = generateSpkNumber()
 
+  // ── Auto-create contact jika new_contact_name diisi ──
+  let contactId = (formData.get('contact_id') as string) || null
+  const newContactName = (formData.get('new_contact_name') as string)?.trim()
+
+  if (!contactId && newContactName) {
+    const { data: newContact, error: contactErr } = await supabase
+      .from('contacts')
+      .insert({ org_id: orgId, name: newContactName, type: 'CUSTOMER' })
+      .select('id')
+      .single()
+    if (contactErr) return { error: 'Gagal membuat pelanggan baru: ' + contactErr.message }
+    contactId = newContact.id
+  }
+
   const payload = {
     org_id: orgId,
     branch_id: branch.branchId,
     spk_number: spkNumber,
     vehicle_id: (formData.get('vehicle_id') as string) || null,
-    contact_id: (formData.get('contact_id') as string) || null,
+    contact_id: contactId, // sudah auto-create jika perlu
     mechanic_name: (formData.get('mechanic_name') as string) || null,
     status: 'ANTRI',
     customer_complaint: (formData.get('customer_complaint') as string) || null,
@@ -246,6 +260,16 @@ export async function updateWorkOrderStatus(orgId: string, orderId: string, stat
     }
     // Deduct stok spare part dari inventori
     await deductWorkshopPartInventory(orgId, orderId)
+    // ── Auto-create invoice ──
+    try {
+      const { createInvoiceFromWorkOrder } = await import('@/modules/operational-bridge/actions/bridge.actions')
+      const invResult = await createInvoiceFromWorkOrder(orderId)
+      if (invResult && 'error' in invResult) {
+        console.warn('[auto-invoice] Gagal:', invResult.error)
+      }
+    } catch (invErr: any) {
+      console.warn('[auto-invoice] Error:', invErr.message)
+    }
   }
 
   revalidatePath('/workshop')
@@ -580,17 +604,23 @@ export async function deleteWorkshopServiceRate(orgId: string, rateId: string) {
 }
 
 // Ambil produk inventori (spare part) untuk lookup di form item SPK
-export async function getWorkshopPartProducts(orgId: string) {
+export async function getWorkshopPartProducts(orgId: string, branchId?: string | null) {
   try {
     const { queryPostgres } = await import('@/lib/db/postgres')
+
+    // Hanya tampilkan produk dengan stok > 0 di warehouse default
+    // Filter by default warehouse agar sesuai dengan logika deduct stok
     const res = await queryPostgres<{ id: string; name: string; sku: string; selling_price: number; quantity: number }>(
       `SELECT p.id, p.name, p.sku, p.selling_price,
               COALESCE(SUM(s.quantity), 0) AS quantity
        FROM public.products p
        LEFT JOIN public.inventory_stocks s ON s.product_id = p.id AND s.org_id = p.org_id
+         AND s.warehouse_id = (SELECT w.id FROM public.warehouses w WHERE w.org_id = $1 AND w.is_default = true LIMIT 1)
        WHERE p.org_id = $1
          AND p.type IN ('INVENTORY', 'PART', 'SPAREPART')
+         AND p.is_active = true
        GROUP BY p.id, p.name, p.sku, p.selling_price
+       HAVING COALESCE(SUM(s.quantity), 0) > 0
        ORDER BY p.name`,
       [orgId]
     )

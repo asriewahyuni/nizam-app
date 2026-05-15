@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getModuleInstanceStatus } from '@/modules/marketplace/actions/marketplace.actions'
-import { getModuleByKey } from '@/modules/marketplace/lib/module-registry'
 import { CheckCircle2, Handshake, BookOpen, Settings, Zap, Users } from 'lucide-react'
 import { InstallCoaButton, SimpleSettingsForm, CompleteOnboardingButton, type SettingsField } from '@/components/shared/ModuleOnboardingActions'
 

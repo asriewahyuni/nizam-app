@@ -189,7 +189,7 @@ export async function installModuleCoa(moduleKey: string) {
   }
 
   await markCoaInstalled(orgData.org.id, moduleKey)
-  revalidatePath('/lms/onboarding')
+  revalidatePath('/', 'layout')
   return { success: true }
 }
 
@@ -229,7 +229,7 @@ export async function saveModuleSettings(moduleKey: string, settings: Record<str
 
   if (error) throw new Error(error.message)
 
-  revalidatePath('/lms/onboarding')
+  revalidatePath('/', 'layout')
   return { success: true }
 }
 

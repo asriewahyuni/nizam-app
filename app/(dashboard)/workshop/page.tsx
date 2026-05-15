@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getActiveOrg, getActiveBranch } from '@/modules/organization/actions/org.actions'
 import { getModuleInstanceStatus } from '@/modules/marketplace/actions/marketplace.actions'
 import {
   getWorkshopWorkOrders,
@@ -23,6 +23,8 @@ export default async function WorkshopPage() {
   }
 
   const orgId = orgData.org.id
+  const activeBranch = await getActiveBranch(orgId)
+  const branchId = activeBranch?.id ?? null
   const supabase = await createClient() as any
 
   const [workOrders, vehicles, contactsResult, invoicesResult, serviceRates, partProducts] = await Promise.all([
@@ -38,7 +40,7 @@ export default async function WorkshopPage() {
       .neq('status', 'VOIDED')
       .order('created_at', { ascending: false }),
     getWorkshopServiceRates(orgId),
-    getWorkshopPartProducts(orgId),
+    getWorkshopPartProducts(orgId, branchId),
   ])
 
   const invoices = (invoicesResult.data || []).map((s: any) => ({
