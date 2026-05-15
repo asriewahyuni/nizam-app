@@ -202,6 +202,21 @@ export async function createWorkshopWorkOrder(orgId: string, formData: FormData)
 
   if (error) return { error: error.message }
 
+  const mechanicFee = Number(formData.get('mechanic_fee') || 0)
+  if (mechanicFee > 0 && order?.id) {
+    const feeName = (formData.get('mechanic_fee_name') as string)?.trim() || 'Biaya Jasa Mekanik'
+    await db.from('workshop_work_order_items').insert({
+      work_order_id: order.id,
+      org_id: orgId,
+      item_type: 'JASA',
+      name: feeName,
+      quantity: 1,
+      unit_price: mechanicFee,
+      subtotal: mechanicFee,
+    })
+    await db.from('workshop_work_orders').update({ subtotal: mechanicFee, total: mechanicFee }).eq('id', order.id)
+  }
+
   revalidatePath('/workshop')
   return { success: true, id: order?.id as string }
 }

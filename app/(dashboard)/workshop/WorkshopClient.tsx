@@ -33,6 +33,7 @@ import {
   getVehicleForSpkPrefill,
   createInvoiceFromWorkOrder,
 } from '@/modules/operational-bridge/actions/bridge.actions'
+import { createContact } from '@/modules/contacts/actions/contact.actions'
 import type {
   WorkshopWorkOrder,
   WorkshopVehicle,
@@ -95,6 +96,10 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
   const [showVehicleModal, setShowVehicleModal] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<WorkshopWorkOrder | null>(null)
   const [loading, setLoading] = useState(false)
+  // Contacts lokal — diupdate saat tambah pelanggan baru
+  const [localContacts, setLocalContacts] = useState<{ id: string; name: string }[]>(contacts)
+  const [spkContactId, setSpkContactId] = useState('')
+  const [vehicleFormContactId, setVehicleFormContactId] = useState('')
   // Vehicle auto-fill state
   const [vehiclePrefill, setVehiclePrefill] = useState<{
     contactId: string | null
@@ -136,7 +141,7 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
   }), [workOrders])
 
   async function handleVehicleChange(vehicleId: string) {
-    if (!vehicleId) { setVehiclePrefill(null); return }
+    if (!vehicleId) { setVehiclePrefill(null); setSpkContactId(''); return }
     setVehicleLoading(true)
     const data = await getVehicleForSpkPrefill(vehicleId)
     if (data) {
@@ -146,10 +151,16 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
         lastOdometer: data.lastOdometer,
         info: `${data.brand} ${data.model}${data.year ? ` (${data.year})` : ''}${data.color ? ` · ${data.color}` : ''}`,
       })
+      setSpkContactId(data.contactId || '')
     } else {
       setVehiclePrefill(null)
+      setSpkContactId('')
     }
     setVehicleLoading(false)
+  }
+
+  function handleContactCreated(contact: { id: string; name: string }) {
+    setLocalContacts(prev => [...prev, contact].sort((a, b) => a.name.localeCompare(b.name, 'id')))
   }
 
   async function handleCreateSpk(e: React.FormEvent<HTMLFormElement>) {
@@ -157,7 +168,7 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
     setLoading(true)
     const res = await createWorkshopWorkOrder(orgId, new FormData(e.currentTarget))
     if (res.error) alert(res.error)
-    else { setShowSpkModal(false); setVehiclePrefill(null); window.location.reload() }
+    else { setShowSpkModal(false); setVehiclePrefill(null); setSpkContactId(''); window.location.reload() }
     setLoading(false)
   }
 
@@ -166,7 +177,7 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
     setLoading(true)
     const res = await createWorkshopVehicle(orgId, new FormData(e.currentTarget))
     if (res.error) alert(res.error)
-    else { setShowVehicleModal(false); window.location.reload() }
+    else { setShowVehicleModal(false); setVehicleFormContactId(''); window.location.reload() }
     setLoading(false)
   }
 
@@ -257,7 +268,7 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
       {/* Modal: Buat SPK */}
       <AnimatePresence>
         {showSpkModal && (
-          <Modal title="Buat Surat Perintah Kerja" onClose={() => setShowSpkModal(false)}>
+          <Modal title="Buat Surat Perintah Kerja" onClose={() => { setShowSpkModal(false); setVehiclePrefill(null); setSpkContactId('') }}>
             <form onSubmit={handleCreateSpk} className="space-y-4">
               <FormRow label="Kendaraan">
                 <select
@@ -285,11 +296,11 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
                 <select
                   name="contact_id"
                   className={inputCls}
-                  value={vehiclePrefill?.contactId ?? ''}
-                  onChange={() => {}}
+                  value={spkContactId}
+                  onChange={e => setSpkContactId(e.target.value)}
                 >
                   <option value="">— Pilih pelanggan —</option>
-                  {contacts.map(c => (
+                  {localContacts.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
@@ -298,9 +309,13 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
                     ✓ Otomatis diisi dari data kendaraan: {vehiclePrefill.contactName}
                   </p>
                 )}
+                <AddCustomerInline orgId={orgId} onCreated={c => { handleContactCreated(c); setSpkContactId(c.id) }} />
               </FormRow>
               <FormRow label="Nama Mekanik">
                 <input name="mechanic_name" placeholder="Contoh: Budi" className={inputCls} />
+              </FormRow>
+              <FormRow label="Biaya Jasa Mekanik (Rp)">
+                <input name="mechanic_fee" type="number" min="0" defaultValue="" placeholder="0 jika tidak ada" className={inputCls} />
               </FormRow>
               <FormRow label="Keluhan Pelanggan" required>
                 <textarea name="customer_complaint" rows={2} required className={inputCls} placeholder="Deskripsikan keluhan..." />
@@ -333,12 +348,18 @@ export function WorkshopClient({ orgId, workOrders, vehicles, contacts, invoices
           <Modal title="Daftarkan Kendaraan" onClose={() => setShowVehicleModal(false)}>
             <form onSubmit={handleCreateVehicle} className="space-y-4">
               <FormRow label="Pelanggan">
-                <select name="contact_id" className={inputCls}>
+                <select
+                  name="contact_id"
+                  className={inputCls}
+                  value={vehicleFormContactId}
+                  onChange={e => setVehicleFormContactId(e.target.value)}
+                >
                   <option value="">— Pilih pelanggan —</option>
-                  {contacts.map(c => (
+                  {localContacts.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
+                <AddCustomerInline orgId={orgId} onCreated={c => { handleContactCreated(c); setVehicleFormContactId(c.id) }} />
               </FormRow>
               <FormRow label="Nomor Plat" required>
                 <input name="plate_number" required placeholder="Contoh: B 1234 ABC" className={`${inputCls} uppercase`} />
@@ -948,6 +969,55 @@ function FormRow({ label, required, children }: { label: string; required?: bool
       </label>
       {children}
     </div>
+  )
+}
+
+function AddCustomerInline({ orgId, onCreated }: {
+  orgId: string
+  onCreated: (contact: { id: string; name: string }) => void
+}) {
+  const [show, setShow] = useState(false)
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim()) return
+    setLoading(true)
+    const fd = new FormData()
+    fd.set('name', name.trim())
+    fd.set('type', 'CUSTOMER')
+    if (phone.trim()) fd.set('phone', phone.trim())
+    const res = await createContact(orgId, fd)
+    if (res.error) { alert(res.error); setLoading(false); return }
+    if (res.data) {
+      onCreated({ id: (res.data as { id: string; name: string }).id, name: (res.data as { id: string; name: string }).name })
+      setName(''); setPhone(''); setShow(false)
+    }
+    setLoading(false)
+  }
+
+  if (!show) {
+    return (
+      <button type="button" onClick={() => setShow(true)} className="mt-2 text-[11px] font-semibold text-[#003366] hover:underline flex items-center gap-1">
+        <Plus size={11} /> Tambah pelanggan baru
+      </button>
+    )
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl space-y-2">
+      <p className="text-[10px] font-black uppercase tracking-tight text-emerald-700">Pelanggan Baru</p>
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="Nama *" required className={inputCls} />
+      <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="No. HP (opsional)" className={inputCls} />
+      <div className="flex gap-2">
+        <button type="submit" disabled={loading || !name.trim()} className="flex-1 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-xl disabled:opacity-50">
+          {loading ? 'Menyimpan...' : 'Simpan'}
+        </button>
+        <button type="button" onClick={() => { setShow(false); setName(''); setPhone('') }} className="px-3 py-1.5 text-xs text-slate-500 font-bold rounded-xl hover:bg-slate-100">Batal</button>
+      </div>
+    </form>
   )
 }
 
