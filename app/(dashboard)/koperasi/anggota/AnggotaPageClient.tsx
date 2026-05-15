@@ -69,7 +69,7 @@ export default function AnggotaPageClient({ orgId }: { orgId: string }) {
         title="Anggota Koperasi"
         subtitle="Data anggota dan status keanggotaan"
         actions={
-          <SafeButton onClick={() => { setShowForm(true); setEditId(null); setForm({ nama: '', nik: '', alamat: '', no_telepon: '', email: '', status: 'AKTIF' }) }}>
+          <SafeButton type="button" onClick={() => { setShowForm(true); setEditId(null); setForm({ nama: '', nik: '', alamat: '', no_telepon: '', email: '', status: 'AKTIF' }) }}>
             <Plus className="w-4 h-4" /> Tambah Anggota
           </SafeButton>
         }
@@ -113,10 +113,10 @@ export default function AnggotaPageClient({ orgId }: { orgId: string }) {
         )}
       </SectionCard>
 
-      <Modal open={showForm} onClose={() => setShowForm(false)} title={editId ? 'Edit Anggota' : 'Tambah Anggota'}>
+      <Modal show={showForm} onClose={() => setShowForm(false)} title={editId ? 'Edit Anggota' : 'Tambah Anggota'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <FormField label="Nama Lengkap" required>
-            <FormInput value={form.nama} onChange={e => setForm({ ...form, nama: e.target.value })} placeholder="Nama lengkap anggota" />
+            <FormInput value={form.nama} onChange={e => setForm({ ...form, nama: e.target.value })} placeholder="Nama lengkap anggota" required />
           </FormField>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="NIK">
