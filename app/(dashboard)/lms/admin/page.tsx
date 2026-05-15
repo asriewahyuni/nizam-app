@@ -255,10 +255,10 @@ export default async function LearningAdminPage() {
             <form action={createLmsBatch} className="mt-6 grid gap-5">
               <label className="block text-sm">
                 <div className="font-bold text-slate-900 mb-1.5">Pilih Course</div>
-                <select name="courseSlug" required className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50">
+                <select name="courseId" required className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50">
                   <option value="">-- Pilih Course --</option>
                   {courses.filter((c: any) => c.is_active).map((c: any) => (
-                    <option key={c.slug} value={c.slug}>{c.title}</option>
+                    <option key={c.id} value={c.id}>{c.title}</option>
                   ))}
                 </select>
               </label>
