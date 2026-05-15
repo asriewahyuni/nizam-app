@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { PageHeader, StatCard, SafeButton, SectionCard, SectionHeader } from '@/components/ui/NizamUI'
-import { Users, Wallet, TrendingUp, BadgePercent, UserPlus, BookOpen, List, Loader2, ArrowRight, UserCog } from 'lucide-react'
+import { PageHeader, StatCard, SectionCard, SectionHeader } from '@/components/ui/NizamUI'
+import { Users, Wallet, TrendingUp, BadgePercent, UserPlus, BookOpen, List, Loader2, ArrowRight, UserCog, CheckCircle2, BarChart3, FileText } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface Stats {
@@ -35,6 +35,43 @@ export default function KoperasiDashboardPage() {
     )
   }
 
+  const anggotaTelahDidaftar = (stats?.totalAnggota || 0) > 0
+  const adaSimpanan = (stats?.totalSimpananPokok || 0) > 0
+  const adaShahibulMaal = (stats?.totalShahibulMaal || 0) > 0
+
+  const steps = [
+    { 
+      label: 'Daftar Anggota', 
+      done: anggotaTelahDidaftar, 
+      href: '/koperasi/anggota',
+      desc: 'Data anggota & status keanggotaan'
+    },
+    { 
+      label: 'Kelola Simpanan', 
+      done: adaSimpanan, 
+      href: '/koperasi/simpanan',
+      desc: 'Pokok, Wajib, Sukarela'
+    },
+    { 
+      label: 'Daftarkan Shahibul Maal', 
+      done: adaShahibulMaal, 
+      href: '/koperasi/shahibul-maal',
+      desc: 'Investor / penyedia modal'
+    },
+    { 
+      label: 'Buat Akad / Proyek', 
+      done: false, 
+      href: '/koperasi/proyek',
+      desc: 'Mudharabah, Murabahah, Wakalah'
+    },
+    { 
+      label: 'Laporan & SHU', 
+      done: false, 
+      href: '/koperasi/laporan',
+      desc: 'Sisa Hasil Usaha, Laba/Rugi'
+    },
+  ]
+
   return (
     <div className="space-y-8">
       <PageHeader title="Koperasi Syariah" subtitle="Dashboard operasional koperasi serba usaha" />
@@ -47,53 +84,74 @@ export default function KoperasiDashboardPage() {
         <StatCard label="Shahibul Maal" value={stats?.totalShahibulMaal || 0} icon={BadgePercent} color="indigo" />
       </div>
 
-      {/* Aksi Cepat */}
+      {/* Panduan Alur */}
       <SectionCard>
-        <SectionHeader title="Aksi Cepat" subtitle="Menu yang paling sering digunakan" />
+        <SectionHeader title="Panduan Langkah" subtitle="Ikuti alur ini untuk mulai menggunakan Koperasi Syariah" />
         <div className="p-6 md:p-8">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {[
-              { label: 'Daftar Anggota', icon: UserPlus, href: '/koperasi/anggota', gradient: 'from-emerald-500 to-emerald-600' },
-              { label: 'Simpanan', icon: Wallet, href: '/koperasi/simpanan', gradient: 'from-blue-500 to-blue-600' },
-              { label: 'Proyek Mudharabah', icon: TrendingUp, href: '/koperasi/proyek', gradient: 'from-purple-500 to-purple-600' },
-              { label: 'Murabahah', icon: BadgePercent, href: '/koperasi/murabahah', gradient: 'from-orange-500 to-orange-600' },
-            ].map(action => (
+          <div className="space-y-4">
+            {steps.map((step, i) => (
               <button
-                key={action.label}
-                onClick={() => router.push(action.href)}
-                className={`bg-gradient-to-br ${action.gradient} text-white p-5 md:p-6 rounded-2xl flex flex-col items-start gap-3 hover:shadow-xl hover:-translate-y-0.5 transition-all group text-left`}
+                key={step.label}
+                onClick={() => router.push(step.href)}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 hover:shadow-md transition-all text-left group"
               >
-                <action.icon className="w-7 h-7 opacity-90" />
-                <span className="font-semibold text-sm leading-tight">{action.label}</span>
+                {/* Step Number / Status */}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                  step.done 
+                    ? 'bg-emerald-50 text-emerald-500' 
+                    : 'bg-slate-50 text-slate-400'
+                }`}>
+                  {step.done 
+                    ? <CheckCircle2 className="w-5 h-5" />
+                    : <span className="text-sm font-bold">{i + 1}</span>
+                  }
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-semibold ${step.done ? 'text-emerald-600' : 'text-slate-900'}`}>
+                    {step.label}
+                    {step.done && <span className="ml-2 text-[10px]">✅ Selesai</span>}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-0.5">{step.desc}</div>
+                </div>
+
+                <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 transition-all shrink-0" />
               </button>
             ))}
           </div>
         </div>
       </SectionCard>
 
-      {/* Menu Lainnya */}
+      {/* Menu per Fitur */}
       <SectionCard>
-        <SectionHeader title="Menu Lainnya" subtitle="Akses ke seluruh fitur koperasi" />
+        <SectionHeader title="Menu Lengkap" subtitle="Akses semua fitur koperasi" />
         <div className="p-6 md:p-8">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {[
-              { label: 'Akad Wakalah', icon: BookOpen, href: '/koperasi/akad-wakalah' },
-              { label: 'Shahibul Maal', icon: Users, href: '/koperasi/shahibul-maal' },
-              { label: 'Mudharib', icon: UserCog, href: '/koperasi/mudharib' },
-              { label: 'Sertifikasi DPS', icon: BadgePercent, href: '/koperasi/sertifikasi' },
-              { label: 'Pengurus', icon: List, href: '/koperasi/pengurus' },
-              { label: 'Laporan', icon: List, href: '/koperasi/laporan' },
+              { label: 'Anggota', icon: Users, href: '/koperasi/anggota', desc: 'Data anggota' },
+              { label: 'Simpanan', icon: Wallet, href: '/koperasi/simpanan', desc: 'Pokok, Wajib, Sukarela' },
+              { label: 'Shahibul Maal', icon: BadgePercent, href: '/koperasi/shahibul-maal', desc: 'Investor' },
+              { label: 'Mudharib', icon: UserCog, href: '/koperasi/mudharib', desc: 'Pengelola proyek' },
+              { label: 'Akad Wakalah', icon: BookOpen, href: '/koperasi/akad-wakalah', desc: 'Akad wakalah' },
+              { label: 'Murabahah', icon: TrendingUp, href: '/koperasi/murabahah', desc: 'Jual beli' },
+              { label: 'Proyek', icon: BarChart3, href: '/koperasi/proyek', desc: 'Mudharabah' },
+              { label: 'Sertifikasi DPS', icon: BadgePercent, href: '/koperasi/sertifikasi', desc: 'Sertifikasi' },
+              { label: 'Pengurus', icon: List, href: '/koperasi/pengurus', desc: 'Kepengurusan' },
+              { label: 'Laporan', icon: FileText, href: '/koperasi/laporan', desc: 'SHU & Rugi/Laba' },
             ].map(item => (
               <button
                 key={item.label}
                 onClick={() => router.push(item.href)}
-                className="bg-white hover:bg-slate-50 border border-slate-200 p-4 rounded-2xl flex items-center gap-3 transition-all text-left shadow-sm hover:shadow-md hover:-translate-y-0.5 group"
+                className="bg-white hover:bg-slate-50 border border-slate-200 p-4 rounded-2xl flex flex-col gap-2 transition-all text-left shadow-sm hover:shadow-md hover:-translate-y-0.5 group"
               >
                 <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
                   <item.icon className="w-5 h-5 text-emerald-500" />
                 </div>
-                <span className="text-sm font-semibold text-slate-700">{item.label}</span>
-                <ArrowRight className="w-4 h-4 text-slate-300 ml-auto group-hover:text-emerald-500 transition-all" />
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">{item.label}</div>
+                  <div className="text-[10px] text-slate-400">{item.desc}</div>
+                </div>
               </button>
             ))}
           </div>

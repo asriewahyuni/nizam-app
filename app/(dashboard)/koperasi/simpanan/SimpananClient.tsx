@@ -82,7 +82,7 @@ export default function SimpananClient({ orgId }: { orgId: string }) {
                     <td className="p-2 text-slate-900 font-medium">Rp {Number(d.jumlah).toLocaleString()}</td>
                     <td className="p-2 text-slate-500">{d.tgl_bayar || d.tgl_transaksi}</td>
                     {tab === 'wajib' && <td className="p-2 text-slate-500">{d.periode_bulan}</td>}
-                    {tab === 'sukarela' && <td className="p-2"><StatusBadge status={d.jenis} variant={d.jenis === 'SETOR' ? 'success' : 'warning'} /></td>}
+                    {tab === 'sukarela' && <td className="p-2"><StatusBadge label={d.jenis} variant={d.jenis === 'SETOR' ? 'success' : 'warning'} /></td>}
                     <td className="p-2 text-slate-400">{d.keterangan || '-'}</td>
                   </tr>
                 ))}

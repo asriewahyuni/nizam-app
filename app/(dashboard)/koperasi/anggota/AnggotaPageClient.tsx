@@ -61,8 +61,8 @@ export default function AnggotaPageClient({ orgId }: { orgId: string }) {
                     <td className="p-2 text-slate-900 font-medium">{a.nama}</td>
                     <td className="p-2 text-slate-500">{a.nik || '-'}</td>
                     <td className="p-2 text-slate-500">{a.no_telepon || '-'}</td>
-                    <td className="p-2"><StatusBadge status={a.status} variant={a.status === 'AKTIF' ? 'success' : 'warning'} /></td>
-                    <td className="p-2">{a.is_tersertifikasi_dps ? <StatusBadge status="Terdaftar" variant="success" /> : '-'}</td>
+                    <td className="p-2"><StatusBadge label={a.status} variant={a.status === 'AKTIF' ? 'success' : 'warning'} /></td>
+                    <td className="p-2">{a.is_tersertifikasi_dps ? <StatusBadge label="Terdaftar" variant="success" /> : '-'}</td>
                     <td className="p-2"><button onClick={() => edit(a)} className="text-xs text-emerald-600 hover:text-emerald-700">Edit</button></td>
                   </tr>
                 ))}
