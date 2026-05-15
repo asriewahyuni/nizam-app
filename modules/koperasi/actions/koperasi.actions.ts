@@ -173,7 +173,7 @@ export async function getMudharib(orgId: string) {
   const db = await getDb()
   const { data, error } = await db
     .from('koperasi_mudharib')
-    .select('*')
+    .select('*, anggota:koperasi_anggota(nama, kode_anggota)')
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
@@ -441,6 +441,57 @@ export async function createMurabahahTransaksi(orgId: string, payload: {
   
   revalidatePath('/koperasi/murabahah')
   return data
+}
+
+// ── CURRENT USER ROLE ─────────────────────────────────────────────────────────
+
+export async function getCurrentUserKoperasiRole(orgId?: string) {
+  const db = await getDb()
+
+  // If no orgId provided, get from active org
+  if (!orgId) {
+    const { getActiveOrg } = await import('@/modules/organization/actions/org.actions')
+    const orgData = await getActiveOrg()
+    if (!orgData?.org) return { role: null, anggota: null }
+    orgId = orgData.org.id
+  }
+
+  // Get current user
+  const { data: { user } } = await db.auth.getUser()
+  if (!user?.id) return { role: null, anggota: null }
+
+  const { data: employee } = await db
+    .from('employees')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!employee) return { role: null, anggota: null }
+
+  // Find koperasi_anggota linked to this employee
+  const { data: anggota } = await db
+    .from('koperasi_anggota')
+    .select('id, nama, kode_anggota')
+    .eq('org_id', orgId)
+    .eq('employee_id', employee.id)
+    .maybeSingle()
+
+  if (!anggota) return { role: null, anggota: null }
+
+  // Check if this anggota is a pengurus (has a role)
+  const { data: pengurus } = await db
+    .from('koperasi_pengurus')
+    .select('jabatan')
+    .eq('org_id', orgId)
+    .eq('anggota_id', anggota.id)
+    .eq('is_aktif', true)
+    .maybeSingle()
+
+  return {
+    role: pengurus?.jabatan || null,
+    anggota: { id: anggota.id, nama: anggota.nama, kode: anggota.kode_anggota },
+  }
 }
 
 // ── DASHBOARD ────────────────────────────────────────────────────────────────
