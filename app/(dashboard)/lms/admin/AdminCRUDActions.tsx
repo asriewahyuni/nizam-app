@@ -32,6 +32,8 @@ function EditBatchModal({
   const [price, setPrice] = useState(batch.price ?? 0)
   const [startDate, setStartDate] = useState(batch.start_date ? String(batch.start_date).slice(0, 10) : '')
   const [endDate, setEndDate] = useState(batch.end_date ? String(batch.end_date).slice(0, 10) : '')
+  const [description, setDescription] = useState(batch.description || '')
+  const [paymentInstructions, setPaymentInstructions] = useState(batch.payment_instructions || '')
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -45,6 +47,8 @@ function EditBatchModal({
     fd.set('name', name.trim())
     fd.set('quota', String(quota))
     fd.set('price', String(price))
+    fd.set('description', description)
+    fd.set('paymentInstructions', paymentInstructions)
     if (startDate) fd.set('startDate', startDate)
     if (endDate) fd.set('endDate', endDate)
 
@@ -75,7 +79,7 @@ function EditBatchModal({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-500">Kuota</label>
+              <label className="text-xs font-semibold text-slate-500">Kuota (0=Unlimited)</label>
               <input type="number" min="0" value={quota} onChange={(e) => setQuota(Number(e.target.value))}
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
             </div>
@@ -96,6 +100,18 @@ function EditBatchModal({
               <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
             </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500">Deskripsi</label>
+            <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)}
+              placeholder="Informasi singkat tentang batch ini..."
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500">Instruksi Pembayaran</label>
+            <textarea rows={3} value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)}
+              placeholder={'Transfer ke BCA 1234567890 a.n. PT Contoh\nKonfirmasi via WhatsApp ke 08xx-xxxx-xxxx'}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none" />
           </div>
           {error && <p className="text-xs font-semibold text-rose-500 bg-rose-50 rounded-xl px-3 py-2">{error}</p>}
           <div className="flex gap-3 pt-2">

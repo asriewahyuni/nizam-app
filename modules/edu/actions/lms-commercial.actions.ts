@@ -237,6 +237,9 @@ export async function updateLmsBatch(formData: FormData) {
   const taxRate = Number(formData.get('taxRate') || 0)
   const isTaxIncluded = formData.get('isTaxIncluded') === 'on'
 
+  const description = (formData.get('description') as string || '').trim()
+  const paymentInstructions = (formData.get('paymentInstructions') as string || '').trim()
+
   if (!batchId || !name) throw new Error('ID dan Nama Batch wajib diisi')
 
   const supabase = await createClient()
@@ -251,6 +254,8 @@ export async function updateLmsBatch(formData: FormData) {
       status,
       tax_rate: taxRate,
       is_tax_included: isTaxIncluded,
+      description: description || null,
+      payment_instructions: paymentInstructions || null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', batchId)

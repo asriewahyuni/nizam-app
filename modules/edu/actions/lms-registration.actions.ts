@@ -126,9 +126,11 @@ export async function createLmsRegistration(
 
 export async function getAllLmsRegistrations(orgId: string) {
   const supabase = await createClient()
-  const { data, error } = await supabase
+
+  // Fetch registrations
+  const { data: regs, error } = await supabase
     .from('lms_registrations')
-    .select('*, lms_course_batches(id, name, price, learning_courses(title))')
+    .select('*')
     .eq('org_id', orgId)
     .order('registered_at', { ascending: false })
 
@@ -136,7 +138,21 @@ export async function getAllLmsRegistrations(orgId: string) {
     console.error('[getAllLmsRegistrations]', error)
     return []
   }
-  return data || []
+  if (!regs || regs.length === 0) return []
+
+  // Fetch batch info separately to avoid 3-level nesting
+  const batchIds = [...new Set((regs as any[]).map((r) => r.batch_id).filter(Boolean))]
+  const { data: batches } = await supabase
+    .from('lms_course_batches')
+    .select('id, name, price, learning_courses(title)')
+    .in('id', batchIds)
+
+  const batchMap = new Map((batches || []).map((b: any) => [b.id, b]))
+
+  return (regs as any[]).map((r) => ({
+    ...r,
+    lms_course_batches: batchMap.get(r.batch_id) || null,
+  }))
 }
 
 export async function getLmsRegistrationsByBatch(orgId: string, batchId: string) {
