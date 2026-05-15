@@ -25,8 +25,6 @@ export async function GET() {
       CREATE TABLE IF NOT EXISTS koperasi_anggota (
         id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         org_id          UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-        branch_id       UUID REFERENCES branches(id) ON DELETE SET NULL,
-        employee_id     UUID REFERENCES employees(id) ON DELETE SET NULL,
         kode_anggota    VARCHAR(50) NOT NULL,
         nama            VARCHAR(255) NOT NULL,
         nik             VARCHAR(50),
