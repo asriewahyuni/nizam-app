@@ -164,48 +164,60 @@ export async function getLmsBatches(orgId: string) {
   return data
 }
 
-export async function createLmsBatch(formData: FormData) {
-  const orgData = await assertOrgAdmin()
+export async function createLmsBatch(
+  _prevState: { error?: string } | null,
+  formData: FormData
+): Promise<{ error?: string; success?: boolean } | null> {
+  try {
+    const orgData = await assertOrgAdmin()
 
-  const courseId = formData.get('courseId') as string
-  const name = formData.get('name') as string
-  const startDate = formData.get('startDate') as string
-  const endDate = formData.get('endDate') as string
-  const quota = Number(formData.get('quota') || 0)
-  const price = Number(formData.get('price') || 0)
-  const status = (formData.get('status') as string) || 'OPEN'
-  const taxRate = Number(formData.get('taxRate') || 0)
-  const isTaxIncluded = formData.get('isTaxIncluded') === 'on'
+    const courseId = formData.get('courseId') as string
+    const name = formData.get('name') as string
+    const startDate = formData.get('startDate') as string
+    const endDate = formData.get('endDate') as string
+    const quota = Number(formData.get('quota') || 0)
+    const price = Number(formData.get('price') || 0)
+    const status = (formData.get('status') as string) || 'OPEN'
+    const taxRate = Number(formData.get('taxRate') || 0)
+    const isTaxIncluded = formData.get('isTaxIncluded') === 'on'
 
-  const feeStructureStr = formData.get('feeStructure') as string
-  const feeStructure = feeStructureStr ? JSON.parse(feeStructureStr) : []
-  const costStructureStr = formData.get('costStructure') as string
-  const costStructure = costStructureStr ? JSON.parse(costStructureStr) : []
+    const feeStructureStr = formData.get('feeStructure') as string
+    const feeStructure = feeStructureStr ? JSON.parse(feeStructureStr) : []
+    const costStructureStr = formData.get('costStructure') as string
+    const costStructure = costStructureStr ? JSON.parse(costStructureStr) : []
 
-  if (!courseId || !name) throw new Error('Program dan Nama Batch wajib diisi')
+    if (!courseId || !name) return { error: 'Program dan Nama Batch wajib diisi' }
 
-  const supabase = await createClient()
-  const { error } = await supabase.from('lms_course_batches').insert({
-    org_id: orgData.org.id,
-    course_id: courseId,
-    name,
-    start_date: startDate || null,
-    end_date: endDate || null,
-    quota,
-    price,
-    fee_structure: feeStructure,
-    cost_structure: costStructure,
-    status,
-    tax_rate: taxRate,
-    is_tax_included: isTaxIncluded,
-  })
+    const supabase = await createClient()
+    const insertPayload: Record<string, unknown> = {
+      org_id: orgData.org.id,
+      course_id: courseId,
+      name,
+      start_date: startDate || null,
+      end_date: endDate || null,
+      quota,
+      price,
+      status,
+    }
 
-  if (error) {
-    console.error('[createLmsBatch]', JSON.stringify(error))
-    throw new Error(getErrorMessage(error))
+    // Kolom tambahan (migration 1250, 1251) — dimasukkan hanya jika ada data
+    if (feeStructure.length > 0) insertPayload.fee_structure = feeStructure
+    if (costStructure.length > 0) insertPayload.cost_structure = costStructure
+    if (taxRate > 0) insertPayload.tax_rate = taxRate
+    if (isTaxIncluded) insertPayload.is_tax_included = isTaxIncluded
+
+    const { error } = await supabase.from('lms_course_batches').insert(insertPayload)
+
+    if (error) {
+      console.error('[createLmsBatch]', JSON.stringify(error))
+      return { error: getErrorMessage(error) }
+    }
+
+    revalidatePath('/lms/admin')
+    return { success: true }
+  } catch (e: any) {
+    return { error: e?.message || 'Terjadi kesalahan tidak terduga' }
   }
-
-  revalidatePath('/lms/admin')
 }
 
 export async function updateLmsBatch(formData: FormData) {
