@@ -294,7 +294,7 @@ export function BSCClient({
 
   const handleSaveWeights = () => {
     if (!canManageSetup) {
-      window.alert('Pilih unit aktif terlebih dahulu untuk mengubah Strategi.')
+      window.alert('Pilih unit aktif terlebih dahulu untuk mengubah setup BSC.')
       return
     }
 
@@ -311,7 +311,7 @@ export function BSCClient({
 
   const handleSeedTemplate = () => {
     if (!canManageSetup) {
-      window.alert('Pilih unit aktif terlebih dahulu untuk memulai template Strategi.')
+      window.alert('Pilih unit aktif terlebih dahulu untuk memulai template BSC.')
       return
     }
 
@@ -540,754 +540,425 @@ export function BSCClient({
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-12 pb-20 animate-in fade-in duration-1000">
-      
+    <div className="max-w-7xl mx-auto space-y-6 pb-20">
+
       {/* Header */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-3 text-blue-600 font-semibold tracking-tight text-xs uppercase bg-blue-50 w-fit px-4 py-2 rounded-full border border-blue-100 mb-2">
-           <BarChart3 size={14} />
-           Performance Navigation · Live Data
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Balanced Scorecard</h1>
+          <p className="text-sm text-slate-400 mt-0.5">
+            {setupData.cycle?.cycle_name || `BSC ${setupData.scope.cycle_key}`} · {setupData.scope.start_date} – {setupData.scope.end_date}
+            {activeBranchName && <span className="ml-2 text-blue-500">· {scopeLabel}</span>}
+          </p>
         </div>
-        <h1 className="text-4xl font-semibold text-slate-900 tracking-tight">Strategi</h1>
-        <p className="text-slate-500 font-medium text-lg italic opacity-80">4 Perspektif strategis — semua dari data operasional real-time.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 text-sm font-bold text-emerald-700">
+            {setupData.summary.overall_score_100}/100
+          </span>
+          <span className="px-3 py-1.5 rounded-full bg-slate-100 text-sm font-semibold text-slate-500">
+            {setupData.summary.completion_percent}% terukur
+          </span>
+          <button
+            type="button"
+            onClick={handleSyncFromExistingData}
+            disabled={isPending}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 disabled:opacity-50"
+          >
+            <RefreshCcw size={12} /> Refresh
+          </button>
+          <button
+            type="button"
+            onClick={handleGenerateFromExistingData}
+            disabled={isPending}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold disabled:opacity-50"
+          >
+            <Zap size={12} /> Generate KPI
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAdvancedSetup((prev) => !prev)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700"
+          >
+            <Settings size={12} /> Setup
+          </button>
+        </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 space-y-5">
-        <p className="text-[10px] font-semibold tracking-tight text-slate-400">Card Utama</p>
-        <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
-          <p className="text-sm font-semibold text-slate-700 uppercase tracking-tight">Sementara dikosongkan</p>
-          <p className="text-sm text-slate-500 font-medium mt-2">Siap untuk layout utama versi berikutnya.</p>
+      {setupData.error && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+          {setupData.error}
         </div>
-      </div>
+      )}
+      {!canManageSetup && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          Mode baca. Pilih unit aktif untuk mengubah setup BSC.
+        </div>
+      )}
 
-      <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* 4 Perspective Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {PERSPECTIVES.map((perspective) => {
           const visual = perspectiveVisual[perspective]
           const Icon = visual.icon
           const perspectiveKpis = sortedKpis.filter((kpi) => kpi.perspective === perspective)
           const measuredCount = perspectiveKpis.filter((kpi) => Boolean(kpi.latest_measurement)).length
-          const autoCount = perspectiveKpis.filter((kpi) => kpi.source_type === 'AUTO').length
           const perspectiveSummary = setupData.summary.perspective_scores[perspective]
-          const perspectiveSuggestions = quickStartSuggestions.find((group) => group.perspective === perspective)?.suggestions || []
           const coveragePercent = perspectiveSummary.kpi_count > 0
             ? Math.round((measuredCount / perspectiveSummary.kpi_count) * 100)
             : 0
-          const previewKpis = perspectiveKpis.slice(0, 2)
 
           return (
-            <motion.div
-              key={perspective}
-              variants={item}
-              className={`bg-white rounded-[34px] p-7 border border-slate-100 shadow-sm transition-all ${visual.cardAccentClass}`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${visual.iconWrapClass}`}>
-                    <Icon size={22} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Perspective</p>
-                    <h3 className="text-lg font-semibold text-slate-900">{visual.title}</h3>
-                  </div>
+            <div key={perspective} className={`bg-white rounded-2xl p-5 border border-slate-100 shadow-sm transition-all ${visual.cardAccentClass}`}>
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${visual.iconWrapClass}`}>
+                  <Icon size={17} />
                 </div>
-                <div className={`px-3 py-2 rounded-2xl border text-right ${visual.scorePillClass}`}>
-                  <p className="text-[10px] font-semibold tracking-tight">Score</p>
-                  <p className="text-base font-black">{perspectiveSummary.score_100}/100</p>
-                </div>
+                <p className="text-sm font-semibold text-slate-800 leading-tight">{visual.title}</p>
               </div>
-
-              <div className="mt-5 space-y-4">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
-                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">KPI Aktif</p>
-                    <p className="text-lg font-semibold text-slate-900 mt-1">{perspectiveSummary.kpi_count}</p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
-                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Terukur</p>
-                    <p className="text-lg font-semibold text-slate-900 mt-1">{measuredCount}</p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
-                    <p className="text-[10px] font-semibold tracking-tight text-slate-400">Auto</p>
-                    <p className="text-lg font-semibold text-slate-900 mt-1">{autoCount}</p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[10px] font-semibold tracking-tight text-slate-500">Coverage</p>
-                    <p className="text-xs font-black text-slate-700">{coveragePercent}%</p>
-                  </div>
-                  <div className="h-2 rounded-full bg-white border border-slate-200 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${visual.progressClass}`}
-                      style={{ width: `${Math.max(0, Math.min(100, coveragePercent))}%` }}
-                    />
-                  </div>
-
-                  {previewKpis.length > 0 ? (
-                    <div className="space-y-2">
-                      {previewKpis.map((kpi) => (
-                        <div key={kpi.id} className="rounded-xl bg-white border border-slate-200 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-xs font-black text-slate-900">{kpi.name}</p>
-                              <p className="text-[11px] font-semibold text-slate-500 mt-1">
-                                Target {formatMetricValue(kpi.unit, kpi.target_value)}
-                              </p>
-                            </div>
-                            <span className="text-[10px] font-semibold tracking-tight text-slate-400">
-                              {kpi.latest_measurement ? 'Measured' : 'Pending'}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-600 font-medium mt-2">
-                            {kpi.latest_measurement
-                              ? `Actual ${formatMetricValue(kpi.unit, kpi.latest_measurement.actual_value)}`
-                              : 'Belum ada pengukuran terbaru.'}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : perspectiveSuggestions.length > 0 ? (
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-semibold tracking-tight text-slate-500">Siap Digenerate</p>
-                      {perspectiveSuggestions.slice(0, 2).map((suggestion) => (
-                        <div key={`${perspective}-${suggestion.key}`} className="rounded-xl bg-white border border-dashed border-slate-300 p-3">
-                          <p className="text-xs font-black text-slate-900">{suggestion.label}</p>
-                          <p className="text-[11px] text-slate-600 font-medium mt-1">
-                            Nilai sekarang {formatMetricValue(suggestion.unit, suggestion.value)}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-xl bg-white border border-dashed border-slate-300 p-4 text-center">
-                      <p className="text-xs font-semibold text-slate-700 uppercase tracking-tight">Belum Ada KPI</p>
-                      <p className="text-xs text-slate-500 font-medium mt-2">Perspective ini belum punya KPI maupun saran dari data saat ini.</p>
-                    </div>
-                  )}
-                </div>
+              <p className="text-3xl font-black text-slate-900 leading-none">
+                {perspectiveSummary.score_100}
+                <span className="text-base font-medium text-slate-300">/100</span>
+              </p>
+              <div className="mt-3 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${visual.progressClass}`}
+                  style={{ width: `${Math.max(0, Math.min(100, perspectiveSummary.score_100))}%` }}
+                />
               </div>
-            </motion.div>
+              <p className="text-xs text-slate-400 mt-2">
+                {perspectiveSummary.kpi_count} KPI · {coveragePercent}% terukur
+              </p>
+            </div>
           )
         })}
-      </motion.div>
+      </div>
 
-      {/* BSC Setup & Measurement */}
-      <div className="space-y-8">
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-semibold tracking-tight text-indigo-500">Strategy Workbench</p>
-              <h3 className="text-2xl font-semibold text-slate-900 tracking-tight">Setup KPI, Bobot, dan Pengukuran</h3>
-              <p className="text-sm text-slate-500 font-medium mt-1">Skor internal dihitung dalam skala 0-100, lalu ditampilkan juga sebagai skala 0-4.</p>
+      {/* KPI Table */}
+      {sortedKpis.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-dashed border-slate-200 px-8 py-12 text-center">
+          <p className="text-sm text-slate-400">
+            Belum ada KPI. Klik <span className="font-semibold text-slate-600">Generate KPI</span> untuk mulai.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+            <p className="text-sm font-semibold text-slate-700">{sortedKpis.length} KPI Aktif</p>
+            <div className="flex items-center gap-3 text-xs font-medium text-slate-400">
+              <span>Actual</span>
+              <span>Tanggal</span>
+              <span className="w-10 text-right">Skor</span>
+              <span className="w-14" />
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
+          </div>
+          <div className="divide-y divide-slate-50">
+            {sortedKpis.map((kpi) => {
+              const draft = getMeasurementDraft(
+                kpi.id,
+                kpi.latest_measurement ? Number(kpi.latest_measurement.actual_value) : null,
+                kpi.latest_measurement?.measurement_date || null
+              )
+              const visual = perspectiveVisual[kpi.perspective]
+
+              return (
+                <div key={kpi.id} className="px-5 py-3 flex flex-wrap items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${visual.progressClass}`} />
+                      <p className="text-sm font-semibold text-slate-900 truncate">{kpi.name}</p>
+                      {kpi.source_type === 'AUTO' && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100 shrink-0">
+                          AUTO
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5 ml-4">
+                      Target {kpi.target_value}{kpi.unit ? ` ${kpi.unit}` : ''} · Bobot {kpi.weight_percent}%
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <input
+                      type="number"
+                      value={draft.actual}
+                      onChange={(event) =>
+                        setMeasurementDrafts((prev) => ({ ...prev, [kpi.id]: { ...draft, actual: event.target.value } }))
+                      }
+                      className="w-20 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm font-bold text-slate-800 outline-none text-right focus:border-blue-400"
+                      placeholder="0"
+                    />
+                    <input
+                      type="date"
+                      value={draft.date}
+                      onChange={(event) =>
+                        setMeasurementDrafts((prev) => ({ ...prev, [kpi.id]: { ...draft, date: event.target.value } }))
+                      }
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-blue-400"
+                    />
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() =>
+                        handleSaveMeasurement(
+                          kpi.id,
+                          kpi.latest_measurement ? Number(kpi.latest_measurement.actual_value) : null,
+                          kpi.latest_measurement?.measurement_date || null
+                        )
+                      }
+                      className="p-1.5 rounded-lg bg-slate-900 text-white disabled:opacity-50"
+                      title="Simpan pengukuran"
+                    >
+                      <Save size={13} />
+                    </button>
+                  </div>
+
+                  <div className="text-right w-10 shrink-0">
+                    {kpi.latest_measurement ? (
+                      <>
+                        <p className="text-sm font-black text-slate-900">{kpi.latest_measurement.score_100}</p>
+                        <p className="text-[10px] text-slate-400">{kpi.latest_measurement.achievement_percent}%</p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-slate-200 font-medium">—</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openEditKpiModal(kpi)}
+                      className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                      title="Edit KPI"
+                    >
+                      <Settings size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleArchiveKpi(kpi.id)}
+                      className="p-1.5 rounded-lg border border-rose-100 text-rose-300 hover:bg-rose-50 hover:text-rose-600"
+                      title="Nonaktifkan"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Advanced Setup - collapsible */}
+      {showAdvancedSetup && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-800">Bobot Perspektif</p>
               <button
                 type="button"
-                onClick={handleGenerateFromExistingData}
+                onClick={handleSaveWeights}
                 disabled={isPending}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold uppercase tracking-tight disabled:opacity-60"
-                title="Buat KPI siap pakai dari data existing lalu isi nilai awal otomatis."
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-semibold disabled:opacity-50"
               >
-                <Zap size={14} />
-                Generate KPI dari Data Saya
+                <Save size={12} /> Simpan
               </button>
-              <button
-                type="button"
-                onClick={handleSyncFromExistingData}
-                disabled={isPending}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold uppercase tracking-tight disabled:opacity-60"
-                title="Segarkan nilai KPI yang sudah punya sumber data existing."
-              >
-                <RefreshCcw size={14} />
-                Refresh Nilai Existing
-              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {(Object.keys(weightDraft) as BSCPerspective[]).map((perspective) => (
+                <label key={perspective} className="space-y-1">
+                  <span className="text-xs text-slate-400 font-medium">{perspectiveLabel[perspective]}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={weightDraft[perspective]}
+                    onChange={(event) =>
+                      setWeightDraft((prev) => ({ ...prev, [perspective]: Number(event.target.value || 0) }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none focus:border-blue-400"
+                  />
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400">
+              Total: {(Object.values(weightDraft).reduce((sum, value) => sum + Number(value || 0), 0)).toFixed(0)}%
+            </p>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-800">Tambah KPI Manual</p>
               <button
                 type="button"
                 onClick={handleSeedTemplate}
                 disabled={isPending}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold uppercase tracking-tight disabled:opacity-60"
-                title="Isi KPI contoh 4 perspektif x 4 indikator agar cepat mulai."
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 disabled:opacity-50"
               >
-                <RefreshCcw size={14} />
-                Isi Template KPI
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowAdvancedSetup((prev) => !prev)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold uppercase tracking-tight text-slate-700"
-              >
-                {showAdvancedSetup ? 'Sembunyikan Mode Lanjutan' : 'Buka Mode Lanjutan'}
-              </button>
-              <div className={`px-4 py-2 rounded-full border text-[10px] font-semibold tracking-tight ${activeBranchName ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
-                Scope: {scopeLabel}
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
-            <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200">Siklus: {setupData.cycle?.cycle_name || `Strategi ${setupData.scope.cycle_key}`}</span>
-            <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200">Periode: {setupData.scope.start_date} s/d {setupData.scope.end_date}</span>
-            <span className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700">Score: {setupData.summary.overall_score_100} / 100 ({setupData.summary.overall_score_4} / 4)</span>
-            <span className="px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700">Coverage: {setupData.summary.completion_percent}%</span>
-          </div>
-          {setupData.error && (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
-              {setupData.error}
-            </div>
-          )}
-          {!canManageSetup && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-              Mode read-only. Pilih satu unit aktif jika ingin mengubah Strategi.
-            </div>
-          )}
-        </div>
-
-        <div className="bg-gradient-to-br from-blue-50 via-white to-emerald-50 rounded-xl border border-blue-100 shadow-sm p-8 space-y-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="space-y-2 max-w-3xl">
-              <p className="text-[10px] font-semibold tracking-tight text-blue-600">Quick Start</p>
-              <h4 className="text-xl font-semibold text-slate-900">Jalur tercepat: ubah data operasional jadi KPI siap pakai</h4>
-              <p className="text-sm text-slate-600 font-medium">
-                Sistem akan membuat KPI yang paling relevan dari data yang sudah ada, memberi target awal otomatis, lalu langsung mengisi nilai awalnya.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-tight">
-              <span className="px-3 py-1 rounded-full bg-white border border-blue-200 text-blue-700">
-                Siap dibuat: {quickStartSuggestionCount}
-              </span>
-              <span className="px-3 py-1 rounded-full bg-white border border-emerald-200 text-emerald-700">
-                KPI aktif: {totalActiveKpis}
-              </span>
-            </div>
-          </div>
-
-          {quickStartSuggestionCount === 0 ? (
-            <div className="rounded-3xl border border-dashed border-emerald-200 bg-white/80 px-6 py-8 text-center">
-              <p className="text-sm font-semibold text-emerald-800 uppercase tracking-tight">Jalur cepat sudah terpakai semua</p>
-              <p className="text-sm text-slate-600 font-medium mt-2">
-                KPI rekomendasi dari data existing sudah aktif. Tinggal klik refresh nilai atau buka mode lanjutan jika ingin KPI tambahan.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              {quickStartSuggestions.map((group) => (
-                <div key={`quick-start-${group.perspective}`} className="rounded-3xl border border-white/70 bg-white/85 p-5 space-y-3 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-semibold tracking-tight text-slate-400">Perspective</p>
-                      <h5 className="text-base font-black text-slate-900">{perspectiveLabel[group.perspective]}</h5>
-                    </div>
-                    <span className="px-2 py-1 rounded-full bg-blue-50 border border-blue-100 text-[10px] font-semibold tracking-tight text-blue-700">
-                      {group.suggestions.length} KPI
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {group.suggestions.map((suggestion) => (
-                      <div key={`${group.perspective}-${suggestion.key}`} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
-                        <p className="text-xs font-black text-slate-900">{suggestion.label}</p>
-                        <p className="text-[11px] font-semibold text-slate-600 mt-1">
-                          Nilai sekarang: {formatMetricValue(suggestion.unit, suggestion.value)}
-                        </p>
-                        <p className="text-[11px] text-slate-500 font-medium mt-1">
-                          Sumber: {suggestion.references.map((reference) => reference.label).join(', ')}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-6 space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-semibold tracking-tight text-slate-500">Mode Lanjutan</p>
-              <h4 className="text-lg font-semibold text-slate-900">Bobot perspektif dan KPI manual</h4>
-              <p className="text-sm text-slate-500 font-medium mt-1">Buka bagian ini hanya jika ingin mengatur bobot sendiri atau menambah KPI yang tidak ditemukan otomatis.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowAdvancedSetup((prev) => !prev)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold uppercase tracking-tight text-slate-700"
-            >
-              {showAdvancedSetup ? 'Sembunyikan' : 'Buka'}
-            </button>
-          </div>
-
-          {showAdvancedSetup ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 space-y-6">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-semibold text-slate-900">Bobot Perspektif</h4>
-                  <button
-                    type="button"
-                    onClick={handleSaveWeights}
-                    disabled={isPending}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold uppercase tracking-tight disabled:opacity-60"
-                  >
-                    <Save size={14} />
-                    Simpan Bobot
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {(Object.keys(weightDraft) as BSCPerspective[]).map((perspective) => (
-                    <label key={perspective} className="space-y-2">
-                      <span className="text-[10px] font-semibold tracking-tight text-slate-400">{perspectiveLabel[perspective]}</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={weightDraft[perspective]}
-                        onChange={(event) =>
-                          setWeightDraft((prev) => ({
-                            ...prev,
-                            [perspective]: Number(event.target.value || 0),
-                          }))
-                        }
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-800 outline-none focus:border-blue-400"
-                      />
-                    </label>
-                  ))}
-                </div>
-                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 text-sm font-semibold text-slate-600">
-                  Total bobot: {(Object.values(weightDraft).reduce((sum, value) => sum + Number(value || 0), 0)).toFixed(2)}%
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 space-y-6">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-semibold text-slate-900">Tambah KPI Manual</h4>
-                </div>
-                <form onSubmit={handleSubmitKpi} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <label className="space-y-1">
-                      <span className="text-[10px] font-semibold tracking-tight text-slate-400">Perspektif</span>
-                      <select
-                        value={kpiForm.perspective}
-                        onChange={(event) => setKpiForm((prev) => ({ ...prev, perspective: event.target.value as BSCPerspective }))}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
-                      >
-                        {PERSPECTIVES.map((perspective) => (
-                          <option key={perspective} value={perspective}>
-                            {perspectiveLabel[perspective]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="space-y-1">
-                      <span className="text-[10px] font-semibold tracking-tight text-slate-400">Arah KPI</span>
-                      <select
-                        value={kpiForm.direction}
-                        onChange={(event) => setKpiForm((prev) => ({ ...prev, direction: event.target.value as BSCDirection }))}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
-                      >
-                        <option value="HIGHER_BETTER">Semakin tinggi semakin baik</option>
-                        <option value="LOWER_BETTER">Semakin rendah semakin baik</option>
-                      </select>
-                    </label>
-                  </div>
-
-                  <label className="space-y-1 block">
-                    <span className="text-[10px] font-semibold tracking-tight text-slate-400">Nama KPI</span>
-                    <input
-                      value={kpiForm.name}
-                      onChange={(event) => setKpiForm((prev) => ({ ...prev, name: event.target.value }))}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
-                      placeholder="Contoh: Net Profit Margin"
-                    />
-                  </label>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <label className="space-y-1">
-                      <span className="text-[10px] font-semibold tracking-tight text-slate-400">Target</span>
-                      <input
-                        type="number"
-                        value={kpiForm.targetValue}
-                        onChange={(event) => setKpiForm((prev) => ({ ...prev, targetValue: event.target.value }))}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
-                      />
-                    </label>
-                    <label className="space-y-1">
-                      <span className="text-[10px] font-semibold tracking-tight text-slate-400">Bobot KPI (%)</span>
-                      <input
-                        type="number"
-                        value={kpiForm.weightPercent}
-                        onChange={(event) => setKpiForm((prev) => ({ ...prev, weightPercent: event.target.value }))}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
-                      />
-                    </label>
-                    <label className="space-y-1">
-                      <span className="text-[10px] font-semibold tracking-tight text-slate-400">Satuan</span>
-                      <input
-                        value={kpiForm.unit}
-                        onChange={(event) => setKpiForm((prev) => ({ ...prev, unit: event.target.value }))}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
-                        placeholder="%, days, docs"
-                      />
-                    </label>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isPending}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold uppercase tracking-tight disabled:opacity-60"
-                  >
-                    <Plus size={14} />
-                    Tambah KPI
-                  </button>
-                </form>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-6 text-sm font-medium text-slate-500">
-              Form manual dan pengaturan bobot disembunyikan dulu supaya halaman fokus ke jalur cepat dari data existing.
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h4 className="text-lg font-semibold text-slate-900">Audit Sinkron KPI vs Data Existing</h4>
-              <p className="text-xs font-semibold text-slate-500 mt-1">
-                Menandai KPI yang sudah bisa diukur otomatis dan KPI yang belum punya sumber data saat ini.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-tight">
-              <span className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700">
-                Terukur: {kpiCoverage.measurable.length}
-              </span>
-              <span className="px-3 py-1 rounded-full bg-amber-50 border border-amber-100 text-amber-700">
-                Belum Ada Sumber: {kpiCoverage.unmapped.length}
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            <div className="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-5 space-y-3">
-              <p className="text-[10px] font-semibold tracking-tight text-emerald-700">Data Yang Bisa Diukur KPI-nya</p>
-              {kpiCoverage.measurable.length === 0 ? (
-                <p className="text-sm font-semibold text-emerald-800">Belum ada KPI yang match dengan data existing.</p>
-              ) : (
-                <div className="space-y-2">
-                  {kpiCoverage.measurable.map((item) => (
-                    <div key={item.kpi_id} className="rounded-2xl border border-emerald-100 bg-white p-3">
-                      <p className="text-xs font-black text-slate-900">{item.kpi_name}</p>
-                      <p className="text-[11px] font-semibold text-slate-600 mt-1">
-                        Sumber: {item.metric.label} ({item.metric.key}) · Nilai sekarang: {formatMetricValue(item.metric.unit, item.metric.value)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-3xl border border-amber-100 bg-amber-50/60 p-5 space-y-3">
-              <p className="text-[10px] font-semibold tracking-tight text-amber-700">KPI Yang Belum Punya Sumber Data</p>
-              {kpiCoverage.unmapped.length === 0 ? (
-                <p className="text-sm font-semibold text-emerald-700">Semua KPI aktif sudah punya sumber data.</p>
-              ) : (
-                <div className="space-y-4">
-                  {PERSPECTIVES.filter((perspective) => unmappedByPerspective[perspective].length > 0).map((perspective) => (
-                    <div key={perspective} className="rounded-2xl border border-amber-100 bg-white p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-semibold tracking-tight text-amber-800">
-                          {perspectiveLabel[perspective]}
-                        </p>
-                        <span className="px-2 py-1 rounded-md bg-amber-50 border border-amber-100 text-[10px] font-black text-amber-700">
-                          {unmappedByPerspective[perspective].length} KPI
-                        </span>
-                      </div>
-
-                      <div className="space-y-2">
-                        {unmappedByPerspective[perspective].map((item) => (
-                          <div key={item.kpi_id} className="rounded-xl border border-amber-100 bg-amber-50/40 p-2">
-                            <p className="text-xs font-black text-slate-900">{item.kpi_name}</p>
-                            <p className="text-[11px] font-semibold text-amber-700 mt-1">
-                              Saran dari data yang ada:
-                            </p>
-                            <div className="mt-2 space-y-2">
-                              {item.suggestions.map((suggestion) => (
-                                <div
-                                  key={`${item.kpi_id}-${suggestion.key}`}
-                                  className="rounded-lg bg-amber-50 border border-amber-100 p-2 space-y-1"
-                                >
-                                  <p className="text-[10px] font-bold text-amber-900">
-                                    {suggestion.label}: {formatMetricValue(suggestion.unit, suggestion.value)}
-                                  </p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {suggestion.references.map((reference) => (
-                                      <Link
-                                        key={`${item.kpi_id}-${suggestion.key}-${reference.path}`}
-                                        href={reference.path}
-                                        className="inline-flex items-center rounded-md border border-amber-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-tight text-amber-700 hover:bg-amber-100 transition-colors"
-                                      >
-                                        {reference.label}
-                                      </Link>
-                                    ))}
-                                    <button
-                                      type="button"
-                                      disabled={isPending}
-                                      onClick={() => handleApplySuggestedIndicator(item.kpi_id, suggestion.key)}
-                                      className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-tight text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-60"
-                                    >
-                                      Pakai Indikator Ini
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-8 space-y-5">
-          <h4 className="text-lg font-semibold text-slate-900">Daftar KPI Aktif</h4>
-          {sortedKpis.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center space-y-2">
-              <p className="text-sm font-semibold text-slate-700 uppercase tracking-tight">Belum ada KPI di siklus ini</p>
-              <p className="text-sm text-slate-500 font-medium">Klik `Generate KPI dari Data Saya` untuk jalur tercepat, atau buka mode lanjutan jika ingin bikin KPI manual.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {sortedKpis.map((kpi) => {
-                const draft = getMeasurementDraft(
-                  kpi.id,
-                  kpi.latest_measurement ? Number(kpi.latest_measurement.actual_value) : null,
-                  kpi.latest_measurement?.measurement_date || null
-                )
-                return (
-                  <div key={kpi.id} className="rounded-3xl border border-slate-200 p-5 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[10px] font-semibold tracking-tight text-slate-400">
-                          {perspectiveLabel[kpi.perspective]} · {kpi.code}
-                        </p>
-                        <h5 className="text-base font-black text-slate-900">{kpi.name}</h5>
-                        <p className="text-xs text-slate-500 font-medium">
-                          Target {kpi.target_value} {kpi.unit || ''} · Bobot {kpi.weight_percent}% · {kpi.direction === 'HIGHER_BETTER' ? 'Higher better' : 'Lower better'}
-                        </p>
-                        <div className="mt-2">
-                          <span
-                            className={`px-2 py-1 rounded-lg border text-[10px] font-semibold uppercase tracking-tight ${
-                              kpi.source_type === 'AUTO'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                : 'bg-slate-50 text-slate-600 border-slate-200'
-                            }`}
-                          >
-                            Source: {kpi.source_type === 'AUTO' ? 'AUTO' : 'MANUAL'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditKpiModal(kpi)}
-                          className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold uppercase tracking-tight text-slate-600"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleArchiveKpi(kpi.id)}
-                          className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 text-xs font-semibold uppercase tracking-tight text-rose-700"
-                        >
-                          <Trash2 size={12} />
-                          Nonaktifkan
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 items-end">
-                      <label className="space-y-1 lg:col-span-1">
-                        <span className="text-[10px] font-semibold tracking-tight text-slate-400">Actual</span>
-                        <input
-                          type="number"
-                          value={draft.actual}
-                          onChange={(event) =>
-                            setMeasurementDrafts((prev) => ({
-                              ...prev,
-                              [kpi.id]: { ...draft, actual: event.target.value },
-                            }))
-                          }
-                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
-                        />
-                      </label>
-                      <label className="space-y-1 lg:col-span-1">
-                        <span className="text-[10px] font-semibold tracking-tight text-slate-400">Tanggal</span>
-                        <input
-                          type="date"
-                          value={draft.date}
-                          onChange={(event) =>
-                            setMeasurementDrafts((prev) => ({
-                              ...prev,
-                              [kpi.id]: { ...draft, date: event.target.value },
-                            }))
-                          }
-                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
-                        />
-                      </label>
-                      <label className="space-y-1 lg:col-span-2">
-                        <span className="text-[10px] font-semibold tracking-tight text-slate-400">Catatan</span>
-                        <input
-                          value={draft.note}
-                          onChange={(event) =>
-                            setMeasurementDrafts((prev) => ({
-                              ...prev,
-                              [kpi.id]: { ...draft, note: event.target.value },
-                            }))
-                          }
-                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
-                          placeholder="Opsional"
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        disabled={isPending}
-                        onClick={() =>
-                          handleSaveMeasurement(
-                            kpi.id,
-                            kpi.latest_measurement ? Number(kpi.latest_measurement.actual_value) : null,
-                            kpi.latest_measurement?.measurement_date || null
-                          )
-                        }
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-slate-900 text-white text-xs font-semibold uppercase tracking-tight disabled:opacity-60"
-                      >
-                        <Save size={13} />
-                        Simpan
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-bold">
-                      <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 text-slate-600">
-                        Achievement: {kpi.latest_measurement ? `${kpi.latest_measurement.achievement_percent}%` : '-'}
-                      </div>
-                      <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 text-slate-600">
-                        Score 100: {kpi.latest_measurement ? kpi.latest_measurement.score_100 : '-'}
-                      </div>
-                      <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 text-slate-600">
-                        Score 4: {kpi.latest_measurement ? kpi.latest_measurement.score_4 : '-'}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {isEditModalOpen && kpiForm.id && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-xl bg-white border border-slate-100 shadow-2xl p-8 space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-semibold tracking-tight text-indigo-500">Popup Edit KPI</p>
-                <h4 className="text-xl font-semibold text-slate-900">Ubah KPI Aktif</h4>
-              </div>
-              <button
-                type="button"
-                onClick={closeEditKpiModal}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold uppercase tracking-tight text-slate-600"
-              >
-                Tutup
+                Isi Template
               </button>
             </div>
-
-            <form onSubmit={handleSubmitKpi} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleSubmitKpi} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
                 <label className="space-y-1">
-                  <span className="text-[10px] font-semibold tracking-tight text-slate-400">Perspektif</span>
+                  <span className="text-xs text-slate-400 font-medium">Perspektif</span>
                   <select
                     value={kpiForm.perspective}
                     onChange={(event) => setKpiForm((prev) => ({ ...prev, perspective: event.target.value as BSCPerspective }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
                   >
                     {PERSPECTIVES.map((perspective) => (
-                      <option key={perspective} value={perspective}>
-                        {perspectiveLabel[perspective]}
-                      </option>
+                      <option key={perspective} value={perspective}>{perspectiveLabel[perspective]}</option>
                     ))}
                   </select>
                 </label>
                 <label className="space-y-1">
-                  <span className="text-[10px] font-semibold tracking-tight text-slate-400">Arah KPI</span>
+                  <span className="text-xs text-slate-400 font-medium">Arah</span>
                   <select
                     value={kpiForm.direction}
                     onChange={(event) => setKpiForm((prev) => ({ ...prev, direction: event.target.value as BSCDirection }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
                   >
-                    <option value="HIGHER_BETTER">Semakin tinggi semakin baik</option>
-                    <option value="LOWER_BETTER">Semakin rendah semakin baik</option>
+                    <option value="HIGHER_BETTER">↑ Lebih tinggi lebih baik</option>
+                    <option value="LOWER_BETTER">↓ Lebih rendah lebih baik</option>
+                  </select>
+                </label>
+              </div>
+              <input
+                value={kpiForm.name}
+                onChange={(event) => setKpiForm((prev) => ({ ...prev, name: event.target.value }))}
+                placeholder="Nama KPI"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
+              />
+              <div className="grid grid-cols-3 gap-3">
+                <input
+                  type="number"
+                  value={kpiForm.targetValue}
+                  onChange={(event) => setKpiForm((prev) => ({ ...prev, targetValue: event.target.value }))}
+                  placeholder="Target"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
+                />
+                <input
+                  type="number"
+                  value={kpiForm.weightPercent}
+                  onChange={(event) => setKpiForm((prev) => ({ ...prev, weightPercent: event.target.value }))}
+                  placeholder="Bobot %"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
+                />
+                <input
+                  value={kpiForm.unit}
+                  onChange={(event) => setKpiForm((prev) => ({ ...prev, unit: event.target.value }))}
+                  placeholder="Satuan"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isPending}
+                className="w-full py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                <Plus size={13} /> Tambah KPI
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {isEditModalOpen && kpiForm.id && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl bg-white border border-slate-100 shadow-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <p className="text-base font-semibold text-slate-900">Edit KPI</p>
+              <button
+                type="button"
+                onClick={closeEditKpiModal}
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitKpi} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1">
+                  <span className="text-xs text-slate-400 font-medium">Perspektif</span>
+                  <select
+                    value={kpiForm.perspective}
+                    onChange={(event) => setKpiForm((prev) => ({ ...prev, perspective: event.target.value as BSCPerspective }))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
+                  >
+                    {PERSPECTIVES.map((perspective) => (
+                      <option key={perspective} value={perspective}>{perspectiveLabel[perspective]}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs text-slate-400 font-medium">Arah</span>
+                  <select
+                    value={kpiForm.direction}
+                    onChange={(event) => setKpiForm((prev) => ({ ...prev, direction: event.target.value as BSCDirection }))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
+                  >
+                    <option value="HIGHER_BETTER">↑ Lebih tinggi lebih baik</option>
+                    <option value="LOWER_BETTER">↓ Lebih rendah lebih baik</option>
                   </select>
                 </label>
               </div>
 
               <label className="space-y-1 block">
-                <span className="text-[10px] font-semibold tracking-tight text-slate-400">Nama KPI</span>
+                <span className="text-xs text-slate-400 font-medium">Nama KPI</span>
                 <input
                   value={kpiForm.name}
                   onChange={(event) => setKpiForm((prev) => ({ ...prev, name: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
                   placeholder="Contoh: Net Profit Margin"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
                 />
               </label>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-3">
                 <label className="space-y-1">
-                  <span className="text-[10px] font-semibold tracking-tight text-slate-400">Target</span>
+                  <span className="text-xs text-slate-400 font-medium">Target</span>
                   <input
                     type="number"
                     value={kpiForm.targetValue}
                     onChange={(event) => setKpiForm((prev) => ({ ...prev, targetValue: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
                   />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-[10px] font-semibold tracking-tight text-slate-400">Bobot KPI (%)</span>
+                  <span className="text-xs text-slate-400 font-medium">Bobot (%)</span>
                   <input
                     type="number"
                     value={kpiForm.weightPercent}
                     onChange={(event) => setKpiForm((prev) => ({ ...prev, weightPercent: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
                   />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-[10px] font-semibold tracking-tight text-slate-400">Satuan</span>
+                  <span className="text-xs text-slate-400 font-medium">Satuan</span>
                   <input
                     value={kpiForm.unit}
                     onChange={(event) => setKpiForm((prev) => ({ ...prev, unit: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none"
-                    placeholder="%, days, docs"
+                    placeholder="%, days"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-800 outline-none"
                   />
                 </label>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex items-center justify-end gap-2 pt-1">
                 <button
                   type="button"
                   onClick={closeEditKpiModal}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold uppercase tracking-tight text-slate-600"
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold uppercase tracking-tight disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold disabled:opacity-50"
                 >
-                  <Save size={14} />
-                  Simpan Perubahan
+                  <Save size={13} /> Simpan
                 </button>
               </div>
             </form>
