@@ -12,6 +12,7 @@ export default function SimpananClient({ orgId }: { orgId: string }) {
   const [data, setData] = useState<any[]>([])
   const [anggota, setAnggota] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ anggota_id: '', jumlah: '', tgl_bayar: new Date().toISOString().split('T')[0], keterangan: '', periode_bulan: '', jenis: 'SETOR' as 'SETOR'|'TARIK' })
 
@@ -28,11 +29,14 @@ export default function SimpananClient({ orgId }: { orgId: string }) {
 
   async function loadData() {
     setLoading(true)
-    let d: any[]
-    if (tab === 'pokok') d = await getSimpananPokok(orgId)
-    else if (tab === 'wajib') d = await getSimpananWajib(orgId)
-    else d = await getSimpananSukarela(orgId)
-    setData(d)
+    setError('')
+    try {
+      let d: any[]
+      if (tab === 'pokok') d = await getSimpananPokok(orgId)
+      else if (tab === 'wajib') d = await getSimpananWajib(orgId)
+      else d = await getSimpananSukarela(orgId)
+      setData(d)
+    } catch (e: any) { setError(e.message) }
     setLoading(false)
   }
 
@@ -63,6 +67,7 @@ export default function SimpananClient({ orgId }: { orgId: string }) {
       </div>
 
       <SectionCard>
+        {error && <div className="text-red-600 p-4 bg-red-50 rounded-lg mb-4 border border-red-200">{error}</div>}
         {loading ? <div className="text-slate-500 p-4">Memuat...</div> : data.length === 0 ? (
           <div className="text-slate-500 p-8 text-center">Belum ada data simpanan {tab}</div>
         ) : (

@@ -8,26 +8,29 @@ import { getAnggota, createAnggota, updateAnggota } from '@/modules/koperasi/act
 export default function AnggotaPageClient({ orgId }: { orgId: string }) {
   const [anggota, setAnggota] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ nama: '', nik: '', alamat: '', no_telepon: '', email: '', status: 'AKTIF' })
   const [editId, setEditId] = useState<string | null>(null)
 
   useEffect(() => {
-    getAnggota(orgId).then(d => { setAnggota(d); setLoading(false) })
+    getAnggota(orgId).then(d => { setAnggota(d); setLoading(false) }).catch(e => { setError(e.message); setLoading(false) })
   }, [orgId])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (editId) {
-      await updateAnggota(editId, form)
-    } else {
-      await createAnggota(orgId, { ...form, kode_anggota: '' })
-    }
-    setShowForm(false)
-    setEditId(null)
-    setForm({ nama: '', nik: '', alamat: '', no_telepon: '', email: '', status: 'AKTIF' })
-    const d = await getAnggota(orgId)
-    setAnggota(d)
+    try {
+      if (editId) {
+        await updateAnggota(editId, form)
+      } else {
+        await createAnggota(orgId, { ...form, kode_anggota: '' })
+      }
+      setShowForm(false)
+      setEditId(null)
+      setForm({ nama: '', nik: '', alamat: '', no_telepon: '', email: '', status: 'AKTIF' })
+      const d = await getAnggota(orgId)
+      setAnggota(d)
+    } catch (e: any) { setError(e.message) }
   }
 
   function edit(item: any) {
@@ -45,6 +48,7 @@ export default function AnggotaPageClient({ orgId }: { orgId: string }) {
       </PageHeader>
 
       <SectionCard>
+        {error && <div className="text-red-600 p-4 bg-red-50 rounded-lg mb-4 border border-red-200">{error}</div>}
         {loading ? <div className="text-slate-500 p-4">Memuat...</div> : anggota.length === 0 ? (
           <div className="text-slate-500 p-8 text-center">Belum ada anggota. Klik "Tambah Anggota" untuk memulai.</div>
         ) : (
