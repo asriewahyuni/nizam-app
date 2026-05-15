@@ -100,7 +100,7 @@ export default function AnggotaPageClient({ orgId }: { orgId: string }) {
                     <td className="p-2 font-medium">{a.nama}</td>
                     <td className="p-2 text-slate-500">{a.nik || '-'}</td>
                     <td className="p-2 text-slate-500">{a.no_telepon || '-'}</td>
-                    <td className="p-2"><StatusBadge status={a.status} /></td>
+                    <td className="p-2"><StatusBadge label={a.status} variant={a.status === 'AKTIF' ? 'success' : 'neutral'} /></td>
                     <td className="p-2">{a.is_tersertifikasi_dps ? <span className="text-emerald-600 font-medium">✓</span> : '-'}</td>
                     <td className="p-2">
                       <SafeButton variant="ghost" onClick={() => edit(a)}>Edit</SafeButton>
