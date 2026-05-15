@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, Modal, StatusBadge, StatCard } from '@/components/ui/NizamUI'
 import { Plus, TrendingUp, Users, Wallet, ArrowRightCircle, CheckCircle, XCircle, Eye, Send, AlertTriangle, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
-import { getProyek, createProyek, updateStatusProyek, tambahInvestasi, getInvestasiProyek, getMudharib } from '@/lib/koperasi/client'
+import { getProyek, createProyek, updateStatusProyek, tambahInvestasi, getInvestasiProyek, getMudharib } from '@/modules/koperasi/actions/koperasi.actions'
 
 const STATUS_FLOW: Record<string, { next: string[]; color: string; label: string }> = {
   DIAJUKAN:    { next: ['DIVERIFIKASI', 'DITOLAK'], color: 'bg-slate-600', label: 'Diajukan' },

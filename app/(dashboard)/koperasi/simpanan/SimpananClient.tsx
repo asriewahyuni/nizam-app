@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormSelect, FormInput, Modal, StatusBadge } from '@/components/ui/NizamUI'
 import { Plus, Wallet, Banknote, Save } from 'lucide-react'
-import { getSimpananPokok, getSimpananWajib, getSimpananSukarela, bayarSimpananPokok, bayarSimpananWajib, transaksiSimpananSukarela, getAnggota } from '@/lib/koperasi/client'
+import { getSimpananPokok, getSimpananWajib, getSimpananSukarela, bayarSimpananPokok, bayarSimpananWajib, transaksiSimpananSukarela, getAnggota } from '@/modules/koperasi/actions/koperasi.actions'
 
 type TabType = 'pokok' | 'wajib' | 'sukarela'
 

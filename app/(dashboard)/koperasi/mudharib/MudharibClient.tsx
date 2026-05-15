@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, StatusBadge, Modal } from '@/components/ui/NizamUI'
 import { Plus, Users } from 'lucide-react'
-import { getMudharib, createMudharib, getAnggota } from '@/lib/koperasi/client'
+import { getMudharib, createMudharib, getAnggota } from '@/modules/koperasi/actions/koperasi.actions'
 
 export default function MudharibClient({ orgId }: { orgId: string }) {
   const [data, setData] = useState<any[]>([])

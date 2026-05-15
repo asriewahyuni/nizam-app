@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormSelect, Modal } from '@/components/ui/NizamUI'
 import { Plus, Users } from 'lucide-react'
-import { getShahibulMaal, daftarkanShahibulMaal, getAnggota } from '@/lib/koperasi/client'
+import { getShahibulMaal, daftarkanShahibulMaal, getAnggota } from '@/modules/koperasi/actions/koperasi.actions'
 
 export default function SimpleListPage({ orgId, type = 'shahibul-maal' }: { orgId: string; type?: string }) {
   const [data, setData] = useState<any[]>([])

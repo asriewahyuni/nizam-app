@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, StatusBadge, Modal } from '@/components/ui/NizamUI'
 import { Plus, Shield } from 'lucide-react'
-import { getSertifikasiDps, terbitkanSertifikasi, getAnggota } from '@/lib/koperasi/client'
+import { getSertifikasiDps, terbitkanSertifikasi, getAnggota } from '@/modules/koperasi/actions/koperasi.actions'
 
 export default function SertifikasiClient({ orgId }: { orgId: string }) {
   const [data, setData] = useState<any[]>([])

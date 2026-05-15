@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormSelect, StatusBadge, Modal } from '@/components/ui/NizamUI'
 import { Plus, UserCog } from 'lucide-react'
-import { getPengurus, tetapkanPengurus, getAnggota } from '@/lib/koperasi/client'
+import { getPengurus, tetapkanPengurus, getAnggota } from '@/modules/koperasi/actions/koperasi.actions'
 
 const JABATAN = [
   { value: 'KETUA', label: 'Ketua' },

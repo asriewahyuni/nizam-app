@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { PageHeader, SafeButton, SectionCard, StatusBadge } from '@/components/ui/NizamUI'
 import { Calculator, Download, Users, Shield, GraduationCap, Heart, Building, Save, UserCog } from 'lucide-react'
-import { hitungSHU } from '@/lib/koperasi/client'
+import { hitungSHU } from '@/modules/koperasi/actions/shu.actions'
 
 const ALOKASI_LABEL: Record<string, { label: string; icon: any; color: string; desc: string }> = {
   anggota: { label: 'Bagi Hasil Anggota', icon: Users, color: 'text-emerald-600', desc: '40% — Dibagikan ke anggota proporsional simpanan' },
