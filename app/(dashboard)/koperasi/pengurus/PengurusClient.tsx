@@ -36,9 +36,9 @@ export default function PengurusClient({ orgId }: { orgId: string }) {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Pengurus Koperasi" subtitle="Struktur organisasi koperasi">
+      <PageHeader title="Pengurus Koperasi" subtitle="Struktur organisasi koperasi" actions={
         <SafeButton onClick={() => setShowForm(true)}><Plus className="w-4 h-4" /> Tambah Pengurus</SafeButton>
-      </PageHeader>
+      } />
 
       <SectionCard>
         {loading ? <div className="text-slate-500 p-4">Memuat...</div> : data.length === 0 ? (

@@ -28,9 +28,9 @@ export default function MudharibClient({ orgId }: { orgId: string }) {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Mudharib" subtitle="Pengelola proyek / entrepreneur">
+      <PageHeader title="Mudharib" subtitle="Pengelola proyek / entrepreneur" actions={
         <SafeButton onClick={() => setShowForm(true)}><Plus className="w-4 h-4" /> Daftarkan Mudharib</SafeButton>
-      </PageHeader>
+      } />
 
       <SectionCard>
         {loading ? <div className="text-slate-500 p-4">Memuat...</div> : data.length === 0 ? (

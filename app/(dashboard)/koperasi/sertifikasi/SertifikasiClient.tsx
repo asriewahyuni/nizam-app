@@ -34,9 +34,9 @@ export default function SertifikasiClient({ orgId }: { orgId: string }) {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Sertifikasi DPS" subtitle="Dewan Pengawas Syariah — CORE iSEC">
+      <PageHeader title="Sertifikasi DPS" subtitle="Dewan Pengawas Syariah — CORE iSEC" actions={
         <SafeButton onClick={() => setShowForm(true)}><Plus className="w-4 h-4" /> Terbitkan Sertifikat</SafeButton>
-      </PageHeader>
+      } />
 
       <SectionCard>
         {loading ? <div className="text-slate-500 p-4">Memuat...</div> : data.length === 0 ? (
