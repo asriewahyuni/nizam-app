@@ -45,7 +45,19 @@
    - getBalanceSheet optimization (no double getProfitLoss calls)
 10. ✅ PPN Tax Engine live — PKP settings, Bayar Pajak (auto-JE), Download SPT CSV
 
-### Known Issues / In Progress
+### Module Onboarding — All 9 Operational Modules (15 May 2026)
+**Done:**
+- [x] Created 9 onboarding pages with banner + interactive steps (follows LMS pattern)
+- [x] Added onboarding guard (`getModuleInstanceStatus` → redirect to `/onboarding`) in each module page.tsx
+- [x] Updated `activateModule` redirect: now goes to `${modDef.href}/onboarding` for business_type/addon modules
+- [x] Updated marketplace "Selesaikan Setup" link: points to `${mod.href}/onboarding`
+- [x] Deprecated old generic `/marketplace/setup/[moduleKey]` → redirects to module-specific onboarding
+
+**Pattern:**
+- Only operational modules (business_type + addon) get onboarding — core modules skip it
+- CoA injection step only for Fleet, Koperasi, Syirkah (modules with coaInjectionFn)
+- Settings step for all 9 modules with inline SETTINGS_FIELDS arrays
+- Uses shared `ModuleOnboardingActions.tsx` (InstallCoaButton, SimpleSettingsForm, CompleteOnboardingButton)
 - Activation redirect: still redirects to `/marketplace` instead of setup page after activation
 - Server Component render error on marketplace page (Supabase/env issue)
 - Inventory save error (regression)

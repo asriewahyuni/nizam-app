@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getModuleInstanceStatus } from '@/modules/marketplace/actions/marketplace.actions'
 import { getSalesPageAiProfileForOrg, getSalesPageLeadsForOrg, getSalesPagesForOrg } from '@/modules/sales/lib/sales-page.server'
 import { getServiceOrderSeeds } from '@/modules/services/actions/service.actions'
 import SalesPageStudioClient from './SalesPageStudioClient'
@@ -13,6 +14,12 @@ export const metadata: Metadata = {
 export default async function SalesPageStudioPage() {
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
+
+  // ── Module Onboarding Guard ──
+  const moduleInstance = await getModuleInstanceStatus(orgData.org.id, 'Sales Page')
+  if (!moduleInstance || moduleInstance.status !== 'READY') {
+    return redirect('/sales/pages/onboarding')
+  }
 
   const orgId = orgData.org.id
   const orgSlug = orgData.org.slug?.trim() || orgId

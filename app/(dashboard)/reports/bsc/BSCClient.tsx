@@ -294,7 +294,7 @@ export function BSCClient({
 
   const handleSaveWeights = () => {
     if (!canManageSetup) {
-      window.alert('Pilih unit aktif terlebih dahulu untuk mengubah setup BSC.')
+      window.alert('Pilih unit aktif terlebih dahulu untuk mengubah Strategi.')
       return
     }
 
@@ -311,7 +311,7 @@ export function BSCClient({
 
   const handleSeedTemplate = () => {
     if (!canManageSetup) {
-      window.alert('Pilih unit aktif terlebih dahulu untuk memulai template BSC.')
+      window.alert('Pilih unit aktif terlebih dahulu untuk memulai template Strategi.')
       return
     }
 
@@ -548,7 +548,7 @@ export function BSCClient({
            <BarChart3 size={14} />
            Performance Navigation · Live Data
         </div>
-        <h1 className="text-4xl font-semibold text-slate-900 tracking-tight">Balanced Scorecard (BSC)</h1>
+        <h1 className="text-4xl font-semibold text-slate-900 tracking-tight">Strategi</h1>
         <p className="text-slate-500 font-medium text-lg italic opacity-80">4 Perspektif strategis — semua dari data operasional real-time.</p>
       </div>
 
@@ -725,7 +725,7 @@ export function BSCClient({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
-            <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200">Siklus: {setupData.cycle?.cycle_name || `BSC ${setupData.scope.cycle_key}`}</span>
+            <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200">Siklus: {setupData.cycle?.cycle_name || `Strategi ${setupData.scope.cycle_key}`}</span>
             <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200">Periode: {setupData.scope.start_date} s/d {setupData.scope.end_date}</span>
             <span className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700">Score: {setupData.summary.overall_score_100} / 100 ({setupData.summary.overall_score_4} / 4)</span>
             <span className="px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700">Coverage: {setupData.summary.completion_percent}%</span>
@@ -737,7 +737,7 @@ export function BSCClient({
           )}
           {!canManageSetup && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-              Mode read-only. Pilih satu unit aktif jika ingin mengubah setup BSC.
+              Mode read-only. Pilih satu unit aktif jika ingin mengubah Strategi.
             </div>
           )}
         </div>

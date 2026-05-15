@@ -439,7 +439,7 @@ const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
   },
   {
     canonical: 'Reports',
-    aliases: ['reports', 'laporan', 'insight', 'strategy', 'forecast', 'strategi (bsc)'],
+    aliases: ['reports', 'laporan', 'insight', 'strategy', 'forecast', 'strategi'],
   },
   {
     canonical: 'HRIS',

@@ -152,7 +152,16 @@ export async function activateModule(moduleKey: string) {
 
   revalidatePath('/marketplace')
 
-  return { success: true, redirectUrl: `/marketplace/setup/${encodeURIComponent(moduleKey)}` }
+  // ── Redirect to module onboarding if available ──
+  // Operational modules (business_type & addon) have dedicated onboarding pages.
+  // Core/pillar modules use the generic marketplace setup as fallback.
+  const moduleCategoriesWithOnboarding = ['business_type', 'addon']
+  const hasOnboarding = modDef && moduleCategoriesWithOnboarding.includes(modDef.category) && modDef.href
+  const onboardingRedirect = hasOnboarding
+    ? `${modDef!.href}/onboarding`
+    : `/marketplace/setup/${encodeURIComponent(moduleKey)}`
+
+  return { success: true, redirectUrl: onboardingRedirect }
 }
 
 

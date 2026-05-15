@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getModuleInstanceStatus } from '@/modules/marketplace/actions/marketplace.actions'
 import { getBoms, getWorkOrders } from '@/modules/factory/actions/factory.actions'
 import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 import { getProducts } from '@/modules/inventory/actions/inventory.actions'
@@ -10,6 +11,13 @@ export const revalidate = 0
 export default async function ManufacturingPage() {
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
+
+  // ── Module Onboarding Guard ──
+  const moduleInstance = await getModuleInstanceStatus(orgData.org.id, 'Manufacturing')
+  if (!moduleInstance || moduleInstance.status !== 'READY') {
+    return redirect('/factory/onboarding')
+  }
+
   const activeBranch = await getActiveBranch(orgData.org.id)
 
   // Fetch all necessary data

@@ -420,7 +420,7 @@ function OperationalModuleCard({
             </div>
           )}
           {isPending && (
-            <a href={`/marketplace/setup/${mod.key}`} className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-amber-100 hover:bg-amber-600 transition-all">
+            <a href={`${mod.href}/onboarding`} className="inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-amber-100 hover:bg-amber-600 transition-all">
               Selesaikan Setup <ArrowRight className="h-4 w-4" />
             </a>
           )}

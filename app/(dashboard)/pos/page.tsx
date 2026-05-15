@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import POSClient from './POSClient'
 import { getActiveBranch, getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getModuleInstanceStatus } from '@/modules/marketplace/actions/marketplace.actions'
 import { getProducts } from '@/modules/inventory/actions/inventory.actions'
 import { getWarehouses } from '@/modules/inventory/actions/warehouse.actions'
 import type { ProductWithStock } from '@/modules/inventory/actions/inventory.actions'
@@ -11,6 +12,12 @@ import { getPosShiftConfig, isPosShiftFeatureEnabled } from '@/modules/sales/lib
 export default async function POSPage() {
   const orgData = await getActiveOrg()
   if (!orgData) redirect('/onboarding')
+
+  // ── Module Onboarding Guard ──
+  const moduleInstance = await getModuleInstanceStatus(orgData.org.id, 'POS')
+  if (!moduleInstance || moduleInstance.status !== 'READY') {
+    return redirect('/pos/onboarding')
+  }
 
   const supabase = await createClient()
   const orgId = orgData.org.id

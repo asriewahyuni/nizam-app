@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getModuleInstanceStatus } from '@/modules/marketplace/actions/marketplace.actions'
 import { getAssets, getBookings, getRoutes, getSchedules, getAllMedicalRecords, getFleetCrew, getTerminals, getFleetAttendanceToday } from '@/modules/fleet/actions/fleet.actions'
 import { FleetClient } from './FleetClient'
 
@@ -9,6 +10,12 @@ export const revalidate = 0
 export default async function FleetPage() {
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
+
+  // ── Module Onboarding Guard ──
+  const moduleInstance = await getModuleInstanceStatus(orgData.org.id, 'Fleet & Rental')
+  if (!moduleInstance || moduleInstance.status !== 'READY') {
+    return redirect('/fleet/onboarding')
+  }
 
   const supabase = await createClient()
 

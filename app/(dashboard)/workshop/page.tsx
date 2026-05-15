@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
+import { getModuleInstanceStatus } from '@/modules/marketplace/actions/marketplace.actions'
 import {
   getWorkshopWorkOrders,
   getWorkshopVehicles,
@@ -14,6 +15,12 @@ export const revalidate = 0
 export default async function WorkshopPage() {
   const orgData = await getActiveOrg()
   if (!orgData) return redirect('/onboarding')
+
+  // ── Module Onboarding Guard ──
+  const moduleInstance = await getModuleInstanceStatus(orgData.org.id, 'Workshop')
+  if (!moduleInstance || moduleInstance.status !== 'READY') {
+    return redirect('/workshop/onboarding')
+  }
 
   const orgId = orgData.org.id
   const supabase = await createClient() as any
