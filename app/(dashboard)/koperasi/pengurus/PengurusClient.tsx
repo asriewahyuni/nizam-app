@@ -3,7 +3,22 @@
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormSelect, StatusBadge, Modal } from '@/components/ui/NizamUI'
 import { Plus, UserCog } from 'lucide-react'
-import { getPengurus, tetapkanPengurus, getAnggota } from '@/modules/koperasi/actions/koperasi.actions'
+
+const BASE = '/api/koperasi/action'
+
+async function api(action: string, params: any[] = []) {
+  const res = await fetch(BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, params }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || 'Request failed')
+  }
+  const { data } = await res.json()
+  return data
+}
 
 const JABATAN = [
   { value: 'KETUA', label: 'Ketua' },
@@ -21,17 +36,22 @@ export default function PengurusClient({ orgId }: { orgId: string }) {
   const [form, setForm] = useState({ anggota_id: '', jabatan: 'ADMIN' })
 
   useEffect(() => {
-    getPengurus(orgId).then(d => setData(d))
-    getAnggota(orgId).then(a => setAnggota(a.filter((x: any) => x.status === 'AKTIF')))
-    setLoading(false)
+    Promise.all([
+      api('getPengurus', [orgId]),
+      api('getAnggota', [orgId]),
+    ]).then(([d, a]) => {
+      setData(d)
+      setAnggota(a.filter((x: any) => x.status === 'AKTIF'))
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [orgId])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    await tetapkanPengurus(orgId, { anggota_id: form.anggota_id, jabatan: form.jabatan, masa_bakti_awal: new Date().toISOString().split('T')[0] })
+    await api('tetapkanPengurus', [orgId, { anggota_id: form.anggota_id, jabatan: form.jabatan, masa_bakti_awal: new Date().toISOString().split('T')[0] }])
     setShowForm(false)
     setForm({ anggota_id: '', jabatan: 'ADMIN' })
-    setData(await getPengurus(orgId))
+    setData(await api('getPengurus', [orgId]))
   }
 
   return (

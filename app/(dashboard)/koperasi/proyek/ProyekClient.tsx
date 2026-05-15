@@ -1,10 +1,25 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, Modal, StatusBadge, StatCard } from '@/components/ui/NizamUI'
+import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, Modal, StatCard } from '@/components/ui/NizamUI'
 import { Plus, TrendingUp, Users, Wallet, ArrowRightCircle, CheckCircle, XCircle, Eye, Send, AlertTriangle, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
-import { getProyek, createProyek, updateStatusProyek, tambahInvestasi, getInvestasiProyek, getMudharib } from '@/modules/koperasi/actions/koperasi.actions'
+
+const BASE = '/api/koperasi/action'
+
+async function api(action: string, params: any[] = []) {
+  const res = await fetch(BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, params }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || 'Request failed')
+  }
+  const { data } = await res.json()
+  return data
+}
 
 const STATUS_FLOW: Record<string, { next: string[]; color: string; label: string }> = {
   DIAJUKAN:    { next: ['DIVERIFIKASI', 'DITOLAK'], color: 'bg-slate-600', label: 'Diajukan' },
@@ -27,6 +42,7 @@ export default function ProyekClient({ orgId }: { orgId: string }) {
   const [showForm, setShowForm] = useState(false)
   const [showInvestasi, setShowInvestasi] = useState<string | null>(null)
   const [investasi, setInvestasi] = useState<any[]>([])
+  const [shahibulMaalList, setShahibulMaalList] = useState<any[]>([])
   const [form, setForm] = useState({
     mudharib_id: '', nama_proyek: '', deskripsi: '',
     modal_dibutuhkan: '', nisbah_sm: '70', nisbah_mudharib: '30', ujrah_koperasi: '0',
@@ -34,47 +50,49 @@ export default function ProyekClient({ orgId }: { orgId: string }) {
   const [investForm, setInvestForm] = useState({ shahibul_maal_id: '', jumlah: '' })
 
   useEffect(() => {
-    Promise.all([getProyek(orgId), getMudharib(orgId)]).then(([d, m]) => {
-      setData(d); setMudharib(m); setLoading(false)
-    })
+    Promise.all([
+      api('getProyek', [orgId]),
+      api('getMudharib', [orgId]),
+      api('getShahibulMaal', [orgId]),
+    ]).then(([d, m, sm]) => {
+      setData(d)
+      setMudharib(m)
+      setShahibulMaalList(sm)
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [orgId])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    await createProyek(orgId, {
+    await api('createProyek', [orgId, {
       mudharib_id: form.mudharib_id, nama_proyek: form.nama_proyek,
       deskripsi: form.deskripsi, modal_dibutuhkan: Number(form.modal_dibutuhkan),
       nisbah_sm: Number(form.nisbah_sm), nisbah_mudharib: Number(form.nisbah_mudharib),
       ujrah_koperasi: Number(form.ujrah_koperasi),
-    })
+    }])
     setShowForm(false)
     setForm({ mudharib_id: '', nama_proyek: '', deskripsi: '', modal_dibutuhkan: '', nisbah_sm: '70', nisbah_mudharib: '30', ujrah_koperasi: '0' })
-    setData(await getProyek(orgId))
+    setData(await api('getProyek', [orgId]))
   }
 
   async function handleStatus(id: string, status: string, alasan?: string) {
-    await updateStatusProyek(id, status, alasan)
-    setData(await getProyek(orgId))
+    await api('updateStatusProyek', [id, status, alasan])
+    setData(await api('getProyek', [orgId]))
   }
 
   async function openInvestasi(proyekId: string) {
     setShowInvestasi(proyekId)
-    setInvestasi(await getInvestasiProyek(proyekId))
+    setInvestasi(await api('getInvestasiProyek', [proyekId]))
   }
 
   async function handleInvestSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!showInvestasi) return
-    // Dynamic import to get shahibul maal
-    const { getShahibulMaal } = await import('@/modules/koperasi/actions/koperasi.actions')
-    const smList = await getShahibulMaal(orgId)
-    const sm = smList.find((s: any) => s.id === investForm.shahibul_maal_id)
-    if (!sm) return
-    await tambahInvestasi(showInvestasi, investForm.shahibul_maal_id, Number(investForm.jumlah))
+    await api('tambahInvestasi', [showInvestasi, investForm.shahibul_maal_id, Number(investForm.jumlah)])
     setInvestForm({ shahibul_maal_id: '', jumlah: '' })
+    setInvestasi(await api('getInvestasiProyek', [showInvestasi]))
   }
 
-  // Stats
   const proyekAktif = data.filter(p => p.status === 'AKTIF' || p.status === 'PENDANAAN').length
   const totalModal = data.reduce((s, p) => s + Number(p.modal_terkumpul || 0), 0)
   const totalDibutuhkan = data.reduce((s, p) => s + Number(p.modal_dibutuhkan || 0), 0)
@@ -91,14 +109,13 @@ export default function ProyekClient({ orgId }: { orgId: string }) {
         <StatCard title="Total Proyek" value={data.length.toString()} subtitle="Semua status" icon={Users} />
       </div>
 
-      {/* Proyek List */}
       <SectionCard>
         {loading ? <div className="text-slate-500 p-4">Memuat...</div> : data.length === 0 ? (
           <div className="text-slate-500 p-8 text-center">Belum ada proyek. Buat proyek baru untuk memulai Mudharabah.</div>
         ) : (
           <div className="space-y-3">
             {data.map((p: any) => {
-              const flow = STATUS_FLOW[p.status] || { color: 'bg-gray-600', label: p.status }
+              const flow = STATUS_FLOW[p.status] || { color: 'bg-gray-600', label: p.status, next: [] }
               const progress = p.modal_dibutuhkan > 0 ? Math.round((Number(p.modal_terkumpul) / Number(p.modal_dibutuhkan)) * 100) : 0
               return (
                 <div key={p.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200">
@@ -115,7 +132,6 @@ export default function ProyekClient({ orgId }: { orgId: string }) {
                         <span>Mudharib: {p.mudharib?.nama || '-'}</span>
                         <span>Nisbah SM:{Number(p.nisbah_sm || 0).toFixed(0)}% : M:{Number(p.nisbah_mudharib || 0).toFixed(0)}%</span>
                       </div>
-                      {/* Progress bar */}
                       <div className="mt-2">
                         <div className="flex justify-between text-[10px] text-slate-400 mb-1">
                           <span>Progress Pendanaan</span>
@@ -126,7 +142,6 @@ export default function ProyekClient({ orgId }: { orgId: string }) {
                         </div>
                       </div>
                     </div>
-                    {/* Actions */}
                     <div className="flex flex-col gap-1.5">
                       <Link href={`/koperasi/proyek/${p.id}`} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-white/20 text-xs font-medium transition-all">
                         <ExternalLink className="w-3 h-3" /> Buka Detail
@@ -151,7 +166,6 @@ export default function ProyekClient({ orgId }: { orgId: string }) {
         )}
       </SectionCard>
 
-      {/* Create Proyek Modal */}
       <Modal show={showForm} onClose={() => setShowForm(false)} title="Proyek Mudharabah Baru" size="lg">
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -173,7 +187,7 @@ export default function ProyekClient({ orgId }: { orgId: string }) {
           </div>
           <FormField label="Ujrah Koperasi (Flat)"><FormInput type="number" value={form.ujrah_koperasi} onChange={e => setForm(f => ({...f, ujrah_koperasi: e.target.value}))} /></FormField>
           <div className="p-3 bg-emerald-900/20 rounded-xl text-xs text-emerald-600">
-            Nisbah bagi hasil: Shahibul Maal kolektif {form.nisbah_sm}% : Mudharib {form.nisbah_mudharib}%. 
+            Nisbah bagi hasil: Shahibul Maal kolektif {form.nisbah_sm}% : Mudharib {form.nisbah_mudharib}%.
             Ujrah koperasi Rp {Number(form.ujrah_koperasi || 0).toLocaleString()} (flat).
           </div>
           <div className="flex gap-2 justify-end pt-2">
@@ -183,7 +197,6 @@ export default function ProyekClient({ orgId }: { orgId: string }) {
         </form>
       </Modal>
 
-      {/* Investasi Modal */}
       {showInvestasi && (
         <Modal show={true} onClose={() => setShowInvestasi(null)} title="Tambah Investasi" size="lg">
           <div className="space-y-4">
@@ -202,8 +215,8 @@ export default function ProyekClient({ orgId }: { orgId: string }) {
               <FormField label="Shahibul Maal">
                 <FormSelect value={investForm.shahibul_maal_id} onChange={e => setInvestForm(f => ({...f, shahibul_maal_id: e.target.value}))} required>
                   <option value="">Pilih</option>
-                  {data[0] && investasi.length > 0 && investasi.map((inv: any) => (
-                    <option key={inv.shahibul_maal_id} value={inv.shahibul_maal_id}>{inv.shahibul_maal?.anggota?.nama}</option>
+                  {shahibulMaalList.map((sm: any) => (
+                    <option key={sm.id} value={sm.id}>{sm.anggota?.nama}</option>
                   ))}
                 </FormSelect>
               </FormField>

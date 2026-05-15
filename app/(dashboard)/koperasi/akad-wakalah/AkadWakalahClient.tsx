@@ -3,7 +3,22 @@
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, StatusBadge, Modal } from '@/components/ui/NizamUI'
 import { Plus, FileText, Printer } from 'lucide-react'
-import { getAkadWakalah, createAkadWakalah, getShahibulMaal } from '@/modules/koperasi/actions/koperasi.actions'
+
+const BASE = '/api/koperasi/action'
+
+async function api(action: string, params: any[] = []) {
+  const res = await fetch(BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, params }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || 'Request failed')
+  }
+  const { data } = await res.json()
+  return data
+}
 
 export default function AkadWakalahClient({ orgId }: { orgId: string }) {
   const [data, setData] = useState<any[]>([])
@@ -13,22 +28,27 @@ export default function AkadWakalahClient({ orgId }: { orgId: string }) {
   const [form, setForm] = useState({ shahibul_maal_id: '', jenis_barang: '', ujrah_flat: '', tgl_akad: new Date().toISOString().split('T')[0] })
 
   useEffect(() => {
-    getAkadWakalah(orgId).then(d => setData(d))
-    getShahibulMaal(orgId).then(sm => setShahibulMaalList(sm))
-    setLoading(false)
+    Promise.all([
+      api('getAkadWakalah', [orgId]),
+      api('getShahibulMaal', [orgId]),
+    ]).then(([d, sm]) => {
+      setData(d)
+      setShahibulMaalList(sm)
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [orgId])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    await createAkadWakalah(orgId, {
+    await api('createAkadWakalah', [orgId, {
       shahibul_maal_id: form.shahibul_maal_id,
       jenis_barang: form.jenis_barang,
       ujrah_flat: Number(form.ujrah_flat),
       tgl_akad: form.tgl_akad,
-    })
+    }])
     setShowForm(false)
     setForm({ shahibul_maal_id: '', jenis_barang: '', ujrah_flat: '', tgl_akad: new Date().toISOString().split('T')[0] })
-    setData(await getAkadWakalah(orgId))
+    setData(await api('getAkadWakalah', [orgId]))
   }
 
   return (

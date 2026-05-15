@@ -3,7 +3,22 @@
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, StatusBadge, Modal } from '@/components/ui/NizamUI'
 import { Plus, Shield } from 'lucide-react'
-import { getSertifikasiDps, terbitkanSertifikasi, getAnggota } from '@/modules/koperasi/actions/koperasi.actions'
+
+const BASE = '/api/koperasi/action'
+
+async function api(action: string, params: any[] = []) {
+  const res = await fetch(BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, params }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || 'Request failed')
+  }
+  const { data } = await res.json()
+  return data
+}
 
 export default function SertifikasiClient({ orgId }: { orgId: string }) {
   const [data, setData] = useState<any[]>([])
@@ -13,23 +28,28 @@ export default function SertifikasiClient({ orgId }: { orgId: string }) {
   const [form, setForm] = useState({ entity_id: '', entity_type: 'ANGGOTA', tgl_expired: '' })
 
   useEffect(() => {
-    getSertifikasiDps(orgId).then(d => setData(d))
-    getAnggota(orgId).then(a => setAnggota(a.filter((x: any) => x.status === 'AKTIF')))
-    setLoading(false)
+    Promise.all([
+      api('getSertifikasiDps', [orgId]),
+      api('getAnggota', [orgId]),
+    ]).then(([d, a]) => {
+      setData(d)
+      setAnggota(a.filter((x: any) => x.status === 'AKTIF'))
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [orgId])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    await terbitkanSertifikasi(orgId, {
-      entity_type: form.entity_type as 'ANGGOTA' | 'MUDHARIB',
+    await api('terbitkanSertifikasi', [orgId, {
+      entity_type: form.entity_type,
       entity_id: form.entity_id,
       no_sertifikat: `DPS-${orgId.slice(0,4).toUpperCase()}-${Date.now()}`,
       tgl_terbit: new Date().toISOString().split('T')[0],
       tgl_expired: form.tgl_expired,
-    })
+    }])
     setShowForm(false)
     setForm({ entity_id: '', entity_type: 'ANGGOTA', tgl_expired: '' })
-    setData(await getSertifikasiDps(orgId))
+    setData(await api('getSertifikasiDps', [orgId]))
   }
 
   return (

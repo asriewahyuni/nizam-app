@@ -3,7 +3,12 @@
 import { useState } from 'react'
 import { PageHeader, SafeButton, SectionCard, StatusBadge } from '@/components/ui/NizamUI'
 import { Calculator, Download, Users, Shield, GraduationCap, Heart, Building, Save, UserCog } from 'lucide-react'
-import { hitungSHU } from '@/modules/koperasi/actions/shu.actions'
+const BASE = '/api/koperasi/action'
+async function api(action: string, params: any[] = []) {
+  const res = await fetch(BASE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, params }) })
+  if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error || 'Request failed') }
+  const { data } = await res.json(); return data
+}
 
 const ALOKASI_LABEL: Record<string, { label: string; icon: any; color: string; desc: string }> = {
   anggota: { label: 'Bagi Hasil Anggota', icon: Users, color: 'text-emerald-600', desc: '40% — Dibagikan ke anggota proporsional simpanan' },
@@ -23,7 +28,7 @@ export default function ShuClient({ orgId }: { orgId: string }) {
   async function handleHitung() {
     setLoading(true)
     try {
-      const r = await hitungSHU(orgId, tahun)
+      const r = await api('hitungSHU', [orgId, tahun])
       setResult(r)
     } catch (e: any) {
       alert('❌ ' + e.message)

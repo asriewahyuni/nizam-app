@@ -3,7 +3,22 @@
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormSelect, FormInput, Modal, StatusBadge } from '@/components/ui/NizamUI'
 import { Plus, Wallet, Banknote, Save } from 'lucide-react'
-import { getSimpananPokok, getSimpananWajib, getSimpananSukarela, bayarSimpananPokok, bayarSimpananWajib, transaksiSimpananSukarela, getAnggota } from '@/modules/koperasi/actions/koperasi.actions'
+
+const BASE = '/api/koperasi/action'
+
+async function api(action: string, params: any[] = []) {
+  const res = await fetch(BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, params }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || 'Request failed')
+  }
+  const { data } = await res.json()
+  return data
+}
 
 type TabType = 'pokok' | 'wajib' | 'sukarela'
 
@@ -24,17 +39,19 @@ export default function SimpananClient({ orgId }: { orgId: string }) {
 
   useEffect(() => {
     loadData()
-    getAnggota(orgId).then(setAnggota)
+    api('getAnggota', [orgId]).then(setAnggota).catch(() => {})
   }, [tab])
 
   async function loadData() {
     setLoading(true)
     setError('')
     try {
-      let d: any[]
-      if (tab === 'pokok') d = await getSimpananPokok(orgId)
-      else if (tab === 'wajib') d = await getSimpananWajib(orgId)
-      else d = await getSimpananSukarela(orgId)
+      const actionMap: Record<TabType, string> = {
+        pokok: 'getSimpananPokok',
+        wajib: 'getSimpananWajib',
+        sukarela: 'getSimpananSukarela',
+      }
+      const d = await api(actionMap[tab], [orgId])
       setData(d)
     } catch (e: any) { setError(e.message) }
     setLoading(false)
@@ -43,9 +60,13 @@ export default function SimpananClient({ orgId }: { orgId: string }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const payload = { anggota_id: form.anggota_id, jumlah: Number(form.jumlah), tgl_bayar: form.tgl_bayar, keterangan: form.keterangan }
-    if (tab === 'pokok') await bayarSimpananPokok(orgId, payload)
-    else if (tab === 'wajib') await bayarSimpananWajib(orgId, { ...payload, periode_bulan: form.periode_bulan })
-    else await transaksiSimpananSukarela(orgId, { ...payload, jenis: form.jenis })
+    const actionMap: Record<TabType, [string, any[]]> = {
+      pokok: ['bayarSimpananPokok', [orgId, payload]],
+      wajib: ['bayarSimpananWajib', [orgId, { ...payload, periode_bulan: form.periode_bulan }]],
+      sukarela: ['transaksiSimpananSukarela', [orgId, { ...payload, jenis: form.jenis }]],
+    }
+    const [action, params] = actionMap[tab]
+    await api(action, params)
     setShowForm(false)
     setForm({ anggota_id: '', jumlah: '', tgl_bayar: new Date().toISOString().split('T')[0], keterangan: '', periode_bulan: '', jenis: 'SETOR' })
     loadData()

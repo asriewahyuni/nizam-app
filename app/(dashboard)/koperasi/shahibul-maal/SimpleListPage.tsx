@@ -3,9 +3,24 @@
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormSelect, Modal } from '@/components/ui/NizamUI'
 import { Plus, Users } from 'lucide-react'
-import { getShahibulMaal, daftarkanShahibulMaal, getAnggota } from '@/modules/koperasi/actions/koperasi.actions'
 
-export default function SimpleListPage({ orgId, type = 'shahibul-maal' }: { orgId: string; type?: string }) {
+const BASE = '/api/koperasi/action'
+
+async function api(action: string, params: any[] = []) {
+  const res = await fetch(BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, params }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || 'Request failed')
+  }
+  const { data } = await res.json()
+  return data
+}
+
+export default function SimpleListPage({ orgId }: { orgId: string; type?: string }) {
   const [data, setData] = useState<any[]>([])
   const [anggota, setAnggota] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -13,18 +28,22 @@ export default function SimpleListPage({ orgId, type = 'shahibul-maal' }: { orgI
   const [selectedAnggota, setSelectedAnggota] = useState('')
 
   useEffect(() => {
-    getShahibulMaal(orgId).then(d => setData(d))
-    getAnggota(orgId).then(a => setAnggota(a.filter((x: any) => x.status === 'AKTIF' && x.is_tersertifikasi_dps)))
-    setLoading(false)
+    Promise.all([
+      api('getShahibulMaal', [orgId]),
+      api('getAnggota', [orgId]),
+    ]).then(([d, a]) => {
+      setData(d)
+      setAnggota(a.filter((x: any) => x.status === 'AKTIF' && x.is_tersertifikasi_dps))
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [orgId])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    await daftarkanShahibulMaal(orgId, selectedAnggota)
+    await api('daftarkanShahibulMaal', [orgId, selectedAnggota])
     setShowForm(false)
     setSelectedAnggota('')
-    const d = await getShahibulMaal(orgId)
-    setData(d)
+    setData(await api('getShahibulMaal', [orgId]))
   }
 
   return (

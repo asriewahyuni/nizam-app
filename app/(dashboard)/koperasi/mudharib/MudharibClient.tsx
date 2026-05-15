@@ -1,9 +1,24 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, StatusBadge, Modal } from '@/components/ui/NizamUI'
+import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, Modal } from '@/components/ui/NizamUI'
 import { Plus, Users } from 'lucide-react'
-import { getMudharib, createMudharib, getAnggota } from '@/modules/koperasi/actions/koperasi.actions'
+
+const BASE = '/api/koperasi/action'
+
+async function api(action: string, params: any[] = []) {
+  const res = await fetch(BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, params }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || 'Request failed')
+  }
+  const { data } = await res.json()
+  return data
+}
 
 export default function MudharibClient({ orgId }: { orgId: string }) {
   const [data, setData] = useState<any[]>([])
@@ -13,17 +28,22 @@ export default function MudharibClient({ orgId }: { orgId: string }) {
   const [form, setForm] = useState({ anggota_id: '', keahlian: '', pengalaman: '' })
 
   useEffect(() => {
-    getMudharib(orgId).then(d => setData(d))
-    getAnggota(orgId).then(a => setAnggota(a.filter((x: any) => x.status === 'AKTIF')))
-    setLoading(false)
+    Promise.all([
+      api('getMudharib', [orgId]),
+      api('getAnggota', [orgId]),
+    ]).then(([d, a]) => {
+      setData(d)
+      setAnggota(a.filter((x: any) => x.status === 'AKTIF'))
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [orgId])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    await createMudharib(orgId, { anggota_id: form.anggota_id, keahlian: form.keahlian, pengalaman: form.pengalaman })
+    await api('createMudharib', [orgId, { anggota_id: form.anggota_id, keahlian: form.keahlian, pengalaman: form.pengalaman }])
     setShowForm(false)
     setForm({ anggota_id: '', keahlian: '', pengalaman: '' })
-    setData(await getMudharib(orgId))
+    setData(await api('getMudharib', [orgId]))
   }
 
   return (

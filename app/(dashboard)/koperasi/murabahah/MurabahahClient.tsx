@@ -3,7 +3,22 @@
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, StatusBadge, Modal } from '@/components/ui/NizamUI'
 import { Plus, ShoppingCart, Printer } from 'lucide-react'
-import { getMurabahahTransaksi, createMurabahahTransaksi, getAkadWakalah, getAnggota } from '@/modules/koperasi/actions/koperasi.actions'
+
+const BASE = '/api/koperasi/action'
+
+async function api(action: string, params: any[] = []) {
+  const res = await fetch(BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, params }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || 'Request failed')
+  }
+  const { data } = await res.json()
+  return data
+}
 
 export default function MurabahahClient({ orgId }: { orgId: string }) {
   const [data, setData] = useState<any[]>([])
@@ -18,40 +33,30 @@ export default function MurabahahClient({ orgId }: { orgId: string }) {
 
   useEffect(() => {
     Promise.all([
-      getMurabahahTransaksi(orgId),
-      getAkadWakalah(orgId),
-      getAnggota(orgId),
+      api('getMurabahahTransaksi', [orgId]),
+      api('getAkadWakalah', [orgId]),
+      api('getAnggota', [orgId]),
     ]).then(([d, a, ag]) => {
       setData(d)
       setAkad(a.filter((x: any) => x.status === 'AKTIF'))
       setAnggota(ag.filter((x: any) => x.status === 'AKTIF'))
       setLoading(false)
-    })
+    }).catch(() => setLoading(false))
   }, [orgId])
-
-  useEffect(() => {
-    if (form.harga_pokok && form.margin) {
-      const pokok = Number(form.harga_pokok)
-      const margin = Number(form.margin)
-      const total = pokok + margin
-      const tenor = Number(form.tenor_bulan) || 1
-      // Just auto-fill, we'll let user see the calc
-    }
-  }, [form.harga_pokok, form.margin, form.tenor_bulan])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    await createMurabahahTransaksi(orgId, {
+    await api('createMurabahahTransaksi', [orgId, {
       akad_wakalah_id: form.akad_wakalah_id,
       pembeli_id: form.pembeli_id,
       nama_barang: form.nama_barang,
       harga_pokok: Number(form.harga_pokok),
       margin: Number(form.margin),
       tenor_bulan: Number(form.tenor_bulan),
-    })
+    }])
     setShowForm(false)
     setForm({ akad_wakalah_id: '', pembeli_id: '', nama_barang: '', harga_pokok: '', margin: '', tenor_bulan: '12' })
-    setData(await getMurabahahTransaksi(orgId))
+    setData(await api('getMurabahahTransaksi', [orgId]))
   }
 
   return (
