@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import {
   getAnggota, createAnggota, updateAnggota,
   getSimpananPokok, bayarSimpananPokok,
@@ -48,30 +48,17 @@ const ACTION_MAP: Record<string, Function> = {
 
 export async function POST(req: NextRequest) {
   try {
-    const db = await createClient()
-    const { data: { user }, error: authError } = await db.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
-
-    const { data: orgMember } = await db
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .eq('status', 'ACTIVE')
-      .order('is_primary', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (!orgMember) {
-      return NextResponse.json({ error: 'No active organization' }, { status: 404 })
-    }
-
     const body = await req.json()
     const { action, params = [] } = body
 
     if (!action || !ACTION_MAP[action]) {
       return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
+    }
+
+    // Verify auth + active org (same pattern as /api/koperasi/dashboard)
+    const orgData = await getActiveOrg()
+    if (!orgData || !orgData.org) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
     const fn = ACTION_MAP[action]
