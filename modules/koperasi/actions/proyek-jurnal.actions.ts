@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 // ── GENERATE COA PER PROYEK ──────────────────────────────────────────────
 
 export async function generateProjectCoa(proyekId: string) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   
   const { data: proyek } = await db.from('koperasi_proyek').select('*').eq('id', proyekId).single()
   if (!proyek) throw new Error('Proyek tidak ditemukan')
@@ -49,7 +49,7 @@ export async function generateProjectCoa(proyekId: string) {
 // ── GET COA PROYEK ───────────────────────────────────────────────────────
 
 export async function getProjectCoa(proyekId: string) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   const { data, error } = await db
     .from('koperasi_proyek_coa')
     .select('*')
@@ -62,7 +62,7 @@ export async function getProjectCoa(proyekId: string) {
 // ── JURNAL PROYEK ────────────────────────────────────────────────────────
 
 export async function getProjectJournal(proyekId: string) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   const { data, error } = await db
     .from('koperasi_proyek_jurnal')
     .select(`
@@ -85,7 +85,7 @@ export async function createProjectJournalEntry(proyekId: string, payload: {
   keterangan: string
   lines: { coa_id: string; debit: number; kredit: number; keterangan?: string }[]
 }) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   
   const totalDebit = payload.lines.reduce((s, l) => s + l.debit, 0)
   const totalKredit = payload.lines.reduce((s, l) => s + l.kredit, 0)
@@ -126,7 +126,7 @@ export async function createProjectJournalEntry(proyekId: string, payload: {
 // ── NERACA PROYEK ────────────────────────────────────────────────────────
 
 export async function getProjectBalanceSheet(proyekId: string) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   // Query journal lines joined with project COA directly
   const { data: lines, error } = await db
     .from('koperasi_proyek_jurnal_lines')
@@ -183,7 +183,7 @@ export async function getProjectBalanceSheet(proyekId: string) {
 // ── P&L PROYEK ───────────────────────────────────────────────────────────
 
 export async function getProjectProfitLoss(proyekId: string) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   const { data: lines, error } = await db
     .from('koperasi_proyek_jurnal_lines')
     .select(`

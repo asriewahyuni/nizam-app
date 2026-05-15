@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 // ── SHU ENGINE ────────────────────────────────────────────────────────────
 
 export async function hitungSHU(orgId: string, periodeTahun: number) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   
   // 1. Get all organization-level accounting data
   const periodAwal = `${periodeTahun}-01-01`
@@ -137,7 +137,7 @@ export async function hitungSHU(orgId: string, periodeTahun: number) {
 // ── GET SHU HISTORY ────────────────────────────────────────────────────────
 
 export async function getSHUHistory(orgId: string) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   const { data } = await db
     .from('koperasi_proyek_bagi_hasil')
     .select('*')
@@ -150,7 +150,7 @@ export async function getSHUHistory(orgId: string) {
 // ── GET MEMBER DATA ────────────────────────────────────────────────────────
 
 export async function getMemberData(anggotaId: string) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   
   const { data: anggota } = await db
     .from('koperasi_anggota')

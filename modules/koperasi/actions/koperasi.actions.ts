@@ -5,14 +5,14 @@ import { revalidatePath } from 'next/cache'
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 
-function getDb() {
-  return createAdminClient()
+async function getDb() {
+  return await createAdminClient()
 }
 
 // ── ANGGOTA ──────────────────────────────────────────────────────────────────
 
 export async function getAnggota(orgId: string) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_anggota')
     .select('*, branch:branch_id(name)')
@@ -32,7 +32,7 @@ export async function createAnggota(orgId: string, payload: {
   no_telepon?: string
   email?: string
 }) {
-  const db = getDb()
+  const db = await getDb()
   // Auto-generate kode if not provided
   if (!payload.kode_anggota) {
     const { data: result } = await db.rpc('koperasi_generate_kode_anggota', { p_org_id: orgId })
@@ -51,7 +51,7 @@ export async function createAnggota(orgId: string, payload: {
 export async function updateAnggota(id: string, payload: Partial<{
   nama: string; nik: string; alamat: string; no_telepon: string; email: string; status: string
 }>) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_anggota')
     .update({ ...payload, updated_at: new Date().toISOString() })
@@ -66,7 +66,7 @@ export async function updateAnggota(id: string, payload: Partial<{
 // ── SIMPANAN ─────────────────────────────────────────────────────────────────
 
 export async function getSimpananPokok(orgId: string) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_simpanan_pokok')
     .select('*, anggota:koperasi_anggota!inner(nama, kode_anggota)')
@@ -79,7 +79,7 @@ export async function getSimpananPokok(orgId: string) {
 export async function bayarSimpananPokok(orgId: string, payload: {
   anggota_id: string; jumlah: number; tgl_bayar?: string; keterangan?: string
 }) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_simpanan_pokok')
     .insert({ org_id: orgId, ...payload, tgl_bayar: payload.tgl_bayar || new Date().toISOString().split('T')[0] })
@@ -93,7 +93,7 @@ export async function bayarSimpananPokok(orgId: string, payload: {
 }
 
 export async function getSimpananWajib(orgId: string) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_simpanan_wajib')
     .select('*, anggota:koperasi_anggota!inner(nama, kode_anggota)')
@@ -106,7 +106,7 @@ export async function getSimpananWajib(orgId: string) {
 export async function bayarSimpananWajib(orgId: string, payload: {
   anggota_id: string; jumlah: number; periode_bulan: string; tgl_bayar?: string; keterangan?: string
 }) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_simpanan_wajib')
     .insert({ org_id: orgId, ...payload, tgl_bayar: payload.tgl_bayar || new Date().toISOString().split('T')[0] })
@@ -118,7 +118,7 @@ export async function bayarSimpananWajib(orgId: string, payload: {
 }
 
 export async function getSimpananSukarela(orgId: string) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_simpanan_sukarela')
     .select('*, anggota:koperasi_anggota!inner(nama, kode_anggota)')
@@ -131,7 +131,7 @@ export async function getSimpananSukarela(orgId: string) {
 export async function transaksiSimpananSukarela(orgId: string, payload: {
   anggota_id: string; jenis: 'SETOR' | 'TARIK'; jumlah: number; tgl_transaksi?: string; keterangan?: string
 }) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_simpanan_sukarela')
     .insert({ org_id: orgId, ...payload, tgl_transaksi: payload.tgl_transaksi || new Date().toISOString().split('T')[0] })
@@ -145,7 +145,7 @@ export async function transaksiSimpananSukarela(orgId: string, payload: {
 // ── SHAHIBUL MAAL ────────────────────────────────────────────────────────────
 
 export async function getShahibulMaal(orgId: string) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_shahibul_maal')
     .select('*, anggota:koperasi_anggota!inner(nama, kode_anggota, email, no_telepon)')
@@ -156,7 +156,7 @@ export async function getShahibulMaal(orgId: string) {
 }
 
 export async function daftarkanShahibulMaal(orgId: string, anggota_id: string) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_shahibul_maal')
     .insert({ org_id: orgId, anggota_id })
@@ -170,7 +170,7 @@ export async function daftarkanShahibulMaal(orgId: string, anggota_id: string) {
 // ── MUDHARIB ─────────────────────────────────────────────────────────────────
 
 export async function getMudharib(orgId: string) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_mudharib')
     .select('*')
@@ -183,7 +183,7 @@ export async function getMudharib(orgId: string) {
 export async function createMudharib(orgId: string, payload: {
   anggota_id?: string; nama: string; nik?: string; alamat?: string; no_telepon?: string; email?: string
 }) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_mudharib')
     .insert({ org_id: orgId, ...payload })
@@ -197,7 +197,7 @@ export async function createMudharib(orgId: string, payload: {
 // ── SERTIFIKASI DPS ──────────────────────────────────────────────────────────
 
 export async function getSertifikasiDps(orgId: string) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_sertifikasi_dps')
     .select('*')
@@ -216,7 +216,7 @@ export async function terbitkanSertifikasi(orgId: string, payload: {
   level?: string
   penerbit?: string
 }) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_sertifikasi_dps')
     .insert({ org_id: orgId, ...payload })
@@ -234,7 +234,7 @@ export async function terbitkanSertifikasi(orgId: string, payload: {
 // ── PENGURUS ─────────────────────────────────────────────────────────────────
 
 export async function getPengurus(orgId: string) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_pengurus')
     .select('*, anggota:koperasi_anggota!inner(nama, kode_anggota)')
@@ -247,7 +247,7 @@ export async function getPengurus(orgId: string) {
 export async function tetapkanPengurus(orgId: string, payload: {
   anggota_id: string; jabatan: string; masa_bakti_awal: string; masa_bakti_akhir?: string
 }) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_pengurus')
     .insert({ org_id: orgId, ...payload })
@@ -261,7 +261,7 @@ export async function tetapkanPengurus(orgId: string, payload: {
 // ── COA ──────────────────────────────────────────────────────────────────────
 
 export async function installCoaKoperasi(orgId: string) {
-  const db = getDb()
+  const db = await getDb()
   const { error } = await db.rpc('inject_koperasi_coa', { p_org_id: orgId })
   if (error) throw new Error(error.message)
   revalidatePath('/koperasi')
@@ -271,7 +271,7 @@ export async function installCoaKoperasi(orgId: string) {
 // ── PROYEK ───────────────────────────────────────────────────────────────────
 
 export async function getProyek(orgId: string) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_proyek')
     .select('*, mudharib:koperasi_mudharib!inner(nama)')
@@ -290,7 +290,7 @@ export async function createProyek(orgId: string, payload: {
   nisbah_mudharib?: number
   ujrah_koperasi?: number
 }) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_proyek')
     .insert({ org_id: orgId, ...payload, status: 'DIAJUKAN' })
@@ -302,7 +302,7 @@ export async function createProyek(orgId: string, payload: {
 }
 
 export async function updateStatusProyek(id: string, status: string, alasan?: string) {
-  const db = getDb()
+  const db = await getDb()
   const update: any = { status, updated_at: new Date().toISOString() }
   const now = new Date().toISOString().split('T')[0]
   if (status === 'DIVERIFIKASI') update.tgl_diverifikasi = now
@@ -321,7 +321,7 @@ export async function updateStatusProyek(id: string, status: string, alasan?: st
 }
 
 export async function getInvestasiProyek(proyek_id: string) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_proyek_investasi')
     .select('*, shahibul_maal:koperasi_shahibul_maal!inner(anggota:koperasi_anggota!inner(nama))')
@@ -331,7 +331,7 @@ export async function getInvestasiProyek(proyek_id: string) {
 }
 
 export async function tambahInvestasi(proyek_id: string, shahibul_maal_id: string, jumlah: number) {
-  const db = getDb()
+  const db = await getDb()
   // Get current proyek modal
   const { data: proyek } = await db.from('koperasi_proyek').select('modal_dibutuhkan, modal_terkumpul').eq('id', proyek_id).single()
   if (!proyek) throw new Error('Proyek tidak ditemukan')
@@ -356,7 +356,7 @@ export async function tambahInvestasi(proyek_id: string, shahibul_maal_id: strin
 // ── MURABAHAH ────────────────────────────────────────────────────────────────
 
 export async function getMurabahahTransaksi(orgId: string) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_murabahah_transaksi')
     .select('*, pembeli:koperasi_anggota!inner(nama, kode_anggota), akad:koperasi_akad_wakalah(nomor_akad)')
@@ -367,7 +367,7 @@ export async function getMurabahahTransaksi(orgId: string) {
 }
 
 export async function getAkadWakalah(orgId: string) {
-  const db = getDb()
+  const db = await getDb()
   const { data, error } = await db
     .from('koperasi_akad_wakalah')
     .select('*, shahibul_maal:koperasi_shahibul_maal(id, anggota:koperasi_anggota(id, nama))')
@@ -383,7 +383,7 @@ export async function createAkadWakalah(orgId: string, payload: {
   ujrah_flat: number
   tgl_akad?: string
 }) {
-  const db = getDb()
+  const db = await getDb()
   const { data: noAkad } = await db.rpc('koperasi_generate_nomor_akad', { p_org_id: orgId })
   const { data, error } = await db.from('koperasi_akad_wakalah').insert({
     org_id: orgId,
@@ -406,7 +406,7 @@ export async function createMurabahahTransaksi(orgId: string, payload: {
   margin: number
   tenor_bulan: number
 }) {
-  const db = getDb()
+  const db = await getDb()
   const hargaJual = payload.harga_pokok + payload.margin
   const noTrans = `MB-${orgId.slice(0,4)}-${Date.now()}`
   
@@ -446,7 +446,7 @@ export async function createMurabahahTransaksi(orgId: string, payload: {
 // ── DASHBOARD ────────────────────────────────────────────────────────────────
 
 export async function getDashboardStats(orgId: string) {
-  const db = getDb()
+  const db = await getDb()
   const [anggota, proyek, simpananPokok, shahibulMaal, murabahah] = await Promise.all([
     db.from('koperasi_anggota').select('id, status').eq('org_id', orgId),
     db.from('koperasi_proyek').select('id, status, modal_terkumpul, modal_dibutuhkan').eq('org_id', orgId),

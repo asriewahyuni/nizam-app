@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 // ── BAGI HASIL ENGINE ──────────────────────────────────────────────────────
 
 export async function hitungBagiHasil(proyekId: string) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   
   // 1. Get proyek info
   const { data: proyek } = await db.from('koperasi_proyek').select('*').eq('id', proyekId).single()
@@ -128,7 +128,7 @@ export async function hitungBagiHasil(proyekId: string) {
 // ── GET BAGI HASIL ─────────────────────────────────────────────────────────
 
 export async function getBagiHasil(proyekId: string) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   
   const { data: bhList, error } = await db
     .from('koperasi_proyek_bagi_hasil')
@@ -153,7 +153,7 @@ export async function getBagiHasil(proyekId: string) {
 // ── KONFIRMASI BAGI HASIL ──────────────────────────────────────────────────
 
 export async function konfirmasiBagiHasil(bagiHasilId: string) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   const { data, error } = await db
     .from('koperasi_proyek_bagi_hasil')
     .update({ status: 'DIKONFIRMASI', updated_at: new Date().toISOString() })
@@ -168,7 +168,7 @@ export async function konfirmasiBagiHasil(bagiHasilId: string) {
 // ── SETUJUI DISTRIBUSI ─────────────────────────────────────────────────────
 
 export async function setujuiDistribusi(bagiHasilId: string, proyekId: string) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   
   // Update status bagi hasil
   const { data: bh } = await db
@@ -193,7 +193,7 @@ export async function setujuiDistribusi(bagiHasilId: string, proyekId: string) {
 // ── SYNC LAYER 2 — Buku Besar Resmi Koperasi ──────────────────────────────
 
 export async function syncProyekKeBukuBesar(orgId: string, proyekId: string) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   
   // 1. Get proyek info
   const { data: proyek } = await db.from('koperasi_proyek').select('*').eq('id', proyekId).single()
@@ -317,7 +317,7 @@ export async function syncProyekKeBukuBesar(orgId: string, proyekId: string) {
 // ── GET PROJECT SUMMARY ────────────────────────────────────────────────────
 
 export async function getProjectFinancialSummary(proyekId: string) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   
   const { data: proyek } = await db.from('koperasi_proyek').select('*').eq('id', proyekId).single()
   if (!proyek) throw new Error('Proyek tidak ditemukan')
