@@ -34,6 +34,7 @@ type Session = {
   end_time?: string | null
   instructor_name?: string | null
   location_url?: string | null
+  mode?: string | null
 }
 
 // ── Inline Batch Form ──────────────────────────────────────────────────────
@@ -125,6 +126,25 @@ function InlineSessionForm({ batchId }: { batchId: string }) {
         <div className="font-bold text-slate-900 mb-1">Judul Sesi</div>
         <input name="title" required placeholder="Contoh: Sesi 1 - Pengenalan" className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none focus:border-blue-400 bg-white text-sm" />
       </label>
+
+      <div>
+        <div className="font-bold text-slate-900 mb-2 text-sm">Mode Sesi</div>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { value: 'OFFLINE', label: 'Offline', icon: '🏢' },
+            { value: 'ONLINE', label: 'Online', icon: '💻' },
+            { value: 'HYBRID', label: 'Hybrid', icon: '🔀' },
+          ].map((opt) => (
+            <label key={opt.value} className="cursor-pointer">
+              <input type="radio" name="mode" value={opt.value} defaultChecked={opt.value === 'OFFLINE'} className="sr-only peer" />
+              <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5 text-center text-xs font-bold text-slate-500 transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700">
+                <span className="text-base">{opt.icon}</span>
+                {opt.label}
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block text-sm">
@@ -235,6 +255,15 @@ function BatchSection({ batch, sessions }: { batch: Batch; sessions: Session[] }
                 <div key={s.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 group/session">
                   <div className="flex items-start justify-between gap-3">
                     <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${
+                          s.mode === 'ONLINE' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                          s.mode === 'HYBRID' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                          'bg-slate-50 text-slate-500 border-slate-200'
+                        }`}>
+                          {s.mode === 'ONLINE' ? '💻 Online' : s.mode === 'HYBRID' ? '🔀 Hybrid' : '🏢 Offline'}
+                        </span>
+                      </div>
                       <h5 className="text-sm font-semibold text-slate-900">{s.title}</h5>
                       <p className="mt-0.5 text-xs font-medium text-slate-400">
                         {new Date(s.start_time).toLocaleString('id-ID')}

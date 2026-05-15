@@ -145,6 +145,7 @@ function EditSessionModal({
   const [locationUrl, setLocationUrl] = useState(session.location_url || '')
   const [startTime, setStartTime] = useState(session.start_time ? new Date(session.start_time).toISOString().slice(0, 16) : '')
   const [endTime, setEndTime] = useState(session.end_time ? new Date(session.end_time).toISOString().slice(0, 16) : '')
+  const [mode, setMode] = useState(session.mode || 'OFFLINE')
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -158,6 +159,7 @@ function EditSessionModal({
     fd.set('title', title.trim())
     fd.set('instructorName', instructorName.trim())
     fd.set('locationUrl', locationUrl.trim())
+    fd.set('mode', mode)
     if (startTime) fd.set('startTime', startTime)
     if (endTime) fd.set('endTime', endTime)
 
@@ -196,6 +198,22 @@ function EditSessionModal({
               <label className="text-xs font-semibold text-slate-500">Selesai</label>
               <input type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500">Mode Sesi</label>
+            <div className="mt-1 grid grid-cols-3 gap-2">
+              {[
+                { value: 'OFFLINE', label: 'Offline', icon: '🏢' },
+                { value: 'ONLINE', label: 'Online', icon: '💻' },
+                { value: 'HYBRID', label: 'Hybrid', icon: '🔀' },
+              ].map((opt) => (
+                <button key={opt.value} type="button" onClick={() => setMode(opt.value)}
+                  className={`flex flex-col items-center gap-1 rounded-xl border-2 px-3 py-2 text-xs font-bold transition-all ${mode === opt.value ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-500'}`}>
+                  <span>{opt.icon}</span>
+                  {opt.label}
+                </button>
+              ))}
             </div>
           </div>
           <div>

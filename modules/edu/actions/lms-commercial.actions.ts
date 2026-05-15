@@ -348,6 +348,7 @@ export async function createLmsSession(
     const endTime = formData.get('endTime') as string
     const instructor = formData.get('instructorName') as string
     const locationUrl = formData.get('locationUrl') as string
+    const mode = (formData.get('mode') as string) || 'OFFLINE'
 
     if (!batchId || !title || !startTime || !endTime) {
       return { error: 'Batch, Judul, Waktu Mulai, dan Waktu Selesai wajib diisi' }
@@ -362,6 +363,7 @@ export async function createLmsSession(
       end_time: new Date(endTime).toISOString(),
       instructor_name: instructor || null,
       location_url: locationUrl || null,
+      mode,
     })
 
     if (error) {
@@ -385,6 +387,7 @@ export async function updateLmsSession(formData: FormData) {
   const endTime = formData.get('endTime') as string
   const instructor = formData.get('instructorName') as string
   const locationUrl = formData.get('locationUrl') as string
+  const mode = (formData.get('mode') as string) || 'OFFLINE'
 
   if (!sessionId || !title || !startTime || !endTime) {
     throw new Error('ID, Judul, Waktu Mulai, dan Waktu Selesai wajib diisi')
@@ -399,6 +402,7 @@ export async function updateLmsSession(formData: FormData) {
       end_time: new Date(endTime).toISOString(),
       instructor_name: instructor || null,
       location_url: locationUrl || null,
+      mode,
       updated_at: new Date().toISOString(),
     })
     .eq('id', sessionId)
