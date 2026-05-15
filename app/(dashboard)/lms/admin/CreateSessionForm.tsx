@@ -43,25 +43,6 @@ export default function CreateSessionForm({ batches }: { batches: Batch[] }) {
         <input name="title" required placeholder="Contoh: Sesi 1 - Pengenalan" className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
       </label>
 
-      <div>
-        <div className="font-bold text-slate-900 mb-2 text-sm">Mode Sesi</div>
-        <div className="grid grid-cols-3 gap-2">
-          {([
-            { value: 'OFFLINE', label: 'Offline', icon: '🏢' },
-            { value: 'ONLINE', label: 'Online', icon: '💻' },
-            { value: 'HYBRID', label: 'Hybrid', icon: '🔀' },
-          ] as const).map((opt) => (
-            <label key={opt.value} className="cursor-pointer">
-              <input type="radio" name="mode" value={opt.value} defaultChecked={opt.value === 'OFFLINE'} className="sr-only peer" />
-              <div className="flex flex-col items-center gap-1 rounded-2xl border-2 border-slate-200 bg-white px-3 py-3 text-center text-xs font-bold text-slate-500 transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700">
-                <span className="text-lg">{opt.icon}</span>
-                {opt.label}
-              </div>
-            </label>
-          ))}
-        </div>
-      </div>
-
       <div className="grid grid-cols-2 gap-4">
         <label className="block text-sm">
           <div className="font-bold text-slate-900 mb-1.5">Waktu Mulai</div>
