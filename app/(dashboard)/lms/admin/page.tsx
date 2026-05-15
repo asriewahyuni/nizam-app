@@ -17,13 +17,15 @@ import {
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { getLearningAccessContext } from '@/modules/edu/lib/learning-access.server'
 import { getCompetencyManagementDashboard } from '@/modules/edu/lib/competency-management.server'
-import { getLmsBatches, getLmsCourses, createLmsCourse, getAllLmsSessions, createLmsSession } from '@/modules/edu/actions/lms-commercial.actions'
+import { getLmsBatches, getLmsCourses, getAllLmsSessions } from '@/modules/edu/actions/lms-commercial.actions'
 import {
   getTrainingLessonsForCourse,
   getTrainingCenterSummary,
 } from '@/modules/edu/lib/training-center-mvp'
 import SessionQRClient from './SessionQRClient'
 import CreateBatchForm from './CreateBatchForm'
+import CreateCourseForm from './CreateCourseForm'
+import CreateSessionForm from './CreateSessionForm'
 import { CourseActions, BatchActions, SessionActions } from './AdminCRUDActions'
 
 function StatCard({
@@ -334,48 +336,7 @@ export default async function LearningAdminPage() {
             <p className="mt-1 text-sm text-slate-500 font-medium">
               Tambahkan jadwal sesi belajar (Live/Offline) untuk sebuah batch.
             </p>
-            <form action={createLmsSession} className="mt-6 grid gap-5">
-              <label className="block text-sm">
-                <div className="font-bold text-slate-900 mb-1.5">Pilih Batch</div>
-                <select name="batchId" required className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50">
-                  <option value="">-- Pilih Batch --</option>
-                  {batches.map((b: any) => (
-                    <option key={b.id} value={b.id}>{b.name} ({b.learning_courses?.title})</option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block text-sm">
-                <div className="font-bold text-slate-900 mb-1.5">Judul Sesi</div>
-                <input name="title" required placeholder="Contoh: Sesi 1 - Pengenalan" className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-              </label>
-
-              <div className="grid grid-cols-2 gap-4">
-                <label className="block text-sm">
-                  <div className="font-bold text-slate-900 mb-1.5">Waktu Mulai</div>
-                  <input type="datetime-local" name="startTime" required className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-                </label>
-                <label className="block text-sm">
-                  <div className="font-bold text-slate-900 mb-1.5">Waktu Selesai</div>
-                  <input type="datetime-local" name="endTime" required className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-                </label>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <label className="block text-sm">
-                  <div className="font-bold text-slate-900 mb-1.5">Nama Instruktur</div>
-                  <input name="instructorName" placeholder="Contoh: Budi Santoso" className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-                </label>
-                <label className="block text-sm">
-                  <div className="font-bold text-slate-900 mb-1.5">Link / Lokasi</div>
-                  <input name="locationUrl" placeholder="Zoom link / Nama Gedung" className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-                </label>
-              </div>
-
-              <button className="mt-2 w-full rounded-2xl bg-blue-600 px-5 py-3.5 text-sm font-bold text-white shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all">
-                Buat Sesi
-              </button>
-            </form>
+            <CreateSessionForm batches={batches} />
           </div>
 
           <div className="space-y-4">
@@ -431,26 +392,7 @@ export default async function LearningAdminPage() {
             <p className="mt-1 text-sm text-slate-500 font-medium">
               Tambahkan materi course ke dalam katalog organisasi Anda.
             </p>
-            <form action={createLmsCourse} className="mt-6 grid gap-5">
-              <label className="block text-sm">
-                <div className="font-bold text-slate-900 mb-1.5">Judul Course</div>
-                <input name="title" required placeholder="Contoh: Basic Leadership" className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-              </label>
-
-              <label className="block text-sm">
-                <div className="font-bold text-slate-900 mb-1.5">Kode Level</div>
-                <input name="levelCode" placeholder="Contoh: L1, ALL, SPV" className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50" />
-              </label>
-
-              <label className="block text-sm">
-                <div className="font-bold text-slate-900 mb-1.5">Deskripsi Singkat</div>
-                <textarea name="description" rows={3} placeholder="Deskripsi materi yang akan dipelajari..." className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50"></textarea>
-              </label>
-
-              <button type="submit" className="mt-2 inline-flex justify-center rounded-2xl bg-slate-900 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-black shadow-xl shadow-slate-200">
-                Simpan Course
-              </button>
-            </form>
+            <CreateCourseForm />
           </div>
 
           <div className="space-y-4">

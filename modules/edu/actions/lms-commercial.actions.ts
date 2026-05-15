@@ -52,34 +52,42 @@ export async function getLmsCourseBySlug(orgId: string, slug: string) {
   return data
 }
 
-export async function createLmsCourse(formData: FormData) {
-  const orgData = await assertOrgAdmin()
+export async function createLmsCourse(
+  _prevState: { error?: string; success?: boolean } | null,
+  formData: FormData
+): Promise<{ error?: string; success?: boolean }> {
+  try {
+    const orgData = await assertOrgAdmin()
 
-  const title = formData.get('title') as string
-  const description = formData.get('description') as string
-  const levelCode = formData.get('levelCode') as string
+    const title = (formData.get('title') as string || '').trim()
+    const description = formData.get('description') as string
+    const levelCode = formData.get('levelCode') as string
 
-  if (!title) throw new Error('Judul course wajib diisi')
+    if (!title) return { error: 'Judul course wajib diisi' }
 
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now()
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now()
 
-  const supabase = await createClient()
-  const { error } = await supabase.from('learning_courses').insert({
-    org_id: orgData.org.id,
-    slug,
-    title,
-    description: description || null,
-    level_code: levelCode || 'ALL',
-    is_active: true,
-  })
+    const supabase = await createClient()
+    const { error } = await supabase.from('learning_courses').insert({
+      org_id: orgData.org.id,
+      slug,
+      title,
+      description: description || null,
+      level_code: levelCode || 'ALL',
+      is_active: true,
+    })
 
-  if (error) {
-    console.error('[createLmsCourse]', JSON.stringify(error))
-    throw new Error(getErrorMessage(error))
+    if (error) {
+      console.error('[createLmsCourse]', JSON.stringify(error))
+      return { error: getErrorMessage(error) }
+    }
+
+    revalidatePath('/lms/admin')
+    revalidatePath('/lms')
+    return { success: true }
+  } catch (e: any) {
+    return { error: e?.message || 'Terjadi kesalahan tidak terduga' }
   }
-
-  revalidatePath('/lms/admin')
-  revalidatePath('/lms')
 }
 
 export async function updateLmsCourse(formData: FormData) {
@@ -327,37 +335,45 @@ export async function getLmsBatchSessions(orgId: string, batchId: string) {
   return data
 }
 
-export async function createLmsSession(formData: FormData) {
-  const orgData = await assertOrgAdmin()
+export async function createLmsSession(
+  _prevState: { error?: string; success?: boolean } | null,
+  formData: FormData
+): Promise<{ error?: string; success?: boolean }> {
+  try {
+    const orgData = await assertOrgAdmin()
 
-  const batchId = formData.get('batchId') as string
-  const title = formData.get('title') as string
-  const startTime = formData.get('startTime') as string
-  const endTime = formData.get('endTime') as string
-  const instructor = formData.get('instructorName') as string
-  const locationUrl = formData.get('locationUrl') as string
+    const batchId = formData.get('batchId') as string
+    const title = (formData.get('title') as string || '').trim()
+    const startTime = formData.get('startTime') as string
+    const endTime = formData.get('endTime') as string
+    const instructor = formData.get('instructorName') as string
+    const locationUrl = formData.get('locationUrl') as string
 
-  if (!batchId || !title || !startTime || !endTime) {
-    throw new Error('Batch, Judul, Waktu Mulai, dan Waktu Selesai wajib diisi')
+    if (!batchId || !title || !startTime || !endTime) {
+      return { error: 'Batch, Judul, Waktu Mulai, dan Waktu Selesai wajib diisi' }
+    }
+
+    const supabase = await createClient()
+    const { error } = await supabase.from('lms_batch_sessions').insert({
+      org_id: orgData.org.id,
+      batch_id: batchId,
+      title,
+      start_time: new Date(startTime).toISOString(),
+      end_time: new Date(endTime).toISOString(),
+      instructor_name: instructor || null,
+      location_url: locationUrl || null,
+    })
+
+    if (error) {
+      console.error('[createLmsSession]', JSON.stringify(error))
+      return { error: getErrorMessage(error) }
+    }
+
+    revalidatePath('/lms/admin')
+    return { success: true }
+  } catch (e: any) {
+    return { error: e?.message || 'Terjadi kesalahan tidak terduga' }
   }
-
-  const supabase = await createClient()
-  const { error } = await supabase.from('lms_batch_sessions').insert({
-    org_id: orgData.org.id,
-    batch_id: batchId,
-    title,
-    start_time: new Date(startTime).toISOString(),
-    end_time: new Date(endTime).toISOString(),
-    instructor_name: instructor || null,
-    location_url: locationUrl || null,
-  })
-
-  if (error) {
-    console.error('[createLmsSession]', JSON.stringify(error))
-    throw new Error(getErrorMessage(error))
-  }
-
-  revalidatePath('/lms/admin')
 }
 
 export async function updateLmsSession(formData: FormData) {
