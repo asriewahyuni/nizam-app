@@ -201,31 +201,31 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
       {/* Info Bar */}
       <div className="grid grid-cols-4 gap-4">
         <SectionCard>
-          <div className="text-xs text-white/40">Status</div>
+          <div className="text-xs text-slate-400">Status</div>
           <StatusBadge label={proyek.status} variant={proyek.status === 'AKTIF' ? 'success' : 'warning'} />
         </SectionCard>
         <SectionCard>
-          <div className="text-xs text-white/40">Modal Dibutuhkan</div>
-          <div className="text-sm font-semibold text-white">Rp {Number(proyek.modal_dibutuhkan).toLocaleString()}</div>
+          <div className="text-xs text-slate-400">Modal Dibutuhkan</div>
+          <div className="text-sm font-semibold text-slate-900">Rp {Number(proyek.modal_dibutuhkan).toLocaleString()}</div>
         </SectionCard>
         <SectionCard>
-          <div className="text-xs text-white/40">Terkumpul</div>
-          <div className="text-sm font-semibold text-emerald-400">Rp {Number(proyek.modal_terkumpul).toLocaleString()}</div>
+          <div className="text-xs text-slate-400">Terkumpul</div>
+          <div className="text-sm font-semibold text-emerald-600">Rp {Number(proyek.modal_terkumpul).toLocaleString()}</div>
         </SectionCard>
         <SectionCard>
-          <div className="text-xs text-white/40">Nisbah</div>
-          <div className="text-sm font-semibold text-white">SM {Number(proyek.nisbah_sm || 0).toFixed(0)}% : M {Number(proyek.nisbah_mudharib || 0).toFixed(0)}%</div>
+          <div className="text-xs text-slate-400">Nisbah</div>
+          <div className="text-sm font-semibold text-slate-900">SM {Number(proyek.nisbah_sm || 0).toFixed(0)}% : M {Number(proyek.nisbah_mudharib || 0).toFixed(0)}%</div>
         </SectionCard>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 border-b border-white/10 pb-2">
+      <div className="flex gap-2 border-b border-slate-200 pb-2">
         {tabs.map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm transition-all ${
-              tab === t.key ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-white/40 hover:text-white/60'
+              tab === t.key ? 'text-emerald-600 border-b-2 border-emerald-400' : 'text-slate-400 hover:text-slate-500'
             }`}
           >
             <t.icon className="w-4 h-4" /> {t.label}
@@ -254,12 +254,12 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
             <SectionCard title="Transaksi Terakhir">
               <div className="space-y-2 mt-2">
                 {journal.slice(0, 5).map((j: any) => (
-                  <div key={j.id} className="flex justify-between p-2 rounded-lg bg-white/5">
+                  <div key={j.id} className="flex justify-between p-2 rounded-lg bg-slate-50">
                     <div>
-                      <span className="text-xs text-white/60">{j.tgl_transaksi}</span>
-                      <span className="ml-2 text-xs font-medium text-white">{j.keterangan}</span>
+                      <span className="text-xs text-slate-500">{j.tgl_transaksi}</span>
+                      <span className="ml-2 text-xs font-medium text-slate-900">{j.keterangan}</span>
                     </div>
-                    <span className="text-xs text-white/40">{j.tipe}</span>
+                    <span className="text-xs text-slate-400">{j.tipe}</span>
                   </div>
                 ))}
               </div>
@@ -269,17 +269,17 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
             <SectionCard title="CoA Proyek ({coa.length} akun)">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
                 {coa.map((c: any) => (
-                  <div key={c.id} className="p-2 rounded-lg bg-white/5 text-xs">
-                    <span className="text-emerald-400">{c.kode}</span>
-                    <span className="ml-1 text-white/60">{c.nama}</span>
-                    <span className="ml-1 text-[10px] text-white/30">({c.tipe})</span>
+                  <div key={c.id} className="p-2 rounded-lg bg-slate-50 text-xs">
+                    <span className="text-emerald-600">{c.kode}</span>
+                    <span className="ml-1 text-slate-500">{c.nama}</span>
+                    <span className="ml-1 text-[10px] text-slate-400">({c.tipe})</span>
                   </div>
                 ))}
               </div>
             </SectionCard>
           )}
           {journal.length === 0 && coa.length === 0 && (
-            <div className="p-8 text-center text-white/50">
+            <div className="p-8 text-center text-slate-500">
               <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p>Belum ada transaksi. Aktifkan proyek dan mulai input transaksi di tab Jurnal.</p>
             </div>
@@ -291,27 +291,27 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
       {tab === 'jurnal' && (
         <SectionCard title="Jurnal Transaksi">
           {journal.length === 0 ? (
-            <div className="p-4 text-white/50 text-center">Belum ada jurnal</div>
+            <div className="p-4 text-slate-500 text-center">Belum ada jurnal</div>
           ) : (
             <div className="space-y-3 mt-2">
               {journal.map((j: any) => (
-                <div key={j.id} className="p-3 rounded-xl bg-white/5 border border-white/10">
+                <div key={j.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <span className="text-xs text-white/40">{j.tgl_transaksi}</span>
-                      <span className="ml-2 text-xs font-medium text-white">{j.keterangan}</span>
+                      <span className="text-xs text-slate-400">{j.tgl_transaksi}</span>
+                      <span className="ml-2 text-xs font-medium text-slate-900">{j.keterangan}</span>
                     </div>
                     <StatusBadge label={j.tipe} variant="info" />
                   </div>
                   <table className="w-full text-xs">
-                    <thead><tr className="text-white/30 border-b border-white/10">
+                    <thead><tr className="text-slate-400 border-b border-slate-200">
                       <th className="p-1 text-left">Akun</th><th className="p-1 text-right">Debit</th><th className="p-1 text-right">Kredit</th>
                     </tr></thead>
                     <tbody>
                       {(j as any).lines?.map((line: any) => (
-                        <tr key={line.id} className="border-b border-white/5">
-                          <td className="p-1 text-white/60">{line.coa?.kode} — {line.coa?.nama}</td>
-                          <td className="p-1 text-right text-emerald-400">{Number(line.debit) > 0 ? `Rp ${Number(line.debit).toLocaleString()}` : '-'}</td>
+                        <tr key={line.id} className="border-b border-slate-100">
+                          <td className="p-1 text-slate-500">{line.coa?.kode} — {line.coa?.nama}</td>
+                          <td className="p-1 text-right text-emerald-600">{Number(line.debit) > 0 ? `Rp ${Number(line.debit).toLocaleString()}` : '-'}</td>
                           <td className="p-1 text-right text-amber-400">{Number(line.kredit) > 0 ? `Rp ${Number(line.kredit).toLocaleString()}` : '-'}</td>
                         </tr>
                       ))}
@@ -332,39 +332,39 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
               <div className="space-y-2 mt-2">
                 {neraca.aset.map((a: any, i: number) => (
                   <div key={i} className="flex justify-between text-sm">
-                    <span className="text-white/60">{a.nama}</span>
-                    <span className="text-white font-medium">Rp {a.saldo.toLocaleString()}</span>
+                    <span className="text-slate-500">{a.nama}</span>
+                    <span className="text-slate-900 font-medium">Rp {a.saldo.toLocaleString()}</span>
                   </div>
                 ))}
-                <div className="flex justify-between text-sm font-semibold pt-2 border-t border-white/10">
-                  <span className="text-white">Total Aset</span>
-                  <span className="text-emerald-400">Rp {neraca.totalAset.toLocaleString()}</span>
+                <div className="flex justify-between text-sm font-semibold pt-2 border-t border-slate-200">
+                  <span className="text-slate-900">Total Aset</span>
+                  <span className="text-emerald-600">Rp {neraca.totalAset.toLocaleString()}</span>
                 </div>
               </div>
-            ) : <div className="text-white/50 text-sm p-2">Belum ada data</div>}
+            ) : <div className="text-slate-500 text-sm p-2">Belum ada data</div>}
           </SectionCard>
           <SectionCard title="Pasiva">
             <div className="mb-3">
-              <h4 className="text-xs text-white/40 mb-1">Liabilitas</h4>
+              <h4 className="text-xs text-slate-400 mb-1">Liabilitas</h4>
               {neraca?.liabilitas?.length > 0 ? neraca.liabilitas.map((l: any, i: number) => (
                 <div key={i} className="flex justify-between text-sm">
-                  <span className="text-white/60">{l.nama}</span>
-                  <span className="text-white font-medium">Rp {l.saldo.toLocaleString()}</span>
+                  <span className="text-slate-500">{l.nama}</span>
+                  <span className="text-slate-900 font-medium">Rp {l.saldo.toLocaleString()}</span>
                 </div>
-              )) : <div className="text-white/50 text-xs">Tidak ada</div>}
+              )) : <div className="text-slate-500 text-xs">Tidak ada</div>}
             </div>
             <div>
-              <h4 className="text-xs text-white/40 mb-1">Ekuitas</h4>
+              <h4 className="text-xs text-slate-400 mb-1">Ekuitas</h4>
               {neraca?.ekuitas?.length > 0 ? neraca.ekuitas.map((e: any, i: number) => (
                 <div key={i} className="flex justify-between text-sm">
-                  <span className="text-white/60">{e.nama}</span>
-                  <span className="text-white font-medium">Rp {e.saldo.toLocaleString()}</span>
+                  <span className="text-slate-500">{e.nama}</span>
+                  <span className="text-slate-900 font-medium">Rp {e.saldo.toLocaleString()}</span>
                 </div>
-              )) : <div className="text-white/50 text-xs">Tidak ada</div>}
+              )) : <div className="text-slate-500 text-xs">Tidak ada</div>}
             </div>
-            <div className="flex justify-between text-sm font-semibold pt-2 border-t border-white/10 mt-2">
-              <span className="text-white">Total Pasiva</span>
-              <span className="text-emerald-400">Rp {neraca?.totalPasiva?.toLocaleString() || '0'}</span>
+            <div className="flex justify-between text-sm font-semibold pt-2 border-t border-slate-200 mt-2">
+              <span className="text-slate-900">Total Pasiva</span>
+              <span className="text-emerald-600">Rp {neraca?.totalPasiva?.toLocaleString() || '0'}</span>
             </div>
           </SectionCard>
         </div>
@@ -376,41 +376,41 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
           {pnl ? (
             <div className="space-y-3 mt-2">
               <div>
-                <h4 className="text-xs text-emerald-400 mb-1 font-semibold">PENDAPATAN</h4>
+                <h4 className="text-xs text-emerald-600 mb-1 font-semibold">PENDAPATAN</h4>
                 {pnl.pendapatan.length > 0 ? pnl.pendapatan.map((p: any, i: number) => (
                   <div key={i} className="flex justify-between text-sm">
-                    <span className="text-white/60">{p.nama}</span>
-                    <span className="text-emerald-400">Rp {p.jumlah.toLocaleString()}</span>
+                    <span className="text-slate-500">{p.nama}</span>
+                    <span className="text-emerald-600">Rp {p.jumlah.toLocaleString()}</span>
                   </div>
-                )) : <div className="text-white/50 text-xs">Belum ada pendapatan</div>}
-                <div className="flex justify-between text-sm font-semibold pt-2 border-t border-white/10 mt-1">
-                  <span className="text-white">Total Pendapatan</span>
-                  <span className="text-emerald-400">Rp {pnl.totalPendapatan.toLocaleString()}</span>
+                )) : <div className="text-slate-500 text-xs">Belum ada pendapatan</div>}
+                <div className="flex justify-between text-sm font-semibold pt-2 border-t border-slate-200 mt-1">
+                  <span className="text-slate-900">Total Pendapatan</span>
+                  <span className="text-emerald-600">Rp {pnl.totalPendapatan.toLocaleString()}</span>
                 </div>
               </div>
               <div>
                 <h4 className="text-xs text-amber-400 mb-1 font-semibold">BEBAN</h4>
                 {pnl.beban.length > 0 ? pnl.beban.map((b: any, i: number) => (
                   <div key={i} className="flex justify-between text-sm">
-                    <span className="text-white/60">{b.nama}</span>
+                    <span className="text-slate-500">{b.nama}</span>
                     <span className="text-amber-400">Rp {b.jumlah.toLocaleString()}</span>
                   </div>
-                )) : <div className="text-white/50 text-xs">Belum ada beban</div>}
-                <div className="flex justify-between text-sm font-semibold pt-2 border-t border-white/10 mt-1">
-                  <span className="text-white">Total Beban</span>
+                )) : <div className="text-slate-500 text-xs">Belum ada beban</div>}
+                <div className="flex justify-between text-sm font-semibold pt-2 border-t border-slate-200 mt-1">
+                  <span className="text-slate-900">Total Beban</span>
                   <span className="text-amber-400">Rp {pnl.totalBeban.toLocaleString()}</span>
                 </div>
               </div>
               <div className={`p-3 rounded-xl ${pnl.labaBersih >= 0 ? 'bg-emerald-900/20' : 'bg-red-900/20'} mt-3`}>
                 <div className="flex justify-between text-base font-bold">
-                  <span className="text-white">LABA / RUGI BERSIH</span>
-                  <span className={pnl.labaBersih >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                  <span className="text-slate-900">LABA / RUGI BERSIH</span>
+                  <span className={pnl.labaBersih >= 0 ? 'text-emerald-600' : 'text-red-400'}>
                     Rp {pnl.labaBersih.toLocaleString()}
                   </span>
                 </div>
               </div>
             </div>
-          ) : <div className="text-white/50 p-4 text-center">Memuat...</div>}
+          ) : <div className="text-slate-500 p-4 text-center">Memuat...</div>}
         </SectionCard>
       )}
 
@@ -421,22 +421,22 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
           {finSummary && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <SectionCard>
-                <div className="text-xs text-white/40">Total Pendapatan</div>
-                <div className="text-sm font-semibold text-emerald-400">Rp {finSummary.totalPendapatan.toLocaleString()}</div>
+                <div className="text-xs text-slate-400">Total Pendapatan</div>
+                <div className="text-sm font-semibold text-emerald-600">Rp {finSummary.totalPendapatan.toLocaleString()}</div>
               </SectionCard>
               <SectionCard>
-                <div className="text-xs text-white/40">Total Beban</div>
+                <div className="text-xs text-slate-400">Total Beban</div>
                 <div className="text-sm font-semibold text-amber-400">Rp {finSummary.totalBeban.toLocaleString()}</div>
               </SectionCard>
               <SectionCard>
-                <div className="text-xs text-white/40">Laba Bersih</div>
-                <div className={`text-sm font-semibold ${finSummary.labaBersih >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <div className="text-xs text-slate-400">Laba Bersih</div>
+                <div className={`text-sm font-semibold ${finSummary.labaBersih >= 0 ? 'text-emerald-600' : 'text-red-400'}`}>
                   Rp {finSummary.labaBersih.toLocaleString()}
                 </div>
               </SectionCard>
               <SectionCard>
-                <div className="text-xs text-white/40">Nisbah</div>
-                <div className="text-sm font-semibold text-white">SM {finSummary.nisbahSM}% : M {finSummary.nisbahMudharib}%</div>
+                <div className="text-xs text-slate-400">Nisbah</div>
+                <div className="text-sm font-semibold text-slate-900">SM {finSummary.nisbahSM}% : M {finSummary.nisbahMudharib}%</div>
               </SectionCard>
             </div>
           )}
@@ -471,44 +471,44 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
               <div className="space-y-3 mt-2">
                 <div className="grid grid-cols-3 gap-3">
                   <div className="p-3 rounded-xl bg-emerald-900/20">
-                    <div className="text-xs text-emerald-400">Total Laba</div>
-                    <div className="text-lg font-bold text-emerald-400">Rp {Number(bagiHasil[0].total_laba).toLocaleString()}</div>
+                    <div className="text-xs text-emerald-600">Total Laba</div>
+                    <div className="text-lg font-bold text-emerald-600">Rp {Number(bagiHasil[0].total_laba).toLocaleString()}</div>
                   </div>
                   <div className="p-3 rounded-xl bg-blue-900/20">
                     <div className="text-xs text-blue-400">Bagian Shahibul Maal</div>
                     <div className="text-lg font-bold text-blue-400">Rp {Number(bagiHasil[0].total_distribusi_shahibul_maal).toLocaleString()}</div>
-                    <div className="text-[10px] text-white/40">{finSummary ? finSummary.nisbahSM : '?'}% dari laba</div>
+                    <div className="text-[10px] text-slate-400">{finSummary ? finSummary.nisbahSM : '?'}% dari laba</div>
                   </div>
                   <div className="p-3 rounded-xl bg-purple-900/20">
                     <div className="text-xs text-purple-400">Bagian Mudharib</div>
                     <div className="text-lg font-bold text-purple-400">Rp {Number(bagiHasil[0].total_distribusi_mudharib).toLocaleString()}</div>
-                    <div className="text-[10px] text-white/40">{finSummary ? finSummary.nisbahMudharib : '?'}% dari laba</div>
+                    <div className="text-[10px] text-slate-400">{finSummary ? finSummary.nisbahMudharib : '?'}% dari laba</div>
                   </div>
                 </div>
                 
                 {Number(bagiHasil[0].ujrah_koperasi) > 0 && (
                   <div className="p-2 rounded-lg bg-amber-900/20 text-xs">
                     <span className="text-amber-400">Ujrah Koperasi:</span>
-                    <span className="text-white ml-1">Rp {Number(bagiHasil[0].ujrah_koperasi).toLocaleString()}</span>
+                    <span className="text-slate-900 ml-1">Rp {Number(bagiHasil[0].ujrah_koperasi).toLocaleString()}</span>
                   </div>
                 )}
 
                 {/* Distribution per party */}
                 {(bagiHasil[0] as any).distribusi?.length > 0 && (
                   <div className="mt-3">
-                    <h4 className="text-xs text-white/40 mb-2">Distribusi per Pihak</h4>
+                    <h4 className="text-xs text-slate-400 mb-2">Distribusi per Pihak</h4>
                     <div className="space-y-2">
                       {(bagiHasil[0] as any).distribusi.map((d: any) => (
-                        <div key={d.id} className="flex justify-between items-center p-2 rounded-lg bg-white/5">
+                        <div key={d.id} className="flex justify-between items-center p-2 rounded-lg bg-slate-50">
                           <div>
-                            <span className="text-xs font-medium text-white">
+                            <span className="text-xs font-medium text-slate-900">
                               {d.shahibul_maal?.anggota?.nama || d.mudharib?.anggota?.nama || d.pihak_id?.slice(0, 8)}
                             </span>
-                            <span className="ml-2 text-[10px] text-white/30">{d.pihak_type}</span>
+                            <span className="ml-2 text-[10px] text-slate-400">{d.pihak_type}</span>
                           </div>
                           <div className="text-right">
-                            <div className="text-xs text-white">Rp {Number(d.nominal).toLocaleString()}</div>
-                            <div className="text-[10px] text-white/40">{d.porsi_persen}%</div>
+                            <div className="text-xs text-slate-600">Rp {Number(d.nominal).toLocaleString()}</div>
+                            <div className="text-[10px] text-slate-400">{d.porsi_persen}%</div>
                           </div>
                         </div>
                       ))}
@@ -521,7 +521,7 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
 
           {bagiHasil.length === 0 && finSummary && finSummary.labaBersih <= 0 && (
             <SectionCard>
-              <div className="p-4 text-center text-white/50">
+              <div className="p-4 text-center text-slate-500">
                 Proyek belum menghasilkan laba. Input transaksi pendapatan dan beban dulu di tab Jurnal.
               </div>
             </SectionCard>
@@ -547,16 +547,16 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
           </div>
           <FormField label="Keterangan"><FormInput value={jurnalForm.keterangan} onChange={e => setJurnalForm(f => ({...f, keterangan: e.target.value}))} required /></FormField>
 
-          <div className="border border-white/10 rounded-xl p-3">
+          <div className="border border-slate-200 rounded-xl p-3">
             <div className="flex justify-between items-center mb-2">
-              <h4 className="text-xs font-semibold text-white/60">Garis Jurnal</h4>
+              <h4 className="text-xs font-semibold text-slate-500">Garis Jurnal</h4>
               <SafeButton type="button" size="sm" onClick={addJurnalLine}><Plus className="w-3 h-3" /> Tambah Baris</SafeButton>
             </div>
             {jurnalForm.lines.length === 0 && (
-              <p className="text-xs text-white/40 p-2">Klik "Tambah Baris" untuk mulai</p>
+              <p className="text-xs text-slate-400 p-2">Klik "Tambah Baris" untuk mulai</p>
             )}
             {jurnalForm.lines.map((line, idx) => (
-              <div key={idx} className="flex gap-2 items-start mb-2 p-2 rounded-lg bg-white/5">
+              <div key={idx} className="flex gap-2 items-start mb-2 p-2 rounded-lg bg-slate-50">
                 <div className="flex-1">
                   <FormSelect value={line.coa_id} onChange={e => updateJurnalLine(idx, 'coa_id', e.target.value)} required>
                     <option value="">Pilih Akun</option>
@@ -581,7 +581,7 @@ export default function ProyekDetailClient({ proyek, orgId }: { proyek: any; org
               </div>
             ))}
             {jurnalForm.lines.length > 0 && (
-              <div className={`flex justify-between text-xs font-medium pt-2 border-t border-white/10 ${isBalance ? 'text-emerald-400' : 'text-red-400'}`}>
+              <div className={`flex justify-between text-xs font-medium pt-2 border-t border-slate-200 ${isBalance ? 'text-emerald-600' : 'text-red-400'}`}>
                 <span>{isBalance ? '✅ Balance' : '❌ Tidak Balance'}</span>
                 <span>Debit: Rp {totalDebit.toLocaleString()} | Kredit: Rp {totalKredit.toLocaleString()}</span>
               </div>

@@ -41,18 +41,18 @@ export default function PengurusClient({ orgId }: { orgId: string }) {
       </PageHeader>
 
       <SectionCard>
-        {loading ? <div className="text-white/50 p-4">Memuat...</div> : data.length === 0 ? (
-          <div className="text-white/50 p-8 text-center">
+        {loading ? <div className="text-slate-500 p-4">Memuat...</div> : data.length === 0 ? (
+          <div className="text-slate-500 p-8 text-center">
             <UserCog className="w-8 h-8 mx-auto mb-2 opacity-30" />
             Belum ada pengurus. Tetapkan Ketua, Sekretaris, Bendahara, DPS, atau Admin.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {data.map((p: any) => (
-              <div key={p.id} className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <div key={p.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200">
                 <StatusBadge label={JABATAN.find(j => j.value === p.jabatan)?.label || p.jabatan} variant={p.jabatan === 'KETUA' ? 'success' : 'info'} />
-                <div className="text-sm font-semibold text-white mt-2">{p.anggota?.nama}</div>
-                <div className="text-xs text-white/40">Kode: {p.anggota?.kode_anggota}</div>
+                <div className="text-sm font-semibold text-slate-900 mt-2">{p.anggota?.nama}</div>
+                <div className="text-xs text-slate-400">Kode: {p.anggota?.kode_anggota}</div>
               </div>
             ))}
           </div>

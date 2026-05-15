@@ -39,8 +39,8 @@ export default function SertifikasiClient({ orgId }: { orgId: string }) {
       </PageHeader>
 
       <SectionCard>
-        {loading ? <div className="text-white/50 p-4">Memuat...</div> : data.length === 0 ? (
-          <div className="text-white/50 p-8 text-center">
+        {loading ? <div className="text-slate-500 p-4">Memuat...</div> : data.length === 0 ? (
+          <div className="text-slate-500 p-8 text-center">
             <Shield className="w-8 h-8 mx-auto mb-2 opacity-30" />
             Belum ada sertifikasi DPS. Sertifikasi adalah syarat wajib menjadi Shahibul Maal atau Mudharib.
           </div>
@@ -49,13 +49,13 @@ export default function SertifikasiClient({ orgId }: { orgId: string }) {
             {data.map((s: any) => {
               const expired = s.masa_berlaku && new Date(s.masa_berlaku) < new Date()
               return (
-                <div key={s.id} className={`p-4 rounded-xl border ${expired ? 'bg-red-900/10 border-red-800' : 'bg-white/5 border-white/10'}`}>
+                <div key={s.id} className={`p-4 rounded-xl border ${expired ? 'bg-red-900/10 border-red-800' : 'bg-slate-50 border-slate-200'}`}>
                   <div className="flex justify-between items-start mb-1">
-                    <span className="text-xs text-white/30 font-mono">{s.no_sertifikat || '-'}</span>
+                    <span className="text-xs text-slate-400 font-mono">{s.no_sertifikat || '-'}</span>
                     <StatusBadge label={s.entity_type} variant={s.entity_type === 'ANGGOTA' ? 'info' : 'success'} />
                   </div>
-                  <div className="text-sm font-semibold text-white">{s.entity_id ? 'Entity #' + s.entity_id.slice(0,8) : '-'}</div>
-                  <div className="text-xs text-white/60">Berlaku s/d: {s.tgl_expired ? new Date(s.tgl_expired).toLocaleDateString('id-ID') : '-'}</div>
+                  <div className="text-sm font-semibold text-slate-900">{s.entity_id ? 'Entity #' + s.entity_id.slice(0,8) : '-'}</div>
+                  <div className="text-xs text-slate-500">Berlaku s/d: {s.tgl_expired ? new Date(s.tgl_expired).toLocaleDateString('id-ID') : '-'}</div>
                   {expired && <div className="text-[10px] text-red-400 mt-1">⚠️ Sertifikat expired</div>}
                 </div>
               )
@@ -79,7 +79,7 @@ export default function SertifikasiClient({ orgId }: { orgId: string }) {
             </FormSelect>
           </FormField>
           <FormField label="Masa Berlaku"><FormInput type="date" value={form.tgl_expired} onChange={e => setForm(f => ({...f, tgl_expired: e.target.value}))} required /></FormField>
-          <div className="text-[10px] text-white/40">Sertifikat akan terbit dengan nomor otomatis dan tanggal hari ini.</div>
+          <div className="text-[10px] text-slate-400">Sertifikat akan terbit dengan nomor otomatis dan tanggal hari ini.</div>
           <div className="flex gap-2 justify-end pt-2">
             <SafeButton type="button" variant="ghost" onClick={() => setShowForm(false)}>Batal</SafeButton>
             <SafeButton type="submit">Terbitkan</SafeButton>

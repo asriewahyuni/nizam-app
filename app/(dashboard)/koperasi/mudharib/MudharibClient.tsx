@@ -33,20 +33,20 @@ export default function MudharibClient({ orgId }: { orgId: string }) {
       </PageHeader>
 
       <SectionCard>
-        {loading ? <div className="text-white/50 p-4">Memuat...</div> : data.length === 0 ? (
-          <div className="text-white/50 p-8 text-center">
+        {loading ? <div className="text-slate-500 p-4">Memuat...</div> : data.length === 0 ? (
+          <div className="text-slate-500 p-8 text-center">
             <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
             Belum ada Mudharib. Daftarkan anggota sebagai pengelola proyek.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {data.map((m: any) => (
-              <div key={m.id} className="p-4 rounded-xl bg-white/5 border border-white/10">
-                <div className="text-sm font-semibold text-white">{m.anggota?.nama}</div>
-                <div className="text-xs text-white/40">Kode: {m.anggota?.kode_anggota}</div>
-                <div className="text-xs text-white/60 mt-1">Keahlian: {m.keahlian || '-'}</div>
+              <div key={m.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-sm font-semibold text-slate-900">{m.anggota?.nama}</div>
+                <div className="text-xs text-slate-400">Kode: {m.anggota?.kode_anggota}</div>
+                <div className="text-xs text-slate-500 mt-1">Keahlian: {m.keahlian || '-'}</div>
                 {m.sertifikat?.nomor_sertifikat && (
-                  <div className="text-[10px] text-emerald-400 mt-1">✅ Tersertifikasi DPS</div>
+                  <div className="text-[10px] text-emerald-600 mt-1">✅ Tersertifikasi DPS</div>
                 )}
               </div>
             ))}

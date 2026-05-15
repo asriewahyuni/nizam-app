@@ -12,7 +12,7 @@ export default async function ProyekDetailPage({ params }: { params: Promise<{ i
   
   const proyekList = await getProyek(orgId)
   const proyek = proyekList.find((p: any) => p.id === id)
-  if (!proyek) return <div className="p-8 text-center text-white/50">Proyek tidak ditemukan</div>
+  if (!proyek) return <div className="p-8 text-center text-slate-500">Proyek tidak ditemukan</div>
   
   return <ProyekDetailClient proyek={proyek} orgId={orgId} />
 }

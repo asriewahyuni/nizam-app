@@ -61,8 +61,8 @@ export default function MurabahahClient({ orgId }: { orgId: string }) {
       </PageHeader>
 
       <SectionCard>
-        {loading ? <div className="text-white/50 p-4">Memuat...</div> : data.length === 0 ? (
-          <div className="text-white/50 p-8 text-center">
+        {loading ? <div className="text-slate-500 p-4">Memuat...</div> : data.length === 0 ? (
+          <div className="text-slate-500 p-8 text-center">
             <ShoppingCart className="w-8 h-8 mx-auto mb-2 opacity-30" />
             Belum ada transaksi murabahah.
           </div>
@@ -73,24 +73,24 @@ export default function MurabahahClient({ orgId }: { orgId: string }) {
               const totalTagihan = Number(t.harga_jual)
               const progress = totalTagihan > 0 ? Math.min(100, (totalBayar / totalTagihan) * 100) : 0
               return (
-                <div key={t.id} className="p-4 rounded-xl bg-white/5 border border-white/10">
+                <div key={t.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200">
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <span className="text-sm font-medium text-white">{t.pembeli?.nama || '-'}</span>
-                      <span className="ml-2 text-xs text-white/30">{t.nomor_transaksi}</span>
+                      <span className="text-sm font-medium text-slate-900">{t.pembeli?.nama || '-'}</span>
+                      <span className="ml-2 text-xs text-slate-400">{t.nomor_transaksi}</span>
                     </div>
                     <StatusBadge label={t.status || 'AKTIF'} variant="success" />
                   </div>
                   <div className="grid grid-cols-4 gap-2 text-xs">
-                    <div><span className="text-white/40">Barang:</span> <span className="text-white">{t.nama_barang}</span></div>
-                    <div><span className="text-white/40">Harga Pokok:</span> <span className="text-white">Rp {Number(t.harga_pokok).toLocaleString()}</span></div>
-                    <div><span className="text-white/40">Margin:</span> <span className="text-amber-400">Rp {Number(t.margin).toLocaleString()}</span></div>
-                    <div><span className="text-white/40">Tenor:</span> <span className="text-white">{t.tenor_bulan} bln</span></div>
+                    <div><span className="text-slate-400">Barang:</span> <span className="text-slate-900">{t.nama_barang}</span></div>
+                    <div><span className="text-slate-400">Harga Pokok:</span> <span className="text-slate-900">Rp {Number(t.harga_pokok).toLocaleString()}</span></div>
+                    <div><span className="text-slate-400">Margin:</span> <span className="text-amber-400">Rp {Number(t.margin).toLocaleString()}</span></div>
+                    <div><span className="text-slate-400">Tenor:</span> <span className="text-slate-900">{t.tenor_bulan} bln</span></div>
                   </div>
-                  <div className="mt-2 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                     <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${progress}%` }} />
                   </div>
-                  <div className="flex justify-between text-[10px] text-white/40 mt-1">
+                  <div className="flex justify-between text-[10px] text-slate-400 mt-1">
                     <span>Progress: {progress.toFixed(0)}%</span>
                     <span>Rp {totalBayar.toLocaleString()} / Rp {totalTagihan.toLocaleString()}</span>
                   </div>
@@ -133,11 +133,11 @@ export default function MurabahahClient({ orgId }: { orgId: string }) {
               </FormSelect>
             </FormField>
           </div>
-          <div className="p-3 rounded-lg bg-white/5 text-xs">
-            <span className="text-white/60">Harga Jual = </span>
-            <span className="text-white font-medium">Rp {(Number(form.harga_pokok || 0) + Number(form.margin || 0)).toLocaleString()}</span>
-            <span className="text-white/60 ml-2">| Angsuran/bln ≈ </span>
-            <span className="text-emerald-400 font-medium">Rp {Math.ceil((Number(form.harga_pokok || 0) + Number(form.margin || 0)) / Math.max(1, Number(form.tenor_bulan || 1))).toLocaleString()}</span>
+          <div className="p-3 rounded-lg bg-slate-50 text-xs">
+            <span className="text-slate-500">Harga Jual = </span>
+            <span className="text-slate-900 font-medium">Rp {(Number(form.harga_pokok || 0) + Number(form.margin || 0)).toLocaleString()}</span>
+            <span className="text-slate-500 ml-2">| Angsuran/bln ≈ </span>
+            <span className="text-emerald-600 font-medium">Rp {Math.ceil((Number(form.harga_pokok || 0) + Number(form.margin || 0)) / Math.max(1, Number(form.tenor_bulan || 1))).toLocaleString()}</span>
           </div>
           <div className="flex gap-2 justify-end pt-2">
             <SafeButton type="button" variant="ghost" onClick={() => setShowForm(false)}>Batal</SafeButton>

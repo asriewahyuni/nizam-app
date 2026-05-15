@@ -34,18 +34,18 @@ export default function SimpleListPage({ orgId, type = 'shahibul-maal' }: { orgI
       </PageHeader>
 
       <SectionCard>
-        {loading ? <div className="text-white/50 p-4">Memuat...</div> : data.length === 0 ? (
-          <div className="text-white/50 p-8 text-center">
+        {loading ? <div className="text-slate-500 p-4">Memuat...</div> : data.length === 0 ? (
+          <div className="text-slate-500 p-8 text-center">
             <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
             Belum ada Shahibul Maal. Daftarkan anggota yang sudah tersertifikasi DPS.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {data.map((sm: any) => (
-              <div key={sm.id} className="p-4 rounded-xl bg-white/5 border border-white/10">
-                <div className="text-sm font-semibold text-white">{sm.anggota?.nama}</div>
-                <div className="text-xs text-white/40">Kode: {sm.anggota?.kode_anggota}</div>
-                <div className="text-xs text-white/40 mt-1">Total Investasi: <span className="text-emerald-400">Rp {Number(sm.total_investasi || 0).toLocaleString()}</span></div>
+              <div key={sm.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-sm font-semibold text-slate-900">{sm.anggota?.nama}</div>
+                <div className="text-xs text-slate-400">Kode: {sm.anggota?.kode_anggota}</div>
+                <div className="text-xs text-slate-400 mt-1">Total Investasi: <span className="text-emerald-600">Rp {Number(sm.total_investasi || 0).toLocaleString()}</span></div>
               </div>
             ))}
           </div>

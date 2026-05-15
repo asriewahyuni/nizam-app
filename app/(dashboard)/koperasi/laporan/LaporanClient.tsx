@@ -18,7 +18,7 @@ export default function LaporanClient({ orgId }: { orgId: string }) {
     })
   }, [orgId])
 
-  if (loading) return <div className="p-8 text-white/50">Memuat...</div>
+  if (loading) return <div className="p-8 text-slate-500">Memuat...</div>
 
   // Proyek selesai untuk laporan bagi hasil
   const proyekSelesai = proyek.filter(p => p.status === 'SELESAI' || p.status === 'DISTRIBUSI' || p.status === 'DITUTUP')
@@ -34,19 +34,19 @@ export default function LaporanClient({ orgId }: { orgId: string }) {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <SectionCard>
-          <div className="text-xs text-white/40">Total Anggota</div>
-          <div className="text-xl font-semibold text-white mt-1">{stats?.totalAnggota || 0}</div>
+          <div className="text-xs text-slate-400">Total Anggota</div>
+          <div className="text-xl font-semibold text-slate-900 mt-1">{stats?.totalAnggota || 0}</div>
         </SectionCard>
         <SectionCard>
-          <div className="text-xs text-white/40">Total Simpanan Pokok</div>
-          <div className="text-xl font-semibold text-emerald-400 mt-1">Rp {(stats?.totalSimpananPokok || 0).toLocaleString()}</div>
+          <div className="text-xs text-slate-400">Total Simpanan Pokok</div>
+          <div className="text-xl font-semibold text-emerald-600 mt-1">Rp {(stats?.totalSimpananPokok || 0).toLocaleString()}</div>
         </SectionCard>
         <SectionCard>
-          <div className="text-xs text-white/40">Total Modal Proyek</div>
-          <div className="text-xl font-semibold text-emerald-400 mt-1">Rp {(stats?.totalModal || 0).toLocaleString()}</div>
+          <div className="text-xs text-slate-400">Total Modal Proyek</div>
+          <div className="text-xl font-semibold text-emerald-600 mt-1">Rp {(stats?.totalModal || 0).toLocaleString()}</div>
         </SectionCard>
         <SectionCard>
-          <div className="text-xs text-white/40">Pendapatan Ujrah</div>
+          <div className="text-xs text-slate-400">Pendapatan Ujrah</div>
           <div className="text-xl font-semibold text-amber-400 mt-1">Rp {totalPendapatanUjrah.toLocaleString()}</div>
         </SectionCard>
       </div>
@@ -56,15 +56,15 @@ export default function LaporanClient({ orgId }: { orgId: string }) {
         <SectionCard title="Proyek Selesai — Siap Bagi Hasil">
           <div className="space-y-2 mt-2">
             {proyekSelesai.map((p: any) => (
-              <div key={p.id} className="p-3 rounded-lg bg-white/5 border border-white/10">
+              <div key={p.id} className="p-3 rounded-lg bg-slate-50 border border-slate-200">
                 <div className="flex justify-between items-center">
                   <div>
-                    <span className="text-sm font-medium text-white">{p.nama_proyek}</span>
-                    <span className="ml-2 text-[10px] text-white/40">{p.status}</span>
+                    <span className="text-sm font-semibold text-slate-900">{p.nama_proyek}</span>
+                    <span className="ml-2 text-[10px] text-slate-400">{p.status}</span>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm text-emerald-400">Rp {Number(p.modal_terkumpul).toLocaleString()}</div>
-                    <div className="text-xs text-white/40">Nisbah SM {Number(p.nisbah_sm || 0).toFixed(0)}% : M {Number(p.nisbah_mudharib || 0).toFixed(0)}%</div>
+                    <div className="text-sm text-emerald-600">Rp {Number(p.modal_terkumpul).toLocaleString()}</div>
+                    <div className="text-xs text-slate-400">Nisbah SM {Number(p.nisbah_sm || 0).toFixed(0)}% : M {Number(p.nisbah_mudharib || 0).toFixed(0)}%</div>
                   </div>
                 </div>
               </div>
@@ -82,10 +82,10 @@ export default function LaporanClient({ orgId }: { orgId: string }) {
       {/* Catatan */}
       <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-900/20 to-teal-900/20 border border-emerald-800/20">
         <div className="flex items-start gap-3">
-          <PieChart className="w-5 h-5 text-emerald-400 mt-0.5" />
+          <PieChart className="w-5 h-5 text-emerald-600 mt-0.5" />
           <div>
-            <h4 className="text-sm font-semibold text-white">Laporan Lengkap</h4>
-            <p className="text-xs text-white/50 mt-1">
+            <h4 className="text-sm font-semibold text-slate-900">Laporan Lengkap</h4>
+            <p className="text-xs text-slate-500 mt-1">
               Laporan keuangan koperasi (Neraca, Laba Rugi, SHU, Arus Kas) mengikuti siklus akuntansi 
               dua lapis: Layer 1 (proyek) dan Layer 2 (buku resmi koperasi). 
               Laporan real-time akan tersedia setelah integrasi jurnal selesai.

@@ -56,19 +56,19 @@ export default function SimpananClient({ orgId }: { orgId: string }) {
       <div className="flex gap-2">
         {tabs.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${tab === t.key ? 'bg-emerald-600 text-white' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}>
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${tab === t.key ? 'bg-emerald-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
             <t.icon className="w-4 h-4" /> {t.label}
           </button>
         ))}
       </div>
 
       <SectionCard>
-        {loading ? <div className="text-white/50 p-4">Memuat...</div> : data.length === 0 ? (
-          <div className="text-white/50 p-8 text-center">Belum ada data simpanan {tab}</div>
+        {loading ? <div className="text-slate-500 p-4">Memuat...</div> : data.length === 0 ? (
+          <div className="text-slate-500 p-8 text-center">Belum ada data simpanan {tab}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="text-white/40 border-b border-white/10">
+              <thead><tr className="text-slate-400 border-b border-slate-200">
                 <th className="p-2 text-left">Anggota</th><th className="p-2 text-left">Jumlah</th>
                 <th className="p-2 text-left">Tanggal</th>
                 {tab === 'wajib' && <th className="p-2 text-left">Periode</th>}
@@ -77,13 +77,13 @@ export default function SimpananClient({ orgId }: { orgId: string }) {
               </tr></thead>
               <tbody>
                 {data.map((d: any) => (
-                  <tr key={d.id} className="border-b border-white/5 hover:bg-white/5">
-                    <td className="p-2 text-white/80">{d.anggota?.nama || '-'}</td>
-                    <td className="p-2 text-white font-medium">Rp {Number(d.jumlah).toLocaleString()}</td>
-                    <td className="p-2 text-white/60">{d.tgl_bayar || d.tgl_transaksi}</td>
-                    {tab === 'wajib' && <td className="p-2 text-white/60">{d.periode_bulan}</td>}
+                  <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="p-2 text-slate-700">{d.anggota?.nama || '-'}</td>
+                    <td className="p-2 text-slate-900 font-medium">Rp {Number(d.jumlah).toLocaleString()}</td>
+                    <td className="p-2 text-slate-500">{d.tgl_bayar || d.tgl_transaksi}</td>
+                    {tab === 'wajib' && <td className="p-2 text-slate-500">{d.periode_bulan}</td>}
                     {tab === 'sukarela' && <td className="p-2"><StatusBadge status={d.jenis} variant={d.jenis === 'SETOR' ? 'success' : 'warning'} /></td>}
-                    <td className="p-2 text-white/40">{d.keterangan || '-'}</td>
+                    <td className="p-2 text-slate-400">{d.keterangan || '-'}</td>
                   </tr>
                 ))}
               </tbody>

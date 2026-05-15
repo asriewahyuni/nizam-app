@@ -45,25 +45,25 @@ export default function AnggotaPageClient({ orgId }: { orgId: string }) {
       </PageHeader>
 
       <SectionCard>
-        {loading ? <div className="text-white/50 p-4">Memuat...</div> : anggota.length === 0 ? (
-          <div className="text-white/50 p-8 text-center">Belum ada anggota. Klik "Tambah Anggota" untuk memulai.</div>
+        {loading ? <div className="text-slate-500 p-4">Memuat...</div> : anggota.length === 0 ? (
+          <div className="text-slate-500 p-8 text-center">Belum ada anggota. Klik "Tambah Anggota" untuk memulai.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="text-white/40 border-b border-white/10">
+              <thead><tr className="text-slate-400 border-b border-slate-200">
                 <th className="p-2 text-left">Kode</th><th className="p-2 text-left">Nama</th><th className="p-2 text-left">NIK</th>
                 <th className="p-2 text-left">Telepon</th><th className="p-2 text-left">Status</th><th className="p-2 text-left">DPS</th><th className="p-2"></th>
               </tr></thead>
               <tbody>
                 {anggota.map((a: any) => (
-                  <tr key={a.id} className="border-b border-white/5 hover:bg-white/5">
-                    <td className="p-2 text-white/60">{a.kode_anggota}</td>
-                    <td className="p-2 text-white font-medium">{a.nama}</td>
-                    <td className="p-2 text-white/60">{a.nik || '-'}</td>
-                    <td className="p-2 text-white/60">{a.no_telepon || '-'}</td>
+                  <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="p-2 text-slate-500">{a.kode_anggota}</td>
+                    <td className="p-2 text-slate-900 font-medium">{a.nama}</td>
+                    <td className="p-2 text-slate-500">{a.nik || '-'}</td>
+                    <td className="p-2 text-slate-500">{a.no_telepon || '-'}</td>
                     <td className="p-2"><StatusBadge status={a.status} variant={a.status === 'AKTIF' ? 'success' : 'warning'} /></td>
                     <td className="p-2">{a.is_tersertifikasi_dps ? <StatusBadge status="Terdaftar" variant="success" /> : '-'}</td>
-                    <td className="p-2"><button onClick={() => edit(a)} className="text-xs text-emerald-400 hover:text-emerald-300">Edit</button></td>
+                    <td className="p-2"><button onClick={() => edit(a)} className="text-xs text-emerald-600 hover:text-emerald-700">Edit</button></td>
                   </tr>
                 ))}
               </tbody>
