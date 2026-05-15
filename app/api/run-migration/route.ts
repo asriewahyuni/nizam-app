@@ -17,7 +17,7 @@ async function runAll() {
   const checks: any = await queryPostgres(
     `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'koperasi_%'`
   )
-  const existing = (checks || []).map((r: any) => r.table_name)
+  const existing = (checks?.rows || []).map((r: any) => r.table_name)
   const missing = tables.filter(t => !existing.includes(t))
 
   if (missing.length === 0) {
@@ -47,7 +47,7 @@ async function runAll() {
   const verify: any = await queryPostgres(
     `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'koperasi_%'`
   )
-  const created = (verify || []).map((r: any) => r.table_name)
+  const created = (verify?.rows || []).map((r: any) => r.table_name)
 
   return { message: `Migration done: ${missing.length} tables created`, created }
 }
