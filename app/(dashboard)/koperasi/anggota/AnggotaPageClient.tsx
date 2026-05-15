@@ -65,11 +65,15 @@ export default function AnggotaPageClient({ orgId }: { orgId: string }) {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Anggota Koperasi" subtitle="Data anggota dan status keanggotaan">
-        <SafeButton onClick={() => { setShowForm(true); setEditId(null); setForm({ nama: '', nik: '', alamat: '', no_telepon: '', email: '', status: 'AKTIF' }) }}>
-          <Plus className="w-4 h-4" /> Tambah Anggota
-        </SafeButton>
-      </PageHeader>
+      <PageHeader
+        title="Anggota Koperasi"
+        subtitle="Data anggota dan status keanggotaan"
+        actions={
+          <SafeButton onClick={() => { setShowForm(true); setEditId(null); setForm({ nama: '', nik: '', alamat: '', no_telepon: '', email: '', status: 'AKTIF' }) }}>
+            <Plus className="w-4 h-4" /> Tambah Anggota
+          </SafeButton>
+        }
+      />
 
       <SectionCard>
         {error && <div className="text-red-600 p-4 bg-red-50 rounded-lg mb-4 border border-red-200">{error}</div>}

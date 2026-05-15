@@ -37,7 +37,7 @@ export default function ShuClient({ orgId }: { orgId: string }) {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Sisa Hasil Usaha (SHU)" subtitle="Laporan laba bersih & alokasi tahunan koperasi">
+      <PageHeader title="Sisa Hasil Usaha (SHU)" subtitle="Laporan laba bersih & alokasi tahunan koperasi" actions={
         <div className="flex items-center gap-2">
           <select
             value={tahun}
@@ -52,7 +52,7 @@ export default function ShuClient({ orgId }: { orgId: string }) {
             <Calculator className="w-4 h-4" /> {loading ? 'Menghitung...' : 'Hitung SHU'}
           </SafeButton>
         </div>
-      </PageHeader>
+      } />
 
       {result && (
         <>

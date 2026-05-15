@@ -81,9 +81,9 @@ export default function ProyekClient({ orgId }: { orgId: string }) {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Proyek Mudharabah" subtitle="Multi Shahibul Maal — kelola proyek investasi syariah">
+      <PageHeader title="Proyek Mudharabah" subtitle="Multi Shahibul Maal — kelola proyek investasi syariah" actions={
         <SafeButton onClick={() => setShowForm(true)}><Plus className="w-4 h-4" /> Proyek Baru</SafeButton>
-      </PageHeader>
+      } />
 
       <div className="grid grid-cols-3 gap-4">
         <StatCard title="Proyek Aktif" value={proyekAktif.toString()} subtitle="Sedang berjalan" icon={TrendingUp} />

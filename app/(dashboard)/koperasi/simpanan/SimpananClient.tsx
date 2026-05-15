@@ -53,9 +53,9 @@ export default function SimpananClient({ orgId }: { orgId: string }) {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Simpanan" subtitle="Pokok, Wajib, Sukarela (Wadiah)">
+      <PageHeader title="Simpanan" subtitle="Pokok, Wajib, Sukarela (Wadiah)" actions={
         <SafeButton onClick={() => setShowForm(true)}><Plus className="w-4 h-4" /> Tambah Transaksi</SafeButton>
-      </PageHeader>
+      } />
 
       <div className="flex gap-2">
         {tabs.map(t => (

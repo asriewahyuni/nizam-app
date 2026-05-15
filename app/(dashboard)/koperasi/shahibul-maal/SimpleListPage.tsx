@@ -29,9 +29,9 @@ export default function SimpleListPage({ orgId, type = 'shahibul-maal' }: { orgI
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Shahibul Maal" subtitle="Investor / penyedia modal terdaftar">
+      <PageHeader title="Shahibul Maal" subtitle="Investor / penyedia modal terdaftar" actions={
         <SafeButton onClick={() => setShowForm(true)}><Plus className="w-4 h-4" /> Daftarkan Shahibul Maal</SafeButton>
-      </PageHeader>
+      } />
 
       <SectionCard>
         {loading ? <div className="text-slate-500 p-4">Memuat...</div> : data.length === 0 ? (

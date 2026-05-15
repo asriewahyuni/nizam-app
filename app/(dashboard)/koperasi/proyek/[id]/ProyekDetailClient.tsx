@@ -248,11 +248,11 @@ export default function ProyekDetailClient() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title={proyek.nama_proyek} subtitle={`Mudharib: ${proyek.mudharib?.nama || '-'}`}>
+      <PageHeader title={proyek.nama_proyek} subtitle={`Mudharib: ${proyek.mudharib?.nama || '-'}`} actions={
         <SafeButton variant="ghost" onClick={() => router.push('/koperasi/proyek')}>
           <ArrowLeft className="w-4 h-4" /> Kembali
         </SafeButton>
-      </PageHeader>
+      } />
 
       {/* Info Bar */}
       <div className="grid grid-cols-4 gap-4">

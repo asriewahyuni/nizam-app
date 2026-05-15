@@ -56,9 +56,9 @@ export default function MurabahahClient({ orgId }: { orgId: string }) {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Transaksi Murabahah" subtitle="Jual beli dengan margin + angsuran">
+      <PageHeader title="Transaksi Murabahah" subtitle="Jual beli dengan margin + angsuran" actions={
         <SafeButton onClick={() => setShowForm(true)}><Plus className="w-4 h-4" /> Transaksi Baru</SafeButton>
-      </PageHeader>
+      } />
 
       <SectionCard>
         {loading ? <div className="text-slate-500 p-4">Memuat...</div> : data.length === 0 ? (
