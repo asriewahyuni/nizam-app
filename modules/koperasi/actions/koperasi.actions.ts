@@ -69,8 +69,8 @@ export async function getSimpananPokok(orgId: string) {
   const db = await getDb()
   const { data, error } = await db
     .from('koperasi_simpanan_pokok')
-    .select('*, anggota:koperasi_anggota!inner(nama, kode_anggota)')
-    .eq('anggota.org_id', orgId)
+    .select('*, anggota:koperasi_anggota(nama, kode_anggota)')
+    .eq('org_id', orgId)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data || []
@@ -96,8 +96,8 @@ export async function getSimpananWajib(orgId: string) {
   const db = await getDb()
   const { data, error } = await db
     .from('koperasi_simpanan_wajib')
-    .select('*, anggota:koperasi_anggota!inner(nama, kode_anggota)')
-    .eq('anggota.org_id', orgId)
+    .select('*, anggota:koperasi_anggota(nama, kode_anggota)')
+    .eq('org_id', orgId)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data || []
@@ -121,8 +121,8 @@ export async function getSimpananSukarela(orgId: string) {
   const db = await getDb()
   const { data, error } = await db
     .from('koperasi_simpanan_sukarela')
-    .select('*, anggota:koperasi_anggota!inner(nama, kode_anggota)')
-    .eq('anggota.org_id', orgId)
+    .select('*, anggota:koperasi_anggota(nama, kode_anggota)')
+    .eq('org_id', orgId)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data || []
@@ -148,8 +148,8 @@ export async function getShahibulMaal(orgId: string) {
   const db = await getDb()
   const { data, error } = await db
     .from('koperasi_shahibul_maal')
-    .select('*, anggota:koperasi_anggota!inner(nama, kode_anggota, email, no_telepon)')
-    .eq('anggota.org_id', orgId)
+    .select('*, anggota:koperasi_anggota(nama, kode_anggota, email, no_telepon)')
+    .eq('org_id', orgId)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data || []
@@ -237,8 +237,8 @@ export async function getPengurus(orgId: string) {
   const db = await getDb()
   const { data, error } = await db
     .from('koperasi_pengurus')
-    .select('*, anggota:koperasi_anggota!inner(nama, kode_anggota)')
-    .eq('anggota.org_id', orgId)
+    .select('*, anggota:koperasi_anggota(nama, kode_anggota)')
+    .eq('org_id', orgId)
     .order('jabatan', { ascending: true })
   if (error) throw new Error(error.message)
   return data || []
@@ -274,8 +274,8 @@ export async function getProyek(orgId: string) {
   const db = await getDb()
   const { data, error } = await db
     .from('koperasi_proyek')
-    .select('*, mudharib:koperasi_mudharib!inner(nama)')
-    .eq('mudharib.org_id', orgId)
+    .select('*, mudharib:koperasi_mudharib(nama)')
+    .eq('org_id', orgId)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data || []
