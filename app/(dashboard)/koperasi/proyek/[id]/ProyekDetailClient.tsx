@@ -4,15 +4,15 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, Modal, StatusBadge } from '@/components/ui/NizamUI'
 import { ArrowLeft, Plus, BookOpen, BarChart3, TrendingUp, Wallet, FileText, Gift, Loader2 } from 'lucide-react'
-import { updateStatusProyek } from '@/modules/koperasi/actions/koperasi.actions'
+import { updateStatusProyek } from '@/lib/koperasi/client'
 import {
   generateProjectCoa, getProjectCoa, getProjectJournal,
   createProjectJournalEntry, getProjectBalanceSheet, getProjectProfitLoss,
-} from '@/modules/koperasi/actions/proyek-jurnal.actions'
+} from '@/lib/koperasi/client'
 import {
   hitungBagiHasil, getBagiHasil, konfirmasiBagiHasil,
   setujuiDistribusi, syncProyekKeBukuBesar, getProjectFinancialSummary,
-} from '@/modules/koperasi/actions/bagi-hasil.actions'
+} from '@/lib/koperasi/client'
 
 type TabType = 'overview' | 'jurnal' | 'neraca' | 'laba-rugi' | 'bagi-hasil'
 

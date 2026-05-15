@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, StatusBadge, Modal } from '@/components/ui/NizamUI'
 import { Plus, Search } from 'lucide-react'
-import { getAnggota, createAnggota, updateAnggota } from '@/modules/koperasi/actions/koperasi.actions'
+import { getAnggota, createAnggota, updateAnggota } from '@/lib/koperasi/client'
 
 export default function AnggotaPageClient({ orgId }: { orgId: string }) {
   const [anggota, setAnggota] = useState<any[]>([])

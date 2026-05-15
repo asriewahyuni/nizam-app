@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, StatusBadge, Modal } from '@/components/ui/NizamUI'
 import { Plus, FileText, Printer } from 'lucide-react'
-import { getAkadWakalah, createAkadWakalah, getShahibulMaal } from '@/modules/koperasi/actions/koperasi.actions'
+import { getAkadWakalah, createAkadWakalah, getShahibulMaal } from '@/lib/koperasi/client'
 
 export default function AkadWakalahClient({ orgId }: { orgId: string }) {
   const [data, setData] = useState<any[]>([])

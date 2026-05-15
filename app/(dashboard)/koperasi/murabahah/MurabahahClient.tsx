@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, StatusBadge, Modal } from '@/components/ui/NizamUI'
 import { Plus, ShoppingCart, Printer } from 'lucide-react'
-import { getMurabahahTransaksi, createMurabahahTransaksi, getAkadWakalah, getAnggota } from '@/modules/koperasi/actions/koperasi.actions'
+import { getMurabahahTransaksi, createMurabahahTransaksi, getAkadWakalah, getAnggota } from '@/lib/koperasi/client'
 
 export default function MurabahahClient({ orgId }: { orgId: string }) {
   const [data, setData] = useState<any[]>([])

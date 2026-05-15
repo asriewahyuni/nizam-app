@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { PageHeader, SectionCard, StatusBadge } from '@/components/ui/NizamUI'
 import { BarChart3, TrendingUp, PieChart, Calculator, FileText } from 'lucide-react'
 import Link from 'next/link'
-import { getProyek } from '@/modules/koperasi/actions/koperasi.actions'
-import { getDashboardStats } from '@/modules/koperasi/actions/koperasi.actions'
+import { getProyek } from '@/lib/koperasi/client'
+import { getDashboardStats } from '@/lib/koperasi/client'
 
 export default function LaporanClient({ orgId }: { orgId: string }) {
   const [stats, setStats] = useState<any>(null)
