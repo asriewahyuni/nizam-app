@@ -499,22 +499,27 @@ export interface WorkshopServiceRate {
 }
 
 export async function getWorkshopServiceRates(orgId: string): Promise<WorkshopServiceRate[]> {
-  const { queryPostgres } = await import('@/lib/db/postgres')
-  const res = await queryPostgres<Record<string, unknown>>(
-    `SELECT id, name, description, unit_price, category, is_active
-     FROM public.workshop_service_rates
-     WHERE org_id = $1 AND is_active = true
-     ORDER BY category, name`,
-    [orgId]
-  )
-  return res.rows.map(r => ({
-    id: String(r.id),
-    name: String(r.name),
-    description: r.description ? String(r.description) : null,
-    unitPrice: Number(r.unit_price),
-    category: String(r.category || 'UMUM'),
-    isActive: Boolean(r.is_active),
-  }))
+  try {
+    const { queryPostgres } = await import('@/lib/db/postgres')
+    const res = await queryPostgres<Record<string, unknown>>(
+      `SELECT id, name, description, unit_price, category, is_active
+       FROM public.workshop_service_rates
+       WHERE org_id = $1 AND is_active = true
+       ORDER BY category, name`,
+      [orgId]
+    )
+    return res.rows.map(r => ({
+      id: String(r.id),
+      name: String(r.name),
+      description: r.description ? String(r.description) : null,
+      unitPrice: Number(r.unit_price),
+      category: String(r.category || 'UMUM'),
+      isActive: Boolean(r.is_active),
+    }))
+  } catch (error) {
+    console.error('getWorkshopServiceRates:', error)
+    return []
+  }
 }
 
 export async function upsertWorkshopServiceRate(orgId: string, formData: FormData) {
@@ -561,17 +566,22 @@ export async function deleteWorkshopServiceRate(orgId: string, rateId: string) {
 
 // Ambil produk inventori (spare part) untuk lookup di form item SPK
 export async function getWorkshopPartProducts(orgId: string) {
-  const { queryPostgres } = await import('@/lib/db/postgres')
-  const res = await queryPostgres<{ id: string; name: string; sku: string; selling_price: number; quantity: number }>(
-    `SELECT p.id, p.name, p.sku, p.selling_price,
-            COALESCE(SUM(s.quantity), 0) AS quantity
-     FROM public.products p
-     LEFT JOIN public.inventory_stocks s ON s.product_id = p.id AND s.org_id = p.org_id
-     WHERE p.org_id = $1
-       AND p.type IN ('INVENTORY', 'PART', 'SPAREPART')
-     GROUP BY p.id, p.name, p.sku, p.selling_price
-     ORDER BY p.name`,
-    [orgId]
-  )
-  return res.rows
+  try {
+    const { queryPostgres } = await import('@/lib/db/postgres')
+    const res = await queryPostgres<{ id: string; name: string; sku: string; selling_price: number; quantity: number }>(
+      `SELECT p.id, p.name, p.sku, p.selling_price,
+              COALESCE(SUM(s.quantity), 0) AS quantity
+       FROM public.products p
+       LEFT JOIN public.inventory_stocks s ON s.product_id = p.id AND s.org_id = p.org_id
+       WHERE p.org_id = $1
+         AND p.type IN ('INVENTORY', 'PART', 'SPAREPART')
+       GROUP BY p.id, p.name, p.sku, p.selling_price
+       ORDER BY p.name`,
+      [orgId]
+    )
+    return res.rows
+  } catch (error) {
+    console.error('getWorkshopPartProducts:', error)
+    return []
+  }
 }
