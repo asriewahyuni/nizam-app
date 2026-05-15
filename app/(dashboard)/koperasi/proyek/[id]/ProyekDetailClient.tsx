@@ -4,15 +4,12 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { PageHeader, SafeButton, SectionCard, FormField, FormInput, FormSelect, Modal, StatusBadge } from '@/components/ui/NizamUI'
 import { ArrowLeft, Plus, BookOpen, BarChart3, TrendingUp, Wallet, FileText, Gift, Loader2 } from 'lucide-react'
-import { updateStatusProyek } from '@/modules/koperasi/actions/koperasi.actions'
-import {
-  generateProjectCoa, getProjectCoa, getProjectJournal,
-  createProjectJournalEntry, getProjectBalanceSheet, getProjectProfitLoss,
-} from '@/modules/koperasi/actions/proyek-jurnal.actions'
-import {
-  hitungBagiHasil, getBagiHasil, konfirmasiBagiHasil,
-  setujuiDistribusi, syncProyekKeBukuBesar, getProjectFinancialSummary,
-} from '@/modules/koperasi/actions/bagi-hasil.actions'
+const BASE = '/api/koperasi/action'
+async function api(action: string, params: any[] = []) {
+  const res = await fetch(BASE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, params }) })
+  if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error || 'Request failed') }
+  const { data } = await res.json(); return data
+}
 
 type TabType = 'overview' | 'jurnal' | 'neraca' | 'laba-rugi' | 'bagi-hasil'
 
@@ -73,10 +70,10 @@ export default function ProyekDetailClient() {
   async function loadCoa() {
     if (!proyek) return
     try {
-      const c = await getProjectCoa(proyek.id)
+      const c = await api('getProjectCoa', [proyek.id])
       if (c.length === 0) {
-        await generateProjectCoa(proyek.id)
-        setCoa(await getProjectCoa(proyek.id))
+        await api('generateProjectCoa', [proyek.id])
+        setCoa(await api('getProjectCoa', [proyek.id]))
       } else {
         setCoa(c)
       }
@@ -87,32 +84,32 @@ export default function ProyekDetailClient() {
 
   async function loadJournal() {
     if (!proyek) return
-    const j = await getProjectJournal(proyek.id)
+    const j = await api('getProjectJournal', [proyek.id])
     setJournal(j)
   }
 
   async function loadNeraca() {
     if (!proyek) return
-    const n = await getProjectBalanceSheet(proyek.id)
+    const n = await api('getProjectBalanceSheet', [proyek.id])
     setNeraca(n)
   }
 
   async function loadPnl() {
     if (!proyek) return
-    const p = await getProjectProfitLoss(proyek.id)
+    const p = await api('getProjectProfitLoss', [proyek.id])
     setPnl(p)
   }
 
   async function loadBagiHasil() {
     if (!proyek) return
-    const bh = await getBagiHasil(proyek.id)
+    const bh = await api('getBagiHasil', [proyek.id])
     setBagiHasil(bh)
   }
 
   async function loadFinSummary() {
     if (!proyek) return
     try {
-      const s = await getProjectFinancialSummary(proyek.id)
+      const s = await api('getProjectFinancialSummary', [proyek.id])
       setFinSummary(s)
     } catch (e) { console.error('fin summary error:', e) }
   }
@@ -121,7 +118,7 @@ export default function ProyekDetailClient() {
     if (!proyek) return
     setLoadingBh(true)
     try {
-      const result = await hitungBagiHasil(proyek.id)
+      const result = await api('hitungBagiHasil', [proyek.id])
       alert(`✅ Bagi hasil berhasil dihitung!\nLaba: Rp ${result.totalLaba.toLocaleString()}\nBagian SM: Rp ${result.bagianSM.toLocaleString()}\nBagian Mudharib: Rp ${result.bagianMudharib.toLocaleString()}`)
       loadBagiHasil()
     } catch (e: any) {
@@ -131,7 +128,7 @@ export default function ProyekDetailClient() {
   }
 
   async function handleKonfirmasiBagiHasil(bhId: string) {
-    await konfirmasiBagiHasil(bhId)
+    await api('konfirmasiBagiHasil', [bhId])
     loadBagiHasil()
   }
 
@@ -139,10 +136,9 @@ export default function ProyekDetailClient() {
     if (!proyek) return
     setLoadingBh(true)
     try {
-      await setujuiDistribusi(bhId, proyek.id)
+      await api('setujuiDistribusi', [bhId, proyek.id])
       alert('✅ Distribusi disetujui!')
       loadBagiHasil()
-      // Refresh proyek data from API
       const updated = await fetchProyek(id)
       setProyek(updated)
     } catch (e: any) {
@@ -155,7 +151,7 @@ export default function ProyekDetailClient() {
     if (!proyek) return
     setLoadingBh(true)
     try {
-      await syncProyekKeBukuBesar(proyek.org_id, proyek.id)
+      await api('syncProyekKeBukuBesar', [proyek.org_id, proyek.id])
       alert('✅ Proyek berhasil disinkronkan ke buku besar!')
       const updated = await fetchProyek(id)
       setProyek(updated)
@@ -167,8 +163,8 @@ export default function ProyekDetailClient() {
 
   async function handleGenerateCoa() {
     if (!proyek) return
-    await generateProjectCoa(proyek.id)
-    setCoa(await getProjectCoa(proyek.id))
+    await api('generateProjectCoa', [proyek.id])
+    setCoa(await api('getProjectCoa', [proyek.id]))
   }
 
   function addJurnalLine() {
@@ -191,7 +187,7 @@ export default function ProyekDetailClient() {
   async function handleSubmitJurnal(e: React.FormEvent) {
     if (!proyek) return
     e.preventDefault()
-    await createProjectJournalEntry(proyek.id, {
+    await api('createProjectJournalEntry', [proyek.id, {
       tgl_transaksi: jurnalForm.tgl_transaksi,
       tipe: jurnalForm.tipe,
       keterangan: jurnalForm.keterangan,
@@ -201,7 +197,7 @@ export default function ProyekDetailClient() {
         kredit: Number(l.kredit),
         keterangan: l.keterangan,
       })),
-    })
+    }])
     setShowJurnal(false)
     setJurnalForm({
       tgl_transaksi: new Date().toISOString().split('T')[0],
