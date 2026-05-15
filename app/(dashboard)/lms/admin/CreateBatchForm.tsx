@@ -67,6 +67,17 @@ export default function CreateBatchForm({ courses }: { courses: Course[] }) {
         </label>
       </div>
 
+      <label className="block text-sm">
+        <div className="font-bold text-slate-900 mb-1.5">Deskripsi Batch <span className="text-slate-400 font-normal">(opsional)</span></div>
+        <textarea name="description" rows={2} placeholder="Informasi singkat tentang batch ini untuk calon peserta..." className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50 resize-none" />
+      </label>
+
+      <label className="block text-sm">
+        <div className="font-bold text-slate-900 mb-1.5">Instruksi Pembayaran <span className="text-slate-400 font-normal">(opsional)</span></div>
+        <textarea name="paymentInstructions" rows={3} placeholder={'Contoh:\nTransfer ke BCA 1234567890 a.n. PT Contoh\nKonfirmasi via WhatsApp ke 08xx-xxxx-xxxx'} className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-400 bg-slate-50 resize-none text-xs" />
+        <p className="mt-1 text-xs text-slate-400">Akan ditampilkan ke peserta setelah mendaftar.</p>
+      </label>
+
       <div className="pt-2">
         <BatchStructureBuilder />
       </div>

@@ -117,12 +117,20 @@ export default async function LearningAdminPage() {
             </Link>
           )}
           {accessContext.canManage && (
-            <Link
-              href="/lms#buat-pelatihan"
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all"
-            >
-              <PlusCircle size={18} /> Buat Program
-            </Link>
+            <>
+              <Link
+                href="/lms/registrasi"
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white text-sm font-bold rounded-2xl hover:bg-black shadow-xl shadow-slate-200 transition-all"
+              >
+                <Users size={18} /> Registrasi Peserta
+              </Link>
+              <Link
+                href="/lms#buat-pelatihan"
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-bold rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all"
+              >
+                <PlusCircle size={18} /> Buat Program
+              </Link>
+            </>
           )}
         </div>
       </div>
@@ -282,6 +290,21 @@ export default async function LearningAdminPage() {
                   <div className="mt-5 pt-5 border-t border-slate-50 flex gap-6 text-xs font-bold text-slate-500 uppercase tracking-wide">
                     <span>Kuota: <span className="text-slate-900">{b.quota === 0 ? 'Unlimited' : b.quota}</span></span>
                     <span>Mulai: <span className="text-slate-900">{b.start_date ? String(b.start_date) : '-'}</span></span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link
+                      href={`/lms/daftar/${b.id}`}
+                      target="_blank"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 border border-blue-100 px-3 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-100 transition-colors"
+                    >
+                      🔗 Link Daftar
+                    </Link>
+                    <Link
+                      href="/lms/registrasi"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                    >
+                      👥 Lihat Peserta
+                    </Link>
                   </div>
                   <BatchActions batch={b} />
                 </div>

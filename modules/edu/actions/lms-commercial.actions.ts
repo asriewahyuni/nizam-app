@@ -180,6 +180,8 @@ export async function createLmsBatch(
     const status = (formData.get('status') as string) || 'OPEN'
     const taxRate = Number(formData.get('taxRate') || 0)
     const isTaxIncluded = formData.get('isTaxIncluded') === 'on'
+    const description = (formData.get('description') as string || '').trim()
+    const paymentInstructions = (formData.get('paymentInstructions') as string || '').trim()
 
     const feeStructureStr = formData.get('feeStructure') as string
     const feeStructure = feeStructureStr ? JSON.parse(feeStructureStr) : []
@@ -198,6 +200,8 @@ export async function createLmsBatch(
       quota,
       price,
       status,
+      description: description || null,
+      payment_instructions: paymentInstructions || null,
     }
 
     // Kolom tambahan (migration 1250, 1251) — JSONB wajib di-stringify agar pg tidak kirim [object Object]
