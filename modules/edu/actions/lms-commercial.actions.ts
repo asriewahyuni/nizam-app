@@ -200,9 +200,9 @@ export async function createLmsBatch(
       status,
     }
 
-    // Kolom tambahan (migration 1250, 1251) — dimasukkan hanya jika ada data
-    if (feeStructure.length > 0) insertPayload.fee_structure = feeStructure
-    if (costStructure.length > 0) insertPayload.cost_structure = costStructure
+    // Kolom tambahan (migration 1250, 1251) — JSONB wajib di-stringify agar pg tidak kirim [object Object]
+    if (feeStructure.length > 0) insertPayload.fee_structure = JSON.stringify(feeStructure)
+    if (costStructure.length > 0) insertPayload.cost_structure = JSON.stringify(costStructure)
     if (taxRate > 0) insertPayload.tax_rate = taxRate
     if (isTaxIncluded) insertPayload.is_tax_included = isTaxIncluded
 
