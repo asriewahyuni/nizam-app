@@ -485,8 +485,9 @@ export async function deductWorkshopPartInventory(orgId: string, workOrderId: st
   const items = await queryPostgres<{
     product_id: string
     quantity: number
+    unit_price: number
   }>(`
-    SELECT product_id, quantity
+    SELECT product_id, quantity, unit_price
     FROM public.workshop_work_order_items
     WHERE work_order_id = $1
       AND item_type = 'PART'
@@ -501,21 +502,48 @@ export async function deductWorkshopPartInventory(orgId: string, workOrderId: st
     [orgId]
   )
   const warehouseId = warehouseRes.rows[0]?.id
-  if (!warehouseId) return { success: true } // Tidak ada warehouse, skip
 
-  // Deduct stok setiap part
+  // Ambil branch_id dari work order
+  const orderRes = await queryPostgres<{ branch_id: string | null }>(
+    `SELECT branch_id FROM public.workshop_work_orders WHERE id = $1 LIMIT 1`,
+    [workOrderId]
+  )
+  const branchId = orderRes.rows[0]?.branch_id || null
+
+  // Deduct stok dan catat movement untuk setiap part
   const errors: string[] = []
   for (const item of items.rows) {
     try {
+      // Update stok di warehouse default jika ada
+      if (warehouseId) {
+        await queryPostgres(`
+          UPDATE public.inventory_stocks
+          SET quantity = GREATEST(0, quantity - $1)
+          WHERE org_id = $2
+            AND product_id = $3
+            AND warehouse_id = $4
+        `, [item.quantity, orgId, item.product_id, warehouseId])
+      }
+
+      // Catat movement keluar di stock_movements (quantity negatif = keluar)
       await queryPostgres(`
-        UPDATE public.inventory_stocks
-        SET quantity = GREATEST(0, quantity - $1)
-        WHERE org_id = $2
-          AND product_id = $3
-          AND warehouse_id = $4
-      `, [item.quantity, orgId, item.product_id, warehouseId])
+        INSERT INTO public.stock_movements
+          (org_id, product_id, quantity, unit_price, reference_type, reference_id, notes, branch_id)
+        VALUES ($1, $2, $3, $4, 'WORKSHOP', $5, 'Pemakaian spare part bengkel', $6)
+        ON CONFLICT DO NOTHING
+      `, [orgId, item.product_id, -item.quantity, item.unit_price, workOrderId, branchId])
     } catch (err: any) {
-      errors.push(`Part ${item.product_id}: ${err.message}`)
+      // branch_id kolom mungkin belum ada, coba tanpa branch_id
+      try {
+        await queryPostgres(`
+          INSERT INTO public.stock_movements
+            (org_id, product_id, quantity, unit_price, reference_type, reference_id, notes)
+          VALUES ($1, $2, $3, $4, 'WORKSHOP', $5, 'Pemakaian spare part bengkel')
+          ON CONFLICT DO NOTHING
+        `, [orgId, item.product_id, -item.quantity, item.unit_price, workOrderId])
+      } catch (err2: any) {
+        errors.push(`Part ${item.product_id}: ${err2.message}`)
+      }
     }
   }
 
@@ -603,6 +631,30 @@ export async function deleteWorkshopServiceRate(orgId: string, rateId: string) {
   return { success: true }
 }
 
+// Buat pelanggan baru langsung dari konteks workshop (bypass membership check)
+export async function createWorkshopCustomer(orgId: string, formData: FormData) {
+  const { queryPostgres } = await import('@/lib/db/postgres')
+  const name = (formData.get('name') as string)?.trim()
+  const phone = (formData.get('phone') as string)?.trim() || null
+
+  if (!name) return { error: 'Nama pelanggan wajib diisi.' }
+
+  try {
+    const res = await queryPostgres<{ id: string; name: string }>(
+      `INSERT INTO public.contacts (org_id, name, type, phone, is_active)
+       VALUES ($1, $2, 'CUSTOMER', $3, true)
+       RETURNING id::text, name`,
+      [orgId, name, phone]
+    )
+    if (!res.rows[0]) return { error: 'Gagal membuat pelanggan.' }
+    revalidatePath('/contacts')
+    revalidatePath('/workshop')
+    return { data: res.rows[0] }
+  } catch (err: any) {
+    return { error: 'Gagal membuat pelanggan: ' + (err.message || '') }
+  }
+}
+
 // Ambil produk inventori (spare part) untuk lookup di form item SPK
 export async function getWorkshopPartProducts(orgId: string, branchId?: string | null) {
   try {
@@ -617,7 +669,7 @@ export async function getWorkshopPartProducts(orgId: string, branchId?: string |
        LEFT JOIN public.inventory_stocks s ON s.product_id = p.id AND s.org_id = p.org_id
          AND s.warehouse_id = (SELECT w.id FROM public.warehouses w WHERE w.org_id = $1 AND w.is_default = true LIMIT 1)
        WHERE p.org_id = $1
-         AND p.type IN ('INVENTORY', 'PART', 'SPAREPART')
+         AND p.type = 'INVENTORY'
          AND p.is_active = true
        GROUP BY p.id, p.name, p.sku, p.selling_price
        HAVING COALESCE(SUM(s.quantity), 0) > 0

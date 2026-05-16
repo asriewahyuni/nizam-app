@@ -462,10 +462,6 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
       return { error: 'Rekening tujuan transfer tidak ditemukan.' }
     }
 
-    if (targetBankAccount.branch_id !== activeBranchResult.branchId) {
-      return { error: 'Rekening tujuan transfer tidak tersedia pada unit aktif.' }
-    }
-
     if (targetBankAccount.id === bankAccount.id || targetBankAccount.account_id === bankAccount.account_id) {
       return { error: 'Rekening sumber dan tujuan transfer harus berbeda.' }
     }

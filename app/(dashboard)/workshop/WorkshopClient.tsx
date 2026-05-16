@@ -27,13 +27,13 @@ import {
   updateWorkOrderStatus,
   addWorkOrderItem,
   deleteWorkOrderItem,
+  createWorkshopCustomer,
 } from '@/modules/workshop/actions/workshop.actions'
 import { PageHeader, StatCard, StatusBadge, SafeButton, SectionCard, FormField, FormInput, FormSelect, FormTextarea } from '@/components/ui/NizamUI'
 import {
   getVehicleForSpkPrefill,
   createInvoiceFromWorkOrder,
 } from '@/modules/operational-bridge/actions/bridge.actions'
-import { createContact } from '@/modules/contacts/actions/contact.actions'
 import type {
   WorkshopWorkOrder,
   WorkshopVehicle,
@@ -490,11 +490,15 @@ function SpkCard({
   const [selectedProductId, setSelectedProductId] = useState('')
   const cfg = STATUS_CONFIG[order.status]
 
-  function resetItemForm() {
-    setItemType('JASA')
+  function resetItemFields() {
     setSelectedName('')
     setSelectedPrice(0)
     setSelectedProductId('')
+  }
+
+  function resetItemForm() {
+    setItemType('JASA')
+    resetItemFields()
   }
 
   function handleSelectRate(rateId: string) {
@@ -672,7 +676,7 @@ function SpkCard({
                           <button
                             key={t}
                             type="button"
-                            onClick={() => { setItemType(t); resetItemForm() }}
+                            onClick={() => { setItemType(t); resetItemFields() }}
                             className={`px-4 py-1.5 text-xs font-semibold rounded-xl border transition-all ${
                               itemType === t
                                 ? t === 'JASA' ? 'bg-blue-600 text-white border-blue-600' : 'bg-orange-500 text-white border-orange-500'
@@ -981,18 +985,16 @@ function AddCustomerInline({ orgId, onCreated }: {
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSave() {
     if (!name.trim()) return
     setLoading(true)
     const fd = new FormData()
     fd.set('name', name.trim())
-    fd.set('type', 'CUSTOMER')
     if (phone.trim()) fd.set('phone', phone.trim())
-    const res = await createContact(orgId, fd)
+    const res = await createWorkshopCustomer(orgId, fd)
     if (res.error) { alert(res.error); setLoading(false); return }
     if (res.data) {
-      onCreated({ id: (res.data as { id: string; name: string }).id, name: (res.data as { id: string; name: string }).name })
+      onCreated({ id: res.data.id, name: res.data.name })
       setName(''); setPhone(''); setShow(false)
     }
     setLoading(false)
@@ -1006,18 +1008,19 @@ function AddCustomerInline({ orgId, onCreated }: {
     )
   }
 
+  // Gunakan div, bukan form — karena komponen ini dirender di dalam form lain (nested form tidak valid di HTML)
   return (
-    <form onSubmit={handleSubmit} className="mt-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl space-y-2">
+    <div className="mt-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl space-y-2">
       <p className="text-[10px] font-black uppercase tracking-tight text-emerald-700">Pelanggan Baru</p>
-      <input value={name} onChange={e => setName(e.target.value)} placeholder="Nama *" required className={inputCls} />
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="Nama *" className={inputCls} />
       <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="No. HP (opsional)" className={inputCls} />
       <div className="flex gap-2">
-        <button type="submit" disabled={loading || !name.trim()} className="flex-1 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-xl disabled:opacity-50">
+        <button type="button" onClick={handleSave} disabled={loading || !name.trim()} className="flex-1 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-xl disabled:opacity-50">
           {loading ? 'Menyimpan...' : 'Simpan'}
         </button>
         <button type="button" onClick={() => { setShow(false); setName(''); setPhone('') }} className="px-3 py-1.5 text-xs text-slate-500 font-bold rounded-xl hover:bg-slate-100">Batal</button>
       </div>
-    </form>
+    </div>
   )
 }
 
