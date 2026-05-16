@@ -597,6 +597,16 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                     {canEstimateProfit ? formatRupiah(profitSharingBaseAmount) : 'Belum tersedia'}
                   </p>
                 </div>
+                {/* Peringatan: laba belum melampaui modal asal */}
+                {canEstimateProfit && profitSharingBaseAmount > 0 && totalCapital > 0 && profitSharingBaseAmount < totalCapital && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">
+                    <p className="text-xs font-black text-amber-800 uppercase tracking-wide">⚠ Tidak Disarankan Bagi Hasil</p>
+                    <p className="text-xs text-amber-700 leading-relaxed">
+                      Basis bagi hasil <span className="font-bold">{formatRupiah(profitSharingBaseAmount)}</span> belum melampaui total modal asal <span className="font-bold">{formatRupiah(totalCapital)}</span>.
+                      Dalam prinsip syirkah, distribusi laba sebaiknya dilakukan setelah keuntungan melebihi pokok modal.
+                    </p>
+                  </div>
+                )}
                 <div>
                   <span className="block text-xs font-bold text-slate-400">Rekening Pembayaran</span>
                   <p className="font-medium text-slate-700">
