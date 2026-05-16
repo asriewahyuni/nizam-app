@@ -66,6 +66,7 @@ interface NavGroup {
     module_key?: string
     saas_assessor_only?: boolean
     admin_only?: boolean
+    comingSoon?: boolean
   }[]
 }
 
@@ -110,7 +111,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Project Konstruksi', href: '/construction', icon: Building2, permission_key: 'construction,project,services', module_key: 'Project & Construction' },
       { label: 'LMS (Pelatihan Komersial)', href: '/lms', icon: GraduationCap, permission_key: 'learning', module_key: 'LMS' },
       { label: 'Panel Penilai', href: '/lms/assessment-center', icon: ShieldCheck, permission_key: 'learning:write', module_key: 'LMS', saas_assessor_only: true },
-      { label: 'Koperasi Syariah', href: '/koperasi', icon: Landmark, permission_key: 'koperasi', module_key: 'Koperasi Syariah' },
+      { label: 'Koperasi Syariah', href: '/koperasi', icon: Landmark, permission_key: 'koperasi', module_key: 'Koperasi Syariah', comingSoon: true },
     ]
   },
   {
@@ -449,6 +450,8 @@ export function AppSidebar({
     if (isDemo) return true
 
     // 1. SaaS Module Check
+    // Coming Soon items are always visible (regardless of enabled modules)
+    if (item.comingSoon) return true
     if (item.module_key && enabledModules.length > 0) {
       const matches = enabledModules.some((moduleName) => {
         const enabledLower = moduleName.trim().toLowerCase()
@@ -648,6 +651,31 @@ export function AppSidebar({
 
                       return (
                         <li key={`${group.group}:${item.label}:${item.href}`}>
+                          {item.comingSoon ? (
+                            <div
+                              className={`flex items-center rounded-2xl text-sm font-bold transition-all duration-200 group/item relative opacity-40 cursor-not-allowed
+                                ${effectiveIsCollapsed ? 'justify-center p-3' : 'justify-between px-4 py-3'}
+                                text-slate-400
+                              `}
+                              title={effectiveIsCollapsed ? `${item.label} (Segera Hadir)` : ''}
+                            >
+                              <div className="flex items-center gap-3.5 relative">
+                                <Icon
+                                  size={18}
+                                  strokeWidth={2}
+                                  className="shrink-0 text-slate-300"
+                                />
+                                {!effectiveIsCollapsed && (
+                                  <span className="tracking-tight truncate flex-1">{item.label}</span>
+                                )}
+                              </div>
+                              {!effectiveIsCollapsed && (
+                                <span className="text-[9px] font-bold text-amber-500 bg-amber-50 px-2 py-0.5 rounded-lg whitespace-nowrap">
+                                  Segera Hadir
+                                </span>
+                              )}
+                            </div>
+                          ) : (
                           <Link
                             href={item.module_key && pendingModules.includes(item.module_key) ? `/marketplace/setup/${item.module_key}` : item.href}
                             onMouseEnter={() => prefetchRoute(item.href)}
@@ -705,6 +733,7 @@ export function AppSidebar({
                               </div>
                             )}
                           </Link>
+                            )}
                         </li>
                       )
                     })}

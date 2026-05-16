@@ -47,6 +47,7 @@ export default async function MarketplacePage() {
   const instanceMap = new Map((instances as any[]).map(i => [i.module_key, i]))
 
   function getModuleState(mod: ModuleDefinition): ModuleState {
+    if (mod.comingSoon) return 'locked'
     const instance = instanceMap.get(mod.key) as any
     if (instance?.status === 'DISABLED') return 'inactive'
     const isEnabled = enabledModules.some(m => moduleNameMatches(m, mod.key))

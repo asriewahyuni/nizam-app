@@ -40,6 +40,7 @@ export type ModuleDefinition = {
   onboardingSteps: OnboardingStep[]
   tags?: string[]
   requires?: string[]
+  comingSoon?: boolean      // true = belum siap, tampilkan "Segera Hadir"
 }
 
 // ── FINANCE PILLAR ─────────────────────────────────────────────────────────
@@ -297,6 +298,7 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
     ],
     tags: ['koperasi', 'syariah', 'simpan-pinjam', 'murabahah', 'mudharabah'],
     requires: ['Finance', 'Accounting'],
+    comingSoon: true,
   },
 ]
 
