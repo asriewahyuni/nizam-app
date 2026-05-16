@@ -990,57 +990,51 @@ async function createOrganizationRecord(
       }
     }
 
-    // IF ABS, SEED COA + CREATE DEFAULT KAS UTAMA BANK ACCOUNT
+    // IF ABS, SEED COA + CREATE DEFAULT KAS UTAMA BANK ACCOUNT + ACTIVATE CORE MODULES
     if (isAbsFlow) {
       try {
-        await (privilegedDb as any).rpc('seed_default_coa', { p_org_id: orgId })
-        const { data: kasAccount } = await (privilegedDb as any)
-          .from('accounts')
-          .select('id')
-          .eq('org_id', orgId)
-          .eq('code', '1101')
-          .eq('is_active', true)
-          .maybeSingle()
-        if (kasAccount?.id) {
-          await (privilegedDb as any).from('bank_accounts').insert({
-            org_id: orgId,
-            branch_id: defaultBranchId,
-            account_id: kasAccount.id,
-            bank_name: 'Kas Utama',
-            account_number: null,
-            account_holder: null,
-            currency: 'IDR',
-            is_active: true,
-          })
+        const { queryPostgres: qp } = await import('@/lib/db/postgres')
+
+        // 1. Seed full PSAK CoA (SECURITY DEFINER — bypass RLS)
+        await qp('SELECT public.seed_default_coa($1::uuid)', [orgId])
+
+        // 2. Ambil akun Kas Besar (1101) yang baru di-seed
+        const kasResult = await qp<{ id: string }>(
+          `SELECT id FROM public.accounts WHERE org_id = $1 AND code = '1101' AND is_active = TRUE LIMIT 1`,
+          [orgId]
+        )
+        const kasAccountId = kasResult.rows[0]?.id ?? null
+
+        if (kasAccountId) {
+          // 3. Buat rekening Kas Utama
+          await qp(
+            `INSERT INTO public.bank_accounts (org_id, branch_id, account_id, bank_name, account_number, account_holder, currency, is_active)
+             VALUES ($1, $2, $3, 'Kas Utama', NULL, NULL, 'IDR', TRUE)
+             ON CONFLICT DO NOTHING`,
+            [orgId, defaultBranchId, kasAccountId]
+          )
+        }
+
+        // 4. Aktifkan modul inti ABS
+        const ABS_CORE_MODULES = ['Accounting', 'Finance', 'Inventory', 'Purchasing', 'Sales', 'CRM', 'HRIS', 'Reports']
+        const now = new Date().toISOString()
+
+        await qp(
+          `UPDATE public.organizations SET enabled_modules = $1::text[] WHERE id = $2`,
+          [ABS_CORE_MODULES, orgId]
+        )
+
+        if (ABS_CORE_MODULES.length > 0) {
+          const modulePlaceholders = ABS_CORE_MODULES.map((_, i) => `($1, $${i + 2}, 'READY', $${ABS_CORE_MODULES.length + 2})`).join(', ')
+          await qp(
+            `INSERT INTO public.org_module_instances (org_id, module_key, status, ready_at)
+             VALUES ${modulePlaceholders}
+             ON CONFLICT (org_id, module_key) DO UPDATE SET status = 'READY', ready_at = EXCLUDED.ready_at`,
+            [orgId, ...ABS_CORE_MODULES, now]
+          )
         }
       } catch (absSetupErr) {
-        ;(console as any).warn('ABS Setup: CoA/rekening default gagal di-seed (non-fatal)', absSetupErr)
-      }
-    }
-
-    // IF ABS, AUTO-ACTIVATE CORE MODULES
-    if (isAbsFlow) {
-      const ABS_CORE_MODULES = ['Accounting', 'Finance', 'Inventory', 'Purchasing', 'Sales', 'CRM', 'HRIS', 'Reports']
-      try {
-        const now = new Date().toISOString()
-        await Promise.all([
-          (privilegedDb as any)
-            .from('organizations')
-            .update({ enabled_modules: ABS_CORE_MODULES })
-            .eq('id', orgId),
-          (privilegedDb as any)
-            .from('org_module_instances')
-            .insert(
-              ABS_CORE_MODULES.map((key) => ({
-                org_id: orgId,
-                module_key: key,
-                status: 'READY',
-                ready_at: now,
-              }))
-            ),
-        ])
-      } catch (absModuleErr) {
-        ;(console as any).warn('ABS Setup: aktivasi modul inti gagal (non-fatal)', absModuleErr)
+        ;(console as any).error('ABS Setup: gagal seed CoA/rekening/modul (non-fatal)', absSetupErr)
       }
     }
 
