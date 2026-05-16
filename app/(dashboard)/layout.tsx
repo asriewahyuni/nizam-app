@@ -22,6 +22,7 @@ import { EduModeShell } from '@/components/edu/EduModeShell'
 import { hasEnabledModuleAccess, hasPosOnlyAccess } from '@/modules/organization/lib/navigation-access'
 import { getSaasAssessorContext } from '@/modules/edu/lib/assessment-access.server'
 import { getOrgModuleInstances } from '@/modules/marketplace/actions/marketplace.actions'
+import { getModuleByKey } from '@/modules/marketplace/lib/module-registry'
 
 type RouteModuleEntry = {
   path: string
@@ -210,7 +211,9 @@ export default async function DashboardLayout({
         }}
         permissions={orgData.permissions}
         enabledModules={orgData.enabledModules}
-        pendingModules={(moduleInstances as any[]).filter(i => i.status !== 'READY').map(i => i.module_key)}
+        pendingModules={(moduleInstances as any[])
+          .filter(i => i.status !== 'READY' && ['business_type', 'addon', 'syirkah'].includes(getModuleByKey(i.module_key)?.category ?? ''))
+          .map(i => i.module_key)}
         isDemo={isDemo}
         planName={effectivePlanName}
         canManageSubOrganizations={canManageSubOrganizations}
