@@ -494,6 +494,15 @@ export async function getCurrentUserKoperasiRole(orgId?: string) {
   }
 }
 
+// ── GET ACTIVE ORG ID ──────────────────────────────────────────────────────
+
+export async function getActiveOrgId(): Promise<string | null> {
+  const { getActiveOrg } = await import('@/modules/organization/actions/org.actions')
+  const orgData = await getActiveOrg()
+  if (!orgData?.org) return null
+  return orgData.org.id
+}
+
 // ── DASHBOARD ────────────────────────────────────────────────────────────────
 
 export async function getDashboardStats(orgId: string) {

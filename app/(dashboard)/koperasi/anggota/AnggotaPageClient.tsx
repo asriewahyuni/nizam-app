@@ -20,15 +20,24 @@ async function api(action: string, params: any[] = []) {
   return data
 }
 
-export default function AnggotaPageClient({ orgId }: { orgId: string }) {
+export default function AnggotaPageClient() {
   const [anggota, setAnggota] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ nama: '', nik: '', alamat: '', no_telepon: '', email: '', status: 'AKTIF' })
   const [editId, setEditId] = useState<string | null>(null)
+  const [orgId, setOrgId] = useState<string | null>(null)
+
+  // Fetch orgId from API (same pattern as dashboard — server component doesn't pass props)
+  useEffect(() => {
+    api('getActiveOrgId', []).then((id) => {
+      setOrgId(id)
+    }).catch(() => setError('Gagal memuat data organisasi'))
+  }, [])
 
   const loadAnggota = useCallback(async () => {
+    if (!orgId) return
     try {
       const d = await api('getAnggota', [orgId])
       setAnggota(d)
@@ -39,11 +48,22 @@ export default function AnggotaPageClient({ orgId }: { orgId: string }) {
     }
   }, [orgId])
 
-  useEffect(() => { loadAnggota() }, [loadAnggota])
+  useEffect(() => {
+    if (orgId) loadAnggota()
+  }, [orgId, loadAnggota])
+
+  // Show loading while orgId hasn't resolved yet
+  if (!orgId && !error) {
+    return <div className="space-y-4">
+      <PageHeader title="Anggota Koperasi" subtitle="Data anggota dan status keanggotaan" />
+      <SectionCard><div className="text-slate-500 p-4">Memuat...</div></SectionCard>
+    </div>
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     try {
+      if (!orgId) return
       if (editId) {
         await api('updateAnggota', [editId, form])
       } else {
@@ -129,18 +149,20 @@ export default function AnggotaPageClient({ orgId }: { orgId: string }) {
           <FormField label="Email">
             <FormInput type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="email@example.com" />
           </FormField>
-          <FormField label="Alamat">
-            <FormInput value={form.alamat} onChange={e => setForm({ ...form, alamat: e.target.value })} placeholder="Alamat lengkap" />
-          </FormField>
-          <FormField label="Status">
-            <FormSelect value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-              <option value="AKTIF">Aktif</option>
-              <option value="NONAKTIF">Nonaktif</option>
-              <option value="KELUAR">Keluar</option>
-            </FormSelect>
-          </FormField>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField label="Alamat">
+              <FormInput value={form.alamat} onChange={e => setForm({ ...form, alamat: e.target.value })} placeholder="Alamat lengkap" />
+            </FormField>
+            <FormField label="Status">
+              <FormSelect value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+                <option value="AKTIF">Aktif</option>
+                <option value="NONAKTIF">Non-Aktif</option>
+                <option value="KELUAR">Keluar</option>
+              </FormSelect>
+            </FormField>
+          </div>
           <div className="flex justify-end gap-2 pt-2">
-            <SafeButton variant="ghost" type="button" onClick={() => setShowForm(false)}>Batal</SafeButton>
+            <SafeButton type="button" variant="secondary" onClick={() => setShowForm(false)}>Batal</SafeButton>
             <SafeButton type="submit">{editId ? 'Simpan' : 'Tambah Anggota'}</SafeButton>
           </div>
         </form>

@@ -473,14 +473,14 @@ export function FormField({ label, error, hint, required, children, className = 
 }
 
 interface FormInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label: string
+  label?: string
   error?: string
   hint?: string
 }
 
 export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
   ({ label, error, hint, required, className = '', id, ...props }, ref) => {
-    const inputId = id || `input-${label.toLowerCase().replace(/\s+/g, '-')}`
+    const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined)
     return (
       <FormField label={label} error={error} hint={hint} required={required}>
         <input
@@ -496,16 +496,16 @@ export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
 FormInput.displayName = 'FormInput'
 
 interface FormSelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  label: string
+  label?: string
   error?: string
   hint?: string
-  options: Array<{ value: string; label: string }>
+  options?: { value: string; label: string }[]
   placeholder?: string
 }
 
 export const FormSelect = React.forwardRef<HTMLSelectElement, FormSelectProps>(
   ({ label, error, hint, required, options, placeholder, className = '', id, ...props }, ref) => {
-    const selectId = id || `select-${label.toLowerCase().replace(/\s+/g, '-')}`
+    const selectId = id || (label ? `select-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined)
     return (
       <FormField label={label} error={error} hint={hint} required={required}>
         <select
@@ -527,14 +527,14 @@ export const FormSelect = React.forwardRef<HTMLSelectElement, FormSelectProps>(
 FormSelect.displayName = 'FormSelect'
 
 interface FormTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
-  label: string
+  label?: string
   error?: string
   hint?: string
 }
 
 export const FormTextarea = React.forwardRef<HTMLTextAreaElement, FormTextareaProps>(
   ({ label, error, hint, required, className = '', id, ...props }, ref) => {
-    const textareaId = id || `textarea-${label.toLowerCase().replace(/\s+/g, '-')}`
+    const textareaId = id || (label ? `textarea-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined)
     return (
       <FormField label={label} error={error} hint={hint} required={required}>
         <textarea

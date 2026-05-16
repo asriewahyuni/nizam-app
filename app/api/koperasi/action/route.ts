@@ -14,6 +14,7 @@ import {
   getMurabahahTransaksi, createMurabahahTransaksi,
   getAkadWakalah, createAkadWakalah,
   getDashboardStats,
+  getActiveOrgId,
 } from '@/modules/koperasi/actions/koperasi.actions'
 import {
   generateProjectCoa, getProjectCoa, getProjectJournal,
@@ -41,6 +42,7 @@ const ACTION_MAP: Record<string, Function> = {
   getMurabahahTransaksi, createMurabahahTransaksi,
   getAkadWakalah, createAkadWakalah,
   getDashboardStats,
+  getActiveOrgId,
   generateProjectCoa, getProjectCoa, getProjectJournal,
   createProjectJournalEntry, getProjectBalanceSheet, getProjectProfitLoss,
   hitungBagiHasil, getBagiHasil, konfirmasiBagiHasil,
