@@ -170,6 +170,42 @@ export async function generatePayrollRun(orgId: string, formData: FormData) {
 }
 
 
+export async function recalculatePayrollRun(runId: string, orgId: string) {
+  const supabase = await createClient()
+  const db = supabase as any
+
+  const { data: run, error: runError } = await db
+    .from('payroll_runs')
+    .select('id, branch_id, status')
+    .eq('id', runId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (runError) return { error: runError.message }
+
+  const accessibleRun = await ensurePayrollBranchAccess(orgId, run?.branch_id ?? null, 'Payroll run tidak ditemukan.')
+  if ('error' in accessibleRun) return { error: accessibleRun.error }
+
+  if (run?.status !== 'DRAFT') return { error: 'Hanya payroll run dengan status DRAFT yang bisa dikalkulasi ulang.' }
+
+  const { data: slipCount, error: genErr } = await (db as any).rpc('generate_payslips_for_run', { p_run_id: runId })
+  if (genErr) return { error: 'Gagal kalkulasi ulang: ' + genErr.message }
+
+  revalidatePath('/hris')
+
+  const count = Number(slipCount ?? 0)
+  if (count === 0) {
+    return { success: true, warning: 'Kalkulasi selesai, tetapi tidak ada karyawan yang ditemukan untuk unit ini.' }
+  }
+
+  const { data: updatedRun } = await db.from('payroll_runs').select('total_net').eq('id', runId).single()
+  if (updatedRun && Number(updatedRun.total_net ?? 0) === 0) {
+    return { success: true, warning: `${count} slip dibuat, tetapi Total Gaji Netto masih 0. Periksa gaji pokok karyawan.` }
+  }
+
+  return { success: true }
+}
+
 export async function payPayrollRun(runId: string, orgId: string, accountId: string) {
   const supabase = await createClient()
   const db = supabase as any

@@ -37,12 +37,13 @@ import {
   AlertCircle,
   Key,
   FileText,
-  MessageCircle
+  MessageCircle,
+  RefreshCw
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useActiveOrgId } from '@/lib/hooks/useActiveOrgId'
 import { createEmployee, deleteEmployee, resignEmployee, transferEmployeeToChildOrg, updateEmployee } from '@/modules/hris/actions/employee.actions'
-import { createPayrollComponent, deletePayrollComponent, generatePayrollRun, payPayrollRun, fixEmptyPayrollJournals, getPayrollRunDetails, deletePayrollRun, voidPayrollRun } from '@/modules/hris/actions/payroll.actions'
+import { createPayrollComponent, deletePayrollComponent, generatePayrollRun, recalculatePayrollRun, payPayrollRun, fixEmptyPayrollJournals, getPayrollRunDetails, deletePayrollRun, voidPayrollRun } from '@/modules/hris/actions/payroll.actions'
 import { upsertAttendanceRecord } from '@/modules/hris/actions/attendance.actions'
 import { approveLeaveRequest, createLeaveRequest, rejectLeaveRequest } from '@/modules/hris/actions/leave.actions'
 import {
@@ -1546,6 +1547,22 @@ export default function HrisClient({
 
                             {run.status === 'DRAFT' ? (
                               <>
+                                <button
+                                  title="Kalkulasi ulang payslip"
+                                  onClick={async () => {
+                                    setLoading(true)
+                                    const res = await recalculatePayrollRun(run.id, orgId)
+                                    setLoading(false)
+                                    if (res.error) showToast(res.error, 'error')
+                                    else {
+                                      if ((res as any).warning) sessionStorage.setItem('hris_payroll_warning', (res as any).warning)
+                                      window.location.reload()
+                                    }
+                                  }}
+                                  className="w-10 h-10 flex items-center justify-center bg-white text-slate-400 rounded-xl hover:text-blue-600 hover:shadow-lg transition-all border border-slate-100"
+                                >
+                                  <RefreshCw size={16} />
+                                </button>
                                 <SafeButton
                                   onClick={() => setIsPayModalOpen(run)}
                                   variant="emerald"
