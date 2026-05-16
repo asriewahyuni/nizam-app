@@ -1387,6 +1387,44 @@ export async function voidJournalEntry(
 }
 
 // ─────────────────────────────────────────────────────────────
+// unvoidJournalEntry — Kembalikan jurnal VOIDED ke POSTED
+// ─────────────────────────────────────────────────────────────
+export async function unvoidJournalEntry(entryId: string, orgId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Tidak terautentikasi.' }
+
+  const { data: entry, error: entryError } = await (supabase as any)
+    .from('journal_entries')
+    .select('status, entry_number')
+    .eq('id', entryId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (entryError) return { error: entryError.message || 'Gagal membaca jurnal.' }
+  if (!entry) return { error: 'Jurnal tidak ditemukan.' }
+  if (String(entry.status || '').toUpperCase() !== 'VOIDED') {
+    return { error: 'Hanya jurnal VOIDED yang dapat dikembalikan.' }
+  }
+
+  const { error } = await (supabase as any)
+    .from('journal_entries')
+    .update({
+      status: 'POSTED',
+      voided_at: null,
+      voided_by: null,
+      void_reason: null,
+    })
+    .eq('id', entryId)
+    .eq('org_id', orgId)
+
+  if (error) return { error: error.message || 'Gagal mengembalikan jurnal dari void.' }
+
+  revalidateAfterJournalMutation()
+  return { success: true }
+}
+
+// ─────────────────────────────────────────────────────────────
 // deleteJournalEntry — Soft-delete (Hidden from UI)
 // ─────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────

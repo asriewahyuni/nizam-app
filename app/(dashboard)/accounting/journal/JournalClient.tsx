@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { Plus, X, Trash2, Download, FileText, Filter, History, CheckCircle2, AlertCircle, Wallet, ListChecks, FilePlus } from 'lucide-react'
 import { PageHeader, StatCard, SectionCard, SectionHeader, StatusBadge, SafeButton } from '@/components/ui/NizamUI'
-import { createJournalEntry, postJournalEntry, voidJournalEntry, hardDeleteDraftJournal } from '@/modules/accounting/actions/journal.actions'
+import { createJournalEntry, postJournalEntry, voidJournalEntry, unvoidJournalEntry, hardDeleteDraftJournal } from '@/modules/accounting/actions/journal.actions'
 import { CurrencyInput } from '@/components/ui/CurrencyInput'
 import { motion, AnimatePresence } from 'framer-motion'
 import { formatRupiah } from '@/lib/utils'
@@ -201,6 +201,13 @@ export default function JournalClient({
     const reason = prompt("Alasan membatalkan jurnal ini:")
     if (!reason) return
     const res = await voidJournalEntry(id, orgId, reason)
+    if (res.error) alert(res.error)
+    else window.location.reload()
+  }
+
+  const handleUnvoid = async (id: string) => {
+    if (!confirm("Kembalikan jurnal ini dari VOID ke POSTED?")) return
+    const res = await unvoidJournalEntry(id, orgId)
     if (res.error) alert(res.error)
     else window.location.reload()
   }
@@ -491,7 +498,17 @@ export default function JournalClient({
 	                            </SafeButton>
 	                          )}
                           {entry.status === 'VOIDED' && (
-                            <span className="text-[10px] font-black text-rose-300 uppercase italic tracking-[0.2em] px-3 py-1 border border-rose-100 rounded-lg">Voided</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black text-rose-300 uppercase italic tracking-[0.2em] px-3 py-1 border border-rose-100 rounded-lg">Voided</span>
+                              <SafeButton
+                                variant="ghost"
+                                size="sm"
+                                className="text-emerald-600 hover:bg-emerald-50 border-emerald-100"
+                                onClick={() => handleUnvoid(entry.id)}
+                              >
+                                Kembalikan
+                              </SafeButton>
+                            </div>
                           )}
 	                       </div>
 	                    </td>
