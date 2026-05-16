@@ -174,8 +174,14 @@ export default function ReportsClient({
     () => buildBalanceTreeRows(balanceSheet?.liabilities || [], showEmptyAccounts),
     [balanceSheet?.liabilities, showEmptyAccounts]
   )
+  // Akun 3002 (Laba Ditahan) dan 3004 (Prive/Dividen) disembunyikan di neraca syariah —
+  // fungsinya digantikan oleh akun Syirkah (3110, 3120, 3130).
+  const SYARIAH_HIDDEN_EQUITY_CODES = ['3002', '3004']
+  const syariahEquity = (balanceSheet?.equity || []).filter(
+    (acc: any) => !SYARIAH_HIDDEN_EQUITY_CODES.includes(String(acc?.code || ''))
+  )
   const equityTreeRows = useMemo(
-    () => buildBalanceTreeRows(balanceSheet?.equity || [], showEmptyAccounts),
+    () => buildBalanceTreeRows(syariahEquity, showEmptyAccounts),
     [balanceSheet?.equity, showEmptyAccounts]
   )
 
@@ -575,9 +581,6 @@ export default function ReportsClient({
                     {/* Equity */}
                     <div className="space-y-2">
                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Modal</p>
-                       <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
-                         Akun <span className="font-mono font-black">3002</span> menampung laba/rugi periode lampau atau periode yang sudah ditutup, sedangkan <span className="font-mono font-black">3003</span> menampung laba/rugi periode berjalan. Beban utilitas tetap dicatat di laba rugi, lalu dampaknya mengurangi laba periode berjalan di neraca.
-                       </p>
                        {renderBalanceRows(equityTreeRows)}
                     </div>
                     
@@ -586,7 +589,7 @@ export default function ReportsClient({
                       <span className="font-black text-lg">
                         {formatRupiah(
                           balanceSheet.liabilities.reduce((s:any, x:any) => s + (x.balance || 0), 0) +
-                          balanceSheet.equity.reduce((s:any, x:any) => s + (x.balance || 0), 0)
+                          syariahEquity.reduce((s:any, x:any) => s + (x.balance || 0), 0)
                         )}
                       </span>
                     </div>
