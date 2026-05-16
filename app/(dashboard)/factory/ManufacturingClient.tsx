@@ -1072,8 +1072,13 @@ export function ManufacturingClient({
                   </div>
 
                   {(() => {
-                    const rawMaterialCost = selectedWo?.bom?.items?.reduce((sum: number, item: any) => {
-                      const cost = item.product?.average_cost || item.product?.purchase_price || 0;
+                    const bomItems: any[] = selectedWo?.bom?.items || []
+                    const missingCostItems = bomItems.filter((item: any) =>
+                      !item.product?.average_cost && !item.product?.purchase_price
+                    )
+
+                    const rawMaterialCost = bomItems.reduce((sum: number, item: any) => {
+                      const cost = Number(item.product?.average_cost || item.product?.purchase_price || 0)
                       let qtyPerUnit = Number(item.quantity || 0)
                       try {
                         qtyPerUnit = convertQuantityBetweenUnits(
@@ -1084,8 +1089,8 @@ export function ManufacturingClient({
                       } catch {
                         qtyPerUnit = Number(item.quantity || 0)
                       }
-                      return sum + (qtyPerUnit * selectedWo.quantity_planned * cost)
-                    }, 0) || 0
+                      return sum + (qtyPerUnit * Number(selectedWo.quantity_planned) * cost)
+                    }, 0)
                     const totalOverhead = overheadCosts.reduce((s, c) => s + c.amount, 0)
                     const grandTotalHPP = rawMaterialCost + totalOverhead
                     const qtyPlanned = selectedWo?.quantity_planned || 1
@@ -1096,6 +1101,16 @@ export function ManufacturingClient({
 
                     return (
                       <div className="pt-4 border-t border-slate-100 space-y-3">
+                        {missingCostItems.length > 0 && (
+                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
+                            <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">⚠ Bahan berikut belum memiliki harga — biaya bahan = Rp 0:</p>
+                            {missingCostItems.map((item: any, i: number) => (
+                              <p key={i} className="text-[10px] text-amber-700 font-medium pl-2">
+                                • {item.product?.name || item.product_id} — atur harga di Master Produk atau lakukan Penerimaan PO terlebih dahulu.
+                              </p>
+                            ))}
+                          </div>
+                        )}
                         <div className="flex justify-between items-center text-xs">
                           <span className="text-slate-500">Total Biaya Tambahan:</span>
                           <span className="font-bold text-slate-700">{formatRupiah(totalOverhead)}</span>
