@@ -87,7 +87,8 @@ export default function ShuClient({ orgId }: { orgId: string }) {
           </div>
 
           {/* SHU Allocation */}
-          <SectionCard title="Alokasi SHU">
+          <SectionCard>
+            <h3 className="text-sm font-black text-slate-800 mb-2">Alokasi SHU</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
               {Object.entries(ALOKASI_LABEL).map(([key, meta]) => {
                 const amount = (result.alokasi as any)[key] || 0
@@ -108,7 +109,8 @@ export default function ShuClient({ orgId }: { orgId: string }) {
 
           {/* SHU Per Anggota */}
           {result.shuPerAnggota?.length > 0 && (
-            <SectionCard title={`Distribusi SHU ke Anggota (${result.shuPerAnggota.length} penerima)`}>
+            <SectionCard>
+              <h3 className="text-sm font-black text-slate-800 mb-2">Distribusi SHU ke Anggota ({result.shuPerAnggota.length} penerima)</h3>
               <div className="max-h-64 overflow-y-auto mt-2">
                 <table className="w-full text-xs">
                   <thead>
@@ -135,7 +137,8 @@ export default function ShuClient({ orgId }: { orgId: string }) {
           )}
 
           {/* Summary */}
-          <SectionCard title="Ringkasan">
+          <SectionCard>
+            <h3 className="text-sm font-black text-slate-800 mb-2">Ringkasan SHU</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="p-3 rounded-xl bg-slate-50">
                 <div className="text-xs text-slate-400">Total Anggota Aktif</div>

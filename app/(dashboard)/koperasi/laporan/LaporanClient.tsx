@@ -58,7 +58,8 @@ export default function LaporanClient({ orgId }: { orgId: string }) {
 
       {/* Proyek Selesai — Bagi Hasil */}
       {proyekSelesai.length > 0 && (
-        <SectionCard title="Proyek Selesai — Siap Bagi Hasil">
+        <SectionCard>
+          <h3 className="text-sm font-black text-slate-800 mb-2">Proyek Selesai — Siap Bagi Hasil</h3>
           <div className="space-y-2 mt-2">
             {proyekSelesai.map((p: any) => (
               <div key={p.id} className="p-3 rounded-lg bg-slate-50 border border-slate-200">
