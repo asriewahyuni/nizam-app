@@ -59,9 +59,9 @@ export default function AbsClient({ status }: { status: VoucherStatus }) {
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center gap-6 mb-12 bg-white/80 backdrop-blur-md px-8 py-4 rounded-[32px] shadow-sm border border-slate-100"
         >
-          <img src="/logos/abs_logo.png" alt="ABS" className="h-10 object-contain" />
+          <img src="/logos/abs_logo.jpeg" alt="ABS" className="h-10 object-contain" />
           <div className="h-6 w-px bg-slate-200" />
-          <img src="/logos/core_logo.png" alt="CORe ISEC" className="h-6 object-contain" />
+          <img src="/logos/core_logo.webp" alt="CORe ISEC" className="h-6 object-contain" />
         </motion.div>
 
         {/* Main Ticket */}
