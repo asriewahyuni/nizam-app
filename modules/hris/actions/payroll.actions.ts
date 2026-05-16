@@ -218,8 +218,23 @@ export async function recalculatePayrollRun(runId: string, orgId: string) {
 
   const { data: updatedRun } = await db.from('payroll_runs').select('total_net').eq('id', runId).single()
   if (updatedRun && Number(updatedRun.total_net ?? 0) === 0) {
-    const names = empList.map(e => `${e.first_name} ${e.last_name} (Rp ${Number(e.basic_salary).toLocaleString('id-ID')})`).join(', ')
-    return { success: true, warning: `${count} slip dibuat, Total Netto masih 0. Gaji di DB: ${names}` }
+    // Diagnostic: show payslip_lines to find what's causing net = 0
+    const linesCheck = await qp<{ component_name: string; type: string; amount: string }>(
+      `SELECT pl.component_name, pl.type, pl.amount
+       FROM public.payslip_lines pl
+       JOIN public.payslips ps ON pl.payslip_id = ps.id
+       WHERE ps.run_id = $1
+       ORDER BY pl.type, pl.component_name
+       LIMIT 20`,
+      [runId]
+    )
+    const linesSummary = linesCheck.rows
+      .map(l => `${l.component_name} (${l.type}): Rp ${Number(l.amount).toLocaleString('id-ID')}`)
+      .join(' | ')
+    return {
+      success: true,
+      warning: `${count} slip dibuat, Total Netto masih 0. Komponen: ${linesSummary || '(tidak ada)'}`
+    }
   }
 
   return { success: true }
