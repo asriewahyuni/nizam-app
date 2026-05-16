@@ -604,7 +604,7 @@ export default function SyirkahDetailClient({ orgId, contract, members, netProfi
                   if (!isOperational || totalCapital <= 0 || basisForWarning >= totalCapital) return null
                   return (
                     <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">
-                      <p className="text-xs font-black text-amber-800 uppercase tracking-wide">⚠ Tidak Disarankan Bagi Hasil</p>
+                      <p className="text-xs font-black text-amber-800 uppercase tracking-wide">⚠ Belum Dibolehkan Bagi Hasil</p>
                       <p className="text-xs text-amber-700 leading-relaxed">
                         {canEstimateProfit
                           ? <>Basis bagi hasil <span className="font-bold">{formatRupiah(profitSharingBaseAmount)}</span> belum melampaui total modal asal <span className="font-bold">{formatRupiah(totalCapital)}</span>.</>

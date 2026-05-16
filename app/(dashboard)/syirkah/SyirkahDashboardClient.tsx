@@ -211,7 +211,7 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
           <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex gap-3 items-start">
             <span className="text-amber-500 mt-0.5 text-base leading-none">⚠</span>
             <div className="space-y-0.5">
-              <p className="text-xs font-black text-amber-800 uppercase tracking-wide">Tidak Disarankan Bagi Hasil</p>
+              <p className="text-xs font-black text-amber-800 uppercase tracking-wide">Belum Dibolehkan Bagi Hasil</p>
               <p className="text-xs text-amber-700 leading-relaxed">
                 Total net profit <span className="font-bold">{formatRupiah(Number(netProfit || 0))}</span> belum melampaui
                 total modal asal <span className="font-bold">{formatRupiah(totalCapitalAllContracts)}</span>.
