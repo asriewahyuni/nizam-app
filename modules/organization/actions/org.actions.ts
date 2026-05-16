@@ -990,6 +990,34 @@ async function createOrganizationRecord(
       }
     }
 
+    // IF ABS, SEED COA + CREATE DEFAULT KAS UTAMA BANK ACCOUNT
+    if (isAbsFlow) {
+      try {
+        await (privilegedDb as any).rpc('seed_default_coa', { p_org_id: orgId })
+        const { data: kasAccount } = await (privilegedDb as any)
+          .from('accounts')
+          .select('id')
+          .eq('org_id', orgId)
+          .eq('code', '1101')
+          .eq('is_active', true)
+          .maybeSingle()
+        if (kasAccount?.id) {
+          await (privilegedDb as any).from('bank_accounts').insert({
+            org_id: orgId,
+            branch_id: defaultBranchId,
+            account_id: kasAccount.id,
+            bank_name: 'Kas Utama',
+            account_number: null,
+            account_holder: null,
+            currency: 'IDR',
+            is_active: true,
+          })
+        }
+      } catch (absSetupErr) {
+        ;(console as any).warn('ABS Setup: CoA/rekening default gagal di-seed (non-fatal)', absSetupErr)
+      }
+    }
+
     if (shouldClaimTrial) {
       const trialClaimResult = await recordTrialClaim(privilegedDb, {
         authUserId: user.id,
