@@ -107,6 +107,35 @@ export async function getPayrollRuns(orgId: string, branchId?: string | null) {
   return data
 }
 
+async function fixPayslipTotals(runId: string) {
+  const { queryPostgres: qp } = await import('@/lib/db/postgres')
+  // Recompute gross_salary / net_salary from payslip_lines (fixes old DB function bug)
+  await qp(
+    `UPDATE public.payslips ps SET
+       gross_salary     = ps.basic_salary + COALESCE(
+         (SELECT SUM(pl.amount) FROM public.payslip_lines pl
+          WHERE pl.payslip_id = ps.id AND pl.type IN ('EARNING','BENEFIT') AND pl.component_name != 'Gaji Pokok'), 0),
+       total_deductions = COALESCE(
+         (SELECT SUM(pl.amount) FROM public.payslip_lines pl
+          WHERE pl.payslip_id = ps.id AND pl.type IN ('DEDUCTION','TAX')), 0),
+       net_salary       = ps.basic_salary
+         + COALESCE((SELECT SUM(pl.amount) FROM public.payslip_lines pl
+            WHERE pl.payslip_id = ps.id AND pl.type IN ('EARNING','BENEFIT') AND pl.component_name != 'Gaji Pokok'), 0)
+         - COALESCE((SELECT SUM(pl.amount) FROM public.payslip_lines pl
+            WHERE pl.payslip_id = ps.id AND pl.type IN ('DEDUCTION','TAX')), 0)
+     WHERE ps.run_id = $1`,
+    [runId]
+  )
+  await qp(
+    `UPDATE public.payroll_runs SET
+       total_gross      = COALESCE((SELECT SUM(gross_salary)      FROM public.payslips WHERE run_id = $1), 0),
+       total_deductions = COALESCE((SELECT SUM(total_deductions)  FROM public.payslips WHERE run_id = $1), 0),
+       total_net        = COALESCE((SELECT SUM(net_salary)        FROM public.payslips WHERE run_id = $1), 0)
+     WHERE id = $1`,
+    [runId]
+  )
+}
+
 export async function generatePayrollRun(orgId: string, formData: FormData) {
   const supabase = await createClient()
   const activeBranch = await requirePayrollRunBranch(
@@ -114,12 +143,11 @@ export async function generatePayrollRun(orgId: string, formData: FormData) {
     'Pilih unit aktif terlebih dahulu untuk membuat payroll run.'
   )
   if ('error' in activeBranch) return { error: activeBranch.error }
-  
+
   const periodStart = formData.get('period_start') as string
   const periodEnd = formData.get('period_end') as string
   const paymentDate = formData.get('payment_date') as string
 
-  // 1. Create the Run Header
   const { data: run, error: runErr } = await (supabase as any)
     .from('payroll_runs')
     .insert({
@@ -135,37 +163,24 @@ export async function generatePayrollRun(orgId: string, formData: FormData) {
 
   if (runErr) return { error: runErr.message }
 
-  // 2. Execute SQL generation function
   const { data: slipCount, error: genErr } = await (supabase as any).rpc('generate_payslips_for_run', {
     p_run_id: run.id
   })
 
   if (genErr) return { error: 'Gagal memproses payslip: ' + genErr.message }
 
-  revalidatePath('/hris')
-
   const count = Number(slipCount ?? 0)
   if (count === 0) {
+    revalidatePath('/hris')
     return {
       success: true,
       warning: `Payroll run berhasil dibuat, tetapi tidak ada karyawan yang ditemukan untuk unit ini. Pastikan data karyawan sudah ditambahkan dan berada di unit yang sama dengan payroll run ini.`
     }
   }
 
-  // Re-fetch the run to check if total_net is still 0 despite having payslips
-  const { data: updatedRun } = await (supabase as any)
-    .from('payroll_runs')
-    .select('total_net')
-    .eq('id', run.id)
-    .single()
-
-  if (updatedRun && Number(updatedRun.total_net ?? 0) === 0) {
-    return {
-      success: true,
-      warning: `${count} slip gaji berhasil dibuat, tetapi Total Gaji Netto adalah 0. Pastikan gaji pokok karyawan sudah diisi dengan benar di data karyawan.`
-    }
-  }
-
+  // Patch: recompute totals from payslip_lines to fix potential old-function bug
+  await fixPayslipTotals(run.id)
+  revalidatePath('/hris')
   return { success: true }
 }
 
@@ -188,7 +203,7 @@ export async function recalculatePayrollRun(runId: string, orgId: string) {
 
   if (run?.status !== 'DRAFT') return { error: 'Hanya payroll run dengan status DRAFT yang bisa dikalkulasi ulang.' }
 
-  // Fetch employee salaries for this run's branch before recalculating
+  // Check if all employees have basic_salary = 0 before generating
   const { queryPostgres: qp } = await import('@/lib/db/postgres')
   const empCheck = await qp<{ first_name: string; last_name: string; basic_salary: string }>(
     `SELECT first_name, last_name, basic_salary FROM public.employees
@@ -201,14 +216,14 @@ export async function recalculatePayrollRun(runId: string, orgId: string) {
   const { data: slipCount, error: genErr } = await (db as any).rpc('generate_payslips_for_run', { p_run_id: runId })
   if (genErr) return { error: 'Gagal kalkulasi ulang: ' + genErr.message }
 
-  revalidatePath('/hris')
-
   const count = Number(slipCount ?? 0)
   if (count === 0) {
+    revalidatePath('/hris')
     return { success: true, warning: 'Kalkulasi selesai, tetapi tidak ada karyawan yang ditemukan untuk unit ini.' }
   }
 
   if (allZero) {
+    revalidatePath('/hris')
     const names = empList.map(e => `${e.first_name} ${e.last_name}`).join(', ')
     return {
       success: true,
@@ -216,30 +231,10 @@ export async function recalculatePayrollRun(runId: string, orgId: string) {
     }
   }
 
-  // Diagnostic: query actual payslip and run values directly from DB
-  const [slipsRaw, runRaw] = await Promise.all([
-    qp<{ basic_salary: string; gross_salary: string; total_deductions: string; net_salary: string }>(
-      `SELECT basic_salary, gross_salary, total_deductions, net_salary FROM public.payslips WHERE run_id = $1`,
-      [runId]
-    ),
-    qp<{ total_gross: string; total_deductions: string; total_net: string }>(
-      `SELECT total_gross, total_deductions, total_net FROM public.payroll_runs WHERE id = $1`,
-      [runId]
-    ),
-  ])
-  const fmt = (v: string) => `Rp ${Number(v).toLocaleString('id-ID')}`
-  const slipsSummary = slipsRaw.rows.map((r, i) =>
-    `Slip${i + 1}[basic=${fmt(r.basic_salary)} gross=${fmt(r.gross_salary)} potongan=${fmt(r.total_deductions)} netto=${fmt(r.net_salary)}]`
-  ).join('; ')
-  const runRow = runRaw.rows[0]
-  const runSummary = runRow
-    ? `Run[gross=${fmt(runRow.total_gross)} potongan=${fmt(runRow.total_deductions)} net=${fmt(runRow.total_net)}]`
-    : 'Run[not found]'
-
-  return {
-    success: true,
-    warning: `DB Diagnostic — ${runSummary} | ${slipsSummary}`
-  }
+  // Patch: recompute totals from payslip_lines to fix potential old-function bug
+  await fixPayslipTotals(runId)
+  revalidatePath('/hris')
+  return { success: true }
 }
 
 export async function payPayrollRun(runId: string, orgId: string, accountId: string) {
