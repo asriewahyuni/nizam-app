@@ -1284,30 +1284,13 @@ export async function getBalanceSheet(
   const latestClosedEnd = String(latestClosedPeriod?.end_date || '').trim() || null
   const nextOpenDate = latestClosedEnd ? addDaysToDateString(latestClosedEnd, 1) : null
   const currentPeriodStart = nextOpenDate && nextOpenDate > fiscalYearStart ? nextOpenDate : fiscalYearStart
-  const retainedEarningsEnd = addDaysToDateString(currentPeriodStart, -1)
 
   // ── Optimasi: hitung laba tanpa manggil getProfitLoss() ──
   // Sebelumnya getBalanceSheet manggil getProfitLoss 2× (masing2 bikin query sendiri).
   // Sekarang pake getPostedEntryIds + getAccountBalancesFromEntries langsung,
   // lebih ringan karena gak perlu auth check & setup client ulang.
 
-  let retainedProfit = 0
   let currentProfit = 0
-
-  if (retainedEarningsEnd >= '1970-01-01') {
-    const retainedEntryIds = await getPostedEntryIds(db, orgId, {
-      branchId,
-      startDate: '1970-01-01',
-      endDate: retainedEarningsEnd,
-      consolidated,
-    })
-    if (retainedEntryIds.length > 0) {
-      const retainedBalances = await getAccountBalancesFromEntries(db, retainedEntryIds, undefined, consolidationParentOrgId)
-      const revBal = retainedBalances.filter((b: any) => b.type === 'REVENUE').reduce((s: number, b: any) => s + (b.total_credit - b.total_debit), 0)
-      const expBal = retainedBalances.filter((b: any) => b.type === 'EXPENSE').reduce((s: number, b: any) => s + (b.total_debit - b.total_credit), 0)
-      retainedProfit = revBal - expBal
-    }
-  }
 
   if (currentPeriodStart <= finalAsOfDate) {
     const currentEntryIds = await getPostedEntryIds(db, orgId, {
@@ -1349,7 +1332,6 @@ export async function getBalanceSheet(
     })
   }
 
-  upsertDerivedEquity('3002', 'Laba Ditahan', retainedProfit)
   upsertDerivedEquity('3003', 'Laba Periode Berjalan', currentProfit)
   equity.sort((a: any, b: any) => String(a.code || '').localeCompare(String(b.code || '')))
 

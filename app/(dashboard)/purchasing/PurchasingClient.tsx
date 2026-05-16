@@ -142,6 +142,13 @@ export default function PurchasingClient({
     }
   }, [paymentTerm, payOverheadNow, shariahMode])
   
+  // Receive Modal State
+  const [showReceiveModal, setShowReceiveModal] = useState(false)
+  const [purchaseToReceive, setPurchaseToReceive] = useState<any>(null)
+  const [receiveBins, setReceiveBins] = useState<any[]>([])
+  const [selectedReceiveBinId, setSelectedReceiveBinId] = useState('')
+  const [loadingBins, setLoadingBins] = useState(false)
+
   // Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedPurchase, setSelectedPurchase] = useState<any>(null)
@@ -503,20 +510,43 @@ export default function PurchasingClient({
     setLoading(false)
   }
 
-  const handleReceivePO = async (purchase: any) => {
+  const handleOpenReceive = async (purchase: any) => {
     if (isReceiveBlockedByPayment(purchase)) {
       setError('Akad SALAM pembelian wajib lunas terlebih dahulu sebelum penerimaan barang.')
       return
     }
-    if (!confirm('Tandai bahwa barang sudah diterima (Status -> RECEIVED)?')) return
+    setPurchaseToReceive(purchase)
+    setSelectedReceiveBinId('')
+    setShowReceiveModal(true)
+    setLoadingBins(true)
+    
+    try {
+      const { getWarehouseBins } = await import('@/modules/inventory/actions/warehouse.actions')
+      const res = await getWarehouseBins(orgId, purchase.warehouse_id || undefined, activeBranchId)
+      if (res && res.bins) {
+        setReceiveBins(res.bins)
+      } else {
+        setReceiveBins([])
+      }
+    } catch (e) {
+      console.error('Failed to fetch bins:', e)
+      setReceiveBins([])
+    } finally {
+      setLoadingBins(false)
+    }
+  }
+
+  const handleConfirmReceive = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!purchaseToReceive) return
     setLoading(true)
-    const res = await receivePurchase(orgId, purchase.id)
+    const res = await receivePurchase(orgId, purchaseToReceive.id, selectedReceiveBinId || undefined)
     if (res?.error) {
       setError(res.error)
     } else {
       setSuccess('Status PO berhasil diubah menjadi RECEIVED! Stok inventaris telah diperbarui.')
-      // Refresh halaman agar data stok di inventaris langsung sinkron
       router.refresh()
+      setShowReceiveModal(false)
       setTimeout(() => setSuccess(null), 3500)
     }
     setLoading(false)
@@ -900,7 +930,7 @@ export default function PurchasingClient({
                          {p.status === 'ORDERED' && (
                            <span className="inline-flex" title={receiveButtonTitle}>
                              <button
-                               onClick={() => handleReceivePO(p)}
+                               onClick={() => handleOpenReceive(p)}
                                disabled={receiveBlockedByPayment}
                                aria-disabled={receiveBlockedByPayment}
                                className={`p-2.5 rounded-xl transition-all shadow-sm border group/btn ${
@@ -2031,6 +2061,57 @@ export default function PurchasingClient({
                   </div>
                 )}
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Receive Modal */}
+      <AnimatePresence>
+        {showReceiveModal && purchaseToReceive && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Truck size={20} className="text-emerald-600" /> Penerimaan Barang
+                </h2>
+                <button onClick={() => setShowReceiveModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleConfirmReceive} className="p-6 space-y-5">
+                <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl text-sm font-medium text-blue-800">
+                  Terima barang untuk PO <span className="font-bold">{purchaseToReceive.purchase_number}</span>?
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Target Bin (Opsional)</label>
+                  <select
+                    value={selectedReceiveBinId}
+                    onChange={(e) => setSelectedReceiveBinId(e.target.value)}
+                    disabled={loadingBins}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none"
+                  >
+                    <option value="">-- Biarkan Kosong (Unassigned) --</option>
+                    {receiveBins.map((bin) => (
+                      <option key={bin.id} value={bin.id}>
+                        {bin.code} {bin.description ? `(${bin.description})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingBins && <p className="text-[10px] text-slate-400 font-medium mt-1">Memuat daftar Bin...</p>}
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <button type="button" onClick={() => setShowReceiveModal(false)} className="flex-1 px-4 py-3 text-sm font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200">
+                    Batal
+                  </button>
+                  <button type="submit" disabled={loading} className="flex-1 px-4 py-3 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 disabled:opacity-70 flex items-center justify-center gap-2">
+                    <CheckSquare size={16} /> {loading ? 'Memproses...' : 'Terima Barang'}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

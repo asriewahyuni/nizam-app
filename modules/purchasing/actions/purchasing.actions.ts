@@ -55,6 +55,7 @@ type InventorySyncParams = {
   orgId: string
   productId: string
   warehouseId: string
+  binId?: string
   diff: number
 }
 
@@ -357,7 +358,7 @@ async function syncInventoryStock(supabase: any, params: InventorySyncParams) {
     p_warehouse_id: params.warehouseId,
     p_diff: params.diff,
     p_batch_number: null,
-    p_bin_id: null,
+    p_bin_id: params.binId || null,
   })
 
   if (!inventorySyncError) {
@@ -1046,7 +1047,7 @@ export async function createPurchaseEntry(orgId: string, payload: CreatePurchase
   return { success: true, purchaseId: rpcRes.purchase_id }
 }
 
-export async function receivePurchase(orgId: string, purchaseId: string) {
+export async function receivePurchase(orgId: string, purchaseId: string, targetBinId?: string) {
   const supabase = await createClient()
   const { queryPostgres } = await import('@/lib/db/postgres')
 
@@ -1296,6 +1297,7 @@ export async function receivePurchase(orgId: string, purchaseId: string) {
         orgId,
         productId: m.product_id,
         warehouseId: whId,
+        binId: targetBinId,
         diff: m.quantity,
       })
 

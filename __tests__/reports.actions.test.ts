@@ -749,7 +749,7 @@ describe('Reports Branch Context', () => {
     ])
   })
 
-  it('splits retained earnings and current earnings on the balance sheet', async () => {
+  it('calculates current earnings on the balance sheet', async () => {
     const supabase = createSupabaseMock({
       tables: {
         accounts: [
@@ -783,15 +783,6 @@ describe('Reports Branch Context', () => {
                 parent_id: null,
               },
               {
-                id: 'retained',
-                org_id: 'org-1',
-                code: '3002',
-                name: 'Laba Ditahan',
-                type: 'EQUITY',
-                normal_balance: 'CREDIT',
-                parent_id: 'eq-root',
-              },
-              {
                 id: 'current',
                 org_id: 'org-1',
                 code: '3003',
@@ -808,9 +799,6 @@ describe('Reports Branch Context', () => {
             result: success([]),
           },
           {
-            result: success([{ id: 'je-retained' }]),
-          },
-          {
             result: success([{ id: 'je-current' }]),
           },
         ],
@@ -820,34 +808,6 @@ describe('Reports Branch Context', () => {
           },
         ],
         journal_lines: [
-          {
-            result: success([
-              {
-                debit: 0,
-                credit: 1000000,
-                accounts: {
-                  id: 'acc-rev',
-                  code: '4001',
-                  name: 'Pendapatan Usaha',
-                  type: 'REVENUE',
-                  normal_balance: 'CREDIT',
-                  cash_flow_category: 'OPERATING',
-                },
-              },
-              {
-                debit: 400000,
-                credit: 0,
-                accounts: {
-                  id: 'acc-exp',
-                  code: '6003',
-                  name: 'Utilitas',
-                  type: 'EXPENSE',
-                  normal_balance: 'DEBIT',
-                  cash_flow_category: 'OPERATING',
-                },
-              },
-            ]),
-          },
           {
             result: success([
               {
@@ -886,32 +846,6 @@ describe('Reports Branch Context', () => {
         rows: [
           {
             debit: 0,
-            credit: 1000000,
-            account_id: 'acc-rev',
-            account_code: '4001',
-            account_name: 'Pendapatan Usaha',
-            account_type: 'REVENUE',
-            account_normal_balance: 'CREDIT',
-            account_parent_id: null,
-            account_cash_flow_category: 'OPERATING',
-          },
-          {
-            debit: 400000,
-            credit: 0,
-            account_id: 'acc-exp',
-            account_code: '6003',
-            account_name: 'Utilitas',
-            account_type: 'EXPENSE',
-            account_normal_balance: 'DEBIT',
-            account_parent_id: null,
-            account_cash_flow_category: 'OPERATING',
-          },
-        ],
-      })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            debit: 0,
             credit: 500000,
             account_id: 'acc-rev',
             account_code: '4001',
@@ -937,12 +871,11 @@ describe('Reports Branch Context', () => {
 
     const result = await getBalanceSheet('org-1', '2026-04-30', 'branch-1')
 
-    expect(result.equity.find((row: { code: string }) => row.code === '3002')?.balance).toBe(600000)
     expect(result.equity.find((row: { code: string }) => row.code === '3003')?.balance).toBe(300000)
     expect(result.equity.find((row: { code: string }) => row.code === '9999')).toBeUndefined()
 
     const journalEntryCalls = supabase.calls.filter((call) => call.table === 'journal_entries')
-    expect(journalEntryCalls).toHaveLength(3)
+    expect(journalEntryCalls).toHaveLength(2)
     journalEntryCalls.forEach((call) => {
       expect(call.operations).toEqual(
         expect.arrayContaining([
