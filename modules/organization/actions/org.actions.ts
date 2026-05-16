@@ -861,7 +861,7 @@ async function createOrganizationRecord(
         is_demo: isDemo,
         business_type: businessType,
         skip_coa_seed: shouldSkipCoaSeed,
-        ...(isAbsFlow ? { abs_source: true } : {}),
+        ...(isAbsFlow ? { abs_source: true, use_custom_modules: true } : {}),
       },
     }
     if (subscriptionEndToSet) {
@@ -1015,6 +1015,32 @@ async function createOrganizationRecord(
         }
       } catch (absSetupErr) {
         ;(console as any).warn('ABS Setup: CoA/rekening default gagal di-seed (non-fatal)', absSetupErr)
+      }
+    }
+
+    // IF ABS, AUTO-ACTIVATE CORE MODULES
+    if (isAbsFlow) {
+      const ABS_CORE_MODULES = ['Accounting', 'Finance', 'Inventory', 'Purchasing', 'Sales', 'CRM', 'HRIS', 'Reports']
+      try {
+        const now = new Date().toISOString()
+        await Promise.all([
+          (privilegedDb as any)
+            .from('organizations')
+            .update({ enabled_modules: ABS_CORE_MODULES })
+            .eq('id', orgId),
+          (privilegedDb as any)
+            .from('org_module_instances')
+            .insert(
+              ABS_CORE_MODULES.map((key) => ({
+                org_id: orgId,
+                module_key: key,
+                status: 'READY',
+                ready_at: now,
+              }))
+            ),
+        ])
+      } catch (absModuleErr) {
+        ;(console as any).warn('ABS Setup: aktivasi modul inti gagal (non-fatal)', absModuleErr)
       }
     }
 
