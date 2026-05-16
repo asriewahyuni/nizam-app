@@ -5,32 +5,19 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { signUp } from '@/modules/auth/actions/auth.actions'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { User, Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2, Building, ShieldCheck } from 'lucide-react'
+import { User, Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 type SignUpResult = Awaited<ReturnType<typeof signUp>>
 
 export default function RegisterPage() {
   return (
-    <Suspense fallback={<RegisterPageFallback />}>
+    <Suspense fallback={
+      <div className="flex items-center justify-center p-8 text-xs text-slate-600 animate-pulse">
+        Memuat...
+      </div>
+    }>
       <RegisterPageContent />
     </Suspense>
-  )
-}
-
-function RegisterPageFallback() {
-  return (
-    <div className="w-full max-w-md">
-      <div className="mb-10 text-center">
-        <div className="w-16 h-16 bg-blue-600 rounded-[24px] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-200">
-          <ShieldCheck className="text-white" size={32} />
-        </div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase italic">Daftar Akun NIZAM</h1>
-        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">SaaS ENTERPRISE SOLUTION • FREE TRIAL</p>
-      </div>
-      <div className="rounded-3xl border border-slate-100 bg-slate-50 px-6 py-8 text-center text-sm font-bold text-slate-500">
-        Memuat formulir pendaftaran...
-      </div>
-    </div>
   )
 }
 
@@ -41,6 +28,7 @@ function RegisterPageContent() {
   const [showPassword, setShowPassword] = useState(false)
   const searchParams = useSearchParams()
   const [formData, setFormData] = useState({ fullName: '', email: '', password: '' })
+
   const source = (searchParams.get('source') || '').trim().toLowerCase()
   const requestedPlan = (searchParams.get('plan') || '').trim().toLowerCase()
   const isDemoFlow = source === 'demo'
@@ -54,20 +42,18 @@ function RegisterPageContent() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
-    
     startTransition(async () => {
       const fd = new FormData()
       fd.append('fullName', formData.fullName)
       fd.append('email', formData.email)
       fd.append('password', formData.password)
       fd.append('plan', plan)
-      
       const res: SignUpResult = await signUp(fd)
       if ('error' in res && res.error) {
         if (res.error.includes('already registered')) {
-           setError(`Email "${formData.email}" sudah terdaftar sebelumnya. Silakan gunakan email lain atau Login.`)
+          setError(`Email "${formData.email}" sudah terdaftar. Silakan gunakan email lain atau masuk.`)
         } else {
-           setError(res.error)
+          setError(res.error)
         }
       } else {
         setSuccess(formData.email)
@@ -75,138 +61,146 @@ function RegisterPageContent() {
     })
   }
 
-  if (success) {
-     return (
-        <motion.div 
-           initial={{ opacity: 0, scale: 0.9 }} 
-           animate={{ opacity: 1, scale: 1 }} 
-           className="text-center space-y-8"
-        >
-           <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-[32px] flex items-center justify-center mx-auto shadow-xl shadow-emerald-900/10">
-              <CheckCircle2 size={40} />
-           </div>
-           <div>
-              <h1 className="text-2xl font-black text-slate-900 uppercase italic tracking-tight">PENDAFTARAN BERHASIL!</h1>
-              <p className="text-slate-500 text-sm mt-2 font-medium">Akun Anda dengan email <span className="text-slate-900 font-black underline">{success}</span> telah dibuat.</p>
-           </div>
-           
-           <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 text-[11px] text-slate-500 font-bold leading-relaxed">
-              Silakan cek email Anda untuk verifikasi atau klik tombol di bawah untuk masuk ke dashboard organisasi.
-           </div>
+  const inputClass = 'w-full px-4 py-3.5 rounded-2xl border border-white/8 text-sm font-medium text-white bg-white/5 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40 transition-all'
 
-           <Link 
-              href={onboardingHref}
-              className="w-full py-4 rounded-3xl bg-slate-900 text-white text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl shadow-slate-200"
-           >
-              Lanjutkan ke Onboarding
-              <ArrowRight size={16} />
-           </Link>
-        </motion.div>
-     )
+  if (success) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
+        className="text-center space-y-7"
+      >
+        <div className="w-16 h-16 bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 rounded-3xl flex items-center justify-center mx-auto">
+          <CheckCircle2 size={32} />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-white tracking-tight">Akun berhasil dibuat!</h2>
+          <p className="text-slate-400 text-sm mt-2 leading-relaxed">
+            Email <span className="text-white font-semibold">{success}</span> berhasil didaftarkan.
+          </p>
+        </div>
+        <div className="p-4 bg-white/5 border border-white/8 rounded-2xl text-xs text-slate-400 leading-relaxed">
+          Cek email Anda untuk verifikasi, atau langsung lanjutkan ke setup organisasi.
+        </div>
+        <Link
+          href={onboardingHref}
+          className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-blue-900/30"
+        >
+          Lanjutkan Setup
+          <ArrowRight size={15} />
+        </Link>
+      </motion.div>
+    )
   }
 
   return (
-    <div className="w-full max-w-md">
-      <div className="mb-10 text-center">
-        <div className="w-16 h-16 bg-blue-600 rounded-[24px] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-200">
-           <ShieldCheck className="text-white" size={32} />
-        </div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase italic italic">Daftar Akun NIZAM</h1>
-        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">SaaS ENTERPRISE SOLUTION • FREE TRIAL</p>
+    <div>
+      {/* Header */}
+      <div className="mb-8">
+        <h2 className="text-xl font-bold text-white tracking-tight">
+          {plan === 'abs' ? 'Daftar ABS Trial' : plan === 'demo' ? 'Coba Demo' : 'Buat Akun Bisnis'}
+        </h2>
+        <p className="text-slate-500 text-sm mt-1">
+          {plan === 'abs'
+            ? 'Trial 30 hari gratis khusus peserta ABS.'
+            : plan === 'demo'
+            ? 'Akses lingkungan demo selama 12 jam.'
+            : 'Mulai trial gratis, tanpa kartu kredit.'}
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Lengkap Pemilik</label>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Nama Lengkap</label>
           <div className="relative">
-             <input
-               required
-               placeholder="Contoh: Budi Santoso"
-               value={formData.fullName}
-               onChange={e => setFormData({...formData, fullName: e.target.value})}
-               className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all pr-12"
-             />
-             <User className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+            <input
+              required
+              placeholder="Contoh: Budi Santoso"
+              value={formData.fullName}
+              onChange={e => setFormData({ ...formData, fullName: e.target.value })}
+              className={`${inputClass} pr-11`}
+            />
+            <User className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600" size={15} />
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Koorporasi / Bisnis</label>
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Email</label>
           <div className="relative">
-             <input
-               type="email"
-               required
-               placeholder="nama@perusahaan.com"
-               value={formData.email}
-               onChange={e => setFormData({...formData, email: e.target.value})}
-               className={`w-full px-6 py-4 bg-slate-50 border rounded-2xl text-sm font-bold text-slate-900 outline-none transition-all pr-12 ${
-                 error && error.includes('Email') ? 'border-rose-300 ring-4 ring-rose-50' : 'border-slate-100 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50'
-               }`}
-             />
-             <Mail className={`absolute right-5 top-1/2 -translate-y-1/2 ${error && error.includes('Email') ? 'text-rose-400' : 'text-slate-300'}`} size={18} />
+            <input
+              type="email"
+              required
+              placeholder="nama@perusahaan.com"
+              value={formData.email}
+              onChange={e => setFormData({ ...formData, email: e.target.value })}
+              className={`${inputClass} pr-11 ${error && error.includes('Email') ? 'border-rose-500/40 ring-2 ring-rose-500/20' : ''}`}
+            />
+            <Mail className={`absolute right-4 top-1/2 -translate-y-1/2 ${error && error.includes('Email') ? 'text-rose-500' : 'text-slate-600'}`} size={15} />
           </div>
-          <p className="text-[10px] font-bold text-amber-600 mt-2 flex gap-1.5 items-start">
-             <AlertCircle size={14} className="shrink-0" />
-             Pastikan email ini aktif dan dapat diakses untuk keperluan Lupa Password dan pengiriman Tagihan Billing.
+          <p className="text-[10px] text-slate-600 flex gap-1.5 items-start pt-0.5">
+            <AlertCircle size={12} className="shrink-0 mt-0.5 text-amber-500/70" />
+            Pastikan email ini aktif untuk reset password dan notifikasi billing.
           </p>
         </div>
 
-        <div className="space-y-2">
-           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Create Password</label>
-           <div className="relative">
-              <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                minLength={8}
-                placeholder="Minimal 8 Karakter"
-                value={formData.password}
-                onChange={e => setFormData({...formData, password: e.target.value})}
-                className="w-full py-4 pl-12 pr-12 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((previous) => !previous)}
-                aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
-                className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors"
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-           </div>
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Password</label>
+          <div className="relative">
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={15} />
+            <input
+              type={showPassword ? 'text' : 'password'}
+              required
+              minLength={8}
+              placeholder="Minimal 8 karakter"
+              value={formData.password}
+              onChange={e => setFormData({ ...formData, password: e.target.value })}
+              className={`${inputClass} pl-11 pr-11`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(p => !p)}
+              aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-300 transition-colors"
+            >
+              {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          </div>
         </div>
 
         <AnimatePresence>
-           {error && (
-             <motion.div 
-               initial={{ opacity: 0, y: -10 }} 
-               animate={{ opacity: 1, y: 0 }} 
-               className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-start gap-3 text-rose-600 text-[11px] font-black uppercase tracking-tight italic"
-             >
-                <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                {error}
-             </motion.div>
-           )}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-2.5 text-xs text-rose-400"
+            >
+              <AlertCircle size={14} className="shrink-0 mt-0.5" />
+              {error}
+            </motion.div>
+          )}
         </AnimatePresence>
 
         <button
           disabled={isPending}
           type="submit"
-          className="w-full py-4 rounded-2xl bg-slate-900 text-white text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl shadow-slate-200 disabled:opacity-50 active:scale-[0.98]"
+          className="w-full py-3.5 mt-1 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-blue-900/30 disabled:opacity-50 active:scale-[0.98]"
         >
-          {isPending ? 'Mendaftarkan Akun...' : 'Mulai Sekarang — Gratis'}
-          <ArrowRight size={18} />
+          {isPending ? 'Mendaftarkan...' : 'Buat Akun — Gratis'}
+          <ArrowRight size={15} />
         </button>
+
         <input type="hidden" name="plan" value={plan || ''} />
       </form>
 
-      <div className="mt-8 text-center space-y-4">
-         <p className="text-xs text-slate-400 font-bold">
-            Sudah ada akun bisnis?{' '}
-            <Link href="/login" className="text-blue-600 font-black hover:underline uppercase tracking-wider">Login di sini</Link>
-         </p>
-         <div className="flex items-center justify-center gap-2 text-[9px] text-slate-300 font-black uppercase tracking-[0.2em]">
-            <Building size={12} /> Powered by NIZAM ERP Global
-         </div>
+      <div className="mt-7 pt-6 border-t border-white/5 text-center">
+        <p className="text-sm text-slate-500">
+          Sudah punya akun?{' '}
+          <Link href="/login" className="text-white font-semibold hover:text-blue-400 transition-colors">
+            Masuk di sini
+          </Link>
+        </p>
       </div>
     </div>
   )
