@@ -10,7 +10,7 @@ export async function createAkadWakalahAction(orgId: string, payload: {
   ujrah_flat: number
   status?: string
 }) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   // Generate nomor akad
   const { data: noResult } = await db.rpc('koperasi_generate_nomor_akad', { p_org_id: orgId })
   const nomor_akad = noResult || `KOP/WKL/${new Date().getFullYear()}/${String(Date.now()).slice(-4)}`

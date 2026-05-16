@@ -6,7 +6,7 @@ import {
   Users, Wallet, TrendingUp, BadgePercent, Loader2, ArrowRight, UserCog,
   CheckCircle2, BarChart3, FileText, ShieldCheck, Landmark, ShoppingCart,
   BookOpen, Target, DollarSign, Activity, Clock, AlertTriangle, PiggyBank,
-  Handshake, ClipboardList, UserCheck, Star,
+  Handshake, ClipboardList, UserCheck, Star, UserPlus,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 

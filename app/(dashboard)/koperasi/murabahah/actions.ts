@@ -11,7 +11,7 @@ export async function createMurabahahAction(orgId: string, payload: {
   margin: number
   tenor_bulan: number
 }) {
-  const db = createAdminClient()
+  const db = await createAdminClient()
   const harga_jual = payload.harga_pokok + payload.margin
   const nomor_transaksi = `MUR/${new Date().getFullYear()}/${String(Date.now()).slice(-6)}`
   
