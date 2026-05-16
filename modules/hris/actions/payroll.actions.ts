@@ -216,28 +216,30 @@ export async function recalculatePayrollRun(runId: string, orgId: string) {
     }
   }
 
-  const { data: updatedRun } = await db.from('payroll_runs').select('total_net').eq('id', runId).single()
-  if (updatedRun && Number(updatedRun.total_net ?? 0) === 0) {
-    // Diagnostic: show payslip_lines to find what's causing net = 0
-    const linesCheck = await qp<{ component_name: string; type: string; amount: string }>(
-      `SELECT pl.component_name, pl.type, pl.amount
-       FROM public.payslip_lines pl
-       JOIN public.payslips ps ON pl.payslip_id = ps.id
-       WHERE ps.run_id = $1
-       ORDER BY pl.type, pl.component_name
-       LIMIT 20`,
+  // Diagnostic: query actual payslip and run values directly from DB
+  const [slipsRaw, runRaw] = await Promise.all([
+    qp<{ basic_salary: string; gross_salary: string; total_deductions: string; net_salary: string }>(
+      `SELECT basic_salary, gross_salary, total_deductions, net_salary FROM public.payslips WHERE run_id = $1`,
       [runId]
-    )
-    const linesSummary = linesCheck.rows
-      .map(l => `${l.component_name} (${l.type}): Rp ${Number(l.amount).toLocaleString('id-ID')}`)
-      .join(' | ')
-    return {
-      success: true,
-      warning: `${count} slip dibuat, Total Netto masih 0. Komponen: ${linesSummary || '(tidak ada)'}`
-    }
-  }
+    ),
+    qp<{ total_gross: string; total_deductions: string; total_net: string }>(
+      `SELECT total_gross, total_deductions, total_net FROM public.payroll_runs WHERE id = $1`,
+      [runId]
+    ),
+  ])
+  const fmt = (v: string) => `Rp ${Number(v).toLocaleString('id-ID')}`
+  const slipsSummary = slipsRaw.rows.map((r, i) =>
+    `Slip${i + 1}[basic=${fmt(r.basic_salary)} gross=${fmt(r.gross_salary)} potongan=${fmt(r.total_deductions)} netto=${fmt(r.net_salary)}]`
+  ).join('; ')
+  const runRow = runRaw.rows[0]
+  const runSummary = runRow
+    ? `Run[gross=${fmt(runRow.total_gross)} potongan=${fmt(runRow.total_deductions)} net=${fmt(runRow.total_net)}]`
+    : 'Run[not found]'
 
-  return { success: true }
+  return {
+    success: true,
+    warning: `DB Diagnostic — ${runSummary} | ${slipsSummary}`
+  }
 }
 
 export async function payPayrollRun(runId: string, orgId: string, accountId: string) {
