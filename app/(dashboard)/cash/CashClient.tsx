@@ -190,16 +190,26 @@ export function CashClient({
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const categoryNodeByOrg = new Map(transferCategoryNodes.map((node) => [node.orgId, node]))
-  const transferTargetBankOptions = transferBankAccounts.filter(
-    (bankAccount) => bankAccount.id !== txBankAccountId
-  )
+  const selectedSourceBankAccount = bankAccounts.find((bankAccount) => bankAccount.id === txBankAccountId) || null
+  const sourceBranchIdForTransfer = selectedSourceBankAccount?.branch_id || activeBranchId
+  const transferTargetBankOptions = transferBankAccounts.filter((bankAccount) => {
+    if (bankAccount.id === txBankAccountId) return false
+
+    // Transfer reguler dalam organisasi yang sama hanya valid untuk rekening
+    // kas/bank pada unit/branch yang sama dengan rekening sumber. Tanpa filter
+    // ini user bisa memilih rekening dari unit lain lalu ditolak oleh server.
+    if (bankAccount.org_id === orgId) {
+      return Boolean(sourceBranchIdForTransfer) && bankAccount.branch_id === sourceBranchIdForTransfer
+    }
+
+    return true
+  })
   const selectedTransferTarget = transferTargetBankOptions.find((bankAccount) => bankAccount.id === txTargetBankId) || null
   const isInterOrgTransfer = txType === 'TRANSFER' && Boolean(selectedTransferTarget?.org_id && selectedTransferTarget.org_id !== orgId)
   const targetOrgTransferAccounts = selectedTransferTarget?.org_id
     ? categoryNodeByOrg.get(selectedTransferTarget.org_id)?.accounts || []
     : []
   const targetFinancingAccounts = targetOrgTransferAccounts.filter(isFinancingTransferAccount)
-  const selectedSourceBankAccount = bankAccounts.find((bankAccount) => bankAccount.id === txBankAccountId) || null
   const sourceInterOrgCounterAccounts = interOrgSourceAccounts.filter(
     (account) => account.id !== selectedSourceBankAccount?.account_id
   )
@@ -1165,7 +1175,11 @@ export function CashClient({
                         onChange={(e) => {
                           const nextBankId = e.target.value
                           setTxBankAccountId(nextBankId)
-                          if (nextBankId === txTargetBankId) {
+                          if (txType === 'TRANSFER') {
+                            setTxTargetBankId('')
+                            setTxSourceCounterAccountId('')
+                            setTxTargetCounterAccountId('')
+                          } else if (nextBankId === txTargetBankId) {
                             setTxTargetBankId('')
                           }
                         }}
@@ -1242,7 +1256,9 @@ export function CashClient({
                                    <option key={bankAccount.id} value={bankAccount.id} className="text-white">
                                      {bankAccount.bank_name}
                                      {bankAccount.account_number ? ` (${bankAccount.account_number})` : ''}
-                                     {bankAccount.org_id !== orgId ? ` — ${(bankAccount.org_name || 'Entitas Anak')}${bankAccount.branch_name ? ` / ${bankAccount.branch_name}` : ''}` : ''}
+                                     {bankAccount.org_id !== orgId
+                                       ? ` — ${(bankAccount.org_name || 'Entitas Anak')}${bankAccount.branch_name ? ` / ${bankAccount.branch_name}` : ''}`
+                                       : bankAccount.branch_name ? ` — ${bankAccount.branch_name}` : ''}
                                    </option>
                                  ))}
                             </select>
