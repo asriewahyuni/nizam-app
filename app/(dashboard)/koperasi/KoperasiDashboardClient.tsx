@@ -9,6 +9,7 @@ import {
   Handshake, ClipboardList, UserCheck, Star, UserPlus,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { KoperasiSubNav } from './KoperasiSubNav'
 
 const BASE = '/api/koperasi/action'
 
@@ -92,6 +93,7 @@ export default function KoperasiDashboardPage() {
 
   return (
     <div className="space-y-6">
+      <KoperasiSubNav />
       {/* Header + Role Badge */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <PageHeader title="Koperasi Syariah" subtitle="Dashboard operasional koperasi serba usaha" />
