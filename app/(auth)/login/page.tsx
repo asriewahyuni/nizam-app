@@ -35,19 +35,19 @@ function LoginForm() {
     setTimeout(() => setResetMsg(null), 10000)
   }
 
-  const inputClass = (accent: 'blue' | 'emerald') =>
-    `w-full px-4 py-3.5 rounded-2xl border border-white/8 text-sm font-medium text-white bg-white/5 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-${accent}-500/30 focus:border-${accent}-500/40 transition-all`
+  const inputClass = 'w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-900 bg-slate-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 focus:bg-white transition-all'
+  const inputClassEmerald = 'w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-900 bg-slate-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 focus:bg-white transition-all'
 
   return (
     <div>
       {/* Header */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-white tracking-tight">Masuk ke Akun</h2>
-        <p className="text-slate-500 text-sm mt-1">Pilih mode akses sesuai peran Anda.</p>
+      <div className="mb-7">
+        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Masuk ke Akun</h2>
+        <p className="text-slate-400 text-sm mt-1">Pilih mode akses sesuai peran Anda.</p>
       </div>
 
       {/* Tab Switcher */}
-      <div className="flex p-1 bg-white/5 border border-white/8 rounded-2xl mb-7 gap-1">
+      <div className="flex p-1 bg-slate-100 border border-slate-200 rounded-2xl mb-6 gap-1">
         {(['bisnis', 'karyawan'] as const).map((t) => (
           <button
             key={t}
@@ -55,9 +55,9 @@ function LoginForm() {
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-semibold uppercase tracking-wider transition-all duration-200 ${
               tab === t
                 ? t === 'bisnis'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                  : 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40'
-                : 'text-slate-500 hover:text-slate-300'
+                  ? 'bg-white text-blue-600 shadow-sm border border-slate-200'
+                  : 'bg-white text-emerald-600 shadow-sm border border-slate-200'
+                : 'text-slate-400 hover:text-slate-600'
             }`}
           >
             {t === 'bisnis' ? <Building2 size={13} /> : <IdCard size={13} />}
@@ -68,7 +68,7 @@ function LoginForm() {
 
       {/* Error Banner */}
       {error && (
-        <div className="mb-5 px-4 py-3 rounded-xl text-xs font-medium leading-relaxed bg-rose-500/10 text-rose-400 border border-rose-500/20">
+        <div className="mb-5 px-4 py-3 rounded-xl text-xs font-medium leading-relaxed bg-rose-50 text-rose-600 border border-rose-100">
           {decodeURIComponent(error)}
         </div>
       )}
@@ -77,8 +77,8 @@ function LoginForm() {
       {resetMsg && (
         <div className={`mb-5 px-4 py-3 rounded-xl text-xs font-medium leading-relaxed border ${
           resetMsg.type === 'success'
-            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-            : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+            : 'bg-rose-50 text-rose-600 border-rose-100'
         }`}>
           {resetMsg.text}
         </div>
@@ -97,7 +97,7 @@ function LoginForm() {
               <input type="hidden" name="redirectTo" value={searchParams.get('redirectTo') || ''} />
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Email</label>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Email</label>
                 <input
                   name="email"
                   type="email"
@@ -105,14 +105,14 @@ function LoginForm() {
                   required
                   autoFocus={tab === 'bisnis'}
                   placeholder="nama@perusahaan.com"
-                  className={inputClass('blue')}
+                  className={inputClass}
                 />
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Password</label>
-                  <Link href="/forgot-password" className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Password</label>
+                  <Link href="/forgot-password" className="text-[10px] text-blue-500 hover:text-blue-600 transition-colors">
                     Lupa password?
                   </Link>
                 </div>
@@ -123,9 +123,9 @@ function LoginForm() {
                     autoComplete="current-password"
                     required
                     placeholder="••••••••"
-                    className={`${inputClass('blue')} pr-11`}
+                    className={`${inputClass} pr-11`}
                   />
-                  <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-300 transition-colors">
+                  <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
                     {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
@@ -133,23 +133,23 @@ function LoginForm() {
 
               <button
                 type="submit"
-                className="w-full mt-1 py-3.5 rounded-2xl text-sm font-semibold text-white flex items-center justify-center gap-2.5 hover:opacity-90 active:scale-[0.98] transition-all bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/30"
+                className="w-full mt-1 py-3.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2.5 hover:opacity-90 active:scale-[0.98] transition-all bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-100"
               >
                 Masuk
                 <ArrowRight size={15} />
               </button>
             </form>
 
-            <div className="mt-7 pt-6 border-t border-white/5 space-y-3 text-center">
+            <div className="mt-7 pt-6 border-t border-slate-100 space-y-3 text-center">
               <p className="text-sm text-slate-500">
                 Belum punya akun?{' '}
-                <Link href="/register" className="text-white font-semibold hover:text-blue-400 transition-colors">
+                <Link href="/register" className="text-blue-600 font-semibold hover:text-blue-700 transition-colors">
                   Daftar gratis
                 </Link>
               </p>
               <Link
                 href="/demo"
-                className="inline-flex w-full justify-center items-center gap-2 px-5 py-3 bg-white/5 text-slate-400 text-xs font-medium rounded-xl hover:bg-white/10 hover:text-white transition-all border border-white/8"
+                className="inline-flex w-full justify-center items-center gap-2 px-5 py-3 bg-slate-50 text-slate-500 text-xs font-medium rounded-xl hover:bg-slate-100 hover:text-slate-700 transition-all border border-slate-200"
               >
                 Coba Demo Dulu
               </Link>
@@ -167,25 +167,25 @@ function LoginForm() {
               <input type="hidden" name="redirectTo" value={searchParams.get('redirectTo') || ''} />
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Nomor Induk Karyawan</label>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Nomor Induk Karyawan</label>
                 <input
                   name="nik"
                   type="text"
                   required
                   autoFocus={tab === 'karyawan'}
                   placeholder="Contoh: NIZ-001"
-                  className={`${inputClass('emerald')} uppercase`}
+                  className={`${inputClassEmerald} uppercase`}
                 />
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Password</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Password</label>
                   <button
                     type="button"
                     onClick={() => setIsResetModalOpen(true)}
                     disabled={resetLoading}
-                    className="text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                    className="text-[10px] text-emerald-600 hover:text-emerald-700 transition-colors"
                   >
                     {resetLoading ? 'Memproses...' : 'Lupa password?'}
                   </button>
@@ -196,9 +196,9 @@ function LoginForm() {
                     type={showPass ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
-                    className={`${inputClass('emerald')} pr-11`}
+                    className={`${inputClassEmerald} pr-11`}
                   />
-                  <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-300 transition-colors">
+                  <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
                     {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
@@ -206,16 +206,16 @@ function LoginForm() {
 
               <button
                 type="submit"
-                className="w-full mt-1 py-3.5 rounded-2xl text-sm font-semibold text-white flex items-center justify-center gap-2.5 hover:opacity-90 active:scale-[0.98] transition-all bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-900/30"
+                className="w-full mt-1 py-3.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2.5 hover:opacity-90 active:scale-[0.98] transition-all bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-100"
               >
                 Masuk
                 <ArrowRight size={15} />
               </button>
             </form>
 
-            <p className="mt-7 pt-6 border-t border-white/5 text-center text-sm text-slate-500">
+            <p className="mt-7 pt-6 border-t border-slate-100 text-center text-sm text-slate-500">
               Login sebagai pemilik bisnis?{' '}
-              <button type="button" onClick={() => setTab('bisnis')} className="text-white font-semibold hover:text-emerald-400 transition-colors">
+              <button type="button" onClick={() => setTab('bisnis')} className="text-slate-800 font-semibold hover:text-blue-600 transition-colors">
                 Ganti mode
               </button>
             </p>
@@ -232,7 +232,7 @@ function LoginForm() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
               onClick={() => setIsResetModalOpen(false)}
             />
             <motion.div
@@ -241,48 +241,48 @@ function LoginForm() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.96, opacity: 0, y: 16 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="relative w-full max-w-sm bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl"
+              className="relative w-full max-w-sm bg-white border border-slate-200 rounded-3xl p-8 shadow-2xl shadow-slate-200"
             >
               <button
                 onClick={() => setIsResetModalOpen(false)}
-                className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:text-white hover:bg-white/10 transition-all"
+                className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all"
               >
                 <X size={15} />
               </button>
 
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
                   <ShieldCheck size={22} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Reset Password</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Masukkan NIK Anda untuk melanjutkan</p>
+                  <h3 className="text-base font-bold text-slate-900">Reset Password</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Masukkan NIK Anda untuk melanjutkan</p>
                 </div>
               </div>
 
               <form onSubmit={submitResetRequest} className="space-y-5">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Nomor Induk Karyawan</label>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Nomor Induk Karyawan</label>
                   <input
                     required
                     autoFocus
                     value={resetNik}
                     onChange={(e) => setResetNik(e.target.value)}
                     placeholder="Contoh: NIZ-0042"
-                    className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-sm font-medium uppercase text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/40 transition-all placeholder:normal-case placeholder:font-normal placeholder:text-slate-600"
+                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium uppercase text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 focus:bg-white transition-all placeholder:normal-case placeholder:font-normal placeholder:text-slate-400"
                   />
                 </div>
                 <div className="flex gap-3">
                   <button
                     type="button"
                     onClick={() => setIsResetModalOpen(false)}
-                    className="flex-1 py-3 text-xs font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/8 rounded-xl transition-all"
+                    className="flex-1 py-3 text-xs font-semibold text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition-all active:scale-95"
+                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-all active:scale-95"
                   >
                     Kirim Permintaan
                   </button>
@@ -299,7 +299,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center p-8 text-xs text-slate-600 animate-pulse">
+      <div className="flex items-center justify-center p-8 text-xs text-slate-400 animate-pulse">
         Memuat...
       </div>
     }>

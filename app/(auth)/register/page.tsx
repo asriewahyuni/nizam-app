@@ -12,7 +12,7 @@ type SignUpResult = Awaited<ReturnType<typeof signUp>>
 export default function RegisterPage() {
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center p-8 text-xs text-slate-600 animate-pulse">
+      <div className="flex items-center justify-center p-8 text-xs text-slate-400 animate-pulse">
         Memuat...
       </div>
     }>
@@ -61,7 +61,7 @@ function RegisterPageContent() {
     })
   }
 
-  const inputClass = 'w-full px-4 py-3.5 rounded-2xl border border-white/8 text-sm font-medium text-white bg-white/5 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/40 transition-all'
+  const inputClass = 'w-full px-4 py-3.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-900 bg-slate-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 focus:bg-white transition-all'
 
   if (success) {
     return (
@@ -71,21 +71,21 @@ function RegisterPageContent() {
         transition={{ duration: 0.3, ease: 'easeOut' }}
         className="text-center space-y-7"
       >
-        <div className="w-16 h-16 bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 rounded-3xl flex items-center justify-center mx-auto">
+        <div className="w-16 h-16 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto">
           <CheckCircle2 size={32} />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">Akun berhasil dibuat!</h2>
-          <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-            Email <span className="text-white font-semibold">{success}</span> berhasil didaftarkan.
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Akun berhasil dibuat!</h2>
+          <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+            Email <span className="text-slate-800 font-semibold">{success}</span> berhasil didaftarkan.
           </p>
         </div>
-        <div className="p-4 bg-white/5 border border-white/8 rounded-2xl text-xs text-slate-400 leading-relaxed">
+        <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs text-slate-400 leading-relaxed">
           Cek email Anda untuk verifikasi, atau langsung lanjutkan ke setup organisasi.
         </div>
         <Link
           href={onboardingHref}
-          className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-blue-900/30"
+          className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold flex items-center justify-center gap-2.5 transition-all shadow-md shadow-blue-100"
         >
           Lanjutkan Setup
           <ArrowRight size={15} />
@@ -97,11 +97,11 @@ function RegisterPageContent() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-white tracking-tight">
+      <div className="mb-7">
+        <h2 className="text-xl font-bold text-slate-900 tracking-tight">
           {plan === 'abs' ? 'Daftar ABS Trial' : plan === 'demo' ? 'Coba Demo' : 'Buat Akun Bisnis'}
         </h2>
-        <p className="text-slate-500 text-sm mt-1">
+        <p className="text-slate-400 text-sm mt-1">
           {plan === 'abs'
             ? 'Trial 30 hari gratis khusus peserta ABS.'
             : plan === 'demo'
@@ -112,7 +112,7 @@ function RegisterPageContent() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
-          <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Nama Lengkap</label>
+          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Nama Lengkap</label>
           <div className="relative">
             <input
               required
@@ -121,12 +121,12 @@ function RegisterPageContent() {
               onChange={e => setFormData({ ...formData, fullName: e.target.value })}
               className={`${inputClass} pr-11`}
             />
-            <User className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600" size={15} />
+            <User className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={15} />
           </div>
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Email</label>
+          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Email</label>
           <div className="relative">
             <input
               type="email"
@@ -134,20 +134,20 @@ function RegisterPageContent() {
               placeholder="nama@perusahaan.com"
               value={formData.email}
               onChange={e => setFormData({ ...formData, email: e.target.value })}
-              className={`${inputClass} pr-11 ${error && error.includes('Email') ? 'border-rose-500/40 ring-2 ring-rose-500/20' : ''}`}
+              className={`${inputClass} pr-11 ${error && error.includes('Email') ? 'border-rose-300 ring-2 ring-rose-100 bg-rose-50' : ''}`}
             />
-            <Mail className={`absolute right-4 top-1/2 -translate-y-1/2 ${error && error.includes('Email') ? 'text-rose-500' : 'text-slate-600'}`} size={15} />
+            <Mail className={`absolute right-4 top-1/2 -translate-y-1/2 ${error && error.includes('Email') ? 'text-rose-400' : 'text-slate-300'}`} size={15} />
           </div>
-          <p className="text-[10px] text-slate-600 flex gap-1.5 items-start pt-0.5">
-            <AlertCircle size={12} className="shrink-0 mt-0.5 text-amber-500/70" />
+          <p className="text-[10px] text-slate-400 flex gap-1.5 items-start pt-0.5">
+            <AlertCircle size={11} className="shrink-0 mt-0.5 text-amber-400" />
             Pastikan email ini aktif untuk reset password dan notifikasi billing.
           </p>
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Password</label>
+          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Password</label>
           <div className="relative">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={15} />
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={15} />
             <input
               type={showPassword ? 'text' : 'password'}
               required
@@ -161,7 +161,7 @@ function RegisterPageContent() {
               type="button"
               onClick={() => setShowPassword(p => !p)}
               aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-300 transition-colors"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
             >
               {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
@@ -174,7 +174,7 @@ function RegisterPageContent() {
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-2.5 text-xs text-rose-400"
+              className="p-3.5 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-2.5 text-xs text-rose-600"
             >
               <AlertCircle size={14} className="shrink-0 mt-0.5" />
               {error}
@@ -185,7 +185,7 @@ function RegisterPageContent() {
         <button
           disabled={isPending}
           type="submit"
-          className="w-full py-3.5 mt-1 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-blue-900/30 disabled:opacity-50 active:scale-[0.98]"
+          className="w-full py-3.5 mt-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold flex items-center justify-center gap-2.5 transition-all shadow-md shadow-blue-100 disabled:opacity-50 active:scale-[0.98]"
         >
           {isPending ? 'Mendaftarkan...' : 'Buat Akun — Gratis'}
           <ArrowRight size={15} />
@@ -194,10 +194,10 @@ function RegisterPageContent() {
         <input type="hidden" name="plan" value={plan || ''} />
       </form>
 
-      <div className="mt-7 pt-6 border-t border-white/5 text-center">
+      <div className="mt-7 pt-6 border-t border-slate-100 text-center">
         <p className="text-sm text-slate-500">
           Sudah punya akun?{' '}
-          <Link href="/login" className="text-white font-semibold hover:text-blue-400 transition-colors">
+          <Link href="/login" className="text-blue-600 font-semibold hover:text-blue-700 transition-colors">
             Masuk di sini
           </Link>
         </p>
