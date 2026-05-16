@@ -280,7 +280,7 @@ function buildDefaultTemplateRows(cycleId: string, userId: string | null) {
       perspective: template.perspective,
       code: `${PERSPECTIVE_CODE_MAP[template.perspective]}_${slug.slice(0, 18)}_${suffix}`,
       name: template.name,
-      description: 'Template KPI Strategi 4x4.',
+      description: 'Template KPI Nizameter 4x4.',
       unit: template.unit,
       direction: template.direction,
       weight_percent: 25,
@@ -551,14 +551,14 @@ async function ensureActiveCycle(orgId: string, branchId?: string | null): Promi
       .single()
 
     if (insertError || !createdCycle?.id) {
-      return { error: insertError?.message || 'Gagal membuat siklus Strategi aktif.' }
+      return { error: insertError?.message || 'Gagal membuat siklus Nizameter aktif.' }
     }
 
     cycle = createdCycle as BSCCycle
   }
 
   if (!cycle) {
-    return { error: 'Gagal memastikan siklus Strategi aktif.' }
+    return { error: 'Gagal memastikan siklus Nizameter aktif.' }
   }
 
   const defaultWeightRows = PERSPECTIVES.map((perspective) => ({
@@ -1366,7 +1366,7 @@ export async function seedDefaultBSCKpis(orgId: string, branchId?: string | null
     .eq('is_active', true)
 
   if ((count || 0) > 0) {
-    return { error: 'Siklus Strategi aktif sudah memiliki KPI. Template default hanya untuk setup awal kosong.' }
+    return { error: 'Siklus Nizameter aktif sudah memiliki KPI. Template default hanya untuk setup awal kosong.' }
   }
 
   const userId = (await supabase.auth.getUser())?.data?.user?.id || null

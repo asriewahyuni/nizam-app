@@ -1908,7 +1908,7 @@ export function AppHeader({
                                           ? 'bg-white/10 text-slate-100'
                                           : 'bg-slate-100 text-slate-600'
                                     }`}>
-                                      {bscIsReady ? `${bscSummary?.overall_score_100 ?? 0}` : 'BSC -'}
+                                      {bscIsReady ? `${bscSummary?.overall_score_100 ?? 0}` : 'Nizameter'}
                                     </div>
                                     <button
                                       type="button"
@@ -1925,7 +1925,7 @@ export function AppHeader({
                                           ? 'border-white/10 bg-white/5 text-white hover:bg-white/10'
                                           : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
                                       }`}
-                                      aria-label="Tampilkan 4 perspektif BSC"
+                                      aria-label="Tampilkan 4 perspektif Nizameter"
                                     >
                                       <ChevronDown size={14} className={`transition-transform ${isPerspectiveExpanded ? 'rotate-180' : ''}`} />
                                     </button>
@@ -2024,8 +2024,8 @@ export function AppHeader({
                               isActiveCard ? 'text-slate-300' : 'text-slate-500'
                             }`}>
                               {bscHasError
-                                ? 'Ringkasan BSC belum bisa dibaca untuk organisasi ini.'
-                                : 'Belum ada global score BSC yang siap ditampilkan.'}
+                                ? 'Ringkasan Nizameter belum bisa dibaca untuk organisasi ini.'
+                                : 'Belum ada global score Nizameter yang siap ditampilkan.'}
                             </div>
                           )}
 
