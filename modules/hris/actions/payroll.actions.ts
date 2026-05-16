@@ -188,6 +188,16 @@ export async function recalculatePayrollRun(runId: string, orgId: string) {
 
   if (run?.status !== 'DRAFT') return { error: 'Hanya payroll run dengan status DRAFT yang bisa dikalkulasi ulang.' }
 
+  // Fetch employee salaries for this run's branch before recalculating
+  const { queryPostgres: qp } = await import('@/lib/db/postgres')
+  const empCheck = await qp<{ first_name: string; last_name: string; basic_salary: string }>(
+    `SELECT first_name, last_name, basic_salary FROM public.employees
+     WHERE org_id = $1 AND branch_id = $2 AND employment_status NOT IN ('TERMINATED', 'RESIGNED')`,
+    [orgId, run.branch_id]
+  )
+  const empList = empCheck.rows
+  const allZero = empList.every(e => Number(e.basic_salary) === 0)
+
   const { data: slipCount, error: genErr } = await (db as any).rpc('generate_payslips_for_run', { p_run_id: runId })
   if (genErr) return { error: 'Gagal kalkulasi ulang: ' + genErr.message }
 
@@ -198,9 +208,18 @@ export async function recalculatePayrollRun(runId: string, orgId: string) {
     return { success: true, warning: 'Kalkulasi selesai, tetapi tidak ada karyawan yang ditemukan untuk unit ini.' }
   }
 
+  if (allZero) {
+    const names = empList.map(e => `${e.first_name} ${e.last_name}`).join(', ')
+    return {
+      success: true,
+      warning: `Gaji pokok semua karyawan (${names}) masih 0 di database. Silakan edit data karyawan, isi gaji pokok, lalu klik Simpan — kemudian recalculate kembali.`
+    }
+  }
+
   const { data: updatedRun } = await db.from('payroll_runs').select('total_net').eq('id', runId).single()
   if (updatedRun && Number(updatedRun.total_net ?? 0) === 0) {
-    return { success: true, warning: `${count} slip dibuat, tetapi Total Gaji Netto masih 0. Periksa gaji pokok karyawan.` }
+    const names = empList.map(e => `${e.first_name} ${e.last_name} (Rp ${Number(e.basic_salary).toLocaleString('id-ID')})`).join(', ')
+    return { success: true, warning: `${count} slip dibuat, Total Netto masih 0. Gaji di DB: ${names}` }
   }
 
   return { success: true }
