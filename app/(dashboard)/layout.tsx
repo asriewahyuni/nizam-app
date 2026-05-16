@@ -10,6 +10,7 @@ import { AppSidebar } from '@/components/shared/AppSidebar'
 import { AppHeader } from '@/components/shared/AppHeader'
 import { AdminImpersonationBanner } from '@/components/shared/AdminImpersonationBanner'
 import { DemoBanner } from '@/components/shared/DemoBanner'
+import { AbsTrialBanner } from '@/components/shared/AbsTrialBanner'
 import { SentryUserContext } from '@/components/shared/SentryUserContext'
 import { StartupWizard } from '@/components/shared/StartupWizard'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
@@ -51,6 +52,10 @@ export default async function DashboardLayout({
       ? orgData.org.settings as Record<string, unknown>
       : {}
   const startupWizardEnabled = orgSettings.startup_wizard_enabled !== false
+  const isAbsTrialOrg = orgSettings.abs_source === true || orgSettings.plan === 'ABS Trial'
+  const absSubscriptionEnd = isAbsTrialOrg
+    ? (String((orgData.org as any).subscription_end || '')).trim() || null
+    : null
   const [adminImpersonation, activeBranch, allowAllBranchSelection, isDemo, moduleInstances] = await Promise.all([
     getAdminImpersonationState(),
     getActiveBranch(orgData.org.id),
@@ -221,6 +226,7 @@ export default async function DashboardLayout({
           />
         )}
         {isDemo && <DemoBanner />}
+        {isAbsTrialOrg && !isDemo && <AbsTrialBanner subscriptionEnd={absSubscriptionEnd} />}
         <AppHeader
           key={`header:${orgData.org.id}:${activeBranch?.id || 'all'}`}
           user={{

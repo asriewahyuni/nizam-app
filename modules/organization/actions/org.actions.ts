@@ -796,9 +796,11 @@ async function createOrganizationRecord(
     }
 
     const isDemo = accountIsDemo || requestedDemoPlan || parentOrgIsDemo
+    const isAbsFlow = !parentOrgId && !isDemo && planParam === 'abs'
     const shouldSkipCoaSeed = parentOrgId ? true : !isDemo
-    const shouldAutoApplyAbsVoucher = !parentOrgId && !isDemo && planParam === 'abs'
-    let selectedPlan = isDemo ? 'Demo' : 'Trial'
+    const shouldAutoApplyAbsVoucher = isAbsFlow
+    const ABS_TRIAL_PLAN_NAME = 'ABS Trial'
+    let selectedPlan = isDemo ? 'Demo' : (isAbsFlow ? ABS_TRIAL_PLAN_NAME : 'Trial')
     if (parentPackageState?.plan) {
       selectedPlan = parentPackageState.plan
     }
@@ -806,7 +808,7 @@ async function createOrganizationRecord(
       !hasUnlimitedAccess &&
       !isDemo &&
       !parentOrgId &&
-      planParam !== 'abs' &&
+      !isAbsFlow &&
       selectedPlan === TRIAL_PLAN_NAME
 
     if (shouldClaimTrial) {
@@ -855,12 +857,11 @@ async function createOrganizationRecord(
         currency: 'IDR',
         timezone: 'Asia/Jakarta',
         fiscal_year_start_month: 1,
-        plan: selectedPlan, // Default plan for new orgs
+        plan: selectedPlan,
         is_demo: isDemo,
         business_type: businessType,
-        // Demo root orgs should be ready-to-explore immediately, while regular orgs
-        // and child entities keep the manual/sync-first CoA activation behavior.
         skip_coa_seed: shouldSkipCoaSeed,
+        ...(isAbsFlow ? { abs_source: true } : {}),
       },
     }
     if (subscriptionEndToSet) {
