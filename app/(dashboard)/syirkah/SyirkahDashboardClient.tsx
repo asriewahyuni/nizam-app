@@ -30,6 +30,13 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
     (sum: number, member: any) => sum + Number(member?.profit_share_percentage || 0),
     0
   )
+  // Total modal asal seluruh PEMODAL dari semua kontrak aktif
+  const totalCapitalAllContracts = allMembers.reduce(
+    (sum: number, group: any) =>
+      sum + (group.members || []).reduce((s: number, m: any) => s + Number(m.capital_contribution || 0), 0),
+    0
+  )
+  const showLowProfitWarning = totalCapitalAllContracts > 0 && Number(netProfit || 0) < totalCapitalAllContracts
   const router = useRouter()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isEditingProfitSharing, setIsEditingProfitSharing] = useState(false)
@@ -199,6 +206,20 @@ export default function SyirkahDashboardClient({ orgId, initialData }: { orgId: 
             </div>
           )}
         </div>
+
+        {showLowProfitWarning && (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex gap-3 items-start">
+            <span className="text-amber-500 mt-0.5 text-base leading-none">⚠</span>
+            <div className="space-y-0.5">
+              <p className="text-xs font-black text-amber-800 uppercase tracking-wide">Tidak Disarankan Bagi Hasil</p>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                Total net profit <span className="font-bold">{formatRupiah(Number(netProfit || 0))}</span> belum melampaui
+                total modal asal <span className="font-bold">{formatRupiah(totalCapitalAllContracts)}</span>.
+                Dalam prinsip syirkah, distribusi laba sebaiknya dilakukan setelah keuntungan melebihi pokok modal.
+              </p>
+            </div>
+          </div>
+        )}
 
         {profitSharingReferenceGroup ? (
           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
