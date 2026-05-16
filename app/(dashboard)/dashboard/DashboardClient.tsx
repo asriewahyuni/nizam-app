@@ -351,7 +351,7 @@ export function DashboardClient({ data }: DashboardClientProps) {
                                  {pareto.top20Count} produk penguasa pendapatan.
                               </p>
                               <p className="text-[11px] font-medium text-slate-400 mt-2 leading-relaxed">
-                                 Nizameter 80/20 otomatis mendeteksi item pelarisan untuk optimasi stok.
+                                 Nizametrics 80/20 otomatis mendeteksi item pelarisan untuk optimasi stok.
                               </p>
                            </div>
                            <div className="space-y-4">

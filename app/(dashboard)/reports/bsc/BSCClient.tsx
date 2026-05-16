@@ -294,7 +294,7 @@ export function BSCClient({
 
   const handleSaveWeights = () => {
     if (!canManageSetup) {
-      window.alert('Pilih unit aktif terlebih dahulu untuk mengubah setup Nizameter.')
+      window.alert('Pilih unit aktif terlebih dahulu untuk mengubah setup Nizametrics.')
       return
     }
 
@@ -311,7 +311,7 @@ export function BSCClient({
 
   const handleSeedTemplate = () => {
     if (!canManageSetup) {
-      window.alert('Pilih unit aktif terlebih dahulu untuk memulai template Nizameter.')
+      window.alert('Pilih unit aktif terlebih dahulu untuk memulai template Nizametrics.')
       return
     }
 
@@ -545,9 +545,9 @@ export function BSCClient({
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Nizameter</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">Nizametrics</h1>
           <p className="text-sm text-slate-400 mt-0.5">
-            {setupData.cycle?.cycle_name || `Nizameter ${setupData.scope.cycle_key}`} · {setupData.scope.start_date} – {setupData.scope.end_date}
+            {setupData.cycle?.cycle_name || `Nizametrics ${setupData.scope.cycle_key}`} · {setupData.scope.start_date} – {setupData.scope.end_date}
             {activeBranchName && <span className="ml-2 text-blue-500">· {scopeLabel}</span>}
           </p>
         </div>
@@ -591,7 +591,7 @@ export function BSCClient({
       )}
       {!canManageSetup && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-          Mode baca. Pilih unit aktif untuk mengubah setup Nizameter.
+          Mode baca. Pilih unit aktif untuk mengubah setup Nizametrics.
         </div>
       )}
 

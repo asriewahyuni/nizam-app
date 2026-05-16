@@ -34,7 +34,7 @@ const MODULE_CATEGORIES = [
     val: 'INSIGHT',
     modules: [
       { id: 'reports', name: 'Laporan Finansial', perms: ['reports:read'] },
-      { id: 'strategy', name: 'Nizameter', perms: ['strategy:read', 'strategy:write'] },
+      { id: 'strategy', name: 'Nizametrics', perms: ['strategy:read', 'strategy:write'] },
       { id: 'forecast', name: 'Proyeksi Arus Kas', perms: ['forecast:read'] },
     ]
   },
