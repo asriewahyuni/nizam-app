@@ -405,7 +405,6 @@ const SAAS_CAPABILITY_COVERAGE: Record<string, readonly string[]> = {
   'Job Order (Jasa)': ['Project & Construction'],
   'Project & Construction': ['Job Order (Jasa)'],
   LMS: ['Learning', 'Pelatihan', 'Training'],
-  'Koperasi Syariah': [],
 }
 
 const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
@@ -523,10 +522,6 @@ const SAAS_ENTITLEMENT_CATALOG: CatalogEntry[] = [
   {
     canonical: 'Syirkah',
     aliases: ['syirkah', 'akad syirkah', 'partnership', 'partnership contract'],
-  },
-  {
-    canonical: 'Koperasi Syariah',
-    aliases: ['koperasi syariah', 'koperasi', 'sharia cooperative', 'cooperative'],
   },
   {
     canonical: 'Integrasi API',

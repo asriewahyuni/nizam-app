@@ -281,25 +281,6 @@ export const BUSINESS_TYPE_MODULES: ModuleDefinition[] = [
     ],
     requires: ['Finance'],
   },
-  {
-    key: 'Koperasi Syariah',
-    name: 'Koperasi Syariah',
-    tagline: 'Koperasi serba usaha berbasis syariah',
-    description: 'Koperasi dengan simpanan (Pokok, Wajib, Sukarela), Murabahah bil Wakalah, Mudharabah Multi Shahibul Maal, sertifikasi DPS, dan akuntansi dua lapis syariah.',
-    icon: '🕌',
-    color: 'bg-emerald-600',
-    href: '/koperasi',
-    isCore: false,
-    category: 'business_type',
-    coaInjectionFn: 'inject_koperasi_coa',
-    onboardingSteps: [
-      { id: 'coa', title: 'Install CoA Koperasi', description: 'Pasang akun Piutang Murabahah, DST, Simpanan, Pendapatan Ujrah, dan Beban Operasional Koperasi.' },
-      { id: 'pengurus', title: 'Pilih Pengurus', description: 'Tentukan Ketua, Sekretaris, Bendahara, dan DPS untuk operasional koperasi.' },
-    ],
-    tags: ['koperasi', 'syariah', 'simpan-pinjam', 'murabahah', 'mudharabah'],
-    requires: ['Finance', 'Accounting'],
-    comingSoon: true,
-  },
 ]
 
 // ── SYIRKAH PILLAR ─────────────────────────────────────────────────────────
