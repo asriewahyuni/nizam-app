@@ -152,16 +152,28 @@ export async function activateModule(moduleKey: string) {
 
   revalidatePath('/marketplace')
 
-  // ── Redirect to module onboarding if available ──
-  // Operational modules (business_type & addon) have dedicated onboarding pages.
-  // Core/pillar modules use the generic marketplace setup as fallback.
-  const moduleCategoriesWithOnboarding = ['business_type', 'addon']
-  const hasOnboarding = modDef && moduleCategoriesWithOnboarding.includes(modDef.category) && modDef.href
-  const onboardingRedirect = hasOnboarding
-    ? `${modDef!.href}/onboarding`
-    : `/marketplace/setup/${encodeURIComponent(moduleKey)}`
+  // ── Determine onboarding need ──
+  // business_type & addon have dedicated onboarding pages (CoA install, settings).
+  // syirkah also has an onboarding flow with CoA injection.
+  // All other categories (finance, marketing, hris, operasional, special) are
+  // activated immediately as READY — no setup required.
+  const moduleCategoriesWithOnboarding = ['business_type', 'addon', 'syirkah']
+  const needsOnboarding = modDef && moduleCategoriesWithOnboarding.includes(modDef.category) && modDef.href
 
-  return { success: true, redirectUrl: onboardingRedirect }
+  if (!needsOnboarding) {
+    // Auto-complete: mark as READY immediately
+    await supabase
+      .from('org_module_instances')
+      .update({ status: 'READY', ready_at: new Date().toISOString() })
+      .eq('org_id', orgData.org.id)
+      .eq('module_key', moduleKey)
+
+    revalidatePath('/', 'layout')
+    const mainHref = modDef?.href ?? '/marketplace'
+    return { success: true, redirectUrl: mainHref }
+  }
+
+  return { success: true, redirectUrl: `${modDef!.href}/onboarding` }
 }
 
 
