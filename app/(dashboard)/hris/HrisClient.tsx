@@ -1383,10 +1383,10 @@ export default function HrisClient({
                     if (mapped.length === 0) return null
 
                     const config = {
-                      EARNING: { title: 'Earnings & Allowances', variant: 'success', icon: TrendingUp },
-                      DEDUCTION: { title: 'Employee Deductions', variant: 'danger', icon: Wallet },
-                      TAX: { title: 'Taxation Rules (PPh 21)', variant: 'warning', icon: ShieldCheck },
-                      BENEFIT: { title: 'Company Benefits', variant: 'info', icon: Briefcase }
+                      EARNING: { title: 'Pendapatan & Tunjangan', variant: 'success', icon: TrendingUp },
+                      DEDUCTION: { title: 'Potongan Karyawan', variant: 'danger', icon: Wallet },
+                      TAX: { title: 'Pajak (PPh 21)', variant: 'warning', icon: ShieldCheck },
+                      BENEFIT: { title: 'Benefit Perusahaan', variant: 'info', icon: Briefcase }
                     } as const
 
                     const { title, variant, icon: Icon } = config[type]
@@ -1411,7 +1411,7 @@ export default function HrisClient({
                                 <h5 className="font-black text-slate-800 tracking-tight">{comp.name}</h5>
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span className="px-3 py-1 bg-slate-50 text-slate-500 text-[10px] font-black font-mono rounded-lg border border-slate-100">
-                                    {comp.is_percentage ? `${comp.percentage_value}% of Base` : formatRupiah(comp.default_amount)}
+                                    {comp.is_percentage ? `${comp.percentage_value}% dari Gaji Pokok` : formatRupiah(comp.default_amount)}
                                   </span>
                                   <span className={`px-3 py-1 text-[10px] font-black uppercase rounded-lg border flex items-center gap-1.5
                                          ${comp.account ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
@@ -1495,12 +1495,12 @@ export default function HrisClient({
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/50 border-b border-slate-100">
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Period</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Gross Total</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Deductions</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right whitespace-nowrap">Net Payable</th>
+                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Periode</th>
+                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Total Kotor</th>
+                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Potongan</th>
+                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right whitespace-nowrap">Neto Dibayar</th>
                       <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Status</th>
-                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
+                      <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -1900,7 +1900,7 @@ export default function HrisClient({
               <div className="p-8">
                 <form id="payroll-form" onSubmit={handleCreatePayrollComponent} className="space-y-8">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Component Template</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Template Komponen</label>
                     <select
                       value={componentNameOption} onChange={(e: any) => handleComponentSelect(e.target.value)}
                       className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black text-slate-700 outline-none focus:border-blue-400 focus:bg-white transition-all shadow-inner"
@@ -1909,7 +1909,7 @@ export default function HrisClient({
                       <option value="Tunjangan Transport">Tunjangan Transport (Pendapatan)</option>
                       <option value="BPJS Kesehatan (Karyawan)">BPJS Kesehatan (Potongan Karyawan 1%)</option>
                       <option value="BPJS Ketenagakerjaan JHT (Karyawan)">BPJS Ketenagakerjaan JHT (Potongan Karyawan 2%)</option>
-                      <option value="PPh 21">Tarif Pajak PPh 21 (Deduction)</option>
+                      <option value="PPh 21">Tarif Pajak PPh 21 (Potongan)</option>
                       <option value="Potongan Koperasi">Potongan Koperasi / Kasbon</option>
                       <option value="CUSTOM">Lainnya (Tulis Kustom...)</option>
                     </select>
@@ -1919,7 +1919,7 @@ export default function HrisClient({
                         name="name"
                         value={customComponentName} onChange={(e: any) => setCustomComponentName(e.target.value)}
                         required
-                        placeholder="Enter component name..."
+                        placeholder="Nama komponen (kustom)..."
                         className="w-full mt-3 px-6 py-4 bg-white border-2 border-blue-50 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:border-blue-500 transition-all shadow-sm"
                       />
                     )}
@@ -1929,12 +1929,12 @@ export default function HrisClient({
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Cash Flow Category</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Kategori Komponen</label>
                     <select name="type" required value={componentType} onChange={(e: any) => setComponentType(e.target.value)} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black text-slate-700 outline-none focus:border-blue-400 focus:bg-white transition-all shadow-inner">
-                      <option value="EARNING">Earnings (Allowances / Bonuses)</option>
-                      <option value="DEDUCTION">Deductions (Employee Pays)</option>
-                      <option value="TAX">Tax Deduction (PPh 21 Specific)</option>
-                      <option value="BENEFIT">Company Benefits (Non-Slip)</option>
+                      <option value="EARNING">Pendapatan (Tunjangan / Bonus)</option>
+                      <option value="DEDUCTION">Potongan (Dibayar Karyawan)</option>
+                      <option value="TAX">Pajak (PPh 21)</option>
+                      <option value="BENEFIT">Benefit Perusahaan (Non-Slip)</option>
                     </select>
                   </div>
 
@@ -1955,35 +1955,35 @@ export default function HrisClient({
                         <span className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></span>
                       </span>
                       <span className="text-[11px] font-black text-slate-700 uppercase tracking-tight">
-                        Calculate by Percentage (%)
+                        Hitung Berdasarkan Persentase (%)
                       </span>
                     </label>
                     {!isPercentage ? (
                       <CurrencyInput
-                        label="Default Nominal (Rp)"
+                        label="Nominal Default (Rp)"
                         value={payrollAmount}
                         onChange={setPayrollAmount}
                       />
                     ) : (
                       <div className="flex items-center gap-4">
                         <div className="flex-1 space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Percentage Rate (%)</label>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Persentase (%)</label>
                           <div className="relative">
                             <input type="number" step="0.01" value={payrollAmount} onChange={(e: any) => setPayrollAmount(Number(e.target.value))} required placeholder="2.00" className="w-full px-6 py-4 bg-white border border-slate-100 rounded-2xl text-sm font-black text-slate-900 outline-none focus:border-blue-500 transition-all shadow-sm" />
                             <span className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 font-black">%</span>
                           </div>
                         </div>
-                        <div className="pt-8 text-[10px] font-bold text-slate-400 italic">of Basic Salary</div>
+                        <div className="pt-8 text-[10px] font-bold text-slate-400 italic">dari Gaji Pokok</div>
                       </div>
                     )}
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
-                      General Ledger Mapping
+                      Pemetaan Akun (Buku Besar)
                     </label>
                     <select name="account_id" required className="w-full px-6 py-4 bg-white border-2 border-indigo-50 shadow-[0_10px_20px_-5px_rgba(99,102,241,0.1)] rounded-2xl text-sm font-black text-indigo-700 outline-none focus:border-indigo-500 transition-all">
-                      <option value="">-- UNMAPPED (REQUIRED) --</option>
+                      <option value="">-- BELUM DIPETAKAN (WAJIB) --</option>
                       {accounts.map((acc: any) => (
                         <option key={acc.account_id} value={acc.account_id}>{acc.code} - {acc.name}</option>
                       ))}
@@ -1994,14 +1994,14 @@ export default function HrisClient({
                     <div className="relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" id="is_taxable" name="is_taxable" checked={isTaxable} onChange={(e: any) => setIsTaxable(e.target.checked)} className="sr-only peer" />
                       <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-                      <label htmlFor="is_taxable" className="ml-3 text-[11px] font-black text-slate-800 uppercase tracking-tight cursor-pointer">Taxable Component (PPh 21 Effect)</label>
+                      <label htmlFor="is_taxable" className="ml-3 text-[11px] font-black text-slate-800 uppercase tracking-tight cursor-pointer">Kena Pajak (Pengaruhi PPh 21)</label>
                     </div>
                   </div>
                 </form>
               </div>
 
               <div className="px-8 py-6 border-t border-slate-50 bg-slate-50/30 flex justify-end gap-4">
-                <button type="button" onClick={() => setIsPayrollModalOpen(false)} className="px-8 py-3 rounded-2xl text-[11px] font-semibold uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-tight">CANCEL</button>
+                <button type="button" onClick={() => setIsPayrollModalOpen(false)} className="px-8 py-3 rounded-2xl text-[11px] font-semibold uppercase text-slate-400 hover:bg-slate-100 transition-all tracking-tight">BATAL</button>
                 <SafeButton
                   form="payroll-form"
                   type="submit"
