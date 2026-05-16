@@ -150,6 +150,14 @@ export default function HrisClient({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setBaseUrl(window.location.origin)
+      const pendingWarning = sessionStorage.getItem('hris_payroll_warning')
+      if (pendingWarning) {
+        sessionStorage.removeItem('hris_payroll_warning')
+        setTimeout(() => {
+          setToast({ message: pendingWarning, type: 'info' })
+          setTimeout(() => setToast(null), 6000)
+        }, 500)
+      }
     }
   }, [])
 
@@ -367,7 +375,7 @@ export default function HrisClient({
         // Alert non-intrusif memberitahu berhasil
         showToast('Data Karyawan berhasil disimpan!', 'success')
       }
-      if (res.warning) showToast(res.warning, 'info')
+      if ((res as any).warning) showToast((res as any).warning, 'info')
     }
     setLoading(false)
   }
@@ -2196,7 +2204,12 @@ export default function HrisClient({
                 setLoading(true)
                 const res = await generatePayrollRun(orgId, new FormData(e.currentTarget))
                 if (res.error) showToast(res.error, 'error')
-                else window.location.reload()
+                else {
+                  if ('warning' in res && res.warning) {
+                    sessionStorage.setItem('hris_payroll_warning', res.warning as string)
+                  }
+                  window.location.reload()
+                }
               }} className="p-10 space-y-8">
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">

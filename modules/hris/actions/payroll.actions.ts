@@ -136,13 +136,36 @@ export async function generatePayrollRun(orgId: string, formData: FormData) {
   if (runErr) return { error: runErr.message }
 
   // 2. Execute SQL generation function
-  const { error: genErr } = await (supabase as any).rpc('generate_payslips_for_run', { 
-    p_run_id: run.id 
+  const { data: slipCount, error: genErr } = await (supabase as any).rpc('generate_payslips_for_run', {
+    p_run_id: run.id
   })
 
   if (genErr) return { error: 'Gagal memproses payslip: ' + genErr.message }
 
   revalidatePath('/hris')
+
+  const count = Number(slipCount ?? 0)
+  if (count === 0) {
+    return {
+      success: true,
+      warning: `Payroll run berhasil dibuat, tetapi tidak ada karyawan yang ditemukan untuk unit ini. Pastikan data karyawan sudah ditambahkan dan berada di unit yang sama dengan payroll run ini.`
+    }
+  }
+
+  // Re-fetch the run to check if total_net is still 0 despite having payslips
+  const { data: updatedRun } = await (supabase as any)
+    .from('payroll_runs')
+    .select('total_net')
+    .eq('id', run.id)
+    .single()
+
+  if (updatedRun && Number(updatedRun.total_net ?? 0) === 0) {
+    return {
+      success: true,
+      warning: `${count} slip gaji berhasil dibuat, tetapi Total Gaji Netto adalah 0. Pastikan gaji pokok karyawan sudah diisi dengan benar di data karyawan.`
+    }
+  }
+
   return { success: true }
 }
 
