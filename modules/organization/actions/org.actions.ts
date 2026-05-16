@@ -995,6 +995,15 @@ async function createOrganizationRecord(
       try {
         const { queryPostgres: qp } = await import('@/lib/db/postgres')
 
+        // trg_zz_seed_inventory_accounts_on_org_create fires for ALL orgs (no skip_coa_seed check),
+        // inserting accounts 1302/1303/1304 with parent_id=NULL before the CoA hierarchy exists.
+        // seed_default_coa uses plain INSERT (no ON CONFLICT), so it would fail on those duplicates.
+        // Delete them first so seed_default_coa can re-insert with proper parent hierarchy.
+        await qp(
+          `DELETE FROM public.accounts WHERE org_id = $1 AND code IN ('1302', '1303', '1304') AND parent_id IS NULL`,
+          [orgId]
+        )
+
         // 1. Seed full PSAK CoA (SECURITY DEFINER — bypass RLS)
         await qp('SELECT public.seed_default_coa($1::uuid)', [orgId])
 
