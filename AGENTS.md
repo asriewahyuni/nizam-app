@@ -190,6 +190,90 @@ npm run test:coverage  # Test dengan laporan coverage
 
 ---
 
+## UI/UX Pro Max Skill — Wajib Diaktifkan untuk Semua Pekerjaan UI/UX
+
+Project ini menggunakan **UI/UX Pro Max Skill** (v2.5.0) — sebuah AI skill yang menyediakan design intelligence profesional. Skill ini **wajib diaktifkan secara otomatis** setiap kali ada permintaan terkait UI/UX, komponen, halaman, atau desain.
+
+### Lokasi Skill
+
+| AI Tool | Path Skill |
+|---|---|
+| Claude / Zed | `.claude/skills/ui-ux-pro-max/SKILL.md` |
+| Cursor | `.cursor/skills/ui-ux-pro-max/SKILL.md` |
+| Windsurf | `.windsurf/skills/ui-ux-pro-max/SKILL.md` |
+| Copilot | `.github/skills/ui-ux-pro-max/SKILL.md` |
+| Semua AI lain | Baca panduan di bawah ini |
+
+**Jika AI tool kamu mendukung skill loading native** → baca file `SKILL.md` dari path yang sesuai di atas.
+
+### Kapan Skill Ini Diaktifkan
+
+Aktifkan skill ini secara otomatis ketika user meminta:
+- Membuat halaman baru, landing page, dashboard, komponen UI
+- Memilih warna, font, style, atau tema
+- Review atau perbaikan UI/UX yang sudah ada
+- Implementasi dark mode, animasi, atau accessibility
+- Perbaikan layout, spacing, atau responsivitas
+
+### Alur Kerja Wajib (untuk semua AI)
+
+**Step 1 — Analisis Kebutuhan:**
+Identifikasi jenis produk, target pengguna, dan keyword style dari permintaan user.
+
+**Step 2 — Generate Design System (WAJIB sebelum menulis kode UI apapun):**
+```bash
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<product_type> <keywords>" --design-system -p "Nizam ERP"
+```
+Perintah ini menghasilkan: Pattern, Style, Color Palette, Typography, Key Effects, dan Anti-Patterns.
+
+**Step 3 — Domain Search (jika perlu detail tambahan):**
+```bash
+# Cari style spesifik
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<keyword>" --domain style
+
+# Cari UX guidelines
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<keyword>" --domain ux
+
+# Cari typography
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<keyword>" --domain typography
+
+# Cari color palette
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<keyword>" --domain color
+```
+
+**Step 4 — Stack Guidelines (Next.js + TailwindCSS):**
+```bash
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<keyword>" --stack nextjs
+```
+
+### Aturan UI Wajib untuk Nizam App
+
+Berikut aturan minimum yang SELALU diterapkan pada setiap pekerjaan UI:
+
+1. **Tidak ada emoji sebagai icon** — Gunakan Lucide React (`lucide-react`) atau Heroicons (`@heroicons/react`).
+2. **`cursor-pointer` pada semua elemen yang bisa diklik.**
+3. **Hover states** dengan transisi halus `150–300ms`.
+4. **Kontras teks minimum 4.5:1** untuk light mode, 4.5:1 untuk dark mode.
+5. **Focus states visible** untuk navigasi keyboard.
+6. **`prefers-reduced-motion`** dihormati untuk semua animasi.
+7. **Responsive**: wajib ditest pada 375px, 768px, 1024px, 1440px.
+8. **Touch targets** minimum 44×44px.
+9. **Semantic HTML** dan ARIA attributes yang benar.
+10. **Spacing system** konsisten: gunakan kelipatan 4/8px (TailwindCSS spacing).
+
+### Pre-Delivery Checklist (wajib sebelum selesai)
+
+- [ ] Design system sudah di-generate dan diikuti
+- [ ] Tidak ada emoji sebagai icon struktural
+- [ ] Semua elemen clickable punya `cursor-pointer` dan hover state
+- [ ] Kontras warna memenuhi standar WCAG AA (4.5:1)
+- [ ] Focus state visible untuk keyboard navigation
+- [ ] Responsif di semua breakpoint utama
+- [ ] Tidak ada layout shift saat interaksi
+- [ ] TailwindCSS kelas dirapikan dengan `cn()` dari `lib/utils.ts`
+
+---
+
 ## Catatan Penting untuk Asisten AI
 
 1. **Jangan gunakan Supabase SDK secara langsung** — `lib/supabase/` sudah menjadi compatibility layer di atas PostgreSQL. Import dari sana tetap valid.
