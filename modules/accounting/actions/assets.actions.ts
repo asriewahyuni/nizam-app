@@ -144,6 +144,9 @@ export async function createFixedAsset(orgId: string, assetData: any) {
 
   if (assetError) {
     (console as any).error('Error creating fixed asset:', assetError)
+    if (assetError.message?.includes('fixed_assets_org_id_code_key')) {
+      return { error: `Kode aset "${finalAssetData.code}" sudah digunakan oleh aset lain. Silakan ganti kode aset.` }
+    }
     return { error: assetError.message }
   }
 

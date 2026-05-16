@@ -14,6 +14,7 @@ interface AssetClientProps {
   activeBranchId?: string | null
   activeBranchName?: string | null
   initialAssets: any[]
+  totalAssetCount: number
   coa: any[]
 }
 
@@ -79,6 +80,7 @@ export function AssetClient({
   activeBranchId = null,
   activeBranchName = null,
   initialAssets,
+  totalAssetCount,
   coa,
 }: AssetClientProps) {
   const router = useRouter()
@@ -133,15 +135,16 @@ export function AssetClient({
     should_capitalize_tax: false,
   })
 
-  // Auto Code logic
+  // Auto Code logic — uses total org-wide count (not branch count) to avoid cross-branch duplicates
   React.useEffect(() => {
     if (showModal && !editingAssetId) {
        const year = new Date().getFullYear()
-       const count = assets.length + 1
+       const sessionAdded = assets.length - initialAssets.length
+       const count = totalAssetCount + sessionAdded + 1
        const paddedCount = count.toString().padStart(4, '0')
        setFormData(prev => ({ ...prev, code: `AST-${year}-${paddedCount}` }))
     }
-  }, [showModal, editingAssetId, assets.length])
+  }, [showModal, editingAssetId, totalAssetCount, assets.length])
 
   // Filters
   const assetAccounts = coa.filter(a => a.type === 'ASSET' && a.normal_balance === 'DEBIT' && a.code.startsWith('15'))
