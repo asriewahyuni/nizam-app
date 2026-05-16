@@ -1080,28 +1080,55 @@ function summarizeCashFlowFromLines(
     )
     if (Math.abs(cashAmount) < 0.01) continue
 
-    const category = resolveEntryCashFlowCategory(nonCashLines)
-    const primaryLine = resolvePrimaryCashFlowLine(nonCashLines, cashAccountCodes, category, cashAmount)
-    const code = String(primaryLine?.accounts?.code || category.slice(0, 3)).trim() || category.slice(0, 3)
-    const itemName = formatDirectCashFlowItemName(primaryLine, category, cashAmount)
-    const detail = buildCashFlowItemDetail(primaryLine, cashAmount, itemName, referenceLabels)
-    const itemKey = `${category}:${code}:${itemName}`
-    const existingItem = itemMap.get(itemKey)
-    if (existingItem) {
-      existingItem.amount += cashAmount
-      existingItem.details.push(detail)
-    } else {
-      itemMap.set(itemKey, {
-        code,
-        name: itemName,
-        amount: cashAmount,
-        details: [detail],
-      })
+    // Group non-cash lines by their resolved cash flow category.
+    // When a journal entry spans multiple categories (e.g. asset debit = INVESTING +
+    // PPN Masukan debit = OPERATING), split cashAmount proportionally so each
+    // category only claims its own share of the total cash movement.
+    const linesByCat = new Map<CashFlowCategory, CashFlowLine[]>()
+    for (const line of nonCashLines) {
+      const cat = resolveCashFlowCategory(line.accounts)
+      const arr = linesByCat.get(cat) ?? []
+      arr.push(line)
+      linesByCat.set(cat, arr)
     }
 
-    if (category === 'OPERATING') ocf += cashAmount
-    else if (category === 'INVESTING') icf += cashAmount
-    else fcf += cashAmount
+    type Split = { category: CashFlowCategory; lines: CashFlowLine[]; amount: number }
+    const splits: Split[] = []
+
+    if (linesByCat.size <= 1) {
+      splits.push({ category: resolveEntryCashFlowCategory(nonCashLines), lines: nonCashLines, amount: cashAmount })
+    } else {
+      // Compute weight per category = absolute net debit of non-cash lines in that category
+      let totalWeight = 0
+      const catWeights: Array<[CashFlowCategory, CashFlowLine[], number]> = []
+      for (const [cat, lines] of linesByCat.entries()) {
+        const w = Math.abs(lines.reduce((s, l) => s + Number(l.debit || 0) - Number(l.credit || 0), 0))
+        catWeights.push([cat, lines, w])
+        totalWeight += w
+      }
+      for (const [cat, lines, w] of catWeights) {
+        if (totalWeight === 0 || w === 0) continue
+        splits.push({ category: cat, lines, amount: cashAmount * (w / totalWeight) })
+      }
+    }
+
+    for (const { category, lines, amount } of splits) {
+      const primaryLine = resolvePrimaryCashFlowLine(lines, cashAccountCodes, category, amount)
+      const code = String(primaryLine?.accounts?.code || category.slice(0, 3)).trim() || category.slice(0, 3)
+      const itemName = formatDirectCashFlowItemName(primaryLine, category, amount)
+      const detail = buildCashFlowItemDetail(primaryLine, amount, itemName, referenceLabels)
+      const itemKey = `${category}:${code}:${itemName}`
+      const existingItem = itemMap.get(itemKey)
+      if (existingItem) {
+        existingItem.amount += amount
+        existingItem.details.push(detail)
+      } else {
+        itemMap.set(itemKey, { code, name: itemName, amount, details: [detail] })
+      }
+      if (category === 'OPERATING') ocf += amount
+      else if (category === 'INVESTING') icf += amount
+      else fcf += amount
+    }
   }
 
   const toSortedItems = (category: CashFlowCategory) =>
