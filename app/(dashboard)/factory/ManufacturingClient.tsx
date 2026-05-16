@@ -1101,7 +1101,12 @@ export function ManufacturingClient({
 
                     return (
                       <div className="pt-4 border-t border-slate-100 space-y-3">
-                        {missingCostItems.length > 0 && (
+                        {bomItems.length === 0 && (
+                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                            <p className="text-[10px] font-bold text-amber-800">⚠ BOM tidak memiliki bahan baku — biaya bahan tidak bisa dihitung. Tambahkan item bahan di Resep (BOM) terlebih dahulu.</p>
+                          </div>
+                        )}
+                        {bomItems.length > 0 && missingCostItems.length > 0 && (
                           <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1">
                             <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">⚠ Bahan berikut belum memiliki harga — biaya bahan = Rp 0:</p>
                             {missingCostItems.map((item: any, i: number) => (
