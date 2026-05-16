@@ -6,6 +6,7 @@ import { resolveAccessibleBranchSelection } from '@/modules/organization/lib/bra
 import { checkCanManageCoA } from '@/modules/accounting/actions/coa.actions'
 import { hasRolePermission } from '@/modules/organization/lib/navigation-access'
 import { nudgeEduModeValidation } from '@/modules/edu/lib/progress-hooks.server'
+import { createInterBranchBankTransfer } from './interbranch-transfer.server'
 import type { Account, BankAccount } from '@/types/database.types'
 import type { CashBankAccount, RecentTransactionOption } from '@/modules/cash/types'
 
@@ -463,7 +464,33 @@ export async function createBankTransaction(orgId: string, formData: FormData) {
     }
 
     if (targetBankAccount.branch_id !== activeBranchResult.branchId) {
-      return { error: 'Rekening tujuan transfer tidak tersedia pada unit aktif.' }
+      if (!targetBankAccount.branch_id) {
+        return { error: 'Rekening tujuan transfer belum memiliki unit aktif.' }
+      }
+
+      const targetBranchSelection = await resolveAccessibleBranchSelection(orgId, targetBankAccount.branch_id)
+      if ('error' in targetBranchSelection) return { error: targetBranchSelection.error }
+
+      const { data: { user } } = await (supabase as any).auth.getUser()
+      const interBranchResult = await createInterBranchBankTransfer({
+        orgId,
+        sourceBankAccount: bankAccount,
+        targetBankAccount,
+        transactionDate: transDate,
+        description,
+        amount,
+        referenceNumber,
+        createdBy: user?.id || null,
+      })
+
+      if (interBranchResult.error) return { error: interBranchResult.error }
+
+      revalidatePath('/cash')
+      revalidatePath('/accounting/journal')
+      revalidatePath('/reports')
+      revalidatePath('/dashboard')
+      await nudgeEduModeValidation('cash.create.interbranch-transfer')
+      return { success: true }
     }
 
     if (targetBankAccount.id === bankAccount.id || targetBankAccount.account_id === bankAccount.account_id) {

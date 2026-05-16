@@ -191,19 +191,9 @@ export function CashClient({
   const pathname = usePathname()
   const categoryNodeByOrg = new Map(transferCategoryNodes.map((node) => [node.orgId, node]))
   const selectedSourceBankAccount = bankAccounts.find((bankAccount) => bankAccount.id === txBankAccountId) || null
-  const sourceBranchIdForTransfer = selectedSourceBankAccount?.branch_id || activeBranchId
-  const transferTargetBankOptions = transferBankAccounts.filter((bankAccount) => {
-    if (bankAccount.id === txBankAccountId) return false
-
-    // Transfer reguler dalam organisasi yang sama hanya valid untuk rekening
-    // kas/bank pada unit/branch yang sama dengan rekening sumber. Tanpa filter
-    // ini user bisa memilih rekening dari unit lain lalu ditolak oleh server.
-    if (bankAccount.org_id === orgId) {
-      return Boolean(sourceBranchIdForTransfer) && bankAccount.branch_id === sourceBranchIdForTransfer
-    }
-
-    return true
-  })
+  const transferTargetBankOptions = transferBankAccounts.filter(
+    (bankAccount) => bankAccount.id !== txBankAccountId
+  )
   const selectedTransferTarget = transferTargetBankOptions.find((bankAccount) => bankAccount.id === txTargetBankId) || null
   const isInterOrgTransfer = txType === 'TRANSFER' && Boolean(selectedTransferTarget?.org_id && selectedTransferTarget.org_id !== orgId)
   const targetOrgTransferAccounts = selectedTransferTarget?.org_id
