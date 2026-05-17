@@ -1055,6 +1055,19 @@ export async function upsertSyirkahContract(orgId: string, payload: any) {
     error = retryResult.error
   }
 
+  if (error && isMissingColumnError(error, 'ijab_qobul')) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { ijab_qobul: _omitted, ...legacyUpsertPayload } = upsertPayload
+    const retryResult = await supabase
+      .from('syirkah_contracts')
+      .upsert(legacyUpsertPayload)
+      .select()
+      .single()
+
+    data = retryResult.data
+    error = retryResult.error
+  }
+
   if (error) {
     throw new Error('Gagal menyimpan akad syirkah: ' + error.message)
   }
