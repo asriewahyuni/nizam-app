@@ -21,6 +21,7 @@ import {
   deleteConstructionBudgetItem,
   deleteConstructionChangeOrder,
   deleteConstructionProgressLog,
+  generateInvoiceFromBillingTerm,
   submitConstructionChangeOrderApproval,
   updateConstructionProjectSnapshot,
   upsertConstructionBillingTerm,
@@ -281,6 +282,24 @@ function getCurrencyDeltaClass(value: number, positiveClass: string, negativeCla
   return 'text-slate-600'
 }
 
+async function handleGenerateInvoiceFromBillingTerm(
+  orgId: string,
+  projectId: string,
+  billingTermId: string,
+  onSuccess: () => void
+) {
+  const result = await generateInvoiceFromBillingTerm(orgId, projectId, billingTermId)
+  if (result.error) {
+    alert(`Error: ${result.error}`)
+    return
+  }
+
+  if (result.invoiceNumber) {
+    alert(`✅ Invoice ${result.invoiceNumber} berhasil dibuat!`)
+    onSuccess()
+  }
+}
+
 export function ConstructionDetailClient({
   orgId,
   project,
@@ -297,6 +316,7 @@ export function ConstructionDetailClient({
   const [isSavingProgress, startProgressTransition] = useTransition()
   const [isSavingBilling, startBillingTransition] = useTransition()
   const [isSavingChangeOrder, startChangeOrderTransition] = useTransition()
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false)
   const [submittingApprovalId, setSubmittingApprovalId] = useState<string | null>(null)
 
   const [showBudgetModal, setShowBudgetModal] = useState(false)
@@ -410,6 +430,19 @@ export function ConstructionDetailClient({
       evidenceUrlsText: item.evidenceUrls.join('\n'),
     })
     setShowProgressModal(true)
+  }
+
+  const handleGenerateInvoice = async (term: ConstructionBillingTermRecord) => {
+    setIsGeneratingInvoice(true)
+    try {
+      await handleGenerateInvoiceFromBillingTerm(orgId, project.id, term.id, () => {
+        startTransition(() => {
+          router.refresh()
+        })
+      })
+    } finally {
+      setIsGeneratingInvoice(false)
+    }
   }
 
   const openCreateBillingModal = () => {
@@ -1381,6 +1414,17 @@ export function ConstructionDetailClient({
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {term.status === 'READY_TO_BILL' && !term.invoiceReference ? (
+                          <button
+                            type="button"
+                            onClick={() => handleGenerateInvoice(term)}
+                            disabled={isGeneratingInvoice}
+                            className="rounded-2xl bg-emerald-50 px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-600 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            title="Generate invoice untuk termin ini"
+                          >
+                            {isGeneratingInvoice ? '⏳' : '📄'} Invoice
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => openEditBillingModal(term)}

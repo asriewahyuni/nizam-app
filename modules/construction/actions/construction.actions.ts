@@ -755,6 +755,58 @@ export async function updateConstructionProjectSnapshot(
 }
 
 /**
+ * Auto-generate invoice dari billing term saat status → BILLED.
+ * Calls RPC createInvoiceFromConstructionBillingTerm.
+ */
+export async function generateInvoiceFromBillingTerm(
+  orgId: string,
+  projectId: string,
+  billingTermId: string,
+  invoiceDate?: string
+) {
+  const projectResult = await getAccessibleConstructionProjectRow(orgId, projectId)
+  if ('error' in projectResult) return { error: projectResult.error }
+
+  const trimmedBillingTermId = billingTermId.trim()
+  if (!trimmedBillingTermId) {
+    return { error: 'Billing term tidak valid.' }
+  }
+
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  // Call RPC
+  const { data, error } = await db.rpc('createInvoiceFromConstructionBillingTerm', {
+    p_org_id: orgId,
+    p_billing_term_id: trimmedBillingTermId,
+    p_invoice_date: invoiceDate || new Date().toISOString().split('T')[0],
+  })
+
+  if (error) {
+    return { error: error.message || 'Gagal generate invoice.' }
+  }
+
+  if (!data || !data[0]) {
+    return { error: 'RPC response kosong.' }
+  }
+
+  const result = data[0]
+  if (!result.success) {
+    return { error: result.error_message || 'Gagal generate invoice.' }
+  }
+
+  revalidatePath('/construction')
+  revalidatePath(`/construction/${projectId}`)
+  revalidatePath('/accounting/invoices')
+
+  return {
+    success: true,
+    invoiceId: result.invoice_id,
+    invoiceNumber: result.invoice_number,
+  }
+}
+
+/**
  * Menambah atau memperbarui item RAB/BoQ.
  */
 export async function upsertConstructionBudgetItem(
@@ -811,6 +863,58 @@ export async function upsertConstructionBudgetItem(
 }
 
 /**
+ * Auto-generate invoice dari billing term saat status → BILLED.
+ * Calls RPC createInvoiceFromConstructionBillingTerm.
+ */
+export async function generateInvoiceFromBillingTerm(
+  orgId: string,
+  projectId: string,
+  billingTermId: string,
+  invoiceDate?: string
+) {
+  const projectResult = await getAccessibleConstructionProjectRow(orgId, projectId)
+  if ('error' in projectResult) return { error: projectResult.error }
+
+  const trimmedBillingTermId = billingTermId.trim()
+  if (!trimmedBillingTermId) {
+    return { error: 'Billing term tidak valid.' }
+  }
+
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  // Call RPC
+  const { data, error } = await db.rpc('createInvoiceFromConstructionBillingTerm', {
+    p_org_id: orgId,
+    p_billing_term_id: trimmedBillingTermId,
+    p_invoice_date: invoiceDate || new Date().toISOString().split('T')[0],
+  })
+
+  if (error) {
+    return { error: error.message || 'Gagal generate invoice.' }
+  }
+
+  if (!data || !data[0]) {
+    return { error: 'RPC response kosong.' }
+  }
+
+  const result = data[0]
+  if (!result.success) {
+    return { error: result.error_message || 'Gagal generate invoice.' }
+  }
+
+  revalidatePath('/construction')
+  revalidatePath(`/construction/${projectId}`)
+  revalidatePath('/accounting/invoices')
+
+  return {
+    success: true,
+    invoiceId: result.invoice_id,
+    invoiceNumber: result.invoice_number,
+  }
+}
+
+/**
  * Menghapus item budget tertentu dari project.
  */
 export async function deleteConstructionBudgetItem(
@@ -840,6 +944,58 @@ export async function deleteConstructionBudgetItem(
   revalidatePath('/construction')
   revalidatePath(`/construction/${projectId}`)
   return { success: true }
+}
+
+/**
+ * Auto-generate invoice dari billing term saat status → BILLED.
+ * Calls RPC createInvoiceFromConstructionBillingTerm.
+ */
+export async function generateInvoiceFromBillingTerm(
+  orgId: string,
+  projectId: string,
+  billingTermId: string,
+  invoiceDate?: string
+) {
+  const projectResult = await getAccessibleConstructionProjectRow(orgId, projectId)
+  if ('error' in projectResult) return { error: projectResult.error }
+
+  const trimmedBillingTermId = billingTermId.trim()
+  if (!trimmedBillingTermId) {
+    return { error: 'Billing term tidak valid.' }
+  }
+
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  // Call RPC
+  const { data, error } = await db.rpc('createInvoiceFromConstructionBillingTerm', {
+    p_org_id: orgId,
+    p_billing_term_id: trimmedBillingTermId,
+    p_invoice_date: invoiceDate || new Date().toISOString().split('T')[0],
+  })
+
+  if (error) {
+    return { error: error.message || 'Gagal generate invoice.' }
+  }
+
+  if (!data || !data[0]) {
+    return { error: 'RPC response kosong.' }
+  }
+
+  const result = data[0]
+  if (!result.success) {
+    return { error: result.error_message || 'Gagal generate invoice.' }
+  }
+
+  revalidatePath('/construction')
+  revalidatePath(`/construction/${projectId}`)
+  revalidatePath('/accounting/invoices')
+
+  return {
+    success: true,
+    invoiceId: result.invoice_id,
+    invoiceNumber: result.invoice_number,
+  }
 }
 
 /**
@@ -896,6 +1052,58 @@ export async function upsertConstructionProgressLog(
 }
 
 /**
+ * Auto-generate invoice dari billing term saat status → BILLED.
+ * Calls RPC createInvoiceFromConstructionBillingTerm.
+ */
+export async function generateInvoiceFromBillingTerm(
+  orgId: string,
+  projectId: string,
+  billingTermId: string,
+  invoiceDate?: string
+) {
+  const projectResult = await getAccessibleConstructionProjectRow(orgId, projectId)
+  if ('error' in projectResult) return { error: projectResult.error }
+
+  const trimmedBillingTermId = billingTermId.trim()
+  if (!trimmedBillingTermId) {
+    return { error: 'Billing term tidak valid.' }
+  }
+
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  // Call RPC
+  const { data, error } = await db.rpc('createInvoiceFromConstructionBillingTerm', {
+    p_org_id: orgId,
+    p_billing_term_id: trimmedBillingTermId,
+    p_invoice_date: invoiceDate || new Date().toISOString().split('T')[0],
+  })
+
+  if (error) {
+    return { error: error.message || 'Gagal generate invoice.' }
+  }
+
+  if (!data || !data[0]) {
+    return { error: 'RPC response kosong.' }
+  }
+
+  const result = data[0]
+  if (!result.success) {
+    return { error: result.error_message || 'Gagal generate invoice.' }
+  }
+
+  revalidatePath('/construction')
+  revalidatePath(`/construction/${projectId}`)
+  revalidatePath('/accounting/invoices')
+
+  return {
+    success: true,
+    invoiceId: result.invoice_id,
+    invoiceNumber: result.invoice_number,
+  }
+}
+
+/**
  * Menghapus progress log harian.
  */
 export async function deleteConstructionProgressLog(
@@ -925,6 +1133,58 @@ export async function deleteConstructionProgressLog(
   revalidatePath('/construction')
   revalidatePath(`/construction/${projectId}`)
   return { success: true }
+}
+
+/**
+ * Auto-generate invoice dari billing term saat status → BILLED.
+ * Calls RPC createInvoiceFromConstructionBillingTerm.
+ */
+export async function generateInvoiceFromBillingTerm(
+  orgId: string,
+  projectId: string,
+  billingTermId: string,
+  invoiceDate?: string
+) {
+  const projectResult = await getAccessibleConstructionProjectRow(orgId, projectId)
+  if ('error' in projectResult) return { error: projectResult.error }
+
+  const trimmedBillingTermId = billingTermId.trim()
+  if (!trimmedBillingTermId) {
+    return { error: 'Billing term tidak valid.' }
+  }
+
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  // Call RPC
+  const { data, error } = await db.rpc('createInvoiceFromConstructionBillingTerm', {
+    p_org_id: orgId,
+    p_billing_term_id: trimmedBillingTermId,
+    p_invoice_date: invoiceDate || new Date().toISOString().split('T')[0],
+  })
+
+  if (error) {
+    return { error: error.message || 'Gagal generate invoice.' }
+  }
+
+  if (!data || !data[0]) {
+    return { error: 'RPC response kosong.' }
+  }
+
+  const result = data[0]
+  if (!result.success) {
+    return { error: result.error_message || 'Gagal generate invoice.' }
+  }
+
+  revalidatePath('/construction')
+  revalidatePath(`/construction/${projectId}`)
+  revalidatePath('/accounting/invoices')
+
+  return {
+    success: true,
+    invoiceId: result.invoice_id,
+    invoiceNumber: result.invoice_number,
+  }
 }
 
 /**
@@ -992,6 +1252,58 @@ export async function upsertConstructionBillingTerm(
 }
 
 /**
+ * Auto-generate invoice dari billing term saat status → BILLED.
+ * Calls RPC createInvoiceFromConstructionBillingTerm.
+ */
+export async function generateInvoiceFromBillingTerm(
+  orgId: string,
+  projectId: string,
+  billingTermId: string,
+  invoiceDate?: string
+) {
+  const projectResult = await getAccessibleConstructionProjectRow(orgId, projectId)
+  if ('error' in projectResult) return { error: projectResult.error }
+
+  const trimmedBillingTermId = billingTermId.trim()
+  if (!trimmedBillingTermId) {
+    return { error: 'Billing term tidak valid.' }
+  }
+
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  // Call RPC
+  const { data, error } = await db.rpc('createInvoiceFromConstructionBillingTerm', {
+    p_org_id: orgId,
+    p_billing_term_id: trimmedBillingTermId,
+    p_invoice_date: invoiceDate || new Date().toISOString().split('T')[0],
+  })
+
+  if (error) {
+    return { error: error.message || 'Gagal generate invoice.' }
+  }
+
+  if (!data || !data[0]) {
+    return { error: 'RPC response kosong.' }
+  }
+
+  const result = data[0]
+  if (!result.success) {
+    return { error: result.error_message || 'Gagal generate invoice.' }
+  }
+
+  revalidatePath('/construction')
+  revalidatePath(`/construction/${projectId}`)
+  revalidatePath('/accounting/invoices')
+
+  return {
+    success: true,
+    invoiceId: result.invoice_id,
+    invoiceNumber: result.invoice_number,
+  }
+}
+
+/**
  * Menghapus termin billing project.
  */
 export async function deleteConstructionBillingTerm(
@@ -1021,6 +1333,58 @@ export async function deleteConstructionBillingTerm(
   revalidatePath('/construction')
   revalidatePath(`/construction/${projectId}`)
   return { success: true }
+}
+
+/**
+ * Auto-generate invoice dari billing term saat status → BILLED.
+ * Calls RPC createInvoiceFromConstructionBillingTerm.
+ */
+export async function generateInvoiceFromBillingTerm(
+  orgId: string,
+  projectId: string,
+  billingTermId: string,
+  invoiceDate?: string
+) {
+  const projectResult = await getAccessibleConstructionProjectRow(orgId, projectId)
+  if ('error' in projectResult) return { error: projectResult.error }
+
+  const trimmedBillingTermId = billingTermId.trim()
+  if (!trimmedBillingTermId) {
+    return { error: 'Billing term tidak valid.' }
+  }
+
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  // Call RPC
+  const { data, error } = await db.rpc('createInvoiceFromConstructionBillingTerm', {
+    p_org_id: orgId,
+    p_billing_term_id: trimmedBillingTermId,
+    p_invoice_date: invoiceDate || new Date().toISOString().split('T')[0],
+  })
+
+  if (error) {
+    return { error: error.message || 'Gagal generate invoice.' }
+  }
+
+  if (!data || !data[0]) {
+    return { error: 'RPC response kosong.' }
+  }
+
+  const result = data[0]
+  if (!result.success) {
+    return { error: result.error_message || 'Gagal generate invoice.' }
+  }
+
+  revalidatePath('/construction')
+  revalidatePath(`/construction/${projectId}`)
+  revalidatePath('/accounting/invoices')
+
+  return {
+    success: true,
+    invoiceId: result.invoice_id,
+    invoiceNumber: result.invoice_number,
+  }
 }
 
 /**
@@ -1093,6 +1457,58 @@ export async function upsertConstructionChangeOrder(
   revalidatePath('/construction')
   revalidatePath(`/construction/${projectId}`)
   return { success: true }
+}
+
+/**
+ * Auto-generate invoice dari billing term saat status → BILLED.
+ * Calls RPC createInvoiceFromConstructionBillingTerm.
+ */
+export async function generateInvoiceFromBillingTerm(
+  orgId: string,
+  projectId: string,
+  billingTermId: string,
+  invoiceDate?: string
+) {
+  const projectResult = await getAccessibleConstructionProjectRow(orgId, projectId)
+  if ('error' in projectResult) return { error: projectResult.error }
+
+  const trimmedBillingTermId = billingTermId.trim()
+  if (!trimmedBillingTermId) {
+    return { error: 'Billing term tidak valid.' }
+  }
+
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  // Call RPC
+  const { data, error } = await db.rpc('createInvoiceFromConstructionBillingTerm', {
+    p_org_id: orgId,
+    p_billing_term_id: trimmedBillingTermId,
+    p_invoice_date: invoiceDate || new Date().toISOString().split('T')[0],
+  })
+
+  if (error) {
+    return { error: error.message || 'Gagal generate invoice.' }
+  }
+
+  if (!data || !data[0]) {
+    return { error: 'RPC response kosong.' }
+  }
+
+  const result = data[0]
+  if (!result.success) {
+    return { error: result.error_message || 'Gagal generate invoice.' }
+  }
+
+  revalidatePath('/construction')
+  revalidatePath(`/construction/${projectId}`)
+  revalidatePath('/accounting/invoices')
+
+  return {
+    success: true,
+    invoiceId: result.invoice_id,
+    invoiceNumber: result.invoice_number,
+  }
 }
 
 /**
@@ -1233,4 +1649,56 @@ export async function deleteConstructionChangeOrder(
   revalidatePath('/construction')
   revalidatePath(`/construction/${projectId}`)
   return { success: true }
+}
+
+/**
+ * Auto-generate invoice dari billing term saat status → BILLED.
+ * Calls RPC createInvoiceFromConstructionBillingTerm.
+ */
+export async function generateInvoiceFromBillingTerm(
+  orgId: string,
+  projectId: string,
+  billingTermId: string,
+  invoiceDate?: string
+) {
+  const projectResult = await getAccessibleConstructionProjectRow(orgId, projectId)
+  if ('error' in projectResult) return { error: projectResult.error }
+
+  const trimmedBillingTermId = billingTermId.trim()
+  if (!trimmedBillingTermId) {
+    return { error: 'Billing term tidak valid.' }
+  }
+
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  // Call RPC
+  const { data, error } = await db.rpc('createInvoiceFromConstructionBillingTerm', {
+    p_org_id: orgId,
+    p_billing_term_id: trimmedBillingTermId,
+    p_invoice_date: invoiceDate || new Date().toISOString().split('T')[0],
+  })
+
+  if (error) {
+    return { error: error.message || 'Gagal generate invoice.' }
+  }
+
+  if (!data || !data[0]) {
+    return { error: 'RPC response kosong.' }
+  }
+
+  const result = data[0]
+  if (!result.success) {
+    return { error: result.error_message || 'Gagal generate invoice.' }
+  }
+
+  revalidatePath('/construction')
+  revalidatePath(`/construction/${projectId}`)
+  revalidatePath('/accounting/invoices')
+
+  return {
+    success: true,
+    invoiceId: result.invoice_id,
+    invoiceNumber: result.invoice_number,
+  }
 }
