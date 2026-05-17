@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import {
   ChevronRight, ChevronLeft, Check, Building2, Landmark, Users, ListTodo,
-  PieChart, Shield, FileText, QrCode, AlertCircle, Link2, Plus, Trash2, Info, Scale
+  PieChart, FileText, QrCode, AlertCircle, Link2, Plus, Trash2, Info, Scale
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import {
@@ -13,7 +13,6 @@ import {
 import {
   generateSyirkahClauses, calcWitnessWeight, isWitnessQuorumMet
 } from '@/modules/syirkah/lib/syirkah.utils'
-import { formatRupiah } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import type { SyirkahClause } from '@/modules/syirkah/lib/syirkah.utils'
 import type { SyirkahMemberPayload, SyirkahWitnessPayload } from '@/modules/syirkah/actions/syirkah.actions'
@@ -70,9 +69,8 @@ const STEPS = [
   { id: 4, label: 'Tugas & Tanggung Jawab', icon: ListTodo },
   { id: 5, label: 'Saksi Akad', icon: Scale },
   { id: 6, label: 'Nisbah Bagi Hasil', icon: PieChart },
-  { id: 7, label: 'Alokasi Hutang', icon: Shield },
-  { id: 8, label: 'Drafting Akad', icon: FileText },
-  { id: 9, label: 'Tanda Tangan', icon: QrCode },
+  { id: 7, label: 'Drafting Akad', icon: FileText },
+  { id: 8, label: 'Tanda Tangan', icon: QrCode },
 ]
 
 const emptyMember = (): Member => ({
@@ -155,11 +153,43 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
 
   // Step 6: Nisbah
   const totalNisbah = members.reduce((sum, m) => sum + Number(m.profit_share_percentage || 0), 0)
-  const [profitSharingAllocation, setProfitSharingAllocation] = useState(contract.profit_sharing_allocation || 0)
 
-  // Step 7: Debt
-  const [debtAllocation, setDebtAllocation] = useState(contract.debt_allocation || 0)
-  const [currentDebt, setCurrentDebt] = useState(contract.current_debt || 0)
+  // Step 7: Ijab Qobul
+  type IjabQobulEntry = {
+    member_name: string
+    type: 'IJAB' | 'QOBUL'
+    mode: 'personal' | 'perwakilan'
+    wakil_name: string
+    wakil_jabatan: string
+  }
+
+  const buildIjabQobulEntries = (memberList: Member[], saved: IjabQobulEntry[]): IjabQobulEntry[] => {
+    return memberList
+      .filter(m => m.member_name)
+      .map((m, i) => {
+        const existing = saved.find(e => e.member_name === m.member_name)
+        return existing ?? {
+          member_name: m.member_name,
+          type: i === 0 ? 'IJAB' : 'QOBUL',
+          mode: 'personal',
+          wakil_name: '',
+          wakil_jabatan: '',
+        }
+      })
+  }
+
+  const savedIjabQobul: IjabQobulEntry[] = Array.isArray(contract.ijab_qobul) ? contract.ijab_qobul : []
+  const [ijabQobulEntries, setIjabQobulEntries] = useState<IjabQobulEntry[]>(
+    () => buildIjabQobulEntries(
+      initialMembers.length > 0 ? initialMembers : [],
+      savedIjabQobul
+    )
+  )
+
+  // Sync entries when members change (add/remove)
+  const syncIjabQobul = (updatedMembers: Member[]) => {
+    setIjabQobulEntries(prev => buildIjabQobulEntries(updatedMembers, prev))
+  }
 
   // Step 8: Clauses
   const [clauses, setClauses] = useState<SyirkahClause[]>(
@@ -178,12 +208,18 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
     setMembers(prev => prev.map((m, i) => i === index ? { ...m, [field]: value } : m))
   }, [])
 
-  const addMember = () => setMembers(prev => [...prev, emptyMember()])
+  const addMember = () => {
+    const next = [...members, emptyMember()]
+    setMembers(next)
+    syncIjabQobul(next)
+  }
 
   const removeMember = async (index: number) => {
     const m = members[index]
     if (m.id) { await deleteSyirkahMember(m.id, contractId) }
-    setMembers(prev => prev.filter((_, i) => i !== index))
+    const next = members.filter((_, i) => i !== index)
+    setMembers(next)
+    syncIjabQobul(next)
   }
 
   const updateWitness = (index: number, field: keyof Witness, value: any) => {
@@ -205,7 +241,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
       return contractStatus
     }
 
-    if (targetStep >= 9 || contractStatus === 'SIGNING') {
+    if (targetStep >= 8 || contractStatus === 'SIGNING') {
       return 'SIGNING'
     }
 
@@ -225,11 +261,8 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
         contract_type: contractType,
         duration_months: durationMonths,
         start_date: startDate,
-        debt_allocation: debtAllocation,
-        profit_sharing_allocation: profitSharingAllocation,
         currency,
-
-        current_debt: currentDebt,
+        ijab_qobul: ijabQobulEntries.length > 0 ? ijabQobulEntries : undefined,
         clauses: clauses.length > 0 ? clauses : undefined,
         wizard_step: targetStep,
         status: nextStatus,
@@ -277,8 +310,8 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
   }
 
   const handleNext = async () => {
-    if (step === 8) {
-      // Generate clauses before going to step 9
+    if (step === 7) {
+      // Generate clauses before going to step 8
       const freshMembers = members.filter(m => m.member_name)
       const generated = generateSyirkahClauses({
         contract_type: contractType,
@@ -289,8 +322,8 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
       }, freshMembers)
       const finalClauses = clauses.length > 0 ? clauses : generated
       setClauses(finalClauses)
-      await saveProgress(9)
-    } else if (step < 9) {
+      await saveProgress(8)
+    } else if (step < 8) {
       await saveProgress(step + 1)
     }
   }
@@ -651,16 +684,6 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
         {/* ── STEP 6: Nisbah Bagi Hasil (was 5) ── */}
         {step === 6 && (
           <StepCard title="Nisbah Bagi Hasil" desc="Tentukan persentase bagi hasil untuk setiap pihak. Total harus sama dengan 100%." icon={PieChart}>
-            <Field
-              label="Nominal Alokasi Bagi Hasil (Rp)"
-              hint="Isi nominal laba yang benar-benar akan dibagikan. Jika kosong atau 0, sistem memakai basis default saat tersedia."
-            >
-              <MoneyInput
-                value={profitSharingAllocation}
-                onChange={setProfitSharingAllocation}
-              />
-            </Field>
-
             <div className="space-y-4">
               {members.filter(m => m.member_name).map((member, index) => (
                 <div key={index} className="bg-white border border-slate-200 rounded-2xl p-5">
@@ -709,82 +732,110 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
               </p>
             )}
 
-            {profitSharingAllocation > 0 && members.filter(m => m.member_name).length > 0 && (
-              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h4 className="font-black text-blue-900">Preview Alokasi Nominal</h4>
-                    <p className="text-sm text-blue-700">
-                      Dengan alokasi {formatRupiah(profitSharingAllocation)}, estimasi nominal per syarik menjadi:
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-700">
-                    Basis {formatRupiah(profitSharingAllocation)}
-                  </span>
-                </div>
-                <div className="mt-4 space-y-2">
-                  {members.filter(m => m.member_name).map((member, index) => (
-                    <div key={`${member.id || member.member_name}-${index}`} className="flex items-center justify-between rounded-xl bg-white px-4 py-3 text-sm">
-                      <div>
-                        <p className="font-bold text-slate-800">{member.member_name}</p>
-                        <p className="text-xs font-medium text-slate-500">{member.profit_share_percentage}% nisbah</p>
+          </StepCard>
+        )}
+
+        {/* ── STEP 7: Drafting Akad ── */}
+        {step === 7 && (
+          <StepCard title="Drafting Akad" desc="Review dan edit pasal-pasal akad yang telah digenerate secara otomatis." icon={FileText}>
+
+            {/* ── Ijab Qobul ── */}
+            <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-5 space-y-4">
+              <div>
+                <h4 className="font-black text-indigo-900 text-sm flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">IQ</span>
+                  Ijab Qobul
+                </h4>
+                <p className="text-xs text-indigo-600 mt-1">Tentukan pihak yang berijab dan berqobul, serta apakah hadir atas nama sendiri atau mewakili.</p>
+              </div>
+
+              {members.filter(m => m.member_name).length === 0 ? (
+                <p className="text-xs text-indigo-400 italic">Tambahkan anggota syirkah terlebih dahulu di langkah sebelumnya.</p>
+              ) : (
+                <div className="space-y-3">
+                  {ijabQobulEntries.map((entry, idx) => (
+                    <div key={idx} className="bg-white rounded-xl border border-indigo-100 p-4 space-y-3">
+                      {/* Name + IJAB/QOBUL toggle */}
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <span className="font-black text-slate-800 text-sm">{entry.member_name}</span>
+                        <div className="flex rounded-xl border border-indigo-200 overflow-hidden text-xs font-black">
+                          {(['IJAB', 'QOBUL'] as const).map(t => (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => setIjabQobulEntries(prev => prev.map((e, i) => i === idx ? { ...e, type: t } : e))}
+                              className={`px-3 py-1.5 transition-all ${entry.type === t ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-400 hover:bg-indigo-50'}`}
+                            >
+                              {t}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      <span className="font-black text-blue-700">
-                        {formatRupiah((profitSharingAllocation * Number(member.profit_share_percentage || 0)) / 100)}
-                      </span>
+
+                      {/* Mode toggle */}
+                      <div className="flex gap-2">
+                        {([
+                          { val: 'personal', label: 'Atas Nama Sendiri' },
+                          { val: 'perwakilan', label: 'Mewakili (Perwakilan)' },
+                        ] as const).map(opt => (
+                          <button
+                            key={opt.val}
+                            type="button"
+                            onClick={() => setIjabQobulEntries(prev => prev.map((e, i) => i === idx ? { ...e, mode: opt.val } : e))}
+                            className={`flex-1 text-[11px] font-bold px-3 py-2 rounded-lg border transition-all ${
+                              entry.mode === opt.val
+                                ? 'border-indigo-400 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-100'
+                                : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Wakil fields */}
+                      {entry.mode === 'perwakilan' && (
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Wakil</label>
+                            <input
+                              type="text"
+                              value={entry.wakil_name}
+                              onChange={e => setIjabQobulEntries(prev => prev.map((en, i) => i === idx ? { ...en, wakil_name: e.target.value } : en))}
+                              placeholder="Nama perwakilan"
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">Jabatan / Kapasitas Wakil</label>
+                            <input
+                              type="text"
+                              value={entry.wakil_jabatan}
+                              onChange={e => setIjabQobulEntries(prev => prev.map((en, i) => i === idx ? { ...en, wakil_jabatan: e.target.value } : en))}
+                              placeholder="cth. Direktur, Kuasa Hukum"
+                              className={inputCls}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Preview text */}
+                      <div className="text-[11px] text-slate-500 italic bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 leading-relaxed">
+                        {entry.type === 'IJAB'
+                          ? entry.mode === 'perwakilan'
+                            ? `"Saya ${entry.wakil_name || '___'} selaku ${entry.wakil_jabatan || '___'} yang mewakili ${entry.member_name}, berijab untuk bersyirkah dalam usaha ini sesuai ketentuan akad."`
+                            : `"Saya ${entry.member_name}, berijab untuk bersyirkah dalam usaha ini sesuai ketentuan akad."`
+                          : entry.mode === 'perwakilan'
+                            ? `"Saya ${entry.wakil_name || '___'} selaku ${entry.wakil_jabatan || '___'} yang mewakili ${entry.member_name}, berqobul atas ijab yang telah disampaikan."`
+                            : `"Saya ${entry.member_name}, berqobul atas ijab yang telah disampaikan."`
+                        }
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-          </StepCard>
-        )}
+              )}
+            </div>
 
-        {/* ── STEP 7: Alokasi Hutang (was 6) ── */}
-        {step === 7 && (
-          <StepCard title="Alokasi & Eksposur Hutang" desc="Tetapkan batas maksimum hutang yang diizinkan dalam kemitraan ini." icon={Shield}>
-            <Field label="Limit Alokasi Hutang Keseluruhan (Rp)" hint="Batas maksimum hutang yang boleh ditanggung oleh usaha bersama ini">
-              <input
-                type="number"
-                value={debtAllocation}
-                onChange={e => setDebtAllocation(Number(e.target.value))}
-                className={inputCls}
-                placeholder="0"
-              />
-              <p className="text-xs text-slate-500 mt-1">{formatRupiah(debtAllocation)}</p>
-            </Field>
-            <Field label="Hutang Terserap Saat Ini (Rp)" hint="Jumlah hutang yang sudah berjalan sekarang">
-              <input
-                type="number"
-                value={currentDebt}
-                onChange={e => setCurrentDebt(Number(e.target.value))}
-                className={inputCls}
-                placeholder="0"
-              />
-              <p className="text-xs text-slate-500 mt-1">{formatRupiah(currentDebt)}</p>
-            </Field>
-            {debtAllocation > 0 && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-5">
-                <div className="flex justify-between text-sm font-bold mb-2">
-                  <span className="text-slate-600">Kapasitas Digunakan</span>
-                  <span className={Number(currentDebt) / Number(debtAllocation) > 0.8 ? 'text-rose-600' : 'text-slate-700'}>
-                    {((Number(currentDebt) / Number(debtAllocation)) * 100).toFixed(1)}%
-                  </span>
-                </div>
-                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${Number(currentDebt) / Number(debtAllocation) > 0.8 ? 'bg-rose-500' : 'bg-amber-500'}`}
-                    style={{ width: `${Math.min((Number(currentDebt) / Number(debtAllocation)) * 100, 100)}%` }}
-                  />
-                </div>
-              </div>
-            )}
-          </StepCard>
-        )}
-
-        {/* ── STEP 8: Drafting Akad (was 7) ── */}
-        {step === 8 && (
-          <StepCard title="Drafting Akad" desc="Review dan edit pasal-pasal akad yang telah digenerate secara otomatis." icon={FileText}>
             {clauses.length === 0 ? (
               <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl">
                 <FileText size={48} className="mx-auto text-slate-300 mb-4" />
@@ -834,8 +885,8 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
           </StepCard>
         )}
 
-        {/* ── STEP 9: Tanda Tangan (was 8) ── */}
-        {step === 9 && (
+        {/* ── STEP 8: Tanda Tangan ── */}
+        {step === 8 && (
           <StepCard title="Tanda Tangan Digital" desc="Masing-masing pihak dan saksi melakukan tanda tangan digital dengan scan QR Code." icon={QrCode}>
             <h3 className="font-semibold text-slate-700 text-sm uppercase tracking-tight">Para Pihak Bersyirkah</h3>
             <div className="space-y-4">
@@ -903,7 +954,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
       </div>
 
       {/* Navigation Footer */}
-      {step < 9 && (
+      {step < 8 && (
         <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-4 shadow-lg">
           <div className="max-w-4xl mx-auto flex justify-between items-center">
             <button
@@ -919,7 +970,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
               disabled={saving || (step === 6 && totalNisbah !== 100) || (step === 5 && !witnessQuorumMet)}
               className="px-6 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
             >
-              {saving ? 'Menyimpan...' : step === 8 ? 'Finalisasi & Tanda Tangan' : 'Lanjut'}
+              {saving ? 'Menyimpan...' : step === 7 ? 'Finalisasi & Tanda Tangan' : 'Lanjut'}
               {!saving && <ChevronRight size={16} />}
             </button>
           </div>
