@@ -15,8 +15,7 @@ const PLAN_ICON: Record<string, any> = {
   Trial: Shield,
   Demo: Zap,
   Lite: Package,
-  Basic: Package,
-  Pro: Crown,
+  Mini: Package,
   Enterprise: Crown,
 }
 
@@ -24,8 +23,7 @@ const PLAN_GRADIENT: Record<string, string> = {
   Trial: 'from-slate-500 to-slate-700',
   Demo: 'from-orange-500 to-amber-600',
   Lite: 'from-emerald-500 to-teal-700',
-  Basic: 'from-blue-500 to-blue-700',
-  Pro: 'from-indigo-500 to-purple-700',
+  Mini: 'from-blue-500 to-blue-700',
   Enterprise: 'from-[#003366] to-indigo-800',
 }
 
@@ -96,7 +94,7 @@ export default function PricingPage() {
       {/* Pricing Cards */}
       <div className={`grid gap-6 ${packages.length <= 2 ? 'md:grid-cols-2 max-w-2xl mx-auto' : packages.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2 lg:grid-cols-4'}`}>
         {packages.map((pkg, i) => {
-          const isEnterprise = pkg.name === 'Enterprise' || pkg.name === 'Pro'
+          const isEnterprise = pkg.name === 'Enterprise'
           const isCurrentPlan = currentPlan === pkg.name
           const Icon = PLAN_ICON[pkg.name] || Package
           const gradient = PLAN_GRADIENT[pkg.name] || 'from-slate-600 to-slate-800'
@@ -230,7 +228,7 @@ export default function PricingPage() {
                     <span className="text-xs font-black leading-tight tracking-tight">
                       {pkg.name === 'Trial' ? 'Mulai Langkah Berkah Sekarang →' : 
                        pkg.name === 'Lite' ? 'Mulai Transaksi Paling Sederhana →' :
-                       pkg.name === 'Basic' ? 'Dapatkan Akses Operasional →' :
+                       pkg.name === 'Mini' ? 'Dapatkan Akses Operasional →' :
                        isEnterprise ? 'Dapatkan Full Power Expansion →' :
                        'Pilih Paket Ini →'}
                     </span>

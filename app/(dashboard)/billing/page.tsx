@@ -54,17 +54,13 @@ const PLAN_UI_META: Record<string, { eyebrow: string; summary: string }> = {
     eyebrow: 'Mulai rapi tanpa ribet',
     summary: 'Paling pas untuk bisnis yang ingin penjualan, kasir, pelanggan, dan laporan inti berjalan dalam satu alur ringan.',
   },
-  Basic: {
+  Mini: {
     eyebrow: 'Naik kelas ke operasional yang lebih tertib',
     summary: 'Untuk bisnis yang sudah butuh accounting, finance, inventory, dan purchasing tanpa loncat ke sistem terlalu berat.',
   },
-  Pro: {
+  Enterprise: {
     eyebrow: 'Full core untuk tim yang sudah serius bertumbuh',
     summary: 'Cocok saat HRIS, manufacturing, dan audit mulai jadi kebutuhan operasional harian.',
-  },
-  Enterprise: {
-    eyebrow: 'Untuk skala besar dan kontrol yang lebih luas',
-    summary: 'Paling cocok untuk organisasi yang butuh ruang tumbuh lebih besar, governance lebih rapi, dan ekspansi berlapis.',
   },
   'ABS Special': {
     eyebrow: 'Paket khusus untuk kebutuhan operasional tertentu',

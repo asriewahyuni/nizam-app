@@ -1,13 +1,33 @@
 'use client'
 
-import React, { Suspense, useState, useTransition } from 'react'
+import React, { Suspense, useState, useTransition, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { signUp } from '@/modules/auth/actions/auth.actions'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { User, Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { getSaasPackageArchitecture } from '@/lib/saas/module-catalog'
 
 type SignUpResult = Awaited<ReturnType<typeof signUp>>
+
+type SaasPackageRow = {
+  id: string
+  name: string
+  price: number
+  billing: string
+  modules: string[]
+}
+
+const PLAN_UI_CONFIG: Record<string, { gradient: string; ring: string }> = {
+  Lite:       { gradient: 'from-emerald-500 to-teal-600',   ring: 'ring-emerald-500' },
+  Mini:       { gradient: 'from-blue-500 to-blue-700',      ring: 'ring-blue-500'    },
+  Enterprise: { gradient: 'from-indigo-500 to-purple-700',  ring: 'ring-indigo-500'  },
+}
+
+const SELECTABLE_PLAN_NAMES = ['Lite', 'Mini', 'Enterprise']
+
+const db = createClient() as any
 
 export default function RegisterPage() {
   return (
@@ -28,18 +48,40 @@ function RegisterPageContent() {
   const [showPassword, setShowPassword] = useState(false)
   const searchParams = useSearchParams()
   const [formData, setFormData] = useState({ fullName: '', email: '', password: '' })
+  const [packages, setPackages] = useState<SaasPackageRow[]>([])
+  const [selectedPackage, setSelectedPackage] = useState<string>('lite')
 
   const source = (searchParams.get('source') || '').trim().toLowerCase()
   const requestedPlan = (searchParams.get('plan') || '').trim().toLowerCase()
   const isDemoFlow = source === 'demo'
-  const plan = isDemoFlow ? 'demo' : (requestedPlan === 'abs' ? 'abs' : 'trial')
+  const isAbsFlow = requestedPlan === 'abs'
+
+  const plan = isDemoFlow ? 'demo' : (isAbsFlow ? 'abs' : selectedPackage)
   const onboardingParams = new URLSearchParams(searchParams.toString())
   onboardingParams.set('plan', plan)
   if (isDemoFlow) onboardingParams.set('source', 'demo')
   else onboardingParams.delete('source')
   const onboardingHref = `/onboarding?${onboardingParams.toString()}`
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    if (isDemoFlow || isAbsFlow) return
+    db.from('saas_packages')
+      .select('id, name, price, billing, modules')
+      .eq('is_active', true)
+      .in('name', SELECTABLE_PLAN_NAMES)
+      .order('price', { ascending: true })
+      .then(({ data }: { data: any[] | null }) => {
+        if (!data) return
+        const rows: SaasPackageRow[] = data.map((p) => ({
+          ...p,
+          modules: Array.isArray(p.modules) ? p.modules : JSON.parse(p.modules || '[]'),
+        }))
+        setPackages(rows)
+        if (rows.length > 0) setSelectedPackage(rows[0].name.toLowerCase())
+      })
+  }, [isDemoFlow, isAbsFlow])
+
+  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
     startTransition(async () => {
@@ -97,18 +139,73 @@ function RegisterPageContent() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-7">
+      <div className="mb-6">
         <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-          {plan === 'abs' ? 'Daftar ABS Trial' : plan === 'demo' ? 'Coba Demo' : 'Buat Akun Bisnis'}
+          {isAbsFlow ? 'Daftar ABS Trial' : isDemoFlow ? 'Coba Demo' : 'Buat Akun Bisnis'}
         </h2>
         <p className="text-slate-400 text-sm mt-1">
-          {plan === 'abs'
+          {isAbsFlow
             ? 'Trial 30 hari gratis khusus peserta ABS.'
-            : plan === 'demo'
+            : isDemoFlow
             ? 'Akses lingkungan demo selama 12 jam.'
-            : 'Mulai trial gratis, tanpa kartu kredit.'}
+            : 'Pilih paket, mulai trial gratis tanpa kartu kredit.'}
         </p>
       </div>
+
+      {/* Package Selector — hanya tampil untuk alur reguler */}
+      {!isAbsFlow && !isDemoFlow && packages.length > 0 && (
+        <div className="mb-6 space-y-2">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Pilih Paket</p>
+          <div className="grid grid-cols-3 gap-2">
+            {packages.map((pkg) => {
+              const key = pkg.name.toLowerCase()
+              const isSelected = selectedPackage === key
+              const ui = PLAN_UI_CONFIG[pkg.name] || { gradient: 'from-slate-500 to-slate-700', ring: 'ring-slate-400' }
+              const arch = getSaasPackageArchitecture(pkg.modules, [])
+              const coreItems = [...arch.liteCore, ...arch.starterCore, ...arch.fullCoreExtensions]
+              const displayModules = coreItems.slice(0, 4)
+              const extra = coreItems.length - displayModules.length
+
+              return (
+                <button
+                  key={pkg.id}
+                  type="button"
+                  onClick={() => setSelectedPackage(key)}
+                  className={`relative flex flex-col rounded-xl border-2 p-3 text-left transition-all ${
+                    isSelected
+                      ? `border-transparent ring-2 ${ui.ring} bg-white shadow-md`
+                      : 'border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-200'
+                  }`}
+                >
+                  {isSelected && (
+                    <div className={`absolute top-2 right-2 w-4 h-4 rounded-full bg-gradient-to-br ${ui.gradient} flex items-center justify-center`}>
+                      <CheckCircle2 size={10} className="text-white" />
+                    </div>
+                  )}
+                  <span className={`text-xs font-black tracking-tight ${isSelected ? 'text-slate-900' : 'text-slate-600'}`}>
+                    {pkg.name}
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400 mt-0.5 leading-none">
+                    {pkg.price === 0 ? 'Gratis' : `Rp ${pkg.price.toLocaleString('id-ID')}`}
+                    {pkg.price > 0 && <span className="font-medium">/{pkg.billing}</span>}
+                  </span>
+                  <div className="mt-2 space-y-0.5">
+                    {displayModules.map((mod) => (
+                      <p key={mod} className="text-[9px] font-semibold text-slate-500 leading-tight flex items-center gap-1">
+                        <span className="w-1 h-1 rounded-full bg-slate-300 shrink-0" />
+                        {mod}
+                      </p>
+                    ))}
+                    {extra > 0 && (
+                      <p className="text-[9px] text-slate-400 italic leading-tight">+{extra} lainnya</p>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">

@@ -882,7 +882,7 @@ export default function SaaSAdminPage() {
       const { error: orgErr } = await db.from('organizations').update({
         settings: {
           ...currentSettings,
-          plan: pkg?.name || 'Pro',
+          plan: pkg?.name || 'Enterprise',
           expires_at: expiresAt,
           updated_at: new Date().toISOString()
         },

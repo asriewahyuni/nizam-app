@@ -800,7 +800,8 @@ async function createOrganizationRecord(
     const shouldSkipCoaSeed = parentOrgId ? true : !isDemo
     const shouldAutoApplyAbsVoucher = isAbsFlow
     const ABS_TRIAL_PLAN_NAME = 'ABS Trial'
-    let selectedPlan = isDemo ? 'Demo' : (isAbsFlow ? ABS_TRIAL_PLAN_NAME : 'Trial')
+    const SELECTABLE_PLAN_MAP: Record<string, string> = { lite: 'Lite', mini: 'Mini', enterprise: 'Enterprise' }
+    let selectedPlan = isDemo ? 'Demo' : (isAbsFlow ? ABS_TRIAL_PLAN_NAME : (SELECTABLE_PLAN_MAP[planParam] || 'Trial'))
     if (parentPackageState?.plan) {
       selectedPlan = parentPackageState.plan
     }
