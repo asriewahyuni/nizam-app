@@ -69,3 +69,10 @@ scratch/db-backups/
 
 # Python scratch files (root only)
 /*.py
+
+# Router proxy scratch files
+__pycache__/
+*.pyc
+/ROUTER_PROXY_SETUP.md
+/run_router_proxy.sh
+/setup_router_proxy.sh
