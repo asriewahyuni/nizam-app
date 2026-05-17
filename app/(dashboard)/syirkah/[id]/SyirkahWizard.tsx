@@ -285,6 +285,7 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
         nextMembers.push({ ...member, role: normalizedRole })
       }
       setMembers(nextMembers)
+      syncIjabQobul(nextMembers)
 
       // Witnesses follow the same flow as members: once a row is saved, keep
       // the database id so the next wizard step performs an update.
