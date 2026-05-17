@@ -1,6 +1,8 @@
 import { queryPostgres } from '@/lib/db/postgres'
 import PlanClient from './PlanClient'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Paket & Harga — NIZAM ERP',
   description: 'Pilih paket NIZAM ERP yang sesuai dengan kebutuhan bisnis Anda.',
