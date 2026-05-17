@@ -19,6 +19,7 @@ import { getLearningAccessContext } from '@/modules/edu/lib/learning-access.serv
 import { formatRupiah } from '@/lib/utils'
 import { getModuleInstanceStatus } from '@/modules/marketplace/actions/marketplace.actions'
 import { TambahProgramButton } from './TambahProgramButton'
+import { ProgramListClient } from './ProgramListClient'
 
 function StatCard({
   label,
@@ -212,37 +213,7 @@ export default async function LMSDashboardPage(props: {
             </div>
             <h2 className="mt-2 text-xl font-semibold text-white">Program Tersedia</h2>
             
-            <div className="mt-6 space-y-3">
-              {activeCourses.slice(0, 4).map((c: any) => (
-                <div key={c.slug} className="flex items-center gap-3 p-4 rounded-2xl bg-white/10 hover:bg-white/15 transition-colors border border-white/5">
-                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-blue-300">
-                    <BookOpen size={18} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-white">{c.title}</h3>
-                    <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight mt-1">Level: {c.level_code || 'ALL'}</div>
-                  </div>
-                </div>
-              ))}
-
-              {activeCourses.length === 0 && (
-                <div className="p-6 text-center border border-dashed border-slate-700 rounded-2xl space-y-3">
-                  <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto">
-                    <GraduationCap size={22} className="text-slate-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-400">Belum ada program</p>
-                    <p className="text-xs text-slate-600 mt-1">Klik &ldquo;Tambah Program&rdquo; untuk mulai.</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {activeCourses.length > 4 && (
-              <Link href="/lms/admin" className="mt-4 block text-center text-sm font-bold text-blue-400 hover:text-blue-300 transition-colors">
-                Lihat Semua Program ({activeCourses.length})
-              </Link>
-            )}
+            <ProgramListClient courses={activeCourses} />
           </div>
         </section>
       </div>

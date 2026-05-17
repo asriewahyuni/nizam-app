@@ -207,7 +207,7 @@ export default function PricingPage() {
               {/* CTA */}
               <div className="bg-white px-6 pb-6">
                 {isCurrentPlan ? (
-                  <Link 
+                  <Link
                     href="/billing"
                     className="group flex items-center justify-center w-full py-4 text-center text-sm font-black text-[#003366] bg-[#003366]/5 rounded-2xl border border-[#003366]/20 hover:bg-[#003366] hover:text-white transition-all shadow-sm"
                   >
@@ -219,18 +219,18 @@ export default function PricingPage() {
                     className={`group flex items-center justify-center text-center px-4 py-4 rounded-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
                       ${isEnterprise
                         ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/20 hover:shadow-orange-500/40'
-                        : pkg.name === 'Trial' 
+                        : pkg.name === 'Trial'
                           ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20'
                           : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                       }
                     `}
                   >
                     <span className="text-xs font-black leading-tight tracking-tight">
-                      {pkg.name === 'Trial' ? 'Mulai Langkah Berkah Sekarang →' : 
-                       pkg.name === 'Lite' ? 'Mulai Transaksi Paling Sederhana →' :
-                       pkg.name === 'Mini' ? 'Dapatkan Akses Operasional →' :
-                       isEnterprise ? 'Dapatkan Full Power Expansion →' :
-                       'Pilih Paket Ini →'}
+                      {pkg.name === 'Trial' ? 'Mulai Langkah Berkah Sekarang →' :
+                        pkg.name === 'Lite' ? 'Mulai Transaksi Paling Sederhana →' :
+                          pkg.name === 'Mini' ? 'Dapatkan Akses Operasional →' :
+                            isEnterprise ? 'Dapatkan Full Power Expansion →' :
+                              'Pilih Paket Ini →'}
                     </span>
                   </Link>
                 )}
@@ -248,7 +248,7 @@ export default function PricingPage() {
         className="bg-slate-900 rounded-2xl p-8 md:p-12 text-white relative overflow-hidden"
       >
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/20 rounded-full blur-[100px]" />
-        
+
         <div className="relative z-10 flex flex-col md:flex-row items-center gap-12">
           <div className="flex-1 space-y-6 text-center md:text-left">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-500/20 text-blue-300 rounded-full text-[10px] font-semibold tracking-tight border border-blue-500/30">
@@ -260,8 +260,8 @@ export default function PricingPage() {
             </p>
           </div>
 
-        <div className="w-full md:w-auto space-y-6">
-          {[
+          <div className="w-full md:w-auto space-y-6">
+            {[
               { title: 'Module Marketplace', items: OPERATOR_MODULE_OPTIONS },
               { title: 'Add-on Marketplace', items: OPERATOR_GROWTH_ADDON_OPTIONS },
             ].map((section) => (
