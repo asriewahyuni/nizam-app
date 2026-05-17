@@ -820,16 +820,32 @@ export default function SyirkahWizard({ orgId, contract, members: initialMembers
                       )}
 
                       {/* Preview text */}
-                      <div className="text-[11px] text-slate-500 italic bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 leading-relaxed">
-                        {entry.type === 'IJAB'
-                          ? entry.mode === 'perwakilan'
-                            ? `"Saya ${entry.wakil_name || '___'} selaku ${entry.wakil_jabatan || '___'} yang mewakili ${entry.member_name}, berijab untuk bersyirkah dalam usaha ini sesuai ketentuan akad."`
-                            : `"Saya ${entry.member_name}, berijab untuk bersyirkah dalam usaha ini sesuai ketentuan akad."`
-                          : entry.mode === 'perwakilan'
-                            ? `"Saya ${entry.wakil_name || '___'} selaku ${entry.wakil_jabatan || '___'} yang mewakili ${entry.member_name}, berqobul atas ijab yang telah disampaikan."`
-                            : `"Saya ${entry.member_name}, berqobul atas ijab yang telah disampaikan."`
-                        }
-                      </div>
+                      {(() => {
+                        const pihakKe = idx + 1
+                        const memberData = members.find(m => m.member_name === entry.member_name)
+                        const nisbah = memberData?.profit_share_percentage ?? 0
+                        const pihakIjab = ijabQobulEntries.find(e => e.type === 'IJAB')
+                        const namaPihakIjab = pihakIjab?.mode === 'perwakilan'
+                          ? `${pihakIjab.wakil_name || '___'} (mewakili ${pihakIjab.member_name})`
+                          : pihakIjab?.member_name || '___'
+                        const namaPengucap = entry.mode === 'perwakilan'
+                          ? `${entry.wakil_name || '___'} selaku ${entry.wakil_jabatan || '___'} yang mewakili ${entry.member_name}`
+                          : entry.member_name
+                        const usaha = businessName || '___'
+                        const jenis = contractType || '___'
+                        const durasi = durationMonths ? `${durationMonths} bulan` : '___'
+                        const tglMulai = startDate || '___'
+
+                        const text = entry.type === 'IJAB'
+                          ? `"Saya ${namaPengucap}, sebagai pihak ke-${pihakKe} atas nama ${entry.mode === 'perwakilan' ? 'perwakilan' : 'sendiri'}, menawarkan kepada Saudara/i [pihak lain] untuk bersyirkah ${jenis} dalam usaha ${usaha}, dengan nisbah bagi hasil saya sebesar ${nisbah}%, berlaku selama ${durasi} terhitung sejak ${tglMulai}."`
+                          : `"Saya ${namaPengucap}, sebagai pihak ke-${pihakKe} atas nama ${entry.mode === 'perwakilan' ? 'perwakilan' : 'sendiri'}, menerima tawaran ${jenis} dari Saudara/i ${namaPihakIjab} sebagaimana yang telah disebutkan."`
+
+                        return (
+                          <div className="text-[11px] text-slate-500 italic bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 leading-relaxed">
+                            {text}
+                          </div>
+                        )
+                      })()}
                     </div>
                   ))}
                 </div>
