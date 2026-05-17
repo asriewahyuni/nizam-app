@@ -156,8 +156,8 @@ export async function createFixedAsset(orgId: string, assetData: any) {
       return { error: 'Akun PPN Masukan harus dipilih jika ada pajak!' }
   }
 
-  // 3. OTOMATIS JURNAL KAPITALISASI (Enterprise Engine)
-  const description = `Kapitalisasi Aset: ${asset.name} (${asset.code})`
+  // 3. OTOMATIS JURNAL PEROLEHAN ASET TETAP (Enterprise Engine)
+  const description = `Perolehan Aset Tetap: ${asset.name} (${asset.code})`
 
   const journalLines: any[] = [
     {

@@ -567,7 +567,7 @@ export function AssetClient({
             <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                <h2 className="text-2xl font-semibold text-slate-900 flex items-center gap-3">
                   {editingAssetId ? <Pencil size={28} className="text-amber-500" /> : <Landmark size={28} className="text-blue-600" />}
-                  {editingAssetId ? 'Perbarui Data Aset' : 'Kapitalisasi Aset Tetap Baru'}
+                  {editingAssetId ? 'Perbarui Data Aset' : 'Perolehan Aset Tetap Baru'}
                </h2>
                <button onClick={() => { setShowModal(false); setEditingAssetId(null); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-900 transition-all shadow-sm"> <X size={20} /> </button>
             </div>
