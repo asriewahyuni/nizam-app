@@ -1081,17 +1081,30 @@ export async function uploadCoAFromExcel(
 
       const code = String(row.getCell(headers.code).value || '').trim()
       const name = String(row.getCell(headers.name).value || '').trim()
-      const type = String(row.getCell(headers.type).value || '').trim().toUpperCase()
+      const typeRaw = String(row.getCell(headers.type).value || '').trim().toUpperCase()
       const normalBalance = String(row.getCell(headers.normal_balance).value || '').trim().toUpperCase()
       const parentCode = headers['parent_code'] ? String(row.getCell(headers['parent_code']).value || '').trim() : undefined
       const description = headers['description'] ? String(row.getCell(headers['description']).value || '').trim() : undefined
 
       if (!code || !name) return // Skip empty rows
 
-      // Validate type
-      if (!['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'].includes(type)) {
-        return
+      // Normalize type: support Bahasa Indonesia & English
+      const typeMap: Record<string, AccountType> = {
+        'ASSET': 'ASSET',
+        'ASET': 'ASSET',
+        'LIABILITY': 'LIABILITY',
+        'KEWAJIBAN': 'LIABILITY',
+        'EQUITY': 'EQUITY',
+        'EKUITAS': 'EQUITY',
+        'MODAL': 'EQUITY',
+        'REVENUE': 'REVENUE',
+        'PENDAPATAN': 'REVENUE',
+        'EXPENSE': 'EXPENSE',
+        'BEBAN': 'EXPENSE',
+        'BIAYA': 'EXPENSE',
       }
+      const type = typeMap[typeRaw]
+      if (!type) return // Skip invalid type
 
       // Validate normal balance
       if (!['DEBIT', 'CREDIT'].includes(normalBalance)) {
@@ -1101,7 +1114,7 @@ export async function uploadCoAFromExcel(
       accounts.push({
         code,
         name,
-        type: type as AccountType,
+        type,
         normal_balance: normalBalance as NormalBalance,
         parent_code: parentCode,
         description
