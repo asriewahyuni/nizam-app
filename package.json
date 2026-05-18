@@ -40,6 +40,7 @@
     "schedule:list": "tsx scripts/schedule-list.ts",
     "schedule:run": "tsx scripts/schedule-run.ts",
     "templates:migrasi": "node scripts/generate-migration-template-xlsx.mjs",
+    "templates:coa": "node scripts/generate-coa-upload-template.mjs",
     "test": "vitest run",
     "test:erp": "vitest run __tests__/accounting.test.ts __tests__/auth.actions.test.ts __tests__/fleet.actions.test.ts __tests__/middleware.test.ts __tests__/proxy.test.ts",
     "test:erp:coverage": "vitest run --coverage __tests__/accounting.test.ts __tests__/auth.actions.test.ts __tests__/fleet.actions.test.ts __tests__/middleware.test.ts __tests__/proxy.test.ts",
