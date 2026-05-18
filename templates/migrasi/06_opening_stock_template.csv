@@ -1,1 +1,11 @@
 sku,product_name,warehouse_name,qty,unit_cost,total_value,batch_number,bin_name,notes
+BRG-001,Beras Premium 5kg,Gudang Utama,500,55000,27500000,,R-A1,
+BRG-002,Minyak Goreng 1L,Gudang Utama,200,14000,2800000,,R-A2,
+BRG-003,Gula Pasir 1kg,Gudang Utama,350,12500,4375000,,R-A3,
+BHN-001,Tepung Terigu,Gudang Bahan,1000,9000,9000000,BATCH-2026-03,,
+BHN-002,Ragi Instant,Gudang Bahan,500,2500,1250000,BATCH-2026-03,,
+BHN-003,Gula Pasir Curah,Gudang Bahan,800,11000,8800000,,,
+PRD-001,Roti Tawar Standar 400g,Gudang Produk Jadi,150,8000,1200000,,,
+PKG-001,Plastik Kemasan 1kg,Gudang Bahan,5000,500,2500000,,,
+BRG-001,Beras Premium 5kg,Gudang Cabang Surabaya,200,55000,11000000,,,Stok cabang Surabaya
+BRG-002,Minyak Goreng 1L,Gudang Cabang Surabaya,100,14000,1400000,,,

@@ -1,1 +1,6 @@
-customer_name,invoice_number,invoice_date,due_date,outstanding_amount,branch_name,notes
+customer_name,invoice_number,invoice_date,due_date,outstanding_amount,currency_code,exchange_rate,branch_name,notes
+PT Maju Bersama,INV-2026-0312,2026-03-15,2026-04-15,5750000,IDR,1,Pusat,
+PT Maju Bersama,INV-2026-0389,2026-04-01,2026-05-01,3200000,IDR,1,Pusat,Invoice kedua belum jatuh tempo
+CV Sejahtera Mandiri,INV-2026-0401,2026-04-10,2026-04-25,1875000,IDR,1,Surabaya,
+UD Nusantara Trading,INV-2026-0421,2026-04-20,2026-05-20,9500000,IDR,1,Pusat,Pembayaran sebagian sudah masuk
+Toko Berkah Jaya,INV-2026-0430,2026-04-28,2026-05-05,620000,IDR,1,Bandung,

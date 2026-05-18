@@ -1,1 +1,6 @@
 warehouse_code,warehouse_name,branch_name,address,is_active,notes
+GDG-001,Gudang Utama,Pusat,"Jl. Industri No. 10, Cakung, Jakarta Timur",TRUE,Gudang barang jadi dan dagangan
+GDG-002,Gudang Bahan,Pusat,"Jl. Industri No. 10, Cakung, Jakarta Timur",TRUE,Khusus bahan baku produksi
+GDG-003,Gudang Produk Jadi,Pusat,"Jl. Industri No. 12, Cakung, Jakarta Timur",TRUE,Output produksi
+GDG-004,Gudang Cabang Surabaya,Surabaya,"Jl. Raya Margomulyo No. 35, Surabaya",TRUE,
+GDG-005,Gudang Titipan Mitra,Bandung,"Jl. Soekarno Hatta No. 77, Bandung",TRUE,Barang konsinyasi

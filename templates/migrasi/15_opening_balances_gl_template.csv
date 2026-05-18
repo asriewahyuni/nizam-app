@@ -1,0 +1,14 @@
+account_code,account_name,normal_balance,opening_amount,notes
+3101,Modal Disetor,CREDIT,500000000,Modal awal pemegang saham
+3201,Laba Ditahan,CREDIT,45750000,Akumulasi laba s.d. 31 Desember 2025
+3202,Laba Berjalan Tahun Ini,CREDIT,12500000,Laba Jan-Apr 2026 sebelum cut-off
+2101,Hutang Usaha,CREDIT,30500000,Total hutang dagang - detail di template 08
+2102,Hutang Pajak PPN,CREDIT,4500000,PPN keluaran bulan April 2026
+2103,Hutang PPh 21,CREDIT,2750000,PPh karyawan April 2026 belum disetor
+2201,Hutang Bank BCA - KMK,CREDIT,120000000,Kredit modal kerja sisa pokok
+2301,Pendapatan Diterima Dimuka,CREDIT,8000000,DP dari pelanggan yang belum dikirim
+1201,Piutang Usaha,DEBIT,20945000,Total piutang - detail di template 07
+1301,Persediaan Barang Dagangan,DEBIT,69825000,Nilai stok - detail di template 06
+1302,Persediaan Bahan Baku,DEBIT,19050000,Nilai bahan - detail di template 06
+1303,Persediaan Barang Jadi,DEBIT,1200000,Nilai produk jadi - detail di template 06
+1304,Perlengkapan,DEBIT,2500000,Nilai kemasan - detail di template 06

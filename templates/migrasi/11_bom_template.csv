@@ -1,1 +1,8 @@
 bom_code,output_sku,output_name,output_qty,component_sku,component_name,component_qty,component_unit,notes
+BOM-001,PRD-001,Roti Tawar Standar 400g,20,BHN-001,Tepung Terigu,1,KG,Per 20 loyang
+BOM-001,PRD-001,Roti Tawar Standar 400g,20,BHN-002,Ragi Instant,2,SACHET,
+BOM-001,PRD-001,Roti Tawar Standar 400g,20,BHN-003,Gula Pasir Curah,0.2,KG,
+BOM-001,PRD-001,Roti Tawar Standar 400g,20,PKG-001,Plastik Kemasan 1kg,20,LEMBAR,Satu kemasan per loyang
+BOM-002,PRD-002,Roti Manis Isi Coklat,50,BHN-001,Tepung Terigu,0.8,KG,Per 50 pcs
+BOM-002,PRD-002,Roti Manis Isi Coklat,50,BHN-002,Ragi Instant,1,SACHET,
+BOM-002,PRD-002,Roti Manis Isi Coklat,50,BHN-003,Gula Pasir Curah,0.3,KG,

@@ -1,1 +1,12 @@
-sku,product_name,type,category,unit,purchase_price,selling_price,warehouse_default,is_active,notes
+sku,product_name,type,category,unit,purchase_price,selling_price,warehouse_default,income_account_code,cogs_account_code,asset_account_code,currency_code,is_active,notes
+BRG-001,Beras Premium 5kg,INVENTORY,Siap Jual,KG,55000,75000,Gudang Utama,4101,5101,1301,IDR,TRUE,
+BRG-002,Minyak Goreng 1L,INVENTORY,Siap Jual,BOTOL,14000,18500,Gudang Utama,4101,5101,1301,IDR,TRUE,
+BRG-003,Gula Pasir 1kg,INVENTORY,Siap Jual,KG,12500,15000,Gudang Utama,4101,5101,1301,IDR,TRUE,
+BHN-001,Tepung Terigu,INVENTORY,Bahan,KG,9000,0,Gudang Bahan,,,1302,IDR,TRUE,Bahan baku produksi
+BHN-002,Ragi Instant,INVENTORY,Bahan,SACHET,2500,0,Gudang Bahan,,,1302,IDR,TRUE,
+BHN-003,Gula Pasir Curah,INVENTORY,Bahan,KG,11000,0,Gudang Bahan,,,1302,IDR,TRUE,
+PRD-001,Roti Tawar Standar 400g,INVENTORY,Siap Jual,LOYANG,8000,12500,Gudang Produk Jadi,4101,5101,1303,IDR,TRUE,Produk hasil produksi
+PRD-002,Roti Manis Isi Coklat,INVENTORY,Siap Jual,PCS,3000,5000,Gudang Produk Jadi,4101,5101,1303,IDR,TRUE,
+PKG-001,Plastik Kemasan 1kg,INVENTORY,Pelengkap,LEMBAR,500,0,Gudang Bahan,,,1304,IDR,TRUE,
+SVC-001,Ongkos Kirim,SERVICE,Layanan,LAYANAN,0,25000,,,4102,,IDR,TRUE,
+SVC-002,Jasa Instalasi,SERVICE,Layanan,JAM,0,150000,,,4103,,IDR,TRUE,

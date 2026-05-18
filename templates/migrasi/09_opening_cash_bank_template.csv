@@ -1,1 +1,7 @@
-account_code,account_name,account_type,balance,branch_name,notes
+account_code,account_name,account_type,normal_balance,opening_amount,currency_code,exchange_rate,branch_name,notes
+1101,Kas Besar,KAS,DEBIT,5000000,IDR,1,Pusat,Hasil hitung fisik per 30 Apr 2026
+1102,Kas Kecil,KAS,DEBIT,1500000,IDR,1,Pusat,
+1111,Bank BCA - Rek 1234567890,BANK,DEBIT,85000000,IDR,1,Pusat,Saldo per rekening koran 30 Apr 2026
+1112,Bank Mandiri - Rek 9876543210,BANK,DEBIT,30000000,IDR,1,Pusat,
+1113,Bank BRI - Rek 5678901234,BANK,DEBIT,12500000,IDR,1,Surabaya,Rekening cabang Surabaya
+1114,Rekening USD - Citibank,BANK,DEBIT,5000,USD,16200,Pusat,Saldo USD per cut-off

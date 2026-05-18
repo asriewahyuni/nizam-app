@@ -1,1 +1,8 @@
 employee_code,employee_name,email,phone,department,position,join_date,employment_status,basic_salary,is_active,notes
+EMP-001,Budi Santoso,budi.santoso@perusahaan.com,081234567890,Operasional,Manager Operasional,2019-03-01,PERMANENT,8000000,TRUE,
+EMP-002,Siti Rahayu,siti.rahayu@perusahaan.com,082345678901,Keuangan,Staff Akuntansi,2021-07-15,PERMANENT,5500000,TRUE,
+EMP-003,Dedi Kurniawan,dedi.k@perusahaan.com,083456789012,Gudang,Kepala Gudang,2020-01-20,PERMANENT,6200000,TRUE,
+EMP-004,Rina Wulandari,rina.w@perusahaan.com,084567890123,Sales,Sales Executive,2022-05-10,PERMANENT,4800000,TRUE,Target komisi terpisah
+EMP-005,Ahmad Fauzi,ahmad.f@perusahaan.com,085678901234,Produksi,Operator Mesin,2023-02-01,PERMANENT,4200000,TRUE,
+EMP-006,Mega Lestari,mega.l@perusahaan.com,086789012345,HRD,Staff HR,2023-08-01,CONTRACT,4000000,TRUE,Kontrak 1 tahun - habis Agustus 2026
+EMP-007,Yusuf Hakim,yusuf.h@perusahaan.com,087890123456,Kurir,Driver,2021-11-15,PERMANENT,4500000,TRUE,

@@ -1,0 +1,5 @@
+project_code,project_name,project_type,client_name,site_address,contract_value,estimated_cost,start_date,target_end_date,project_status,branch_name,notes
+PRJ-2025-001,Pembangunan Gedung Kantor PT ABC 6 Lantai,CONTRACTOR,PT ABC Indonesia,"Jl. Sudirman No. 45, Jakarta Selatan",2500000000,1800000000,2025-06-01,2026-08-31,EXECUTION,Pusat,Progres 62% per cut-off
+PRJ-2025-002,Renovasi Interior Showroom Mewah,INTERIOR,CV Showroom Jaya,"Jl. Gatot Subroto No. 22, Jakarta",350000000,250000000,2026-03-01,2026-06-30,EXECUTION,Pusat,Progres 35% per cut-off
+PRJ-2026-001,Desain Arsitektur Villa Pantai,ARCHITECT,Bpk Hendra Wijaya,"Jl. Pantai Indah No. 10, Bali",180000000,90000000,2026-04-01,2026-07-31,DESIGN,Bali,Masih tahap desain
+PRJ-2026-002,Konstruksi Gudang Industri,CONTRACTOR,PT Logistik Prima,"Kawasan Industri KIIC Blok B-12, Karawang",950000000,700000000,2026-05-01,2026-11-30,PLANNING,Pusat,Baru mulai setelah cut-off

@@ -1,1 +1,6 @@
-supplier_name,bill_number,bill_date,due_date,outstanding_amount,branch_name,notes
+supplier_name,bill_number,bill_date,due_date,outstanding_amount,currency_code,exchange_rate,branch_name,notes
+PT Bahan Prima Nusantara,PO-2026-0211,2026-03-20,2026-04-20,12000000,IDR,1,Pusat,
+PT Bahan Prima Nusantara,PO-2026-0278,2026-04-15,2026-05-15,8500000,IDR,1,Pusat,Pembelian terakhir sebelum cut-off
+UD Logistik Andalan,PO-2026-0290,2026-04-22,2026-05-06,3750000,IDR,1,Pusat,
+PT Indo Packaging,PO-2026-0301,2026-04-25,2026-06-10,6250000,IDR,1,Pusat,Net 45 hari
+Importir Global Trade Ltd,PO-2026-0055,2026-03-01,2026-06-01,1500,USD,16200,Pusat,Invoice USD - kurs per cut-off 30 Apr 2026
