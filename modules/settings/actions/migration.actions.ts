@@ -596,6 +596,8 @@ function resolveCoaAccountType(value: string) {
     modal: 'EQUITY',
     pendapatan: 'REVENUE',
     pemasukan: 'REVENUE',
+    penjualan: 'REVENUE',
+    income: 'REVENUE',
     hpp: 'EXPENSE',
     beban: 'EXPENSE',
     'beban operasional': 'EXPENSE',
