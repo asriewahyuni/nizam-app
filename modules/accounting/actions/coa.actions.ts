@@ -1083,7 +1083,16 @@ export async function uploadCoAFromExcel(
       const name = String(row.getCell(headers.name).value || '').trim()
       const typeRaw = String(row.getCell(headers.type).value || '').trim().toUpperCase()
       const normalBalance = String(row.getCell(headers.normal_balance).value || '').trim().toUpperCase()
-      const parentCode = headers['parent_code'] ? String(row.getCell(headers['parent_code']).value || '').trim() : undefined
+      
+      // Parse parent_code: convert integer to string, empty string to undefined
+      let parentCode: string | undefined = undefined
+      if (headers['parent_code']) {
+        const parentRaw = row.getCell(headers['parent_code']).value
+        if (parentRaw !== null && parentRaw !== undefined && String(parentRaw).trim()) {
+          parentCode = String(parentRaw).trim()
+        }
+      }
+      
       const description = headers['description'] ? String(row.getCell(headers['description']).value || '').trim() : undefined
 
       if (!code || !name) return // Skip empty rows
@@ -1128,6 +1137,7 @@ export async function uploadCoAFromExcel(
     // ── Validasi struktur akun ──
     const validationErrors: string[] = []
     const seenCodes = new Set<string>()
+    const validParentCodes = new Set(accounts.map(a => a.code))
 
     for (let i = 0; i < accounts.length; i++) {
       const acc = accounts[i]
@@ -1139,34 +1149,49 @@ export async function uploadCoAFromExcel(
       }
       seenCodes.add(acc.code)
 
-      // 2. Cek parent_code jika ada
-      if (acc.parent_code) {
-        // Parent code harus ada di dalam list akun yang diupload
-        const parentExists = accounts.some(p => p.code === acc.parent_code)
-        if (!parentExists) {
-          validationErrors.push(`Baris ${rowNum}: Akun "${acc.name}" (${acc.code}) mereferensi parent "${acc.parent_code}" yang tidak ada di file.`)
-        }
-      }
-
-      // 3. Validasi format kode akun (minimal harus ada karakter)
+      // 2. Validasi format kode akun (minimal harus ada karakter)
       if (!acc.code || acc.code.length === 0) {
         validationErrors.push(`Baris ${rowNum}: Kode akun tidak boleh kosong.`)
+        continue // skip weitere validasi untuk row ini
       }
 
-      // 4. Validasi nama akun
+      // 3. Validasi nama akun
       if (!acc.name || acc.name.length === 0) {
         validationErrors.push(`Baris ${rowNum}: Nama akun tidak boleh kosong.`)
+      }
+
+      // 4. Cek parent_code jika ada
+      if (acc.parent_code) {
+        // Parent code tidak boleh berupa angka murni (1, 2, 3, etc) — harus kode akun valid
+        if (/^\d+$/.test(acc.parent_code)) {
+          validationErrors.push(`Baris ${rowNum}: Parent code "${acc.parent_code}" hanya angka. Gunakan kode akun valid (contoh: "1", "1.1", "2", "2.1"), bukan nomor level.`)
+        }
+        // Parent code harus ada di dalam list akun yang diupload
+        else if (!validParentCodes.has(acc.parent_code)) {
+          validationErrors.push(`Baris ${rowNum}: Parent code "${acc.parent_code}" tidak ditemukan di file. Pastikan parent akun sudah ada di atas.`)
+        }
       }
     }
 
     // Jika ada error validasi, kembalikan dengan detail
     if (validationErrors.length > 0) {
-      const errorSummary = validationErrors.slice(0, 15).join('\n')
-      const moreErrors = validationErrors.length > 15 ? `\nBaris ${15 + 1}: ... dan ${validationErrors.length - 15} error lainnya.` : ''
+      const errorSummary = validationErrors.slice(0, 20).join('\n')
+      const moreErrors = validationErrors.length > 20 ? `\n... dan ${validationErrors.length - 20} error lainnya.` : ''
       const fullError = `${errorSummary}${moreErrors}`
+      
+      // Categorize errors untuk helpful message
+      const hasParentError = validationErrors.some(e => e.includes('Parent') || e.includes('parent'))
+      const hasDuplicateError = validationErrors.some(e => e.includes('sudah pernah'))
+      
+      let hints = '✏️ Untuk memperbaiki:\n'
+      if (hasDuplicateError) hints += '- Pastikan setiap KODE AKUN unik (cek baris yang ditunjukkan)\n'
+      if (hasParentError) hints += '- Parent code hanya boleh "1", "2", "1.1", "2.1" dll (sesuai dengan kode akun yang ada)\n- Jangan gunakan angka seperti 1, 2, 3 tanpa format kode\n'
+      hints += '- Kode dan nama akun TIDAK boleh kosong\n'
+      hints += '- Untuk aset: parent biasanya "1", untuk liabilitas: "2", dst.'
+      
       return {
         success: false,
-        error: `❌ Ditemukan ${validationErrors.length} masalah:\n\n${fullError}\n\n✏️ Perbaiki:\n- Pastikan setiap kode akun UNIK (tidak boleh duplikat)\n- Jika ada parent_code, parent tersebut harus ada di file\n- Kode dan nama akun tidak boleh kosong`
+        error: `❌ Validasi CoA gagal. Ditemukan ${validationErrors.length} masalah:\n\n${fullError}\n\n${hints}`
       }
     }
 
@@ -1183,12 +1208,20 @@ export async function uploadCoAFromExcel(
     }
 
     // Insert/update accounts
+    // First pass: create all accounts with parent_id = null to avoid parent-not-found errors
     let insertedCount = 0
     let updatedCount = 0
     const createdAccounts: Record<string, string> = {} // code -> id mapping for new accounts
 
     for (const account of accounts) {
-      const parentId = account.parent_code ? codeToParentId[account.parent_code] || null : null
+      // In first pass, try to find parent in existing OR just-created accounts
+      let parentId: string | null = null
+      if (account.parent_code) {
+        // Check existing accounts first
+        parentId = codeToParentId[account.parent_code] || null
+        // If parent is another new account being created, use its ID once available
+        // For now, we'll set it to null and fix it in second pass if needed
+      }
 
       // Check if account with this code already exists
       const existing = existingAccounts?.find(a => String(a.code).trim() === account.code)
@@ -1232,6 +1265,21 @@ export async function uploadCoAFromExcel(
           insertedCount++
           codeToParentId[account.code] = insertedData.id
           createdAccounts[account.code] = insertedData.id
+        }
+      }
+    }
+
+    // Second pass: update parent_id for accounts that reference other newly created accounts
+    for (const account of accounts) {
+      if (account.parent_code && createdAccounts[account.parent_code]) {
+        const parentId = createdAccounts[account.parent_code]
+        const newAcc = createdAccounts[account.code]
+        
+        if (newAcc && newAcc !== parentId) {
+          await supabase
+            .from('accounts')
+            .update({ parent_id: parentId })
+            .eq('id', newAcc)
         }
       }
     }
