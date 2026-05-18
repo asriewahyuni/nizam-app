@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { formatDate, formatRupiah } from '@/lib/utils'
+import { BudgetVariancePanel } from './BudgetVariancePanel'
 import {
   deleteConstructionBillingTerm,
   deleteConstructionBudgetItem,
@@ -817,11 +818,11 @@ export function ConstructionDetailClient({
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.95fr]">
         <div className="space-y-6">
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between gap-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-6 flex items-center justify-between gap-4">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">RAB / BoQ</div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Budget & Actual Cost</h2>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Analisis Budget vs Actual</h2>
               </div>
               <button
                 type="button"
@@ -833,84 +834,10 @@ export function ConstructionDetailClient({
               </button>
             </div>
 
-            <div className="mt-6 overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-y-3">
-                <thead>
-                  <tr className="text-left text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
-                    <th className="px-3">Item</th>
-                    <th className="px-3">Tahap</th>
-                    <th className="px-3">Plan</th>
-                    <th className="px-3">Actual</th>
-                    <th className="px-3">Variance</th>
-                    <th className="px-3">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {budgetItems.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm font-medium text-slate-500">
-                        Belum ada item RAB. Tambahkan material, upah, subkon, atau alat untuk project ini.
-                      </td>
-                    </tr>
-                  ) : (
-                    budgetItems.map((item) => {
-                      const variance = item.actualTotal - item.plannedTotal
-
-                      return (
-                        <tr key={item.id} className="rounded-xl bg-slate-50">
-                          <td className="rounded-l-[24px] px-3 py-4 align-top">
-                            <div className="font-black text-slate-900">{item.description}</div>
-                            <div className="mt-1 text-xs font-medium text-slate-500">
-                              {budgetCategoryLabels[item.category]}{item.uom ? ` • ${item.uom}` : ''}{item.vendorName ? ` • ${item.vendorName}` : ''}
-                            </div>
-                          </td>
-                          <td className="px-3 py-4 align-top text-sm font-bold text-slate-700">
-                            {item.stageName || 'Belum ditautkan'}
-                          </td>
-                          <td className="px-3 py-4 align-top">
-                            <div className="text-sm font-black text-slate-900">{formatRupiah(item.plannedTotal)}</div>
-                            <div className="mt-1 text-xs font-medium text-slate-500">
-                              {item.plannedQuantity} x {formatRupiah(item.plannedUnitCost)}
-                            </div>
-                          </td>
-                          <td className="px-3 py-4 align-top">
-                            <div className="text-sm font-black text-slate-900">{formatRupiah(item.actualTotal)}</div>
-                            <div className="mt-1 text-xs font-medium text-slate-500">
-                              {item.actualQuantity} x {formatRupiah(item.actualUnitCost)}
-                            </div>
-                          </td>
-                          <td className="px-3 py-4 align-top">
-                            <div className={`text-sm font-black ${variance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                              {formatRupiah(variance)}
-                            </div>
-                          </td>
-                          <td className="rounded-r-[24px] px-3 py-4 align-top">
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openEditBudgetModal(item)}
-                                className="rounded-2xl bg-white p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                                aria-label="Edit item budget"
-                              >
-                                <Pencil size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteBudgetItem(item.id)}
-                                className="rounded-2xl bg-white p-2 text-rose-500 transition hover:bg-rose-50"
-                                aria-label="Hapus item budget"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <BudgetVariancePanel
+              budgetItems={budgetItems}
+              onEditItem={(item) => openEditBudgetModal(item)}
+            />
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
