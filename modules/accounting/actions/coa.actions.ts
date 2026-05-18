@@ -1213,51 +1213,13 @@ export async function uploadCoAFromExcel(
       codeToParentId[String(acc.code).trim()] = acc.id
     }
 
-    // ── Validasi struktur akun ──
-    const validationErrors: string[] = []
+    // ── De-duplikasi: jika ada kode yang sama dalam file, ambil yang pertama ──
     const seenCodes = new Set<string>()
-    // Parent code valid = kode dari file ATAU kode yang sudah ada di DB
-    const validParentCodes = new Set([
-      ...accounts.map(a => a.code),
-      ...Object.keys(codeToParentId),
-    ])
-
-    for (let i = 0; i < accounts.length; i++) {
-      const acc = accounts[i]
-      const rowNum = i + 2 // +2 karena row 1 header, array 0-indexed
-
-      // 1. Cek duplikasi kode akun dalam file
-      if (seenCodes.has(acc.code)) {
-        validationErrors.push(`Baris ${rowNum}: Kode akun "${acc.code}" sudah pernah muncul di atas. Setiap kode harus unik.`)
-      }
+    const deduplicatedAccounts = accounts.filter(acc => {
+      if (seenCodes.has(acc.code)) return false
       seenCodes.add(acc.code)
-
-      // 2. Validasi format kode akun
-      if (!acc.code || acc.code.length === 0) {
-        validationErrors.push(`Baris ${rowNum}: Kode akun tidak boleh kosong.`)
-        continue
-      }
-
-      // 3. Validasi nama akun
-      if (!acc.name || acc.name.length === 0) {
-        validationErrors.push(`Baris ${rowNum}: Nama akun tidak boleh kosong.`)
-      }
-
-      // 4. Cek parent_code jika ada — boleh merujuk ke file atau DB
-      if (acc.parent_code && !validParentCodes.has(acc.parent_code)) {
-        validationErrors.push(`Baris ${rowNum}: Parent code "${acc.parent_code}" tidak ditemukan di file maupun di database.`)
-      }
-    }
-
-    // Jika ada error validasi, kembalikan dengan detail
-    if (validationErrors.length > 0) {
-      const errorSummary = validationErrors.slice(0, 20).join('\n')
-      const moreErrors = validationErrors.length > 20 ? `\n... dan ${validationErrors.length - 20} error lainnya.` : ''
-      return {
-        success: false,
-        error: `❌ Validasi CoA gagal. Ditemukan ${validationErrors.length} masalah:\n\n${errorSummary}${moreErrors}`
-      }
-    }
+      return true
+    })
 
     // Insert/update accounts
     // First pass: create all accounts with parent_id = null to avoid parent-not-found errors
@@ -1265,7 +1227,7 @@ export async function uploadCoAFromExcel(
     let updatedCount = 0
     const createdAccounts: Record<string, string> = {} // code -> id mapping for new accounts
 
-    for (const account of accounts) {
+    for (const account of deduplicatedAccounts) {
       // In first pass, try to find parent in existing OR just-created accounts
       let parentId: string | null = null
       if (account.parent_code) {
@@ -1322,7 +1284,7 @@ export async function uploadCoAFromExcel(
     }
 
     // Second pass: update parent_id for accounts that reference other newly created accounts
-    for (const account of accounts) {
+    for (const account of deduplicatedAccounts) {
       if (account.parent_code && createdAccounts[account.parent_code]) {
         const parentId = createdAccounts[account.parent_code]
         const newAcc = createdAccounts[account.code]
