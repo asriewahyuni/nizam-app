@@ -10,9 +10,10 @@ interface AccountRowActionsProps {
   orgId: string
   accountCode: string
   accountName: string
+  isOwner?: boolean
 }
 
-export default function AccountRowActions({ accountId, orgId, accountCode, accountName }: AccountRowActionsProps) {
+export default function AccountRowActions({ accountId, orgId, accountCode, accountName, isOwner = false }: AccountRowActionsProps) {
   const [loading, setLoading] = useState(false)
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
 
@@ -39,13 +40,15 @@ export default function AccountRowActions({ accountId, orgId, accountCode, accou
         <Edit2 size={16} />
       </a>
       
-      <button 
-        onClick={() => setIsConfirmOpen(true)}
-        className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
-        title="Hapus Akun"
-      >
-        <Trash2 size={16} />
-      </button>
+      {isOwner && (
+        <button
+          onClick={() => setIsConfirmOpen(true)}
+          className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+          title="Hapus Akun"
+        >
+          <Trash2 size={16} />
+        </button>
+      )}
 
       <AnimatePresence>
         {isConfirmOpen && (

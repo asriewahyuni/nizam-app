@@ -22,6 +22,7 @@ import type {
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { isInternalAuthProvider } from '@/lib/auth/provider'
 import { setShariahAccountsActive as syncShariahAccountsActive } from './shariah.actions'
+import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 
 type MirrorableAccount = Pick<
   Account,
@@ -793,6 +794,12 @@ export async function updateAccount(
 // ─────────────────────────────────────────────────────────────
 export async function deleteAccount(accountId: string, orgId: string) {
   const supabase = await createClient()
+
+  const orgData = await getActiveOrg()
+  const currentRole = String(orgData?.role || '').toLowerCase()
+  if (currentRole !== 'owner') {
+    return { error: 'Hanya owner organisasi yang dapat menghapus akun CoA.' }
+  }
 
   const { data: existing } = await (supabase as any)
     .from('accounts')

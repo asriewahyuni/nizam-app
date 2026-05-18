@@ -246,11 +246,12 @@ export default async function ChartOfAccountsPage() {
                         className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                         style={{ background: account.is_active ? '#10b981' : '#d1d5db' }}
                       />
-                      <AccountRowActions 
-                        accountId={account.id} 
-                        orgId={orgData!.org.id} 
+                      <AccountRowActions
+                        accountId={account.id}
+                        orgId={orgData!.org.id}
                         accountCode={account.code}
                         accountName={account.name}
+                        isOwner={String(orgData!.role || '').toLowerCase() === 'owner'}
                       />
                     </div>
                   )}
