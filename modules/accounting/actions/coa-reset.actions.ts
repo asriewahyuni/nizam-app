@@ -10,9 +10,10 @@ export async function resetCoAAction() {
   if (!orgData) return redirect('/onboarding')
 
   // Guard: cek permission
-  const hasPermission = orgData.permissions?.includes('manage_accounting') || orgData.role === 'admin'
+  const role = String(orgData.role || '').toLowerCase()
+  const hasPermission = role === 'owner' || role === 'admin' || orgData.permissions?.includes('manage_accounting')
   if (!hasPermission) {
-    return { success: false, error: 'Anda tidak memiliki izin untuk reset CoA.' }
+    return { success: false, error: 'Hanya owner atau admin yang dapat mereset CoA.' }
   }
 
   const result = await resetCoA(orgData.org.id)
