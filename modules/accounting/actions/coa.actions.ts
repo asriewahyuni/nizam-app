@@ -1200,25 +1200,42 @@ export async function uploadCoAFromExcel(
       return { success: false, error: 'Tidak ada data akun yang valid di file Excel' }
     }
 
+    // Ambil kode akun yang sudah ada di DB terlebih dahulu
+    // agar validasi parent_code bisa merujuk ke akun yang sudah terdaftar
+    const { data: existingAccounts } = await supabase
+      .from('accounts')
+      .select('id, code')
+      .eq('org_id', trimmedOrgId)
+      .order('code', { ascending: true })
+
+    const codeToParentId: Record<string, string> = {}
+    for (const acc of existingAccounts || []) {
+      codeToParentId[String(acc.code).trim()] = acc.id
+    }
+
     // ── Validasi struktur akun ──
     const validationErrors: string[] = []
     const seenCodes = new Set<string>()
-    const validParentCodes = new Set(accounts.map(a => a.code))
+    // Parent code valid = kode dari file ATAU kode yang sudah ada di DB
+    const validParentCodes = new Set([
+      ...accounts.map(a => a.code),
+      ...Object.keys(codeToParentId),
+    ])
 
     for (let i = 0; i < accounts.length; i++) {
       const acc = accounts[i]
       const rowNum = i + 2 // +2 karena row 1 header, array 0-indexed
 
-      // 1. Cek duplikasi kode akun
+      // 1. Cek duplikasi kode akun dalam file
       if (seenCodes.has(acc.code)) {
         validationErrors.push(`Baris ${rowNum}: Kode akun "${acc.code}" sudah pernah muncul di atas. Setiap kode harus unik.`)
       }
       seenCodes.add(acc.code)
 
-      // 2. Validasi format kode akun (minimal harus ada karakter)
+      // 2. Validasi format kode akun
       if (!acc.code || acc.code.length === 0) {
         validationErrors.push(`Baris ${rowNum}: Kode akun tidak boleh kosong.`)
-        continue // skip weitere validasi untuk row ini
+        continue
       }
 
       // 3. Validasi nama akun
@@ -1226,12 +1243,9 @@ export async function uploadCoAFromExcel(
         validationErrors.push(`Baris ${rowNum}: Nama akun tidak boleh kosong.`)
       }
 
-      // 4. Cek parent_code jika ada
-      if (acc.parent_code) {
-        // Parent code harus ada di dalam list akun yang diupload
-        if (!validParentCodes.has(acc.parent_code)) {
-          validationErrors.push(`Baris ${rowNum}: Parent code "${acc.parent_code}" tidak ditemukan di file. Pastikan parent akun sudah ada di atas.`)
-        }
+      // 4. Cek parent_code jika ada — boleh merujuk ke file atau DB
+      if (acc.parent_code && !validParentCodes.has(acc.parent_code)) {
+        validationErrors.push(`Baris ${rowNum}: Parent code "${acc.parent_code}" tidak ditemukan di file maupun di database.`)
       }
     }
 
@@ -1239,34 +1253,10 @@ export async function uploadCoAFromExcel(
     if (validationErrors.length > 0) {
       const errorSummary = validationErrors.slice(0, 20).join('\n')
       const moreErrors = validationErrors.length > 20 ? `\n... dan ${validationErrors.length - 20} error lainnya.` : ''
-      const fullError = `${errorSummary}${moreErrors}`
-      
-      // Categorize errors untuk helpful message
-      const hasParentError = validationErrors.some(e => e.includes('Parent') || e.includes('parent'))
-      const hasDuplicateError = validationErrors.some(e => e.includes('sudah pernah'))
-      
-      let hints = '✏️ Untuk memperbaiki:\n'
-      if (hasDuplicateError) hints += '- Pastikan setiap KODE AKUN unik (cek baris yang ditunjukkan)\n'
-      if (hasParentError) hints += '- Parent code hanya boleh "1", "2", "1.1", "2.1" dll (sesuai dengan kode akun yang ada)\n- Jangan gunakan angka seperti 1, 2, 3 tanpa format kode\n'
-      hints += '- Kode dan nama akun TIDAK boleh kosong\n'
-      hints += '- Untuk aset: parent biasanya "1", untuk liabilitas: "2", dst.'
-      
       return {
         success: false,
-        error: `❌ Validasi CoA gagal. Ditemukan ${validationErrors.length} masalah:\n\n${fullError}\n\n${hints}`
+        error: `❌ Validasi CoA gagal. Ditemukan ${validationErrors.length} masalah:\n\n${errorSummary}${moreErrors}`
       }
-    }
-
-    // Build parent code to ID mapping
-    const codeToParentId: Record<string, string> = {}
-    const { data: existingAccounts } = await supabase
-      .from('accounts')
-      .select('id, code')
-      .eq('org_id', trimmedOrgId)
-      .order('code', { ascending: true })
-
-    for (const acc of existingAccounts || []) {
-      codeToParentId[String(acc.code).trim()] = acc.id
     }
 
     // Insert/update accounts
