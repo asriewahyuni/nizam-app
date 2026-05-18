@@ -1099,7 +1099,7 @@ export async function uploadCoAFromExcel(
     // Parse Excel
     const ExcelJS = (await import('exceljs')).default
     const workbook = new ExcelJS.Workbook()
-    await workbook.xlsx.load(fileBuffer)
+    await workbook.xlsx.load(fileBuffer as any)
     const worksheet = workbook.getWorksheet(1)
 
     if (!worksheet) {
@@ -1286,7 +1286,7 @@ export async function uploadCoAFromExcel(
       }
 
       // Check if account with this code already exists
-      const existing = existingAccounts?.find(a => String(a.code).trim() === account.code)
+      const existing = existingAccounts?.find((a: any) => String(a.code).trim() === account.code)
 
       if (existing) {
         // Update existing account
