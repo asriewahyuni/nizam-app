@@ -22,6 +22,7 @@ import {
   deleteConstructionBudgetItem,
   deleteConstructionChangeOrder,
   deleteConstructionProgressLog,
+  deleteConstructionStage,
   generateInvoiceFromBillingTerm,
   submitConstructionChangeOrderApproval,
   updateConstructionProjectSnapshot,
@@ -29,6 +30,7 @@ import {
   upsertConstructionBudgetItem,
   upsertConstructionChangeOrder,
   upsertConstructionProgressLog,
+  upsertConstructionStage,
 } from '@/modules/construction/actions/construction.actions'
 import type {
   ConstructionBillingBasisType,
@@ -47,6 +49,7 @@ import type {
   ConstructionProjectRecord,
   ConstructionProjectSnapshotInput,
   ConstructionProjectStageRecord,
+  ConstructionStageStatus,
 } from '@/modules/construction/lib/construction'
 
 type ContactOption = {
@@ -103,6 +106,17 @@ type BillingFormState = {
   invoiceReference: string
   dueDate: string
   paidDate: string
+  notes: string
+}
+
+type StageFormState = {
+  id?: string
+  stageCode: string
+  stageName: string
+  weightPercent: number
+  status: ConstructionStageStatus
+  plannedStartDate: string
+  plannedEndDate: string
   notes: string
 }
 
@@ -222,6 +236,18 @@ function emptyProgressForm(): ProgressFormState {
   }
 }
 
+function emptyStageForm(): StageFormState {
+  return {
+    stageCode: '',
+    stageName: '',
+    weightPercent: 0,
+    status: 'NOT_STARTED',
+    plannedStartDate: '',
+    plannedEndDate: '',
+    notes: '',
+  }
+}
+
 function emptyBillingForm(nextSequence = 1): BillingFormState {
   return {
     termLabel: '',
@@ -324,15 +350,19 @@ export function ConstructionDetailClient({
   const [showProgressModal, setShowProgressModal] = useState(false)
   const [showBillingModal, setShowBillingModal] = useState(false)
   const [showChangeOrderModal, setShowChangeOrderModal] = useState(false)
+  const [showStageModal, setShowStageModal] = useState(false)
 
   const [budgetError, setBudgetError] = useState('')
   const [progressError, setProgressError] = useState('')
   const [billingError, setBillingError] = useState('')
   const [changeOrderError, setChangeOrderError] = useState('')
   const [projectError, setProjectError] = useState('')
+  const [stageError, setStageError] = useState('')
 
   const [budgetForm, setBudgetForm] = useState<BudgetFormState>(emptyBudgetForm)
   const [progressForm, setProgressForm] = useState<ProgressFormState>(emptyProgressForm)
+  const [stageForm, setStageForm] = useState<StageFormState>(emptyStageForm)
+  const [isSavingStage, startStageTransition] = useTransition()
   const [billingForm, setBillingForm] = useState<BillingFormState>(emptyBillingForm(billingTerms.length + 1))
   const [changeOrderForm, setChangeOrderForm] = useState<ChangeOrderFormState>(
     emptyChangeOrderForm(`CO-${String(changeOrders.length + 1).padStart(3, '0')}`)
@@ -471,6 +501,27 @@ export function ConstructionDetailClient({
     setShowBillingModal(true)
   }
 
+  const openCreateStageModal = () => {
+    setStageError('')
+    setStageForm(emptyStageForm())
+    setShowStageModal(true)
+  }
+
+  const openEditStageModal = (stage: ConstructionProjectStageRecord) => {
+    setStageError('')
+    setStageForm({
+      id: stage.id,
+      stageCode: stage.stageCode,
+      stageName: stage.stageName,
+      weightPercent: stage.weightPercent,
+      status: stage.status,
+      plannedStartDate: stage.plannedStartDate || '',
+      plannedEndDate: stage.plannedEndDate || '',
+      notes: stage.notes || '',
+    })
+    setShowStageModal(true)
+  }
+
   const openCreateChangeOrderModal = () => {
     setChangeOrderError('')
     setChangeOrderForm(emptyChangeOrderForm(`CO-${String(changeOrders.length + 1).padStart(3, '0')}`))
@@ -511,6 +562,40 @@ export function ConstructionDetailClient({
         router.refresh()
       })
     })
+  }
+
+  const handleStageSave = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setStageError('')
+    startStageTransition(async () => {
+      const result = await upsertConstructionStage(orgId, project.id, {
+        id: stageForm.id,
+        stageCode: stageForm.stageCode,
+        stageName: stageForm.stageName,
+        weightPercent: stageForm.weightPercent,
+        status: stageForm.status,
+        plannedStartDate: stageForm.plannedStartDate || null,
+        plannedEndDate: stageForm.plannedEndDate || null,
+        notes: stageForm.notes || null,
+      })
+      if (result.error) {
+        setStageError(result.error)
+        return
+      }
+      setShowStageModal(false)
+      setStageForm(emptyStageForm())
+      startTransition(() => { router.refresh() })
+    })
+  }
+
+  const handleStageDelete = async (stageId: string) => {
+    if (!confirm('Hapus tahap ini? Item RAB yang tautkan ke tahap ini akan dilepas.')) return
+    const result = await deleteConstructionStage(orgId, project.id, stageId)
+    if (result.error) {
+      alert(`Error: ${result.error}`)
+      return
+    }
+    startTransition(() => { router.refresh() })
   }
 
   const handleBudgetSave = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -1058,47 +1143,83 @@ export function ConstructionDetailClient({
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Stage Breakdown</div>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Tahap Pekerjaan</h2>
-
-            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-              {stages.map((stage) => (
-                <article key={stage.id} className="rounded-xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{stage.stageCode}</div>
-                      <h3 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">{stage.stageName}</h3>
-                    </div>
-                    <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${stageStatusStyles[stage.status] || stageStatusStyles.NOT_STARTED}`}>
-                      {stage.status}
-                    </span>
-                  </div>
-
-                  <div className="mt-5 flex items-end justify-between">
-                    <div>
-                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Bobot</div>
-                      <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{stage.weightPercent}%</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Progress</div>
-                      <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{stage.progressPercent}%</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-[#254b63] via-[#3b6b5a] to-[#e07a5f]"
-                      style={{ width: `${Math.min(Math.max(stage.progressPercent, 0), 100)}%` }}
-                    />
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between text-xs font-medium text-slate-500">
-                    <span>{stage.plannedStartDate ? formatDate(stage.plannedStartDate, 'short') : 'Mulai TBD'}</span>
-                    <span>{stage.plannedEndDate ? formatDate(stage.plannedEndDate, 'short') : 'Target TBD'}</span>
-                  </div>
-                </article>
-              ))}
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Stage Breakdown</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Tahap Pekerjaan</h2>
+              </div>
+              <button
+                type="button"
+                onClick={openCreateStageModal}
+                className="inline-flex items-center gap-2 rounded-2xl bg-[#254b63] px-4 py-3 text-sm font-black text-white transition hover:bg-[#1e3d52]"
+              >
+                <Plus size={16} />
+                Tambah Tahap
+              </button>
             </div>
+
+            {stages.length === 0 ? (
+              <div className="mt-6 rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm font-medium text-slate-400">
+                Belum ada tahap. Klik &ldquo;Tambah Tahap&rdquo; untuk memulai.
+              </div>
+            ) : (
+              <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+                {stages.map((stage) => (
+                  <article key={stage.id} className="rounded-xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#fbfaf8_100%)] p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{stage.stageCode}</div>
+                        <h3 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">{stage.stageName}</h3>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${stageStatusStyles[stage.status] || stageStatusStyles.NOT_STARTED}`}>
+                          {stage.status}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openEditStageModal(stage)}
+                          className="rounded-xl bg-slate-100 p-1.5 text-slate-500 transition hover:bg-slate-200"
+                          aria-label="Edit tahap"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStageDelete(stage.id)}
+                          className="rounded-xl bg-rose-50 p-1.5 text-rose-600 transition hover:bg-rose-100"
+                          aria-label="Hapus tahap"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex items-end justify-between">
+                      <div>
+                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Bobot</div>
+                        <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{stage.weightPercent}%</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Progress</div>
+                        <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{stage.progressPercent}%</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-[#254b63] via-[#3b6b5a] to-[#e07a5f]"
+                        style={{ width: `${Math.min(Math.max(stage.progressPercent, 0), 100)}%` }}
+                      />
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between text-xs font-medium text-slate-500">
+                      <span>{stage.plannedStartDate ? formatDate(stage.plannedStartDate, 'short') : 'Mulai TBD'}</span>
+                      <span>{stage.plannedEndDate ? formatDate(stage.plannedEndDate, 'short') : 'Target TBD'}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1414,8 +1535,8 @@ export function ConstructionDetailClient({
             aria-label="Tutup modal"
           />
 
-          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+          <div className="relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-6 py-5">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">RAB / BoQ</div>
                 <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
@@ -1432,7 +1553,7 @@ export function ConstructionDetailClient({
               </button>
             </div>
 
-            <form onSubmit={handleBudgetSave} className="space-y-5 px-6 py-6">
+            <form onSubmit={handleBudgetSave} className="flex-1 space-y-5 overflow-y-auto px-6 py-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-2">
                   <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tahap</span>
@@ -1581,6 +1702,141 @@ export function ConstructionDetailClient({
                   className="rounded-2xl bg-[#254b63] px-5 py-3 text-sm font-black text-white shadow-lg shadow-[#254b63]/20 transition hover:bg-[#1e3d52] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSavingBudget ? 'Menyimpan...' : 'Simpan Item'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {showStageModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm"
+            onClick={() => setShowStageModal(false)}
+            aria-label="Tutup modal"
+          />
+
+          <div className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-6 py-5">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Tahap Pekerjaan</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                  {stageForm.id ? 'Edit Tahap' : 'Tambah Tahap'}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowStageModal(false)}
+                className="rounded-2xl bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200"
+                aria-label="Tutup"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleStageSave} className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
+              <div className="grid grid-cols-2 gap-4">
+                <label className="space-y-2">
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Kode Tahap</span>
+                  <input
+                    value={stageForm.stageCode}
+                    onChange={(e) => setStageForm((prev) => ({ ...prev, stageCode: e.target.value }))}
+                    placeholder="mis. FOUNDATION"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold uppercase text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                    required
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Status</span>
+                  <select
+                    value={stageForm.status}
+                    onChange={(e) => setStageForm((prev) => ({ ...prev, status: e.target.value as ConstructionStageStatus }))}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  >
+                    <option value="NOT_STARTED">Not Started</option>
+                    <option value="IN_PROGRESS">In Progress</option>
+                    <option value="BLOCKED">Blocked</option>
+                    <option value="DONE">Done</option>
+                  </select>
+                </label>
+              </div>
+
+              <label className="space-y-2">
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Nama Tahap</span>
+                <input
+                  value={stageForm.stageName}
+                  onChange={(e) => setStageForm((prev) => ({ ...prev, stageName: e.target.value }))}
+                  placeholder="mis. Pekerjaan Pondasi"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  required
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Bobot (%)</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={stageForm.weightPercent}
+                  onChange={(e) => setStageForm((prev) => ({ ...prev, weightPercent: Number(e.target.value) || 0 }))}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                />
+              </label>
+
+              <div className="grid grid-cols-2 gap-4">
+                <label className="space-y-2">
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Mulai Plan</span>
+                  <input
+                    type="date"
+                    value={stageForm.plannedStartDate}
+                    onChange={(e) => setStageForm((prev) => ({ ...prev, plannedStartDate: e.target.value }))}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Selesai Plan</span>
+                  <input
+                    type="date"
+                    value={stageForm.plannedEndDate}
+                    onChange={(e) => setStageForm((prev) => ({ ...prev, plannedEndDate: e.target.value }))}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                  />
+                </label>
+              </div>
+
+              <label className="space-y-2">
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Catatan</span>
+                <textarea
+                  value={stageForm.notes}
+                  onChange={(e) => setStageForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  className="h-20 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
+                />
+              </label>
+
+              {stageError ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                  {stageError}
+                </div>
+              ) : null}
+
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 md:flex-row md:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowStageModal(false)}
+                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingStage}
+                  className="rounded-2xl bg-[#254b63] px-5 py-3 text-sm font-black text-white shadow-lg shadow-[#254b63]/20 transition hover:bg-[#1e3d52] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSavingStage ? 'Menyimpan...' : 'Simpan Tahap'}
                 </button>
               </div>
             </form>
