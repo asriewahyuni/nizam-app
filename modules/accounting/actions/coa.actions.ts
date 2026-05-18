@@ -1103,14 +1103,20 @@ export async function uploadCoAFromExcel(
         'ASET': 'ASSET',
         'LIABILITY': 'LIABILITY',
         'KEWAJIBAN': 'LIABILITY',
+        'LIABILITAS': 'LIABILITY',
+        'UTANG': 'LIABILITY',
         'EQUITY': 'EQUITY',
         'EKUITAS': 'EQUITY',
         'MODAL': 'EQUITY',
         'REVENUE': 'REVENUE',
         'PENDAPATAN': 'REVENUE',
+        'PENJUALAN': 'REVENUE',
+        'INCOME': 'REVENUE',
         'EXPENSE': 'EXPENSE',
         'BEBAN': 'EXPENSE',
         'BIAYA': 'EXPENSE',
+        'HPP': 'EXPENSE',
+        'HARGA POKOK PENJUALAN': 'EXPENSE',
       }
       const type = typeMap[typeRaw]
       if (!type) return // Skip invalid type
