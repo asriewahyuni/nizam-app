@@ -94,8 +94,8 @@ export default async function ChartOfAccountsPage() {
           </form>
         ) : canCreateDirectAccount ? (
           <div className="flex items-center gap-2">
-            <UploadCoAButton />
             <ResetCoAButton />
+            <UploadCoAButton />
             <Link
               href="/settings/accounts/new"
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-all"
