@@ -1125,6 +1125,51 @@ export async function uploadCoAFromExcel(
       return { success: false, error: 'Tidak ada data akun yang valid di file Excel' }
     }
 
+    // ── Validasi struktur akun ──
+    const validationErrors: string[] = []
+    const seenCodes = new Set<string>()
+
+    for (let i = 0; i < accounts.length; i++) {
+      const acc = accounts[i]
+      const rowNum = i + 2 // +2 karena row 1 header, array 0-indexed
+
+      // 1. Cek duplikasi kode akun
+      if (seenCodes.has(acc.code)) {
+        validationErrors.push(`Baris ${rowNum}: Kode akun "${acc.code}" sudah pernah muncul di atas. Setiap kode harus unik.`)
+      }
+      seenCodes.add(acc.code)
+
+      // 2. Cek parent_code jika ada
+      if (acc.parent_code) {
+        // Parent code harus ada di dalam list akun yang diupload
+        const parentExists = accounts.some(p => p.code === acc.parent_code)
+        if (!parentExists) {
+          validationErrors.push(`Baris ${rowNum}: Akun "${acc.name}" (${acc.code}) mereferensi parent "${acc.parent_code}" yang tidak ada di file.`)
+        }
+      }
+
+      // 3. Validasi format kode akun (minimal harus ada karakter)
+      if (!acc.code || acc.code.length === 0) {
+        validationErrors.push(`Baris ${rowNum}: Kode akun tidak boleh kosong.`)
+      }
+
+      // 4. Validasi nama akun
+      if (!acc.name || acc.name.length === 0) {
+        validationErrors.push(`Baris ${rowNum}: Nama akun tidak boleh kosong.`)
+      }
+    }
+
+    // Jika ada error validasi, kembalikan dengan detail
+    if (validationErrors.length > 0) {
+      const errorSummary = validationErrors.slice(0, 15).join('\n')
+      const moreErrors = validationErrors.length > 15 ? `\nBaris ${15 + 1}: ... dan ${validationErrors.length - 15} error lainnya.` : ''
+      const fullError = `${errorSummary}${moreErrors}`
+      return {
+        success: false,
+        error: `❌ Ditemukan ${validationErrors.length} masalah:\n\n${fullError}\n\n✏️ Perbaiki:\n- Pastikan setiap kode akun UNIK (tidak boleh duplikat)\n- Jika ada parent_code, parent tersebut harus ada di file\n- Kode dan nama akun tidak boleh kosong`
+      }
+    }
+
     // Build parent code to ID mapping
     const codeToParentId: Record<string, string> = {}
     const { data: existingAccounts } = await supabase

@@ -8,6 +8,7 @@ export default function UploadCoAButton() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [status, setStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle')
   const [message, setMessage] = useState('')
+  const [errorDetails, setErrorDetails] = useState<string[]>([])
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -32,21 +33,26 @@ export default function UploadCoAButton() {
       if (json.success) {
         setStatus('success')
         setMessage(json.message || 'CoA berhasil diimport')
+        setErrorDetails([])
         router.refresh()
+        // Reset setelah 3 detik
+        setTimeout(() => {
+          setStatus('idle')
+          setMessage('')
+        }, 3000)
       } else {
         setStatus('error')
         setMessage(json.error || 'Gagal mengimport CoA')
+        // Parse error message untuk ekstrak detail per baris
+        const errorText = json.error || ''
+        const lines = errorText.split('\n').filter((line: string) => line.trim().startsWith('Baris'))
+        setErrorDetails(lines.length > 0 ? lines : [errorText])
       }
     } catch {
       setStatus('error')
       setMessage('Gagal menghubungi server')
+      setErrorDetails([])
     }
-
-    // Reset status setelah 4 detik
-    setTimeout(() => {
-      setStatus('idle')
-      setMessage('')
-    }, 4000)
   }
 
   return (
@@ -97,15 +103,26 @@ export default function UploadCoAButton() {
       </button>
 
       {message && (
-        <span
-          className={`text-xs font-medium px-2 py-1 rounded-lg ${
-            status === 'success'
-              ? 'bg-green-50 text-green-700'
-              : 'bg-red-50 text-red-700'
-          }`}
-        >
-          {message}
-        </span>
+        <div className="flex flex-col gap-1 w-full">
+          <div
+            className={`text-xs font-medium px-3 py-2 rounded-lg ${
+              status === 'success'
+                ? 'bg-green-50 text-green-700'
+                : 'bg-red-50 text-red-700'
+            }`}
+          >
+            {message}
+          </div>
+          {errorDetails.length > 0 && status === 'error' && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-1 max-h-48 overflow-y-auto">
+              {errorDetails.map((detail, i) => (
+                <div key={i} className="text-[11px] text-red-700 font-mono">
+                  • {detail}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
