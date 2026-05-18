@@ -25,6 +25,7 @@ import type {
   ConstructionProjectStageRecord,
   ConstructionProjectStatus,
   ConstructionProjectType,
+  ConstructionStageStatus,
 } from '@/modules/construction/lib/construction'
 
 type BranchResult =
@@ -1294,3 +1295,101 @@ export async function deleteConstructionChangeOrder(
   return { success: true }
 }
 
+/**
+ * Membuat atau memperbarui tahap pekerjaan project.
+ */
+export async function upsertConstructionStage(
+  orgId: string,
+  projectId: string,
+  input: {
+    id?: string
+    stageCode: string
+    stageName: string
+    weightPercent: number
+    status: ConstructionStageStatus
+    plannedStartDate?: string | null
+    plannedEndDate?: string | null
+    notes?: string | null
+  }
+) {
+  const projectResult = await getAccessibleConstructionProjectRow(orgId, projectId)
+  if ('error' in projectResult) return { error: projectResult.error }
+
+  const stageName = (input.stageName || '').trim()
+  const stageCode = (input.stageCode || '').trim().toUpperCase()
+  if (!stageName) return { error: 'Nama tahap wajib diisi.' }
+  if (!stageCode) return { error: 'Kode tahap wajib diisi.' }
+
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+
+  const payload = {
+    org_id: orgId,
+    project_id: projectId,
+    stage_code: stageCode,
+    stage_name: stageName,
+    weight_percent: Math.max(0, Math.min(100, Number(input.weightPercent) || 0)),
+    status: input.status || 'NOT_STARTED',
+    planned_start_date: input.plannedStartDate || null,
+    planned_end_date: input.plannedEndDate || null,
+    notes: input.notes || null,
+  }
+
+  const trimmedId = (input.id || '').trim()
+  if (trimmedId) {
+    const { error } = await db
+      .from('construction_project_stages')
+      .update(payload)
+      .eq('org_id', orgId)
+      .eq('project_id', projectId)
+      .eq('id', trimmedId)
+    if (error) return { error: error.message }
+  } else {
+    const { data: existing } = await db
+      .from('construction_project_stages')
+      .select('sort_order')
+      .eq('project_id', projectId)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .single()
+    const nextOrder = (Number((existing as { sort_order?: number } | null)?.sort_order) || 0) + 1
+    const { error } = await db
+      .from('construction_project_stages')
+      .insert({ ...payload, sort_order: nextOrder })
+    if (error) return { error: error.message }
+  }
+
+  revalidatePath('/construction')
+  revalidatePath(`/construction/${projectId}`)
+  return { success: true }
+}
+
+/**
+ * Menghapus tahap pekerjaan project.
+ */
+export async function deleteConstructionStage(
+  orgId: string,
+  projectId: string,
+  stageId: string
+) {
+  const projectResult = await getAccessibleConstructionProjectRow(orgId, projectId)
+  if ('error' in projectResult) return { error: projectResult.error }
+
+  const trimmedId = stageId.trim()
+  if (!trimmedId) return { error: 'Tahap tidak valid.' }
+
+  const supabase = await createClient()
+  const db = supabase as unknown as LooseDb
+  const { error } = await db
+    .from('construction_project_stages')
+    .delete()
+    .eq('org_id', orgId)
+    .eq('project_id', projectId)
+    .eq('id', trimmedId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/construction')
+  revalidatePath(`/construction/${projectId}`)
+  return { success: true }
+}

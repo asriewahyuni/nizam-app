@@ -424,11 +424,11 @@ export function ConstructionClient({
                     defaultValue="PLANNING"
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-[#254b63] focus:bg-white"
                   >
-                    <option value="PLANNING">Planning</option>
-                    <option value="TENDER">Tender</option>
-                    <option value="DESIGN">Design</option>
-                    <option value="EXECUTION">Execution</option>
-                    <option value="HANDOVER">Handover</option>
+                    <option value="PLANNING">Perencanaan</option>
+                    <option value="TENDER">Lelang</option>
+                    <option value="DESIGN">Desain</option>
+                    <option value="EXECUTION">Eksekusi</option>
+                    <option value="HANDOVER">Serah Terima</option>
                   </select>
                 </label>
 
