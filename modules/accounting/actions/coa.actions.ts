@@ -896,6 +896,59 @@ export async function deleteAccount(accountId: string, orgId: string) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// resetCoA — Delete all non-system accounts & reset to fresh state
+// ─────────────────────────────────────────────────────────────
+export async function resetCoA(orgId: string) {
+  const supabase = await createClient()
+  const trimmedOrgId = String(orgId || '').trim()
+  if (!trimmedOrgId) return { error: 'Organisasi tidak valid.' }
+
+  // Safeguard: Check if there are any journal entries (prevent accidental wipe of live data)
+  const { count: journalCount } = await (supabase as any)
+    .from('journal_lines')
+    .select('*', { count: 'exact', head: true })
+    .eq('org_id', trimmedOrgId)
+
+  if ((journalCount ?? 0) > 0) {
+    return { 
+      error: 'Tidak bisa reset CoA: ada transaksi yang sudah dibuat. Silakan hapus transaksi terlebih dahulu atau hubungi admin.' 
+    }
+  }
+
+  // Get all non-system accounts
+  const { data: allAccounts } = await (supabase as any)
+    .from('accounts')
+    .select('id, is_system')
+    .eq('org_id', trimmedOrgId)
+
+  const nonSystemIds = (allAccounts || [])
+    .filter((acc: any) => !acc.is_system)
+    .map((acc: any) => acc.id)
+
+  if (nonSystemIds.length === 0) {
+    return { success: true, deletedCount: 0 }
+  }
+
+  // Delete all non-system accounts in batches
+  const batchSize = 50
+  for (let i = 0; i < nonSystemIds.length; i += batchSize) {
+    const batch = nonSystemIds.slice(i, i + batchSize)
+    const { error } = await (supabase as any)
+      .from('accounts')
+      .delete()
+      .in('id', batch)
+      .eq('org_id', trimmedOrgId)
+
+    if (error) {
+      return { error: `Gagal menghapus akun: ${error.message}` }
+    }
+  }
+
+  revalidatePath('/settings/accounts')
+  return { success: true, deletedCount: nonSystemIds.length }
+}
+
+// ─────────────────────────────────────────────────────────────
 // getAccountBalances — for dashboard/reports
 // ─────────────────────────────────────────────────────────────
 export async function getAccountBalances(orgId: string): Promise<AccountBalance[]> {
