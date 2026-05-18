@@ -591,12 +591,16 @@ function resolveCoaAccountType(value: string) {
     aset: 'ASSET',
     liabilitas: 'LIABILITY',
     hutang: 'LIABILITY',
+    kewajiban: 'LIABILITY',
     ekuitas: 'EQUITY',
+    modal: 'EQUITY',
     pendapatan: 'REVENUE',
+    pemasukan: 'REVENUE',
     hpp: 'EXPENSE',
     beban: 'EXPENSE',
     'beban operasional': 'EXPENSE',
     'beban lainnya': 'EXPENSE',
+    biaya: 'EXPENSE',
   }
 
   return mapping[normalizeLookup(value)] || null

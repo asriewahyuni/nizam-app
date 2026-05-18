@@ -119,7 +119,7 @@ const SHEET_SCHEMAS: SheetSchema[] = [
     booleanFields: ['aktif'],
     numericFields: ['level'],
     enumFields: {
-      kategori_utama: ['Aset', 'Liabilitas', 'Ekuitas', 'Pendapatan', 'HPP', 'Beban Operasional', 'Beban Lainnya'],
+      kategori_utama: ['Aset', 'Liabilitas', 'Kewajiban', 'Ekuitas', 'Modal', 'Pendapatan', 'Pemasukan', 'HPP', 'Beban', 'Beban Operasional', 'Beban Lainnya', 'Biaya'],
       tipe_akun: ['HEADER', 'DETAIL'],
       saldo_normal: ['DEBIT', 'CREDIT'],
       arus_kas: ['OPERATING', 'INVESTING', 'FINANCING'],
