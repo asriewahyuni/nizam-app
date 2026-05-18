@@ -3,6 +3,7 @@ import { unstable_noStore as noStore } from 'next/cache'
 import { redirect } from 'next/navigation'
 import {
   ArrowRight,
+  ClipboardCheck,
   FileText,
   Settings,
   ShieldCheck,
@@ -77,7 +78,7 @@ export default async function LearningAdminPage() {
       />
 
       {/* ── Navigasi Cepat ── */}
-      <section className="grid gap-6 md:grid-cols-3">
+      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-3xl border border-slate-100 bg-white p-8 shadow-sm hover:shadow-md transition-all group">
           <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
             <Users size={24} />
@@ -116,6 +117,23 @@ export default async function LearningAdminPage() {
               Tidak ada akses
             </span>
           )}
+        </div>
+
+        <div className="rounded-3xl border border-slate-100 bg-white p-8 shadow-sm hover:shadow-md transition-all group">
+          <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+            <ClipboardCheck size={24} />
+          </div>
+          <h3 className="mt-5 text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">Template Asesmen</h3>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500 font-medium">
+            Atur rubrik penilaian per course. Sesuaikan pertanyaan, tugas praktik, dan checklist.
+          </p>
+          <Link
+            href="/lms/admin/assessment-templates"
+            className="mt-6 inline-flex items-center gap-2 text-[11px] font-semibold tracking-tight text-slate-400 group-hover:text-blue-600 transition-colors"
+          >
+            Kelola Template
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
 
         <div className="rounded-3xl border border-slate-100 bg-white p-8 shadow-sm hover:shadow-md transition-all group">

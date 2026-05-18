@@ -17,6 +17,7 @@ import {
 import { getActiveOrg } from '@/modules/organization/actions/org.actions'
 import { submitTrainingCourseAssessment } from '@/modules/edu/actions/training-assessment.actions'
 import { getTrainingAssessmentByCourseSlug } from '@/modules/edu/lib/training-assessment-mvp'
+import { getAssessmentTemplateFromDb } from '@/modules/edu/lib/training-assessment-template.server'
 import {
   listTrainingCourseAnswerSubmissions,
   listTrainingCourseAssessments,
@@ -85,7 +86,8 @@ export default async function LearningCourseAssessmentPage(props: {
   const course = getTrainingCourseBySlug(params.courseSlug)
   if (!course) notFound()
 
-  const assessment = getTrainingAssessmentByCourseSlug(course.slug)
+  const assessment = (await getAssessmentTemplateFromDb(orgData.org.id, course.slug))
+    || getTrainingAssessmentByCourseSlug(course.slug)
   if (!assessment) notFound()
 
   const firstLesson = getTrainingLessonsForCourse(course.slug)[0] || null
