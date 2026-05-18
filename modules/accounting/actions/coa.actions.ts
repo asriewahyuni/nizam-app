@@ -1162,12 +1162,8 @@ export async function uploadCoAFromExcel(
 
       // 4. Cek parent_code jika ada
       if (acc.parent_code) {
-        // Parent code tidak boleh berupa angka murni (1, 2, 3, etc) — harus kode akun valid
-        if (/^\d+$/.test(acc.parent_code)) {
-          validationErrors.push(`Baris ${rowNum}: Parent code "${acc.parent_code}" hanya angka. Gunakan kode akun valid (contoh: "1", "1.1", "2", "2.1"), bukan nomor level.`)
-        }
         // Parent code harus ada di dalam list akun yang diupload
-        else if (!validParentCodes.has(acc.parent_code)) {
+        if (!validParentCodes.has(acc.parent_code)) {
           validationErrors.push(`Baris ${rowNum}: Parent code "${acc.parent_code}" tidak ditemukan di file. Pastikan parent akun sudah ada di atas.`)
         }
       }
