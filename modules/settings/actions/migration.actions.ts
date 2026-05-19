@@ -390,7 +390,7 @@ function normalizeCode(value: string | null | undefined) {
   return String(value || '')
     .trim()
     .toUpperCase()
-    .replace(/[^A-Z0-9-]/g, '-')
+    .replace(/[^A-Z0-9.\-]/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
 }
@@ -759,11 +759,10 @@ export async function importCoaMigration(
         continue
       }
 
-      if (!['HEADER', 'DETAIL'].includes(rowType)) {
-        summary.skipped += 1
-        summary.errors.push(`Baris ${row.rowNumber}: tipe_akun harus HEADER atau DETAIL.`)
-        continue
-      }
+      // tipe_akun opsional — default ke HEADER untuk level 1, DETAIL untuk level lainnya
+      const resolvedType = ['HEADER', 'DETAIL'].includes(rowType)
+        ? rowType
+        : level === 1 ? 'HEADER' : 'DETAIL'
 
       if (level === 1 && parentCode) {
         summary.skipped += 1
@@ -846,8 +845,8 @@ export async function importCoaMigration(
         const savedAccount = updatedAccount as ExistingCoaImportRecord
         accountByCode.set(code, savedAccount)
         summary.updated += 1
-        if (rowType === 'HEADER') summary.headerRows += 1
-        if (rowType === 'DETAIL') summary.detailRows += 1
+        if (resolvedType === 'HEADER') summary.headerRows += 1
+        if (resolvedType === 'DETAIL') summary.detailRows += 1
 
         try {
           const syncResult = await syncParentAccountToDescendants(orgId, savedAccount, {
