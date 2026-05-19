@@ -351,7 +351,11 @@ function isDateValue(raw: unknown, text: string) {
   if (raw instanceof Date) return true
   if (typeof raw === 'number') return true
   if (isBlank(text)) return true
-  return /^\d{4}-\d{2}-\d{2}$/.test(text)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return true   // YYYY-MM-DD
+  if (/^\d{4}\/\d{2}\/\d{2}$/.test(text)) return true // YYYY/MM/DD
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(text)) return true // DD/MM/YYYY
+  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(text)) return true   // DD-MM-YYYY
+  return false
 }
 
 function resolveWorstStatus(statuses: ValidationSeverity[]): ValidationSeverity {

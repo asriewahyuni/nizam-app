@@ -395,6 +395,32 @@ function normalizeCode(value: string | null | undefined) {
     .replace(/^-|-$/g, '')
 }
 
+// Normalizes various date formats to YYYY-MM-DD.
+// Handles: Date object, Excel serial number, DD/MM/YYYY, D/M/YYYY, YYYY/MM/DD, DD-MM-YYYY.
+function normalizeDate(value: unknown, fallback: string): string {
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10)
+  }
+  if (typeof value === 'number' && value > 0) {
+    // Excel serial date: days since 1900-01-00 (with leap year bug)
+    const date = new Date((value - 25569) * 86400 * 1000)
+    return date.toISOString().slice(0, 10)
+  }
+  const s = String(value || '').trim()
+  if (!s) return fallback
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  // YYYY/MM/DD
+  if (/^\d{4}\/\d{2}\/\d{2}$/.test(s)) return s.replace(/\//g, '-')
+  // DD/MM/YYYY or D/M/YYYY
+  const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
+  // DD-MM-YYYY
+  const dmyDash = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
+  if (dmyDash) return `${dmyDash[3]}-${dmyDash[2].padStart(2, '0')}-${dmyDash[1].padStart(2, '0')}`
+  return fallback
+}
+
 function parseBoolean(value: string | null | undefined, fallback = true) {
   const normalized = String(value || '').trim().toUpperCase()
   if (!normalized) return fallback
@@ -2766,7 +2792,7 @@ export async function importFixedAssetsMigration(
   for (const row of payload.fixedAssetRows) {
     const assetName = String(row.values.asset_name || '').trim()
     const assetCodeInput = String(row.values.asset_code || '').trim()
-    const acquisitionDate = String(row.values.acquisition_date || '').trim() || journalDate
+    const acquisitionDate = normalizeDate(row.values.acquisition_date, journalDate)
     const branchName = String(row.values.branch_name || '').trim()
     const notes = String(row.values.notes || '').trim()
     const acquisitionCost = Number(String(row.values.acquisition_cost || '').trim())
@@ -3248,7 +3274,7 @@ export async function importEmployeesMigration(
     const phone = String(row.values.phone || '').trim()
     const department = String(row.values.department || '').trim()
     const position = String(row.values.position || '').trim()
-    const joinDate = String(row.values.join_date || '').trim() || new Date().toISOString().slice(0, 10)
+    const joinDate = normalizeDate(row.values.join_date, new Date().toISOString().slice(0, 10))
     const employmentStatusInput = String(row.values.employment_status || '').trim()
     const basicSalary = Number(String(row.values.basic_salary || '').trim() || '0')
     const isActive = parseBoolean(row.values.is_active, true)
