@@ -151,7 +151,6 @@ const SHEET_SCHEMAS: SheetSchema[] = [
     numericFields: ['purchase_price', 'selling_price'],
     enumFields: {
       type: ['INVENTORY', 'SERVICE'],
-      category: ['Bahan', 'Setengah Jadi', 'Siap Jual', 'Pelengkap', 'Layanan'],
     },
   },
   {
