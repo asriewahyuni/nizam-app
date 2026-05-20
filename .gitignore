@@ -14,7 +14,7 @@
 /coverage
 
 # next.js
-/.next/
+# /.next/ — commented out, we commit .next build output from CI
 /out/
 
 # production
