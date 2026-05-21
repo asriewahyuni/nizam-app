@@ -145,7 +145,7 @@ const SHEET_SCHEMAS: SheetSchema[] = [
   },
   {
     name: 'products',
-    columns: ['sku', 'product_name', 'type', 'category', 'unit', 'purchase_price', 'selling_price', 'warehouse_default', 'is_active', 'notes'],
+    columns: ['sku', 'product_name', 'type', 'category', 'unit', 'purchase_price', 'selling_price', 'warehouse_default', 'income_account_code', 'cogs_account_code', 'asset_account_code', 'currency_code', 'is_active', 'notes'],
     requiredFields: ['sku', 'product_name', 'type'],
     booleanFields: ['is_active'],
     numericFields: ['purchase_price', 'selling_price'],
@@ -167,33 +167,37 @@ const SHEET_SCHEMAS: SheetSchema[] = [
   },
   {
     name: 'opening_ar',
-    columns: ['customer_name', 'invoice_number', 'invoice_date', 'due_date', 'outstanding_amount', 'branch_name', 'notes'],
+    columns: ['customer_name', 'invoice_number', 'invoice_date', 'due_date', 'outstanding_amount', 'currency_code', 'exchange_rate', 'branch_name', 'notes'],
     requiredFields: ['customer_name', 'outstanding_amount'],
-    numericFields: ['outstanding_amount'],
+    numericFields: ['outstanding_amount', 'exchange_rate'],
     dateFields: ['invoice_date', 'due_date'],
   },
   {
     name: 'opening_ap',
-    columns: ['supplier_name', 'bill_number', 'bill_date', 'due_date', 'outstanding_amount', 'branch_name', 'notes'],
+    columns: ['supplier_name', 'bill_number', 'bill_date', 'due_date', 'outstanding_amount', 'currency_code', 'exchange_rate', 'branch_name', 'notes'],
     requiredFields: ['supplier_name', 'outstanding_amount'],
-    numericFields: ['outstanding_amount'],
+    numericFields: ['outstanding_amount', 'exchange_rate'],
     dateFields: ['bill_date', 'due_date'],
   },
   {
     name: 'opening_cash_bank',
-    columns: ['account_code', 'account_name', 'account_type', 'balance', 'branch_name', 'notes'],
-    requiredFields: ['account_name', 'account_type', 'balance'],
-    numericFields: ['balance'],
+    columns: ['account_code', 'account_name', 'account_type', 'normal_balance', 'opening_amount', 'currency_code', 'exchange_rate', 'branch_name', 'notes'],
+    requiredFields: ['account_name', 'account_type', 'opening_amount'],
+    numericFields: ['opening_amount', 'exchange_rate'],
     enumFields: {
       account_type: ['CASH', 'BANK'],
+      normal_balance: ['DEBIT', 'CREDIT'],
     },
   },
   {
     name: 'fixed_assets',
-    columns: ['asset_code', 'asset_name', 'acquisition_date', 'acquisition_cost', 'accumulated_depreciation', 'useful_life_months', 'residual_value', 'branch_name', 'notes'],
+    columns: ['asset_code', 'asset_name', 'category', 'acquisition_date', 'acquisition_cost', 'acquisition_method', 'accumulated_depreciation', 'useful_life_months', 'residual_value', 'asset_account_code', 'depreciation_account_code', 'branch_name', 'notes'],
     requiredFields: ['asset_name', 'acquisition_cost'],
     numericFields: ['acquisition_cost', 'accumulated_depreciation', 'useful_life_months', 'residual_value'],
     dateFields: ['acquisition_date'],
+    enumFields: {
+      acquisition_method: ['LUNAS', 'KREDIT', 'SPLIT'],
+    },
   },
   {
     name: 'bom',
@@ -209,7 +213,7 @@ const SHEET_SCHEMAS: SheetSchema[] = [
     numericFields: ['basic_salary'],
     dateFields: ['join_date'],
     enumFields: {
-      employment_status: ['Tetap', 'Kontrak', 'Magang', 'Freelance'],
+      employment_status: ['Tetap', 'Kontrak', 'Magang', 'Freelance', 'PERMANENT', 'CONTRACT', 'INTERN', 'FREELANCE', 'Permanent', 'Contract', 'Intern'],
     },
   },
 ]
@@ -1357,7 +1361,7 @@ export default function MigrationClient() {
               <Download size={16} />
               Download Template Migrasi
               <span className="absolute -top-2 -right-2 inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-black uppercase tracking-tight text-white shadow-sm animate-pulse">
-                🔥 v2.0
+                🔥 v2.1
               </span>
             </a>
           </div>

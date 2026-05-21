@@ -17,7 +17,7 @@ const SAMPLE_FILL = 'F0F7FF'
 const BORDER_COLOR = 'D9E2F2'
 
 // ── VERSION MARKER ──
-const TEMPLATE_VERSION = 'v2.0'
+const TEMPLATE_VERSION = 'v2.1'
 const TEMPLATE_RELEASE_DATE = new Date().toISOString().split('T')[0] // YYYY-MM-DD
 const TEMPLATE_RELEASE_LABEL = `🔥 TERBARU · ${TEMPLATE_VERSION} (${TEMPLATE_RELEASE_DATE})`
 
@@ -31,7 +31,7 @@ const templates = [
     rows: [
       { section: '🔥 VERSI TEMPLATE', content: TEMPLATE_RELEASE_LABEL },
       { section: '📅 Tanggal Release', content: `${TEMPLATE_RELEASE_DATE} · Update: validasi date, integer parent_code, Indonesian labels` },
-      { section: 'Update terbaru', content: '✅ Validasi YYYY-MM-DD untuk join_date & acquisition_date · ✅ Support Bahasa Indonesia untuk tipe akun (Aset, Liabilitas, Ekuitas, Pendapatan, Beban) · ✅ Parent code unik & ter-validasi · ✅ Auto-deteksi format angka & tanggal Excel' },
+      { section: 'Update terbaru', content: '✅ Schema FIXED - validator & template sekarang match 100% · ✅ products: + income/cogs/asset_account_code & currency_code · ✅ opening_ar/ap: + currency_code & exchange_rate · ✅ opening_cash_bank: balance → normal_balance + opening_amount · ✅ fixed_assets: + category, acquisition_method, asset_account_code, depreciation_account_code · ✅ employees: terima PERMANENT/CONTRACT/INTERN/FREELANCE (English) + Tetap/Kontrak/Magang/Freelance (Indonesia)' },
       { section: 'Tujuan', content: 'Workbook ini dipakai client untuk menyiapkan data migrasi ke NIZAM dalam satu file kerja yang rapi, termasuk Chart of Accounts, master data, dan opening balance.' },
       { section: 'Urutan kerja', content: 'Isi berurutan: coa → customers → suppliers → products → warehouses → opening_stock → opening_ar → opening_ap → opening_cash_bank → opening_balances_gl → fixed_assets → bom → employees. Sheet vertikal (construction_projects, fleet_assets) hanya diisi bila memakai modul tersebut.' },
       { section: 'Baris sampel', content: 'Setiap sheet memiliki baris contoh berwarna biru muda. Hapus atau timpa baris sampel sebelum submit ke tim onboarding.' },
