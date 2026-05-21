@@ -185,7 +185,8 @@ const SHEET_SCHEMAS: SheetSchema[] = [
     requiredFields: ['account_name', 'account_type', 'opening_amount'],
     numericFields: ['opening_amount', 'exchange_rate'],
     enumFields: {
-      account_type: ['CASH', 'BANK'],
+      // Terima sinonim ID & EN supaya template lama & baru sama-sama jalan.
+      account_type: ['KAS', 'BANK', 'CASH'],
       normal_balance: ['DEBIT', 'CREDIT'],
     },
   },
@@ -334,6 +335,13 @@ function normalizeText(value: unknown) {
     const richText = value as { text?: unknown }
     return typeof richText.text === 'string' ? richText.text.trim() : ''
   }
+  if (typeof value === 'object' && value && 'result' in value) {
+    // ExcelJS formula cell -> ambil hasilnya
+    const formulaCell = value as { result?: unknown }
+    if (formulaCell.result !== undefined && formulaCell.result !== null) {
+      return normalizeText(formulaCell.result)
+    }
+  }
   return String(value).trim()
 }
 
@@ -341,9 +349,63 @@ function isBlank(value: string) {
   return value.trim().length === 0
 }
 
+/**
+ * Bersihkan input numeric dari noise umum: prefix "Rp", spasi, dan pemisah
+ * ribuan. Kembalikan string angka mentah ("1000000" / "1000000.5").
+ *
+ * Dukungan format input:
+ *   "Rp 1.000.000" -> "1000000"
+ *   "1,000,000.50" -> "1000000.50"
+ *   "1.000.000,50" -> "1000000.50"
+ *   "  500000  "   -> "500000"
+ */
+function sanitizeNumericInput(value: string): string {
+  let cleaned = value.trim()
+  if (!cleaned) return cleaned
+  // buang prefix mata uang & spasi
+  cleaned = cleaned.replace(/^rp\.?\s*/i, '').replace(/\s+/g, '')
+  if (!cleaned) return cleaned
+
+  const hasDot = cleaned.includes('.')
+  const hasComma = cleaned.includes(',')
+
+  if (hasDot && hasComma) {
+    // Tentukan pemisah desimal berdasarkan posisi terakhir
+    const lastDot = cleaned.lastIndexOf('.')
+    const lastComma = cleaned.lastIndexOf(',')
+    if (lastComma > lastDot) {
+      // Format ID: "1.000.000,50"
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.')
+    } else {
+      // Format EN: "1,000,000.50"
+      cleaned = cleaned.replace(/,/g, '')
+    }
+  } else if (hasComma) {
+    // Hanya koma. Jika koma terlihat sebagai pemisah ribuan (3 digit setelah),
+    // buang. Kalau tidak, anggap desimal.
+    const parts = cleaned.split(',')
+    if (parts.length > 2 || (parts[1] && parts[1].length === 3)) {
+      cleaned = cleaned.replace(/,/g, '')
+    } else {
+      cleaned = cleaned.replace(',', '.')
+    }
+  } else if (hasDot) {
+    // Hanya titik. Jika lebih dari satu, pasti pemisah ribuan ID.
+    const parts = cleaned.split('.')
+    if (parts.length > 2) {
+      cleaned = cleaned.replace(/\./g, '')
+    } else if (parts[1] && parts[1].length === 3 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1])) {
+      // Heuristik: "1.000" -> 1000 (jarang user butuh desimal exact 3 digit)
+      cleaned = cleaned.replace('.', '')
+    }
+  }
+  return cleaned
+}
+
 function isNumericText(value: string) {
   if (isBlank(value)) return true
-  return Number.isFinite(Number(value))
+  const cleaned = sanitizeNumericInput(value)
+  return Number.isFinite(Number(cleaned))
 }
 
 function isBooleanText(value: string) {
@@ -445,14 +507,28 @@ async function parseWorkbook(file: File): Promise<WorkbookReport> {
       continue
     }
 
-    const actualHeaders = schema.columns.map((_, index) => normalizeText(worksheet.getRow(1).getCell(index + 1).value))
-    const missingColumns = schema.columns.filter((column, index) => actualHeaders[index] !== column)
-
-    const extraColumns: string[] = []
-    for (let index = schema.columns.length + 1; index <= worksheet.columnCount; index += 1) {
-      const extraHeader = normalizeText(worksheet.getRow(1).getCell(index).value)
-      if (!isBlank(extraHeader)) extraColumns.push(extraHeader)
+    // Header-based mapping (BUKAN positional): baca header di row 1 satu per satu,
+    // lalu petakan ke kolom schema. Ini bikin parser tahan banting kalau urutan
+    // kolom di template berubah (mis. user pakai versi lama yang minus kolom
+    // baru), sehingga nilai gak nyasar ke kolom tetangga.
+    const headerKeyToColumnIndex = new Map<string, number>()
+    const orderedHeaders: { header: string; columnIndex: number }[] = []
+    const lastColumnIndex = Math.max(worksheet.columnCount, schema.columns.length)
+    for (let index = 1; index <= lastColumnIndex; index += 1) {
+      const headerRaw = normalizeText(worksheet.getRow(1).getCell(index).value)
+      if (isBlank(headerRaw)) continue
+      const normalized = headerRaw.toLowerCase().replace(/\s+/g, '_')
+      if (!headerKeyToColumnIndex.has(normalized)) {
+        headerKeyToColumnIndex.set(normalized, index)
+        orderedHeaders.push({ header: headerRaw, columnIndex: index })
+      }
     }
+
+    const schemaColumnsLower = schema.columns.map((column) => column.toLowerCase())
+    const missingColumns = schema.columns.filter((column) => !headerKeyToColumnIndex.has(column.toLowerCase()))
+    const extraColumns = orderedHeaders
+      .map((entry) => entry.header)
+      .filter((header) => !schemaColumnsLower.includes(header.toLowerCase().replace(/\s+/g, '_')))
 
     const issues: SheetIssue[] = []
     const samples: SampleRow[] = []
@@ -463,7 +539,7 @@ async function parseWorkbook(file: File): Promise<WorkbookReport> {
     if (missingColumns.length > 0) {
       issues.push({
         severity: 'blocked',
-        message: `Header tidak cocok. Pastikan urutan kolom mengikuti template untuk sheet ${schema.name}.`,
+        message: `Sheet ${schema.name}: kolom ${missingColumns.join(', ')} tidak ditemukan di header. Pakai template terbaru atau samakan nama kolom.`,
       })
     }
 
@@ -480,9 +556,9 @@ async function parseWorkbook(file: File): Promise<WorkbookReport> {
       const rawValues: Record<string, unknown> = {}
 
       let hasData = false
-      for (let columnIndex = 0; columnIndex < schema.columns.length; columnIndex += 1) {
-        const key = schema.columns[columnIndex]
-        const raw = row.getCell(columnIndex + 1).value
+      for (const key of schema.columns) {
+        const columnIndex = headerKeyToColumnIndex.get(key.toLowerCase())
+        const raw = columnIndex ? row.getCell(columnIndex).value : undefined
         const text = normalizeText(raw)
         rowValues[key] = text
         rawValues[key] = raw
@@ -535,11 +611,14 @@ async function parseWorkbook(file: File): Promise<WorkbookReport> {
 
       for (const [field, allowedValues] of Object.entries(schema.enumFields || {})) {
         const currentValue = rowValues[field]
-        if (!isBlank(currentValue) && !allowedValues.includes(currentValue)) {
-          issues.push({
-            severity: 'warning',
-            message: `Baris ${rowIndex}: nilai ${field} (${currentValue}) tidak ada di daftar template.`,
-          })
+        if (!isBlank(currentValue)) {
+          const allowedUpper = allowedValues.map((value) => value.toUpperCase())
+          if (!allowedUpper.includes(currentValue.toUpperCase())) {
+            issues.push({
+              severity: 'warning',
+              message: `Baris ${rowIndex}: nilai ${field} (${currentValue}) tidak ada di daftar template (${allowedValues.join(', ')}).`,
+            })
+          }
         }
       }
 

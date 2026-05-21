@@ -427,10 +427,49 @@ function parseBoolean(value: string | null | undefined, fallback = true) {
   return normalized === 'TRUE'
 }
 
+function sanitizeNumericString(value: string): string {
+  let cleaned = value.trim()
+  if (!cleaned) return cleaned
+  cleaned = cleaned.replace(/^rp\.?\s*/i, '').replace(/\s+/g, '')
+  if (!cleaned) return cleaned
+
+  const hasDot = cleaned.includes('.')
+  const hasComma = cleaned.includes(',')
+
+  if (hasDot && hasComma) {
+    const lastDot = cleaned.lastIndexOf('.')
+    const lastComma = cleaned.lastIndexOf(',')
+    if (lastComma > lastDot) {
+      // ID: "1.000.000,50"
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.')
+    } else {
+      // EN: "1,000,000.50"
+      cleaned = cleaned.replace(/,/g, '')
+    }
+  } else if (hasComma) {
+    const parts = cleaned.split(',')
+    if (parts.length > 2 || (parts[1] && parts[1].length === 3)) {
+      cleaned = cleaned.replace(/,/g, '')
+    } else {
+      cleaned = cleaned.replace(',', '.')
+    }
+  } else if (hasDot) {
+    const parts = cleaned.split('.')
+    if (parts.length > 2) {
+      cleaned = cleaned.replace(/\./g, '')
+    } else if (parts[1] && parts[1].length === 3 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1])) {
+      cleaned = cleaned.replace('.', '')
+    }
+  }
+  return cleaned
+}
+
 function parseNumber(value: string | null | undefined) {
-  const normalized = String(value || '').trim()
-  if (!normalized) return 0
-  const parsed = Number(normalized)
+  const raw = String(value || '').trim()
+  if (!raw) return 0
+  const clean = sanitizeNumericString(raw)
+  if (!clean) return 0
+  const parsed = Number(clean)
   return Number.isFinite(parsed) ? parsed : 0
 }
 
@@ -785,7 +824,11 @@ export async function importCoaMigration(
       const parentAccount = parentCode ? accountByCode.get(parentCode) || null : null
       if (parentCode && !parentAccount?.id) {
         summary.skipped += 1
-        summary.errors.push(`Baris ${row.rowNumber}: parent_kode ${parentCode} belum ditemukan di sistem atau di baris level sebelumnya.`)
+        summary.errors.push(
+          `Baris ${row.rowNumber}: parent_kode "${parentCode}" belum ditemukan di sistem atau di baris level sebelumnya. ` +
+          `Pastikan baris parent sudah diisi di level yang lebih rendah dan diproses sebelum baris ini. ` +
+          `Contoh: akun level 2 harus punya parent_kode akun level 1, level 3 parent_kode level 2.`
+        )
         continue
       }
 
@@ -1402,7 +1445,7 @@ export async function importOpeningStockMigration(
     const warehouseInput = String(row.values.warehouse_name || '').trim()
     const batchNumber = String(row.values.batch_number || '').trim() || null
     const binName = String(row.values.bin_name || '').trim()
-    const rawQty = Number(String(row.values.qty || '').trim())
+    const rawQty = parseNumber(row.values.qty)
     const rawUnitCost = String(row.values.unit_cost || '').trim()
     const rawTotalValue = String(row.values.total_value || '').trim()
 
@@ -1448,8 +1491,8 @@ export async function importOpeningStockMigration(
       continue
     }
 
-    const providedTotalValue = rawTotalValue ? Number(rawTotalValue) : NaN
-    const providedUnitCost = rawUnitCost ? Number(rawUnitCost) : NaN
+    const providedTotalValue = rawTotalValue ? parseNumber(rawTotalValue) : NaN
+    const providedUnitCost = rawUnitCost ? parseNumber(rawUnitCost) : NaN
     const totalValue = Number.isFinite(providedTotalValue) && providedTotalValue > 0
       ? Number(providedTotalValue.toFixed(2))
       : Number.isFinite(providedUnitCost) && providedUnitCost >= 0
@@ -1952,7 +1995,7 @@ export async function importOpeningArMigration(
     const dueDate = String(row.values.due_date || '').trim() || invoiceDate
     const branchName = String(row.values.branch_name || '').trim()
     const notes = String(row.values.notes || '').trim()
-    const outstandingAmount = Number(String(row.values.outstanding_amount || '').trim())
+    const outstandingAmount = parseNumber(row.values.outstanding_amount)
 
     if (!customerName) {
       summary.skipped += 1
@@ -2238,7 +2281,7 @@ export async function importOpeningApMigration(
     const dueDate = String(row.values.due_date || '').trim() || billDate
     const branchName = String(row.values.branch_name || '').trim()
     const notes = String(row.values.notes || '').trim()
-    const outstandingAmount = Number(String(row.values.outstanding_amount || '').trim())
+    const outstandingAmount = parseNumber(row.values.outstanding_amount)
 
     if (!supplierName) {
       summary.skipped += 1
@@ -2522,14 +2565,17 @@ export async function importOpeningCashBankMigration(
   for (const row of payload.openingCashBankRows) {
     const accountCode = String(row.values.account_code || '').trim()
     const accountName = String(row.values.account_name || '').trim()
-    const accountType = String(row.values.account_type || '').trim().toUpperCase()
+    // Terima KAS (template v2.1+) maupun CASH (lama)
+    const accountTypeRaw = String(row.values.account_type || '').trim().toUpperCase()
     const branchName = String(row.values.branch_name || '').trim()
     const notes = String(row.values.notes || '').trim()
-    const balance = Number(String(row.values.balance || '').trim())
+    // opening_amount (v2.1+) dengan fallback ke balance (lama)
+    const balanceRaw = String(row.values.opening_amount || row.values.balance || '').trim()
+    const balance = Number(sanitizeNumericString(balanceRaw))
 
-    if (!['CASH', 'BANK'].includes(accountType)) {
+    if (!['KAS', 'BANK', 'CASH'].includes(accountTypeRaw)) {
       summary.skipped += 1
-      summary.errors.push(`Baris ${row.rowNumber}: account_type harus CASH atau BANK.`)
+      summary.errors.push(`Baris ${row.rowNumber}: account_type harus KAS atau BANK.`)
       continue
     }
 
@@ -2794,10 +2840,10 @@ export async function importFixedAssetsMigration(
     const acquisitionDate = normalizeDate(row.values.acquisition_date, journalDate)
     const branchName = String(row.values.branch_name || '').trim()
     const notes = String(row.values.notes || '').trim()
-    const acquisitionCost = Number(String(row.values.acquisition_cost || '').trim())
-    const accumulatedDepreciation = Number(String(row.values.accumulated_depreciation || '').trim() || '0')
-    const residualValue = Number(String(row.values.residual_value || '').trim() || '0')
-    const usefulLifeInput = Number(String(row.values.useful_life_months || '').trim() || '0')
+    const acquisitionCost = parseNumber(row.values.acquisition_cost)
+    const accumulatedDepreciation = parseNumber(row.values.accumulated_depreciation)
+    const residualValue = parseNumber(row.values.residual_value)
+    const usefulLifeInput = parseNumber(row.values.useful_life_months)
 
     if (!assetName) {
       summary.skipped += 1
@@ -3113,7 +3159,7 @@ export async function importManufacturingMigration(
       const componentSku = String(row.values.component_sku || '').trim()
       const componentName = String(row.values.component_name || '').trim()
       const componentUnit = String(row.values.component_unit || '').trim() || null
-      const componentQty = Number(String(row.values.component_qty || '').trim())
+      const componentQty = parseNumber(row.values.component_qty)
 
       const componentProduct =
         (componentSku ? productBySku.get(normalizeCode(componentSku)) : null) ||
@@ -3275,7 +3321,7 @@ export async function importEmployeesMigration(
     const position = String(row.values.position || '').trim()
     const joinDate = normalizeDate(row.values.join_date, new Date().toISOString().slice(0, 10))
     const employmentStatusInput = String(row.values.employment_status || '').trim()
-    const basicSalary = Number(String(row.values.basic_salary || '').trim() || '0')
+    const basicSalary = parseNumber(row.values.basic_salary)
     const isActive = parseBoolean(row.values.is_active, true)
 
     if (!employeeName) {
@@ -3327,7 +3373,8 @@ export async function importEmployeesMigration(
     const { error: employeeError } = await supabase.from('employees').insert(employeeInsert)
     if (employeeError) {
       summary.skipped += 1
-      summary.errors.push(`Baris ${row.rowNumber}: gagal membuat karyawan ${employeeName}.`)
+      const reason = employeeError instanceof Error ? employeeError.message : String(employeeError)
+      summary.errors.push(`Baris ${row.rowNumber}: gagal membuat karyawan ${employeeName} — ${reason}.`)
       continue
     }
 
