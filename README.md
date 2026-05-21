@@ -11,20 +11,28 @@ Dokumentasi ini ditujukan sebagai pintu masuk utama untuk programmer dan develop
 | Frontend | Next.js 16, React 19, App Router |
 | Styling | Tailwind CSS 4, Framer Motion |
 | Backend | Server Actions, Route Handlers |
-| Database | PostgreSQL native (`pg`) dengan lapisan kompatibilitas Supabase |
-| Auth | Internal auth dan compatibility flow untuk mode legacy |
+| Database | **Railway PostgreSQL** (via `pg` native client) |
+| Auth | **Internal Auth** (Nizam-native, cookie-based) |
+| Storage | Railway S3-compatible bucket |
 | Testing | Vitest |
 | Runtime | Node.js 20.19.x |
 
-## Status Arsitektur Saat Ini
+## Status Arsitektur
 
-Codebase sedang berada dalam fase transisi dokumentasi dan infrastruktur:
+✅ **Production-ready.** Project sudah 100% pakai Railway PostgreSQL + Internal Auth.
 
-- Jalur database utama saat ini sudah mengarah ke PostgreSQL native melalui [`lib/db/postgres.ts`](/Users/manbook/nizam-app/lib/db/postgres.ts:1) dan [`lib/supabase/server.ts`](/Users/manbook/nizam-app/lib/supabase/server.ts:1).
-- Beberapa nama file, helper, dan flow masih menggunakan istilah `supabase` karena layer kompatibilitas lama masih dipertahankan agar migrasi kode tidak mematahkan modul yang ada.
-- Middleware masih mendukung dua mode auth lewat [`lib/supabase/middleware.ts`](/Users/manbook/nizam-app/lib/supabase/middleware.ts:1): `supabase` dan `internal`.
+**Tidak ada koneksi ke Supabase Cloud.**
 
-Karena itu, developer baru disarankan membaca dokumentasi di `docs/` sebagai referensi utama, bukan hanya mengandalkan nama file.
+> ⚠️ **Catatan tentang Nama "Supabase" di Codebase**
+>
+> Beberapa folder dan file masih menggunakan nama `supabase` (misal `lib/supabase/server.ts`).
+> Ini hanya **legacy naming** dari layer kompatibilitas — bukan koneksi ke Supabase Cloud.
+>
+> - `lib/supabase/server.ts` = drop-in replacement untuk Supabase SDK, tapi query ke Railway PostgreSQL
+> - `scripts/legacy/supabase-migration/` = scripts historical (sudah di-archive)
+> - Auth pakai **Internal Auth** (`AUTH_PROVIDER=internal`), bukan Supabase Auth
+>
+> Detail: [`lib/supabase/README.md`](./lib/supabase/README.md)
 
 ## Quick Start
 
@@ -32,22 +40,32 @@ Karena itu, developer baru disarankan membaca dokumentasi di `docs/` sebagai ref
 
 - Node.js `20.19.x`
 - npm
-- Akses ke database project
-- File environment lokal
+- Akses ke database Railway PostgreSQL
+- File `.env` lokal
 
 ### 2. Setup
 
 ```bash
 npm install
-cp .env.local.example .env.local
+cp .env.local.example .env
 ```
 
-Isi `.env.local` sesuai mode yang ingin dipakai:
+Isi `.env` dengan:
 
-- Mode yang direkomendasikan untuk runtime saat ini: `DATABASE_URL` atau `RAILWAY_DATABASE_URL`
-- Jika memakai internal auth: `AUTH_PROVIDER=internal` dan `INTERNAL_AUTH_SESSION_SECRET`
-- Jika masih membutuhkan flow kompatibilitas lama: isi variabel Supabase yang relevan
-- File [`.env.local.example`](/Users/manbook/nizam-app/.env.local.example:1) bisa dipakai sebagai baseline, tetapi untuk mode PostgreSQL native Anda mungkin tetap perlu menambahkan env database yang belum tercantum penuh di sana.
+```bash
+# Database (Railway PostgreSQL)
+DATABASE_URL=postgresql://...
+RAILWAY_DATABASE_URL=postgresql://...
+
+# Internal Auth (Nizam-native)
+AUTH_PROVIDER=internal
+NEXTAUTH_SECRET=<your-secret>
+
+# Storage (Railway S3)
+RAILWAY_STORAGE_*=...
+```
+
+File [`.env.local.example`](./.env.local.example) bisa dipakai sebagai baseline.
 
 ### 3. Menjalankan aplikasi
 
@@ -69,6 +87,7 @@ Dokumentasi utama untuk developer ada di folder [`docs/`](./docs/README.md):
 - [`docs/developer-guide.md`](./docs/developer-guide.md): panduan setup, workflow, dan kebiasaan kerja tim
 - [`docs/architecture.md`](./docs/architecture.md): arsitektur aplikasi, auth, data access, dan request flow
 - [`docs/modules.md`](./docs/modules.md): peta modul bisnis, route, dan lokasi kode
+- [`docs/BACKUP_SCHEDULER.md`](./docs/BACKUP_SCHEDULER.md): scheduler backup database otomatis
 
 Dokumen besar yang sudah ada tetap dipertahankan sebagai referensi tambahan:
 
@@ -84,11 +103,15 @@ Dokumen besar yang sudah ada tetap dipertahankan sebagai referensi tambahan:
 nizam-app/
 ├── app/                # Route Next.js App Router
 ├── components/         # Shared UI dan reusable components
-├── docs/               # Dokumentasi developer yang dirapikan
+├── docs/               # Dokumentasi developer
 ├── lib/                # Infra, helper, auth, db, email, hooks
+│   ├── db/            # PostgreSQL native client (Railway)
+│   ├── supabase/      # Legacy compat layer (bukan Supabase Cloud, lihat README di dalamnya)
+│   └── scheduler/     # Background jobs (backup, etc)
 ├── modules/            # Business logic per domain
-├── scripts/            # Script utilitas, migrasi, sinkronisasi
-├── supabase/           # Migration SQL dan artefak legacy/compatibility
+├── scripts/            # Script utilitas
+│   └── legacy/        # Archived migration scripts (Supabase → Railway)
+├── supabase/           # Migration SQL files (naming legacy, applied ke Railway)
 ├── __tests__/          # Vitest test suites
 └── public/             # Asset statis
 ```
@@ -104,16 +127,11 @@ nizam-app/
 | `npm run test:watch` | Menjalankan test dalam mode watch |
 | `npm run test:coverage` | Menjalankan test dengan coverage |
 | `npm run lint` | Menjalankan ESLint |
-| `npm run supabase:start` | Menyalakan Supabase local |
-| `npm run supabase:stop` | Mematikan Supabase local |
-| `npm run supabase:status` | Melihat status Supabase local |
-| `npm run supabase:db:reset` | Reset database Supabase local |
-| `npm run supabase:migrate-local-data` | Clone data dari project lama ke local |
 | `npm run db:railway:sync` | Dry-run sinkronisasi schema ke Railway |
 | `npm run db:railway:sync:apply` | Apply sinkronisasi schema ke Railway |
-| `npm run db:railway:data:sync` | Dry-run sinkronisasi data ke Railway |
-| `npm run db:railway:data:sync:apply` | Apply sinkronisasi data ke Railway |
 | `npm run db:railway:readiness` | Verifikasi kesiapan cutover |
+
+> ⚠️ Script `supabase:*` di `package.json` masih ada untuk legacy local dev environment. **Tidak digunakan di production.**
 
 ## Area Modul Utama
 
@@ -133,9 +151,12 @@ Detail lengkap tiap modul ada di [`docs/modules.md`](./docs/modules.md).
 
 ## Catatan Untuk Developer
 
-- Jangan berasumsi semua referensi `supabase` berarti project masih fully Supabase-native.
-- Cek lebih dulu apakah sebuah modul membaca PostgreSQL native, compatibility layer, atau flow transisional.
-- Perubahan pada auth, organization context, dan route protection sebaiknya selalu ditinjau bersama [`app/(dashboard)/layout.tsx`](/Users/manbook/nizam-app/app/(dashboard)/layout.tsx:1), [`proxy.ts`](/Users/manbook/nizam-app/proxy.ts:1), dan [`lib/supabase/middleware.ts`](/Users/manbook/nizam-app/lib/supabase/middleware.ts:1).
+- **Project ini TIDAK pakai Supabase Cloud.** Nama "supabase" di code = legacy compatibility wrapper.
+- Semua query ke database = Railway PostgreSQL.
+- Auth = Internal Auth (cookie `nizam_internal_session`), bukan Supabase Auth.
+- Storage = Railway S3-compatible bucket, bukan Supabase Storage.
+- Jangan install/setup Supabase project — tidak diperlukan.
+- Untuk akses database, butuh `DATABASE_URL` ke Railway PostgreSQL.
 
 ## Lisensi dan Kepemilikan
 
