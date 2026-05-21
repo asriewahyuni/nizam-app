@@ -1,0 +1,79 @@
+# Cursor AI Rules — Nizam App
+
+## 🚨🚨🚨 CRITICAL: NO SUPABASE 🚨🚨🚨
+
+**THIS PROJECT DOES NOT USE SUPABASE CLOUD.**
+
+Walaupun lu lihat folder `lib/supabase/` dan import `from '@/lib/supabase/server'` di 249+ file:
+
+- ❌ TIDAK ada koneksi ke Supabase Cloud
+- ❌ TIDAK pakai Supabase Auth (pakai Internal Auth)
+- ❌ TIDAK pakai Supabase Storage (pakai Railway S3)
+- ✅ Database = **Railway PostgreSQL** (via `pg` native)
+- ✅ `lib/supabase/server.ts` = drop-in replacement wrapper ke Railway
+
+**Wajib baca dulu sebelum suggest apapun:**
+1. `AGENTS.md` (top section)
+2. `lib/supabase/README.md`
+3. `lib/supabase/server.ts` (header comment baris 1-10)
+
+## Stack
+
+- Framework: Next.js 16 (App Router) + TypeScript
+- Database: Railway PostgreSQL
+- Auth: Internal Auth (cookie `nizam_internal_session`)
+- Storage: Railway S3-compatible
+- UI: Tailwind CSS + Framer Motion
+- Testing: Vitest
+
+## Rules untuk AI Code Suggestions
+
+1. **JANGAN** suggest install/setup Supabase
+2. **JANGAN** suggest env var `NEXT_PUBLIC_SUPABASE_URL=https://*.supabase.co`
+3. **JANGAN** suggest Supabase RLS policies sebagai solusi auth
+4. **JANGAN** asumsi data tersimpan di Supabase Cloud
+5. **WAJIB** pahami `lib/supabase/*` adalah compat layer Railway
+
+## Auth System
+
+- Mode satu-satunya: `AUTH_PROVIDER=internal`
+- Cookie: `nizam_internal_session`
+- Tabel: `internal_auth_users`, `internal_auth_sessions`
+- File: `lib/auth/internal-auth.server.ts`
+
+## Database Access
+
+```typescript
+// Cara akses database di Server Components / Server Actions
+import { createClient } from '@/lib/supabase/server'  // ← Wrapper Railway, BUKAN Supabase!
+
+const supabase = await createClient()
+const { data } = await supabase.from('organizations').select('*')
+// ↑ Query ini ke Railway PostgreSQL via wrapper
+```
+
+## Module Structure
+
+- `app/` — Next.js App Router routes
+- `modules/` — Business logic (accounting, sales, hris, dll)
+- `lib/db/` — Real PostgreSQL client (Railway native)
+- `lib/supabase/` — Compat wrapper (legacy name, redirect ke Railway)
+- `lib/auth/` — Internal Auth implementation
+- `components/` — Shared UI
+- `scripts/` — Utilities
+- `scripts/legacy/supabase-migration/` — Archived migration scripts
+
+## Test Commands
+
+- `npm run dev` — Development server
+- `npm run build` — Production build
+- `npm run test` — Vitest tests
+- `npm run lint` — ESLint
+
+## Convention
+
+- Server Actions: `'use server'` directive di top
+- Component naming: PascalCase
+- File naming: kebab-case untuk utils, PascalCase untuk components
+- Indonesian comments OK untuk business logic
+- English untuk technical/structural comments

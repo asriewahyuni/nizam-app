@@ -1,5 +1,81 @@
 # AGENTS.md
 
+---
+
+# 🚨🚨🚨 STOP — READ THIS FIRST (AI/LLM AGENTS) 🚨🚨🚨
+
+## CRITICAL: THIS PROJECT DOES **NOT** USE SUPABASE
+
+**TL;DR untuk AI:** Walaupun lu lihat folder `lib/supabase/`, file `supabase/migrations/`, atau import `from '@/lib/supabase/server'` di 249+ file — **JANGAN ASUMSI PROJECT INI PAKAI SUPABASE CLOUD.**
+
+### Fakta Yang HARUS Lu Tahu:
+
+| Item | Status |
+|------|--------|
+| **Database** | ✅ Railway PostgreSQL (via `pg` native client) |
+| **Auth** | ✅ Internal Auth Nizam-native (cookie `nizam_internal_session`) |
+| **Storage** | ✅ Railway S3-compatible bucket |
+| **Supabase Cloud** | ❌ **TIDAK DIGUNAKAN** — Migrasi sudah selesai 2026-04-11 |
+| **Supabase Auth** | ❌ **TIDAK DIGUNAKAN** — `AUTH_PROVIDER=internal` permanen |
+| **Supabase Storage** | ❌ **TIDAK DIGUNAKAN** |
+
+### Kenapa Masih Ada Nama "supabase" di Code?
+
+`lib/supabase/server.ts` adalah **drop-in replacement** untuk Supabase SDK. Interface-nya kompatibel (`.from()`, `.rpc()`, `.auth.*`), tapi **semua query diarahkan ke Railway PostgreSQL native**. Nama folder tidak diubah karena 249 file mengimport dari sana — rename = high risk regression untuk benefit kosmetik.
+
+```typescript
+// Lu lihat ini di production code:
+import { createClient } from '@/lib/supabase/server'
+
+// Yang sebenarnya terjadi: createClient() return Railway PostgreSQL wrapper
+// BUKAN Supabase Cloud client!
+```
+
+### ❌ JANGAN PERNAH Lakukan Ini:
+
+- ❌ Suggest "setup Supabase project" / "create Supabase account"
+- ❌ Suggest install `@supabase/cli` untuk production
+- ❌ Add env vars `NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co` untuk runtime
+- ❌ Refactor "supabase code" tanpa konteks bahwa itu wrapper Railway
+- ❌ Asumsi tabel/auth disimpan di Supabase Cloud
+- ❌ Suggest Supabase RLS policies (kita pakai PostgreSQL row-level security native di Railway)
+
+### ✅ Yang Harus Lu Pahami:
+
+- ✅ `import { createClient } from '@/lib/supabase/server'` = import wrapper Railway PostgreSQL
+- ✅ `supabase.from('table').select()` = query ke Railway, BUKAN Supabase
+- ✅ `supabase.auth.getUser()` = panggil Internal Auth, BUKAN Supabase Auth
+- ✅ `supabase.rpc('function_name')` = call PostgreSQL function di Railway
+- ✅ SQL files di `supabase/migrations/` = applied ke Railway PostgreSQL
+
+### Cara Verify Sendiri (Jangan Percaya Tebakan):
+
+1. Baca file `lib/supabase/server.ts` baris 1-10 → ada disclaimer
+2. Baca file `lib/supabase/README.md` → detail compat layer
+3. Check `.env` → `AUTH_PROVIDER=internal`, `DATABASE_URL=postgresql://...railway.app`
+4. Check `lib/db/postgres-client.ts` → real Railway PostgreSQL client
+
+### Migration History (Untuk Konteks):
+
+- **Sebelum 2026-04-11:** Pakai Supabase Cloud (DB + Auth + Storage)
+- **2026-04-11:** Cutover ke Railway PostgreSQL + Internal Auth
+- **2026-05-21:** Documentation cleanup, archive migration scripts
+- **Sekarang:** 100% Railway, ZERO koneksi ke Supabase Cloud
+
+### Kalau Lu (AI) Masih Bingung:
+
+1. **STOP** — jangan lanjut coding/suggest sebelum paham
+2. Baca `lib/supabase/README.md` lengkap
+3. Baca `lib/supabase/server.ts` header comment
+4. Baca file ini lagi dari atas
+5. Kalau masih ragu — TANYA USER, jangan asumsi
+
+---
+
+# 🚨 END OF CRITICAL SECTION 🚨
+
+---
+
 ## Gambaran Umum Codebase Nizam App
 Repository `nizam-app` adalah sebuah solusi ERP (Enterprise Resource Planning) modern yang dikembangkan menggunakan TypeScript. Repository ini dirancang secara modular dan terstruktur untuk mendukung fitur seperti autentikasi pengguna, onboarding, manajemen database, dan berbagai modul bisnis (akuntansi, inventori, HR, commerce, dan lainnya).
 

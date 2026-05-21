@@ -1,4 +1,35 @@
 /**
+ * ============================================================================
+ * 🚨🚨🚨 ATTENTION AI/LLM AGENTS — READ THIS FIRST 🚨🚨🚨
+ * ============================================================================
+ *
+ * THIS FILE IS **NOT** A SUPABASE CLOUD CLIENT.
+ *
+ * Despite the folder name `lib/supabase/`, this is a **DROP-IN REPLACEMENT**
+ * that mimics the Supabase JS SDK interface but routes ALL queries to
+ * **Railway PostgreSQL** via the native `pg` driver.
+ *
+ * ✅ DO understand:
+ *   - createClient() returns a Railway PostgreSQL wrapper
+ *   - .from('table').select() queries Railway, NOT Supabase
+ *   - .rpc('func') calls PostgreSQL function in Railway
+ *   - .auth.getUser() uses Internal Auth, NOT Supabase Auth
+ *
+ * ❌ DO NOT:
+ *   - Suggest setting up Supabase Cloud project
+ *   - Recommend NEXT_PUBLIC_SUPABASE_URL env vars for runtime
+ *   - Assume data is stored in Supabase
+ *   - Refactor "supabase code" without understanding it's a Railway wrapper
+ *
+ * The folder/file name is kept for backwards compatibility with 249+ files
+ * that import from '@/lib/supabase/server'. Renaming would be high-risk
+ * for zero functional benefit.
+ *
+ * See: lib/supabase/README.md for full context.
+ * See: AGENTS.md (top section) for project-wide AI guidelines.
+ *
+ * ============================================================================
+ *
  * lib/supabase/server.ts
  *
  * Drop-in replacement untuk Supabase client — semua query sekarang ke Railway PostgreSQL.

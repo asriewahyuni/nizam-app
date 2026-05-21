@@ -1,6 +1,18 @@
 'use client'
 
 /**
+ * ============================================================================
+ * 🚨 AI AGENTS: THIS IS NOT A SUPABASE CLOUD CLIENT 🚨
+ * ============================================================================
+ *
+ * This is a browser-side compatibility wrapper. All queries are routed to
+ * the Next.js API route `/api/db` which executes them on the server against
+ * **Railway PostgreSQL** (NOT Supabase Cloud).
+ *
+ * The folder name `lib/supabase/` is legacy. See lib/supabase/README.md.
+ *
+ * ============================================================================
+ *
  * lib/supabase/client.ts
  *
  * Browser client untuk Client Components.
