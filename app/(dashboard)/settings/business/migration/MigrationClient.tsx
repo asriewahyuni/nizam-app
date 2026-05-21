@@ -1352,10 +1352,13 @@ export default function MigrationClient() {
             <a
               href="/templates/migrasi/NIZAM_Migration_Template.xlsx"
               download
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-white transition hover:bg-black"
+              className="relative inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-xs font-black uppercase tracking-[0.18em] text-white transition hover:bg-black"
             >
               <Download size={16} />
               Download Template Migrasi
+              <span className="absolute -top-2 -right-2 inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-black uppercase tracking-tight text-white shadow-sm animate-pulse">
+                🔥 v2.0
+              </span>
             </a>
           </div>
         )}
